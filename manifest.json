@@ -1,7 +1,7 @@
 {
   "name": "Sort Play",
   "description": "Sorts playlist by play count",
-  "preview": "preview.png", 
+  "preview": "cover.png", 
   "main": "sort-play.js",
   "readme": "README.md",
   "authors": [
