@@ -1,7 +1,6 @@
 # Sort Play
 Sort Spotify playlists by play count using the Spotify Web API.
 
-
 ## Installation  
 #### Using Marketplace  
 1. Ensure that Spicetify is installed on your system.  
