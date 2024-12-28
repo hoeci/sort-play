@@ -1,5 +1,5 @@
 # Sort Play
-Sort Spotify playlists by play count using the Spotify Web API.
+Sort Spotify playlists by play count
 
 ## Installation  
 #### Using Marketplace  
