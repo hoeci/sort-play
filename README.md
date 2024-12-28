@@ -15,18 +15,6 @@ Sort Spotify playlists by play count and save it as new playlist.
 
 ## Usage
 
-1. Go to a public playlist (private playlists not supported).
+1. Go to a public playlist.
 2. You'll see a new "Sort" button in the playlist header.
-3. In first use, you'll be prompted to enter your Spotify API Client ID and Client Secret. (to change API later right, click on the button)
 4. Click "Sort" to sort the playlist, a new playlist with the sorted tracks will be added to your library.
-
-## Setting Up Spotify API Credentials
-
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/).
-2. Log in with your Spotify account.
-3. Click "Create an App".
-4. Give your app a name and description (e.g., "Spicetify Sort Play").
-5. Copy the **Client ID** and **Client Secret**.
-6. Paste these into the extension's prompt in Spotify when asked.
-   *   The extension saves these credentials locally, so you only need to enter them once.
-   *   You can change or delete the saved credentials by right-clicking the "Sort" button.
