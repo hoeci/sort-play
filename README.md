@@ -1,5 +1,5 @@
 # Sort Play
-Sort Spotify playlists by play count and save it as new playlist
+Sort Spotify playlists by play count and save it as new playlist.
 
 ## Installation  
 #### Using Marketplace  
