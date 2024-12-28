@@ -335,7 +335,7 @@
 
   // Function to add tracks to a playlist
   async function addTracksToPlaylist(playlistId, trackUris) {
-    const BATCH_SIZE = 100; // Max is 100
+    const BATCH_SIZE = 100;
     const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
 
     // Filter out invalid URIs and remove duplicates
