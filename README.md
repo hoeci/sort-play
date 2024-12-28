@@ -6,10 +6,12 @@ Spicetify extension to sort playlists by play count and create a new sorted play
 ### Manual Installation  
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
 2. Copy the `sort-play.js` file to the Spicetify extensions folder:
+
    - For **Windows**: `%appdata%\spicetify\Extensions`
    - For **Linux** & **macOS**: `~/.config/spicetify/Extensions`
-3. Open a terminal and run `spicetify config extensions sort-play.js`.  
-4. Apply the changes by running `spicetify apply`.  
+
+4. Open a terminal and run `spicetify config extensions sort-play.js`.  
+5. Apply the changes by running `spicetify apply`.  
 
 ### Using Marketplace (when it becomes available)
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
