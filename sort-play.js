@@ -4,13 +4,11 @@
     return;
   }
 
-  // Import necessary functions and objects from sort-plus.js
   const { URI } = Spicetify;
   const { PlaylistAPI } = Spicetify.Platform;
 
+  // Caching system to prevent redundant API calls
   const albumDataCache = {};
-
-  // Map to track in-flight album data requests
   const inFlightAlbumRequests = {};
 
   // Function to get current playlist ID
@@ -335,7 +333,7 @@
 
   // Function to add tracks to a playlist
   async function addTracksToPlaylist(playlistId, trackUris) {
-    const BATCH_SIZE = 100;
+    const BATCH_SIZE = 100; 
     const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
 
     // Filter out invalid URIs and remove duplicates
@@ -444,7 +442,7 @@
 
                 const newPlaylist = await createPlaylist(
                     `(Sorted) ${sourcePlaylist.name}`,
-                    "Sorted by play count using sort-play-plus"
+                    "Sorted by play count using sort-play"
                 );
                 console.log("Created new playlist:", newPlaylist.name);
 
