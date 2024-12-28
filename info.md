@@ -6,6 +6,6 @@ A Spicetify extension to sort Spotify playlists by play count and save the sorte
 
 ## Usage
 
-1. Go to a public playlist.
+1. Go to a playlist.
 2. You'll see a new "Sort" button in the playlist header.
 4. Click "Sort" to sort the playlist by playcount, a new playlist with the sorted tracks will be added to your library.
