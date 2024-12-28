@@ -3,7 +3,7 @@
   "description": "Sorts playlist by play count",
   "preview": "cover.png", 
   "main": "sort-play.js",
-  "readme": "README.md",
+  "readme": "info.md",
   "authors": [
     {
       "name": "hoeci",
