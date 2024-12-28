@@ -17,7 +17,7 @@ Sort Spotify playlists by play count using the Spotify Web API.
 
 1. Go to a public playlist (private playlists not supported).
 2. You'll see a new "Sort" button in the playlist header.
-3. In first use, you'll be prompted to enter your Spotify API Client ID and Client Secret. (to change API later right click on the button)
+3. In first use, you'll be prompted to enter your Spotify API Client ID and Client Secret. (to change API later right, click on the button)
 4. Click "Sort" to sort the playlist, a new playlist with the sorted tracks will be added to your library.
 
 ## Setting Up Spotify API Credentials
