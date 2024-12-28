@@ -11,7 +11,7 @@ A Spicetify extension to sort Spotify playlists by play count and save the sorte
 3. Open a terminal and run `spicetify config extensions sort-play.js`.  
 4. Apply the changes by running `spicetify apply`.  
 
-### Using Marketplace  
+### Using Marketplace (Not available yet)
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
 2. Open the Spicetify Marketplace.  
 3. Search for **"Sort Play"**.  
