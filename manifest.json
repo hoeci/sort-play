@@ -1,14 +1,16 @@
-{
-  "name": "Sort Play",
-  "description": "Sorts playlist by play count",
-  "preview": "cover.png", 
-  "main": "sort-play.js",
-  "readme": "info.md",
-  "authors": [
-    {
-      "name": "hoeci",
-      "url": "https://github.com/hoeci"
-    }
-  ],
-  "tags": ["sort", "playlist", "playcount", "sorting"]
-}
+[  
+  {
+    "name": "Sort Play",
+    "description": "Sorts playlist by play count",
+    "preview": "cover.png", 
+    "main": "sort-play.js",
+    "readme": "info.md",
+    "authors": [
+      {
+        "name": "hoeci",
+        "url": "https://github.com/hoeci"
+      }
+    ],
+    "tags": ["sort", "playlist", "playcount", "sorting"]
+  }
+]
