@@ -11,7 +11,7 @@ Sort Spotify playlists & artist page by play count, popularity, release date, sh
 
 ## Installation  
 
-### Manual Installation  
+#### Manual Installation  
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
 2. Copy the `sort-play.js` file to the Spicetify extensions folder:
 
@@ -20,7 +20,7 @@ Sort Spotify playlists & artist page by play count, popularity, release date, sh
 
 4. Open a terminal and run `spicetify config extensions sort-play.js` and `spicetify apply`
 
-### Using Marketplace 
+#### Using Marketplace 
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
 2. Open the Spicetify Marketplace.  
 3. Search for **"Sort Play"**.  
