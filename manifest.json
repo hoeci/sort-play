@@ -3,7 +3,7 @@
     "name": "Sort Play",
     "description": "Sort playlists/artists by plays, popularity, release date, Last.fm scrobbles.",
     "preview": "cover.png",
-    "main": "sort-play-loader.mjs",
+    "main": "sort-play.js",
     "readme": "info.md",
     "authors": [
         { "name": "hoeci", "url": "https://github.com/hoeci" }
