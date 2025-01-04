@@ -27,10 +27,3 @@ Sort Spotify playlists & artist pages by play count, popularity, release date, s
 2. Open the Spicetify Marketplace.  
 3. Search for **"Sort Play"**.  
 4. Click **Install**.  
-
-
-## Usage
-
-1. Go to a playlist.
-2. Click the new "Sort" button in the header.
-3. A new sorted playlist will be added to your library.
