@@ -32,6 +32,3 @@ Sort Spotify playlists & artist page by play count, popularity, release date, sh
 1. Go to a playlist.
 2. Click the new "Sort" button in the header.
 3. A new sorted playlist will be added to your library.
-
-#
-Partially inspired by [Delusoire](https://github.com/Delusoire/spicetify-extensions) archived [sort-plus](https://github.com/Delusoire/spicetify-extensions/tree/main/extensions/sort-plus).
