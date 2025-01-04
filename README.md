@@ -1,5 +1,5 @@
 # Sort Play
-Spicetify extension to sort playlists & artist page by play count, popularity, release date, shuffle, Last.fm Scrobbles (global & personal).
+Sort spotify playlists & artist page by play count, popularity, release date, shuffle, Last.fm Scrobbles (global & personal).
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
