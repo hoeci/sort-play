@@ -1,7 +1,7 @@
 [
   {
     "name": "Sort Play",
-    "description": "Sort playlists & artist discography by play count, popularity, release date, shuffle, Last.fm data",
+    "description": "Sort playlists & artist discography by play count, popularity, release date, shuffle, Last.fm scrobbles (global & personal)",
     "preview": "cover.png",
     "main": "sort-play.js",
     "readme": "info.md",
