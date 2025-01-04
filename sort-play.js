@@ -1,12 +1,12 @@
 (async function () {
-  async function main() {
-      const { React, ReactDOM, URI, GraphQL, Platform } = Spicetify;
-      if (!React || !ReactDOM || !GraphQL || !Platform) {
-          setTimeout(main, 10);
-          return;
-      }
+async function main() {
+  const { React, ReactDOM, URI, GraphQL, Platform } = Spicetify;
+  if (!React || !ReactDOM || !GraphQL || !Platform) {
+      setTimeout(main, 10);
+      return;
+  }
 
-      const { PlaylistAPI } = Platform;
+  const { PlaylistAPI } = Platform;
 
   const LFMApiKey = "***REMOVED***";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
@@ -2053,9 +2053,7 @@
 
   console.log(`sort-play loaded`);
 }
-
 if (typeof module !== 'undefined' && module.exports) {
-
     module.exports = main;
 } else {
     await main();
