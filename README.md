@@ -1,5 +1,13 @@
 # Sort Play
-Spicetify extension to sort playlists by play count and create a new sorted playlist.
+Spicetify extension to sort playlists & artist page by play count, popularity, release date, shuffle, Last.fm Scrobbles (global & personal).
+
+## Features
++ Sort playlists & artist discography (single, album, appears on).
++ Connects to your Last.fm account.
++ Removes duplicate tracks, keeping the most popular.
++ Smart Shuffle considering track similarity and artist spread.
++ Toggle ascending/descending release date sorting.
++ Saves sorted tracks to a new private playlist.
 
 ## Installation  
 
@@ -12,7 +20,7 @@ Spicetify extension to sort playlists by play count and create a new sorted play
 
 4. Open a terminal and run `spicetify config extensions sort-play.js` and `spicetify apply`
 
-### Using Marketplace (when it becomes available)
+### Using Marketplace 
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
 2. Open the Spicetify Marketplace.  
 3. Search for **"Sort Play"**.  
