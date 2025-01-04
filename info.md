@@ -11,4 +11,4 @@ Sort playlists & artist discography by play count, popularity, release date, shu
 + Toggle ascending/descending release date sorting.
 + Saves sorted tracks to a new private playlist.
 
-> [Report bugs and suggest features!](https://github.com/hoeci/sort-play/issues)
+> [⭐ Star on GitHub, report bugs, and suggest features!](https://github.com/hoeci/sort-play)
