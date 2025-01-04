@@ -1,5 +1,5 @@
 # Sort Play
-Sort Spotify playlists & artist page by play count, popularity, release date, shuffle, Last.fm Data (Global & Personal).
+Sort Spotify playlists & artist page by play count, popularity, release date, shuffle, Last.fm data (global & personal).
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
