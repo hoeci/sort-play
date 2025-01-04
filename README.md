@@ -1,6 +1,8 @@
 # Sort Play
 Sort Spotify playlists & artist page by play count, popularity, release date, shuffle, Last.fm data (global & personal).
 
+![show](https://github.com/user-attachments/assets/d7bcc0e9-e08a-49fe-8bbf-bf77031b4837)
+
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
 + Connects to your Last.fm account.
