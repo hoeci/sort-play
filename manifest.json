@@ -8,6 +8,6 @@
     "authors": [
         { "name": "hoeci", "url": "https://github.com/hoeci" }
     ],
-    "tags": ["playlist", "playcount", "Lastfm", "discography"]
+    "tags": ["playlist", "discography", "playcount", "Lastfm"]
   }
 ]
