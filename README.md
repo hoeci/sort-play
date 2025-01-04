@@ -1,7 +1,7 @@
 # Sort Play
 Sort Spotify playlists & artist pages by play count, popularity, release date, shuffle, Last.fm scrobbles (+ Personal).
 
-> <img src="https://github.com/user-attachments/assets/d7bcc0e9-e08a-49fe-8bbf-bf77031b4837" alt="show" width="450px">
+<img src="https://github.com/user-attachments/assets/d7bcc0e9-e08a-49fe-8bbf-bf77031b4837" alt="show" width="450px">
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
