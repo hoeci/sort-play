@@ -1,7 +1,7 @@
 # Sort Play
 Sort playlists & artist discography by play count, popularity, release date, shuffle, Last.fm data.
 
-<img src="https://github.com/user-attachments/assets/d7bcc0e9-e08a-49fe-8bbf-bf77031b4837" alt="show" width="500px">
+<img src="https://github.com/user-attachments/assets/41086240-6f72-4d02-80ed-601a7c1ba2d1" alt="show" width="550px">
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
