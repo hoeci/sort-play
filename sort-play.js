@@ -11,6 +11,20 @@ async function main() {
   const LFMApiKey = "***REMOVED***";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
 
+  let columnPlayCount = false; 
+  let removeDateAdded = false;
+
+  // Load saved settings on startup
+  function loadSettings() {
+    columnPlayCount = localStorage.getItem("sort-play-column-play-count") === "true";
+    removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
+  }
+  
+  function saveSettings() {
+    localStorage.setItem("sort-play-column-play-count", columnPlayCount);
+    localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
+  }
+
   function saveLastFmUsername(username) {
     localStorage.setItem(STORAGE_KEY_LASTFM_USERNAME, username);
   }
@@ -121,6 +135,81 @@ async function main() {
     });
   }
 
+  function showPlaysColumnModal() {
+    const modalContainer = document.createElement("div");
+    modalContainer.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+          <input type="checkbox" id="columnPlayCount" ${columnPlayCount ? "checked" : ""}>
+          <label for="columnPlayCount" style="margin-left: 8px; color: white;">Play Count Column in PLaylist</label>
+        </div>
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+          <input type="checkbox" id="removeDateAdded" ${removeDateAdded ? "checked" : ""} ${!columnPlayCount ? "disabled" : ""}>
+          <label for="removeDateAdded" style="margin-left: 8px; color: white;">Remove "Date Added" Column</label>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+          <button id="cancelPlaysColumn" class="main-buttons-button" 
+                  style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+            Cancel
+          </button>
+          <button id="savePlaysColumn" class="main-buttons-button main-button-primary" 
+                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+            Save
+          </button>
+        </div>
+      </div>
+    `;
+
+    Spicetify.PopupModal.display({
+        title: "<span style='font-size: 25px;'>Playlist Column Options</span>",
+        content: modalContainer,
+    });
+
+    const modalContainerElement = document.querySelector(".main-popupModal-container");
+    if (modalContainerElement) {
+        modalContainerElement.style.zIndex = "2000";
+    }
+
+    const saveButton = document.getElementById("savePlaysColumn");
+    const cancelButton = document.getElementById("cancelPlaysColumn");
+    const columnPlayCountCheckbox = document.getElementById("columnPlayCount");
+    const removeDateAddedCheckbox = document.getElementById("removeDateAdded");
+
+    columnPlayCountCheckbox.addEventListener("change", () => {
+        removeDateAddedCheckbox.disabled = !columnPlayCountCheckbox.checked;
+    });
+
+    saveButton.addEventListener("mouseenter", () => {
+        saveButton.style.backgroundColor = "#3BE377";
+    });
+    saveButton.addEventListener("mouseleave", () => {
+        saveButton.style.backgroundColor = "#1ED760";
+    });
+
+    cancelButton.addEventListener("mouseenter", () => {
+        cancelButton.style.backgroundColor = "#444444";
+    });
+    cancelButton.addEventListener("mouseleave", () => {
+        cancelButton.style.backgroundColor = "#333333";
+    });
+
+    saveButton.addEventListener("click", () => {
+        columnPlayCount = columnPlayCountCheckbox.checked;
+        removeDateAdded = removeDateAddedCheckbox.checked;
+
+        saveSettings();
+
+        Spicetify.PopupModal.hide();
+        Spicetify.showNotification("Column settings saved successfully!");
+
+        updateTracklist();
+    });
+
+    cancelButton.addEventListener("click", () => {
+        Spicetify.PopupModal.hide();
+    });
+  }
+
   const styleElement = document.createElement("style");
   styleElement.innerHTML = `
     .loader {
@@ -177,6 +266,32 @@ async function main() {
       justify-content: center;
       align-items: center;
       gap: 5px;
+    }
+    /* Column styles */
+    .sort-play-column {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      width: 90px;
+      color: var(--spice-text);
+    }
+    .main-trackList-row .sort-play-playcount {
+        color: var(--spice-text);
+        font-size: 13px;
+        margin-left: 10px;
+    }
+    .main-trackList-row .sort-play-loading {
+        color: var(--spice-subtext);
+        font-size: 13px;
+        margin-left: 10px;
+    }
+    .main-trackList-row .sort-play-playcount,
+    .main-trackList-row .sort-play-loading {
+        display: block;
+        text-align: center;
+        margin: auto;
     }
   `;
   document.head.appendChild(styleElement);
@@ -236,18 +351,10 @@ async function main() {
           .map(parsePlaylistAPITrack);
         return parsedTracks;
       } catch (error) {
-        console.error(
-          `Error fetching playlist tracks (Attempt ${attempt}/${retries}):`,
-          error
-        );
         if (attempt < retries) {
-          console.warn(`Retrying in ${delay / 1000} seconds...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;  
         } else {
-          console.error(
-            `Failed to fetch playlist tracks after ${retries} attempts.`
-          );
           throw error;  
         }
       }
@@ -261,10 +368,6 @@ async function main() {
         return tracks;
       }
     } catch (error) {
-        console.error(
-          "Failed to fetch tracks using Spicetify's internal API:",
-          error
-        );
         Spicetify.showNotification(
           "Failed to fetch playlist tracks. Please check your connection and try again.",
           true 
@@ -396,13 +499,10 @@ async function main() {
                 };
               });
           } catch (err) {
-            console.error(`Error fetching release ${release.uri} (Attempt ${attempt}):`, err);
             if (attempt < retries) {
-              console.warn(`Retrying in ${delay / 1000} seconds...`);
               await new Promise((resolve) => setTimeout(resolve, delay));
               delay *= 2;
             } else {
-              console.error(`Failed to fetch release ${release.uri} after ${retries} attempts.`);
               return [];
             }
           }
@@ -428,7 +528,7 @@ async function main() {
       console.error("Error fetching artist tracks:", error);
       throw error;
     } finally {
-      mainButton.innerText = "Sort by";
+      mainButton.innerText = "Sort Play";
       mainButton.appendChild(svgElement);
     }
   }
@@ -491,17 +591,9 @@ async function main() {
             return;
           } catch (error) {
             if (attempt < retries) {
-              console.warn(
-                `Retrying fetch for album ID ${albumId} in ${
-                  retryDelay / 1000
-                } seconds...`
-              );
               await new Promise((resolve) => setTimeout(resolve, retryDelay));
               retryDelay *= 2;
             } else {
-              console.error(
-                `Failed to fetch album data for album ID ${albumId} after ${retries} attempts.`
-              );
               reject(error);
             }
           }
@@ -569,14 +661,10 @@ async function main() {
             resolve(releaseDate);
             return;
           } catch (error) {
-            console.error(`Error fetching release date for album ID ${albumId} on attempt ${attempt}:`, error);
-
             if (attempt < retries) {
-              console.warn(`Retrying fetch for album ID ${albumId} in ${retryDelay / 1000} seconds...`);
               await new Promise((resolve) => setTimeout(resolve, retryDelay));
               retryDelay *= 2;
             } else {
-              console.error(`Failed to fetch release date for album ID ${albumId} after ${retries} attempts.`);
               reject(error);
               return;
             }
@@ -631,11 +719,6 @@ async function main() {
       );
 
       if (retries > 0) {
-        console.warn(
-          `Retrying track ${track.name} in ${
-            retryDelay / 1000
-          } seconds... (${retries} retries left)`
-        );
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
         return getTrackDetailsWithPlayCount(
           track,
@@ -703,35 +786,15 @@ async function main() {
             updateProgress(intermediateProgress);
             success = true; 
           } else {
-            console.warn(
-              `Could not fetch details for batch: ${batch.join(",")} (Attempt ${
-                retries + 1
-              })`
-            );
           }
         } catch (error) {
-          console.error(
-            `Error fetching batch ${batch.join(",")} (Attempt ${
-              retries + 1
-            }):`,
-            error
-          );
         }
-
         if (!success) {
           retries++;
           if (retries < maxRetries) {
-            console.warn(
-              `Retrying batch ${batch.join(",")} in ${delay / 1000} seconds...`
-            );
             await new Promise((resolve) => setTimeout(resolve, delay));
             delay *= 2; 
           } else {
-            console.error(
-              `Failed to fetch popularity for batch ${batch.join(
-                ","
-              )} after ${maxRetries} attempts.`
-            );
               batch.forEach((trackId) => {
                 const originalTrack = tracks.find((t) => t.trackId === trackId);
                 if (originalTrack) {
@@ -875,7 +938,6 @@ async function main() {
 
         retries++;
         if (retries < maxRetries) {
-          console.warn(`Retrying in ${delay / 1000} seconds...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2; 
         } else {
@@ -926,9 +988,6 @@ async function main() {
         const response = await fetch(lastFmUrl);
 
         if (!response.ok) {
-          console.warn(
-            `Last.fm API request failed with status ${response.status} for track: ${track.name} (Attempt ${retries + 1})`
-          );
           throw new Error(`Last.fm API request failed with status ${response.status}`);  
         }
 
@@ -956,9 +1015,6 @@ async function main() {
               };
             }
           } else {
-            console.warn(
-              `Last.fm API error for track ${track.name} (Attempt ${retries + 1}): ${data.message}`
-            );
             throw new Error(`Last.fm API error: ${data.message}`); 
           }
         } else {
@@ -981,7 +1037,6 @@ async function main() {
 
         retries++;
         if (retries < maxRetries) {
-          console.warn(`Retrying in ${delay / 1000} seconds...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;
         } else {
@@ -1008,6 +1063,10 @@ async function main() {
       disabledColor: "#666",
     },
     menuItems: [
+      {
+        type: "divider",
+        text: "Sort By",
+      },
       {
         backgroundColor: "#282828",
         color: "white",
@@ -1046,6 +1105,16 @@ async function main() {
         sortType: "personalScrobbles",
         hasInnerButton: true,
       },
+      {
+        type: "divider",
+        text: "Display Options",
+      },
+      {
+        backgroundColor: "#282828",
+        color: "white",
+        text: "Play Count Column",
+        isSetting: true, 
+      },
     ],
   };
 
@@ -1056,7 +1125,7 @@ async function main() {
   const mainButton = document.createElement("button");
   mainButton.title = "sort-play extension";
   mainButton.className = "Button-sc-qlcn5g-0 Button-small-buttonTertiary-useBrowserDefaultFocusStyle";
-  mainButton.innerText = "Sort by"; 
+  mainButton.innerText = "Sort Play"; 
   mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
   mainButton.style.color = buttonStyles.main.color;
   mainButton.style.borderRadius = "16px";
@@ -1066,7 +1135,7 @@ async function main() {
   mainButton.style.fontSize = "14px";
   mainButton.style.height = "32px";  
   mainButton.style.overflow = "hidden";
-  mainButton.style.width = "90px";
+  mainButton.style.width = "100px";
   mainButton.style.display = "flex";
   mainButton.style.justifyContent = "center";
   mainButton.style.alignItems = "center";
@@ -1154,6 +1223,22 @@ async function main() {
   let releaseDateReverse = localStorage.getItem("sort-play-release-date-reverse") === "true";
   
   const menuButtons = buttonStyles.menuItems.map((style) => {
+    if (style.type === "divider") {
+      const divider = document.createElement("div");
+      divider.style.cssText = `
+        padding: 8px 10px 4px;
+        color: #FFFFFF99;
+        font-size: 11px;
+        font-weight: 700;
+        margin-top: 6px;
+        margin-bottom: 8px;
+        letter-spacing: 0.1em;
+        pointer-events: none;
+      `;
+      divider.innerText = style.text;
+      return divider;
+    }
+    
     const button = document.createElement("button");
     button.style.backgroundColor = "transparent";
     button.style.color = "#ffffffe6";
@@ -1163,12 +1248,11 @@ async function main() {
     button.style.padding = "4px 10px";
     button.style.fontWeight = "400";
     button.style.fontSize = "14px";
-    button.style.height = "40px";
-    button.style.width = "140px"; 
+    button.style.height = "44px";
+    button.style.width = "155px"; 
     button.style.textAlign = "center";
     button.style.opacity = "0";
     button.style.transform = "translateY(-10px)";
-    button.style.cursor = "pointer";
     button.style.position = "relative"; 
     button.style.display = "flex";  
     button.style.alignItems = "center";  
@@ -1201,13 +1285,13 @@ async function main() {
           const innerButton = document.createElement("button");
           innerButton.title = "Toggle Order (Newest/Oldest First)";
           const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          svg.setAttribute("viewBox", "0 0 14 14");
+          svg.setAttribute("viewBox", "0 0 16 16");
           svg.setAttribute("width", "50%");
           svg.setAttribute("height", "50%");
           svg.style.fill = "#ffffffe6";  
 
           const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", releaseDateReverse ? "M14 7L7 0L0 7h14z" : "M14 0L7 7L0 0h14z");
+          path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
 
           svg.appendChild(path);
           innerButton.appendChild(svg);
@@ -1219,14 +1303,14 @@ async function main() {
             padding: 0;
             cursor: pointer;
             position: absolute;
-            right: 4px; 
+            right: 0px; 
             top: 50%;
-            transform: translateY(-32%);
+            transform: translateY(-50%);
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 25px;
-            height: 25px;
+            width: 32px;
+            height: 32px;
           `;
 
           innerButton.addEventListener("mouseenter", () => {
@@ -1241,8 +1325,7 @@ async function main() {
             event.stopPropagation();
             releaseDateReverse = !releaseDateReverse;
             localStorage.setItem("sort-play-release-date-reverse", releaseDateReverse);
-
-            path.setAttribute("d", releaseDateReverse ? "M14 7L7 0L0 7h14z" : "M14 0L7 7L0 0h14z");
+            path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
           });
           
           button.appendChild(innerButton);
@@ -1257,21 +1340,21 @@ async function main() {
           padding: 0;
           cursor: pointer;
           position: absolute;
-          right: 4px; 
+          right: 0px; 
           top: 50%;
           transform: translateY(-48%);
           display: flex;
           align-items: center;
           justify-content: center;
-          width: 25px;
-          height: 25px;
+          width: 30px;
+          height: 30px;
         `; 
 
         const parser = new DOMParser();
         const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
         const svgElement = svgDoc.documentElement;
-        svgElement.setAttribute("width", "55%");
-        svgElement.setAttribute("height", "55%");
+        svgElement.setAttribute("width", "50%");
+        svgElement.setAttribute("height", "50%");
         svgElement.style.fill = "#ffffffe6";
   
         innerButton.appendChild(svgElement);
@@ -1506,11 +1589,6 @@ async function main() {
           }
 
           retries++;
-          console.warn(
-            `Retrying adding batch ${
-              i / BATCH_SIZE + 1
-            } in ${currentDelay / 1000} seconds...`
-          );
           await new Promise((resolve) => setTimeout(resolve, currentDelay));
           currentDelay *= 2;  
         }
@@ -1554,7 +1632,6 @@ async function main() {
             }
 
             retries++;
-            console.warn(`Retrying creating playlist in ${currentDelay / 1000} seconds...`);
             await new Promise((resolve) => setTimeout(resolve, currentDelay));
             currentDelay *= 2;
         }
@@ -1982,25 +2059,44 @@ async function main() {
     return sortedTracks;
   }
 
-  menuButtons.forEach((button) => {
-    const sortType = buttonStyles.menuItems.find(
-      (item) => item.text === button.querySelector("span").innerText 
-    ).sortType;
-    button.addEventListener("click", async (event) => {
-      event.stopPropagation();
-      menuButtons.forEach((btn) => {
-        if (!btn.disabled) {
-          btn.style.backgroundColor = "#282828"; 
+  menuButtons.forEach((element) => {
+    if (element.tagName.toLowerCase() === 'div') {
+      return;
+    }
+    const buttonText = element.querySelector("span")?.innerText;
+    const buttonStyle = buttonStyles.menuItems.find(
+      (item) => item.text === buttonText
+    );
+  
+    if (!buttonStyle) {
+      return; 
+    }
+  
+    if (buttonStyle.isSetting) {
+      element.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (buttonStyle.text === "Play Count Column") {
+          showPlaysColumnModal();
         }
       });
-      await handleSortAndCreatePlaylist(sortType);
-    });
+    } else {
+      const sortType = buttonStyle.sortType;
+      element.addEventListener("click", async (event) => { 
+        event.stopPropagation();
+        menuButtons.forEach((btn) => {
+          if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+            btn.style.backgroundColor = "#282828";
+          }
+        });
+        await handleSortAndCreatePlaylist(sortType);
+      });
+    }
   });
 
   
   function resetButtons() {
     mainButton.disabled = false;
-    mainButton.innerText = "Sort by"; 
+    mainButton.innerText = "Sort Play"; 
     mainButton.appendChild(svgElement); 
     mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
     mainButton.style.cursor = "pointer";
@@ -2010,6 +2106,321 @@ async function main() {
     isButtonClicked = false;
     menuButtons.forEach((button) => {
       button.disabled = false;
+    });
+  }
+
+  function getTracklistTrackUri(tracklistElement) {
+      let values = Object.values(tracklistElement);
+      if (!values) {
+          console.log("Error: Could not get tracklist element");
+          return null;
+      }
+      return (
+          values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
+          values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+          values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props
+              ?.uri ||
+          values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+      );
+  }
+
+  const waitForElement = (selector) => {
+    return new Promise((resolve) => {
+      if (document.querySelector(selector)) {
+        return resolve(document.querySelector(selector));
+      }
+      const observer = new MutationObserver(() => {
+        if (document.querySelector(selector)) {
+          observer.disconnect();
+          resolve(document.querySelector(selector));
+        }
+      });
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    });
+  };
+
+  const CACHE_KEY = 'spotify-play-count-cache';
+  const CACHE_TIMESTAMP_KEY = 'spotify-play-count-cache-timestamp';
+  const CACHE_EXPIRY_DAYS = 6;
+
+  function initializeCache() {
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
+    if (!timestamp) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+      localStorage.setItem(CACHE_KEY, JSON.stringify({}));
+      return;
+    }
+
+    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
+    if (daysPassed >= CACHE_EXPIRY_DAYS) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
+      localStorage.setItem(CACHE_KEY, JSON.stringify({}));
+    }
+  }
+
+  function getCachedPlayCount(trackId) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+      return cache[trackId] || null;
+    } catch (error) {
+      console.error('Error reading from cache:', error);
+      return null;
+    }
+  }
+
+  function setCachedPlayCount(trackId, playCount) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+      cache[trackId] = playCount;
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      console.error('Error writing to cache:', error);
+    }
+  }
+
+  async function loadPlayCounts(tracklist_) {
+    initializeCache();
+
+    const tracks = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
+      .filter(track => {
+        const playCountElement = track.querySelector(".sort-play-playcount");
+        const trackUri = getTracklistTrackUri(track);
+        const isTrack = trackUri && trackUri.includes("track");
+        return playCountElement && playCountElement.textContent === "..." && isTrack && trackUri;
+      });
+
+    for (const track of tracks) {
+      try {
+        const playCountElement = track.querySelector(".sort-play-playcount");
+        if (!playCountElement) continue;
+
+        const trackUri = getTracklistTrackUri(track);
+        if (!trackUri) {
+          playCountElement.textContent = "N/A";
+          continue;
+        }
+
+        const trackId = trackUri.split(":")[2];
+
+        const cachedCount = getCachedPlayCount(trackId);
+        if (cachedCount !== null) {
+          const formattedCount = new Intl.NumberFormat('en-US').format(cachedCount);
+          playCountElement.textContent = formattedCount;
+          playCountElement.style.fontSize = "14px";
+          playCountElement.style.fontWeight = "400";
+          playCountElement.style.color = "var(--spice-subtext)";
+          continue;
+        }
+
+        const albumLinkElement = track.querySelector(
+          ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line"
+        );
+
+        if (!albumLinkElement?.href) {
+          playCountElement.textContent = "N/A";
+          continue;
+        }
+
+        const albumId = albumLinkElement.href.split("/album/")[1];
+        if (!albumId) {
+          playCountElement.textContent = "N/A";
+          continue;
+        }
+
+        const trackDetails = {
+          uri: trackUri,
+          name: track.querySelector(".main-trackList-rowTitle")?.textContent || "",
+          albumUri: `spotify:album:${albumId}`,
+          track: { album: { id: albumId }, id: trackId }
+        };
+
+        const result = await Promise.race([
+          getTrackDetailsWithPlayCount(trackDetails),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+        ]);
+
+        if (result?.playCount !== null) {
+          setCachedPlayCount(trackId, result.playCount);
+
+          const formattedCount = new Intl.NumberFormat('en-US').format(result.playCount);
+          playCountElement.textContent = formattedCount;
+        } else {
+          playCountElement.textContent = "N/A";
+        }
+
+        playCountElement.style.fontSize = "14px";
+        playCountElement.style.fontWeight = "400";
+        playCountElement.style.color = "var(--spice-subtext)";
+
+      } catch (error) {
+        console.error("Error processing track:", error);
+        const playCountElement = track.querySelector(".sort-play-playcount");
+        if (playCountElement) {
+          playCountElement.textContent = "N/A";
+          playCountElement.style.fontSize = "14px";
+          playCountElement.style.fontWeight = "400";
+          playCountElement.style.color = "var(--spice-subtext)";
+        }
+      }
+    }
+  }
+
+  let isUpdatingTracklist = false;
+  let tracklistObserver;
+  async function updateTracklist() {
+    if (isUpdatingTracklist || !columnPlayCount) return;
+
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
+  
+    try {
+      isUpdatingTracklist = true;
+  
+      const tracklists = document.getElementsByClassName("main-trackList-indexable");
+      if (!tracklists.length) return;
+  
+      for (const tracklist_ of tracklists) {
+        if (!tracklist_) continue;
+
+        await updateTracklistStructure(tracklist_);
+
+        requestAnimationFrame(() => {
+          loadPlayCounts(tracklist_);
+        });
+      }
+    } finally {
+      isUpdatingTracklist = false;
+    }
+  }
+  
+  async function updateTracklistStructure(tracklist_) {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
+  
+    const gridCss = getGridCss(removeDateAdded);
+  
+    const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
+    if (tracklistHeader && !tracklistHeader.querySelector(".sort-play-header")) {
+      let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+      let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+  
+      switch (colIndexInt) {
+        case 4: tracklistHeader.setAttribute("style", gridCss.fiveColumnGridCss); break;
+        case 5: tracklistHeader.setAttribute("style", gridCss.sixColumnGridCss); break;
+        case 6: tracklistHeader.setAttribute("style", gridCss.sevenColumnGridCss); break;
+      }
+  
+      const headerInsertionPoint = !removeDateAdded 
+        ? lastColumn
+        : tracklistHeader.querySelector('[aria-colindex="4"]');
+      
+      lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+      let headerColumn = document.createElement("div");
+      headerColumn.style.display = "flex";
+      headerColumn.classList.add("main-trackList-rowSectionVariable");
+      headerColumn.classList.add("sort-play-column");
+      headerColumn.role = "columnheader";
+      tracklistHeader.insertBefore(headerColumn, headerInsertionPoint);
+  
+      var btn = document.createElement("button");
+      btn.classList.add("main-trackList-column");
+      btn.classList.add("main-trackList-sortable");
+      btn.classList.add("sort-play-header");
+      var title = document.createElement("span");
+      title.classList.add("TypeElement-mesto-type");
+      title.classList.add("standalone-ellipsis-one-line");
+      title.innerText = "Play Count";
+      btn.appendChild(title);
+      headerColumn.appendChild(btn);
+    }
+  
+    const tracks = tracklist_.getElementsByClassName("main-trackList-trackListRow");
+    for (const track of tracks) {
+      if (track.querySelector(".sort-play-playcount-column")) continue;
+      
+      let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+      if (!lastColumn) continue;
+      
+      let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+  
+      switch (colIndexInt) {
+        case 4: track.setAttribute("style", gridCss.fiveColumnGridCss); break;
+        case 5: track.setAttribute("style", gridCss.sixColumnGridCss); break;
+        case 6: track.setAttribute("style", gridCss.sevenColumnGridCss); break;
+      }
+  
+      const insertionPoint = !removeDateAdded
+        ? lastColumn
+        : track.querySelector('[aria-colindex="4"]');
+      
+      lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+      
+      let playCountColumn = document.createElement("div");
+      playCountColumn.setAttribute("aria-colindex", colIndexInt.toString());
+      playCountColumn.style.display = "flex";
+      playCountColumn.style.justifyContent = "center";
+      playCountColumn.style.alignItems = "center";
+      playCountColumn.classList.add("main-trackList-rowSectionVariable");
+      playCountColumn.classList.add("sort-play-playcount-column");
+      playCountColumn.classList.add("sort-play-column");
+  
+      const playCountElement = document.createElement("span");
+      playCountElement.classList.add("sort-play-playcount");
+      playCountElement.textContent = "...";
+      playCountElement.style.fontSize = "14px";
+      playCountElement.style.fontWeight = "400";
+      playCountElement.style.color = "var(--spice-subtext)";
+      playCountColumn.appendChild(playCountElement);
+      
+      track.insertBefore(playCountColumn, insertionPoint);
+    }
+  }
+  
+  const getGridCss = (removeDateAdded) => {
+    if (removeDateAdded) {
+      return {
+        fiveColumnGridCss: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [spacer] -300px [var2] 2fr [last] minmax(120px,1fr) !important",
+        sixColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [spacer] -300px [var3] 2fr [last] minmax(120px,1fr) !important",
+        sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] minmax(120px,1fr) [spacer] -300px [var4] 2fr [last] minmax(120px,1fr) !important"
+      };
+    }
+    return {
+      fiveColumnGridCss: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr) !important",
+      sixColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
+      sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] minmax(120px,1fr) [var4] 2fr [last] minmax(120px,1fr) !important"
+    };
+  };
+
+  let updateDebounceTimeout;
+  tracklistObserver = new MutationObserver(async (mutations) => {
+    clearTimeout(updateDebounceTimeout);
+    updateDebounceTimeout = setTimeout(() => {
+      for (const mutation of mutations) {
+        for (const addedNode of mutation.addedNodes) {
+          if (addedNode.classList?.contains("main-trackList-indexable")) {
+            updateTracklist();
+            return;
+          }
+        }
+      }
+      updateTracklist();
+    }, 100);
+  });
+    
+  async function initializeTracklistObserver() {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
+  
+    const tracklist = await waitForElement(".main-trackList-indexable");
+    if (!tracklist) return;
+  
+    updateTracklist();
+    tracklistObserver.observe(tracklist.parentElement, {
+      childList: true,
+      subtree: true,
     });
   }
 
@@ -2044,13 +2455,20 @@ async function main() {
     if (!document.contains(buttonContainer)) {
       insertButton();
     }
+    
+    const currentUri = getCurrentUri();
+    if (currentUri && URI.isPlaylistV1OrV2(currentUri)) {
+      initializeTracklistObserver();
+    }
   });
 
   observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
-
+  
+  loadSettings();
+  initializeCache();
   console.log(`sort-play loaded`);
 }
 if (typeof module !== 'undefined' && module.exports) {
