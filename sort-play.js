@@ -248,6 +248,45 @@ async function main() {
         opacity: 0.5;
         cursor: not-allowed;
     }
+
+    .tooltip-container {
+      position: relative;
+      display: inline-block;
+    }
+    
+    .custom-tooltip {
+        visibility: hidden;
+        position: absolute;
+        z-index: 1;
+        background-color: #282828;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        max-width: 230px;
+        width: max-content;
+        bottom: 100%;   
+        left: 50%;       
+        transform: translateX(-50%);  
+        margin-bottom: 5px;   
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        line-height: 1.4;
+        word-wrap: break-word;
+    }
+    .custom-tooltip::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #282828 transparent transparent transparent;
+    }
+    
+    .tooltip-container:hover .custom-tooltip {
+        visibility: visible;
+    }
     </style>
     <div style="display: flex; flex-direction: column; gap: 15px;">
 
@@ -281,7 +320,13 @@ async function main() {
     <div style="border-bottom: 1px solid #555; margin-bottom: 0px;"></div>
 
     <div class="setting-row" id="playlistDeduplicate">
-        <label class="col description">Remove Duplicate Tracks in Playlist</label>
+    <label class="col description">
+        Remove Duplicate Tracks in Playlist
+        <span class="tooltip-container">
+            <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+            <span class="custom-tooltip">Setting won't affect artist pages or tracks with identical URLs</span>
+        </span>
+    </label>
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${playlistDeduplicate ? 'checked' : ''}>
