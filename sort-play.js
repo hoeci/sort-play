@@ -235,7 +235,7 @@ async function main() {
       <div style="display: flex; flex-direction: column; gap: 15px;">
         <div style="display: flex; align-items: center; margin-bottom: 10px;">
           <input type="checkbox" id="playlistDeduplicate" ${playlistDeduplicate ? "checked" : ""}>
-          <label for="playlistDeduplicate" style="margin-left: 8px; color: white;">Deduplicate Playlist Tracks</label>
+          <label for="playlistDeduplicate" style="margin-left: 8px; color: white;">Remove Duplicate Tracks in Playlist</label>
         </div>
         <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
           <button id="cancelSettings" class="main-buttons-button" 
