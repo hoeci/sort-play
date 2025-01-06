@@ -6,7 +6,7 @@ Sort Spotify playlists and artist pages by play count, popularity, release date,
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
-+ Play count column in playlists
++ Play count column in playlists.
 + Connects to your Last.fm account.
 + Removes duplicate tracks, keeping the most popular.
 + Smart Shuffle considering track similarity and artist spread.
