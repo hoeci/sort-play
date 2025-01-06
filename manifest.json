@@ -1,7 +1,7 @@
 [
   {
     "name": "Sort Play",
-    "description": "Sort playlists/artists by plays, popularity, release date, Last.fm scrobbles.",
+    "description": "Sort playlists/artists by plays, Lastfm, and more. plays column in playlist.",
     "preview": "cover.png",
     "main": "sort-play-loader.mjs",
     "readme": "info.md",
