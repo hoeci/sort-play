@@ -29,6 +29,3 @@ Sort Spotify playlists and artist pages by play count, popularity, release date,
 2. Open the Spicetify Marketplace.  
 3. Search for **"Sort Play"**.  
 4. Click **Install**.  
-
-##
-> This extension uses anonymous analytics ([GoatCounter](https://www.goatcounter.com/)). You can view the analytics [here](https://sort-play.goatcounter.com/).
