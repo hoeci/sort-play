@@ -88,6 +88,7 @@ async function main() {
     const saveButton = document.getElementById("saveLastFm");
     const cancelButton = document.getElementById("cancelLastFm");
 
+    
     saveButton.addEventListener("mouseenter", () => {
       saveButton.style.backgroundColor = "#3BE377";
     });
@@ -114,6 +115,24 @@ async function main() {
       button.style.cursor = "pointer";
     }
 
+    menuButtons.forEach((button) => {
+      if (button.tagName.toLowerCase() === 'button') {
+        button.style.backgroundColor = "transparent";
+      }
+    });
+    
+    function resetMenuButtonStyles() {
+      const myScrobblesButton = menuButtons.find(
+        (button) => button.querySelector("span")?.innerText === "My Scrobbles"
+      );
+      if (myScrobblesButton) {
+        const innerSvg = myScrobblesButton.querySelector("svg");
+        if (innerSvg) {
+          innerSvg.style.fill = "#ffffffe6";
+        }
+      }
+    }
+
     saveButton.addEventListener("click", () => {
       const username = document.getElementById("lastFmUsername").value.trim();
       includeZeroScrobbles = document.getElementById("includeZeroScrobbles").checked; 
@@ -126,6 +145,7 @@ async function main() {
 
       saveLastFmUsername(username);
       Spicetify.PopupModal.hide();
+      resetMenuButtonStyles();
       
       if (username) {
         Spicetify.showNotification("Last.fm username saved successfully!");
@@ -1852,7 +1872,7 @@ async function main() {
           await addTracksToPlaylist(newPlaylist.id, trackUris);
     
           Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
-          
+
       } catch (error) {
           console.error("Error creating or updating playlist:", error);
           Spicetify.showNotification(
