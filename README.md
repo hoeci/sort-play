@@ -31,4 +31,4 @@ Sort Spotify playlists and artist pages by play count, popularity, release date,
 4. Click **Install**.  
 
 ##
-> This extension uses anonymous analytics ([GoatCounter](https://www.goatcounter.com/)) to help improve the user experience.
+> This extension uses anonymous analytics ([GoatCounter](https://www.goatcounter.com/)). You can view the analytics [here](https://sort-play.goatcounter.com/).
