@@ -145,36 +145,53 @@ async function main() {
     });
   }
 
-  function showPlaysColumnModal() {
+  function showSettingsModal() {
     const modalContainer = document.createElement("div");
     modalContainer.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 15px;">
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+  
+        <div style="color: white; font-weight: bold; font-size: 16px; margin-top: 10px;">
+          Playlist Column Options
+        </div>
+         <div style="border-bottom: 1px solid #555; margin-bottom: 0px;"></div>
+        <div style="display: flex; align-items: center; margin-bottom: 5px; margin-top: 5px;">
           <input type="checkbox" id="columnPlayCount" ${columnPlayCount ? "checked" : ""}>
-          <label for="columnPlayCount" style="margin-left: 8px; color: white;">Play Count Column in PLaylist</label>
+          <label for="columnPlayCount" style="margin-left: 8px; color: white;">Play Count Column in Playlist</label>
         </div>
         <div style="display: flex; align-items: center; margin-bottom: 10px;">
           <input type="checkbox" id="removeDateAdded" ${removeDateAdded ? "checked" : ""} ${!columnPlayCount ? "disabled" : ""}>
           <label for="removeDateAdded" style="margin-left: 8px; color: white;">Remove "Date Added" Column</label>
         </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-          <button id="cancelPlaysColumn" class="main-buttons-button" 
+  
+        <div style="color: white; font-weight: bold; font-size: 16px; margin-top: 5px;">
+           Duplicate Removal
+        </div>
+        <div style="border-bottom: 1px solid #555; margin-bottom: 0px;"></div>
+        <div style="display: flex; align-items: center; margin-bottom: 10px; margin-top: 5px;">
+          <input type="checkbox" id="playlistDeduplicate" ${playlistDeduplicate ? "checked" : ""}>
+          <label for="playlistDeduplicate" style="margin-left: 8px; color: white;">Remove Duplicate Tracks in Playlist</label>
+        </div>
+        <div style="text-align: center;">
+            <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 13px; text-decoration: none;" target="_blank">⭐ Star on GitHub, report bugs, and suggest features!</a>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
+          <button id="cancelSettings" class="main-buttons-button" 
                   style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
             Cancel
           </button>
-          <button id="savePlaysColumn" class="main-buttons-button main-button-primary" 
-                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+          <button id="saveSettings" class="main-buttons-button main-button-primary" 
+                  style="padding: 8px 18px; width: 100px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
             Save
           </button>
         </div>
       </div>
     `;
-
+  
     Spicetify.PopupModal.display({
-        title: "<span style='font-size: 25px;'>Playlist Column Options</span>",
+        title: "<span style='font-size: 25px;'>Sort-Play Settings</span>",
         content: modalContainer,
     });
-
+  
     if (isMenuOpen) {
       toggleMenu();
       isButtonClicked = false;
@@ -183,120 +200,51 @@ async function main() {
       svgElement.style.fill = buttonStyles.main.color;
       mainButton.style.filter = "brightness(1)";
     }
-
+  
     const modalContainerElement = document.querySelector(".main-popupModal-container");
     if (modalContainerElement) {
         modalContainerElement.style.zIndex = "2000";
     }
-
-    const saveButton = document.getElementById("savePlaysColumn");
-    const cancelButton = document.getElementById("cancelPlaysColumn");
+  
+    const saveButton = document.getElementById("saveSettings");
+    const cancelButton = document.getElementById("cancelSettings");
     const columnPlayCountCheckbox = document.getElementById("columnPlayCount");
     const removeDateAddedCheckbox = document.getElementById("removeDateAdded");
-
+    const playlistDeduplicateCheckbox = document.getElementById("playlistDeduplicate");
+  
     columnPlayCountCheckbox.addEventListener("change", () => {
         removeDateAddedCheckbox.disabled = !columnPlayCountCheckbox.checked;
     });
-
+  
+  
     saveButton.addEventListener("mouseenter", () => {
         saveButton.style.backgroundColor = "#3BE377";
     });
     saveButton.addEventListener("mouseleave", () => {
         saveButton.style.backgroundColor = "#1ED760";
     });
-
+  
     cancelButton.addEventListener("mouseenter", () => {
         cancelButton.style.backgroundColor = "#444444";
     });
     cancelButton.addEventListener("mouseleave", () => {
         cancelButton.style.backgroundColor = "#333333";
     });
-
+  
     saveButton.addEventListener("click", () => {
-        columnPlayCount = columnPlayCountCheckbox.checked;
-        removeDateAdded = removeDateAddedCheckbox.checked;
-
-        saveSettings();
-
-        Spicetify.PopupModal.hide();
-        Spicetify.showNotification("Column settings saved successfully!");
-
-        updateTracklist();
+      columnPlayCount = columnPlayCountCheckbox.checked;
+      removeDateAdded = removeDateAddedCheckbox.checked;
+      playlistDeduplicate = playlistDeduplicateCheckbox.checked;
+  
+      saveSettings();
+  
+      Spicetify.PopupModal.hide();
+      Spicetify.showNotification("Settings saved successfully!");
+      updateTracklist();
     });
-
+  
     cancelButton.addEventListener("click", () => {
-        Spicetify.PopupModal.hide();
-    });
-  }
-
-  function showSettingsModal() {
-    const modalContainer = document.createElement("div");
-    modalContainer.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 15px;">
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-          <input type="checkbox" id="playlistDeduplicate" ${playlistDeduplicate ? "checked" : ""}>
-          <label for="playlistDeduplicate" style="margin-left: 8px; color: white;">Remove Duplicate Tracks in Playlist</label>
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-          <button id="cancelSettings" class="main-buttons-button" 
-                  style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-            Cancel
-          </button>
-          <button id="saveSettings" class="main-buttons-button main-button-primary" 
-                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-            Save
-          </button>
-        </div>
-      </div>
-    `;
-
-    Spicetify.PopupModal.display({
-        title: "<span style='font-size: 25px;'>Sorting Settings</span>",
-        content: modalContainer,
-    });
-
-    if (isMenuOpen) {
-        toggleMenu();
-        isButtonClicked = false;
-        mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-        mainButton.style.color = buttonStyles.main.color;
-        svgElement.style.fill = buttonStyles.main.color;
-        mainButton.style.filter = "brightness(1)";
-    }
-
-    const modalContainerElement = document.querySelector(".main-popupModal-container");
-    if (modalContainerElement) {
-        modalContainerElement.style.zIndex = "2000";
-    }
-
-    const saveButton = document.getElementById("saveSettings");
-    const cancelButton = document.getElementById("cancelSettings");
-
-    saveButton.addEventListener("mouseenter", () => {
-        saveButton.style.backgroundColor = "#3BE377";
-    });
-    saveButton.addEventListener("mouseleave", () => {
-        saveButton.style.backgroundColor = "#1ED760";
-    });
-
-    cancelButton.addEventListener("mouseenter", () => {
-        cancelButton.style.backgroundColor = "#444444";
-    });
-    cancelButton.addEventListener("mouseleave", () => {
-        cancelButton.style.backgroundColor = "#333333";
-    });
-
-    saveButton.addEventListener("click", () => {
-        playlistDeduplicate = document.getElementById("playlistDeduplicate").checked;
-
-        saveSettings();
-
-        Spicetify.PopupModal.hide();
-        Spicetify.showNotification("Settings saved successfully!");
-    });
-
-    cancelButton.addEventListener("click", () => {
-        Spicetify.PopupModal.hide();
+      Spicetify.PopupModal.hide();
     });
   }
 
@@ -1202,13 +1150,7 @@ async function main() {
       {
         backgroundColor: "#282828",
         color: "white",
-        text: "Play Count Column",
-        isSetting: true, 
-      },
-      {
-        backgroundColor: "#282828",
-        color: "white",
-        text: "Setting",
+        text: "Sort-Play Settings",
         isSetting: true, 
       },
     ],
@@ -1910,14 +1852,7 @@ async function main() {
           await addTracksToPlaylist(newPlaylist.id, trackUris);
     
           Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
-
-          if (window.goatcounter && typeof window.goatcounter.count === 'function') {
-              goatcounter.count({
-                  path: `sort-type-${sortType}`,
-                  title: 'Sort Event',
-                  event: true,
-              });
-          }
+          
       } catch (error) {
           console.error("Error creating or updating playlist:", error);
           Spicetify.showNotification(
@@ -2192,11 +2127,7 @@ async function main() {
     if (buttonStyle.isSetting) {
       element.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (buttonStyle.text === "Play Count Column") {
-          showPlaysColumnModal();
-        } else if (buttonStyle.text === "Setting") {
-          showSettingsModal();
-        }
+        showSettingsModal();
       });
     } else {
       const sortType = buttonStyle.sortType;
@@ -2587,16 +2518,6 @@ async function main() {
       initializeTracklistObserver();
     }
   });
-
-  function initializeAnalytics() {
-    const script = document.createElement('script');
-    script.setAttribute('data-goatcounter', 'https://sort-play.goatcounter.com/count');
-    script.async = true;
-    script.src = '//gc.zgo.at/count.js';
-    document.head.appendChild(script);
-  }
-
-  initializeAnalytics();
 
   observer.observe(document.body, {
     childList: true,
