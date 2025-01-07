@@ -553,6 +553,27 @@ async function main() {
   const albumTracksDataCache = {};
   const inFlightAlbumReleaseDateRequests = {};
 
+  const excludedPlaylistNames = ["New Music Friday", "Discover Weekly", "Release Radar"];
+
+  function getCurrentPlaylistName() {
+    const playlistNameElement = document.querySelector(
+      ".encore-text.encore-text-headline-large"
+    );
+    return playlistNameElement ? playlistNameElement.textContent.trim() : null;
+  }
+
+  function getCurrentUri() {
+    const path = Spicetify.Platform.History.location?.pathname;
+    if (!path) return null;
+
+    if (path.startsWith("/playlist/")) {
+      return `spotify:playlist:${path.split("/")[2]}`;
+    } else if (path.startsWith("/artist/")) {
+      return `spotify:artist:${path.split("/")[2]}`;
+    }
+    return null;
+  }
+
   function getCurrentUri() {
     const path = Spicetify.Platform.History.location?.pathname;
     if (!path) return null;
@@ -2532,12 +2553,12 @@ async function main() {
     initializeCache();
 
     const tracks = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
-      .filter(track => {
-        const playCountElement = track.querySelector(".sort-play-playcount");
-        const trackUri = getTracklistTrackUri(track);
-        const isTrack = trackUri && trackUri.includes("track");
-        return playCountElement && playCountElement.textContent === "..." && isTrack && trackUri;
-      });
+        .filter(track => {
+            const playCountElement = track.querySelector(".sort-play-playcount");
+            const trackUri = getTracklistTrackUri(track);
+            const isTrack = trackUri && trackUri.includes("track");
+            return playCountElement && playCountElement.textContent === "..." && isTrack && trackUri;
+        });
 
     for (const track of tracks) {
       try {
@@ -2546,16 +2567,20 @@ async function main() {
 
         const trackUri = getTracklistTrackUri(track);
         if (!trackUri) {
-          playCountElement.textContent = "N/A";
-          continue;
+            playCountElement.textContent = "N/A";
+            continue;
         }
 
         const trackId = trackUri.split(":")[2];
 
         const cachedCount = getCachedPlayCount(trackId);
         if (cachedCount !== null) {
-          const formattedCount = new Intl.NumberFormat('en-US').format(cachedCount);
-          playCountElement.textContent = formattedCount;
+          if (cachedCount === "_") {
+              playCountElement.textContent = "_";
+          } else {
+              const formattedCount = new Intl.NumberFormat('en-US').format(cachedCount);
+              playCountElement.textContent = formattedCount;
+          }
           playCountElement.style.fontSize = "14px";
           playCountElement.style.fontWeight = "400";
           playCountElement.style.color = "var(--spice-subtext)";
@@ -2563,53 +2588,58 @@ async function main() {
         }
 
         const albumLinkElement = track.querySelector(
-          ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line"
+            ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line"
         );
 
         if (!albumLinkElement?.href) {
-          playCountElement.textContent = "N/A";
-          continue;
+            playCountElement.textContent = "N/A";
+            continue;
         }
 
         const albumId = albumLinkElement.href.split("/album/")[1];
         if (!albumId) {
-          playCountElement.textContent = "N/A";
-          continue;
+            playCountElement.textContent = "N/A";
+            continue;
         }
 
         const trackDetails = {
-          uri: trackUri,
-          name: track.querySelector(".main-trackList-rowTitle")?.textContent || "",
-          albumUri: `spotify:album:${albumId}`,
-          track: { album: { id: albumId }, id: trackId }
+            uri: trackUri,
+            name: track.querySelector(".main-trackList-rowTitle")?.textContent || "",
+            albumUri: `spotify:album:${albumId}`,
+            track: { album: { id: albumId }, id: trackId }
         };
 
         const result = await Promise.race([
-          getTrackDetailsWithPlayCount(trackDetails),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+            getTrackDetailsWithPlayCount(trackDetails),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
         ]);
 
         if (result?.playCount !== null) {
-          setCachedPlayCount(trackId, result.playCount);
-
-          const formattedCount = new Intl.NumberFormat('en-US').format(result.playCount);
-          playCountElement.textContent = formattedCount;
+          // Handle "_" values correctly
+          if (result.playCount === "_") {
+              playCountElement.textContent = "_";
+              setCachedPlayCount(trackId, "_"); 
+          } else {
+              const formattedCount = new Intl.NumberFormat('en-US').format(result.playCount);
+              playCountElement.textContent = formattedCount;
+              setCachedPlayCount(trackId, result.playCount); 
+          }
         } else {
-          playCountElement.textContent = "N/A";
+            playCountElement.textContent = "N/A";
         }
 
         playCountElement.style.fontSize = "14px";
         playCountElement.style.fontWeight = "400";
         playCountElement.style.color = "var(--spice-subtext)";
 
-      } catch (error) {
+    } catch (error) {
         console.error("Error processing track:", error);
         const playCountElement = track.querySelector(".sort-play-playcount");
         if (playCountElement) {
-          playCountElement.textContent = "N/A";
-          playCountElement.style.fontSize = "14px";
-          playCountElement.style.fontWeight = "400";
-          playCountElement.style.color = "var(--spice-subtext)";
+            playCountElement.textContent = "N/A";
+            playCountElement.style.fontSize = "14px";
+            playCountElement.style.fontWeight = "400";
+            playCountElement.style.color = "var(--spice-subtext)";
         }
       }
     }
@@ -2646,8 +2676,12 @@ async function main() {
   async function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
+    
+    const currentPlaylistName = getCurrentPlaylistName();
+    const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
+    const shouldRemoveDateAdded = removeDateAdded && !isExcludedPlaylist;
   
-    const gridCss = getGridCss(removeDateAdded);
+    const gridCss = getGridCss(shouldRemoveDateAdded);
   
     const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
     if (tracklistHeader && !tracklistHeader.querySelector(".sort-play-header")) {
@@ -2663,7 +2697,7 @@ async function main() {
         case 6: tracklistHeader.setAttribute("style", gridCss.sevenColumnGridCss); break;
       }
   
-      const headerInsertionPoint = !removeDateAdded 
+      const headerInsertionPoint = !shouldRemoveDateAdded
         ? lastColumn
         : tracklistHeader.querySelector('[aria-colindex="4"]');
       
@@ -2706,7 +2740,7 @@ async function main() {
         case 6: track.setAttribute("style", gridCss.sevenColumnGridCss); break;
       }
   
-      const insertionPoint = !removeDateAdded
+      const insertionPoint = !shouldRemoveDateAdded
         ? lastColumn
         : track.querySelector('[aria-colindex="4"]');
       
