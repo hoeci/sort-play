@@ -263,7 +263,7 @@ async function main() {
         padding: 8px 12px;
         border-radius: 4px;
         font-size: 14px;
-        max-width: 230px;
+        max-width: 240px;
         width: max-content;
         bottom: 100%;   
         left: 50%;       
