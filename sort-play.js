@@ -2512,7 +2512,7 @@ async function main() {
 
   const CACHE_KEY = 'spotify-play-count-cache';
   const CACHE_TIMESTAMP_KEY = 'spotify-play-count-cache-timestamp';
-  const CACHE_EXPIRY_DAYS = 6;
+  const CACHE_EXPIRY_DAYS = 2;
 
   function initializeCache() {
     const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
