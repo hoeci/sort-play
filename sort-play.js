@@ -191,7 +191,7 @@ async function main() {
     .sort-play-settings .setting-row .col.description {
         float: left;
         padding-right: 15px;
-        width: 700px;
+        width: 900px;
         color: white;
     }
     .sort-play-settings .setting-row .col.action {
@@ -321,7 +321,7 @@ async function main() {
 
     <div class="setting-row" id="playlistDeduplicate">
     <label class="col description">
-        Remove Duplicate Tracks in Playlist
+        Remove Duplicate Tracks While Sorting
         <span class="tooltip-container">
             <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
             <span class="custom-tooltip">Setting won't affect artist pages or tracks with identical URLs</span>
