@@ -294,9 +294,15 @@ async function main() {
         Playlist Column Options
     </div>
     <div style="border-bottom: 1px solid #555; margin-bottom: 0px;"></div>
-
+ 
     <div class="setting-row" id="columnPlayCount">
-        <label class="col description">Play Count Column in Playlist</label>
+         <label class="col description">
+             Play Count Column in Playlist
+             <span class="tooltip-container">
+                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                 <span class="custom-tooltip">Play counts are cached for 2 days</span>
+             </span>
+         </label>
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${columnPlayCount ? 'checked' : ''}>
