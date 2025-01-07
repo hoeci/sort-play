@@ -416,10 +416,6 @@ async function main() {
         columnPlayCount = columnPlayCountToggle.checked;
         removeDateAddedToggle.disabled = !columnPlayCount;
         removeDateAddedToggle.parentElement.classList.toggle("disabled", !columnPlayCount);
-        if (!columnPlayCount) {
-            removeDateAddedToggle.checked = false;
-            removeDateAdded = false;
-        }
         saveSettings();
         updateTracklist();
     });
@@ -444,11 +440,16 @@ async function main() {
 
     saveButton.addEventListener("click", () => {
         columnPlayCount = columnPlayCountToggle.checked;
+        const oldRemoveDateAdded = removeDateAdded;
         removeDateAdded = removeDateAddedToggle.checked;
         playlistDeduplicate = playlistDeduplicateToggle.checked;
         showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
 
         saveSettings();
+        if (!columnPlayCount) {
+          removeDateAdded = oldRemoveDateAdded;
+          saveSettings();
+        }
 
         Spicetify.PopupModal.hide();
         Spicetify.showNotification("Settings saved successfully!");
