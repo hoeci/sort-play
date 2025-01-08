@@ -2639,17 +2639,15 @@ async function main() {
 
   function updatePlayCountDisplay(element, count) {
     if (!element) return;
-    if (count !== "_" && (isNaN(count) || count === null || count === undefined)) {
-        element.textContent = "_";
-    } else {
-        element.textContent = count === "_" ? "_" : new Intl.NumberFormat('en-US').format(count);
-    }
     
+    element.textContent = (count && count !== "_") 
+        ? new Intl.NumberFormat('en-US').format(count)
+        : "_";
+        
     element.style.fontSize = "14px";
     element.style.fontWeight = "400";
     element.style.color = "var(--spice-subtext)";
   }
-
 
   let isUpdatingTracklist = false;
   let tracklistObserver;
