@@ -2549,7 +2549,7 @@ async function main() {
   function setCachedPlayCount(trackId, playCount) {
     try {
         const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-        cache[trackId] = playCount;
+        cache[trackId] = (playCount === "―" || typeof playCount === 'number') ? playCount : "―";
         localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
     } catch (error) {
         console.error('Error writing to cache:', error);
@@ -2577,7 +2577,7 @@ async function main() {
 
                 const trackUri = getTracklistTrackUri(track);
                 if (!trackUri) {
-                    playCountElement.textContent = "―";
+                    updatePlayCountDisplay(playCountElement, "―");
                     return;
                 }
 
@@ -2626,7 +2626,7 @@ async function main() {
                     setCachedPlayCount(trackId, result.playCount);
                 }
 
-            } catch (error) {
+              } catch (error) {
                 console.error("Error processing track:", error);
                 const playCountElement = track.querySelector(".sort-play-playcount");
                 if (playCountElement) {
@@ -2638,13 +2638,18 @@ async function main() {
   }
 
   function updatePlayCountDisplay(element, count) {
-      if (!element) return;
-      
-      element.textContent = count === "―" ? "―" : new Intl.NumberFormat('en-US').format(count);
-      element.style.fontSize = "14px";
-      element.style.fontWeight = "400";
-      element.style.color = "var(--spice-subtext)";
+    if (!element) return;
+    if (count !== "―" && (isNaN(count) || count === null || count === undefined)) {
+        element.textContent = "―";
+    } else {
+        element.textContent = count === "―" ? "―" : new Intl.NumberFormat('en-US').format(count);
+    }
+    
+    element.style.fontSize = "14px";
+    element.style.fontWeight = "400";
+    element.style.color = "var(--spice-subtext)";
   }
+
 
   let isUpdatingTracklist = false;
   let tracklistObserver;
