@@ -2565,87 +2565,84 @@ async function main() {
             const isTrack = trackUri && trackUri.includes("track");
             return playCountElement && playCountElement.textContent === "" && isTrack && trackUri;
         });
+        
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < tracks.length; i += BATCH_SIZE) {
+        const batch = tracks.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(async (track) => {
+            try {
+                const playCountElement = track.querySelector(".sort-play-playcount");
+                if (!playCountElement) return;
 
-    for (const track of tracks) {
-      try {
-        const playCountElement = track.querySelector(".sort-play-playcount");
-        if (!playCountElement) continue;
+                const trackUri = getTracklistTrackUri(track);
+                if (!trackUri) {
+                    playCountElement.textContent = "―";
+                    return;
+                }
 
-        const trackUri = getTracklistTrackUri(track);
-        if (!trackUri) {
-            playCountElement.textContent = "―";
-            continue;
-        }
+                const trackId = trackUri.split(":")[2];
 
-        const trackId = trackUri.split(":")[2];
+                const cachedCount = getCachedPlayCount(trackId);
+                if (cachedCount !== null) {
+                    updatePlayCountDisplay(playCountElement, cachedCount);
+                    return;
+                }
 
-        const cachedCount = getCachedPlayCount(trackId);
-        if (cachedCount !== null) {
-            if (cachedCount === "―" || cachedCount === 0) {
-                playCountElement.textContent = "―";
-            } else {
-                const formattedCount = new Intl.NumberFormat('en-US').format(cachedCount);
-                playCountElement.textContent = formattedCount;
+                const albumLinkElement = track.querySelector(
+                    ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line"
+                );
+
+                if (!albumLinkElement?.href) {
+                    updatePlayCountDisplay(playCountElement, "―");
+                    setCachedPlayCount(trackId, "―");
+                    return;
+                }
+
+                const albumId = albumLinkElement.href.split("/album/")[1];
+                if (!albumId) {
+                    updatePlayCountDisplay(playCountElement, "―");
+                    setCachedPlayCount(trackId, "―");
+                    return;
+                }
+
+                const trackDetails = {
+                    uri: trackUri,
+                    name: track.querySelector(".main-trackList-rowTitle")?.textContent || "",
+                    albumUri: `spotify:album:${albumId}`,
+                    track: { album: { id: albumId }, id: trackId }
+                };
+
+                const result = await Promise.race([
+                    getTrackDetailsWithPlayCount(trackDetails),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+                ]);
+
+                if (result?.playCount === null || result?.playCount === 0) {
+                    updatePlayCountDisplay(playCountElement, "―");
+                    setCachedPlayCount(trackId, "―");
+                } else {
+                    updatePlayCountDisplay(playCountElement, result.playCount);
+                    setCachedPlayCount(trackId, result.playCount);
+                }
+
+            } catch (error) {
+                console.error("Error processing track:", error);
+                const playCountElement = track.querySelector(".sort-play-playcount");
+                if (playCountElement) {
+                    updatePlayCountDisplay(playCountElement, "―");
+                }
             }
-            playCountElement.style.fontSize = "14px";
-            playCountElement.style.fontWeight = "400";
-            playCountElement.style.color = "var(--spice-subtext)";
-            continue;
-        }
-
-        const albumLinkElement = track.querySelector(
-            ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line"
-        );
-
-        if (!albumLinkElement?.href) {
-            playCountElement.textContent = "―";
-            setCachedPlayCount(trackId, "―");
-            continue;
-        }
-
-        const albumId = albumLinkElement.href.split("/album/")[1];
-        if (!albumId) {
-            playCountElement.textContent = "―";
-            setCachedPlayCount(trackId, "―");
-            continue;
-        }
-
-        const trackDetails = {
-            uri: trackUri,
-            name: track.querySelector(".main-trackList-rowTitle")?.textContent || "",
-            albumUri: `spotify:album:${albumId}`,
-            track: { album: { id: albumId }, id: trackId }
-        };
-
-        const result = await Promise.race([
-            getTrackDetailsWithPlayCount(trackDetails),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
-        ]);
-
-        if (result?.playCount === null || result?.playCount === 0) {
-            playCountElement.textContent = "―";
-            setCachedPlayCount(trackId, "―");
-        } else {
-            const formattedCount = new Intl.NumberFormat('en-US').format(result.playCount);
-            playCountElement.textContent = formattedCount;
-            setCachedPlayCount(trackId, result.playCount);
-        }
-
-        playCountElement.style.fontSize = "14px";
-        playCountElement.style.fontWeight = "400";
-        playCountElement.style.color = "var(--spice-subtext)";
-
-    } catch (error) {
-        console.error("Error processing track:", error);
-        const playCountElement = track.querySelector(".sort-play-playcount");
-        if (playCountElement) {
-            playCountElement.textContent = "―";
-            playCountElement.style.fontSize = "14px";
-            playCountElement.style.fontWeight = "400";
-            playCountElement.style.color = "var(--spice-subtext)";
-        }
-      }
+        }));
     }
+  }
+
+  function updatePlayCountDisplay(element, count) {
+      if (!element) return;
+      
+      element.textContent = count === "―" ? "―" : new Intl.NumberFormat('en-US').format(count);
+      element.style.fontSize = "14px";
+      element.style.fontWeight = "400";
+      element.style.color = "var(--spice-subtext)";
   }
 
   let isUpdatingTracklist = false;
