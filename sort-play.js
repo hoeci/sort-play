@@ -2563,7 +2563,7 @@ async function main() {
             const playCountElement = track.querySelector(".sort-play-playcount");
             const trackUri = getTracklistTrackUri(track);
             const isTrack = trackUri && trackUri.includes("track");
-            return playCountElement && playCountElement.textContent === "..." && isTrack && trackUri;
+            return playCountElement && playCountElement.textContent === "" && isTrack && trackUri;
         });
 
     for (const track of tracks) {
@@ -2760,7 +2760,7 @@ async function main() {
   
       const playCountElement = document.createElement("span");
       playCountElement.classList.add("sort-play-playcount");
-      playCountElement.textContent = "...";
+      playCountElement.textContent = "";
       playCountElement.style.fontSize = "14px";
       playCountElement.style.fontWeight = "400";
       playCountElement.style.color = "var(--spice-subtext)";
