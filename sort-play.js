@@ -2577,7 +2577,7 @@ async function main() {
 
                 const trackUri = getTracklistTrackUri(track);
                 if (!trackUri) {
-                    playCountElement.textContent = "_";
+                    playCountElement.textContent = "―";
                     return;
                 }
 
@@ -2594,15 +2594,15 @@ async function main() {
                 );
 
                 if (!albumLinkElement?.href) {
-                    updatePlayCountDisplay(playCountElement, "_");
-                    setCachedPlayCount(trackId, "_");
+                    updatePlayCountDisplay(playCountElement, "―");
+                    setCachedPlayCount(trackId, "―");
                     return;
                 }
 
                 const albumId = albumLinkElement.href.split("/album/")[1];
                 if (!albumId) {
-                    updatePlayCountDisplay(playCountElement, "_");
-                    setCachedPlayCount(trackId, "_");
+                    updatePlayCountDisplay(playCountElement, "―");
+                    setCachedPlayCount(trackId, "―");
                     return;
                 }
 
@@ -2619,8 +2619,8 @@ async function main() {
                 ]);
 
                 if (result?.playCount === null || result?.playCount === 0) {
-                    updatePlayCountDisplay(playCountElement, "_");
-                    setCachedPlayCount(trackId, "_");
+                    updatePlayCountDisplay(playCountElement, "―");
+                    setCachedPlayCount(trackId, "―");
                 } else {
                     updatePlayCountDisplay(playCountElement, result.playCount);
                     setCachedPlayCount(trackId, result.playCount);
@@ -2630,7 +2630,7 @@ async function main() {
                 console.error("Error processing track:", error);
                 const playCountElement = track.querySelector(".sort-play-playcount");
                 if (playCountElement) {
-                    updatePlayCountDisplay(playCountElement, "_");
+                    updatePlayCountDisplay(playCountElement, "―");
                 }
             }
         }));
@@ -2639,10 +2639,10 @@ async function main() {
 
   function updatePlayCountDisplay(element, count) {
     if (!element) return;
-    if (count !== "_" && (isNaN(count) || count === null || count === undefined)) {
-        element.textContent = "_";
+    if (count !== "―" && (isNaN(count) || count === null || count === undefined)) {
+        element.textContent = "―";
     } else {
-        element.textContent = count === "_" ? "_" : new Intl.NumberFormat('en-US').format(count);
+        element.textContent = count === "―" ? "―" : new Intl.NumberFormat('en-US').format(count);
     }
     
     element.style.fontSize = "14px";
