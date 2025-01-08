@@ -2547,11 +2547,11 @@ async function main() {
 
   function setCachedPlayCount(trackId, playCount) {
     try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-      cache[trackId] = playCount;
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+        const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
+        cache[trackId] = playCount;
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
     } catch (error) {
-      console.error('Error writing to cache:', error);
+        console.error('Error writing to cache:', error);
     }
   }
 
@@ -2573,7 +2573,7 @@ async function main() {
 
         const trackUri = getTracklistTrackUri(track);
         if (!trackUri) {
-            playCountElement.textContent = "N/A";
+            playCountElement.textContent = "―";
             continue;
         }
 
@@ -2581,16 +2581,16 @@ async function main() {
 
         const cachedCount = getCachedPlayCount(trackId);
         if (cachedCount !== null) {
-          if (cachedCount === "_") {
-              playCountElement.textContent = "_";
-          } else {
-              const formattedCount = new Intl.NumberFormat('en-US').format(cachedCount);
-              playCountElement.textContent = formattedCount;
-          }
-          playCountElement.style.fontSize = "14px";
-          playCountElement.style.fontWeight = "400";
-          playCountElement.style.color = "var(--spice-subtext)";
-          continue;
+            if (cachedCount === "―" || cachedCount === 0) {
+                playCountElement.textContent = "―";
+            } else {
+                const formattedCount = new Intl.NumberFormat('en-US').format(cachedCount);
+                playCountElement.textContent = formattedCount;
+            }
+            playCountElement.style.fontSize = "14px";
+            playCountElement.style.fontWeight = "400";
+            playCountElement.style.color = "var(--spice-subtext)";
+            continue;
         }
 
         const albumLinkElement = track.querySelector(
@@ -2598,13 +2598,15 @@ async function main() {
         );
 
         if (!albumLinkElement?.href) {
-            playCountElement.textContent = "N/A";
+            playCountElement.textContent = "―";
+            setCachedPlayCount(trackId, "―");
             continue;
         }
 
         const albumId = albumLinkElement.href.split("/album/")[1];
         if (!albumId) {
-            playCountElement.textContent = "N/A";
+            playCountElement.textContent = "―";
+            setCachedPlayCount(trackId, "―");
             continue;
         }
 
@@ -2620,18 +2622,13 @@ async function main() {
             new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
         ]);
 
-        if (result?.playCount !== null) {
-          // Handle "_" values correctly
-          if (result.playCount === "_") {
-              playCountElement.textContent = "_";
-              setCachedPlayCount(trackId, "_"); 
-          } else {
-              const formattedCount = new Intl.NumberFormat('en-US').format(result.playCount);
-              playCountElement.textContent = formattedCount;
-              setCachedPlayCount(trackId, result.playCount); 
-          }
+        if (result?.playCount === null || result?.playCount === 0) {
+            playCountElement.textContent = "―";
+            setCachedPlayCount(trackId, "―");
         } else {
-            playCountElement.textContent = "N/A";
+            const formattedCount = new Intl.NumberFormat('en-US').format(result.playCount);
+            playCountElement.textContent = formattedCount;
+            setCachedPlayCount(trackId, result.playCount);
         }
 
         playCountElement.style.fontSize = "14px";
@@ -2642,7 +2639,7 @@ async function main() {
         console.error("Error processing track:", error);
         const playCountElement = track.querySelector(".sort-play-playcount");
         if (playCountElement) {
-            playCountElement.textContent = "N/A";
+            playCountElement.textContent = "―";
             playCountElement.style.fontSize = "14px";
             playCountElement.style.fontWeight = "400";
             playCountElement.style.color = "var(--spice-subtext)";
