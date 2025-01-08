@@ -2549,7 +2549,7 @@ async function main() {
   function setCachedPlayCount(trackId, playCount) {
     try {
         const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-        cache[trackId] = (playCount === "―" || typeof playCount === 'number') ? playCount : "―";
+        cache[trackId] = playCount;
         localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
     } catch (error) {
         console.error('Error writing to cache:', error);
@@ -2577,7 +2577,7 @@ async function main() {
 
                 const trackUri = getTracklistTrackUri(track);
                 if (!trackUri) {
-                    updatePlayCountDisplay(playCountElement, "―");
+                    playCountElement.textContent = "_";
                     return;
                 }
 
@@ -2594,15 +2594,15 @@ async function main() {
                 );
 
                 if (!albumLinkElement?.href) {
-                    updatePlayCountDisplay(playCountElement, "―");
-                    setCachedPlayCount(trackId, "―");
+                    updatePlayCountDisplay(playCountElement, "_");
+                    setCachedPlayCount(trackId, "_");
                     return;
                 }
 
                 const albumId = albumLinkElement.href.split("/album/")[1];
                 if (!albumId) {
-                    updatePlayCountDisplay(playCountElement, "―");
-                    setCachedPlayCount(trackId, "―");
+                    updatePlayCountDisplay(playCountElement, "_");
+                    setCachedPlayCount(trackId, "_");
                     return;
                 }
 
@@ -2619,18 +2619,18 @@ async function main() {
                 ]);
 
                 if (result?.playCount === null || result?.playCount === 0) {
-                    updatePlayCountDisplay(playCountElement, "―");
-                    setCachedPlayCount(trackId, "―");
+                    updatePlayCountDisplay(playCountElement, "_");
+                    setCachedPlayCount(trackId, "_");
                 } else {
                     updatePlayCountDisplay(playCountElement, result.playCount);
                     setCachedPlayCount(trackId, result.playCount);
                 }
 
-              } catch (error) {
+            } catch (error) {
                 console.error("Error processing track:", error);
                 const playCountElement = track.querySelector(".sort-play-playcount");
                 if (playCountElement) {
-                    updatePlayCountDisplay(playCountElement, "―");
+                    updatePlayCountDisplay(playCountElement, "_");
                 }
             }
         }));
@@ -2639,10 +2639,10 @@ async function main() {
 
   function updatePlayCountDisplay(element, count) {
     if (!element) return;
-    if (count !== "―" && (isNaN(count) || count === null || count === undefined)) {
-        element.textContent = "―";
+    if (count !== "_" && (isNaN(count) || count === null || count === undefined)) {
+        element.textContent = "_";
     } else {
-        element.textContent = count === "―" ? "―" : new Intl.NumberFormat('en-US').format(count);
+        element.textContent = count === "_" ? "_" : new Intl.NumberFormat('en-US').format(count);
     }
     
     element.style.fontSize = "14px";
