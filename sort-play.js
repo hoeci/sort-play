@@ -43,6 +43,11 @@ async function main() {
     let includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true"; 
 
     modalContainer.innerHTML = `
+      <style>
+      .main-embedWidgetGenerator-container {
+        width: 420px !important;
+      }
+      </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
         <div style="display: flex; flex-direction: column; gap: 5px;">
           <label for="lastFmUsername">Last.fm Username:</label>
@@ -72,6 +77,7 @@ async function main() {
     Spicetify.PopupModal.display({
       title: "<span style='font-size: 25px;'>Last.fm Username</span>",
       content: modalContainer,
+      isLarge: true,
     });
     
     if (isMenuOpen) {
@@ -354,23 +360,13 @@ async function main() {
             <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 13px; text-decoration: none;" target="_blank">⭐ Star on GitHub, report bugs, and suggest features!</a>
         </label>
     </div>
-    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px;">
-        <button id="cancelSettings" class="main-buttons-button" 
-                style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-        Cancel
-        </button>
-        <button id="saveSettings" class="main-buttons-button main-button-primary" 
-                style="padding: 8px 18px; width: 100px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-        Save
-        </button>
     </div>
-</div>
     `;
 
     Spicetify.PopupModal.display({
-      title: "<span style='font-size: 30px;'>Sort-Play Settings</span>",
-      content: modalContainer,
-      isLarge: true,
+        title: "<span style='font-size: 30px;'>Sort-Play Settings</span>",
+        content: modalContainer,
+        isLarge: true,
     });
 
     if (isMenuOpen) {
@@ -387,8 +383,6 @@ async function main() {
         modalContainerElement.style.zIndex = "2000";
     }
 
-    const saveButton = document.getElementById("saveSettings");
-    const cancelButton = document.getElementById("cancelSettings");
     const columnPlayCountToggle = modalContainer.querySelector("#columnPlayCount input");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
@@ -404,25 +398,20 @@ async function main() {
         });
     }, 50);
 
-    saveButton.addEventListener("mouseenter", () => {
-        saveButton.style.backgroundColor = "#3BE377";
-    });
-    saveButton.addEventListener("mouseleave", () => {
-        saveButton.style.backgroundColor = "#1ED760";
-    });
-
-    cancelButton.addEventListener("mouseenter", () => {
-        cancelButton.style.backgroundColor = "#444444";
-    });
-    cancelButton.addEventListener("mouseleave", () => {
-        cancelButton.style.backgroundColor = "#333333";
-    });
-
     columnPlayCountToggle.addEventListener("change", () => {
         columnPlayCount = columnPlayCountToggle.checked;
         removeDateAddedToggle.disabled = !columnPlayCount;
         removeDateAddedToggle.parentElement.classList.toggle("disabled", !columnPlayCount);
-        saveSettings();
+        if (!columnPlayCount) {
+            const oldRemoveDateAdded = removeDateAdded;
+            removeDateAdded = false;
+            removeDateAddedToggle.checked = false;
+            saveSettings();
+            removeDateAdded = oldRemoveDateAdded;
+            saveSettings();
+        } else {
+            saveSettings();
+        }
         updateTracklist();
     });
 
@@ -442,28 +431,6 @@ async function main() {
     showRemovedDuplicatesToggle.addEventListener("change", () => {
         showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
         saveSettings();
-    });
-
-    saveButton.addEventListener("click", () => {
-        columnPlayCount = columnPlayCountToggle.checked;
-        const oldRemoveDateAdded = removeDateAdded;
-        removeDateAdded = removeDateAddedToggle.checked;
-        playlistDeduplicate = playlistDeduplicateToggle.checked;
-        showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
-
-        saveSettings();
-        if (!columnPlayCount) {
-          removeDateAdded = oldRemoveDateAdded;
-          saveSettings();
-        }
-
-        Spicetify.PopupModal.hide();
-        Spicetify.showNotification("Settings saved successfully!");
-        updateTracklist();
-    });
-
-    cancelButton.addEventListener("click", () => {
-        Spicetify.PopupModal.hide();
     });
   }
   
