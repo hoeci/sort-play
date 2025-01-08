@@ -629,10 +629,17 @@ async function main() {
           .map(parsePlaylistAPITrack);
         return parsedTracks;
       } catch (error) {
+        console.error(
+          `Error fetching playlist tracks (Attempt ${attempt}/${retries}):`,
+          error
+        );
         if (attempt < retries) {
           await new Promise((resolve) => setTimeout(resolve, delay));
-          delay *= 2;  
+          delay *= 2; 
         } else {
+          console.error(
+            `Failed to fetch playlist tracks after ${retries} attempts.`
+          );
           throw error;  
         }
       }
