@@ -1985,6 +1985,7 @@ async function main() {
   
       let sortedTracks;
       let uniqueTracks;
+      let removedTracks = [];
   
       if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
         if (sortType === "releaseDate") {
