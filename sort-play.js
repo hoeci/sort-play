@@ -355,9 +355,9 @@ async function main() {
             </label>
         </div>
     </div>
-    <div class="setting-row" id="githubLink">
-        <label class="col description">
-            <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 13px; text-decoration: none;" target="_blank">⭐ Star on GitHub, report bugs, and suggest features!</a>
+    <div class="setting-row" id="githubLink" style="margin-bottom: 10px; margin-top: 5px; justify-content: center;">
+        <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
+            <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 13px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
         </label>
     </div>
     </div>
