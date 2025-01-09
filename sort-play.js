@@ -1334,7 +1334,7 @@ async function main() {
       {
         backgroundColor: "#282828",
         color: "white",
-        text: "Release date",
+        text: "Release Date",
         sortType: "releaseDate",
         hasInnerButton: true
       },
