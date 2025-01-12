@@ -1,11 +1,14 @@
 # Sort Play
 Sort Spotify playlists and artist pages by play count, popularity, release date, shuffle, and Last.fm scrobbles.
+Create AI playlists from prompts.
 
-<img src="https://github.com/user-attachments/assets/c0593785-6966-499f-a7a7-5741c37c8471" alt="show" width="450px">
+<img src="https://github.com/user-attachments/assets/ea99b2b5-40dd-4c4f-a980-e80e31d49e4e" alt="show" width="358px">
+<img src="https://github.com/user-attachments/assets/f0710ff1-d5a5-4f41-aefa-201b6344b543" alt="show" width="550px">
 
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
++ Generate AI playlists from prompts, using the current playlist/artist as a base.
 + Play count column in playlists.
 + Connects to your Last.fm account.
 + Removes duplicate tracks, keeping the most popular.
