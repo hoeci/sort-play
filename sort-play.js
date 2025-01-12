@@ -6,15 +6,10 @@
     return;
   }
 
-    
   const { PlaylistAPI } = Platform;
-  const DefaultGeminiApiKeys = [
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***"
-  ];
+
   const LFMApiKey = "***REMOVED***";
+  
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
 
   let columnPlayCount = false;
@@ -60,7 +55,13 @@
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
     localStorage.setItem("sort-play-include-various-artists", includeVariousArtists);  
   }
-
+  const DefaultGeminiApiKeys = [
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***"
+  ];
+  
   function getRandomDefaultApiKey() {
     const randomIndex = Math.floor(Math.random() * DefaultGeminiApiKeys.length);
     return DefaultGeminiApiKeys[randomIndex];
