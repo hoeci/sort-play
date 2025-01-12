@@ -1,13 +1,13 @@
 [
   {
     "name": "Sort Play",
-    "description": "Sort playlists/artists by plays, Lastfm, and more. plays column in playlist.",
+    "description": "Sort playlists/artists by plays, Lastfm, and more. Generate AI playlists.",
     "preview": "cover.png",
     "main": "sort-play-loader.mjs",
     "readme": "info.md",
     "authors": [
         { "name": "hoeci", "url": "https://github.com/hoeci" }
     ],
-    "tags": ["playlist", "sort", "discography", "playcount", "Lastfm"]
+    "tags": ["playlist", "AI", "sort", "playcount", "discography", "Lastfm" ]
   }
 ]
