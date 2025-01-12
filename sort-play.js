@@ -1,13 +1,19 @@
 (async function () {
-async function main() {
+  async function main() {
   const { React, ReactDOM, URI, GraphQL, Platform } = Spicetify;
   if (!React || !ReactDOM || !GraphQL || !Platform) {
-      setTimeout(main, 10);
-      return;
+    setTimeout(main, 10);
+    return;
   }
 
+    
   const { PlaylistAPI } = Platform;
-
+  const DefaultGeminiApiKeys = [
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***"
+  ];
   const LFMApiKey = "***REMOVED***";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
 
@@ -15,20 +21,86 @@ async function main() {
   let removeDateAdded = false;
   let playlistDeduplicate = true;
   let showRemovedDuplicates = false;
+  let includeSongStats = true;
+  let includeLyrics = true;
+  let selectedAiModel = "gemini-1.5-pro-002";
+  let includeVariousArtists = true;
+  
+  const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
+
+  const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
+  - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
+  - Order the URIs by how closely each track aligns with the overall intent of the request.`;
+
+  const FIXED_SYSTEM_INSTRUCTION = `
+  Output:
+  - Only provide a raw list of Spotify track URIs (e.g., spotify:track:123, spotify:track:456).
+  - Do not include any additional text, explanations, or formatting.`;
 
   function loadSettings() {
-  columnPlayCount = localStorage.getItem("sort-play-column-play-count") === "true";
-  removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
-  playlistDeduplicate = localStorage.getItem("sort-play-playlist-deduplicate") !== "false";
-  showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
+    columnPlayCount = localStorage.getItem("sort-play-column-play-count") === "true";
+    removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
+    playlistDeduplicate = localStorage.getItem("sort-play-playlist-deduplicate") !== "false";
+    showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
+    includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
+    includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
+    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-1.5-pro-002";
+    userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
+    includeVariousArtists = localStorage.getItem("sort-play-include-various-artists") === "true"; 
   }
 
   function saveSettings() {
-  localStorage.setItem("sort-play-column-play-count", columnPlayCount);
-  localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
-  localStorage.setItem("sort-play-playlist-deduplicate", playlistDeduplicate);
-  localStorage.setItem("sort-play-show-removed-duplicates", showRemovedDuplicates);
+    localStorage.setItem("sort-play-column-play-count", columnPlayCount);
+    localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
+    localStorage.setItem("sort-play-playlist-deduplicate", playlistDeduplicate);
+    localStorage.setItem("sort-play-show-removed-duplicates", showRemovedDuplicates);
+    localStorage.setItem("sort-play-include-song-stats", includeSongStats);
+    localStorage.setItem("sort-play-include-lyrics", includeLyrics);
+    localStorage.setItem("sort-play-ai-model", selectedAiModel);
+    localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
+    localStorage.setItem("sort-play-include-various-artists", includeVariousArtists);  
   }
+
+  function getRandomDefaultApiKey() {
+    const randomIndex = Math.floor(Math.random() * DefaultGeminiApiKeys.length);
+    return DefaultGeminiApiKeys[randomIndex];
+  }
+  
+  let googleAiSdk = null;
+  async function loadGoogleAI() {
+    if (googleAiSdk) {
+      return googleAiSdk;
+    }
+    
+    try {
+      const response = await fetch("https://cdn.jsdelivr.net/npm/@google/generative-ai@0.21.0/dist/index.min.js");
+      const sdkText = await response.text();
+      const moduleScope = {};
+      const wrappedCode = `
+        (function(exports) {
+          ${sdkText}
+          return exports;
+        })(this);
+      `;
+      const sdkExports = new Function(wrappedCode).call(moduleScope);
+      googleAiSdk = moduleScope.GoogleGenerativeAI || moduleScope.GenerativeAI;
+      if (!googleAiSdk) {
+        throw new Error('SDK constructor not found in loaded script');
+      }
+      
+      return googleAiSdk;
+    } catch (error) {
+      console.error('Error loading SDK:', error);
+      throw error;
+    }
+  }
+  
+  try {
+    await loadGoogleAI();
+  } catch (error) {
+    console.error("Failed to load Google AI SDK:", error);
+  }
+
   function saveLastFmUsername(username) {
     localStorage.setItem(STORAGE_KEY_LASTFM_USERNAME, username);
   }
@@ -190,23 +262,34 @@ async function main() {
         clear: both;
     }
     .sort-play-settings .setting-row {
-        display: flex;
         padding: 5px 0;
         align-items: center;
     }
     .sort-play-settings .setting-row .col.description {
         float: left;
         padding-right: 15px;
-        width: 900px;
-        color: white;
+        width: auto;
+        color: #c1c1c1;
     }
     .sort-play-settings .setting-row .col.action {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        float: right;
-        text-align: right;
-        width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      text-align: right;
+    }
+
+    .sort-play-settings .setting-row#githubLink {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+      margin-top: 5px;
+    }
+    
+    .sort-play-settings .setting-row#githubLink .col.description {
+        float: none;
+        text-align: center;
+        width: auto;
+        padding: 0;
     }
     .sort-play-settings .main-popupModal-content {
         overflow-y: auto;
@@ -294,21 +377,21 @@ async function main() {
         visibility: visible;
     }
     </style>
-    <div style="display: flex; flex-direction: column; gap: 15px;">
+    <div style="display: flex; flex-direction: column; gap: 12px;">
 
-    <div style="color: white; font-weight: bold; font-size: 16px; margin-top: 10px;">
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Playlist Column Options
     </div>
-    <div style="border-bottom: 1px solid #555; margin-bottom: 0px;"></div>
- 
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+  
     <div class="setting-row" id="columnPlayCount">
-         <label class="col description">
-             Play Count Column in Playlist
-             <span class="tooltip-container">
-                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                 <span class="custom-tooltip">Play counts are cached for 2 days</span>
-             </span>
-         </label>
+          <label class="col description">
+              Play Count Column in Playlist
+              <span class="tooltip-container">
+                  <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                  <span class="custom-tooltip">Play counts are cached for 2 days</span>
+              </span>
+          </label>
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${columnPlayCount ? 'checked' : ''}>
@@ -326,19 +409,19 @@ async function main() {
         </div>
     </div>
 
-    <div style="color: white; font-weight: bold; font-size: 16px; margin-top: 10px;">
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Duplicate Removal
     </div>
-    <div style="border-bottom: 1px solid #555; margin-bottom: 0px;"></div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
     <div class="setting-row" id="playlistDeduplicate">
-    <label class="col description">
-        Remove Duplicate Tracks While Sorting
-        <span class="tooltip-container">
-            <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-            <span class="custom-tooltip">Setting won't affect artist pages or tracks with identical URLs</span>
-        </span>
-    </label>
+        <label class="col description">
+            Remove Duplicate Tracks While Sorting
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Setting won't affect artist pages or tracks with identical URLs</span>
+            </span>
+        </label>
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${playlistDeduplicate ? 'checked' : ''}>
@@ -355,6 +438,28 @@ async function main() {
             </label>
         </div>
     </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Artist Tracks Options
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="includeVariousArtists">
+        <label class="col description">
+            Include 'Various Artists' Albums in search
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">This might find more tracks, but will make the process significantly slower.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" ${includeVariousArtists ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
     <div class="setting-row" id="githubLink" style="margin-bottom: 10px; margin-top: 5px; justify-content: center;">
         <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
             <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 13px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
@@ -387,6 +492,7 @@ async function main() {
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
+    const includeVariousArtistsToggle = modalContainer.querySelector("#includeVariousArtists input");
 
     removeDateAddedToggle.disabled = !columnPlayCount;
     removeDateAddedToggle.parentElement.classList.toggle("disabled", !columnPlayCount);
@@ -432,8 +538,1120 @@ async function main() {
         showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
         saveSettings();
     });
+
+    includeVariousArtistsToggle.addEventListener("change", () => {
+      includeVariousArtists = includeVariousArtistsToggle.checked;
+      saveSettings();
+    });
+  }
+
+  async function handleAiPick(tracks) {
+    try {
+        const tracksWithPlayCounts = await processBatchesWithDelay(
+            tracks,
+            200,
+            1000,
+            () => {},
+            getTrackDetailsWithPlayCount
+        );
+
+        const tracksWithIds = await processBatchesWithDelay(
+            tracksWithPlayCounts,
+            200,
+            1000,
+            () => {},
+            collectTrackIdsForPopularity
+        );
+
+        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
+            tracksWithIds,
+            () => {}
+        );
+
+        let uniqueTracks;
+        let removedTracks = [];
+        const currentUri = getCurrentUri();
+
+        if (!playlistDeduplicate && URI.isPlaylistV1OrV2(currentUri)) {
+            uniqueTracks = tracksWithPopularity;
+        } else {
+            const deduplicationResult = deduplicateTracks(tracksWithPopularity);
+            uniqueTracks = deduplicationResult.unique;
+            removedTracks = deduplicationResult.removed;
+        }
+
+        return { uniqueTracks, removedTracks };
+    } catch (error) {
+        console.error("Error in handleAiPick:", error);
+        throw error;
+    }
+  }
+
+  async function showAiPickModal(tracks) {
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "ai-pick-modal";
+    modalContainer.innerHTML = `
+      <style>
+        .main-popupModal-container .main-embedWidgetGenerator-container,
+        .ai-pick-modal .main-embedWidgetGenerator-container,
+        div.main-embedWidgetGenerator-container {
+          width: 620px !important;
+          max-width: 620px !important;
+        }
+
+        .main-trackCreditsModal-mainSection {
+          overflow-y: scroll;
+          padding: 16px 18px 0 32px; 
+        }
+
+        .ai-pick-modal .setting-row::after {
+          content: "";
+          display: table;
+          clear: both;
+        }
+        .ai-pick-modal .setting-row {
+          display: flex;
+          padding: 5px 0;
+          align-items: center;
+        }
+        .ai-pick-modal .setting-row .col.description {
+          float: left;
+          padding-right: 15px;
+          width: auto;
+          color: white;
+        }
+        .ai-pick-modal .setting-row .col.action {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          text-align: right;
+        }
+        .ai-pick-modal .main-popupModal-content {
+          overflow-y: auto;
+        }
+        .ai-pick-modal textarea {
+          width: 100%;
+          height: 150px;
+          border-radius: 4px;
+          border: 1px solid #282828;
+          background: #282828;
+          color: white;
+        }
+        .ai-pick-modal button {
+          padding: 8px 18px;
+          border-radius: 20px;
+          border: none;
+          cursor: pointer;
+          background-color: #1ED760;
+          color: black;
+          font-weight: 600;
+          font-size: 14px;
+          transition: all 0.04s ease;
+        }
+        .ai-pick-modal .secondary-button {
+          background-color: #282828;
+          color: white;
+          padding: 7px 35px;
+          border: 1px solid #666;
+          font-weight: 500;
+        }
+        .ai-pick-modal .secondary-button:hover {
+          border: 1px solid #939393;
+        }
+
+        .ai-pick-modal .secondary-button:disabled {
+          color: #666;
+          border-color: #666;
+          cursor: not-allowed;
+        }
+        
+        .ai-pick-modal .secondary-button:disabled:hover {
+          border-color: #666;
+        }
+        .ai-pick-modal .switch {
+          position: relative;
+          display: inline-block;
+          width: 40px;
+          height: 24px;
+        }
+        .ai-pick-modal .switch input {
+          opacity: 0;
+          width: 0;
+          height: 0;
+        }
+        .ai-pick-modal .slider {
+          position: absolute;
+          cursor: pointer;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: #484848;
+          border-radius: 24px;
+          transition: .2s;
+        }
+        .ai-pick-modal .slider:before {
+          position: absolute;
+          content: "";
+          height: 18px;
+          width: 18px;
+          left: 3px;
+          bottom: 3px;
+          background-color: white;
+          border-radius: 50%;
+          transition: .2s;
+        }
+        .ai-pick-modal input:checked + .slider {
+          background-color: #1DB954;
+        }
+        .ai-pick-modal input:checked + .slider:before {
+          transform: translateX(16px);
+        }
+        .ai-pick-modal select {
+          padding: 8px;
+          border-radius: 4px;
+          border: 1px solid #666;
+          background: #282828;
+          color: white;
+          width: 217px;
+          cursor: pointer;
+        }
+        .ai-pick-modal select:hover {
+          border: 1px solid #939393;
+        }
+        .ai-pick-modal select:focus {
+          outline: none;
+          border-color: #c7c7c7;
+        }
+        .ai-pick-modal .model-row {
+          margin-bottom: 5px;
+        }
+        .ai-pick-modal .system-instruction {
+          display: none;
+        }
+        .ai-pick-modal .system-instruction.visible {
+          display: block;
+        }
+        .ai-pick-modal .system-instruction textarea {
+          height: 150px; 
+          font-size: 14px;  
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          max-width: 100%;
+          padding: 15px;
+          border-radius: 20px;
+        }
+        .ai-pick-modal .system-instruction textarea:focus {
+          background: #323232;
+        }
+        .ai-pick-modal .button-row {
+          display: flex;
+          gap: 10px;
+          margin-top: 10px;
+          margin-bottom: 15px;
+        }
+        .loader {
+          border: 2px solid #f3f3f3;
+          border-top: 2px solid #3498db;
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          animation: spin 1s linear infinite;
+          margin: 0 auto;
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .ai-pick-modal .system-instruction textarea.fixed {
+          background-color: #1a1a1a;
+          color: #888;
+          cursor: not-allowed;
+          height: 87px; 
+          font-size: 13px; 
+        }
+        
+        .ai-pick-modal .system-instruction .instruction-label {
+          color: white;
+          display: block;
+          margin-bottom: 10px;
+          margin-top: 10px;
+          font-weight: bold;
+        }
+        .ai-pick-modal .prompt-wrapper {
+          display: flex;
+          align-items: flex-start;
+          border: 1px solid #282828;
+          border-radius: 40px;
+          padding: 5px;
+          margin-bottom: 0px;
+          background-color: #282828;
+          align-items: center;
+        }
+        .ai-pick-modal .prompt-wrapper .textarea-container {
+          flex-grow: 1;
+          margin-right: 6px; 
+          padding: 3px;
+          display: flex;
+          align-items: center; 
+        }
+        .ai-pick-modal .prompt-wrapper textarea {
+          width: 100%;
+          height: 20px;
+          max-height: 136px;
+          overflow-y: hidden;
+          padding-left: 10px;   
+          padding-right: 10px;
+          line-height: 20px;
+          border-radius: 20px;
+          resize: none;
+          font-size: 14px;
+          background-color: #282828;
+          color: white;
+          display: flex;
+          align-items: center;
+          border: none;
+        }
+
+        .ai-pick-modal .prompt-wrapper textarea:focus {
+          outline: none;
+          background-color: #323232;
+        }
+        
+        .ai-pick-modal .prompt-wrapper:has(textarea:focus) {
+          background-color: #323232;
+        }
+
+        .ai-pick-modal .prompt-wrapper .button-container {
+          white-space: nowrap;  
+          padding: 5px;
+        }
+        .ai-pick-modal .prompt-wrapper button {
+        }
+        .ai-pick-modal .prompt-wrapper textarea:focus {
+          outline: none;
+        }
+        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar {
+          width: 6px;
+        }
+        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar-track {
+          background: #282828;
+          border-radius: 20px;
+        }
+        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar-thumb {
+          background-color: #1DB954;
+          border-radius: 20px;
+          border: 2px solid #282828;
+        }
+
+        .ai-pick-modal .settings-container {
+          display: flex;
+          gap: 15px; 
+          flex-direction: row-reverse;
+        }
+      
+        .ai-pick-modal .settings-right-wrapper,
+        .ai-pick-modal .settings-left-wrapper {
+          flex: 1;
+          background-color: #282828;
+          border-radius: 20px;
+          padding: 25px;
+          height: 170px;
+        }
+      
+        .ai-pick-modal .settings-right-wrapper {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+      
+        .ai-pick-modal .settings-left-wrapper {
+          display: flex;
+          flex-direction: column;
+          gap: 0px;
+        }
+      
+        .ai-pick-modal .settings-title {
+          color: white;
+          font-weight: bold;
+          font-size: 14px;
+          margin-bottom: 3px;
+        }
+
+        .ai-pick-modal .setting-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 5px 0;
+          width: auto; 
+        }
+      
+        .ai-pick-modal .setting-row .description {
+          color: white;
+          width: auto;
+          flex-grow: 1; 
+          font-size: 15px;
+        }
+      
+        .ai-pick-modal .setting-row .action {
+          flex-shrink: 0;
+        }
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: transparent;
+          z-index: 999;
+        }
+
+        .GenericModal {
+          position: relative;
+          z-index: 1000;
+        }
+        .tooltip-container {
+          position: relative; 
+          display: inline-block;
+        }
+        .custom-tooltip {
+          visibility: hidden;
+          position: absolute;
+          z-index: 1;
+          background-color: #282828;
+          color: white;
+          padding: 8px 12px;
+          border-radius: 4px;
+          font-size: 14px;
+          max-width: 240px;
+          width: max-content;
+          bottom: 100%;   
+          left: 50%;       
+          transform: translateX(-50%);  
+          margin-bottom: 5px;   
+          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+          line-height: 1.4;
+          word-wrap: break-word;
+      }
+      .custom-tooltip::after {
+          content: "";
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          margin-left: -5px;
+          border-width: 5px;
+          border-style: solid;
+          border-color: #282828 transparent transparent transparent;
+      }
+      
+      .tooltip-container:hover .custom-tooltip {
+          visibility: visible;
+      }
+      </style>
+
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="color: white; font-weight: 500; font-size: 16px;">
+          Ask AI to pick tracks from this playlist
+        </div>
+        
+        <div class="prompt-wrapper">
+          <div class="textarea-container">
+            <textarea id="aiPrompt" placeholder="Enter your request for the AI..."></textarea>
+          </div>
+          <div class="button-container">
+            <button id="sendAiRequest">Send</button>
+          </div>
+        </div>
+      
+        <div class="settings-container">
+          <div class="settings-right-wrapper">
+            <div class="settings-title">Include in AI Analysis:</div>
+            <div class="setting-row" id="includeSongStats">
+            <label class="description">
+            Song Statistics
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Includes popularity, play count, release date, danceability, energy, valence, tempo, key, loudness, speechiness, acousticness, liveness, and instrumentalness.</span>
+            </span>
+        </label>
+              <div class="action">
+                <label class="switch">
+                  <input type="checkbox" ${includeSongStats ? 'checked' : ''}>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            
+            <div class="setting-row" id="includeLyrics">
+              <label class="description">Song Lyrics</label>
+              <div class="action">
+                <label class="switch">
+                  <input type="checkbox" ${includeLyrics ? 'checked' : ''}>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+      
+          <div class="settings-left-wrapper">
+            <div class="model-row">
+              <label style="color: white; display: block; margin-bottom: 15px; font-weight: bold; font-size: 14px;">AI Model:</label>
+              <select id="aiModel">
+                <option value="gemini-2.0-flash-exp" ${selectedAiModel === "gemini-2.0-flash-exp" ? "selected" : ""}>Gemini 2.0 Flash Exp</option>
+                <option value="gemini-1.5-pro-002" ${selectedAiModel === "gemini-1.5-pro-002" ? "selected" : ""}>Gemini 1.5 Pro 002</option>
+                <option value="gemini-1.5-pro" ${selectedAiModel === "gemini-1.5-pro" ? "selected" : ""}>Gemini 1.5 Pro</option>
+                <option value="gemini-1.5-flash" ${selectedAiModel === "gemini-1.5-flash" ? "selected" : ""}>Gemini 1.5 Flash</option>
+              </select>
+            </div>
+            <div class="button-row">
+              <button id="editSystemInstruction" class="secondary-button">Edit System Instruction</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="system-instruction" id="systemInstructionEditor">
+          <label class="instruction-label">User System Instruction:</label>
+          <textarea id="systemInstructionText">${userSystemInstruction}</textarea>
+          
+          <label class="instruction-label">Fixed System Instruction (Not Editable):</label>
+          <textarea class="fixed" readonly>${FIXED_SYSTEM_INSTRUCTION}</textarea>
+          
+          <div class="button-row">
+            <button id="saveSystemInstruction">Save</button>
+            <button id="resetSystemInstruction" class="secondary-button">Reset to Default</button>
+            <button id="cancelSystemInstruction" class="secondary-button">Cancel</button>
+          </div>
+        </div>
+      </div>
+    `;
+  
+    Spicetify.PopupModal.display({
+      title: "<span style='font-size: 30px;'>AI Pick</span>",
+      content: modalContainer,
+      isLarge: true,
+    });
+  
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+  
+    const genericModalOverlay = document.querySelector(".GenericModal__overlay");
+  
+    if (genericModalOverlay) {
+      genericModalOverlay.appendChild(overlay);
+    }
+  
+    if (overlay) {
+      overlay.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    }
+  
+    const modalContainerElement = document.querySelector(".main-popupModal-container");
+    if (modalContainerElement) {
+      modalContainerElement.style.zIndex = "2000";
+    }
+  
+    const songStatsToggle = modalContainer.querySelector("#includeSongStats input");
+    const lyricsToggle = modalContainer.querySelector("#includeLyrics input");
+    const modelSelect = modalContainer.querySelector("#aiModel");
+    
+    const editButton = modalContainer.querySelector("#editSystemInstruction");
+    const resetButton = modalContainer.querySelector("#resetSystemInstruction");
+    const saveButton = modalContainer.querySelector("#saveSystemInstruction");
+    const cancelButton = modalContainer.querySelector("#cancelSystemInstruction");
+    const editorDiv = modalContainer.querySelector("#systemInstructionEditor");
+    const textArea = modalContainer.querySelector("#systemInstructionText");
+  
+    const aiPromptTextarea = modalContainer.querySelector("#aiPrompt");
+    aiPromptTextarea.addEventListener("input", function() {
+      this.style.height = '20px';
+      
+      const scrollHeight = this.scrollHeight;
+      
+      if (scrollHeight > 20) {
+        const newHeight = Math.min(scrollHeight, 136);
+        this.style.height = newHeight + 'px';
+      }
+      
+      this.style.overflowY = scrollHeight > 136 ? 'auto' : 'hidden';
+    });
+    
+    aiPromptTextarea.dispatchEvent(new Event('input'));
+
+    songStatsToggle.addEventListener("change", () => {
+      includeSongStats = songStatsToggle.checked;
+      saveSettings();
+    });
+  
+    lyricsToggle.addEventListener("change", () => {
+      includeLyrics = lyricsToggle.checked;
+      saveSettings();
+    });
+  
+    modelSelect.addEventListener("change", () => {
+      selectedAiModel = modelSelect.value;
+      saveSettings();
+    });
+  
+    editButton.addEventListener("click", () => {
+      editorDiv.classList.add("visible");
+      editButton.disabled = true;
+    });
+  
+    resetButton.addEventListener("click", () => {
+      if (confirm("Are you sure you want to reset the system instruction to default?")) {
+        userSystemInstruction = DEFAULT_USER_SYSTEM_INSTRUCTION;
+        textArea.value = DEFAULT_USER_SYSTEM_INSTRUCTION;
+        saveSettings();
+        Spicetify.showNotification("System instruction reset to default");
+      }
+    });
+  
+    saveButton.addEventListener("click", () => {
+      const newInstruction = textArea.value.trim();
+      if (!newInstruction) {
+        Spicetify.showNotification("System instruction cannot be empty", true);
+        return;
+      }
+      userSystemInstruction = newInstruction;
+      saveSettings();
+      editorDiv.classList.remove("visible");
+      editButton.disabled = false;
+      Spicetify.showNotification("System instruction saved");
+    });
+    
+    cancelButton.addEventListener("click", () => {
+      textArea.value = userSystemInstruction;
+      editorDiv.classList.remove("visible");
+      editButton.disabled = false;
+    });
+  
+    const sendButton = document.getElementById("sendAiRequest");
+    sendButton.addEventListener("click", async () => {
+      const userPrompt = document.getElementById("aiPrompt").value;
+      if (!userPrompt) {
+        Spicetify.showNotification("Please enter a request.", true);
+        return;
+      }
+  
+      Spicetify.PopupModal.hide();
+  
+      mainButton.disabled = true;
+      mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+      mainButton.style.color = buttonStyles.main.disabledColor;
+      mainButton.style.cursor = "default";
+      svgElement.style.fill = buttonStyles.main.disabledColor;
+      menuButtons.forEach((button) => (button.disabled = true));
+  
+      mainButton.innerHTML = '<div class="loader"></div>';
+  
+      try {
+        const userApiKey = localStorage.getItem("sort-play-gemini-api-key") || getRandomDefaultApiKey();
+  
+        selectedAiModel = modelSelect.value; 
+  
+        const aiResponse = await queryGeminiWithPlaylistTracks(
+          tracks,
+          userPrompt,
+          userApiKey,
+          undefined,
+          undefined,
+          includeSongStats,
+          includeLyrics,
+          selectedAiModel  
+        );
+  
+        if (aiResponse && aiResponse.length > 0) {
+          const sourceUri = getCurrentUri();
+          let sourceName = URI.isArtist(sourceUri)
+            ? await Spicetify.CosmosAsync.get(
+              `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name)
+            : await Spicetify.CosmosAsync.get(
+              `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name);
+  
+          const possibleSuffixes = [
+            "\\(PlayCount\\)",
+            "\\(Popularity\\)",
+            "\\(ReleaseDate\\)",
+            "\\(LFM Scrobbles\\)",
+            "\\(LFM My Scrobbles\\)",
+            "\\(Shuffle\\)",
+            "\\(AI Pick\\)",
+          ];
+          let suffixPattern = new RegExp(
+            `\\s*(${possibleSuffixes.join("|")})\\s*`
+          );
+          while (suffixPattern.test(sourceName)) {
+            sourceName = sourceName.replace(suffixPattern, "");
+          }
+          const newPlaylist = await createPlaylist(
+            `${sourceName} (AI Pick)`,
+            `Tracks picked by AI using sort-play`
+          );
+  
+          const trackUris = aiResponse;
+          await addTracksToPlaylist(newPlaylist.id, trackUris);
+  
+          Spicetify.showNotification(`AI Pick playlist created!`);
+        } else {
+          Spicetify.showNotification("AI did not return any track URIs.", true);
+        }
+      } catch (error) {
+        console.error("Error handling AI pick:", error);
+        Spicetify.showNotification(
+          "An error occurred while processing the AI request.",
+          true
+        );
+      } finally {
+        resetButtons();
+      }
+    });
+  }
+
+  const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  async function processBatchWithRateLimit(items, batchSize, delayMs, processItem) {
+    const results = [];
+    
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (item) => {
+          try {
+            return await processItem(item);
+          } catch (error) {
+            console.warn(`Error processing item in batch: ${error.message}`);
+            return null;
+          }
+        })
+      );
+      
+      results.push(...batchResults.filter(result => result !== null));
+      
+      if (i + batchSize < items.length) {
+        await delay(delayMs);
+      }
+    }
+    
+    return results;
   }
   
+  async function getTrackStats(trackId, maxRetries = 3, baseDelay = 1000) {
+    let attempt = 0;
+    
+    while (attempt < maxRetries) {
+      try {
+        const audioFeaturesResponse = await Spicetify.CosmosAsync.get(
+          `https://api.spotify.com/v1/audio-features/${trackId}`
+        );
+        
+        const trackDetailsResponse = await Spicetify.CosmosAsync.get(
+          `https://api.spotify.com/v1/tracks/${trackId}`
+        );
+  
+        if (audioFeaturesResponse?.code === 429 || trackDetailsResponse?.code === 429) {
+          attempt++;
+          const waitTime = baseDelay * Math.pow(2, attempt - 1);
+          console.warn(`Rate limit hit for track ${trackId}, retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`);
+          await delay(waitTime);
+          continue;
+        }
+  
+        if (audioFeaturesResponse?.code || trackDetailsResponse?.code) {
+          console.warn(`Error responses:`, {
+            audioFeatures: audioFeaturesResponse,
+            trackDetails: trackDetailsResponse
+          });
+          throw new Error('Failed to fetch track data');
+        }
+  
+        if (!audioFeaturesResponse || !trackDetailsResponse) {
+          console.warn(`Missing data for track ${trackId}`);
+          return null;
+        }
+  
+        const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+        const keyText = audioFeaturesResponse.key === -1 ? "Undefined" : pitchClasses[audioFeaturesResponse.key];
+  
+        return {
+          danceability: audioFeaturesResponse?.danceability ? Math.round(100 * audioFeaturesResponse.danceability) : null,
+          energy: audioFeaturesResponse?.energy ? Math.round(100 * audioFeaturesResponse.energy) : null,
+          key: keyText,
+          loudness: audioFeaturesResponse?.loudness ?? null,
+          speechiness: audioFeaturesResponse?.speechiness ? Math.round(100 * audioFeaturesResponse.speechiness) : null,
+          acousticness: audioFeaturesResponse?.acousticness ? Math.round(100 * audioFeaturesResponse.acousticness) : null,
+          instrumentalness: audioFeaturesResponse?.instrumentalness ? Math.round(100 * audioFeaturesResponse.instrumentalness) : null,
+          liveness: audioFeaturesResponse?.liveness ? Math.round(100 * audioFeaturesResponse.liveness) : null,
+          valence: audioFeaturesResponse?.valence ? Math.round(100 * audioFeaturesResponse.valence) : null,
+          tempo: audioFeaturesResponse?.tempo ? Math.round(audioFeaturesResponse.tempo) : null,
+          popularity: trackDetailsResponse?.popularity ?? null,
+          releaseDate: trackDetailsResponse?.album?.release_date ?? null
+        };
+      } catch (error) {
+        attempt++;
+        
+        if (attempt === maxRetries) {
+          console.error(`Failed to fetch stats for track ${trackId} after ${maxRetries} attempts:`, error);
+          return null;
+        }
+        
+        const waitTime = baseDelay * Math.pow(2, attempt - 1);
+        console.warn(`Attempt ${attempt}/${maxRetries} failed for track ${trackId}, retrying in ${waitTime}ms`);
+        await delay(waitTime);
+      }
+    }
+    
+    return null;
+  }
+
+  async function fetchLyricsFromSpotify(trackId) {
+    const result = {
+      karaoke: null,
+      synced: null,
+      unsynced: null,
+      provider: "Spotify",
+      copyright: null,
+    };
+  
+    const baseURL = "https://spclient.wg.spotify.com/color-lyrics/v2/track/";
+    let body;
+    try {
+      body = await Spicetify.CosmosAsync.get(`${baseURL + trackId}?format=json&vocalRemoval=false&market=from_token`);
+    } catch {
+      return { error: "Request error", uri: `spotify:track:${trackId}` };
+    }
+  
+    const lyrics = body.lyrics;
+    if (!lyrics) {
+      return { error: "No lyrics", uri: `spotify:track:${trackId}` };
+    }
+  
+    const lines = lyrics.lines;
+    if (lyrics.syncType === "LINE_SYNCED") {
+      result.synced = lines.map((line) => ({
+        startTime: line.startTimeMs,
+        text: line.words,
+      }));
+      result.unsynced = result.synced;
+    } else {
+      result.unsynced = lines.map((line) => ({
+        text: line.words,
+      }));
+    }
+  
+    result.provider = lyrics.provider;
+  
+    return result;
+  }
+
+  async function queryGeminiWithPlaylistTracks(tracks, userPrompt, apiKey, maxRetries = 3, initialDelay = 1000, includeSongStats = true, includeLyrics = true, modelName) {
+    let retries = 0;
+    let delay = initialDelay;
+    let enrichedTracksCache = null;
+  
+    while (retries < maxRetries) {
+      try {
+        if (!enrichedTracksCache) {
+          enrichedTracksCache = await processBatchWithRateLimit(
+            tracks,
+            6,
+            700,
+            async track => {
+              const trackId = track.uri.split(":")[2];
+              
+              let stats = null;
+              let playCount = null;
+  
+              if (includeSongStats) {
+                stats = await getTrackStats(trackId);
+                stats = stats || {
+                  danceability: null,
+                  energy: null,
+                  key: "Undefined",
+                  loudness: null,
+                  speechiness: null,
+                  acousticness: null,
+                  instrumentalness: null,
+                  liveness: null,
+                  valence: null,
+                  tempo: null,
+                  popularity: null,
+                  releaseDate: null
+                };
+                
+                try {
+                  const albumId = track.albumId || track.track?.album?.id;
+                    if(albumId){
+                      const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
+                      const foundTrack = albumTracksWithPlayCounts.find(
+                        (albumTrack) => albumTrack.uri === track.uri
+                      );
+                    if (foundTrack) {
+                      playCount = foundTrack.playcount;
+                    } else {
+                      console.warn(`Could not find playcount for track ${track.uri} in album ${albumId}`);
+                      playCount = "N/A";
+                    }
+                  } else {
+                    console.warn(`Could not get album ID for track: ${track.uri}`);
+                    playCount = "N/A";
+                  }
+                } catch (error) {
+                  console.error(`Error getting playcount for track ${track.uri}: ${error}`);
+                  playCount = "N/A";
+                }
+              }
+              
+              let lyrics = "Not included";
+              if (includeLyrics) {
+                const lyricsData = await fetchLyricsFromSpotify(trackId);
+                lyrics = lyricsData && lyricsData.unsynced ? lyricsData.unsynced.map(line => line.text).join(' ') : "Not included";
+              }
+              
+              const enrichedTrack = {
+                song_title: track.songTitle || track.name || track.title,
+                artist: track.artistName || track.artist,
+                album: track.albumName,
+                uri: track.uri
+              };
+  
+              if (includeSongStats) {
+                enrichedTrack.stats = {
+                  popularity: stats.popularity,
+                  playCount: playCount,
+                  releaseDate: stats.releaseDate,
+                  danceability: stats.danceability,
+                  energy: stats.energy,
+                  valence: stats.valence,
+                  tempo: stats.tempo,
+                  key: stats.key,
+                  loudness: stats.loudness,
+                  speechiness: stats.speechiness,
+                  acousticness: stats.acousticness,
+                  liveness: stats.liveness,
+                  instrumentalness: stats.instrumentalness,
+                };
+              }
+  
+              if (includeLyrics) {
+                enrichedTrack.lyrics = lyrics;
+              }
+  
+              return enrichedTrack;
+            }
+          );
+        }
+  
+        const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
+
+        const GoogleAI = await loadGoogleAI();
+      
+        if (!GoogleAI) {
+          throw new Error('Failed to load Google AI SDK');
+        }
+  
+        const genAI = new GoogleAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelName });
+  
+        const userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
+        const combinedSystemInstruction = `${userSystemInstruction}\n${FIXED_SYSTEM_INSTRUCTION}`;
+    
+        const userMessage = `Playlist Tracks:\n${JSON.stringify(tracksWithStats, null, 2)}\n\nUser Request: ${userPrompt}\n\nGIVE PICKED TRACK URI's`;
+
+        const parts = [
+          { text: combinedSystemInstruction },
+          { text: userMessage } 
+        ];
+
+        const result = await model.generateContentStream({
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            temperature: 0.9,
+            topK: 1,
+            topP: 1,
+            maxOutputTokens: 2048,
+          },
+          safetySettings: [
+            {
+              category: "HARM_CATEGORY_HARASSMENT",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_HATE_SPEECH",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_NONE"
+            }
+          ]
+        });
+  
+        let responseText = '';
+        for await (const chunk of result.stream) {
+          responseText += chunk.text();
+        }
+    
+        if (result.response?.promptFeedback?.blockReason) {
+          throw new Error(`Blocked for ${result.response.promptFeedback.blockReason}`);
+        }
+  
+        const uriRegex = /spotify:track:[a-zA-Z0-9]+/g;
+        let matches = responseText.match(uriRegex);
+  
+        if (!matches) {
+          console.log("No Spotify track URIs found in AI response.");
+          return [];
+        }
+        
+        matches = matches.filter(uri => uri.length === 22 + "spotify:track:".length);
+  
+        if(matches.length === 0) {
+          console.log("No Valid Spotify track URIs found in AI response after filtering.");
+          return [];
+        }
+  
+        return matches;
+        
+      } catch (error) {
+        console.error(`Error during Gemini request (Attempt ${retries + 1}):`, error);
+        if (retries === maxRetries - 1) {
+          throw new Error(`Failed to get a valid response from Gemini after ${maxRetries} retries.`);
+        }
+        retries++;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2;
+      }
+    }
+  }
+
+  function showGeminiApiKeyModal() {
+    const modalContainer = document.createElement("div");
+    const savedApiKey = localStorage.getItem("sort-play-gemini-api-key");
+
+    modalContainer.innerHTML = `
+      <style>
+      .main-embedWidgetGenerator-container {
+        width: 420px !important;
+      }
+      </style>
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="display: flex; flex-direction: column; gap: 5px;">
+          <label for="geminiApiKey">Gemini API Key:</label>
+          <input type="text" id="geminiApiKey" value="${savedApiKey || ""}" placeholder="Enter your API key (optional)"
+                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
+          <a href="https://aistudio.google.com/apikey" target="_blank" style="color: #1ED760; font-size: 14px; margin-left: 2px; margin-top: 4px; text-decoration: none;">Get the free API key from here</a>
+        </div>
+        <div id="geminiApiError" style="color: #ff4444; font-size: 12px; display: none;">
+          Invalid API key.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+          <button id="cancelGeminiApi" class="main-buttons-button" 
+                  style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+            Cancel
+          </button>
+          <button id="saveGeminiApi" class="main-buttons-button main-button-primary" 
+                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+            Save
+          </button>
+        </div>
+      </div>
+    `;
+
+    Spicetify.PopupModal.display({
+      title: "<span style='font-size: 25px;'>Gemini API Key</span>",
+      content: modalContainer,
+      isLarge: true,
+    });
+
+    if (isMenuOpen) {
+      toggleMenu();
+      isButtonClicked = false;
+      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
+      mainButton.style.color = buttonStyles.main.color;
+      svgElement.style.fill = buttonStyles.main.color;
+      mainButton.style.filter = "brightness(1)";
+
+      const geminiApiKeyButton = menuButtons.find(
+        (btn) => btn.querySelector("span")?.innerText === "AI Pick"
+      )?.querySelector("button:nth-child(2)");
+      if (geminiApiKeyButton) {
+        const svg = geminiApiKeyButton.querySelector("svg");
+        if (svg) {
+          svg.style.fill = "#ffffffe6";
+        }
+      }
+      const aiPickButton = menuButtons.find(
+        (btn) => btn.querySelector("span")?.innerText === "AI Pick"
+      );
+      if (aiPickButton) {
+        aiPickButton.style.backgroundColor = "transparent";
+      }
+    }
+
+    const modalContainerElement = document.querySelector(".main-popupModal-container");
+    if (modalContainerElement) {
+      modalContainerElement.style.zIndex = "2000";
+    }
+    const saveButton = document.getElementById("saveGeminiApi");
+    const cancelButton = document.getElementById("cancelGeminiApi");
+
+    saveButton.addEventListener("mouseenter", () => {
+      saveButton.style.backgroundColor = "#3BE377";
+    });
+    saveButton.addEventListener("mouseleave", () => {
+      saveButton.style.backgroundColor = "#1ED760";
+    });
+
+    cancelButton.addEventListener("mouseenter", () => {
+      cancelButton.style.backgroundColor = "#444444";
+    });
+
+    cancelButton.addEventListener("mouseleave", () => {
+      cancelButton.style.backgroundColor = "#333333";
+    });
+
+  function enableButton(button) {
+    button.disabled = false;
+    button.style.backgroundColor = "#1ED760";
+    button.style.cursor = "pointer";
+  }
+
+  saveButton.addEventListener("click", async () => {
+    const apiKey = document.getElementById("geminiApiKey").value.trim();
+
+    saveButton.disabled = true;
+    saveButton.style.backgroundColor = "#FFFFFFB3";
+    saveButton.style.cursor = "default";
+    saveButton.textContent = "Saving...";
+
+    if (apiKey) {
+      localStorage.setItem("sort-play-gemini-api-key", apiKey);
+      Spicetify.showNotification("Gemini API key saved successfully!");
+    } else {
+      localStorage.removeItem("sort-play-gemini-api-key");
+      Spicetify.showNotification("Gemini API key cleared.");
+    }
+
+    Spicetify.PopupModal.hide();
+    enableButton(saveButton);
+    saveButton.textContent = "Save";
+  });
+
+    cancelButton.addEventListener("click", () => {
+      Spicetify.PopupModal.hide();
+      enableButton(cancelButton);
+    });
+  }
+
   const styleElement = document.createElement("style");
   styleElement.innerHTML = `
     .loader {
@@ -483,7 +1701,6 @@ async function main() {
         background-color: #888;
       }
     }
-    /* Button styles */
     .Button-sc-qlcn5g-0.Button-small-buttonTertiary-useBrowserDefaultFocusStyle {
       cursor: default;
       display: flex;
@@ -491,7 +1708,6 @@ async function main() {
       align-items: center;
       gap: 5px;
     }
-    /* Column styles */
     .sort-play-column {
       display: flex;
       align-items: center;
@@ -632,27 +1848,15 @@ async function main() {
   async function getArtistTracks(artistUri) {
     const { Locale, GraphQL } = Spicetify;
   
-    const queryArtistDiscographyAll = {
-      name: "queryArtistDiscographyAll",
-      operation: "query",
-      sha256Hash: "9380995a9d4663cbcb5113fef3c6aabf70ae6d407ba61793fd01e2a1dd6929b0",
-    };
-  
     const queryArtistOverview = {
       name: "queryArtistOverview",
       operation: "query",
       sha256Hash: "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497",
     };
   
-    const queryArtistAppearsOn = {
-      name: "queryArtistAppearsOn",
-      operation: "query",
-      sha256Hash: "9a4bb7a20d6720fe52d7b47bc001cfa91940ddf5e7113761460b4a288d18a4c1",
-    };
-
     mainButton.innerHTML = '<div class="loader"></div>';
     mainButton.disabled = true;
-
+  
     try {
       const artistData = await GraphQL.Request(queryArtistOverview, {
         uri: artistUri,
@@ -662,48 +1866,39 @@ async function main() {
   
       if (artistData.errors) throw new Error(artistData.errors[0].message);
       const artistName = artistData.data.artistUnion.profile.name;
+      const artistId = artistUri.split(":")[2];
   
-      const [discography, appearsOn] = await Promise.all([
-        GraphQL.Request(queryArtistDiscographyAll, {
-          uri: artistUri,
-          offset: 0,
-          limit: 600,
-        }),
-        GraphQL.Request(queryArtistAppearsOn, {
-          uri: artistUri,
-          offset: 0,
-          limit: 200,
-        }),
-      ]);
+      const allAlbumIds = new Set();
+      let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
   
-      if (discography.errors) throw new Error(discography.errors[0].message);
-      if (appearsOn.errors) throw new Error(appearsOn.errors[0].message);
+      do {
+        const albumRes = await Spicetify.CosmosAsync.get(nextUrl);
+        if (!albumRes.items) break;
   
-      const allReleases = discography.data.artistUnion.discography.all.items.flatMap(
-        ({ releases }) => releases.items
-      );
+        albumRes.items.forEach((album) => {
+          if (includeVariousArtists || !album.artists.some((artist) => artist.id === "0LyfQWJT6nXafLPZqxe9Of")) {
+            allAlbumIds.add(album.id);
+          }
+        });
   
-      const appearsOnReleases = appearsOn.data.artistUnion.relatedContent.appearsOn.items.flatMap(
-        ({ releases }) => releases.items
-      );
+        nextUrl = albumRes.next;
+      } while (nextUrl);
   
-      const combinedReleases = [...allReleases, ...appearsOnReleases];
-  
-      async function fetchTracksFromRelease(release, retries = 5, delay = 1000) {
-        if (!release?.uri) return [];
-
+      async function fetchTracksFromAlbum(albumId, retries = 5, delay = 1000) {
+        const albumUri = `spotify:album:${albumId}`;
+        
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
             const albumRes = await GraphQL.Request(
               GraphQL.Definitions.getAlbum,
               {
-                uri: release.uri,
+                uri: albumUri,
                 locale: Locale.getLocale(),
                 offset: 0,
                 limit: 500,
               }
             );
-      
+  
             let tracks = [];
             if (albumRes.data?.albumUnion?.tracks) {
               tracks = albumRes.data.albumUnion.tracks.items;
@@ -712,7 +1907,7 @@ async function main() {
             } else {
               return [];
             }
-      
+  
             return tracks
               .filter((item) => {
                 if (!item?.track?.playability?.playable) return false;
@@ -728,8 +1923,8 @@ async function main() {
                   uri: track.uri,
                   uid: track.uid,
                   name: track.name,
-                  albumUri: track.albumOfTrack?.uri || release.uri,
-                  albumName: track.albumOfTrack?.name || release.name || "Unknown Album",
+                  albumUri: track.albumOfTrack?.uri || albumUri,
+                  albumName: track.albumOfTrack?.name || "Unknown Album",
                   artistUris: (track.artists?.items || []).map(
                     (artist) => artist?.uri || "unknown"
                   ),
@@ -742,7 +1937,7 @@ async function main() {
                   releaseDate: 0,
                   track: {
                     album: {
-                      id: (track.albumOfTrack?.uri || release.uri || "").split(":")[2] || "unknown",
+                      id: albumId,
                     },
                     name: track.name,
                     duration_ms: track.duration?.totalMilliseconds || 0,
@@ -755,27 +1950,31 @@ async function main() {
               await new Promise((resolve) => setTimeout(resolve, delay));
               delay *= 2;
             } else {
+              console.error(`Failed to fetch tracks for album ${albumId}:`, err);
               return [];
             }
           }
         }
       }
-      
+  
       const allTracks = [];
       const batchSize = 5;
-      for (let i = 0; i < combinedReleases.length; i += batchSize) {
-        const batch = combinedReleases.slice(i, i + batchSize);
+      const allAlbumIdArray = Array.from(allAlbumIds);
+      
+      for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
+        const batch = allAlbumIdArray.slice(i, i + batchSize);
         const batchTracks = await Promise.all(
-          batch.map(release => fetchTracksFromRelease(release))
+          batch.map(albumId => fetchTracksFromAlbum(albumId))
         );
         allTracks.push(...batchTracks.flat());
       }
+  
       const uniqueTracks = allTracks.filter(
-        (track, index, self) =>
-          index === self.findIndex((t) => t.uri === track.uri)
+        (track, index, self) => index === self.findIndex((t) => t.uri === track.uri)
       );
   
       return uniqueTracks;
+  
     } catch (error) {
       console.error("Error fetching artist tracks:", error);
       throw error;
@@ -783,6 +1982,50 @@ async function main() {
       mainButton.innerText = "Sort Play";
       mainButton.appendChild(svgElement);
     }
+  }
+  
+  async function getArtistImageUrl(artistId) {
+    const artistData = await Spicetify.CosmosAsync.get(
+      `https://api.spotify.com/v1/artists/${artistId}`
+    );
+    return artistData.images[0]?.url;
+  }
+  
+  async function setPlaylistImage(playlistId, base64Image) {
+    try {
+      const response = await Spicetify.CosmosAsync.put(
+        `https://api.spotify.com/v1/playlists/${playlistId}/images`,
+        base64Image.split("base64,")[1]
+      );
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `Spotify API request failed with status ${response.status}: ${errorText}`
+        );
+      }
+  
+    } catch (error) {
+      console.error("Error setting playlist image:", error);
+    }
+  }
+
+  async function toBase64(imageUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.height = img.naturalHeight;
+        canvas.width = img.naturalWidth;
+        ctx.drawImage(img, 0, 0);
+        const dataUrl = canvas.toDataURL("image/jpeg");
+        resolve(dataUrl);
+      };
+      img.onerror = (error) => reject(error);
+      img.src = imageUrl;
+    });
   }
 
   async function getPlayCountsForAlbum(albumId, retries = 10, retryDelay = 2000) {
@@ -1304,6 +2547,62 @@ async function main() {
     }
   }
 
+  function showDefaultApiKeyWarning() {
+    const modalContainer = document.createElement("div");
+    modalContainer.innerHTML = `
+      <style>
+      .main-embedWidgetGenerator-container {
+        width: 425px !important;
+      }
+      .main-buttons-button:hover {
+        filter: brightness(1.2); 
+      }
+      </style>
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <div style="color: white; font-size: 16px; margin-bottom: 15px;">
+          You are using the default API key for AI Pick. 
+          For extended usage, please use your own API key.
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button id="continueAnyway" class="main-buttons-button" 
+                  style="padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; font-weight: 500; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+            Continue Anyway
+          </button>
+          <button id="addApiKey" class="main-buttons-button main-button-primary" 
+                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 600; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+            Set Free API Key
+          </button>
+        </div>
+      </div>
+    `;
+  
+    Spicetify.PopupModal.display({
+      title: "<span style='font-size: 25px;'>API Key Warning</span>",
+      content: modalContainer,
+      isLarge: true,
+    });
+  
+    const continueButton = document.getElementById("continueAnyway");
+    const addApiKeyButton = document.getElementById("addApiKey");
+  
+    continueButton.addEventListener("click", async () => {
+      Spicetify.PopupModal.hide();
+      menuButtons.forEach((btn) => {
+        if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+          btn.style.backgroundColor = "transparent";
+        }
+      });
+      await handleSortAndCreatePlaylist("aiPick");  
+    });
+  
+    addApiKeyButton.addEventListener("click", () => {
+      Spicetify.PopupModal.hide();  
+      setTimeout(() => {
+        showGeminiApiKeyModal();  
+      }, 350);
+    });
+  }
+
   const buttonStyles = {
     main: {
       backgroundColor: "transparent",
@@ -1343,6 +2642,27 @@ async function main() {
         color: "white",
         text: "Shuffle",
         sortType: "shuffle",
+      },
+      {
+        backgroundColor: "#282828",
+        color: "white",
+        text: "AI Pick",
+        sortType: "aiPick",
+        hasInnerButton: true,
+        onClick: async function (event) {
+          event.stopPropagation();
+          const userApiKey = localStorage.getItem("sort-play-gemini-api-key");
+          if (!userApiKey || DefaultGeminiApiKeys.includes(userApiKey)) {  
+            showDefaultApiKeyWarning();
+          } else {
+            menuButtons.forEach((btn) => {
+              if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                btn.style.backgroundColor = "transparent";
+              }
+            });
+            await handleSortAndCreatePlaylist("aiPick");
+          }
+        },
       },
       {
         backgroundColor: "#282828",
@@ -1419,14 +2739,32 @@ async function main() {
     }
   });
 
-  function getContextMenuBackgroundColor() {
+  function getRawContextMenuStyle() {
+    const style = document.createElement('style');
+    document.head.appendChild(style);
+    
+    const sheets = document.styleSheets;
+    
+    for (let sheet of sheets) {
+        try {
+            const rules = sheet.cssRules || sheet.rules;
+            for (let rule of rules) {
+                if (rule.selectorText === '.main-contextMenu-menu') {
+                    return rule.style.backgroundColor;
+                }
+            }
+        } catch (e) {
+            continue;
+        }
+    }
+    
     const tempElement = document.createElement("div");
     tempElement.className = "main-contextMenu-menu";
     document.body.appendChild(tempElement);
-  
-    const computedStyle = window.getComputedStyle(tempElement);
-    const backgroundColor = computedStyle.backgroundColor;
-  
+    
+    const styles = window.getComputedStyle(tempElement);
+    const backgroundColor = styles.getPropertyValue('background-color');
+    
     document.body.removeChild(tempElement);
     return backgroundColor;
   }
@@ -1442,34 +2780,26 @@ async function main() {
   menuContainer.style.boxShadow = "rgba(0, 0, 0, 0.3) 0px 16px 24px 0px";
 
 
-  menuContainer.style.backgroundColor = getContextMenuBackgroundColor();
+  menuContainer.classList.add('main-contextMenu-menu');
 
   const menuBackgroundObserver = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
           if (mutation.attributeName === 'class') {
-              menuContainer.style.backgroundColor = getContextMenuBackgroundColor();
+              const rawStyle = getRawContextMenuStyle();
+              if (rawStyle.includes('var(--spice-rgb-card)')) {
+                  menuContainer.style.removeProperty('background-color');
+              }
           }
       });
   });
 
   menuBackgroundObserver.observe(document.body, {
-    attributes: true,
-    attributeFilter: ['class']
+      attributes: true,
+      attributeFilter: ['class']
   });
 
   setTimeout(() => {
-    menuBackgroundObserver.disconnect();
-  }, 15000);
-
-  const themeCheckInterval = setInterval(() => {
-    const currentColor = getContextMenuBackgroundColor();
-    if (currentColor !== menuContainer.style.backgroundColor) {
-        menuContainer.style.backgroundColor = currentColor;
-    }
-  }, 1000);
-
-  setTimeout(() => {
-    clearInterval(themeCheckInterval);
+      menuBackgroundObserver.disconnect();
   }, 15000);
 
   let releaseDateReverse = localStorage.getItem("sort-play-release-date-reverse") === "true";
@@ -1500,7 +2830,7 @@ async function main() {
     button.style.padding = "4px 10px";
     button.style.fontWeight = "400";
     button.style.fontSize = "14px";
-    button.style.height = "44px";
+    button.style.height = "42px";
     button.style.width = "155px"; 
     button.style.textAlign = "center";
     button.style.opacity = "0";
@@ -1533,7 +2863,7 @@ async function main() {
     </svg>`;
 
     if (style.hasInnerButton) {
-      if (style.text === "Release date") {
+      if (style.text === "Release Date") {
           const innerButton = document.createElement("button");
           innerButton.title = "Toggle Order (Newest/Oldest First)";
           const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1582,7 +2912,51 @@ async function main() {
           
           button.appendChild(innerButton);
       }
-      if (style.text === "My Scrobbles") {
+      else if (style.text === "AI Pick") {
+        const innerButton = document.createElement("button");
+        innerButton.title = "Set Gemini API Key";
+        innerButton.style.cssText = `
+          background-color: transparent;
+          border: none;
+          border-radius: 2px;
+          padding: 0;
+          cursor: pointer;
+          position: absolute;
+          right: 0px; 
+          top: 50%;
+          transform: translateY(-48%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 30px;
+          height: 30px;
+        `; 
+
+        const parser = new DOMParser();
+        const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
+        const svgElement = svgDoc.documentElement;
+        svgElement.setAttribute("width", "50%");
+        svgElement.setAttribute("height", "50%");
+        svgElement.style.fill = "#ffffffe6";
+  
+        innerButton.appendChild(svgElement);
+  
+        innerButton.addEventListener("mouseenter", () => {
+          svgElement.style.fill = "#1ED760";
+        });
+  
+        innerButton.addEventListener("mouseleave", () => {
+          svgElement.style.fill = "#ffffffe6";
+        });
+  
+        innerButton.addEventListener("click", (event) => {
+          event.stopPropagation();
+          showGeminiApiKeyModal();
+        });
+  
+        button.appendChild(innerButton);
+      }
+      else if (style.text === "My Scrobbles") {
         const innerButton = document.createElement("button");
         innerButton.title = "Set Last.fm Username";
         innerButton.style.cssText = `
@@ -1914,13 +3288,13 @@ async function main() {
       }
   
       let tracks;
-      let isArtistPage = false;  
+      let isArtistPage = false;
   
       if (URI.isPlaylistV1OrV2(currentUri)) {
         tracks = await getPlaylistTracks(currentUri.split(":")[2]);
       } else if (URI.isArtist(currentUri)) {
         tracks = await getArtistTracks(currentUri);
-        isArtistPage = true;  
+        isArtistPage = true;
       }
   
       if (!tracks || tracks.length === 0) {
@@ -1939,17 +3313,15 @@ async function main() {
         },
         getTrackDetailsWithPlayCount
       );
-
       const tracksWithIds = await processBatchesWithDelay(
         tracksWithPlayCounts,
         200,
         1000,
         (progress) => {
-          mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`; 
+          mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`;
         },
         collectTrackIdsForPopularity
       );
-
       const tracksWithPopularity = await fetchPopularityForMultipleTracks(
         tracksWithIds,
         (progress) => {
@@ -1961,7 +3333,12 @@ async function main() {
       let uniqueTracks;
       let removedTracks = [];
   
-      if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
+      if (
+        sortType === "playCount" ||
+        sortType === "popularity" ||
+        sortType === "shuffle" ||
+        sortType === "releaseDate"
+      ) {
         if (sortType === "releaseDate") {
           const tracksWithReleaseDates = await processBatchesWithDelay(
             tracksWithPopularity,
@@ -1981,7 +3358,7 @@ async function main() {
   
         if (sortType === "playCount") {
           sortedTracks = uniqueTracks
-            .filter(track => track.playCount !== "N/A")
+            .filter((track) => track.playCount !== "N/A")
             .sort((a, b) => b.playCount - a.playCount);
         } else if (sortType === "popularity") {
           sortedTracks = uniqueTracks
@@ -1992,7 +3369,7 @@ async function main() {
             .filter((track) => track.releaseDate !== null)
             .sort((a, b) => {
               return releaseDateReverse
-                ? a.releaseDate - b.releaseDate 
+                ? a.releaseDate - b.releaseDate
                 : b.releaseDate - a.releaseDate;
             });
         } else if (sortType === "shuffle") {
@@ -2004,7 +3381,7 @@ async function main() {
           Spicetify.showNotification(`No tracks found with ${sortType} data.`);
           return;
         }
-
+  
         mainButton.innerText = "100%";
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
         try {
@@ -2027,8 +3404,34 @@ async function main() {
           Spicetify.showNotification(error.message);
           return;
         }
+      } else if (sortType === "aiPick") {
+        const { uniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
+          tracks,
+          (progress) => {
+            mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`;
+          }
+        );
+        removedTracks = removedTracksFromAi;
+  
+        if (uniqueTracks.length === 0) {
+          resetButtons();
+          Spicetify.showNotification("No tracks available for AI to pick from.");
+          return;
+        }
+  
+        let artistImageUrl = null;
+        if (isArtistPage) {
+          try {
+            artistImageUrl = await getArtistImageUrl(sourceUri.split(":")[2]);
+          } catch (error) {
+            console.error("Error fetching artist image URL:", error);
+          }
+        }
+  
+        await showAiPickModal(uniqueTracks, artistImageUrl); 
+        return;
       }
-
+  
       const sourceUri = currentUri;
       let sourceName = URI.isArtist(sourceUri)
         ? await Spicetify.CosmosAsync.get(
@@ -2037,53 +3440,67 @@ async function main() {
         : await Spicetify.CosmosAsync.get(
             `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
           ).then((r) => r.name);
-  
+      
       const possibleSuffixes = [
-        "(PlayCount)",
-        "(Popularity)",
-        "(ReleaseDate)",
-        "(LFM Scrobbles)",
-        "(LFM My Scrobbles)",
-        "(Shuffle)"
+        "\\(PlayCount\\)",
+        "\\(Popularity\\)",
+        "\\(ReleaseDate\\)",
+        "\\(LFM Scrobbles\\)",
+        "\\(LFM My Scrobbles\\)",
+        "\\(Shuffle\\)",
+        "\\(AI Pick\\)",
       ];
-  
-      const sortSuffixRegex = new RegExp(` (${possibleSuffixes.map(suffix =>
-        suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      ).join('|')})$`);
-  
-      if (sortSuffixRegex.test(sourceName)) {
-        sourceName = sourceName.replace(sortSuffixRegex, '');
+
+      let suffixPattern = new RegExp(
+        `\\s*(${possibleSuffixes.join("|")})\\s*`
+      );
+      
+      while (suffixPattern.test(sourceName)) {
+        sourceName = sourceName.replace(suffixPattern, "");
       }
-  
+
       const sortTypeInfo = {
         playCount: { fullName: "play count", shortName: "PlayCount" },
         popularity: { fullName: "popularity", shortName: "Popularity" },
         releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
         scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
-        personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
-        shuffle: { fullName: "shuffle", shortName: "Shuffle" }
+        personalScrobbles: {
+          fullName: "Last.fm personal scrobbles",
+          shortName: "LFM My Scrobbles",
+        },
+        shuffle: { fullName: "shuffle", shortName: "Shuffle" },
+        aiPick: { fullName: "AI pick", shortName: "AI Pick" },
       }[sortType];
-
+      
       try {
-
-          if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
-            showRemovedTracksModal(removedTracks);
+        if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
+          showRemovedTracksModal(removedTracks);
+        }
+        const newPlaylist = await createPlaylist(
+          `${sourceName} (${sortTypeInfo.shortName})`,
+          `Sorted by ${sortTypeInfo.fullName} using sort-play`
+        );
+        mainButton.innerText = "Saving...";
+        if (isArtistPage && sortType !== "aiPick") {
+          try {
+            const artistImageUrl = await getArtistImageUrl(sourceUri.split(":")[2]);
+            if (artistImageUrl) {
+              const base64Image = await toBase64(artistImageUrl);
+              await setPlaylistImage(newPlaylist.id, base64Image);
+            }
+          } catch (error) {
+            console.error("Error setting playlist image:", error);
           }
-          const newPlaylist = await createPlaylist(
-            `${sourceName} (${sortTypeInfo.shortName})`,
-            `Sorted by ${sortTypeInfo.fullName} using sort-play`
-          );
-          mainButton.innerText = "Saving...";  
-          const trackUris = sortedTracks.map((track) => track.uri);
-          await addTracksToPlaylist(newPlaylist.id, trackUris);
-    
-          Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
-
+        }
+        const trackUris = sortedTracks.map((track) => track.uri);
+        await addTracksToPlaylist(newPlaylist.id, trackUris);
+  
+        Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
       } catch (error) {
-          console.error("Error creating or updating playlist:", error);
-          Spicetify.showNotification(
-            `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
-          );
+        console.error("Error creating or updating playlist:", error);
+        Spicetify.showNotification(
+          `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
+        );
       }
     } catch (error) {
       console.error("Error during sorting process:", error);
@@ -2432,12 +3849,16 @@ async function main() {
       const sortType = buttonStyle.sortType;
       element.addEventListener("click", async (event) => { 
         event.stopPropagation();
-        menuButtons.forEach((btn) => {
-          if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-            btn.style.backgroundColor = "#282828";
-          }
-        });
-        await handleSortAndCreatePlaylist(sortType);
+        if (buttonStyle.onClick) {  
+          await buttonStyle.onClick(event);
+        } else {
+          menuButtons.forEach((btn) => {
+            if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+              btn.style.backgroundColor = "transparent";
+            }
+          });
+          await handleSortAndCreatePlaylist(sortType);
+        }
       });
     }
   });
