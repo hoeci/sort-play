@@ -3,8 +3,8 @@ Sort Spotify playlists and artist pages by play count, popularity, release date,
 
 Create AI playlists from prompts.
 
-<img src="https://github.com/user-attachments/assets/ea99b2b5-40dd-4c4f-a980-e80e31d49e4e" alt="show" width="326px">
-<img src="https://github.com/user-attachments/assets/f0710ff1-d5a5-4f41-aefa-201b6344b543" alt="show" width="500px">
+<img src="https://github.com/user-attachments/assets/ea99b2b5-40dd-4c4f-a980-e80e31d49e4e" alt="show" width="450px">
+<img src="https://github.com/user-attachments/assets/f0710ff1-d5a5-4f41-aefa-201b6344b543" alt="show" width="450px">
 
 
 ## Features
