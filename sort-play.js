@@ -588,6 +588,9 @@
     }
   }
 
+
+  let userSystemInstruction;
+  
   async function showAiPickModal(tracks) {
     const modalContainer = document.createElement("div");
     modalContainer.className = "ai-pick-modal";
@@ -1891,9 +1894,7 @@
         if (!albumRes.items) break;
   
         albumRes.items.forEach((album) => {
-          if (includeVariousArtists || !album.artists.some((artist) => artist.id === "0LyfQWJT6nXafLPZqxe9Of")) {
-            allAlbumIds.add(album.id);
-          }
+          allAlbumIds.add(album.id);
         });
   
         nextUrl = albumRes.next;
