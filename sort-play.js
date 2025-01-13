@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.0.3";
+  const SORT_PLAY_VERSION = "2.0.2";
 
   const { PlaylistAPI } = Platform;
 
@@ -784,6 +784,8 @@
           max-height: 136px;
           overflow-y: hidden;
           padding-left: 10px;   
+          padding-top: 0px;   
+          padding-bottom: 0px; 
           padding-right: 10px;
           line-height: 20px;
           border-radius: 20px;
@@ -794,6 +796,7 @@
           display: flex;
           align-items: center;
           border: none;
+          margin-bottom: 10px;
         }
 
         .ai-pick-modal .prompt-wrapper textarea:focus {
