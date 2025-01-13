@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.0.1";
+  const SORT_PLAY_VERSION = "2.0.2";
 
   const { PlaylistAPI } = Platform;
 
@@ -20,7 +20,7 @@
   let showRemovedDuplicates = false;
   let includeSongStats = true;
   let includeLyrics = true;
-  let selectedAiModel = "gemini-1.5-pro-002";
+  let selectedAiModel = "gemini-2.0-flash-exp";
 
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
 
@@ -40,7 +40,7 @@
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
-    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-1.5-pro-002";
+    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.0-flash-exp";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
   }
 
