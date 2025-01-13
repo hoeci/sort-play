@@ -937,7 +937,7 @@
         
         <div class="prompt-wrapper">
           <div class="textarea-container">
-            <textarea id="aiPrompt" placeholder="Enter your request for the AI..."></textarea>
+              <textarea id="aiPrompt" class="sort-play-ai-prompt" placeholder="Enter your request for the AI..."></textarea>
           </div>
           <div class="button-container">
             <button id="sendAiRequest">Send</button>
