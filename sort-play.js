@@ -19,8 +19,7 @@
   let includeSongStats = true;
   let includeLyrics = true;
   let selectedAiModel = "gemini-1.5-pro-002";
-  let includeVariousArtists = true;
-  
+
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
@@ -41,7 +40,6 @@
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
     selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-1.5-pro-002";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
-    includeVariousArtists = localStorage.getItem("sort-play-include-various-artists") === "true"; 
   }
 
   function saveSettings() {
@@ -53,7 +51,6 @@
     localStorage.setItem("sort-play-include-lyrics", includeLyrics);
     localStorage.setItem("sort-play-ai-model", selectedAiModel);
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
-    localStorage.setItem("sort-play-include-various-artists", includeVariousArtists);  
   }
   const DefaultGeminiApiKeys = [
     "***REMOVED***",
@@ -377,6 +374,12 @@
     .tooltip-container:hover .custom-tooltip {
         visibility: visible;
     }
+    .version-tag {
+      font-size: 14px;
+      color: #888;
+      margin-left: 12px;
+      vertical-align: middle;
+    }
     </style>
     <div style="display: flex; flex-direction: column; gap: 12px;">
 
@@ -440,27 +443,6 @@
         </div>
     </div>
 
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Artist Tracks Options
-    </div>
-    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="includeVariousArtists">
-        <label class="col description">
-            Include 'Various Artists' Albums in search
-            <span class="tooltip-container">
-                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">This might find more tracks, but will make the process significantly slower.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" ${includeVariousArtists ? 'checked' : ''}>
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
-
     <div class="setting-row" id="githubLink" style="margin-bottom: 10px; margin-top: 5px; justify-content: center;">
         <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
             <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 13px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
@@ -470,7 +452,7 @@
     `;
 
     Spicetify.PopupModal.display({
-        title: "<span style='font-size: 30px;'>Sort-Play Settings</span>",
+        title: `<span style='font-size: 30px;'>Sort-Play Settings <span class='version-tag'>v2.0.0</span></span>`,
         content: modalContainer,
         isLarge: true,
     });
@@ -493,7 +475,6 @@
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
-    const includeVariousArtistsToggle = modalContainer.querySelector("#includeVariousArtists input");
 
     removeDateAddedToggle.disabled = !columnPlayCount;
     removeDateAddedToggle.parentElement.classList.toggle("disabled", !columnPlayCount);
@@ -538,11 +519,6 @@
     showRemovedDuplicatesToggle.addEventListener("change", () => {
         showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
         saveSettings();
-    });
-
-    includeVariousArtistsToggle.addEventListener("change", () => {
-      includeVariousArtists = includeVariousArtistsToggle.checked;
-      saveSettings();
     });
   }
 
