@@ -1,12 +1,9 @@
 # Sort Play
-Sort Spotify playlists and artist pages by play count, popularity, release date, shuffle, and Last.fm scrobbles.
+Sort Spotify playlists and an artist's entire discography by play count, popularity, release date, shuffle, and Last.fm scrobbles.
 
 Create AI playlists from prompts.
 
 <img src="https://github.com/user-attachments/assets/0a3af8b3-c654-42b0-8873-8b0e93c8e719" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/9d4748fc-1644-4509-87ff-20de6b75e190" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/27f6846b-789d-4d27-a927-dfe7dbfa55a9" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/0d7a6c8b-9975-4166-b76e-b84e4c72d949" alt="show" width="100%">
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
@@ -17,6 +14,13 @@ Create AI playlists from prompts.
 + Smart Shuffle considering track similarity and artist spread.
 + Toggle ascending/descending release date sorting.
 + Saves sorted tracks to a new private playlist.
+
+
+<img src="https://github.com/user-attachments/assets/9d4748fc-1644-4509-87ff-20de6b75e190" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/27f6846b-789d-4d27-a927-dfe7dbfa55a9" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/0d7a6c8b-9975-4166-b76e-b84e4c72d949" alt="show" width="100%">
+
+
 
 ## Installation  
 
