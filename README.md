@@ -1,6 +1,4 @@
 # Sort Play
-Sort Spotify playlists and artist discographies by play count and more. Create AI playlists from prompts.
-
 <img src="https://github.com/user-attachments/assets/98dc5ea0-4324-4840-992f-7aecca71c5a6" alt="show" width="100%">
 
 ## ⚡️ Features
