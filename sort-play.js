@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.0.2";
+  const SORT_PLAY_VERSION = "2.0.3";
 
   const { PlaylistAPI } = Platform;
 
@@ -981,7 +981,6 @@
               <label style="color: white; display: block; margin-bottom: 15px; font-weight: bold; font-size: 14px;">AI Model:</label>
               <select id="aiModel">
                 <option value="gemini-2.0-flash-exp" ${selectedAiModel === "gemini-2.0-flash-exp" ? "selected" : ""}>Gemini 2.0 Flash Exp</option>
-                <option value="gemini-1.5-pro-002" ${selectedAiModel === "gemini-1.5-pro-002" ? "selected" : ""}>Gemini 1.5 Pro 002</option>
                 <option value="gemini-1.5-pro" ${selectedAiModel === "gemini-1.5-pro" ? "selected" : ""}>Gemini 1.5 Pro</option>
                 <option value="gemini-1.5-flash" ${selectedAiModel === "gemini-1.5-flash" ? "selected" : ""}>Gemini 1.5 Flash</option>
               </select>
@@ -1472,6 +1471,10 @@
             },
             {
               category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+              threshold: "BLOCK_NONE"
+            },
+            {
+              category: "HARM_CATEGORY_CIVIC_INTEGRITY",
               threshold: "BLOCK_NONE"
             }
           ]
