@@ -6,6 +6,8 @@
     return;
   }
 
+  const SORT_PLAY_VERSION = "2.0.0";
+
   const { PlaylistAPI } = Platform;
 
   const LFMApiKey = "***REMOVED***";
@@ -452,7 +454,7 @@
     `;
 
     Spicetify.PopupModal.display({
-        title: `<span style='font-size: 30px;'>Sort-Play Settings <span class='version-tag'>v2.0.0</span></span>`,
+        title: `<span style='font-size: 30px;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span>`,
         content: modalContainer,
         isLarge: true,
     });
