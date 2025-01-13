@@ -1855,6 +1855,12 @@
       sha256Hash: "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497",
     };
   
+    const queryArtistAppearsOn = {
+      name: "queryArtistAppearsOn",
+      operation: "query",
+      sha256Hash: "9a4bb7a20d6720fe52d7b47bc001cfa91940ddf5e7113761460b4a288d18a4c1",
+    };
+  
     mainButton.innerHTML = '<div class="loader"></div>';
     mainButton.disabled = true;
   
@@ -1868,6 +1874,14 @@
       if (artistData.errors) throw new Error(artistData.errors[0].message);
       const artistName = artistData.data.artistUnion.profile.name;
       const artistId = artistUri.split(":")[2];
+  
+      const appearsOnData = await GraphQL.Request(queryArtistAppearsOn, {
+        uri: artistUri,
+        offset: 0,
+        limit: 200,
+      });
+  
+      if (appearsOnData.errors) throw new Error(appearsOnData.errors[0].message);
   
       const allAlbumIds = new Set();
       let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
@@ -1884,6 +1898,16 @@
   
         nextUrl = albumRes.next;
       } while (nextUrl);
+  
+      const appearsOnAlbums = appearsOnData.data.artistUnion.relatedContent.appearsOn.items.flatMap(
+        ({ releases }) => releases.items
+      );
+      appearsOnAlbums.forEach((release) => {
+        if (release?.uri) {
+          const albumId = release.uri.split(":")[2];
+          allAlbumIds.add(albumId);
+        }
+      });
   
       async function fetchTracksFromAlbum(albumId, retries = 5, delay = 1000) {
         const albumUri = `spotify:album:${albumId}`;
