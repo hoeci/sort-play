@@ -4,9 +4,9 @@ Sort Spotify playlists and artist pages by play count, popularity, release date,
 Create AI playlists from prompts.
 
 <img src="https://github.com/user-attachments/assets/0a3af8b3-c654-42b0-8873-8b0e93c8e719" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/ea99b2b5-40dd-4c4f-a980-e80e31d49e4e" alt="show" width="450px">
-<img src="https://github.com/user-attachments/assets/f0710ff1-d5a5-4f41-aefa-201b6344b543" alt="show" width="450px">
-
+<img src="https://github.com/user-attachments/assets/9d4748fc-1644-4509-87ff-20de6b75e190" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/27f6846b-789d-4d27-a927-dfe7dbfa55a9" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/0d7a6c8b-9975-4166-b76e-b84e4c72d949" alt="show" width="100%">
 
 ## Features
 + Sort playlists & artist discography (single, album, appears on).
