@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.0.0";
+  const SORT_PLAY_VERSION = "2.0.1";
 
   const { PlaylistAPI } = Platform;
 
@@ -2834,7 +2834,7 @@
     button.style.padding = "4px 10px";
     button.style.fontWeight = "400";
     button.style.fontSize = "14px";
-    button.style.height = "42px";
+    button.style.height = "40px";
     button.style.width = "155px"; 
     button.style.textAlign = "center";
     button.style.opacity = "0";
@@ -3480,9 +3480,16 @@
         if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
           showRemovedTracksModal(removedTracks);
         }
+
+        let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using sort-play`;
+
+        if(isArtistPage) {
+          playlistDescription = `Discography of ${sourceName}: created and sorted by ${sortTypeInfo.fullName} using sort-play`
+        }
+
         const newPlaylist = await createPlaylist(
           `${sourceName} (${sortTypeInfo.shortName})`,
-          `Sorted by ${sortTypeInfo.fullName} using sort-play`
+          playlistDescription
         );
         mainButton.innerText = "Saving...";
         if (isArtistPage && sortType !== "aiPick") {
