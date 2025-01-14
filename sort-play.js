@@ -249,7 +249,7 @@
         overflow: hidden; 
       }
       .main-trackCreditsModal-header {
-        padding: 24px 32px 12px !important;
+        padding: 27px 32px 12px !important;
       }
       .main-trackCreditsModal-mainSection {
         overflow-y: hidden !important;
@@ -396,7 +396,7 @@
       padding: 16px 32px 0 32px;
     }
     .main-trackCreditsModal-header {
-      padding: 24px 32px 12px !important;
+      padding: 27px 32px 12px !important;
     }
     .sort-play-settings .col {
         padding: 0;
@@ -732,7 +732,7 @@
           padding: 16px 32px 9px 32px;
         }
         .main-trackCreditsModal-header {
-          padding: 24px 32px 12px !important;
+          padding: 27px 32px 12px !important;
         }
         .ai-pick-modal .setting-row::after {
           content: "";
@@ -1709,7 +1709,7 @@
         overflow-y: hidden !important;
       }
       .main-trackCreditsModal-header {
-        padding: 24px 32px 12px !important;
+        padding: 27px 32px 12px !important;
       }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -2754,7 +2754,7 @@
         filter: brightness(1.2); 
       }
       .main-trackCreditsModal-header {
-        padding: 24px 32px 12px !important;
+        padding: 27px 32px 12px !important;
       }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
