@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.0.3";
+  const SORT_PLAY_VERSION = "2.0.4";
 
   const { PlaylistAPI } = Platform;
 
@@ -245,7 +245,16 @@
       <style>
       .main-embedWidgetGenerator-container {
         width: 420px !important;
+        border-radius: 30px;
+        overflow: hidden; 
       }
+      .main-trackCreditsModal-header {
+        padding: 24px 32px 12px !important;
+      }
+      .main-trackCreditsModal-mainSection {
+        overflow-y: hidden !important;
+      }
+
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
         <div style="display: flex; flex-direction: column; gap: 5px;">
@@ -379,6 +388,15 @@
     <style>
     .main-embedWidgetGenerator-container {
       width: 550px !important;
+      border-radius: 30px;
+      overflow: hidden; 
+    }
+    .main-trackCreditsModal-mainSection {
+      overflow-y: hidden !important;
+      padding: 16px 32px 0 32px;
+    }
+    .main-trackCreditsModal-header {
+      padding: 24px 32px 12px !important;
     }
     .sort-play-settings .col {
         padding: 0;
@@ -408,7 +426,6 @@
     .sort-play-settings .setting-row#githubLink {
       display: flex;
       justify-content: center;
-      margin-bottom: 10px;
       margin-top: 5px;
     }
     
@@ -572,9 +589,9 @@
         </div>
     </div>
 
-    <div class="setting-row" id="githubLink" style="margin-bottom: 10px; margin-top: 5px; justify-content: center;">
+    <div class="setting-row" id="githubLink" style="margin-top: 5px; justify-content: center;">
         <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
-            <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 13px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
+            <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 14px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
         </label>
     </div>
     </div>
@@ -706,13 +723,17 @@
         div.main-embedWidgetGenerator-container {
           width: 620px !important;
           max-width: 620px !important;
+          border-radius: 30px;
+          overflow: hidden; 
         }
 
         .main-trackCreditsModal-mainSection {
-          overflow-y: scroll;
-          padding: 16px 18px 0 32px; 
+          overflow-y: hidden !important;
+          padding: 16px 32px 9px 32px;
         }
-
+        .main-trackCreditsModal-header {
+          padding: 24px 32px 12px !important;
+        }
         .ai-pick-modal .setting-row::after {
           content: "";
           display: table;
@@ -857,8 +878,7 @@
         .ai-pick-modal .button-row {
           display: flex;
           gap: 10px;
-          margin-top: 10px;
-          margin-bottom: 15px;
+          margin-top: 16px;
         }
         .loader {
           border: 2px solid #f3f3f3;
@@ -884,8 +904,8 @@
         .ai-pick-modal .system-instruction .instruction-label {
           color: white;
           display: block;
-          margin-bottom: 10px;
-          margin-top: 10px;
+          margin-bottom: 12px;
+          margin-top: 15px;
           font-weight: bold;
         }
         .ai-pick-modal .prompt-wrapper {
@@ -1108,7 +1128,7 @@
       
           <div class="settings-left-wrapper">
             <div class="model-row">
-              <label style="color: white; display: block; margin-bottom: 15px; font-weight: bold; font-size: 14px;">AI Model:</label>
+              <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:</label>
               <select id="aiModel">
                 <option value="gemini-2.0-flash-exp" ${selectedAiModel === "gemini-2.0-flash-exp" ? "selected" : ""}>Gemini 2.0 Flash Exp</option>
                 <option value="gemini-1.5-pro" ${selectedAiModel === "gemini-1.5-pro" ? "selected" : ""}>Gemini 1.5 Pro</option>
@@ -1682,6 +1702,14 @@
       <style>
       .main-embedWidgetGenerator-container {
         width: 420px !important;
+        border-radius: 30px;
+        overflow: hidden; 
+      }
+      .main-trackCreditsModal-mainSection {
+        overflow-y: hidden !important;
+      }
+      .main-trackCreditsModal-header {
+        padding: 24px 32px 12px !important;
       }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -2716,9 +2744,17 @@
       <style>
       .main-embedWidgetGenerator-container {
         width: 425px !important;
+        border-radius: 30px;
+        overflow: hidden; 
+      }
+      .main-trackCreditsModal-mainSection {
+        overflow-y: hidden !important;
       }
       .main-buttons-button:hover {
         filter: brightness(1.2); 
+      }
+      .main-trackCreditsModal-header {
+        padding: 24px 32px 12px !important;
       }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
