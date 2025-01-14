@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.0.2";
+  const SORT_PLAY_VERSION = "2.0.3";
 
   const { PlaylistAPI } = Platform;
 
@@ -54,6 +54,79 @@
     localStorage.setItem("sort-play-ai-model", selectedAiModel);
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
   }
+
+  const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; 
+  const CACHE_KEY_PREFIX = 'sort-play-playlist-cache-';
+  
+  function getCacheKey(playlistId, includeSongStats, includeLyrics) {
+    return `${CACHE_KEY_PREFIX}${playlistId}-stats${includeSongStats}-lyrics${includeLyrics}`;
+  }
+  
+  function getPlaylistCache(playlistId, includeSongStats, includeLyrics) {
+    const cacheKey = getCacheKey(playlistId, includeSongStats, includeLyrics);
+    const cachedData = localStorage.getItem(cacheKey);
+    
+    if (!cachedData) {
+      return null;
+    }
+    
+    try {
+      const { timestamp, tracks } = JSON.parse(cachedData);
+      const now = Date.now();
+      
+      if (now - timestamp > CACHE_DURATION_MS) {
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+      
+      return tracks;
+    } catch (error) {
+      console.error('Error parsing cache:', error);
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+  }
+  
+  function setPlaylistCache(playlistId, tracks, includeSongStats, includeLyrics) {
+    const cacheKey = getCacheKey(playlistId, includeSongStats, includeLyrics);
+    const cacheData = {
+      timestamp: Date.now(),
+      tracks: tracks
+    };
+    
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Error setting cache:', error);
+      clearOldCaches();
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      } catch (retryError) {
+        console.error('Failed to set cache even after clearing:', retryError);
+      }
+    }
+  }
+  
+  function clearOldCaches() {
+    const keysToRemove = [];
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith(CACHE_KEY_PREFIX)) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key));
+          if (Date.now() - data.timestamp > CACHE_DURATION_MS) {
+            keysToRemove.push(key);
+          }
+        } catch (error) {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+  }
+
   const DefaultGeminiApiKeys = [
     "***REMOVED***",
     "***REMOVED***",
@@ -796,7 +869,7 @@
           display: flex;
           align-items: center;
           border: none;
-          margin-bottom: 10px;
+          margin-bottom: 0px;
         }
 
         .ai-pick-modal .prompt-wrapper textarea:focus {
@@ -1149,7 +1222,8 @@
   
         if (aiResponse && aiResponse.length > 0) {
           const sourceUri = getCurrentUri();
-          let sourceName = URI.isArtist(sourceUri)
+          const isArtistPage = URI.isArtist(sourceUri); 
+          let sourceName = isArtistPage
             ? await Spicetify.CosmosAsync.get(
               `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
             ).then((r) => r.name)
@@ -1172,9 +1246,17 @@
           while (suffixPattern.test(sourceName)) {
             sourceName = sourceName.replace(suffixPattern, "");
           }
+
+          let playlistDescription;
+          if (isArtistPage) {
+            playlistDescription = `Tracks by ${sourceName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
+          } else {
+            playlistDescription = `Tracks picked by AI using Sort-Play for request: "${userPrompt}"`;
+          }
+  
           const newPlaylist = await createPlaylist(
             `${sourceName} (AI Pick)`,
-            `Tracks picked by AI using sort-play`
+            playlistDescription 
           );
   
           const trackUris = aiResponse;
@@ -1337,6 +1419,11 @@
     let delay = initialDelay;
     let enrichedTracksCache = null;
   
+    const playlistId = tracks[0]?.uri.split(":")[2];
+    if (playlistId) {
+      enrichedTracksCache = getPlaylistCache(playlistId, includeSongStats, includeLyrics);
+    }
+
     while (retries < maxRetries) {
       try {
         if (!enrichedTracksCache) {
@@ -1369,11 +1456,11 @@
                 
                 try {
                   const albumId = track.albumId || track.track?.album?.id;
-                    if(albumId){
-                      const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
-                      const foundTrack = albumTracksWithPlayCounts.find(
-                        (albumTrack) => albumTrack.uri === track.uri
-                      );
+                  if(albumId) {
+                    const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
+                    const foundTrack = albumTracksWithPlayCounts.find(
+                      (albumTrack) => albumTrack.uri === track.uri
+                    );
                     if (foundTrack) {
                       playCount = foundTrack.playcount;
                     } else {
@@ -1428,6 +1515,10 @@
               return enrichedTrack;
             }
           );
+  
+          if (enrichedTracksCache && playlistId) {
+            setPlaylistCache(playlistId, enrichedTracksCache, includeSongStats, includeLyrics);
+          }
         }
   
         const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
@@ -3487,10 +3578,10 @@
           showRemovedTracksModal(removedTracks);
         }
 
-        let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using sort-play`;
+        let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
 
         if(isArtistPage) {
-          playlistDescription = `Discography of ${sourceName}: created and sorted by ${sortTypeInfo.fullName} using sort-play`
+          playlistDescription = `Discography of ${sourceName}: created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
         }
 
         const newPlaylist = await createPlaylist(
@@ -4275,7 +4366,7 @@
 
     loadSettings();
     initializeCache();
-    console.log(`sort-play loaded`);
+    console.log(`Sort-Play loaded`);
   }
 
   if (typeof module !== 'undefined' && module.exports) {
