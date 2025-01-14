@@ -55,76 +55,130 @@
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
   }
 
-  const CACHE_DURATION_MS = 24 * 60 * 60 * 1000; 
-  const CACHE_KEY_PREFIX = 'sort-play-playlist-cache-';
+  const AI_DATA_CACHE_VERSION = '1';
+  const AI_DATA_CACHE_KEY_PREFIX = `sort-play-playlist-cache-v${AI_DATA_CACHE_VERSION}-`;
+  const AI_DATA_MAX_CACHE_SIZE_BYTES = 5 * 1024 * 1024;
+  const AI_DATA_CACHE_EXPIRY_DAYS = 14;
   
-  function getCacheKey(playlistId, includeSongStats, includeLyrics) {
-    return `${CACHE_KEY_PREFIX}${playlistId}-stats${includeSongStats}-lyrics${includeLyrics}`;
+  function getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel) {
+    return `${AI_DATA_CACHE_KEY_PREFIX}${trackId}-stats${includeSongStats}-lyrics${includeLyrics}-model${selectedAiModel}`;
   }
   
-  function getPlaylistCache(playlistId, includeSongStats, includeLyrics) {
-    const cacheKey = getCacheKey(playlistId, includeSongStats, includeLyrics);
-    const cachedData = localStorage.getItem(cacheKey);
-    
-    if (!cachedData) {
-      return null;
-    }
+  function getTrackCache(trackId, includeSongStats, includeLyrics, selectedAiModel) {
+    const cacheKey = getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel);
+    let cachedData;
     
     try {
-      const { timestamp, tracks } = JSON.parse(cachedData);
-      const now = Date.now();
+      cachedData = localStorage.getItem(cacheKey);
+      if (!cachedData) return null;
       
-      if (now - timestamp > CACHE_DURATION_MS) {
+      const { timestamp, trackData, version } = JSON.parse(cachedData);
+      
+      if (version !== AI_DATA_CACHE_VERSION) {
         localStorage.removeItem(cacheKey);
         return null;
       }
       
-      return tracks;
+      const expiryTime = AI_DATA_CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+      if (Date.now() - timestamp > expiryTime) {
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+      
+      return trackData;
     } catch (error) {
-      console.error('Error parsing cache:', error);
-      localStorage.removeItem(cacheKey);
+      console.error('Error retrieving cache:', error);
+      if (cachedData) localStorage.removeItem(cacheKey);
       return null;
     }
   }
   
-  function setPlaylistCache(playlistId, tracks, includeSongStats, includeLyrics) {
-    const cacheKey = getCacheKey(playlistId, includeSongStats, includeLyrics);
+  function setTrackCache(trackId, trackData, includeSongStats, includeLyrics, selectedAiModel) {
+    const cacheKey = getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel);
     const cacheData = {
+      version: AI_DATA_CACHE_VERSION,
       timestamp: Date.now(),
-      tracks: tracks
+      trackData: trackData
     };
-    
+  
     try {
       localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      manageCacheSize();
     } catch (error) {
-      console.error('Error setting cache:', error);
-      clearOldCaches();
-      try {
-        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      } catch (retryError) {
-        console.error('Failed to set cache even after clearing:', retryError);
+      if (error.name === 'QuotaExceededError') {
+        clearOldCaches();
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        } catch (retryError) {
+          console.error('Cache write failed after cleanup:', retryError);
+        }
+      } else {
+        console.error('Error setting cache:', error);
       }
     }
   }
   
   function clearOldCaches() {
     const keysToRemove = [];
-    
+    const expiryTime = AI_DATA_CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key.startsWith(CACHE_KEY_PREFIX)) {
+      if (key.startsWith(AI_DATA_CACHE_KEY_PREFIX)) {
         try {
           const data = JSON.parse(localStorage.getItem(key));
-          if (Date.now() - data.timestamp > CACHE_DURATION_MS) {
+          if (data && data.timestamp && (Date.now() - data.timestamp > expiryTime)) {
+            keysToRemove.push(key);
+          } else if (data && !data.version) {
             keysToRemove.push(key);
           }
         } catch (error) {
+          console.error(`Error parsing cache data for key ${key}:`, error);
           keysToRemove.push(key);
         }
       }
     }
-    
-    keysToRemove.forEach(key => localStorage.removeItem(key));
+  
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
+  }
+  
+  function manageCacheSize() {
+    let cacheSize = 0;
+    const cacheItems = [];
+  
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith(AI_DATA_CACHE_KEY_PREFIX)) {
+        const item = localStorage.getItem(key);
+        cacheSize += item.length;
+        try {
+          const data = JSON.parse(item);
+          cacheItems.push({ 
+            key, 
+            size: item.length,
+            timestamp: data.timestamp || 0  
+          });
+        } catch (error) {
+          localStorage.removeItem(key);
+          console.error(`Removed corrupted cache item: ${key}`);
+        }
+      }
+    }
+  
+    if (cacheSize > AI_DATA_MAX_CACHE_SIZE_BYTES) {
+      cacheItems.sort((a, b) => a.timestamp - b.timestamp);
+      
+      let removedSize = 0;
+      for (const item of cacheItems) {
+        localStorage.removeItem(item.key);
+        removedSize += item.size;
+        if (cacheSize - removedSize <= AI_DATA_MAX_CACHE_SIZE_BYTES) {
+          break;
+        }
+      }
+    }
   }
 
   const DefaultGeminiApiKeys = [
@@ -1415,20 +1469,28 @@
   }
 
   async function queryGeminiWithPlaylistTracks(tracks, userPrompt, apiKey, maxRetries = 3, initialDelay = 1000, includeSongStats = true, includeLyrics = true, modelName) {
+    clearOldCaches();
     let retries = 0;
     let delay = initialDelay;
-    let enrichedTracksCache = null;
-  
-    const playlistId = tracks[0]?.uri.split(":")[2];
-    if (playlistId) {
-      enrichedTracksCache = getPlaylistCache(playlistId, includeSongStats, includeLyrics);
-    }
+    let enrichedTracksCache = [];
+    let tracksToProcess = [];
 
+    for (const track of tracks) {
+      const trackId = track.uri.split(":")[2];
+      const cachedTrack = getTrackCache(trackId, includeSongStats, includeLyrics, modelName);
+      
+      if (cachedTrack) {
+        enrichedTracksCache.push(cachedTrack);
+      } else {
+        tracksToProcess.push(track);
+      }
+    }
+  
     while (retries < maxRetries) {
       try {
-        if (!enrichedTracksCache) {
-          enrichedTracksCache = await processBatchWithRateLimit(
-            tracks,
+        if (tracksToProcess.length > 0) {
+          const processedTracks = await processBatchWithRateLimit(
+            tracksToProcess,
             6,
             700,
             async track => {
@@ -1456,7 +1518,7 @@
                 
                 try {
                   const albumId = track.albumId || track.track?.album?.id;
-                  if(albumId) {
+                  if (albumId) {
                     const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
                     const foundTrack = albumTracksWithPlayCounts.find(
                       (albumTrack) => albumTrack.uri === track.uri
@@ -1511,18 +1573,18 @@
               if (includeLyrics) {
                 enrichedTrack.lyrics = lyrics;
               }
-  
+
+              setTrackCache(trackId, enrichedTrack, includeSongStats, includeLyrics, modelName);
+              
               return enrichedTrack;
             }
           );
   
-          if (enrichedTracksCache && playlistId) {
-            setPlaylistCache(playlistId, enrichedTracksCache, includeSongStats, includeLyrics);
-          }
+          enrichedTracksCache = [...enrichedTracksCache, ...processedTracks];
         }
   
         const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
-
+  
         const GoogleAI = await loadGoogleAI();
       
         if (!GoogleAI) {
@@ -1536,12 +1598,12 @@
         const combinedSystemInstruction = `${userSystemInstruction}\n${FIXED_SYSTEM_INSTRUCTION}`;
     
         const userMessage = `Playlist Tracks:\n${JSON.stringify(tracksWithStats, null, 2)}\n\nUser Request: ${userPrompt}\n\nGIVE PICKED TRACK URI's`;
-
+  
         const parts = [
           { text: combinedSystemInstruction },
           { text: userMessage } 
         ];
-
+  
         const result = await model.generateContentStream({
           contents: [{ role: "user", parts }],
           generationConfig: {
@@ -1593,7 +1655,7 @@
         
         matches = matches.filter(uri => uri.length === 22 + "spotify:track:".length);
   
-        if(matches.length === 0) {
+        if (matches.length === 0) {
           console.log("No Valid Spotify track URIs found in AI response after filtering.");
           return [];
         }
