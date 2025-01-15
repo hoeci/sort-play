@@ -254,7 +254,10 @@
       .main-trackCreditsModal-mainSection {
         overflow-y: hidden !important;
       }
-
+      .GenericModal__overlay .GenericModal {
+        border-radius: 30px;
+        overflow: hidden;
+      }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
         <div style="display: flex; flex-direction: column; gap: 5px;">
@@ -390,6 +393,10 @@
       width: 550px !important;
       border-radius: 30px;
       overflow: hidden; 
+    }
+    .GenericModal__overlay .GenericModal {
+      border-radius: 30px;
+      overflow: hidden;
     }
     .main-trackCreditsModal-mainSection {
       overflow-y: hidden !important;
@@ -726,7 +733,10 @@
           border-radius: 30px;
           overflow: hidden; 
         }
-
+        .GenericModal__overlay .GenericModal {
+          border-radius: 30px;
+          overflow: hidden;
+        }
         .main-trackCreditsModal-mainSection {
           overflow-y: hidden !important;
           padding: 16px 32px 9px 32px;
@@ -1704,6 +1714,10 @@
         width: 420px !important;
         border-radius: 30px;
         overflow: hidden; 
+      }
+      .GenericModal__overlay .GenericModal {
+        border-radius: 30px;
+        overflow: hidden;
       }
       .main-trackCreditsModal-mainSection {
         overflow-y: hidden !important;
@@ -2746,6 +2760,10 @@
         width: 425px !important;
         border-radius: 30px;
         overflow: hidden; 
+      }
+      .GenericModal__overlay .GenericModal {
+        border-radius: 30px;
+        overflow: hidden;
       }
       .main-trackCreditsModal-mainSection {
         overflow-y: hidden !important;
