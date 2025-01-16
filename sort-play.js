@@ -1138,7 +1138,13 @@
       
           <div class="settings-left-wrapper">
             <div class="model-row">
-              <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:</label>
+              <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:<span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Free API Limits:<br>
+                - Flash: 1M tokens/min<br>
+                - Pro: 32K tokens/min<br><br>
+                Pro models are best for up to ~180 songs (no lyrics included).
+                </span></label>
               <select id="aiModel">
                 <option value="gemini-2.0-flash-exp" ${selectedAiModel === "gemini-2.0-flash-exp" ? "selected" : ""}>Gemini 2.0 Flash Exp</option>
                 <option value="gemini-1.5-pro" ${selectedAiModel === "gemini-1.5-pro" ? "selected" : ""}>Gemini 1.5 Pro</option>
