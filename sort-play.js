@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.0.4";
+  const SORT_PLAY_VERSION = "2.0.5";
 
   const { PlaylistAPI } = Platform;
 
