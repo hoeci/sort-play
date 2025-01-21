@@ -3457,18 +3457,18 @@
   function openSubMenu(parentButton, items) {
     const existingSubmenus = document.querySelectorAll('.submenu');
     existingSubmenus.forEach(submenu => {
-      if (submenu.parentElement && submenu !== parentButton.querySelector('.submenu')) {
-        cleanupBackgroundObserver(submenu);
-        submenu.parentElement.removeChild(submenu);
-      }
+        if (submenu.parentElement && submenu !== parentButton.querySelector('.submenu')) {
+            cleanupBackgroundObserver(submenu);
+            submenu.parentElement.removeChild(submenu);
+        }
     });
-  
+
     let subMenu = parentButton.querySelector('.submenu');
     
     if (subMenu) {
-      return;
+        return;
     }
-  
+
     subMenu = document.createElement("div");
     subMenu.classList.add("submenu");
     subMenu.classList.add('main-contextMenu-menu');
@@ -3479,57 +3479,72 @@
     subMenu.style.padding = "4px 4px";
     subMenu.style.borderRadius = "4px";
     subMenu.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
-  
+
     createBackgroundObserver(subMenu);
-  
+
     const parentRect = parentButton.getBoundingClientRect();
     const scrollTop = window.scrollY || document.documentElement.scrollTop;
     const spaceRight = window.innerWidth - parentRect.right;
     const subMenuWidth = 163;
-  
+
     if (spaceRight < subMenuWidth) {
-      subMenu.style.left = `${parentRect.left - subMenuWidth}px`;
+        subMenu.style.left = `${parentRect.left - subMenuWidth}px`;
     } else {
-      subMenu.style.left = `${parentRect.right}px`;
+        subMenu.style.left = `${parentRect.right}px`;
     }
-  
+
     subMenu.style.top = `${parentRect.top + scrollTop}px`;
-  
+
     const handleSubMenuRemoval = () => {
-      if (subMenu.parentElement) {
-        cleanupBackgroundObserver(subMenu);
-        subMenu.parentElement.removeChild(subMenu);
-        parentButton.classList.remove('submenu-open');
-        parentButton.style.backgroundColor = "transparent";
-      }
+        if (subMenu.parentElement) {
+            cleanupBackgroundObserver(subMenu);
+            subMenu.parentElement.removeChild(subMenu);
+            parentButton.classList.remove('submenu-open');
+            parentButton.style.backgroundColor = "transparent";
+        }
     };
-  
+
     parentButton.classList.add('submenu-open');
-  
-    parentButton.addEventListener('mouseleave', (event) => {
-      const relatedTarget = event.relatedTarget;
-      if (relatedTarget && 
-          !subMenu.contains(relatedTarget) && 
-          !parentButton.contains(relatedTarget) &&
-          relatedTarget.closest('.menu-item')) {
-        handleSubMenuRemoval();
-      }
+
+    const menuContainer = document.createElement('div');
+    menuContainer.style.position = 'absolute';
+    menuContainer.style.top = '0';
+    menuContainer.style.left = '0';
+    menuContainer.style.right = '0';
+    menuContainer.style.bottom = '0';
+
+    subMenu.addEventListener('mouseenter', () => {
+        parentButton.style.backgroundColor = "#3e3e3e";
     });
-  
+
+    subMenu.addEventListener('mouseleave', (event) => {
+        const toElement = event.relatedTarget;
+        if (!parentButton.contains(toElement)) {
+            parentButton.style.backgroundColor = "transparent";
+        }
+    });
+
+    parentButton.addEventListener('mouseleave', (event) => {
+        const toElement = event.relatedTarget;
+        if (!subMenu.contains(toElement)) {
+            parentButton.style.backgroundColor = "transparent";
+            handleSubMenuRemoval();
+        }
+    });
+
     document.addEventListener('click', (event) => {
-      if (!subMenu.contains(event.target) && !parentButton.contains(event.target)) {
-        handleSubMenuRemoval();
-      }
+        if (!subMenu.contains(event.target) && !parentButton.contains(event.target)) {
+            handleSubMenuRemoval();
+        }
     });
 
     menuButtons.forEach(mainMenuButton => {
-      mainMenuButton.addEventListener('mouseenter', () => {
-        if (mainMenuButton !== parentButton && subMenu.parentElement) {
-          handleSubMenuRemoval();
-        }
-      });
+        mainMenuButton.addEventListener('mouseenter', () => {
+            if (mainMenuButton !== parentButton && subMenu.parentElement) {
+                handleSubMenuRemoval();
+            }
+        });
     });
-
     items.forEach((item) => {
       const button = document.createElement("button");
       button.style.backgroundColor = item.backgroundColor;
