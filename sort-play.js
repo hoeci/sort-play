@@ -1994,42 +1994,89 @@
     let delay = 1000;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const playlistContents = await fetchPlaylistContents(playlistUri);
-        const parsedTracks = playlistContents
-          .filter((track) => !URI.isLocalTrack(track.uri))
-          .map(parsePlaylistAPITrack);
-        return parsedTracks;
-      } catch (error) {
-        console.error(
-          `Error fetching playlist tracks (Attempt ${attempt}/${retries}):`,
-          error
-        );
-        if (attempt < retries) {
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          delay *= 2; 
-        } else {
-          console.error(
-            `Failed to fetch playlist tracks after ${retries} attempts.`
-          );
-          throw error;  
+        try {
+            if (!Spicetify || !URI) {
+                throw new Error('Spicetify is not properly initialized');
+            }
+
+            if (!playlistId) {
+                throw new Error('Invalid playlist ID');
+            }
+
+            const playlistContents = await fetchPlaylistContents(playlistUri);
+            
+            if (!playlistContents || !Array.isArray(playlistContents)) {
+                throw new Error('Failed to fetch playlist contents');
+            }
+
+            const parsedTracks = playlistContents
+                .filter(track => {
+                    if (!track || !track.uri) {
+                        return false;
+                    }
+                    return !URI.isLocalTrack(track.uri);
+                })
+                .map(track => {
+                    try {
+                        return parsePlaylistAPITrack(track);
+                    } catch (parseError) {
+                        Spicetify.showNotification(
+                            'Error processing some tracks. Please try again.',
+                            true
+                        );
+                        return null;
+                    }
+                })
+                .filter(track => track !== null);
+
+            if (parsedTracks.length === 0) {
+                throw new Error('No valid tracks found in playlist');
+            }
+
+            return parsedTracks;
+        } catch (error) {
+            console.error(
+                `Error fetching playlist tracks (Attempt ${attempt}/${retries}):`,
+                error
+            );
+            
+            if (attempt < retries) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                delay *= 2;
+            } else {
+                console.error(
+                    `Failed to fetch playlist tracks after ${retries} attempts.`
+                );
+                throw error;
+            }
         }
-      }
     }
   };
 
   async function getPlaylistTracks(playlistId) {
     try {
-      const tracks = await getPlaylistTracksSpicetify(playlistId);
-      if (tracks.length > 0) {
-        return tracks;
-      }
+        if (!playlistId || typeof playlistId !== 'string') {
+            throw new Error('Invalid playlist format');
+        }
+
+        const tracks = await getPlaylistTracksSpicetify(playlistId);
+        
+        if (!Array.isArray(tracks)) {
+            throw new Error('Failed to process playlist tracks');
+        }
+
+        if (tracks.length > 0) {
+            return tracks;
+        } else {
+            throw new Error('No tracks found in playlist');
+        }
     } catch (error) {
+        console.error('Error in getPlaylistTracks:', error);
         Spicetify.showNotification(
-          "Failed to fetch playlist tracks. Please check your connection and try again.",
-          true 
+            `Failed to fetch playlist tracks: ${error.message}. Please try again.`,
+            true
         );
-      }
+    }
 
     return [];
   }
@@ -2838,36 +2885,52 @@
     },
     menuItems: [
       {
-        type: "divider",
+        type: "parent",
         text: "Sort By",
+        hasInnerButton: true,
+        children: [
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Play Count",
+            sortType: "playCount",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Popularity",
+            sortType: "popularity",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Release Date",
+            sortType: "releaseDate",
+            hasInnerButton: true
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Shuffle",
+            sortType: "shuffle",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Scrobbles",
+            sortType: "scrobbles",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "My Scrobbles",
+            sortType: "personalScrobbles",
+            hasInnerButton: true,
+          },
+        ],
       },
       {
-        backgroundColor: "#282828",
-        color: "white",
-        text: "Play Count",
-        sortType: "playCount",
-      },
-      {
-        backgroundColor: "#282828",
-        color: "white",
-        text: "Popularity",
-        sortType: "popularity",
-      },
-      {
-        backgroundColor: "#282828",
-        color: "white",
-        text: "Release Date",
-        sortType: "releaseDate",
-        hasInnerButton: true
-      },
-      {
-        backgroundColor: "#282828",
-        color: "white",
-        text: "Shuffle",
-        sortType: "shuffle",
-      },
-      {
-        backgroundColor: "#282828",
+        backgroundColor: "transparent",
         color: "white",
         text: "AI Pick",
         sortType: "aiPick",
@@ -2875,7 +2938,7 @@
         onClick: async function (event) {
           event.stopPropagation();
           const userApiKey = localStorage.getItem("sort-play-gemini-api-key");
-          if (!userApiKey || DefaultGeminiApiKeys.includes(userApiKey)) {  
+          if (!userApiKey || DefaultGeminiApiKeys.includes(userApiKey)) {
             showDefaultApiKeyWarning();
           } else {
             menuButtons.forEach((btn) => {
@@ -2888,31 +2951,21 @@
         },
       },
       {
-        backgroundColor: "#282828",
-        color: "white",
-        text: "Scrobbles",
-        sortType: "scrobbles",
-      },
-      {
-        backgroundColor: "#282828",
-        color: "white",
-        text: "My Scrobbles",
-        sortType: "personalScrobbles",
-        hasInnerButton: true,
-      },
-      {
         type: "divider",
-        text: "Options",
       },
       {
-        backgroundColor: "#282828",
+        backgroundColor: "transparent",
         color: "white",
-        text: "Sort-Play Settings",
+        text: "Settings",
         isSetting: true, 
       },
     ],
   };
-
+  const settingsSvg = `<?xml version="1.0" encoding="utf-8"?>
+  <!DOCTYPE svg>
+  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 256 256" enable-background="new 0 0 256 256" xml:space="preserve">
+  <g><g><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></g></g>
+  </svg>`;
   const buttonContainer = document.createElement("div");
   buttonContainer.style.position = "relative";
   buttonContainer.style.display = "inline-block";
@@ -2992,6 +3045,42 @@
     return backgroundColor;
   }
 
+
+  function createBackgroundObserver(menuElement) {
+    menuElement.style.removeProperty('background-color');
+    
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          const rawStyle = getRawContextMenuStyle();
+          if (rawStyle.includes('var(--spice-rgb-card)')) {
+            menuElement.style.removeProperty('background-color');
+          }
+        }
+      });
+    });
+  
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  
+    menuElement._backgroundObserver = observer;
+  
+    setTimeout(() => {
+      cleanupBackgroundObserver(menuElement);
+    }, 15000);
+  
+    return observer;
+  }
+  
+  function cleanupBackgroundObserver(element) {
+    if (element._backgroundObserver) {
+      element._backgroundObserver.disconnect();
+      delete element._backgroundObserver;
+    }
+  }
+
   const menuContainer = document.createElement("div");
   menuContainer.style.position = "fixed";
   menuContainer.style.display = "none";
@@ -3001,106 +3090,181 @@
   menuContainer.style.transform = "translateX(-50%)";
   menuContainer.style.borderRadius = "4px";
   menuContainer.style.boxShadow = "rgba(0, 0, 0, 0.3) 0px 16px 24px 0px";
-
-
   menuContainer.classList.add('main-contextMenu-menu');
-
-  const menuBackgroundObserver = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-          if (mutation.attributeName === 'class') {
-              const rawStyle = getRawContextMenuStyle();
-              if (rawStyle.includes('var(--spice-rgb-card)')) {
-                  menuContainer.style.removeProperty('background-color');
-              }
-          }
-      });
-  });
-
-  menuBackgroundObserver.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['class']
-  });
-
-  setTimeout(() => {
-      menuBackgroundObserver.disconnect();
-  }, 15000);
+  createBackgroundObserver(menuContainer);
 
   let releaseDateReverse = localStorage.getItem("sort-play-release-date-reverse") === "true";
   
   const menuButtons = buttonStyles.menuItems.map((style) => {
     if (style.type === "divider") {
-      const divider = document.createElement("div");
+      const divider = document.createElement("hr");
       divider.style.cssText = `
-        padding: 8px 10px 4px;
-        color: #FFFFFF99;
-        font-size: 11px;
-        font-weight: 700;
-        margin-top: 6px;
-        margin-bottom: 8px;
-        letter-spacing: 0.1em;
-        pointer-events: none;
+        width: 100%;
+        border: none;
+        height: 1px;
+        background-color: rgba(255, 255, 255, 0.1);
+        margin: 0 auto; /* Remove top and bottom margins */
       `;
-      divider.innerText = style.text;
       return divider;
     }
-    
-    const button = document.createElement("button");
-    button.style.backgroundColor = "transparent";
-    button.style.color = "#ffffffe6";
-    button.style.border = "none";
-    button.style.borderRadius = "2px";
-    button.style.margin = "0"; 
-    button.style.padding = "4px 10px";
-    button.style.fontWeight = "400";
-    button.style.fontSize = "14px";
-    button.style.height = "40px";
-    button.style.width = "155px"; 
-    button.style.textAlign = "center";
-    button.style.opacity = "0";
-    button.style.transform = "translateY(-10px)";
-    button.style.position = "relative"; 
-    button.style.display = "flex";  
-    button.style.alignItems = "center";  
-    button.style.justifyContent = "space-between";  
+    if (style.type === "parent") {
+      const parentButton = document.createElement("button");
+      parentButton.style.backgroundColor = "transparent";
+      parentButton.style.color = "#ffffffe6";
+      parentButton.style.border = "none";
+      parentButton.style.borderRadius = "2px";
+      parentButton.style.margin = "0";
+      parentButton.style.padding = "4px 10px";
+      parentButton.style.fontWeight = "400";
+      parentButton.style.fontSize = "0.875rem";
+      parentButton.style.height = "40px";
+      parentButton.style.width = "155px";
+      parentButton.style.textAlign = "center";
+      parentButton.style.opacity = "0";
+      parentButton.style.transform = "translateY(-10px)";
+      parentButton.style.position = "relative";
+      parentButton.style.display = "flex";
+      parentButton.style.alignItems = "center";
+      parentButton.style.justifyContent = "space-between";
+      parentButton.dataset.isParent = 'true';
 
-    button.addEventListener("mouseenter", () => {
-      if (!button.disabled) {
-        button.style.backgroundColor = "#3e3e3e";
-      }
-    });
-  
-    button.addEventListener("mouseleave", () => {
-      if (!button.disabled) {
-        button.style.backgroundColor = "transparent";
-      }
-    });
-  
-    const buttonTextSpan = document.createElement("span");
-    buttonTextSpan.innerText = style.text;
-    button.appendChild(buttonTextSpan);
+      const buttonTextSpan = document.createElement("span");
+      buttonTextSpan.innerText = style.text;
+      parentButton.appendChild(buttonTextSpan);
+     
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 16 16");
+      svg.setAttribute("width", "16px");
+      svg.setAttribute("height", "16px");
+      svg.style.fill = "currentcolor";
+      svg.style.transform = "translateX(2px)";
     
-    const settingsSvg = `<?xml version="1.0" encoding="utf-8"?>
-    <!DOCTYPE svg>
-    <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 256 256" enable-background="new 0 0 256 256" xml:space="preserve">
-    <g><g><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></g></g>
-    </svg>`;
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "M6 14l6-6-6-6v12z");
+      
+      svg.appendChild(path);
+      parentButton.appendChild(svg);
 
-    if (style.hasInnerButton) {
-      if (style.text === "Release Date") {
+      parentButton.addEventListener("mouseenter", () => {
+        if (!parentButton.disabled) {
+          parentButton.style.backgroundColor = "#3e3e3e";
+          openSubMenu(parentButton, style.children);
+        }
+      });
+
+      parentButton.addEventListener("mouseleave", () => {
+        if (!parentButton.disabled) {
+          parentButton.style.backgroundColor = "transparent";
+        }
+      });
+
+      parentButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        return false;
+      });
+
+      return parentButton;
+    } else {
+      const button = document.createElement("button");
+      button.style.backgroundColor = "transparent";
+      button.style.color = "#ffffffe6";
+      button.style.border = "none";
+      button.style.borderRadius = "2px";
+      button.style.margin = "0"; 
+      button.style.padding = "4px 10px";
+      button.style.fontWeight = "400";
+      button.style.fontSize = "0.875rem";
+      button.style.height = "40px";
+      button.style.width = "155px"; 
+      button.style.textAlign = "center";
+      button.style.opacity = "0";
+      button.style.transform = "translateY(-10px)";
+      button.style.position = "relative"; 
+      button.style.display = "flex";  
+      button.style.alignItems = "center";  
+      button.style.justifyContent = "space-between";  
+
+      button.addEventListener("mouseenter", () => {
+        if (!button.disabled) {
+          button.style.backgroundColor = "#3e3e3e";
+        }
+      });
+    
+      button.addEventListener("mouseleave", () => {
+        if (!button.disabled) {
+          button.style.backgroundColor = "transparent";
+        }
+      });
+    
+      const buttonTextSpan = document.createElement("span");
+      buttonTextSpan.innerText = style.text;
+      button.appendChild(buttonTextSpan);
+      
+      if (!style.type && style.sortType) {
+        button.addEventListener("click", async (event) => {
+          event.stopPropagation();
+          if (style.onClick) {
+              await style.onClick(event);
+          } else {
+              await handleSortAndCreatePlaylist(style.sortType, event);
+          }
+        });
+      }
+
+      if (style.hasInnerButton) {
+        if (style.text === "Release Date") {
+            const innerButton = document.createElement("button");
+            innerButton.title = "Toggle Order (Newest/Oldest First)";
+            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            svg.setAttribute("viewBox", "0 0 16 16");
+            svg.setAttribute("width", "50%");
+            svg.setAttribute("height", "50%");
+            svg.style.fill = "#ffffffe6";  
+
+            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
+
+            svg.appendChild(path);
+            innerButton.appendChild(svg);
+            
+            innerButton.style.cssText = `
+              background-color: transparent;
+              border: none;
+              border-radius: 2px;
+              padding: 0;
+              cursor: pointer;
+              position: absolute;
+              right: 0px; 
+              top: 50%;
+              transform: translateY(-50%);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 32px;
+              height: 32px;
+            `;
+
+            innerButton.addEventListener("mouseenter", () => {
+              svg.style.fill = "#1ED760"; 
+            });
+            
+            innerButton.addEventListener("mouseleave", () => {
+              svg.style.fill = "#ffffffe6";  
+            });
+
+            innerButton.addEventListener("click", (event) => {
+              event.stopPropagation();
+              releaseDateReverse = !releaseDateReverse;
+              localStorage.setItem("sort-play-release-date-reverse", releaseDateReverse);
+              path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
+            });
+            
+            button.appendChild(innerButton);
+        }
+        else if (style.text === "AI Pick") {
           const innerButton = document.createElement("button");
-          innerButton.title = "Toggle Order (Newest/Oldest First)";
-          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          svg.setAttribute("viewBox", "0 0 16 16");
-          svg.setAttribute("width", "50%");
-          svg.setAttribute("height", "50%");
-          svg.style.fill = "#ffffffe6";  
-
-          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
-
-          svg.appendChild(path);
-          innerButton.appendChild(svg);
-          
+          innerButton.title = "Set Gemini API Key";
           innerButton.style.cssText = `
             background-color: transparent;
             border: none;
@@ -3110,128 +3274,92 @@
             position: absolute;
             right: 0px; 
             top: 50%;
-            transform: translateY(-50%);
+            transform: translateY(-48%);
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 32px;
-            height: 32px;
-          `;
+            width: 30px;
+            height: 30px;
+          `; 
 
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
+          const svgElement = svgDoc.documentElement;
+          svgElement.setAttribute("width", "50%");
+          svgElement.setAttribute("height", "50%");
+          svgElement.style.fill = "#ffffffe6";
+    
+          innerButton.appendChild(svgElement);
+    
           innerButton.addEventListener("mouseenter", () => {
-            svg.style.fill = "#1ED760"; 
+            svgElement.style.fill = "#1ED760";
           });
-          
+    
           innerButton.addEventListener("mouseleave", () => {
-            svg.style.fill = "#ffffffe6";  
+            svgElement.style.fill = "#ffffffe6";
           });
-
+    
           innerButton.addEventListener("click", (event) => {
             event.stopPropagation();
-            releaseDateReverse = !releaseDateReverse;
-            localStorage.setItem("sort-play-release-date-reverse", releaseDateReverse);
-            path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
+            showGeminiApiKeyModal();
           });
-          
+    
           button.appendChild(innerButton);
-      }
-      else if (style.text === "AI Pick") {
-        const innerButton = document.createElement("button");
-        innerButton.title = "Set Gemini API Key";
-        innerButton.style.cssText = `
-          background-color: transparent;
-          border: none;
-          border-radius: 2px;
-          padding: 0;
-          cursor: pointer;
-          position: absolute;
-          right: 0px; 
-          top: 50%;
-          transform: translateY(-48%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 30px;
-          height: 30px;
-        `; 
+        }
+        else if (style.text === "My Scrobbles") {
+          const innerButton = document.createElement("button");
+          innerButton.title = "Set Last.fm Username";
+          innerButton.style.cssText = `
+            background-color: transparent;
+            border: none;
+            border-radius: 2px;
+            padding: 0;
+            cursor: pointer;
+            position: absolute;
+            right: 0px; 
+            top: 50%;
+            transform: translateY(-48%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+          `; 
 
-        const parser = new DOMParser();
-        const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
-        const svgElement = svgDoc.documentElement;
-        svgElement.setAttribute("width", "50%");
-        svgElement.setAttribute("height", "50%");
-        svgElement.style.fill = "#ffffffe6";
-  
-        innerButton.appendChild(svgElement);
-  
-        innerButton.addEventListener("mouseenter", () => {
-          svgElement.style.fill = "#1ED760";
-        });
-  
-        innerButton.addEventListener("mouseleave", () => {
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
+          const svgElement = svgDoc.documentElement;
+          svgElement.setAttribute("width", "50%");
+          svgElement.setAttribute("height", "50%");
           svgElement.style.fill = "#ffffffe6";
-        });
-  
-        innerButton.addEventListener("click", (event) => {
-          event.stopPropagation();
-          showGeminiApiKeyModal();
-        });
-  
-        button.appendChild(innerButton);
+    
+          innerButton.appendChild(svgElement);
+    
+          innerButton.addEventListener("mouseenter", () => {
+            svgElement.style.fill = "#1ED760";
+          });
+    
+          innerButton.addEventListener("mouseleave", () => {
+            svgElement.style.fill = "#ffffffe6";
+          });
+    
+          innerButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            showLastFmUsernameModal();
+          });
+    
+          button.appendChild(innerButton);
+        }
       }
-      else if (style.text === "My Scrobbles") {
-        const innerButton = document.createElement("button");
-        innerButton.title = "Set Last.fm Username";
-        innerButton.style.cssText = `
-          background-color: transparent;
-          border: none;
-          border-radius: 2px;
-          padding: 0;
-          cursor: pointer;
-          position: absolute;
-          right: 0px; 
-          top: 50%;
-          transform: translateY(-48%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 30px;
-          height: 30px;
-        `; 
 
-        const parser = new DOMParser();
-        const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
-        const svgElement = svgDoc.documentElement;
-        svgElement.setAttribute("width", "50%");
-        svgElement.setAttribute("height", "50%");
-        svgElement.style.fill = "#ffffffe6";
-  
-        innerButton.appendChild(svgElement);
-  
-        innerButton.addEventListener("mouseenter", () => {
-          svgElement.style.fill = "#1ED760";
-        });
-  
-        innerButton.addEventListener("mouseleave", () => {
-          svgElement.style.fill = "#ffffffe6";
-        });
-  
-        innerButton.addEventListener("click", (event) => {
-          event.stopPropagation();
-          showLastFmUsernameModal();
-        });
-  
-        button.appendChild(innerButton);
-      }
+    if (style.isSetting) {
+      button.addEventListener("click", () => {
+        button.style.backgroundColor = "transparent";
+      });
     }
-
-  if (style.isSetting) {
-    button.addEventListener("click", () => {
-      button.style.backgroundColor = "transparent";
-    });
-  }
-  return button;
-});
+    return button;
+    }
+  });
 
   menuButtons.forEach(button => menuContainer.appendChild(button));
   let isMenuOpen = false;
@@ -3266,30 +3394,277 @@
         button.style.transform = "translateY(0)";
       });
     } else {
-      menuContainer.style.display = "none";
-      if (menuContainer.parentElement === document.body) {
-        document.body.removeChild(menuContainer);
-      }
+        menuContainer.style.display = "none";
+        if (menuContainer.parentElement === document.body) {
+            document.body.removeChild(menuContainer);
+        }
+
+        const submenus = document.querySelectorAll('.submenu');
+        submenus.forEach(submenu => {
+            if (submenu.parentElement) {
+                submenu.parentElement.removeChild(submenu);
+            }
+        });
     }
+}
+
+  function closeAllMenus() {
+    isMenuOpen = false;
+    menuContainer.style.display = "none";
+    if (menuContainer.parentElement === document.body) {
+      document.body.removeChild(menuContainer);
+    }
+    
+    const submenus = document.querySelectorAll('.submenu');
+    submenus.forEach(submenu => {
+      if (submenu.parentElement) {
+        cleanupBackgroundObserver(submenu);
+        submenu.parentElement.removeChild(submenu);
+      }
+    });
   }
+  
+  function openSubMenu(parentButton, items) {
+    const existingSubmenus = document.querySelectorAll('.submenu');
+    existingSubmenus.forEach(submenu => {
+      if (submenu.parentElement && submenu !== parentButton.querySelector('.submenu')) {
+        cleanupBackgroundObserver(submenu);
+        submenu.parentElement.removeChild(submenu);
+      }
+    });
+  
+    let subMenu = parentButton.querySelector('.submenu');
+    
+    if (subMenu) {
+      return;
+    }
+  
+    subMenu = document.createElement("div");
+    subMenu.classList.add("submenu");
+    subMenu.classList.add('main-contextMenu-menu');
+    subMenu.style.position = "absolute";
+    subMenu.style.display = "flex";
+    subMenu.style.flexDirection = "column";
+    subMenu.style.zIndex = "2000";
+    subMenu.style.padding = "4px 4px";
+    subMenu.style.borderRadius = "4px";
+    subMenu.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
+  
+    createBackgroundObserver(subMenu);
+  
+    const parentRect = parentButton.getBoundingClientRect();
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const spaceRight = window.innerWidth - parentRect.right;
+    const subMenuWidth = 163;
+  
+    if (spaceRight < subMenuWidth) {
+      subMenu.style.left = `${parentRect.left - subMenuWidth}px`;
+    } else {
+      subMenu.style.left = `${parentRect.right}px`;
+    }
+  
+    subMenu.style.top = `${parentRect.top + scrollTop}px`;
+  
+    const handleSubMenuRemoval = () => {
+      if (subMenu.parentElement) {
+        cleanupBackgroundObserver(subMenu);
+        subMenu.parentElement.removeChild(subMenu);
+        parentButton.classList.remove('submenu-open');
+        parentButton.style.backgroundColor = "transparent";
+      }
+    };
+  
+    parentButton.classList.add('submenu-open');
+  
+    parentButton.addEventListener('mouseleave', (event) => {
+      const relatedTarget = event.relatedTarget;
+      if (relatedTarget && 
+          !subMenu.contains(relatedTarget) && 
+          !parentButton.contains(relatedTarget) &&
+          relatedTarget.closest('.menu-item')) {
+        handleSubMenuRemoval();
+      }
+    });
+  
+    document.addEventListener('click', (event) => {
+      if (!subMenu.contains(event.target) && !parentButton.contains(event.target)) {
+        handleSubMenuRemoval();
+      }
+    });
+
+    menuButtons.forEach(mainMenuButton => {
+      mainMenuButton.addEventListener('mouseenter', () => {
+        if (mainMenuButton !== parentButton && subMenu.parentElement) {
+          handleSubMenuRemoval();
+        }
+      });
+    });
+
+    items.forEach((item) => {
+      const button = document.createElement("button");
+      button.style.backgroundColor = item.backgroundColor;
+      button.style.color = item.color;
+      button.style.border = "none";
+      button.style.borderRadius = "2px";
+      button.style.margin = "0";
+      button.style.padding = "4px 10px";
+      button.style.fontWeight = "400";
+      button.style.fontSize = "0.875rem";
+      button.style.height = "40px";
+      button.style.width = "155px";
+      button.style.textAlign = "center";
+      button.style.position = "relative";
+      button.style.display = "flex";
+      button.style.alignItems = "center";
+      button.style.justifyContent = "space-between";
+      button.innerText = item.text;
+      button.addEventListener("mouseenter", () => {
+        button.style.backgroundColor = "#3e3e3e";
+      });
+  
+      button.addEventListener("mouseleave", () => {
+        button.style.backgroundColor = item.backgroundColor;
+      });
+  
+      if (item.hasInnerButton) {
+        if (item.text === "Release Date") {
+          const innerButton = document.createElement("button");
+          innerButton.title = "Toggle Order (Newest/Oldest First)";
+          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+          svg.setAttribute("viewBox", "0 0 16 16");
+          svg.setAttribute("width", "50%");
+          svg.setAttribute("height", "50%");
+          svg.style.fill = "#ffffffe6";
+  
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
+  
+          svg.appendChild(path);
+          innerButton.appendChild(svg);
+  
+          innerButton.style.cssText = `
+            background-color: transparent;
+            border: none;
+            border-radius: 2px;
+            padding: 0;
+            cursor: pointer;
+            position: absolute;
+            right: 0px; 
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+          `;
+  
+          innerButton.addEventListener("mouseenter", () => {
+            svg.style.fill = "#1ED760";
+          });
+  
+          innerButton.addEventListener("mouseleave", () => {
+            svg.style.fill = "#ffffffe6";
+          });
+  
+          innerButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            releaseDateReverse = !releaseDateReverse;
+            localStorage.setItem("sort-play-release-date-reverse", releaseDateReverse);
+            path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
+          });
+  
+          button.appendChild(innerButton);
+        } else if (item.text === "My Scrobbles") {
+          const innerButton = document.createElement("button");
+          innerButton.title = "Set Last.fm Username";
+          innerButton.style.cssText = `
+            background-color: transparent;
+            border: none;
+            border-radius: 2px;
+            padding: 0;
+            cursor: pointer;
+            position: absolute;
+            right: 0px; 
+            top: 50%;
+            transform: translateY(-48%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+          `;
+  
+          const parser = new DOMParser();
+          const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
+          const svgElement = svgDoc.documentElement;
+          svgElement.setAttribute("width", "50%");
+          svgElement.setAttribute("height", "50%");
+          svgElement.style.fill = "#ffffffe6";
+  
+          innerButton.appendChild(svgElement);
+  
+          innerButton.addEventListener("mouseenter", () => {
+            svgElement.style.fill = "#1ED760";
+          });
+  
+          innerButton.addEventListener("mouseleave", () => {
+            svgElement.style.fill = "#ffffffe6";
+          });
+  
+          innerButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            showLastFmUsernameModal();
+          });
+  
+          button.appendChild(innerButton);
+        }
+      }
+  
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        if (item.onClick) {
+          await item.onClick(event);
+        } else {
+          await handleSortAndCreatePlaylist(item.sortType);
+        }
+        
+        parentButton.style.backgroundColor = "transparent";
+      });
+  
+      subMenu.appendChild(button);
+    });
+  
+    parentButton.appendChild(subMenu);
+    document.body.appendChild(subMenu);
+  }
+  window.addEventListener('resize', closeAllMenus);
+
+  window.addEventListener('scroll', closeAllMenus);
 
   mainButton.addEventListener("click", (event) => {
     event.stopPropagation();
     if (!mainButton.disabled) {
       isButtonClicked = !isButtonClicked;
+      
       if (isButtonClicked) {
         mainButton.style.backgroundColor = buttonStyles.main.clickBackgroundColor;
         mainButton.style.color = buttonStyles.main.clickColor;
-        svgElement.style.fill = buttonStyles.main.clickColor; 
+        svgElement.style.fill = buttonStyles.main.clickColor;
       } else {
         mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
         mainButton.style.color = buttonStyles.main.color;
-        svgElement.style.fill = buttonStyles.main.color;  
+        svgElement.style.fill = buttonStyles.main.color;
       }
-      toggleMenu(event);
+  
+      if (!isMenuOpen) {
+        toggleMenu();
+      } else {
+        closeAllMenus();
+      }
     }
   });
-
+  
   document.addEventListener("click", (event) => {
     if (isMenuOpen && !mainButton.contains(event.target) && !menuContainer.contains(event.target)) {
       toggleMenu();
@@ -3494,6 +3869,10 @@
   }
 
   async function handleSortAndCreatePlaylist(sortType) {
+    const clickedButton = event.target.closest('button');
+    if (clickedButton && clickedButton.dataset.isParent === 'true') {
+        return;
+    }
     mainButton.disabled = true;
     mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
     mainButton.style.color = buttonStyles.main.disabledColor;
@@ -3513,11 +3892,19 @@
       let tracks;
       let isArtistPage = false;
   
+
       if (URI.isPlaylistV1OrV2(currentUri)) {
-        tracks = await getPlaylistTracks(currentUri.split(":")[2]);
+        const playlistId = currentUri.split(":")[2];
+        tracks = await getPlaylistTracks(playlistId);
       } else if (URI.isArtist(currentUri)) {
-        tracks = await getArtistTracks(currentUri);
-        isArtistPage = true;
+          tracks = await getArtistTracks(currentUri);
+          isArtistPage = true;
+      } else {
+          throw new Error('Invalid playlist or artist page');
+      }
+
+      if (!tracks || tracks.length === 0) {
+          throw new Error('No tracks found to sort');
       }
   
       if (!tracks || tracks.length === 0) {
