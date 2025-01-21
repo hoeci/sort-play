@@ -2936,38 +2936,13 @@
         text: "AI Pick",
         sortType: "aiPick",
         hasInnerButton: true,
-        onClick: function (event) {
-          event.stopPropagation();
-      
-          mainButton.disabled = true;
-          mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-          mainButton.style.color = buttonStyles.main.disabledColor;
-          mainButton.style.cursor = "default";
-          svgElement.style.fill = buttonStyles.main.disabledColor;
-      
-          toggleMenu();
-          isButtonClicked = false;
-          mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-          mainButton.style.color = buttonStyles.main.color;
-          svgElement.style.fill = buttonStyles.main.color;
-          mainButton.style.filter = "brightness(1)";
-      
-          const aiPickSortType = "aiPick";
-      
-          setTimeout(() => {
-              const userApiKey = localStorage.getItem("sort-play-gemini-api-key");
-              if (!userApiKey || DefaultGeminiApiKeys.includes(userApiKey)) {
-                  showDefaultApiKeyWarning();
-              } else {
-                  menuButtons.forEach((btn) => {
-                      if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-                          btn.style.backgroundColor = "transparent";
-                      }
-                  });
-                  handleSortAndCreatePlaylist(aiPickSortType);
-              }
-          }, 0);
-        },
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
+        text: "Filter by Genre",
+        sortType: "genreFilter",
+        hasInnerButton: true,
       },
       {
         type: "divider",
@@ -3436,7 +3411,7 @@
             }
         });
     }
-}
+  }
 
   function closeAllMenus() {
     isMenuOpen = false;
@@ -3924,7 +3899,8 @@
     svgElement.style.fill = buttonStyles.main.disabledColor;
     menuButtons.forEach((button) => (button.disabled = true));
     toggleMenu();
-  
+    closeAllMenus();  
+
     try {
       const currentUri = getCurrentUri();
       if (!currentUri) {
