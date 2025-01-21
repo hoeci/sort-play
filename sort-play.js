@@ -2939,14 +2939,12 @@
         onClick: function (event) {
           event.stopPropagation();
       
-          // 1. Disable the main button immediately
           mainButton.disabled = true;
           mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
           mainButton.style.color = buttonStyles.main.disabledColor;
           mainButton.style.cursor = "default";
           svgElement.style.fill = buttonStyles.main.disabledColor;
       
-          // 2. Close the menu immediately
           toggleMenu();
           isButtonClicked = false;
           mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
@@ -2954,10 +2952,8 @@
           svgElement.style.fill = buttonStyles.main.color;
           mainButton.style.filter = "brightness(1)";
       
-          // 3. Store the sortType for later use
-          const aiPickSortType = "aiPick"; // Store the sort type
+          const aiPickSortType = "aiPick";
       
-          // 4. Use setTimeout to defer the asynchronous tasks
           setTimeout(() => {
               const userApiKey = localStorage.getItem("sort-play-gemini-api-key");
               if (!userApiKey || DefaultGeminiApiKeys.includes(userApiKey)) {
@@ -2968,7 +2964,6 @@
                           btn.style.backgroundColor = "transparent";
                       }
                   });
-                  // Pass the stored sortType to the function
                   handleSortAndCreatePlaylist(aiPickSortType);
               }
           }, 0);
@@ -3232,7 +3227,6 @@
             if (style.onClick) {
               await style.onClick(event);
             }
-            // Add the following lines to close the menu after clicking
             toggleMenu();
             isButtonClicked = false;
             mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
