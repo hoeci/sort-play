@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "2.1.0";
+  const SORT_PLAY_VERSION = "2.1.1";
 
   const { PlaylistAPI } = Platform;
 
@@ -2935,13 +2935,6 @@
         color: "white",
         text: "AI Pick",
         sortType: "aiPick",
-        hasInnerButton: true,
-      },
-      {
-        backgroundColor: "transparent",
-        color: "white",
-        text: "Filter by Genre",
-        sortType: "genreFilter",
         hasInnerButton: true,
       },
       {
