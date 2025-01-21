@@ -3136,7 +3136,7 @@
       parentButton.style.padding = "4px 10px";
       parentButton.style.fontWeight = "400";
       parentButton.style.fontSize = "0.875rem";
-      parentButton.style.height = "40px";
+      parentButton.style.height = "44px";
       parentButton.style.width = "155px";
       parentButton.style.textAlign = "center";
       parentButton.style.opacity = "0";
@@ -3194,7 +3194,7 @@
       button.style.padding = "4px 10px";
       button.style.fontWeight = "400";
       button.style.fontSize = "0.875rem";
-      button.style.height = "40px";
+      button.style.height = "44px";
       button.style.width = "155px"; 
       button.style.textAlign = "center";
       button.style.opacity = "0";
@@ -3555,7 +3555,7 @@
       button.style.padding = "4px 10px";
       button.style.fontWeight = "400";
       button.style.fontSize = "0.875rem";
-      button.style.height = "40px";
+      button.style.height = "44px";
       button.style.width = "155px";
       button.style.textAlign = "center";
       button.style.position = "relative";
