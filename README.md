@@ -3,6 +3,7 @@
 
 ## ⚡️ Features
 + Sort playlists & artist pages by play count, popularity, release date, and Last.fm scrobbles.
++ Filter playlists by genre using data from Spotify and Last.fm.
 + Get artists full discography (singles, albums, compilation).
 + Generate AI playlists from prompts, using the current playlist or artist as a base.
 + Play count column in playlists.
