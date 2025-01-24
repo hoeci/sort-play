@@ -14,6 +14,8 @@
 +  Save sorted tracks to a new private playlist.
 
 ## 📷 Screenshots 
-<img src="https://github.com/user-attachments/assets/9d4748fc-1644-4509-87ff-20de6b75e190" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/27f6846b-789d-4d27-a927-dfe7dbfa55a9" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/0d7a6c8b-9975-4166-b76e-b84e4c72d949" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/a5983b65-8f96-42ab-a51c-0d1e3dccb13e" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/a1564622-b5e9-4737-ae0c-cd7ce86091e2" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/cf7430ae-dbc1-4dea-add9-373703427042" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/065357ac-3af9-485d-b2ec-005a8d36c1a1" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/3599d6bc-a3c9-4b0f-91ac-5cb77edced6a" alt="show" width="100%">
