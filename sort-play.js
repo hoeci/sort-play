@@ -599,7 +599,7 @@
         </div>
     </div>
 
-    <div class="setting-row" id="githubLink" style="margin-top: 5px; justify-content: center;">
+    <div class="setting-row" id="githubLink" style="margin-top: 10px; justify-content: center;">
         <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
             <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 14px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
         </label>
@@ -1316,13 +1316,19 @@
         if (aiResponse && aiResponse.length > 0) {
           const sourceUri = getCurrentUri();
           const isArtistPage = URI.isArtist(sourceUri); 
-          let sourceName = isArtistPage
-            ? await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name)
-            : await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
+          let sourceName;
+          
+          if (URI.isArtist(sourceUri)) {
+              sourceName = await Spicetify.CosmosAsync.get(
+                  `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
+              ).then((r) => r.name);
+          } else if (isLikedSongsPage(sourceUri)) {
+              sourceName = "Liked Songs";
+          } else {
+              sourceName = await Spicetify.CosmosAsync.get(
+                  `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+              ).then((r) => r.name);
+          }
   
           const possibleSuffixes = [
             "\\(PlayCount\\)",
@@ -2551,15 +2557,21 @@
         }
 
         mainButton.innerText = "100%";
+        
         const sourceUri = getCurrentUri();
-        let sourceName = URI.isArtist(sourceUri)
-          ? await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name)
-          : await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+        let sourceName;
+        
+        if (URI.isArtist(sourceUri)) {
+            sourceName = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
             ).then((r) => r.name);
-
+        } else if (isLikedSongsPage(sourceUri)) {
+            sourceName = "Liked Songs";
+        } else {
+            sourceName = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name);
+        }
         const possibleSuffixes = [
           "\\(PlayCount\\)",
           "\\(Popularity\\)",
@@ -3261,16 +3273,9 @@
     return playlistNameElement ? playlistNameElement.textContent.trim() : null;
   }
 
-  function getCurrentUri() {
-    const path = Spicetify.Platform.History.location?.pathname;
-    if (!path) return null;
-
-    if (path.startsWith("/playlist/")) {
-      return `spotify:playlist:${path.split("/")[2]}`;
-    } else if (path.startsWith("/artist/")) {
-      return `spotify:artist:${path.split("/")[2]}`;
-    }
-    return null;
+  function isLikedSongsPage(uri) {
+    const uriObj = Spicetify.URI.fromString(uri);
+    return uriObj.type === Spicetify.URI.Type.COLLECTION && uriObj.category === "tracks";
   }
 
   function getCurrentUri() {
@@ -3281,10 +3286,53 @@
       return `spotify:playlist:${path.split("/")[2]}`;
     } else if (path.startsWith("/artist/")) {
       return `spotify:artist:${path.split("/")[2]}`;
+    } else if (path.startsWith("/collection/tracks"))  {
+        return "spotify:collection:tracks";
     }
     return null;
   }
+  
+  async function getLikedSongs() {
+    try {
+      const likedTracksData = await Spicetify.Platform.LibraryAPI.getTracks({
+        limit: Number.MAX_SAFE_INTEGER,
+      });
 
+      if (!likedTracksData || !likedTracksData.items) {
+        throw new Error("Failed to fetch liked songs data.");
+      }
+
+      const likedTracks = likedTracksData.items.map((item) => ({
+        uri: item.uri,
+        uid: item.uid,  
+        name: item.name,
+        albumUri: item.album.uri,
+        albumName: item.album.name,
+        artistUris: item.artists.map((artist) => artist.uri),
+        artistName: item.artists[0].name,
+        durationMilis: item.duration.milliseconds,
+        playCount: "N/A",    
+        popularity: null,    
+        releaseDate: null,   
+        track: {
+            album: {
+                id: item.album.uri.split(":")[2]
+            },
+            name: item.name,
+            duration_ms: item.duration.milliseconds,
+            id: item.uri.split(":")[2]
+          }
+      }));
+
+      return likedTracks;
+
+    } catch (error) {
+      console.error("Error fetching liked songs:", error);
+      Spicetify.showNotification("Failed to fetch liked songs.", true);
+      return [];
+    }
+  }
+    
   const fetchPlaylistContents = async (uri) => (await PlaylistAPI.getContents(uri)).items;
 
   const parsePlaylistAPITrack = (track) => ({
@@ -4298,7 +4346,7 @@
   const buttonContainer = document.createElement("div");
   buttonContainer.style.position = "relative";
   buttonContainer.style.display = "inline-block";
-
+  buttonContainer.style.width = "100px";
   const mainButton = document.createElement("button");
   mainButton.title = "sort-play extension";
   mainButton.className = "Button-sc-qlcn5g-0 Button-small-buttonTertiary-useBrowserDefaultFocusStyle";
@@ -4688,13 +4736,16 @@
     if (isMenuOpen) {
       const buttonRect = mainButton.getBoundingClientRect();
       const { height: headerHeight, bottom: headerBottom } = getHeaderInfo();
+      
       if (buttonRect.top <= headerHeight || buttonRect.bottom <= headerBottom) {
         isMenuOpen = false;
         return;
       }
+      
       const scrollTop = window.scrollY || document.documentElement.scrollTop;
       const menuHeight = menuButtons.length * 34 + 16;
       const spaceBelow = window.innerHeight - buttonRect.bottom;
+      
       let topPosition = buttonRect.bottom + scrollTop + 8;
       if (spaceBelow < menuHeight) {
         topPosition = buttonRect.top + scrollTop - menuHeight - 8;
@@ -4703,27 +4754,33 @@
           return;
         }
       }
+      
+      const menuWidth = 163; 
       const buttonCenter = buttonRect.left + (buttonRect.width / 2);
+      const leftPosition = buttonCenter - (menuWidth / 2);
+      
       menuContainer.style.top = `${topPosition}px`;
-      menuContainer.style.left = `${buttonCenter}px`;
+      menuContainer.style.left = `${leftPosition}px`;
+      menuContainer.style.transform = "none";
       menuContainer.style.display = "flex";
+      
       document.body.appendChild(menuContainer);
       menuButtons.forEach((button) => {
         button.style.opacity = "1";
         button.style.transform = "translateY(0)";
       });
     } else {
-        menuContainer.style.display = "none";
-        if (menuContainer.parentElement === document.body) {
-            document.body.removeChild(menuContainer);
+      menuContainer.style.display = "none";
+      if (menuContainer.parentElement === document.body) {
+        document.body.removeChild(menuContainer);
+      }
+      
+      const submenus = document.querySelectorAll('.submenu');
+      submenus.forEach(submenu => {
+        if (submenu.parentElement) {
+          submenu.parentElement.removeChild(submenu);
         }
-
-        const submenus = document.querySelectorAll('.submenu');
-        submenus.forEach(submenu => {
-            if (submenu.parentElement) {
-                submenu.parentElement.removeChild(submenu);
-            }
-        });
+      });
     }
   }
 
@@ -5022,43 +5079,35 @@
 
   function checkAndUpdateMenuPosition() {
     if (!isMenuOpen) return;
+    
     const buttonRect = mainButton.getBoundingClientRect();
     const { height: headerHeight, bottom: headerBottom } = getHeaderInfo();
     const scrollTop = window.scrollY || document.documentElement.scrollTop;
     const menuHeight = menuButtons.length * 34 + 16;
+    const menuWidth = 163; 
+    
     if (buttonRect.top <= headerHeight || buttonRect.bottom <= headerBottom) {
-      isButtonClicked = false;
-      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      mainButton.style.filter = "brightness(1)";
-      toggleMenu();
+      closeAllMenus();
       return;
     }
+    
     const spaceBelow = window.innerHeight - buttonRect.bottom;
     let topPosition = buttonRect.bottom + scrollTop + 8;
+    
     if (spaceBelow < menuHeight) {
       topPosition = buttonRect.top + scrollTop - menuHeight - 8;
       if (topPosition < scrollTop + headerHeight) {
-        isButtonClicked = false;
-        mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-        mainButton.style.color = buttonStyles.main.color;
-        mainButton.style.filter = "brightness(1)";
-        toggleMenu();
+        closeAllMenus();
         return;
       }
     }
-    if (buttonRect.bottom < headerHeight || buttonRect.top > window.innerHeight || 
-        buttonRect.right < 0 || buttonRect.left > window.innerWidth) {
-      isButtonClicked = false;
-      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      mainButton.style.filter = "brightness(1)";
-      toggleMenu();
-      return;
-    }
+    
     const buttonCenter = buttonRect.left + (buttonRect.width / 2);
+    const leftPosition = buttonCenter - (menuWidth / 2);
+    
     menuContainer.style.top = `${topPosition}px`;
-    menuContainer.style.left = `${buttonCenter}px`;
+    menuContainer.style.left = `${leftPosition}px`;
+    menuContainer.style.transform = "none";
   }
   window.addEventListener("scroll", checkAndUpdateMenuPosition, true);
   window.addEventListener("resize", checkAndUpdateMenuPosition);
@@ -5225,16 +5274,17 @@
   
       let tracks;
       let isArtistPage = false;
-  
 
       if (URI.isPlaylistV1OrV2(currentUri)) {
         const playlistId = currentUri.split(":")[2];
         tracks = await getPlaylistTracks(playlistId);
       } else if (URI.isArtist(currentUri)) {
-          tracks = await getArtistTracks(currentUri);
-          isArtistPage = true;
+        tracks = await getArtistTracks(currentUri);
+        isArtistPage = true;
+      } else if (isLikedSongsPage(currentUri)) {
+        tracks = await getLikedSongs();
       } else {
-          throw new Error('Invalid playlist or artist page');
+        throw new Error('Invalid playlist or artist page');
       }
 
       if (!tracks || tracks.length === 0) {
@@ -5377,13 +5427,19 @@
       }
   
       const sourceUri = currentUri;
-      let sourceName = URI.isArtist(sourceUri)
-        ? await Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-          ).then((r) => r.name)
-        : await Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+      let sourceName;
+      
+      if (URI.isArtist(sourceUri)) {
+          sourceName = await Spicetify.CosmosAsync.get(
+              `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
           ).then((r) => r.name);
+      } else if (isLikedSongsPage(sourceUri)) {
+          sourceName = "Liked Songs";
+      } else {
+          sourceName = await Spicetify.CosmosAsync.get(
+              `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+          ).then((r) => r.name);
+      }
       
       const possibleSuffixes = [
         "\\(PlayCount\\)",
@@ -5831,7 +5887,9 @@
               tracks = await getPlaylistTracks(playlistId);
             } else if (URI.isArtist(currentUri)) {
               tracks = await getArtistTracks(currentUri);
-            } else {
+            } else if (isLikedSongsPage(currentUri)) { 
+                tracks = await getLikedSongs();
+            }else {
               throw new Error("Invalid URI type");
             }
 
@@ -6052,7 +6110,7 @@
     if (isUpdatingTracklist || !columnPlayCount) return;
 
     const currentUri = getCurrentUri();
-    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
+    if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
   
     try {
       isUpdatingTracklist = true;
@@ -6076,7 +6134,7 @@
   
   async function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
-    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
+    if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
     
     const currentPlaylistName = getCurrentPlaylistName();
     const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
@@ -6201,11 +6259,11 @@
     
   async function initializeTracklistObserver() {
     const currentUri = getCurrentUri();
-    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
-  
+    if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
+
     const tracklist = await waitForElement(".main-trackList-indexable");
     if (!tracklist) return;
-  
+
     updateTracklist();
     tracklistObserver.observe(tracklist.parentElement, {
       childList: true,
@@ -6216,7 +6274,7 @@
   function insertButton() {
     const currentUri = getCurrentUri();
     if (!currentUri) return;
-
+  
     if (URI.isPlaylistV1OrV2(currentUri)) {
       const playlistContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
       if (playlistContainer && !playlistContainer.contains(mainButton)) {
@@ -6235,27 +6293,39 @@
         mainButton.style.marginRight = "31px"; 
         artistActionBar.appendChild(mainButton);
       }
+    } else if (currentUri === "spotify:collection:tracks") {
+      const likedSongsContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
+      if (likedSongsContainer && !likedSongsContainer.contains(mainButton)) {
+        mainButton.style.marginLeft = ""; 
+        mainButton.style.marginRight = "";
+        if (likedSongsContainer.firstChild) {
+          likedSongsContainer.insertBefore(mainButton, likedSongsContainer.firstChild);
+        } else {
+          likedSongsContainer.appendChild(mainButton);
+        }
+      }
     }
   }
-
+  
   insertButton();
 
   const observer = new MutationObserver(() => {
-    if (!document.contains(buttonContainer)) {
-      insertButton();
-    }
-    
     const currentUri = getCurrentUri();
-    if (currentUri && URI.isPlaylistV1OrV2(currentUri)) {
-      initializeTracklistObserver();
+    if (currentUri && (URI.isPlaylistV1OrV2(currentUri) || URI.isArtist(currentUri) || isLikedSongsPage(currentUri))) {
+      if (!document.body.contains(mainButton)) {
+        insertButton();
+      }
+
+      if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+          initializeTracklistObserver();
+      }
     }
   });
 
-  observer.observe(document.body, {
+    observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
-
     loadSettings();
     initializeCache();
     console.log(`Sort-Play loaded`);
