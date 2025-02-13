@@ -1149,9 +1149,13 @@
                 Pro models are best for up to ~180 songs (no lyrics included).
                 </span></label>
               <select id="aiModel">
+                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.0-pro-exp-02-05" ? "selected" : ""}>Gemini 2.0 Pro Experimental</option>
+                <option value="gemini-2.0-flash" ${selectedAiModel === "gemini-2.0-flash" ? "selected" : ""}>Gemini 2.0 Flash</option>
+                <option value="gemini-2.0-flash-lite-preview-02-05" ${selectedAiModel === "gemini-2.0-flash-lite-preview-02-05" ? "selected" : ""}>Gemini 2.0 Flash-Lite Preview</option>
                 <option value="gemini-2.0-flash-exp" ${selectedAiModel === "gemini-2.0-flash-exp" ? "selected" : ""}>Gemini 2.0 Flash Exp</option>
                 <option value="gemini-1.5-pro" ${selectedAiModel === "gemini-1.5-pro" ? "selected" : ""}>Gemini 1.5 Pro</option>
                 <option value="gemini-1.5-flash" ${selectedAiModel === "gemini-1.5-flash" ? "selected" : ""}>Gemini 1.5 Flash</option>
+                <option value="gemini-1.5-flash-8b" ${selectedAiModel === "gemini-1.5-flash-8b" ? "selected" : ""}>Gemini 1.5 Flash-8B</option>
               </select>
             </div>
             <div class="button-row">
