@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "3.0.0";
+  const SORT_PLAY_VERSION = "3.1.0";
 
   const { PlaylistAPI } = Platform;
 
@@ -2172,7 +2172,7 @@
     }
     </style>
     <div style="display: flex; flex-direction: column; gap: 15px;">
-        <h2 class="genre-modal-title">Genres from Spoitfy and Last.fm:</h2> 
+        <h2 class="genre-modal-title">Genres from Spotify and Last.fm:</h2> 
         <div class="genre-header">
             <input type="text" class="search-bar" placeholder="Search genres...">
             <button class="select-all-button">
@@ -3279,17 +3279,28 @@
   }
 
   function getCurrentUri() {
-    const path = Spicetify.Platform.History.location?.pathname;
-    if (!path) return null;
+    return new Promise(resolve => { 
+        setTimeout(() => {
+            const path = Spicetify.Platform.History.location?.pathname;
+            console.log("getCurrentUri (delayed) - path:", path);
 
-    if (path.startsWith("/playlist/")) {
-      return `spotify:playlist:${path.split("/")[2]}`;
-    } else if (path.startsWith("/artist/")) {
-      return `spotify:artist:${path.split("/")[2]}`;
-    } else if (path.startsWith("/collection/tracks"))  {
-        return "spotify:collection:tracks";
-    }
-    return null;
+            if (!path) {
+               resolve(null); 
+               return;
+            }
+
+
+            if (path.startsWith("/playlist/")) {
+                resolve(`spotify:playlist:${path.split("/")[2]}`);
+            } else if (path.startsWith("/artist/")) {
+                resolve(`spotify:artist:${path.split("/")[2]}`);
+            } else if (path.startsWith("/collection/tracks")) {
+                resolve("spotify:collection:tracks");
+            } else {
+                resolve(null); 
+            }
+        }, 50);
+    });
   }
   
   async function getLikedSongs() {
@@ -6271,7 +6282,7 @@
     });
   }
 
-  function insertButton() {
+  async function insertButton() {
     const currentUri = getCurrentUri();
     if (!currentUri) return;
   
@@ -6287,7 +6298,7 @@
         }
       }
     } else if (URI.isArtist(currentUri)) {
-      const artistActionBar = document.querySelector(".main-actionBar-ActionBarRow");
+      const artistActionBar = await waitForElement(".main-actionBar-ActionBarRow");
       if (artistActionBar && !artistActionBar.contains(mainButton)) {
         mainButton.style.marginLeft = "auto"; 
         mainButton.style.marginRight = "31px"; 
