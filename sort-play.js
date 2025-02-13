@@ -3255,12 +3255,6 @@
         text-align: center;
         margin: auto;
     }
-    .text-ellipsis {
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-width: 80px;
-    }
   `;
   document.head.appendChild(styleElement);
 
@@ -3288,13 +3282,22 @@
     const path = Spicetify.Platform.History.location?.pathname;
     if (!path) return null;
 
-    if (path.startsWith("/playlist/")) {
-      return `spotify:playlist:${path.split("/")[2]}`;
-    } else if (path.startsWith("/artist/")) {
-      return `spotify:artist:${path.split("/")[2]}`;
-    } else if (path.startsWith("/collection/tracks"))  {
+    const segments = path.split('/').filter(segment => segment.length > 0);
+    
+    if (segments.includes('artist')) {
+        const artistId = segments[segments.length - 1];
+        return `spotify:artist:${artistId}`;
+    }
+    
+    if (segments.includes('playlist')) {
+        const playlistId = segments[segments.length - 1];
+        return `spotify:playlist:${playlistId}`;
+    }
+    
+    if (segments.includes('collection') && segments.includes('tracks')) {
         return "spotify:collection:tracks";
     }
+    
     return null;
   }
   
@@ -6280,52 +6283,36 @@
   function insertButton() {
     const currentUri = getCurrentUri();
     if (!currentUri) return;
-    
-    const findContainer = (selector) => {
-        const container = document.querySelector(selector);
-        if (!container) return null;
-        
-        if (container.contains(mainButton)) return null;
-        
-        return container;
-    };
-
-    const insertWithStyle = (container, isActionBar = false) => {
-        if (!container) return;
-        
-        mainButton.style.marginLeft = "";
-        mainButton.style.marginRight = "";
-        
-        if (isActionBar) {
-            mainButton.style.marginLeft = "auto";
-            mainButton.style.marginRight = "31px";
-            container.appendChild(mainButton);
-        } else {
-            if (container.firstChild) {
-                container.insertBefore(mainButton, container.firstChild);
-            } else {
-                container.appendChild(mainButton);
-            }
-        }
-    };
-
+  
     if (URI.isPlaylistV1OrV2(currentUri)) {
-        const container = findContainer(".playlist-playlist-searchBoxContainer");
-        insertWithStyle(container);
+      const playlistContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
+      if (playlistContainer && !playlistContainer.contains(mainButton)) {
+        mainButton.style.marginLeft = ""; 
+        mainButton.style.marginRight = "";
+        if (playlistContainer.firstChild) {
+          playlistContainer.insertBefore(mainButton, playlistContainer.firstChild);
+        } else {
+          playlistContainer.appendChild(mainButton);
+        }
+      }
     } else if (URI.isArtist(currentUri)) {
-        const container = findContainer(".main-actionBar-ActionBarRow");
-        insertWithStyle(container, true);
+      const artistActionBar = document.querySelector(".main-actionBar-ActionBarRow");
+      if (artistActionBar && !artistActionBar.contains(mainButton)) {
+        mainButton.style.marginLeft = "auto"; 
+        mainButton.style.marginRight = "31px"; 
+        artistActionBar.appendChild(mainButton);
+      }
     } else if (currentUri === "spotify:collection:tracks") {
-        const container = findContainer(".playlist-playlist-searchBoxContainer");
-        insertWithStyle(container);
-    }
-
-    if (mainButton) {
-        mainButton.classList.add('text-ellipsis');
-        mainButton.style.maxWidth = "120px";
-        mainButton.style.whiteSpace = "nowrap";
-        mainButton.style.overflow = "hidden";
-        mainButton.style.textOverflow = "ellipsis";
+      const likedSongsContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
+      if (likedSongsContainer && !likedSongsContainer.contains(mainButton)) {
+        mainButton.style.marginLeft = ""; 
+        mainButton.style.marginRight = "";
+        if (likedSongsContainer.firstChild) {
+          likedSongsContainer.insertBefore(mainButton, likedSongsContainer.firstChild);
+        } else {
+          likedSongsContainer.appendChild(mainButton);
+        }
+      }
     }
   }
   
