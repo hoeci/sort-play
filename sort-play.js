@@ -3255,6 +3255,12 @@
         text-align: center;
         margin: auto;
     }
+    .text-ellipsis {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 80px;
+    }
   `;
   document.head.appendChild(styleElement);
 
@@ -6274,36 +6280,52 @@
   function insertButton() {
     const currentUri = getCurrentUri();
     if (!currentUri) return;
-  
+    
+    const findContainer = (selector) => {
+        const container = document.querySelector(selector);
+        if (!container) return null;
+        
+        if (container.contains(mainButton)) return null;
+        
+        return container;
+    };
+
+    const insertWithStyle = (container, isActionBar = false) => {
+        if (!container) return;
+        
+        mainButton.style.marginLeft = "";
+        mainButton.style.marginRight = "";
+        
+        if (isActionBar) {
+            mainButton.style.marginLeft = "auto";
+            mainButton.style.marginRight = "31px";
+            container.appendChild(mainButton);
+        } else {
+            if (container.firstChild) {
+                container.insertBefore(mainButton, container.firstChild);
+            } else {
+                container.appendChild(mainButton);
+            }
+        }
+    };
+
     if (URI.isPlaylistV1OrV2(currentUri)) {
-      const playlistContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
-      if (playlistContainer && !playlistContainer.contains(mainButton)) {
-        mainButton.style.marginLeft = ""; 
-        mainButton.style.marginRight = "";
-        if (playlistContainer.firstChild) {
-          playlistContainer.insertBefore(mainButton, playlistContainer.firstChild);
-        } else {
-          playlistContainer.appendChild(mainButton);
-        }
-      }
+        const container = findContainer(".playlist-playlist-searchBoxContainer");
+        insertWithStyle(container);
     } else if (URI.isArtist(currentUri)) {
-      const artistActionBar = document.querySelector(".main-actionBar-ActionBarRow");
-      if (artistActionBar && !artistActionBar.contains(mainButton)) {
-        mainButton.style.marginLeft = "auto"; 
-        mainButton.style.marginRight = "31px"; 
-        artistActionBar.appendChild(mainButton);
-      }
+        const container = findContainer(".main-actionBar-ActionBarRow");
+        insertWithStyle(container, true);
     } else if (currentUri === "spotify:collection:tracks") {
-      const likedSongsContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
-      if (likedSongsContainer && !likedSongsContainer.contains(mainButton)) {
-        mainButton.style.marginLeft = ""; 
-        mainButton.style.marginRight = "";
-        if (likedSongsContainer.firstChild) {
-          likedSongsContainer.insertBefore(mainButton, likedSongsContainer.firstChild);
-        } else {
-          likedSongsContainer.appendChild(mainButton);
-        }
-      }
+        const container = findContainer(".playlist-playlist-searchBoxContainer");
+        insertWithStyle(container);
+    }
+
+    if (mainButton) {
+        mainButton.classList.add('text-ellipsis');
+        mainButton.style.maxWidth = "120px";
+        mainButton.style.whiteSpace = "nowrap";
+        mainButton.style.overflow = "hidden";
+        mainButton.style.textOverflow = "ellipsis";
     }
   }
   
