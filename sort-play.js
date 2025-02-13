@@ -2172,7 +2172,7 @@
     }
     </style>
     <div style="display: flex; flex-direction: column; gap: 15px;">
-        <h2 class="genre-modal-title">Genres from Spotify and Last.fm:</h2> 
+        <h2 class="genre-modal-title">Genres from Spoitfy and Last.fm:</h2> 
         <div class="genre-header">
             <input type="text" class="search-bar" placeholder="Search genres...">
             <button class="select-all-button">
@@ -3279,28 +3279,17 @@
   }
 
   function getCurrentUri() {
-    return new Promise(resolve => { 
-        setTimeout(() => {
-            const path = Spicetify.Platform.History.location?.pathname;
-            console.log("getCurrentUri (delayed) - path:", path);
+    const path = Spicetify.Platform.History.location?.pathname;
+    if (!path) return null;
 
-            if (!path) {
-               resolve(null); 
-               return;
-            }
-
-
-            if (path.startsWith("/playlist/")) {
-                resolve(`spotify:playlist:${path.split("/")[2]}`);
-            } else if (path.startsWith("/artist/")) {
-                resolve(`spotify:artist:${path.split("/")[2]}`);
-            } else if (path.startsWith("/collection/tracks")) {
-                resolve("spotify:collection:tracks");
-            } else {
-                resolve(null); 
-            }
-        }, 50);
-    });
+    if (path.startsWith("/playlist/")) {
+      return `spotify:playlist:${path.split("/")[2]}`;
+    } else if (path.startsWith("/artist/")) {
+      return `spotify:artist:${path.split("/")[2]}`;
+    } else if (path.startsWith("/collection/tracks"))  {
+        return "spotify:collection:tracks";
+    }
+    return null;
   }
   
   async function getLikedSongs() {
@@ -6282,7 +6271,7 @@
     });
   }
 
-  async function insertButton() {
+  function insertButton() {
     const currentUri = getCurrentUri();
     if (!currentUri) return;
   
@@ -6298,7 +6287,7 @@
         }
       }
     } else if (URI.isArtist(currentUri)) {
-      const artistActionBar = await waitForElement(".main-actionBar-ActionBarRow");
+      const artistActionBar = document.querySelector(".main-actionBar-ActionBarRow");
       if (artistActionBar && !artistActionBar.contains(mainButton)) {
         mainButton.style.marginLeft = "auto"; 
         mainButton.style.marginRight = "31px"; 
