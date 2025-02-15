@@ -2176,7 +2176,7 @@
     }
     </style>
     <div style="display: flex; flex-direction: column; gap: 15px;">
-        <h2 class="genre-modal-title">Genres from Spoitfy and Last.fm:</h2> 
+        <h2 class="genre-modal-title">Genres from Spotify and Last.fm:</h2> 
         <div class="genre-header">
             <input type="text" class="search-bar" placeholder="Search genres...">
             <button class="select-all-button">
@@ -2612,14 +2612,34 @@
         }[sortType];
 
         try {
-          let playlistDescription = `Filtered using Sort-Play by genres: ${selectedGenres.join(", ")}.`;
+          let baseDescription = `Filtered using Sort-Play by genres: `;
           if (URI.isArtist(sourceUri)) {
-            playlistDescription = `Tracks by ${sourceName} filtered using Sort-Play by genres: ${selectedGenres.join(", ")}.`;
+              baseDescription = `Tracks by ${sourceName} ` + baseDescription;
           }
-        
+
+          let playlistDescription = baseDescription;
+          let genreList = "";
+          let addedGenres = 0;
+
+          for (const genre of selectedGenres) {
+              const potentialGenreList = genreList ? `${genreList}, ${genre}` : genre;
+              if ((playlistDescription.length + potentialGenreList.length) <= 247) { // 247 + "..." = 250
+                  genreList = potentialGenreList;
+                  addedGenres++;
+              } else {
+                  break; // Stop adding genres once the limit is reached
+              }
+          }
+           if (addedGenres < selectedGenres.length) {
+                playlistDescription += genreList + ",...";
+            }else{
+                playlistDescription += genreList + ".";
+            }
+            
+
           const newPlaylist = await createPlaylist(
-            `${sourceName} (Genre Filter)`,
-            playlistDescription
+              `${sourceName} (Genre Filter)`,
+              playlistDescription
           );
           mainButton.innerText = "Saving...";
 
@@ -2711,11 +2731,31 @@
           }[sortType];
 
           try {
-            let playlistDescription = `Filtered using Sort-Play by genres: ${selectedGenres.join(", ")}.`;
+            let baseDescription = `Filtered using Sort-Play by genres: `;
             if (URI.isArtist(sourceUri)) {
-              playlistDescription = `Tracks by ${sourceName} filtered using Sort-Play by genres: ${selectedGenres.join(", ")}.`;
+                baseDescription = `Tracks by ${sourceName} ` + baseDescription;
             }
-          
+
+            let playlistDescription = baseDescription;
+            let genreList = "";
+            let addedGenres = 0;
+
+            for (const genre of selectedGenres) {
+                const potentialGenreList = genreList ? `${genreList}, ${genre}` : genre;
+                if ((playlistDescription.length + potentialGenreList.length) <= 247) { // 247 + "..." = 250
+                    genreList = potentialGenreList;
+                    addedGenres++;
+                } else {
+                    break; // Stop adding genres once the limit is reached
+                }
+            }
+
+            if (addedGenres < selectedGenres.length) {
+                  playlistDescription += genreList + ",...";
+              }else{
+                  playlistDescription += genreList + ".";
+              }
+
             const newPlaylist = await createPlaylist(
               `${sourceName} (Genre Filter)`,
               playlistDescription
