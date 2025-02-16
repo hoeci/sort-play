@@ -6,7 +6,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "3.1.0";
+  const SORT_PLAY_VERSION = "3.1.1";
 
   const { PlaylistAPI } = Platform;
 
@@ -2463,120 +2463,72 @@
 
     createPlaylistButton.addEventListener("click", async () => {
       if (selectedGenres.length === 0) {
-        Spicetify.showNotification("Please select at least one genre.");
-        return;
+          Spicetify.showNotification("Please select at least one genre.");
+          return;
       }
-
+  
       const filteredTracks = filterTracksByGenres(
-        tracks,
-        selectedGenres,
-        trackGenreMap
+          tracks,
+          selectedGenres,
+          trackGenreMap
       );
-
+  
       if (filteredTracks.length === 0) {
-        Spicetify.showNotification("No tracks found for the selected genres.");
-        return;
+          Spicetify.showNotification("No tracks found for the selected genres.");
+          return;
       }
-
+  
       const sortType = sortTypeSelect.value;
       Spicetify.PopupModal.hide();
-
-      if (
-        sortType === "playCount" ||
-        sortType === "popularity" ||
-        sortType === "shuffle" ||
-        sortType === "releaseDate"
-      ) {
-        mainButton.disabled = true;
-        mainButton.style.backgroundColor =
-          buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-
-        mainButton.innerHTML = "0%";
-
-        const tracksWithPlayCounts = await processBatchesWithDelay(
-          filteredTracks,
-          200,
-          1000,
-          (progress) => {
-            mainButton.innerText = `${Math.floor(progress * 0.20)}%`;
-          },
-          getTrackDetailsWithPlayCount
-        );
-        const tracksWithIds = await processBatchesWithDelay(
-          tracksWithPlayCounts,
-          200,
-          1000,
-          (progress) => {
-            mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`;
-          },
-          collectTrackIdsForPopularity
-        );
-        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-          tracksWithIds,
-          (progress) => {
-            mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`;
+  
+      let sortedTracks; 
+  
+      async function createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription) {
+          try {
+              const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+              mainButton.innerText = "Saving...";
+  
+              const trackUris = sortedTracks.map((track) => track.uri);
+              await addTracksToPlaylist(newPlaylist.id, trackUris);
+  
+              const sortTypeInfo = {  // Put this here for easy access
+                  playCount: { fullName: "play count", shortName: "PlayCount" },
+                  popularity: { fullName: "popularity", shortName: "Popularity" },
+                  releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
+                  scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
+                  personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
+                  shuffle: { fullName: "shuffle", shortName: "Shuffle" },
+                  aiPick: { fullName: "AI pick", shortName: "AI Pick" },
+              }[sortType];
+              Spicetify.showNotification(
+                  `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
+              );
+          } catch (error) {
+              console.error("Error creating or updating playlist:", error);
+              Spicetify.showNotification(
+                  `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
+              );
+          } finally {
+              resetButtons();
           }
-        );
-
-        let sortedTracks;
-        let uniqueTracks;
-
-        if (sortType === "releaseDate") {
-          const tracksWithReleaseDates = await processBatchesWithDelay(
-            tracksWithPopularity,
-            200,
-            1000,
-            (progress) => {
-              mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
-            },
-            getTrackDetailsWithReleaseDate
-          );
-          uniqueTracks = deduplicateTracks(tracksWithReleaseDates).unique;
-        } else {
-          uniqueTracks = deduplicateTracks(tracksWithPopularity).unique;
-        }
-
-        if (sortType === "playCount") {
-          sortedTracks = uniqueTracks
-            .filter((track) => track.playCount !== "N/A")
-            .sort((a, b) => b.playCount - a.playCount);
-        } else if (sortType === "popularity") {
-          sortedTracks = uniqueTracks
-            .filter((track) => track.popularity !== null)
-            .sort((a, b) => b.popularity - a.popularity);
-        } else if (sortType === "releaseDate") {
-          sortedTracks = uniqueTracks
-            .filter((track) => track.releaseDate !== null)
-            .sort((a, b) => {
-              return releaseDateReverse
-                ? a.releaseDate - b.releaseDate
-                : b.releaseDate - a.releaseDate;
-            });
-        } else if (sortType === "shuffle") {
-          sortedTracks = shuffleArray(uniqueTracks);
-        }
-
-        mainButton.innerText = "100%";
-        
-        const sourceUri = getCurrentUri();
-        let sourceName;
-        
-        if (URI.isArtist(sourceUri)) {
-            sourceName = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
-        } else if (isLikedSongsPage(sourceUri)) {
-            sourceName = "Liked Songs";
-        } else {
-            sourceName = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
-        }
-        const possibleSuffixes = [
+      }
+  
+  
+      // --- Get source name ---
+      const sourceUri = getCurrentUri();
+      let sourceName;
+      if (URI.isArtist(sourceUri)) {
+          sourceName = await Spicetify.CosmosAsync.get(
+              `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
+          ).then((r) => r.name);
+      } else if (isLikedSongsPage(sourceUri)) {
+          sourceName = "Liked Songs";
+      } else {
+          sourceName = await Spicetify.CosmosAsync.get(
+              `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+          ).then((r) => r.name);
+      }
+      const possibleSuffixes = [
           "\\(PlayCount\\)",
           "\\(Popularity\\)",
           "\\(ReleaseDate\\)",
@@ -2585,202 +2537,153 @@
           "\\(Shuffle\\)",
           "\\(AI Pick\\)",
           "\\(Genre Filter\\)",
-        ];
-
-        let suffixPattern = new RegExp(
+      ];
+  
+      let suffixPattern = new RegExp(
           `\\s*(${possibleSuffixes.join("|")})\\s*`
-        );
-
-        while (suffixPattern.test(sourceName)) {
+      );
+  
+      while (suffixPattern.test(sourceName)) {
           sourceName = sourceName.replace(suffixPattern, "");
-        }
-
-        const sortTypeInfo = {
-          playCount: { fullName: "play count", shortName: "PlayCount" },
-          popularity: { fullName: "popularity", shortName: "Popularity" },
-          releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-          scrobbles: {
-            fullName: "Last.fm scrobbles",
-            shortName: "LFM Scrobbles",
-          },
-          personalScrobbles: {
-            fullName: "Last.fm personal scrobbles",
-            shortName: "LFM My Scrobbles",
-          },
-          shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-          aiPick: { fullName: "AI pick", shortName: "AI Pick" },
-        }[sortType];
-
-        try {
-          let baseDescription = `Filtered using Sort-Play by genres: `;
-          if (URI.isArtist(sourceUri)) {
-              baseDescription = `Tracks by ${sourceName} ` + baseDescription;
+      }
+  
+  
+      let baseDescription = `Filtered using Sort-Play by genres: `;
+      if (URI.isArtist(sourceUri)) {
+          baseDescription = `Tracks by ${sourceName} ` + baseDescription;
+      }
+  
+      let playlistDescription = baseDescription;
+      let genreList = "";
+      let addedGenres = 0;
+  
+      for (const genre of selectedGenres) {
+          const potentialGenreList = genreList ? `${genreList}, ${genre}` : genre;
+          if ((playlistDescription.length + potentialGenreList.length) <= 247) { 
+              genreList = potentialGenreList;
+              addedGenres++;
+          } else {
+              break; 
           }
-
-          let playlistDescription = baseDescription;
-          let genreList = "";
-          let addedGenres = 0;
-
-          for (const genre of selectedGenres) {
-              const potentialGenreList = genreList ? `${genreList}, ${genre}` : genre;
-              if ((playlistDescription.length + potentialGenreList.length) <= 247) { // 247 + "..." = 250
-                  genreList = potentialGenreList;
-                  addedGenres++;
-              } else {
-                  break; // Stop adding genres once the limit is reached
-              }
-          }
-           if (addedGenres < selectedGenres.length) {
-                playlistDescription += genreList + ",...";
-            }else{
-                playlistDescription += genreList + ".";
-            }
-            
-
-          const newPlaylist = await createPlaylist(
-              `${sourceName} (Genre Filter)`,
-              playlistDescription
-          );
-          mainButton.innerText = "Saving...";
-
-          const trackUris = sortedTracks.map((track) => track.uri);
-          await addTracksToPlaylist(newPlaylist.id, trackUris);
-
-          Spicetify.showNotification(
-            `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
-          );
-        } catch (error) {
-          console.error("Error creating or updating playlist:", error);
-          Spicetify.showNotification(
-            `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
-          );
-        } finally {
-          resetButtons();
-        }
-      } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
-        try {
+      }
+      if (addedGenres < selectedGenres.length) {
+          playlistDescription += genreList + ",...";
+      } else {
+          playlistDescription += genreList + ".";
+      }
+  
+      const playlistName = `${sourceName} (Genre Filter)`; 
+  
+  
+      if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
           mainButton.disabled = true;
-          mainButton.style.backgroundColor =
-            buttonStyles.main.disabledBackgroundColor;
+          mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
           mainButton.style.color = buttonStyles.main.disabledColor;
           mainButton.style.cursor = "default";
           svgElement.style.fill = buttonStyles.main.disabledColor;
           menuButtons.forEach((button) => (button.disabled = true));
-
           mainButton.innerHTML = "0%";
-          const result = await handleScrobblesSorting(
-            filteredTracks,
-            sortType,
-            (progress) => {
-              mainButton.innerText = `${Math.floor(progress * 0.90)}%`;
-            }
+  
+          const tracksWithPlayCounts = await processBatchesWithDelay(
+              filteredTracks,
+              200,
+              1000,
+              (progress) => {
+                  mainButton.innerText = `${Math.floor(progress * 0.20)}%`;
+              },
+              getTrackDetailsWithPlayCount
           );
-          sortedTracks = result.sortedTracks;
-          const totalTracks = sortedTracks.length;
-          sortedTracks.forEach((_, index) => {
-            const progress = 90 + Math.floor(((index + 1) / totalTracks) * 10);
-            mainButton.innerText = `${progress}%`;
-          });
-          mainButton.innerText = "100%";
-          const sourceUri = getCurrentUri();
-          let sourceName = URI.isArtist(sourceUri)
-            ? await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/artists/${
-                  sourceUri.split(":")[2]
-                }`
-              ).then((r) => r.name)
-            : await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/playlists/${
-                  sourceUri.split(":")[2]
-                }`
-              ).then((r) => r.name);
-
-          const possibleSuffixes = [
-            "\\(PlayCount\\)",
-            "\\(Popularity\\)",
-            "\\(ReleaseDate\\)",
-            "\\(LFM Scrobbles\\)",
-            "\\(LFM My Scrobbles\\)",
-            "\\(Shuffle\\)",
-            "\\(AI Pick\\)",
-            "\\(Genre Filter\\)",
-          ];
-
-          let suffixPattern = new RegExp(
-            `\\s*(${possibleSuffixes.join("|")})\\s*`
+          const tracksWithIds = await processBatchesWithDelay(
+              tracksWithPlayCounts,
+              200,
+              1000,
+              (progress) => {
+                  mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`;
+              },
+              collectTrackIdsForPopularity
           );
-
-          while (suffixPattern.test(sourceName)) {
-            sourceName = sourceName.replace(suffixPattern, "");
-          }
-
-          const sortTypeInfo = {
-            playCount: { fullName: "play count", shortName: "PlayCount" },
-            popularity: { fullName: "popularity", shortName: "Popularity" },
-            releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-            scrobbles: {
-              fullName: "Last.fm scrobbles",
-              shortName: "LFM Scrobbles",
-            },
-            personalScrobbles: {
-              fullName: "Last.fm personal scrobbles",
-              shortName: "LFM My Scrobbles",
-            },
-            shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-            aiPick: { fullName: "AI pick", shortName: "AI Pick" },
-          }[sortType];
-
-          try {
-            let baseDescription = `Filtered using Sort-Play by genres: `;
-            if (URI.isArtist(sourceUri)) {
-                baseDescription = `Tracks by ${sourceName} ` + baseDescription;
-            }
-
-            let playlistDescription = baseDescription;
-            let genreList = "";
-            let addedGenres = 0;
-
-            for (const genre of selectedGenres) {
-                const potentialGenreList = genreList ? `${genreList}, ${genre}` : genre;
-                if ((playlistDescription.length + potentialGenreList.length) <= 247) { // 247 + "..." = 250
-                    genreList = potentialGenreList;
-                    addedGenres++;
-                } else {
-                    break; // Stop adding genres once the limit is reached
-                }
-            }
-
-            if (addedGenres < selectedGenres.length) {
-                  playlistDescription += genreList + ",...";
-              }else{
-                  playlistDescription += genreList + ".";
+          const tracksWithPopularity = await fetchPopularityForMultipleTracks(
+              tracksWithIds,
+              (progress) => {
+                  mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`;
               }
-
-            const newPlaylist = await createPlaylist(
-              `${sourceName} (Genre Filter)`,
-              playlistDescription
-            );
-            mainButton.innerText = "Saving...";
-
-            const trackUris = sortedTracks.map((track) => track.uri);
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
-
-            Spicetify.showNotification(
-              `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
-            );
-          } catch (error) {
-            console.error("Error creating or updating playlist:", error);
-            Spicetify.showNotification(
-              `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
-            );
-          } finally {
-            resetButtons();
+          );
+  
+          let uniqueTracks;
+  
+          if (sortType === "releaseDate") {
+              const tracksWithReleaseDates = await processBatchesWithDelay(
+                  tracksWithPopularity,
+                  200,
+                  1000,
+                  (progress) => {
+                      mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
+                  },
+                  getTrackDetailsWithReleaseDate
+              );
+              uniqueTracks = deduplicateTracks(tracksWithReleaseDates).unique;
+          } else {
+              uniqueTracks = deduplicateTracks(tracksWithPopularity).unique;
           }
-        } catch (error) {
-          resetButtons();
-          Spicetify.showNotification(error.message);
-          return;
-        }
+  
+          if (sortType === "playCount") {
+              sortedTracks = uniqueTracks
+                  .filter((track) => track.playCount !== "N/A")
+                  .sort((a, b) => b.playCount - a.playCount);
+          } else if (sortType === "popularity") {
+              sortedTracks = uniqueTracks
+                  .filter((track) => track.popularity !== null)
+                  .sort((a, b) => b.popularity - a.popularity);
+          } else if (sortType === "releaseDate") {
+              sortedTracks = uniqueTracks
+                  .filter((track) => track.releaseDate !== null)
+                  .sort((a, b) => {
+                      return releaseDateReverse
+                          ? a.releaseDate - b.releaseDate
+                          : b.releaseDate - a.releaseDate;
+                  });
+          } else if (sortType === "shuffle") {
+              sortedTracks = shuffleArray(uniqueTracks);
+          }
+  
+          mainButton.innerText = "100%";
+  
+          await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
+  
+  
+      } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
+          try {
+              mainButton.disabled = true;
+              mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+              mainButton.style.color = buttonStyles.main.disabledColor;
+              mainButton.style.cursor = "default";
+              svgElement.style.fill = buttonStyles.main.disabledColor;
+              menuButtons.forEach((button) => (button.disabled = true));
+              mainButton.innerHTML = "0%";
+  
+              const result = await handleScrobblesSorting(
+                  filteredTracks,
+                  sortType,
+                  (progress) => {
+                      mainButton.innerText = `${Math.floor(progress * 0.90)}%`;
+                  }
+              );
+              sortedTracks = result.sortedTracks; 
+              const totalTracks = sortedTracks.length;
+              sortedTracks.forEach((_, index) => {
+                  const progress = 90 + Math.floor(((index + 1) / totalTracks) * 10);
+                  mainButton.innerText = `${progress}%`;
+              });
+              mainButton.innerText = "100%";
+  
+              await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
+  
+  
+          } catch (error) {
+              resetButtons();
+              Spicetify.showNotification(error.message);
+              return;
+          }
       }
     });
   }
