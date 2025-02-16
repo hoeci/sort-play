@@ -5,10 +5,13 @@
     setTimeout(main, 10);
     return;
   }
+  const { PlaylistAPI } = Platform;
+  if (!PlaylistAPI || typeof PlaylistAPI.getContents !== 'function') {
+    setTimeout(main, 50);
+    return;
+  }
 
   const SORT_PLAY_VERSION = "3.1.1";
-
-  const { PlaylistAPI } = Platform;
 
   const LFMApiKey = "***REMOVED***";
   
