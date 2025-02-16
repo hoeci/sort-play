@@ -622,16 +622,6 @@
         Custom Filter
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="includeAudioFeatures">
-        <label class="col description">Include Audio Features</label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" ${includeaudiofeatures ? 'checked' : ''}>
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
     
     <div class="setting-row" id="githubLink" style="margin-top: 10px; justify-content: center;">
         <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
