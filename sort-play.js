@@ -1858,7 +1858,7 @@
   }
 
 
-  async function showFilterModal(tracks, trackMap) {
+  async function showGenreFilterModal(tracks, trackMap) {
     const alls = new Set();
     trackMap.forEach((s) => {
       genres.forEach((genre) => allGenres.add(genre));
