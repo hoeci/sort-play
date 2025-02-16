@@ -2881,17 +2881,11 @@
     return await fn();
   }
 
-  
-
   async function withRetry(fn, retryAttempts, retryDelay) {
     let lastError;
     for (let attempt = 0; attempt < retryAttempts; attempt++) {
         try {
-            const response = await callSpotifyApiWithRateLimit(fn);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response;
+            return await callSpotifyApiWithRateLimit(fn);
         } catch (error) {
             lastError = error;
             let waitTime = retryDelay * Math.pow(2, attempt); 
@@ -2901,7 +2895,10 @@
             if (error.status === 429) {
                 waitTime = parseInt(error.headers?.["retry-after"] || waitTime);
             }
-            await new Promise((resolve) => setTimeout(resolve, waitTime));
+            
+            if (attempt < retryAttempts - 1) { 
+                await new Promise((resolve) => setTimeout(resolve, waitTime));
+            }
         }
     }
     throw lastError;
@@ -2925,7 +2922,7 @@
       const batchResults = await Promise.allSettled(
         batch.map(async (track) => {  
           try {
-            const genres = await getTrackGenres(track.uri); 
+            const genres = await getTrackGenres(track.uri);
             return { track, genres };
           } catch (error) {
             console.error(`Error processing track ${track.name}:`, error);
@@ -3045,77 +3042,83 @@
 
   async function getTrackGenres(trackUri) {
     const trackId = trackUri.split(":")[2];
-  
+
     const cachedGenres = getCachedTrackGenres(trackId);
     if (cachedGenres) {
-      return cachedGenres;
+        return cachedGenres;
     }
-  
+
     try {
-      const trackDetails = await callSpotifyApiWithRateLimit(() => 
-        Spicetify.CosmosAsync.get(
-          `https://api.spotify.com/v1/tracks/${trackId}`
-        )
-      );
-  
-      if (!trackDetails?.artists?.length) {
-        console.warn(`Could not fetch details for track URI: ${trackUri}`);
-        return [];
-      }
-  
-      const isRecent = isTrackRecent(trackDetails.album.release_date);
-      
-      let spotifyGenres = new Set();
-      
-      await Promise.all(
-        trackDetails.artists.map(async (artist) => {
-          const artistId = artist.uri.split(":")[2];
-          
-          if (artistGenreCache.has(artistId)) {
-            artistGenreCache.get(artistId).forEach(genre => spotifyGenres.add(genre));
-            return;
-          }
-  
-          try {
-            const artistData = await callSpotifyApiWithRateLimit(() => 
-              Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/artists/${artistId}`
-              )
-            );
-  
-            if (artistData.genres?.length) {
-              const genres = artistData.genres
-                .map(g => g.toLowerCase())
-                .filter(genre => !containsYear(genre));
-              artistGenreCache.set(artistId, genres);
-              genres.forEach(genre => spotifyGenres.add(genre));
+        const trackDetails = await withRetry(
+            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`),
+            CONFIG.spotify.retryAttempts,
+            CONFIG.spotify.retryDelay
+        );
+
+        if (!trackDetails?.artists?.length) {
+            console.warn(`No artists found for track URI: ${trackUri}`);
+            return [];
+        }
+
+        const isRecent = isTrackRecent(trackDetails.album.release_date);
+        let spotifyGenres = new Set();
+
+        const artistIds = [...new Set(trackDetails.artists.map(artist => artist.uri.split(":")[2]))];
+
+        const artistBatches = [];
+        for (let i = 0; i < artistIds.length; i += 50) {
+            artistBatches.push(artistIds.slice(i, i + 50));
+        }
+
+        await Promise.all(artistBatches.map(async (batch) => {
+            try {
+                const artistData = await withRetry(
+                    () => Spicetify.CosmosAsync.get(
+                        `https://api.spotify.com/v1/artists?ids=${batch.join(',')}`
+                    ),
+                    CONFIG.spotify.retryAttempts,
+                    CONFIG.spotify.retryDelay
+                );
+                
+                if (artistData?.artists) {
+                    artistData.artists.forEach(artist => {
+                        if (artist?.genres?.length > 0) {
+                            const artistId = artist.id;
+                            if (!artistGenreCache.has(artistId)) {
+                                const genres = artist.genres
+                                    .map(g => g.toLowerCase())
+                                    .filter(genre => !containsYear(genre));
+                                artistGenreCache.set(artistId, genres);
+                                genres.forEach(genre => spotifyGenres.add(genre));
+                            } else {
+                                artistGenreCache.get(artistId).forEach(genre => spotifyGenres.add(genre));
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.warn(`Error fetching Spotify genres for artists ${batch.join(',')}:`, error);
             }
-          } catch (error) {
-            console.warn(`Error fetching Spotify genres for artist ${artist.name}:`, error);
-          }
-        })
-      );
-  
-      const lastfmGenres = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name, spotifyGenres); 
-      
-      const artistNames = trackDetails.artists.map(artist => artist.name.toLowerCase());
-      const filteredLastfmGenres = lastfmGenres.filter(genre => {
-          return !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName));
-      });
-  
-      const combinedGenres = new Set([...spotifyGenres, ...filteredLastfmGenres]);
-  
-      if (combinedGenres.size > 0) {
-        setCachedTrackGenres(trackId, Array.from(combinedGenres));
-      } else if (!isRecent) {
-        setCachedTrackGenres(trackId, []);
-      } else {
-      }
-  
-      return Array.from(combinedGenres);
+        }));
+
+        const lastfmGenres = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name, spotifyGenres);
+        const artistNames = trackDetails.artists.map(artist => artist.name.toLowerCase());
+        const filteredLastfmGenres = lastfmGenres.filter(genre => {
+            return !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName));
+        });
+        const combinedGenres = new Set([...spotifyGenres, ...filteredLastfmGenres]);
+
+        if (combinedGenres.size > 0) {
+            setCachedTrackGenres(trackId, Array.from(combinedGenres));
+        } else if (!isRecent) {
+            setCachedTrackGenres(trackId, []);
+        }
+
+        return Array.from(combinedGenres);
+
     } catch (error) {
-      console.error(`Error fetching details for track ID ${trackId}:`, error);
-      return [];
+        console.error(`Error fetching details for track ID ${trackId}:`, error);
+        return [];
     }
   }
   
@@ -3160,6 +3163,7 @@
       });
     }
   }
+
 
   const styleElement = document.createElement("style");
   styleElement.innerHTML = `
