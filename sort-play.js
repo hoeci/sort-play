@@ -1858,9 +1858,9 @@
   }
 
 
-  async function showGenreFilterModal(tracks, trackMap) {
-    const alls = new Set();
-    trackMap.forEach((s) => {
+  async function showGenreFilterModal(tracks, trackGenreMap) {
+    const allGenres = new Set();
+    trackGenreMap.forEach((genres) => {
       genres.forEach((genre) => allGenres.add(genre));
     });
 
@@ -2494,7 +2494,7 @@
               const trackUris = sortedTracks.map((track) => track.uri);
               await addTracksToPlaylist(newPlaylist.id, trackUris);
   
-              const sortTypeInfo = {  // Put this here for easy access
+              const sortTypeInfo = { 
                   playCount: { fullName: "play count", shortName: "PlayCount" },
                   popularity: { fullName: "popularity", shortName: "Popularity" },
                   releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
@@ -2517,7 +2517,6 @@
       }
   
   
-      // --- Get source name ---
       const sourceUri = getCurrentUri();
       let sourceName;
       if (URI.isArtist(sourceUri)) {
@@ -2690,7 +2689,6 @@
       }
     });
   }
-
 
   const GENRE_MAPPINGS = {
     "classical": ["classical", "classics", "classical music", "orchestral", "orchestral music", "symphony", "symphonic", "symphonies", "baroque", "classic", "classical's", "orchestra", "orchestras", "baroque's"],
@@ -3011,8 +3009,17 @@
         CONFIG.lastfm.retryAttempts,
         CONFIG.lastfm.retryDelay
       );
-  
-      const trackData = await trackResponse.json();
+
+      if (!trackResponse.ok) {
+        throw new Error(`Track API request failed with status ${trackResponse.status}`);
+      }
+
+      const trackResponseText = await trackResponse.text();
+      if (!trackResponseText) {
+        throw new Error('Empty response from track API');
+      }
+
+      const trackData = JSON.parse(trackResponseText);
       let genres = trackData?.track?.toptags?.tag?.map(tag => tag.name.toLowerCase()) || [];
   
       if (genres.length > 0) {
@@ -3038,15 +3045,32 @@
             CONFIG.lastfm.retryAttempts,
             CONFIG.lastfm.retryDelay
           );
-    
-          const artistData = await artistResponse.json();
+
+          // Check if response is ok before trying to parse JSON
+          if (!artistResponse.ok) {
+            throw new Error(`Artist API request failed with status ${artistResponse.status}`);
+          }
+
+          // Get the response text first to check if it's empty
+          const artistResponseText = await artistResponse.text();
+          if (!artistResponseText) {
+            throw new Error('Empty response from artist API');
+          }
+
+          // Try to parse the JSON
+          const artistData = JSON.parse(artistResponseText);
           genres = artistData?.artist?.tags?.tag?.map(tag => tag.name.toLowerCase()) || [];
       }
 
       lastfmCache.set(cacheKey, genres);
       return genres;
     } catch (error) {
-      console.warn(`Last.fm fetch failed for ${artist} - ${track}:`, error);
+      // Log more specific error information
+      console.warn(`Last.fm fetch failed for ${artist} - ${track}:`, {
+        error: error.message,
+        stack: error.stack,
+        type: error.constructor.name
+      });
       return [];
     }
   }
