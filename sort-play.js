@@ -543,6 +543,21 @@
     <div style="display: flex; flex-direction: column; gap: 12px;">
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        API Key Settings
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+        <div style="display: flex; gap: 16px; justify-content: flex-start; margin-top: 10px;">
+        <button id="setLastFmUsername" class="main-buttons-button"
+                style="padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+          Set Last.fm Username
+        </button>
+        <button id="setGeminiApiKey" class="main-buttons-button"
+                style="padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+          Set Gemini API Key
+        </button>
+    </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Playlist Column Options
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
@@ -602,6 +617,21 @@
         </div>
     </div>
 
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Custom Filter
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="includeAudioFeatures">
+        <label class="col description">Include Audio Features</label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" ${includeaudiofeatures ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+    
     <div class="setting-row" id="githubLink" style="margin-top: 10px; justify-content: center;">
         <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
             <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 14px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
@@ -634,6 +664,41 @@
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
+    const includeAudioFeaturesToggle = modalContainer.querySelector("#includeAudioFeatures input");
+    const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
+    const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
+
+    setGeminiApiKeyButton.addEventListener("click", () => {
+        Spicetify.PopupModal.hide();
+    
+        setTimeout(() => {
+            showGeminiApiKeyModal();
+        }, 200); 
+    });
+    
+    setLastFmUsernameButton.addEventListener("click", () => {
+        Spicetify.PopupModal.hide(); 
+    
+        setTimeout(() => {
+            showLastFmUsernameModal();
+        }, 200);
+    });
+
+    setGeminiApiKeyButton.addEventListener("mouseenter", () => {
+        setGeminiApiKeyButton.style.backgroundColor = "#444444";
+    });
+
+    setGeminiApiKeyButton.addEventListener("mouseleave", () => {
+        setGeminiApiKeyButton.style.backgroundColor = "#333333";
+    });
+
+    setLastFmUsernameButton.addEventListener("mouseenter", () => {
+      setLastFmUsernameButton.style.backgroundColor = "#444444";
+    });
+
+    setLastFmUsernameButton.addEventListener("mouseleave", () => {
+      setLastFmUsernameButton.style.backgroundColor = "#333333";
+    });
 
     removeDateAddedToggle.disabled = !columnPlayCount;
     removeDateAddedToggle.parentElement.classList.toggle("disabled", !columnPlayCount);
@@ -677,6 +742,10 @@
 
     showRemovedDuplicatesToggle.addEventListener("change", () => {
         showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
+        saveSettings();
+    });
+    includeAudioFeaturesToggle.addEventListener("change", () => {
+      includeaudiofeatures = includeAudioFeaturesToggle.checked;
         saveSettings();
     });
   }
