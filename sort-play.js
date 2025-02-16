@@ -2974,7 +2974,7 @@
         updateProgress(progress);
   
         if (i < batches.length - 1) {
-            const waitingMsg = batchIsAllCached ? "using cache (no delay)" : `...`;
+            const waitingMsg = batchIsAllCached ? "using cache" : `...`;
             console.log(`Completed batch ${i + 1}/${batches.length}. Success: ${successfulResults.length}/${batch.length}. ${waitingMsg}`);
             if (!batchIsAllCached) {
                 await new Promise((resolve) => setTimeout(resolve, delayMs));
