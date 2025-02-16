@@ -618,9 +618,6 @@
         </div>
     </div>
 
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Custom Filter
-    </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
     
     <div class="setting-row" id="githubLink" style="margin-top: 10px; justify-content: center;">
