@@ -4484,12 +4484,6 @@
       {
         backgroundColor: "transparent",
         color: "white",
-        text: "Custom Filter",
-        sortType: "customFilter",
-      },
-      {
-        backgroundColor: "transparent",
-        color: "white",
         text: "Genre Filter",
         sortType: "genreFilter",
       },
