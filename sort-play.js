@@ -1480,44 +1480,55 @@
     return null;
   }
 
-  async function fetchLyricsFromSpotify(trackId) {
-    const result = {
-      karaoke: null,
-      synced: null,
-      unsynced: null,
-      provider: "Spotify",
-      copyright: null,
-    };
+  async function fetchLyricsFromLyricsOvh(artist, track, maxRetries = 3, baseDelay = 1000) {
+    let attempt = 0;
+    while (attempt < maxRetries) {
+      try {
+        const encodedArtist = encodeURIComponent(artist);
+        const encodedTrack = encodeURIComponent(track);
+        const url = `https://api.lyrics.ovh/v1/${encodedArtist}/${encodedTrack}`;
+        
+        const response = await fetch(url);
   
-    const baseURL = "https://spclient.wg.spotify.com/color-lyrics/v2/track/";
-    let body;
-    try {
-      body = await Spicetify.CosmosAsync.get(`${baseURL + trackId}?format=json&vocalRemoval=false&market=from_token`);
-    } catch {
-      return { error: "Request error", uri: `spotify:track:${trackId}` };
+        if (response.status === 404) {
+          return { error: "No lyrics found", uri: `spotify:track:${track}`};
+        }
+  
+        if (!response.ok) {
+          attempt++;
+          const waitTime = baseDelay * Math.pow(2, attempt - 1);
+          console.warn(`Retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`);
+          await delay(waitTime);
+          continue;
+        }
+  
+        const data = await response.json();
+  
+        if (data && data.lyrics) {
+          return {
+            unsynced: data.lyrics.split('\n').map(line => ({ text: line })),
+            provider: "Lyrics.ovh",
+            copyright: null,
+          };
+        } else {
+          return { error: "No lyrics found in response", uri: `spotify:track:${track}`};
+        }
+        
+      } catch (error) {
+        attempt++;
+  
+        if (attempt === maxRetries) {
+          console.error(`Failed after ${maxRetries} attempts:`, error);
+          return { error: "Max retries exceeded", uri: `spotify:track:${track}` };
+        }
+  
+        const waitTime = baseDelay * Math.pow(2, attempt - 1);
+        console.warn(`Attempt ${attempt}/${maxRetries} failed, retrying in ${waitTime}ms`);
+        await delay(waitTime);
+      }
     }
   
-    const lyrics = body.lyrics;
-    if (!lyrics) {
-      return { error: "No lyrics", uri: `spotify:track:${trackId}` };
-    }
-  
-    const lines = lyrics.lines;
-    if (lyrics.syncType === "LINE_SYNCED") {
-      result.synced = lines.map((line) => ({
-        startTime: line.startTimeMs,
-        text: line.words,
-      }));
-      result.unsynced = result.synced;
-    } else {
-      result.unsynced = lines.map((line) => ({
-        text: line.words,
-      }));
-    }
-  
-    result.provider = lyrics.provider;
-  
-    return result;
+    return { error: "Unknown error", uri: `spotify:track:${track}` };
   }
 
   async function queryGeminiWithPlaylistTracks(tracks, userPrompt, apiKey, maxRetries = 3, initialDelay = 1000, includeSongStats = true, includeLyrics = true, modelName) {
@@ -1526,13 +1537,18 @@
     let delay = initialDelay;
     let enrichedTracksCache = [];
     let tracksToProcess = [];
-
+    let tracksNeedingLyrics = [];
+  
     for (const track of tracks) {
       const trackId = track.uri.split(":")[2];
       const cachedTrack = getTrackCache(trackId, includeSongStats, includeLyrics, modelName);
       
       if (cachedTrack) {
-        enrichedTracksCache.push(cachedTrack);
+        if (includeLyrics && (!cachedTrack.lyrics || cachedTrack.lyrics === "Not included")) {
+          tracksNeedingLyrics.push({ ...track, cachedData: cachedTrack });
+        } else {
+          enrichedTracksCache.push(cachedTrack);
+        }
       } else {
         tracksToProcess.push(track);
       }
@@ -1593,7 +1609,7 @@
               
               let lyrics = "Not included";
               if (includeLyrics) {
-                const lyricsData = await fetchLyricsFromSpotify(trackId);
+                const lyricsData = await fetchLyricsFromLyricsOvh(track.artistName || track.artist, track.songTitle || track.name || track.title);
                 lyrics = lyricsData && lyricsData.unsynced ? lyricsData.unsynced.map(line => line.text).join(' ') : "Not included";
               }
               
@@ -1625,7 +1641,7 @@
               if (includeLyrics) {
                 enrichedTrack.lyrics = lyrics;
               }
-
+  
               setTrackCache(trackId, enrichedTrack, includeSongStats, includeLyrics, modelName);
               
               return enrichedTrack;
@@ -1635,8 +1651,38 @@
           enrichedTracksCache = [...enrichedTracksCache, ...processedTracks];
         }
   
-        const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
+        if (tracksNeedingLyrics.length > 0) {
+          const processedLyrics = await processBatchWithRateLimit(
+            tracksNeedingLyrics,
+            20,
+            100,
+            async track => {
+              const trackId = track.uri.split(":")[2];
+              const enrichedTrack = { ...track.cachedData };
+
+              const lyricsData = await fetchLyricsFromLyricsOvh(track.artistName || track.artist, track.songTitle || track.name || track.title);
+              enrichedTrack.lyrics = lyricsData && lyricsData.unsynced 
+                ? lyricsData.unsynced.map(line => line.text).join(' ') 
+                : "Not included";
   
+              setTrackCache(trackId, enrichedTrack, includeSongStats, includeLyrics, modelName);
+  
+              return enrichedTrack;
+            }
+          );
+  
+          enrichedTracksCache = [...enrichedTracksCache, ...processedLyrics];
+        }
+  
+        const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
+
+        const tracksWithLyrics = tracksWithStats.filter(track => track.lyrics && track.lyrics !== "Not included").length;
+        const tracksWithoutLyrics = tracksWithStats.filter(track => !track.lyrics || track.lyrics === "Not included").length;
+        console.log(`Lyrics Statistics:
+        - Tracks with lyrics: ${tracksWithLyrics}
+        - Tracks without lyrics: ${tracksWithoutLyrics}
+        - Total tracks: ${tracksWithStats.length}`);
+
         const GoogleAI = await loadGoogleAI();
       
         if (!GoogleAI) {
@@ -1650,7 +1696,7 @@
         const combinedSystemInstruction = `${userSystemInstruction}\n${FIXED_SYSTEM_INSTRUCTION}`;
     
         const userMessage = `Playlist Tracks:\n${JSON.stringify(tracksWithStats, null, 2)}\n\nUser Request: ${userPrompt}\n\nGIVE PICKED TRACK URI's`;
-  
+
         const parts = [
           { text: combinedSystemInstruction },
           { text: userMessage } 
