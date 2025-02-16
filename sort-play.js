@@ -24,6 +24,7 @@
   let includeSongStats = true;
   let includeLyrics = true;
   let matchAllGenres  = false;
+  let includeaudiofeatures = false;
   let selectedAiModel = "gemini-2.0-flash-exp";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   
