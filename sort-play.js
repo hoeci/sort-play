@@ -4458,7 +4458,6 @@
             color: "white",
             text: "My Scrobbles",
             sortType: "personalScrobbles",
-            hasInnerButton: true,
           },
         ],
       },
@@ -4467,7 +4466,6 @@
         color: "white",
         text: "AI Pick",
         sortType: "aiPick",
-        hasInnerButton: true,
         onClick: async function (event) {
           event.stopPropagation();
           const userApiKey = localStorage.getItem("sort-play-gemini-api-key");
@@ -4486,9 +4484,14 @@
       {
         backgroundColor: "transparent",
         color: "white",
+        text: "Custom Filter",
+        sortType: "customFilter",
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
         text: "Genre Filter",
         sortType: "genreFilter",
-        hasInnerButton: true,
       },
       {
         type: "divider",
@@ -4792,94 +4795,6 @@
             
             button.appendChild(innerButton);
         }
-        else if (style.text === "AI Pick") {
-          const innerButton = document.createElement("button");
-          innerButton.title = "Set Gemini API Key";
-          innerButton.style.cssText = `
-            background-color: transparent;
-            border: none;
-            border-radius: 2px;
-            padding: 0;
-            cursor: pointer;
-            position: absolute;
-            right: 0px; 
-            top: 50%;
-            transform: translateY(-48%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-          `; 
-
-          const parser = new DOMParser();
-          const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
-          const svgElement = svgDoc.documentElement;
-          svgElement.setAttribute("width", "50%");
-          svgElement.setAttribute("height", "50%");
-          svgElement.style.fill = "#ffffffe6";
-    
-          innerButton.appendChild(svgElement);
-    
-          innerButton.addEventListener("mouseenter", () => {
-            svgElement.style.fill = "#1ED760";
-          });
-    
-          innerButton.addEventListener("mouseleave", () => {
-            svgElement.style.fill = "#ffffffe6";
-          });
-    
-          innerButton.addEventListener("click", (event) => {
-            event.stopPropagation();
-            showGeminiApiKeyModal();
-          });
-    
-          button.appendChild(innerButton);
-        }
-        else if (style.text === "My Scrobbles") {
-          const innerButton = document.createElement("button");
-          innerButton.title = "Set Last.fm Username";
-          innerButton.style.cssText = `
-            background-color: transparent;
-            border: none;
-            border-radius: 2px;
-            padding: 0;
-            cursor: pointer;
-            position: absolute;
-            right: 0px; 
-            top: 50%;
-            transform: translateY(-48%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-          `; 
-
-          const parser = new DOMParser();
-          const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
-          const svgElement = svgDoc.documentElement;
-          svgElement.setAttribute("width", "50%");
-          svgElement.setAttribute("height", "50%");
-          svgElement.style.fill = "#ffffffe6";
-    
-          innerButton.appendChild(svgElement);
-    
-          innerButton.addEventListener("mouseenter", () => {
-            svgElement.style.fill = "#1ED760";
-          });
-    
-          innerButton.addEventListener("mouseleave", () => {
-            svgElement.style.fill = "#ffffffe6";
-          });
-    
-          innerButton.addEventListener("click", (event) => {
-            event.stopPropagation();
-            showLastFmUsernameModal();
-          });
-    
-          button.appendChild(innerButton);
-        }
       }
 
     if (style.isSetting) {
@@ -5129,49 +5044,6 @@
           });
   
           button.appendChild(innerButton);
-        } else if (item.text === "My Scrobbles") {
-          const innerButton = document.createElement("button");
-          innerButton.title = "Set Last.fm Username";
-          innerButton.style.cssText = `
-            background-color: transparent;
-            border: none;
-            border-radius: 2px;
-            padding: 0;
-            cursor: pointer;
-            position: absolute;
-            right: 0px; 
-            top: 50%;
-            transform: translateY(-48%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-          `;
-  
-          const parser = new DOMParser();
-          const svgDoc = parser.parseFromString(settingsSvg, "image/svg+xml");
-          const svgElement = svgDoc.documentElement;
-          svgElement.setAttribute("width", "50%");
-          svgElement.setAttribute("height", "50%");
-          svgElement.style.fill = "#ffffffe6";
-  
-          innerButton.appendChild(svgElement);
-  
-          innerButton.addEventListener("mouseenter", () => {
-            svgElement.style.fill = "#1ED760";
-          });
-  
-          innerButton.addEventListener("mouseleave", () => {
-            svgElement.style.fill = "#ffffffe6";
-          });
-  
-          innerButton.addEventListener("click", (event) => {
-            event.stopPropagation();
-            showLastFmUsernameModal();
-          });
-  
-          button.appendChild(innerButton);
         }
       }
   
@@ -5281,7 +5153,7 @@
     attributes: true,
     attributeFilter: ['style', 'class']
   });
-
+    
   async function processBatchesWithDelay(
     tracks,
     batchSize = 200,
