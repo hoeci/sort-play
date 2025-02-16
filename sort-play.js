@@ -27,7 +27,7 @@
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
-  - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
+  - Prioritize tracks based on their relevance to the user's request, considering mood, themes, s, and lyrical content.
   - Order the URIs by how closely each track aligns with the overall intent of the request.`;
 
   const FIXED_SYSTEM_INSTRUCTION = `
@@ -44,7 +44,7 @@
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
     selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.0-flash-exp";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
-    matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
+    matchAlls = localStorage.getItem("sort-play-match-all-s") === "true";
   }
   function saveSettings() {
     localStorage.setItem("sort-play-column-play-count", columnPlayCount);
@@ -55,7 +55,7 @@
     localStorage.setItem("sort-play-include-lyrics", includeLyrics);
     localStorage.setItem("sort-play-ai-model", selectedAiModel);
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
-    localStorage.setItem("sort-play-match-all-genres", matchAllGenres);
+    localStorage.setItem("sort-play-match-all-s", matchAlls);
   }
 
   const AI_DATA_CACHE_VERSION = '1';
@@ -1855,9 +1855,9 @@
   }
 
 
-  async function showGenreFilterModal(tracks, trackGenreMap) {
-    const allGenres = new Set();
-    trackGenreMap.forEach((genres) => {
+  async function showFilterModal(tracks, trackMap) {
+    const alls = new Set();
+    trackMap.forEach((s) => {
       genres.forEach((genre) => allGenres.add(genre));
     });
 
@@ -2885,7 +2885,21 @@
     let lastError;
     for (let attempt = 0; attempt < retryAttempts; attempt++) {
         try {
-            return await callSpotifyApiWithRateLimit(fn);
+            const response = await callSpotifyApiWithRateLimit(fn);
+            
+            if (response?.code === 429) {
+                const error = new Error("Too Many Requests");
+                error.status = 429;
+                throw error;
+            }
+            
+            if (response?.error) {
+                const error = new Error(response.message || response.error);
+                error.status = response.code;
+                throw error;
+            }
+            
+            return response;
         } catch (error) {
             lastError = error;
             let waitTime = retryDelay * Math.pow(2, attempt); 
@@ -2893,10 +2907,12 @@
             waitTime = Math.min(waitTime, 60000);            
 
             if (error.status === 429) {
-                waitTime = parseInt(error.headers?.["retry-after"] || waitTime);
+                waitTime = Math.max(5000, waitTime); 
             }
             
-            if (attempt < retryAttempts - 1) { 
+            console.warn(`Attempt ${attempt + 1}/${retryAttempts} failed. Waiting ${waitTime}ms before retry...`);
+            
+            if (attempt < retryAttempts - 1) {
                 await new Promise((resolve) => setTimeout(resolve, waitTime));
             }
         }
@@ -2912,60 +2928,60 @@
     const batches = [];
   
     for (let i = 0; i < tracks.length; i += CONFIG.batchSize) {
-      batches.push(tracks.slice(i, i + CONFIG.batchSize));
+        batches.push(tracks.slice(i, i + CONFIG.batchSize));
     }
   
     for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
-      const startTime = Date.now();
+        const batch = batches[i];
+        const startTime = Date.now();
+        
+        const batchIsAllCached = batch.every(track => {
+            const trackId = track.uri.split(":")[2];
+            return getCachedTrackGenres(trackId) !== null;
+        });
   
-      const batchResults = await Promise.allSettled(
-        batch.map(async (track) => {  
-          try {
-            const genres = await getTrackGenres(track.uri);
-            return { track, genres };
-          } catch (error) {
-            console.error(`Error processing track ${track.name}:`, error);
-            return { track, genres: [] };
-          }
-        })
-      );
+        const batchResults = await Promise.allSettled(
+            batch.map(async (track) => {  
+                try {
+                    const genres = await getTrackGenres(track.uri);
+                    return { track, genres };
+                } catch (error) {
+                    console.error(`Error processing track ${track.name}:`, error);
+                    return { track, genres: [] };
+                }
+            })
+        );
   
-      batchResults.forEach((result) => {
-        if (result.status === 'fulfilled') {
-          const { track, genres } = result.value;
-          const normalizedGenres = genres.map(normalizeGenre);
-          const uniqueNormalizedGenres = [...new Set(normalizedGenres)];
+        const successfulResults = batchResults.filter(result => 
+            result.status === 'fulfilled' && result.value.genres.length > 0
+        );
+        
+        successfulResults.forEach((result) => {
+            const { track, genres } = result.value;
+            const normalizedGenres = genres.map(normalizeGenre);
+            const uniqueNormalizedGenres = [...new Set(normalizedGenres)];
   
-          trackGenreMap.set(track.uri, uniqueNormalizedGenres);
-          uniqueNormalizedGenres.forEach((genre) => allGenres.add(genre));
-  
-          if (uniqueNormalizedGenres.length > 0) {
+            trackGenreMap.set(track.uri, uniqueNormalizedGenres);
+            uniqueNormalizedGenres.forEach((genre) => allGenres.add(genre));
             tracksWithGenresCount++;
-          }
+        });
+  
+        const endTime = Date.now(); 
+        const elapsedTime = endTime - startTime;
+        const delayMs = batchIsAllCached ? 0 : Math.max(CONFIG.batchDelay - elapsedTime, 0);
+  
+        const progress = Math.round(((i + 1) * CONFIG.batchSize / totalTracks) * 100);
+        updateProgress(progress);
+  
+        if (i < batches.length - 1) {
+            const waitingMsg = batchIsAllCached ? "using cache (no delay)" : `...`;
+            console.log(`Completed batch ${i + 1}/${batches.length}. Success: ${successfulResults.length}/${batch.length}. ${waitingMsg}`);
+            if (!batchIsAllCached) {
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
         } else {
-          console.warn(
-            `Failed to process track ${
-              result.reason.track?.name || "Unknown"
-            }:`,
-            result.reason
-          );
+            console.log(`Completed final batch ${batches.length}/${batches.length}. Success: ${successfulResults.length}/${batch.length}`);
         }
-      });
-  
-      const endTime = Date.now(); 
-      const elapsedTime = endTime - startTime;
-      const delayMs = Math.max(0, CONFIG.batchDelay - elapsedTime);
-  
-      const progress = Math.round(
-        (((i + 1) * CONFIG.batchSize) / totalTracks) * 100
-      );
-      updateProgress(progress); 
-  
-      if (i < batches.length - 1) {
-         console.log(`Completed batch ${i + 1}/${batches.length}. Waiting...`); 
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
     }
   
     return { allGenres, trackGenreMap, tracksWithGenresCount };
@@ -3055,6 +3071,11 @@
             CONFIG.spotify.retryDelay
         );
 
+        if (trackDetails?.code || trackDetails?.error) {
+            console.warn(`Failed to fetch track details for URI: ${trackUri}`, trackDetails);
+            throw new Error(trackDetails.message || trackDetails.error);
+        }
+
         if (!trackDetails?.artists?.length) {
             console.warn(`No artists found for track URI: ${trackUri}`);
             return [];
@@ -3080,6 +3101,11 @@
                     CONFIG.spotify.retryDelay
                 );
                 
+                if (artistData?.code || artistData?.error) {
+                    console.warn(`Error in artist data:`, artistData);
+                    throw new Error(artistData.message || artistData.error);
+                }
+
                 if (artistData?.artists) {
                     artistData.artists.forEach(artist => {
                         if (artist?.genres?.length > 0) {
@@ -3163,7 +3189,6 @@
       });
     }
   }
-
 
   const styleElement = document.createElement("style");
   styleElement.innerHTML = `
