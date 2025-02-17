@@ -11,7 +11,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "3.1.2";
+  const SORT_PLAY_VERSION = "3.1.5";
 
   const LFMApiKey = "***REMOVED***";
   
@@ -39,6 +39,8 @@
   - Only provide a raw list of Spotify track URIs (e.g., spotify:track:123, spotify:track:456).
   - Do not include any additional text, explanations, or formatting.`;
 
+  let sortOrderState;
+
   function loadSettings() {
     columnPlayCount = localStorage.getItem("sort-play-column-play-count") === "true";
     removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
@@ -48,8 +50,25 @@
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
     selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.0-flash-exp";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
-    matchAlls = localStorage.getItem("sort-play-match-all-s") === "true";
+    matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
+    includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
+
+    sortOrderState = {
+        playCount: false,
+        popularity: false,
+        releaseDate: false,
+        scrobbles: false,
+        personalScrobbles: false
+    };
+
+    for (const sortType in sortOrderState) {
+        const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
+        if (storedValue !== null) { 
+            sortOrderState[sortType] = storedValue === "true"; 
+        }
+    }
   }
+
   function saveSettings() {
     localStorage.setItem("sort-play-column-play-count", columnPlayCount);
     localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
@@ -59,7 +78,11 @@
     localStorage.setItem("sort-play-include-lyrics", includeLyrics);
     localStorage.setItem("sort-play-ai-model", selectedAiModel);
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
-    localStorage.setItem("sort-play-match-all-s", matchAlls);
+    localStorage.setItem("sort-play-match-all-genres", matchAllGenres);
+    localStorage.setItem("sort-play-include-audio-features", includeaudiofeatures);
+    for (const sortType in sortOrderState) {
+      localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
+    }
   }
 
   const AI_DATA_CACHE_VERSION = '1';
@@ -4390,7 +4413,70 @@
       }, 350);
     });
   }
+    
+  function getSortArrowSvg(reverse) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("width", "50%");
+    svg.setAttribute("height", "50%");
+    svg.style.fill = "#ffffffe6";
 
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", reverse
+      ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z"
+      : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z"
+    );
+
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function createInnerButton(sortType, parentButton, svg) {
+    const innerButton = document.createElement("button");
+    innerButton.title = "Toggle Order (Ascending/Descending)";
+    innerButton.appendChild(svg);
+
+    innerButton.style.cssText = `
+      background-color: transparent;
+      border: none;
+      border-radius: 2px;
+      padding: 0;
+      cursor: pointer;
+      position: absolute;
+      right: 0px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+    `;
+
+    innerButton.addEventListener("mouseenter", () => {
+      svg.style.fill = "#1ED760";
+    });
+
+    innerButton.addEventListener("mouseleave", () => {
+      svg.style.fill = "#ffffffe6";
+    });
+
+    innerButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      sortOrderState[sortType] = !sortOrderState[sortType];
+      localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
+      const path = svg.querySelector("path");
+        if (path) {
+          path.setAttribute("d", sortOrderState[sortType]
+            ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z"
+            : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z"
+          );
+        }
+    });
+
+    return innerButton;
+  }
+    
   const buttonStyles = {
     main: {
       backgroundColor: "transparent",
@@ -4413,12 +4499,14 @@
             color: "white",
             text: "Play Count",
             sortType: "playCount",
+            hasInnerButton: true,
           },
           {
             backgroundColor: "transparent",
             color: "white",
             text: "Popularity",
             sortType: "popularity",
+            hasInnerButton: true,
           },
           {
             backgroundColor: "transparent",
@@ -4438,12 +4526,14 @@
             color: "white",
             text: "Scrobbles",
             sortType: "scrobbles",
+            hasInnerButton: true,
           },
           {
             backgroundColor: "transparent",
             color: "white",
             text: "My Scrobbles",
             sortType: "personalScrobbles",
+            hasInnerButton: true,
           },
         ],
       },
@@ -4976,55 +5066,9 @@
       });
   
       if (item.hasInnerButton) {
-        if (item.text === "Release Date") {
-          const innerButton = document.createElement("button");
-          innerButton.title = "Toggle Order (Newest/Oldest First)";
-          const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-          svg.setAttribute("viewBox", "0 0 16 16");
-          svg.setAttribute("width", "50%");
-          svg.setAttribute("height", "50%");
-          svg.style.fill = "#ffffffe6";
-  
-          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-          path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
-  
-          svg.appendChild(path);
-          innerButton.appendChild(svg);
-  
-          innerButton.style.cssText = `
-            background-color: transparent;
-            border: none;
-            border-radius: 2px;
-            padding: 0;
-            cursor: pointer;
-            position: absolute;
-            right: 0px; 
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-          `;
-  
-          innerButton.addEventListener("mouseenter", () => {
-            svg.style.fill = "#1ED760";
-          });
-  
-          innerButton.addEventListener("mouseleave", () => {
-            svg.style.fill = "#ffffffe6";
-          });
-  
-          innerButton.addEventListener("click", (event) => {
-            event.stopPropagation();
-            releaseDateReverse = !releaseDateReverse;
-            localStorage.setItem("sort-play-release-date-reverse", releaseDateReverse);
-            path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
-          });
-  
-          button.appendChild(innerButton);
-        }
+        const svg = getSortArrowSvg(sortOrderState[item.sortType]); 
+        const innerButton = createInnerButton(item.sortType, button, svg);
+        button.appendChild(innerButton);
       }
   
       button.addEventListener("click", async (event) => {
@@ -5267,8 +5311,8 @@
   }
 
   async function handleSortAndCreatePlaylist(sortType) {
-    if (sortType === "sortByParent") { 
-      return;  
+    if (sortType === "sortByParent") {
+      return;
     }
     mainButton.disabled = true;
     mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
@@ -5277,7 +5321,7 @@
     svgElement.style.fill = buttonStyles.main.disabledColor;
     menuButtons.forEach((button) => (button.disabled = true));
     toggleMenu();
-    closeAllMenus();  
+    closeAllMenus();
 
     try {
       const currentUri = getCurrentUri();
@@ -5286,7 +5330,7 @@
         Spicetify.showNotification("Please select a playlist or artist first");
         return;
       }
-  
+
       let tracks;
       let isArtistPage = false;
 
@@ -5305,14 +5349,14 @@
       if (!tracks || tracks.length === 0) {
           throw new Error('No tracks found to sort');
       }
-  
+
       if (!tracks || tracks.length === 0) {
         resetButtons();
         Spicetify.showNotification("Could not fetch tracks. Please try again.");
         return;
       }
       mainButton.innerText = "0%";
-  
+
       const tracksWithPlayCounts = await processBatchesWithDelay(
         tracks,
         200,
@@ -5337,11 +5381,11 @@
           mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`;
         }
       );
-  
+
       let sortedTracks;
       let uniqueTracks;
       let removedTracks = [];
-  
+
       if (
         sortType === "playCount" ||
         sortType === "popularity" ||
@@ -5364,55 +5408,55 @@
           uniqueTracks = deduplicateTracks(tracksWithPopularity).unique;
           removedTracks = deduplicateTracks(tracksWithPopularity).removed;
         }
-  
+
         if (sortType === "playCount") {
           sortedTracks = uniqueTracks
             .filter((track) => track.playCount !== "N/A")
-            .sort((a, b) => b.playCount - a.playCount);
+            .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount); // Use sortOrderState
         } else if (sortType === "popularity") {
           sortedTracks = uniqueTracks
             .filter((track) => track.popularity !== null)
-            .sort((a, b) => b.popularity - a.popularity);
+            .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity); // Use sortOrderState
         } else if (sortType === "releaseDate") {
           sortedTracks = uniqueTracks
             .filter((track) => track.releaseDate !== null)
             .sort((a, b) => {
-              return releaseDateReverse
+              return sortOrderState.releaseDate
                 ? a.releaseDate - b.releaseDate
                 : b.releaseDate - a.releaseDate;
-            });
+            }); // Use sortOrderState
         } else if (sortType === "shuffle") {
           sortedTracks = shuffleArray(uniqueTracks);
         }
-  
+
         if (sortedTracks.length === 0) {
           resetButtons();
           Spicetify.showNotification(`No tracks found with ${sortType} data.`);
           return;
         }
-  
+
         mainButton.innerText = "100%";
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
-        try {
-          const result = await handleScrobblesSorting(
-            tracks,
-            sortType,
-            (progress) => {
-              mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`;
+          try {
+              const result = await handleScrobblesSorting(
+                tracks,
+                sortType,
+                (progress) => {
+                  mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`;
+                }
+              );
+              sortedTracks = result.sortedTracks;
+              removedTracks = result.removedTracks;
+              const totalTracks = sortedTracks.length;
+              sortedTracks.forEach((_, index) => {
+                const progress = 90 + Math.floor(((index + 1) / totalTracks) * 10);
+                mainButton.innerText = `${progress}%`;
+              });
+            } catch (error) {
+              resetButtons();
+              Spicetify.showNotification(error.message);
+              return;
             }
-          );
-          sortedTracks = result.sortedTracks;
-          removedTracks = result.removedTracks;
-          const totalTracks = sortedTracks.length;
-          sortedTracks.forEach((_, index) => {
-            const progress = 90 + Math.floor(((index + 1) / totalTracks) * 10);
-            mainButton.innerText = `${progress}%`;
-          });
-        } catch (error) {
-          resetButtons();
-          Spicetify.showNotification(error.message);
-          return;
-        }
       } else if (sortType === "aiPick") {
         const { uniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
           tracks,
@@ -5443,7 +5487,7 @@
   
       const sourceUri = currentUri;
       let sourceName;
-      
+
       if (URI.isArtist(sourceUri)) {
           sourceName = await Spicetify.CosmosAsync.get(
               `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
@@ -5455,7 +5499,7 @@
               `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
           ).then((r) => r.name);
       }
-      
+
       const possibleSuffixes = [
         "\\(PlayCount\\)",
         "\\(Popularity\\)",
@@ -5469,7 +5513,7 @@
       let suffixPattern = new RegExp(
         `\\s*(${possibleSuffixes.join("|")})\\s*`
       );
-      
+
       while (suffixPattern.test(sourceName)) {
         sourceName = sourceName.replace(suffixPattern, "");
       }
@@ -5486,7 +5530,7 @@
         shuffle: { fullName: "shuffle", shortName: "Shuffle" },
         aiPick: { fullName: "AI pick", shortName: "AI Pick" },
       }[sortType];
-      
+
       try {
         if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
           showRemovedTracksModal(removedTracks);
@@ -5516,7 +5560,7 @@
         }
         const trackUris = sortedTracks.map((track) => track.uri);
         await addTracksToPlaylist(newPlaylist.id, trackUris);
-  
+
         Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
       } catch (error) {
         console.error("Error creating or updating playlist:", error);
@@ -5732,17 +5776,17 @@
         throw new Error('Last.fm username required for personal scrobbles sorting');
       }
     }
-  
+
     const tracksWithPlayCounts = await processBatchesWithDelay(
       tracks,
       200,
       1000,
       (progress) => {
-        updateProgress(Math.floor(progress * 0.25)); 
+        updateProgress(Math.floor(progress * 0.25));
       },
-      getTrackDetailsWithPlayCount 
+      getTrackDetailsWithPlayCount
     );
-  
+
     const tracksWithIds = await processBatchesWithDelay(
       tracksWithPlayCounts,
       200,
@@ -5752,18 +5796,18 @@
       },
       collectTrackIdsForPopularity
     );
-  
+
     const tracksWithPopularity = await fetchPopularityForMultipleTracks(
       tracksWithIds,
       (progress) => {
         updateProgress(Math.floor(50+progress * 0.1));
       }
     );
-  
+
     let uniqueTracks;
     let removedTracks = [];
     const currentUri = getCurrentUri();
-    
+
     if (!playlistDeduplicate && URI.isPlaylistV1OrV2(currentUri)) {
       uniqueTracks = tracksWithPopularity;
     } else {
@@ -5774,15 +5818,15 @@
       tracksWithPopularity.forEach((track) => {
         const hasValidPlayCount = track.playCount !== "N/A" && track.playCount !== 0;
         const primaryKey = `${track.playCount}-${track.durationMilis}`;
-        const secondaryKey = `${track.songTitle}-${track.durationMilis}`;  
+        const secondaryKey = `${track.songTitle}-${track.durationMilis}`;
         const key = hasValidPlayCount ? primaryKey : secondaryKey;
-  
+
         if (!duplicateGroups.has(key)) {
           duplicateGroups.set(key, []);
         }
         duplicateGroups.get(key).push(track);
       });
-      
+
       uniqueTracks = [];
       duplicateGroups.forEach((group) => {
         if (group.length > 1) {
@@ -5792,7 +5836,7 @@
           const noOrZeroPlayCountTracks = group.filter(
             (track) => track.playCount === "N/A" || track.playCount === 0
           );
-  
+
           if (validPlayCountTracks.length > 0) {
             validPlayCountTracks.sort(
               (a, b) => (b.popularity || 0) - (a.popularity || 0)
@@ -5809,17 +5853,17 @@
         }
       });
     }
-  
-    const fetchFunction = sortType === 'personalScrobbles' 
-      ? getTrackDetailsWithPersonalScrobbles 
+
+    const fetchFunction = sortType === 'personalScrobbles'
+      ? getTrackDetailsWithPersonalScrobbles
       : getTrackDetailsWithScrobbles;
-  
+
     const tracksForScrobbleFetching = uniqueTracks.map(track => ({
       ...track,
       name: track.songTitle,
-      artists: [{ name: track.artistName }] 
+      artists: [{ name: track.artistName }]
     }));
-  
+
     const tracksWithScrobbles = await processBatchesWithDelay(
       tracksForScrobbleFetching,
       50,
@@ -5829,110 +5873,114 @@
       },
       fetchFunction
     );
-  
-    let sortedTracks;
+      let sortedTracks;
     if (sortType === 'personalScrobbles') {
       const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
       sortedTracks = tracksWithScrobbles
         .filter((track) => includeZeroScrobbles || track.personalScrobbles > 0)
-        .sort((a, b) => (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
+        .sort((a, b) => sortOrderState.personalScrobbles ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0)); // Use sortOrderState and nullish
     } else {
       sortedTracks = tracksWithScrobbles
         .filter((track) => track.scrobbles !== null)
-        .sort((a, b) => b.scrobbles - a.scrobbles);
+        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles);  // Use sortOrderState
     }
-  
+
     if (sortedTracks.length === 0) {
       throw new Error(`No tracks found with ${sortType === 'personalScrobbles' ? 'personal ' : ''}Last.fm data to sort.`);
     }
-  
+
     return { sortedTracks, removedTracks };
   }
 
   menuButtons.forEach((element) => {
     if (element.tagName.toLowerCase() === "div") {
-      return;
+        return;
     }
     const buttonText = element.querySelector("span")?.innerText;
     const buttonStyle = buttonStyles.menuItems.find(
-      (item) => item.text === buttonText
+        (item) => item.text === buttonText
     );
 
     if (!buttonStyle) {
-      return;
+        return;
     }
 
     if (buttonStyle.isSetting) {
-      element.addEventListener("click", (event) => {
-        event.stopPropagation();
-        showSettingsModal();
-      });
+        element.addEventListener("click", (event) => {
+            event.stopPropagation();
+            showSettingsModal();
+        });
+    } else if (buttonStyle.sortType === "customFilter") {
+        element.addEventListener("click", (event) => {
+            event.stopPropagation();
+            handleCustomFilter();
+        });
     } else {
-      const sortType = buttonStyle.sortType;
-      element.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        if (buttonStyle.onClick) {
-          await buttonStyle.onClick(event);
-        } else if (sortType === "genreFilter") {
-          mainButton.disabled = true;
-          mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-          mainButton.style.color = buttonStyles.main.disabledColor;
-          mainButton.style.cursor = "default";
-          svgElement.style.fill = buttonStyles.main.disabledColor;
-          toggleMenu();
-          closeAllMenus();
-          menuButtons.forEach((button) => {
-            button.disabled = true;
-            if (button.tagName.toLowerCase() === 'button') {
-                button.style.backgroundColor = "transparent";
-            }
-          });
-          
-          try {
-            const currentUri = getCurrentUri();
-            if (!currentUri) {
-              resetButtons();
-              Spicetify.showNotification("Please select a playlist first");
-              return;
-            }
+        const sortType = buttonStyle.sortType;
+        element.addEventListener("click", async (event) => {
+            event.stopPropagation();
+            if (buttonStyle.onClick) {
+                await buttonStyle.onClick(event);
+            } else if (sortType === "genreFilter") {
+                mainButton.disabled = true;
+                mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+                mainButton.style.color = buttonStyles.main.disabledColor;
+                mainButton.style.cursor = "default";
+                svgElement.style.fill = buttonStyles.main.disabledColor;
+                toggleMenu();
+                closeAllMenus();
+                menuButtons.forEach((button) => {
+                    button.disabled = true;
+                    if (button.tagName.toLowerCase() === 'button') {
+                        button.style.backgroundColor = "transparent";
+                    }
+                });
 
-            let tracks;
-            if (URI.isPlaylistV1OrV2(currentUri)) {
-              const playlistId = currentUri.split(":")[2];
-              tracks = await getPlaylistTracks(playlistId);
-            } else if (URI.isArtist(currentUri)) {
-              tracks = await getArtistTracks(currentUri);
-            } else if (isLikedSongsPage(currentUri)) { 
-                tracks = await getLikedSongs();
-            }else {
-              throw new Error("Invalid URI type");
-            }
+                try {
+                    const currentUri = getCurrentUri();
+                    if (!currentUri) {
+                        resetButtons();
+                        Spicetify.showNotification("Please select a playlist first");
+                        return;
+                    }
 
-            if (!tracks || tracks.length === 0) {
-              throw new Error("No tracks found");
-            }
+                    let tracks;
+                    if (URI.isPlaylistV1OrV2(currentUri)) {
+                        const playlistId = currentUri.split(":")[2];
+                        tracks = await getPlaylistTracks(playlistId);
+                    } else if (URI.isArtist(currentUri)) {
+                        tracks = await getArtistTracks(currentUri);
+                    } else if (isLikedSongsPage(currentUri)) {
+                        tracks = await getLikedSongs();
+                    } else {
+                        throw new Error("Invalid URI type");
+                    }
 
-            const { allGenres, trackGenreMap, tracksWithGenresCount} = await fetchAllTrackGenres(
-              tracks
-            );
-            await showGenreFilterModal(tracks, trackGenreMap, tracksWithGenresCount);
-          } catch (error) {
-            console.error("Error during genre filtering:", error);
-            Spicetify.showNotification(
-              "An error occurred during the genre filtering process."
-            );
-          } finally {
-            resetButtons();
-          }
-        } else {
-          menuButtons.forEach((btn) => {
-            if (btn.tagName.toLowerCase() === "button" && !btn.disabled) {
-              btn.style.backgroundColor = "transparent";
+                    if (!tracks || tracks.length === 0) {
+                        throw new Error("No tracks found");
+                    }
+
+                    const { allGenres, trackGenreMap, tracksWithGenresCount } = await fetchAllTrackGenres(
+                        tracks
+                    );
+                    await showGenreFilterModal(tracks, trackGenreMap, tracksWithGenresCount);
+                } catch (error) {
+                    console.error("Error during genre filtering:", error);
+                    Spicetify.showNotification(
+                        "An error occurred during the genre filtering process."
+                    );
+                } finally {
+                    resetButtons();
+                }
+            } else {
+                menuButtons.forEach((btn) => {
+                    if (btn.tagName.toLowerCase() === "button" && !btn.disabled) {
+                        btn.style.backgroundColor = "transparent";
+                    }
+                });
+                await handleSortAndCreatePlaylist(sortType);
             }
-          });
-          await handleSortAndCreatePlaylist(sortType);
-        }
-      });
+        });
     }
   });
 
