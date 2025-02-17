@@ -4518,12 +4518,6 @@
           {
             backgroundColor: "transparent",
             color: "white",
-            text: "Shuffle",
-            sortType: "shuffle",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
             text: "Scrobbles",
             sortType: "scrobbles",
             hasInnerButton: true,
@@ -4562,6 +4556,12 @@
         color: "white",
         text: "Genre Filter",
         sortType: "genreFilter",
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
+        text: "Shuffle",
+        sortType: "shuffle",
       },
       {
         type: "divider",
