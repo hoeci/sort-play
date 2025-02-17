@@ -4534,6 +4534,12 @@
       {
         backgroundColor: "transparent",
         color: "white",
+        text: "Genre Filter",
+        sortType: "genreFilter",
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
         text: "AI Pick",
         sortType: "aiPick",
         onClick: async function (event) {
@@ -4550,12 +4556,6 @@
             await handleSortAndCreatePlaylist("aiPick");
           }
         },
-      },
-      {
-        backgroundColor: "transparent",
-        color: "white",
-        text: "Genre Filter",
-        sortType: "genreFilter",
       },
       {
         backgroundColor: "transparent",
