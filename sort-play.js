@@ -3611,6 +3611,7 @@
         padding: 8px;
         border-bottom: 1px solid #282828;
         font-weight: 400;
+        font-family: 'SpotifyMixUI';
         color: #b3b3b3;
         position: sticky;
         top: 0;
