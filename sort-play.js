@@ -429,6 +429,10 @@
       border: 2px solid #282828; 
       background-color: #181818;
     }
+    .GenericModal__overlay {
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+    }
     .GenericModal__overlay .GenericModal {
       border-radius: 30px;
       overflow: hidden;
