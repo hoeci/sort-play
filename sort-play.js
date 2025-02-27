@@ -2568,7 +2568,7 @@
     function generateLoadMoreRow(direction) {
         const row = document.createElement("tr");
         row.className = `load-more-row load-more-row-${direction}`;
-        row.innerHTML = `<td colspan="100%" class="load-more-cell">. . . Load More . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Load More . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Load More . . .</td>`;
+        row.innerHTML = `<td colspan="100%" class="load-more-cell">. . . Load More . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Load More . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .  . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Load More . . .</td>`;
 
         row.addEventListener("click", (e) => {
             e.preventDefault();
