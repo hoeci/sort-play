@@ -6,17 +6,18 @@
     return;
   }
   const { PlaylistAPI } = Platform;
+
   if (!PlaylistAPI || typeof PlaylistAPI.getContents !== 'function') {
     setTimeout(main, 50);
     return;
   }
 
-  const SORT_PLAY_VERSION = "3.1.5";
-
+  const SORT_PLAY_VERSION = "4.0.0";
+  
   const LFMApiKey = "***REMOVED***";
   
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
-
+  let isProcessing = false;
   let columnPlayCount = false;
   let removeDateAdded = false;
   let playlistDeduplicate = true;
@@ -31,7 +32,7 @@
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
-  - Prioritize tracks based on their relevance to the user's request, considering mood, themes, s, and lyrical content.
+  - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
   - Order the URIs by how closely each track aligns with the overall intent of the request.`;
 
   const FIXED_SYSTEM_INSTRUCTION = `
@@ -334,6 +335,8 @@
     if (modalContainerElement) {
       modalContainerElement.style.zIndex = "2000";
     }
+    preventDragCloseModal();
+
     const saveButton = document.getElementById("saveLastFm");
     const cancelButton = document.getElementById("cancelLastFm");
 
@@ -422,7 +425,9 @@
     .main-embedWidgetGenerator-container {
       width: 550px !important;
       border-radius: 30px;
-      overflow: hidden; 
+      overflow: hidden;
+      border: 2px solid #282828; 
+      background-color: #181818;
     }
     .GenericModal__overlay .GenericModal {
       border-radius: 30px;
@@ -640,6 +645,21 @@
             </label>
         </div>
     </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Custom Filter
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="includeAudioFeatures">
+        <label class="col description">Include Audio Features</label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" ${includeaudiofeatures ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
     
     <div class="setting-row" id="githubLink" style="margin-top: 10px; justify-content: center;">
         <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
@@ -668,6 +688,8 @@
     if (modalContainerElement) {
         modalContainerElement.style.zIndex = "2000";
     }
+    
+    preventDragCloseModal();
 
     const columnPlayCountToggle = modalContainer.querySelector("#columnPlayCount input");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
@@ -759,6 +781,64 @@
     });
   }
 
+  function preventDragCloseModal() {
+    let mouseDownInsideModal = false;
+    let dragStarted = false;
+    
+    const modal = document.querySelector('.GenericModal');
+    const modalOverlay = document.querySelector('.GenericModal__overlay');
+    
+    if (!modal || !modalOverlay) return;
+    
+    document.addEventListener('mousedown', (e) => {
+      if (modal.contains(e.target)) {
+        mouseDownInsideModal = true;
+      } else {
+        mouseDownInsideModal = false;
+      }
+    }, true);
+    
+    document.addEventListener('mousemove', (e) => {
+      if (mouseDownInsideModal) {
+        dragStarted = true;
+      }
+    }, true);
+    
+    modalOverlay.addEventListener('mouseup', (e) => {
+      if (mouseDownInsideModal || dragStarted) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        setTimeout(() => { dragStarted = false; }, 10);
+        return false;
+      }
+    }, true);
+    
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay && (mouseDownInsideModal || dragStarted)) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return false;
+      }
+      if (e.target === modalOverlay && !mouseDownInsideModal && !dragStarted) {
+        Spicetify.PopupModal.hide();
+      }
+    }, true);
+    
+    document.addEventListener('mouseup', (e) => {
+      setTimeout(() => {
+        mouseDownInsideModal = false;
+        setTimeout(() => { dragStarted = false; }, 10);
+      }, 0);
+    }, true);
+    
+    const closeButton = document.querySelector('.main-trackCreditsModal-closeBtn');
+    if (closeButton) {
+      closeButton.addEventListener('click', (e) => {
+        Spicetify.PopupModal.hide();
+      });
+    }
+  }
+
   async function handleAiPick(tracks) {
     try {
         const tracksWithPlayCounts = await processBatchesWithDelay(
@@ -816,6 +896,8 @@
           max-width: 620px !important;
           border-radius: 30px;
           overflow: hidden; 
+          background-color: #181818;
+          border: 2px solid #282828;
         }
         .GenericModal__overlay .GenericModal {
           border-radius: 30px;
@@ -872,13 +954,18 @@
           font-size: 14px;
           transition: all 0.04s ease;
         }
+
         .ai-pick-modal .secondary-button {
           background-color: #282828;
           color: white;
           padding: 7px 35px;
           border: 1px solid #666;
           font-weight: 500;
+          white-space: nowrap;
+          min-width: 160px;
+          text-align: center;
         }
+
         .ai-pick-modal .secondary-button:hover {
           border: 1px solid #939393;
         }
@@ -1031,7 +1118,7 @@
           line-height: 20px;
           border-radius: 20px;
           resize: none;
-          font-size: 14px;
+          font-size: 15px;
           background-color: #282828;
           color: white;
           display: flex;
@@ -1129,7 +1216,9 @@
           left: 0;
           right: 0;
           bottom: 0;
-          background: transparent;
+          background: rgba(0, 0, 0, 0.25);
+          backdrop-filter: blur(5px);
+          -webkit-backdrop-filter: blur(5px);
           z-index: 999;
         }
 
@@ -1287,7 +1376,10 @@
     if (modalContainerElement) {
       modalContainerElement.style.zIndex = "2000";
     }
-  
+
+    preventDragCloseModal();
+
+
     const songStatsToggle = modalContainer.querySelector("#includeSongStats input");
     const lyricsToggle = modalContainer.querySelector("#includeLyrics input");
     const modelSelect = modalContainer.querySelector("#aiModel");
@@ -1373,7 +1465,7 @@
   
       Spicetify.PopupModal.hide();
   
-      mainButton.disabled = true;
+      setButtonProcessing(true);
       mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
       mainButton.style.color = buttonStyles.main.disabledColor;
       mainButton.style.cursor = "default";
@@ -1860,6 +1952,8 @@
         width: 420px !important;
         border-radius: 30px;
         overflow: hidden; 
+        background-color: #181818;
+        border: 2px solid #282828;
       }
       .GenericModal__overlay .GenericModal {
         border-radius: 30px;
@@ -1930,6 +2024,8 @@
     if (modalContainerElement) {
       modalContainerElement.style.zIndex = "2000";
     }
+    preventDragCloseModal();
+
     const saveButton = document.getElementById("saveGeminiApi");
     const cancelButton = document.getElementById("cancelGeminiApi");
 
@@ -1982,6 +2078,3458 @@
   }
 
 
+  async function getTrackDetailsWithReleaseDateForFilter(track) {
+    const trackWithStandardReleaseDate = await getTrackDetailsWithReleaseDate(track);
+    
+    if (trackWithStandardReleaseDate.releaseDate) {
+      return trackWithStandardReleaseDate;
+    }
+
+    let albumId;
+    
+    if (track.albumId) {
+      albumId = track.albumId;
+    } else if (track.albumUri) {
+      albumId = track.albumUri.split(":")[2];
+    } else {
+      console.warn(`Could not determine album ID for track ${track.name}`);
+      return trackWithStandardReleaseDate;
+    }
+    
+    try {
+      const result = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${track.uri.split(":")[2]}`);
+      
+      if (result && result.album && result.album.release_date) {
+        return {
+          ...trackWithStandardReleaseDate,
+          releaseDate: result.album.release_date
+        };
+      }
+      
+      const albumResult = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+      
+      if (albumResult && albumResult.release_date) {
+        return {
+          ...trackWithStandardReleaseDate,
+          releaseDate: albumResult.release_date
+        };
+      }
+      
+      return trackWithStandardReleaseDate;
+      
+    } catch (error) {
+      console.error(`Error getting single release date for track ${track.name}:`, error);
+      return trackWithStandardReleaseDate;
+    }
+  }
+
+  
+  async function handleCustomFilter() {
+    menuButtons.forEach((btn) => {
+      if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+        btn.style.backgroundColor = "transparent";
+      }
+    });
+    setButtonProcessing(true);
+    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+    mainButton.style.color = buttonStyles.main.disabledColor;
+    mainButton.style.cursor = "default";
+    svgElement.style.fill = buttonStyles.main.disabledColor;
+    menuButtons.forEach((button) => (button.disabled = true));
+    
+    toggleMenu();
+    closeAllMenus();
+
+    try {
+        const currentUri = getCurrentUri();
+        if (!currentUri) {
+            resetButtons();
+            Spicetify.showNotification("Please select a playlist or artist first");
+            return;
+        }
+
+        let tracks;
+        if (URI.isPlaylistV1OrV2(currentUri)) {
+            const playlistId = currentUri.split(":")[2];
+            tracks = await getPlaylistTracks(playlistId);
+        } else if (URI.isArtist(currentUri)) {
+            tracks = await getArtistTracks(currentUri);
+        } else if (isLikedSongsPage(currentUri)) {
+            tracks = await getLikedSongs();
+        } else {
+            throw new Error('Invalid playlist or artist page');
+        }
+
+        if (!tracks || tracks.length === 0) {
+            throw new Error('No tracks found');
+        }
+
+        mainButton.innerText = "0%";
+
+
+        const tracksWithPlayCounts = await processBatchesWithDelay(
+            tracks,
+            200,
+            1000,
+            (progress) => {
+                mainButton.innerText = `${Math.floor(progress * 0.25)}%`;
+            },
+            getTrackDetailsWithPlayCount 
+        );
+
+        const tracksWithIds = await processBatchesWithDelay(
+          tracksWithPlayCounts,
+          200,
+          1000,
+          (progress) => {
+            mainButton.innerText = `${25 + Math.floor(progress * 0.25)}%`; 
+          },
+          collectTrackIdsForPopularity 
+        );
+        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
+            tracksWithIds,
+            (progress) => {
+              mainButton.innerText = `${50 + Math.floor(progress * 0.25)}%`; 
+            }
+        );
+        const tracksWithReleaseDates = await processBatchesWithDelay(
+            tracksWithPopularity,
+            200,
+            1000,
+            (progress) => {
+                mainButton.innerText = `${75 + Math.floor(progress * 0.25)}%`; //75%
+            },
+            getTrackDetailsWithReleaseDateForFilter 
+        );
+
+
+        let tracksWithFeatures = tracksWithReleaseDates;
+
+        if (includeaudiofeatures) {
+            const tracksNeedingFeatures = tracksWithReleaseDates.filter(track => {
+                const trackId = track.uri.split(":")[2];
+                return !getTrackCache(trackId, true, false, selectedAiModel);
+            });
+
+            const fetchedTrackFeatures = await processBatchesWithDelay(
+                tracksNeedingFeatures,
+                6,
+                700,
+                (progress) => {
+                    mainButton.innerText = `${75 + Math.floor(progress * 0.25)}%`; 
+                },
+                async (track) => {
+                    const trackId = track.uri.split(":")[2];
+                    const stats = await getTrackStats(trackId);
+                    const enrichedTrack = {
+                        ...track,
+                        features: stats || {
+                            danceability: null, energy: null, key: "Undefined", loudness: null,
+                            speechiness: null, acousticness: null, instrumentalness: null,
+                            liveness: null, valence: null, tempo: null,
+                        },
+                    };
+
+                    setTrackCache(trackId, { stats: enrichedTrack.features }, true, false, selectedAiModel);
+                    return enrichedTrack;
+                }
+            );
+
+            tracksWithFeatures = tracksWithReleaseDates.map(track => {
+                const trackId = track.uri.split(":")[2];
+                const cachedTrack = getTrackCache(trackId, true, false, selectedAiModel);
+                if (cachedTrack) {
+                    return { ...track, features: cachedTrack.stats }; 
+                }
+                const fetchedTrack = fetchedTrackFeatures.find(ft => ft.uri === track.uri);
+                return fetchedTrack ? { ...track, features: fetchedTrack.features } : track; 
+            });
+        }
+
+
+        showCustomFilterModal(tracksWithFeatures);
+
+    } catch (error) {
+        console.error("Error in custom filter:", error);
+        Spicetify.showNotification(
+            "An error occurred while preparing the custom filter.",
+            true
+        );
+    } finally {
+        resetButtons();
+    }
+  }
+
+  function debounce(func, delay) {
+      let timeout;
+      return function(...args) {
+          const context = this;
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(context, args), delay);
+      };
+  }
+
+  function formatDuration(ms) {
+    if (ms === null || ms === undefined || isNaN(ms)) {
+        return "N/A";
+    }
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  const removeIconSVG = `<svg class="remove-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M982.032787 847.737705L637.901639 503.606557l327.344263-327.344262c33.57377-33.57377 33.57377-83.934426 0-117.508197s-83.934426-33.57377-117.508197 0L520.393443 386.098361 176.262295 50.360656C142.688525 16.786885 92.327869 16.786885 58.754098 50.360656 25.180328 83.934426 25.180328 134.295082 58.754098 167.868852l344.131148 335.737705-335.737705 335.737705c-33.57377 33.57377-33.57377 83.934426 0 117.508197 16.786885 16.786885 41.967213 25.180328 58.754098 25.180328s41.967213-8.393443 58.754099-25.180328l335.737705-335.737705 344.131147 344.131148c16.786885 16.786885 33.57377 25.180328 58.754099 25.180328 25.180328 0 41.967213-8.393443 58.754098-25.180328 33.57377-33.57377 33.57377-83.934426 0-117.508197z"/></svg>`;
+  const restoreIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="5.9844 5.9844 36 36.0312" width="14px" height="14px" preserveAspectRatio="none" class="remove-icon"><path d="M 24 42 C 23.211 42 22.462 41.934 21.752 41.846 C 20.221 41.685 19.438 39.926 20.343 38.681 C 20.78 38.08 21.513 37.77 22.248 37.877 C 22.852 37.952 23.431 38 24 38 C 31.756 38 38 31.756 38 24 C 38 16.244 31.756 10 24 10 C 16.244 10 10 16.244 10 24 C 10 26.635 10.739 29.081 12 31.178 L 12 31 C 11.978 29.46 13.631 28.475 14.976 29.226 C 15.617 29.584 16.01 30.265 16 31 L 16 36.488 L 16 37 C 16 38.105 15.105 39 14 39 L 8 39 C 6.46 39.022 5.475 37.369 6.226 36.024 C 6.584 35.383 7.265 34.99 8 35 L 9.77 35 C 7.412 31.956 6 28.138 6 24 C 6 14.082 14.082 6 24 6 C 33.918 6 42 14.082 42 24 C 42 33.918 33.918 42 24 42 Z" style="transform-origin: 23.9844px 24px;" transform="matrix(0, 1, -1, 0, -0.000001907349, 0.00000100024)" id="object-0"/></svg>`;
+  const saveIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" fill="#ffffff" viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>`;  const loadIconSVG = `<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g id="File / Folder">
+  <path id="Vector" d="M3 6V16.8C3 17.9201 3 18.4798 3.21799 18.9076C3.40973 19.2839 3.71547 19.5905 4.0918 19.7822C4.5192 20 5.07899 20 6.19691 20H17.8031C18.921 20 19.48 20 19.9074 19.7822C20.2837 19.5905 20.5905 19.2841 20.7822 18.9078C21.0002 18.48 21.0002 17.9199 21.0002 16.7998L21.0002 9.19978C21.0002 8.07967 21.0002 7.51962 20.7822 7.0918C20.5905 6.71547 20.2839 6.40973 19.9076 6.21799C19.4798 6 18.9201 6 17.8 6H12M3 6H12M3 6C3 4.89543 3.89543 4 5 4H8.67452C9.1637 4 9.40886 4 9.63904 4.05526C9.84311 4.10425 10.0379 4.18526 10.2168 4.29492C10.4186 4.41857 10.5918 4.59182 10.9375 4.9375L12 6" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  </svg>`;
+  const clearIconSVG = `<svg viewBox="16 15 43 43" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" enable-background="new 0 0 76.00 76.00" xml:space="preserve">
+    <path fill="#ffffff" fill-opacity="1" stroke-width="0.2" stroke-linejoin="round" d="M 18.0147,41.5355C 16.0621,39.5829 16.0621,36.4171 18.0147,34.4645L 26.9646,25.5149C 28.0683,24.4113 29,24 31,24L 52,24C 54.7614,24 57,26.2386 57,29L 57,47C 57,49.7614 54.7614,52 52,52L 31,52C 29,52 28.0683,51.589 26.9646,50.4854L 18.0147,41.5355 Z M 47.5281,42.9497L 42.5784,37.9999L 47.5281,33.0502L 44.9497,30.4717L 40,35.4215L 35.0502,30.4717L 32.4718,33.0502L 37.4215,37.9999L 32.4718,42.9497L 35.0502,45.5281L 40,40.5783L 44.9497,45.5281L 47.5281,42.9497 Z "/>
+  </svg>`;
+
+  async function showCustomFilterModal(tracks) {
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "custom-filter-modal";
+    const originalTracks = [...tracks];
+    let displayedTracks = [];
+    let startIndex = 0;
+    let pageSize;
+    const paginationThreshold = 20;
+    let isFirstLoad = true;
+    let isLastLoad = false;
+    let matchWholeWord = false;
+    let activeRangeFilter = localStorage.getItem("sort-play-active-range-filter") || "releaseDate";
+
+    if (!includeaudiofeatures && activeRangeFilter.startsWith("features.")) {
+        activeRangeFilter = "releaseDate";
+        localStorage.setItem("sort-play-active-range-filter", "releaseDate");
+    }
+    tracks.forEach(track => {
+        track.isRemovedByRange = false;
+        track.isRemovedByKeyword = false;
+        track.isRemoved = false;
+    });
+
+    let tableHeaders = `
+        <th class="sticky-col index-col" data-sort-key="index">#</th>
+        <th class="sticky-col title-col" data-sort-key="songTitle">Title</th>
+        <th class="sticky-col artist-col" data-sort-key="allArtists">Artist</th>
+        <th data-sort-key="albumName">Album</th>
+        <th data-sort-key="releaseDate">Rel Date</th>
+        <th data-sort-key="durationMs">Duration</th>
+        <th data-sort-key="playCount">Plays</th>
+        <th data-sort-key="popularity">Popularity</th>
+    `;
+    if (includeaudiofeatures) {
+        tableHeaders += `
+            <th data-sort-key="features.energy">Energy</th>
+            <th data-sort-key="features.danceability">Danceability</th>
+            <th data-sort-key="features.valence">Valence</th>
+            <th data-sort-key="features.tempo">Tempo</th>
+            <th data-sort-key="features.key">Key</th>
+            <th data-sort-key="features.loudness">Loudness</th>
+            <th data-sort-key="features.acousticness">Acousticness</th>
+            <th data-sort-key="features.instrumentalness">Instrumentalness</th>
+            <th data-sort-key="features.liveness">Liveness</th>
+        `;
+    }
+    tableHeaders += `<th class="sticky-col actions-col">Filter</th>`;
+
+    let observer = null;
+    let titleAlbumKeywords = new Set();
+    let artistKeywords = new Set();
+    let keepMatchingMode = false;
+    let filterModeRadios;
+    let titleToggle;
+    let albumToggle;
+    let artistToggle;
+    let matchWholeWordToggle;
+    let maxRowsSelect;
+    let rangeFilterTypeSelect;
+    let rangeFilterToggle;
+    let keywordFilterToggle;
+    let settingsLeftWrapper;
+
+    function calculateTotalDuration(trackList) {
+        let totalDurationMs = 0;
+        trackList.forEach(track => {
+            totalDurationMs += track.durationMs;
+        });
+        return totalDurationMs;
+    }
+
+    function formatTotalDuration(totalMs) {
+        const totalSeconds = Math.floor(totalMs / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        if(hours > 0)
+            return `${hours}h ${minutes}m`;
+        else
+            return `${minutes}m ${seconds}s`;
+
+    }
+
+
+    function updatePlaylistStats() {
+        if (!modalContainer) return;
+
+        const totalTracks = tracks.length;
+        const displayedTracksCount = tracks.filter(track => !track.isRemoved).length;
+        const totalDuration = calculateTotalDuration(tracks);
+        const displayedDuration = calculateTotalDuration(tracks.filter(track => !track.isRemoved));
+
+        const statsContainer = modalContainer.querySelector(".playlist-stats-container");
+        if (statsContainer) {
+            statsContainer.innerHTML = `
+                <span>${displayedTracksCount}/${totalTracks} tracks</span>
+                <span>${formatTotalDuration(displayedDuration)}/${formatTotalDuration(totalDuration)}</span>
+            `;
+        }
+    }
+
+    function loadAlbumArt(track, imgElement, maxRetries = 3, baseDelay = 200) {
+        if (imgElement.style.opacity === '1') {
+            return;
+        }
+    
+        let attempt = 0;
+        let retryTimer;
+    
+        const clearRetryTimer = () => {
+            if (retryTimer) {
+                clearTimeout(retryTimer);
+                retryTimer = null;
+            }
+        };
+    
+        const attemptLoad = async () => {
+            try {
+                const trackDetails = await Spicetify.GraphQL.Request(
+                    Spicetify.GraphQL.Definitions.decorateContextTracks,
+                    { uris: [track.uri] }
+                );
+    
+                if (trackDetails?.data?.tracks?.[0]?.response?.status === 429) {
+                    attempt++;
+                    const waitTime = baseDelay * Math.pow(2, attempt - 1);
+                    console.warn(`Rate limit hit for track ${track.uri}, retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`);
+                    retryTimer = setTimeout(attemptLoad, waitTime);
+                    return;
+                }
+    
+                const sources = trackDetails?.data?.tracks?.[0]?.albumOfTrack?.coverArt?.sources;
+    
+                if (sources?.length > 0) {
+                    let bestSource = null;
+                    for (const source of sources) {
+                        if (source.width >= 40 && source.height >= 40) {
+                            if (!bestSource || source.width < bestSource.width) {
+                                bestSource = source;
+                            }
+                        }
+                    }
+                    const albumArtSrc = bestSource ? bestSource.url : sources[sources.length - 1].url;
+    
+                    const tempImage = new Image();
+                    tempImage.onload = () => {
+                        imgElement.src = albumArtSrc;
+                        imgElement.style.opacity = '1';
+                        clearRetryTimer();
+                    };
+                    tempImage.onerror = () => {
+                        attempt++;
+                        if (attempt <= maxRetries) {
+                            console.warn(`Failed to load image for track ${track.uri}, retrying (${attempt}/${maxRetries})`);
+                            const waitTime = baseDelay * Math.pow(2, attempt - 1);
+                            retryTimer = setTimeout(attemptLoad, waitTime);
+                        }
+                    };
+                    tempImage.src = albumArtSrc;
+                } else {
+                    console.warn(`No image sources found for track ${track.uri}`);
+                }
+            } catch (error) {
+                attempt++;
+                if (attempt <= maxRetries) {
+                    const waitTime = baseDelay * Math.pow(2, attempt - 1);
+                    retryTimer = setTimeout(attemptLoad, waitTime);
+                }
+            }
+        };
+    
+        attemptLoad();
+    }
+
+
+    function generateTableRows(tracksToDisplay) {
+        return tracksToDisplay.map((track, index) => {
+            const displayedIndex = startIndex + index;
+            const originalIndex = originalTracks.findIndex(t => t.uri === track.uri);
+
+            let row = `
+          <tr data-track-uri="${track.uri}" data-row-index="${originalIndex}" class="${track.isRemoved ? 'removed' : ''}">
+              <td class="sticky-col index-col">${displayedIndex + 1}</td>
+              <td class="sticky-col title-col">
+                  <div class="song-info">
+                      <div class="main-image-container">
+                          <img
+                              aria-hidden="false"
+                              draggable="false"
+                              loading="eager"
+                              src="/api/placeholder/40/40"
+                              alt=""
+                              class="main-image-image2 main-trackList-rowImage"
+                              width="40"
+                              height="40"
+                              style="border-radius: 4px; opacity: 0;"
+                              data-track-uri="${track.uri}"
+                          />
+                      </div>
+                      <span class="song-title text-overflow" title="${track.songTitle || track.name}">${track.songTitle || track.name}</span>
+                  </div>
+              </td>
+              <td class="sticky-col artist-col">
+                  <span class="text-overflow" title="${track.allArtists}">${track.allArtists}</span> 
+              </td>
+              <td>
+                  <span class="text-overflow" title="${track.albumName}">${track.albumName}</span>
+              </td>
+              <td>${track.releaseDate ? new Date(track.releaseDate).toLocaleDateString() : "N/A"}</td>
+              <td>${formatDuration(track.durationMs)}</td> 
+              <td>${Number(track.playCount).toLocaleString()}</td>
+              <td>${track.popularity !== null ? track.popularity : "N/A"}</td>
+          `;
+
+            if (includeaudiofeatures) {
+                row += `
+                  <td>${track.features?.energy !== null ? track.features.energy : "N/A"}</td>
+                  <td>${track.features?.danceability !== null ? track.features.danceability : "N/A"}</td>
+                  <td>${track.features?.valence !== null ? track.features.valence : "N/A"}</td>
+                  <td>${track.features?.tempo !== null ? track.features.tempo : "N/A"}</td>
+                  <td>${track.features?.key !== null ? track.features.key : "N/A"}</td>
+                  <td>${track.features?.loudness !== null ? track.features.loudness : "N/A"}</td>
+                  <td>${track.features?.acousticness !== null ? track.features.acousticness : "N/A"}</td>
+                  <td>${track.features?.instrumentalness !== null ? track.features.instrumentalness : "N/A"}</td>
+                  <td>${track.features?.liveness !== null ? track.features.liveness : "N/A"}</td>
+              `;
+            }
+            row += `
+          <td class="sticky-col actions-col">
+              <button class="remove-button" data-track-uri="${track.uri}">
+                  ${track.isRemoved ? restoreIconSVG : removeIconSVG}
+              </button>
+          </td>
+          </tr>`;
+            return row;
+        }).join('');
+    }
+
+
+    function loadMore(direction) {
+        if (direction === 'down' && !isLastLoad) {
+            startIndex += pageSize;
+            if (startIndex + pageSize >= tracks.length) {
+                isLastLoad = true;
+            }
+            isFirstLoad = false;
+        } else if (direction === 'up' && !isFirstLoad) {
+            startIndex -= pageSize;
+            if (startIndex <= 0) {
+                startIndex = 0;
+                isFirstLoad = true;
+            }
+            isLastLoad = false;
+        }
+
+        displayedTracks = tracks.slice(startIndex, startIndex + pageSize);
+
+        if (tracks.length <= startIndex + pageSize + paginationThreshold) {
+            isLastLoad = true;
+            displayedTracks = tracks.slice(startIndex, tracks.length);
+        }
+
+        updateTable(displayedTracks);
+
+        const playlistWrapper = modalContainer.querySelector(".playlist-wrapper");
+        if (playlistWrapper) {
+            if (direction === 'down') {
+                playlistWrapper.scrollTop = 0;
+            } else if (direction === 'up') {
+                playlistWrapper.scrollTop = playlistWrapper.scrollHeight;
+            }
+        }
+    }
+
+    function generateLoadMoreRow(direction) {
+        const row = document.createElement("tr");
+        row.className = `load-more-row load-more-row-${direction}`;
+        row.innerHTML = `<td colspan="100%" class="load-more-cell">. . . Load More . . .ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ. . . Load More . . .ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ. . . Load More . . .</td>`;
+
+        row.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            loadMore(direction);
+        });
+
+        return row;
+    }
+
+    function sortTracks(tracksToSort, sortKey, direction) {
+        let sortedTracks = [...tracksToSort];
+
+        if (!sortKey || direction === 'none') return sortedTracks;
+
+        sortedTracks.sort((a, b) => {
+            let valueA = sortKey.includes('.') ? sortKey.split('.').reduce((o, k) => (o || {})[k], a) : a[sortKey];
+            let valueB = sortKey.includes('.') ? sortKey.split('.').reduce((o, k) => (o || {})[k], b) : b[sortKey];
+
+            if (valueA === null) valueA = -Infinity;
+            if (valueB === null) valueB = -Infinity;
+
+            if (valueA === "N/A") valueA = -Infinity;
+            if (valueB === "N/A") valueB = -Infinity;
+
+            if (sortKey === 'releaseDate') {
+                valueA = valueA ? new Date(valueA).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
+                valueB = valueB ? new Date(valueB).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
+            }
+
+            if (typeof valueA === 'string' && typeof valueB === 'string') {
+                return direction === 'ascending' ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+            }
+            return direction === 'ascending' ? valueA - valueB : valueB - valueA;
+        });
+        return sortedTracks;
+    }
+
+    let tableBody;
+
+    function setupIntersectionObserver() {
+        if (observer) {
+            observer.disconnect();
+        }
+    
+        const observerCallback = (entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const row = entry.target;
+                    const img = row.querySelector('img[data-track-uri]');
+                    if (!img) return;
+    
+                    const trackUri = img.dataset.trackUri;
+                    const track = originalTracks.find(t => t.uri === trackUri);
+                    if (track) {
+                        loadAlbumArt(track, img);
+                    }
+                }
+            });
+        };
+    
+        observer = new IntersectionObserver(observerCallback, {
+            root: modalContainer.querySelector('.playlist-wrapper'),
+            rootMargin: '1200px 0px',
+            threshold: 0.1
+        });
+        
+        if(tableBody) {
+            const allRows = tableBody.querySelectorAll('tr[data-track-uri]');
+            allRows.forEach(row => {
+                observer.observe(row);
+            });
+            
+            const visibleImages = tableBody.querySelectorAll('img[data-track-uri][style="opacity: 0;"]');
+            visibleImages.forEach(img => {
+                const trackUri = img.dataset.trackUri;
+                const track = originalTracks.find(t => t.uri === trackUri);
+                if (track) {
+                    loadAlbumArt(track, img);
+                }
+            });
+        }
+    }
+
+    function updateTable(updatedTracks) {
+        if(!tableBody) return;
+        tableBody.innerHTML = generateTableRows(updatedTracks);
+        setupIntersectionObserver();
+
+        const existingTopRow = document.querySelector(".load-more-row-up");
+        const existingBottomRow = document.querySelector(".load-more-row-down");
+        if (existingTopRow) existingTopRow.remove();
+        if (existingBottomRow) existingBottomRow.remove();
+
+        const styleElement = document.querySelector(".custom-filter-load-more-style") || document.createElement("style");
+        styleElement.className = "custom-filter-load-more-style";
+
+        if (!isFirstLoad) {
+            const topLoadMoreRow = generateLoadMoreRow("up");
+            const firstRow = tableBody.firstChild;
+            if (firstRow) {
+                tableBody.insertBefore(topLoadMoreRow, firstRow);
+            } else {
+                tableBody.appendChild(topLoadMoreRow);
+            }
+        }
+
+        if (!isLastLoad) {
+            const bottomLoadMoreRow = generateLoadMoreRow("down");
+            tableBody.appendChild(bottomLoadMoreRow);
+        }
+      updatePlaylistStats();
+    }
+
+    function calculateMinMax(tracks, filterType) {
+        if (tracks.length === 0) {
+            return { min: 0, max: 0 };
+        }
+    
+        let min, max;
+    
+        if (filterType === 'releaseDate') {
+            const tracksWithDates = tracks.filter(track => track.releaseDate);
+    
+            if (tracksWithDates.length === 0) {
+                const now = new Date();
+                return {
+                    min: new Date(now.getFullYear() - 5, 0, 1).getTime(),
+                    max: now.getTime()
+                };
+            }
+    
+            const timestamps = tracksWithDates.map(track => {
+                const date = new Date(track.releaseDate);
+                return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+            });
+            min = Math.min(...timestamps);
+            max = Math.max(...timestamps);
+    
+        } else if (filterType === 'durationMs') {
+            min = Math.min(...tracks.map(track => track.durationMs));
+            max = Math.max(...tracks.map(track => track.durationMs));
+    
+        } else {
+            const values = tracks.map(track => {
+                if (filterType === 'playCount') {
+                    return (parseInt(track.playCount) || 0);
+                } else if (filterType === 'popularity') {
+                    return (track.popularity || 0);
+                } else if (filterType === 'features.energy') { 
+                    return (track.features?.energy ?? 0);
+                }
+                else if (filterType === 'features.danceability') {
+                    return (track.features?.danceability ?? 0);
+                }
+                else if (filterType === 'features.valence') {
+                    return (track.features?.valence ?? 0);
+                }
+                else if (filterType === 'features.tempo') {
+                    return (track.features?.tempo ?? 0);
+                }
+                return 0;
+            });
+            min = Math.min(...values);
+            max = Math.max(...values);
+        }
+
+        return { min, max };
+    }
+
+    function formatNumber(number, isMin, filterType) {
+        if (isNaN(number)) {
+            return "";
+        }
+    
+        if (filterType === 'releaseDate') {
+            const date = new Date(number);
+            const month = date.getMonth() + 1; 
+            const day = date.getDate().toString().padStart(2, '0');
+            const year = date.getFullYear();
+            return `${month}/${day}/${year}`;
+        } else if (filterType === 'playCount') {
+            if (number >= 1000000000) {
+                return (isMin ? Math.floor(number / 10000000) / 100 : Math.ceil(number / 10000000) / 100) + "B";
+            } else if (number >= 1000000) {
+                return (isMin ? Math.floor(number / 10000) / 100 : Math.ceil(number / 10000) / 100) + "M";
+            } else if (number >= 1000) {
+                return (isMin ? Math.floor(number / 10) / 100 : Math.ceil(number / 10) / 100) + "k";
+            }
+            return number.toString();
+        } else if (filterType === 'durationMs') {
+            return formatDuration(number);
+        }
+        
+        return number.toString(); 
+    }
+    
+
+    function parseFormattedNumber(formattedNumber) {
+        if (!formattedNumber) {
+            return 0;
+        }
+
+        formattedNumber = formattedNumber.trim();
+
+        const dateMatch = formattedNumber.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (dateMatch) {
+            const month = parseInt(dateMatch[1]) - 1;
+            const day = parseInt(dateMatch[2]);
+            const year = parseInt(dateMatch[3]);
+            const date = new Date(year, month, day);
+            if (isNaN(date.getTime())) {  
+                return 0; 
+            }
+            return date.getTime();
+        }
+
+        const durationMatch = formattedNumber.match(/^(\d+):(\d+)$/);
+        if (durationMatch) {
+            const minutes = parseInt(durationMatch[1]);
+            const seconds = parseInt(durationMatch[2]);
+            return minutes * 60000 + seconds * 1000;
+        }
+
+        const match = formattedNumber.match(/^([0-9.]+)([BMK])?$/i);
+        if (!match) return 0;
+
+        const numberPart = parseFloat(match[1]);
+        const suffix = match[2];
+
+        if (isNaN(numberPart)) return 0;
+
+        switch (suffix) {
+            case "B":
+                return numberPart * 1000000000;
+            case "M":
+                return numberPart * 1000000;
+            case "K":
+                return numberPart * 1000;
+            default:
+                return numberPart;
+        }
+    }
+    function createKeywordTag(keyword, container, keywordSet) {
+        const tag = document.createElement("span");
+        tag.className = "keyword-tag";
+        tag.innerHTML = `
+            ${keyword}
+            <span class="keyword-tag-remove">×</span>
+        `;
+
+        tag.querySelector(".keyword-tag-remove").addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            tag.remove();
+            keywordSet.delete(keyword);
+            updateTrackFilters();
+            saveKeywords();
+
+        });
+
+        tag.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        const tagsContainer = container.querySelector(".keyword-tags-container");
+        tagsContainer.appendChild(tag);
+        tagsContainer.scrollTop = tagsContainer.scrollHeight;
+    }
+
+    function setupKeywordInput(container, keywordSet) {
+      if(!container) return;
+      const input = container.querySelector(".keyword-input");
+      const clearButton = container.querySelector(".keyword-remove-all-button");
+      const saveButton = container.querySelector(".keyword-save-button");
+      const loadButton = container.querySelector(".keyword-load-button");
+      if(!input || !clearButton || !saveButton || !loadButton) return;
+
+      input.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+      });
+
+      input.addEventListener("keydown", (e) => {
+          e.stopPropagation();
+          if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              const keyword = input.value.trim().toLowerCase();
+              if (keyword && !keywordSet.has(keyword)) {
+                  keywordSet.add(keyword);
+                  createKeywordTag(keyword, container, keywordSet);
+                  input.value = "";
+                  updateTrackFilters();
+                  saveKeywords();
+              }
+          }
+      });
+
+      clearButton.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const tagsContainer = container.querySelector(".keyword-tags-container");
+          tagsContainer.innerHTML = "";
+          keywordSet.clear();
+          updateTrackFilters();
+          saveKeywords();
+      });
+
+      input.addEventListener("blur", () => {
+          const keyword = input.value.trim().toLowerCase();
+          if (keyword && !keywordSet.has(keyword)) {
+              keywordSet.add(keyword);
+              createKeywordTag(keyword, container, keywordSet);
+              input.value = "";
+          }
+          if (keyword) {
+              updateTrackFilters();
+          }
+          saveKeywords();
+      });
+
+      saveButton.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (keywordSet.size === 0) {
+              Spicetify.showNotification("No keywords to save.");
+              return;
+          }
+
+          const saveModal = document.createElement("div");
+          saveModal.className = "save-keywords-modal";
+          saveModal.innerHTML = `
+              <style>
+              .save-keywords-modal {
+                  background-color: #282828;
+                  border-radius: 8px;
+                  padding: 16px;
+                  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+                  position: absolute;
+                  top: 50%;
+                  left: 50%;
+                  transform: translate(-50%, -50%);
+                  z-index: 1001;
+                  width: 300px;
+              }
+              .save-keywords-title {
+                  color: #fff;
+                  font-size: 14px;
+                  font-weight: bold;
+                  margin-bottom: 12px;
+              }
+              .save-keywords-input {
+                  width: 100%;
+                  padding: 8px;
+                  border-radius: 4px;
+                  border: 1px solid #434343;
+                  background: #121212;
+                  color: white;
+                  margin-bottom: 12px;
+                  box-sizing: border-box;
+              }
+              .save-keywords-button {
+                  background-color: #1db954;
+                  border: none;
+                  color: black;
+                  padding: 8px 16px;
+                  border-radius: 20px;
+                  font-weight: bold;
+                  cursor: pointer;
+                  display: block;
+                  width: auto;
+                  margin: 0 auto;
+              }
+
+              .save-keywords-button:hover {
+                  background-color: #1ed760;
+              }
+
+              .save-keywords-overlay {
+                  position: fixed;
+                  top: 0;
+                  left: 0;
+                  right: 0;
+                  bottom: 0;
+                  background-color: rgba(0, 0, 0, 0.5);
+                  z-index: 1000;
+              }
+              </style>
+              <div class="save-keywords-title">Enter Keywords Group Name</div>
+              <input type="text" class="save-keywords-input" placeholder="Group Name">
+              <button class="save-keywords-button">Save</button>
+          `;
+          const overlay = document.createElement("div");
+          overlay.className = "save-keywords-overlay";
+
+          document.body.appendChild(overlay);
+          document.body.appendChild(saveModal);
+
+          const saveInput = saveModal.querySelector(".save-keywords-input");
+          const saveBtn = saveModal.querySelector(".save-keywords-button");
+
+          const closeModal = () => {
+              saveModal.remove();
+              overlay.remove();
+          };
+
+          saveBtn.addEventListener("click", () => {
+              const groupName = saveInput.value.trim();
+              if (groupName) {
+                  let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                  savedKeywordGroups[groupName] = [...keywordSet];
+                  localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+                  Spicetify.showNotification(`Keywords saved as "${groupName}"`);
+                  closeModal();
+              } else {
+                  Spicetify.showNotification("Please enter a group name.");
+              }
+          });
+          overlay.addEventListener("click", closeModal);
+      });
+
+      loadButton.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+          const groupNames = Object.keys(savedKeywordGroups).reverse();
+
+          if (groupNames.length === 0) {
+              Spicetify.showNotification("No saved keyword groups.");
+              return;
+          }
+
+          const dropdown = document.createElement("div");
+          dropdown.className = "load-keywords-dropdown";
+          dropdown.innerHTML = `
+              <style>
+              .load-keywords-dropdown {
+                  background-color: #282828;
+                  border-radius: 4px;
+                  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+                  position: absolute;
+                  right: 0;
+                  z-index: 1002;
+                  min-width: 180px;
+                  max-width: 250px;
+                  max-height: 200px;
+                  overflow-y: auto;
+              }
+              .load-keywords-option {
+                  color: #fff;
+                  padding-top: 8px;
+                  padding-right: 5px;
+                  padding-bottom: 8px;
+                  padding-left: 12px;
+                  cursor: pointer;
+                  white-space: nowrap;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+              }
+              .load-keywords-option:hover {
+                  background-color: #383838;
+              }
+              .load-keywords-option:active, .load-keywords-option.selected {
+                  background-color: #1db954;
+                  color: black;
+              }
+              .load-keywords-option .remove-button {
+                  opacity: 0;
+                  transition: opacity 0.2s;
+                  cursor: pointer;
+                  padding: 4px;
+                  display: flex;
+                  align-items: center;
+                  max-width: 30px;
+              }
+              .load-keywords-option:hover .remove-button {
+                  opacity: 1;
+              }
+              .remove-icon {
+                  width: 12px;
+                  height: 12px;
+                  fill: currentColor;
+              }
+              .load-keywords-option-text {
+                  flex-grow: 1;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                  font-size: 14px;
+              }
+              .load-keywords-dropdown::-webkit-scrollbar {
+                  width: 8px;
+              }
+              .load-keywords-dropdown::-webkit-scrollbar-track {
+                  background: transparent;
+              }
+              .load-keywords-dropdown::-webkit-scrollbar-thumb {
+                  background-color: #4d4d4d;
+                  border-radius: 4px;
+              }
+              </style>
+          `;
+
+          let selectedOption = null;
+
+          groupNames.forEach(groupName => {
+              const option = document.createElement("div");
+              option.className = "load-keywords-option";
+
+              const optionContent = document.createElement("span");
+              optionContent.className = "load-keywords-option-text";
+              optionContent.textContent = groupName.length > 30 ? groupName.substring(0, 30) + "..." : groupName;
+              optionContent.dataset.fullName = groupName;
+
+              const removeButton = document.createElement("div");
+              removeButton.className = "remove-button";
+              removeButton.innerHTML = removeIconSVG;
+
+              option.appendChild(optionContent);
+              option.appendChild(removeButton);
+
+              optionContent.addEventListener("click", (e) => {
+                  const tagsContainer = container.querySelector(".keyword-tags-container");
+                  tagsContainer.innerHTML = "";
+                  keywordSet.clear();
+
+                  savedKeywordGroups[groupName].forEach(keyword => {
+                      keywordSet.add(keyword);
+                      createKeywordTag(keyword, container, keywordSet);
+                  });
+
+                  updateTrackFilters();
+                  saveKeywords();
+                  Spicetify.showNotification(`Keywords loaded from "${groupName}"`);
+
+                  if (selectedOption) {
+                      selectedOption.classList.remove("selected");
+                  }
+                  option.classList.add("selected");
+                  selectedOption = option;
+
+                  dropdown.remove();
+              });
+
+              removeButton.addEventListener("click", (e) => {
+                  e.stopPropagation();
+
+                  let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                  delete savedKeywordGroups[groupName];
+                  localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+
+                  option.remove();
+                  Spicetify.showNotification(`Removed keyword group "${groupName}"`);
+
+                  if (Object.keys(savedKeywordGroups).length === 0) {
+                      dropdown.remove();
+                      Spicetify.showNotification("No more saved keyword groups.");
+                  }
+              });
+
+              dropdown.appendChild(option);
+          });
+
+          loadButton.parentNode.appendChild(dropdown);
+
+          const buttonRect = loadButton.getBoundingClientRect();
+          dropdown.style.bottom = `${buttonRect.height + 4}px`;
+          dropdown.style.right = `-50px`;
+
+          const removeDropdown = (event) => {
+              if (!dropdown.contains(event.target)) {
+                  dropdown.remove();
+                  document.removeEventListener('click', removeDropdown);
+              }
+          };
+          setTimeout(() => {
+              document.addEventListener('click', removeDropdown);
+          }, 0);
+      });
+
+      container.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+      });
+  }
+
+    function saveKeywords() {
+        localStorage.setItem("sort-play-title-album-keywords", JSON.stringify([...titleAlbumKeywords]));
+        localStorage.setItem("sort-play-artist-keywords", JSON.stringify([...artistKeywords]));
+    }
+
+     function loadKeywords() {
+      const savedTitleAlbumKeywords = localStorage.getItem("sort-play-title-album-keywords");
+      const savedArtistKeywords = localStorage.getItem("sort-play-artist-keywords");
+
+      if (savedTitleAlbumKeywords) {
+        titleAlbumKeywords = new Set(JSON.parse(savedTitleAlbumKeywords));
+        const titleAlbumContainer = modalContainer.querySelector("#titleAlbumKeywords");
+
+        if(titleAlbumContainer) {
+            titleAlbumKeywords.forEach(keyword => createKeywordTag(keyword, titleAlbumContainer, titleAlbumKeywords));
+        }
+      }
+
+      if (savedArtistKeywords) {
+        artistKeywords = new Set(JSON.parse(savedArtistKeywords));
+        const artistContainer = modalContainer.querySelector("#artistKeywords");
+
+        if(artistContainer){
+            artistKeywords.forEach(keyword => createKeywordTag(keyword, artistContainer, artistKeywords));
+        }
+      }
+    }
+
+    function updateTrackFilters() {
+        const keywordFilterEnabled = keywordFilterToggle.checked;
+        const keepMatching = keepMatchingMode;
+        const filterTitle = titleToggle.checked;
+        const filterAlbum = albumToggle.checked;
+        const filterArtist = artistToggle.checked;
+        const rangeFilterEnabled = rangeFilterToggle.checked;
+    
+        const minRange = parseFormattedNumber(modalContainer.querySelector("#rangeMin").value) || minRangeValue;
+        const maxRange = parseFormattedNumber(modalContainer.querySelector("#rangeMax").value) || maxRangeValue;
+    
+        localStorage.setItem("sort-play-keep-matching-mode", keepMatching);
+        localStorage.setItem("sort-play-filter-title", filterTitle);
+        localStorage.setItem("sort-play-filter-album", filterAlbum);
+        localStorage.setItem("sort-play-filter-artist", filterArtist);
+        localStorage.setItem("sort-play-match-whole-word", matchWholeWord);
+        localStorage.setItem("sort-play-active-range-filter", activeRangeFilter);
+    
+        tracks.forEach((track) => {
+            if (rangeFilterEnabled) {
+                let trackValue;
+    
+                if (activeRangeFilter === 'releaseDate') {
+                    if (!track.releaseDate) {
+                        track.isRemovedByRange = true;
+                        return;
+                    }
+    
+                    const trackDate = new Date(track.releaseDate);
+                    const trackDateNormalized = new Date(
+                        trackDate.getFullYear(),
+                        trackDate.getMonth(),
+                        trackDate.getDate()
+                    ).getTime();
+    
+                    const minDate = new Date(minRange);
+                    const maxDate = new Date(maxRange);
+    
+                    const minDateNormalized = new Date(
+                        minDate.getFullYear(),
+                        minDate.getMonth(),
+                        minDate.getDate()
+                    ).getTime();
+    
+                    const maxDateNormalized = new Date(
+                        maxDate.getFullYear(),
+                        maxDate.getMonth(),
+                        maxDate.getDate(),
+                        23, 59, 59, 999
+                    ).getTime();
+    
+                    track.isRemovedByRange = trackDateNormalized < minDateNormalized || trackDateNormalized > maxDateNormalized;
+    
+                    console.log('Track:', track.songTitle, 'Date:', new Date(trackDateNormalized).toLocaleDateString(),
+                              'Min:', new Date(minDateNormalized).toLocaleDateString(),
+                              'Max:', new Date(maxDateNormalized).toLocaleDateString(),
+                              'Removed:', track.isRemovedByRange);
+                } else if (activeRangeFilter === 'durationMs') {
+                    trackValue = track.durationMs;
+                    track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
+                } else {
+                    if (activeRangeFilter === 'playCount') {
+                        trackValue = (parseInt(track.playCount) || 0);
+                    } else if (activeRangeFilter === 'popularity') {
+                        trackValue = (track.popularity || 0);
+                    } else if (activeRangeFilter === 'features.energy') { 
+                        if (includeaudiofeatures) {
+                            trackValue = (track.features?.energy ?? 0);  
+                        }
+                    }
+                    else if (activeRangeFilter === 'features.danceability') {
+                        if (includeaudiofeatures) {
+                            trackValue = (track.features?.danceability ?? 0);
+                        }
+                    }
+                    else if (activeRangeFilter === 'features.valence') {
+                        if (includeaudiofeatures) {
+                            trackValue = (track.features?.valence ?? 0);
+                        }
+                    }
+                    else if (activeRangeFilter === 'features.tempo') {
+                        if (includeaudiofeatures) {
+                            trackValue = (track.features?.tempo ?? 0);
+                        }
+                    }
+                    if (includeaudiofeatures) {
+                        track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
+                    }
+                }
+            } else {
+                track.isRemovedByRange = false;
+            }
+    
+            if (keywordFilterEnabled && !track.isRemovedByRange) {
+                if (titleAlbumKeywords.size === 0 && artistKeywords.size === 0) {
+                    track.isRemovedByKeyword = false;
+                } else {
+                    const titleAlbumMatch =
+                        titleAlbumKeywords.size === 0
+                            ? null
+                            : [...titleAlbumKeywords].some((keyword) => {
+                                const regex = matchWholeWord
+                                    ? new RegExp(`\\b${keyword}\\b`, "i")
+                                    : new RegExp(keyword, "i");
+                                return (
+                                    (filterTitle && regex.test(track.songTitle)) ||
+                                    (filterAlbum && regex.test(track.albumName))
+                                );
+                            });
+    
+                    const artistMatch =
+                        artistKeywords.size === 0
+                            ? null
+                            : [...artistKeywords].some((keyword) => {
+                                const regex = matchWholeWord
+                                    ? new RegExp(`\\b${keyword}\\b`, "i")
+                                    : new RegExp(keyword, "i");
+                                return filterArtist && regex.test(track.allArtists);
+                            });
+    
+                    if (keepMatching) {
+                        track.isRemovedByKeyword = !(
+                            (titleAlbumMatch === true || titleAlbumMatch === null) &&
+                            (artistMatch === true || artistMatch === null)
+                        );
+                    } else {
+                        track.isRemovedByKeyword =
+                            titleAlbumMatch === true || artistMatch === true;
+                    }
+                }
+            } else {
+                track.isRemovedByKeyword = false;
+            }
+    
+            const shouldRemove = track.isRemovedByRange || track.isRemovedByKeyword;
+    
+            if (track.isRemoved !== shouldRemove) {
+                track.isRemoved = shouldRemove;
+            }
+        });
+    
+        startIndex = 0;
+        isFirstLoad = true;
+        isLastLoad = tracks.length <= pageSize + paginationThreshold;
+        displayedTracks = tracks.slice(startIndex, isLastLoad ? tracks.length : pageSize);
+        updateTable(displayedTracks);
+        updatePlaylistStats();
+    }
+
+    function setupDualRangeSlider(sliderContainerId, minInputId, maxInputId) {
+        const sliderContainer = modalContainer.querySelector(`#${sliderContainerId}`);
+        const slider1 = sliderContainer.querySelector(`#${sliderContainerId}-1`);
+        const slider2 = sliderContainer.querySelector(`#${sliderContainerId}-2`);
+        const minInput = modalContainer.querySelector(`#${minInputId}`);
+        const maxInput = modalContainer.querySelector(`#${maxInputId}`);
+        const sliderTrack = sliderContainer.querySelector(".slider-track");
+
+        if(!sliderContainer         || !slider1 || !slider2 || !minInput || !maxInput || !sliderTrack) return;
+
+        let minGap = 0;
+
+        function slideOne() {
+            if (parseInt(slider2.value) - parseInt(slider1.value) <= minGap) {
+                slider1.value = parseInt(slider2.value) - minGap;
+            }
+            updateInputs();
+            fillColor();
+            debouncedUpdateTrackFilters();
+        }
+
+        function slideTwo() {
+            if (parseInt(slider2.value) - parseInt(slider1.value) <= minGap) {
+                slider2.value = parseInt(slider1.value) + minGap;
+            }
+            updateInputs();
+            fillColor();
+            debouncedUpdateTrackFilters(); 
+        }
+
+        function fillColor() {
+            const sliderMaxValue = parseInt(slider1.max);
+            const sliderMinValue = parseInt(slider1.min);
+            const totalRange = sliderMaxValue - sliderMinValue;
+    
+            const value1 = parseInt(slider1.value);
+            const value2 = parseInt(slider2.value);
+    
+            const percent1 = totalRange === 0 ? 0 : ((value1 - sliderMinValue) / totalRange) * 100;
+            const percent2 = totalRange === 0 ? 100 : ((value2 - sliderMinValue) / totalRange) * 100;
+    
+    
+            sliderTrack.style.background = `linear-gradient(to right, #4d4d4d ${percent1}% , #1ed760 ${percent1}% , #1ed760 ${percent2}%, #4d4d4d ${percent2}%)`;
+        }
+
+        function updateInputs() {
+            minInput.value = formatNumber(parseInt(slider1.value), true, activeRangeFilter);
+            maxInput.value = formatNumber(parseInt(slider2.value), false, activeRangeFilter);
+        }
+
+        const debouncedUpdateSliders = debounce(updateSliders, 800);
+
+        function updateSliders() {
+            let minValue = parseFormattedNumber(minInput.value);
+            let maxValue = parseFormattedNumber(maxInput.value);
+
+            if (minValue === 0) minValue = parseInt(slider1.value);
+            if (maxValue === 0) maxValue = parseInt(slider2.value);
+
+            minValue = Math.max(minRangeValue, Math.min(minValue, maxRangeValue));
+            maxValue = Math.max(minRangeValue, Math.min(maxRangeValue, maxValue));
+
+            maxValue = Math.max(minValue, maxValue);
+
+            minInput.value = formatNumber(minValue, true, activeRangeFilter);
+            maxInput.value = formatNumber(maxValue, false, activeRangeFilter);
+
+            slider1.value = minValue;
+            slider2.value = maxValue;
+
+            fillColor();
+        }
+
+        slider1.addEventListener("input", slideOne);
+        slider2.addEventListener("input", slideTwo);
+        minInput.addEventListener("input", debouncedUpdateSliders);
+        maxInput.addEventListener("input", debouncedUpdateSliders);
+        minInput.addEventListener("blur", updateSliders);
+        maxInput.addEventListener("blur", updateSliders);
+        function handleTrackClick(event) {
+            const rect = sliderTrack.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const trackWidth = rect.width;
+            const percent = clickX / trackWidth;
+            const range = maxRangeValue - minRangeValue;
+            const newValue = minRangeValue + (percent * range);
+
+            const diff1 = Math.abs(newValue - parseInt(slider1.value));
+            const diff2 = Math.abs(newValue - parseInt(slider2.value));
+
+            if (diff1 <= diff2) {
+                slider1.value = newValue;
+                slideOne();
+            } else {
+                slider2.value = newValue;
+                slideTwo();
+            }
+        }
+
+        function handleTrackMove(event) {
+            if (!isDragging) {
+                return;
+            }
+            handleTrackClick(event);
+        }
+
+        sliderTrack.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            handleTrackClick(e);
+        });
+        document.addEventListener("mousemove", handleTrackMove);
+
+        document.addEventListener("mouseup", () => {
+            isDragging = false;
+        });
+
+        updateInputs();
+        fillColor();
+
+        slider1.addEventListener("input", debouncedUpdateTrackFilters);
+        slider2.addEventListener("input", debouncedUpdateTrackFilters);
+        minInput.addEventListener("input", debouncedUpdateTrackFilters);
+        maxInput.addEventListener("input", debouncedUpdateTrackFilters);
+    }
+
+    function updateRangeUI(filterType) {
+        if(!modalContainer) return;
+
+        if (filterType === "features.energy") {
+            minRangeValue = 0;
+            maxRangeValue = 1;
+        }
+        else if (filterType === "features.danceability") {
+            minRangeValue = 0;
+            maxRangeValue = 1;
+        }
+        else if (filterType === "features.valence") {
+            minRangeValue = 0;
+            maxRangeValue = 1;
+        }
+
+        const range = calculateMinMax(tracks, filterType);
+        minRangeValue = range.min;
+        maxRangeValue = range.max;
+
+        const slider1 = modalContainer.querySelector("#rangeSlider-1");
+        const slider2 = modalContainer.querySelector("#rangeSlider-2");
+        const minInput = modalContainer.querySelector("#rangeMin");
+        const maxInput = modalContainer.querySelector("#rangeMax");
+        if(!slider1 || !slider2 || !minInput || !maxInput) return;
+
+        slider1.min = minRangeValue;
+        slider1.max = maxRangeValue;
+        slider1.value = minRangeValue;
+        slider2.min = minRangeValue;
+        slider2.max = maxRangeValue;
+        slider2.value = maxRangeValue;
+
+        minInput.value = formatNumber(minRangeValue, true, filterType);
+        maxInput.value = formatNumber(maxRangeValue, false, filterType);
+        
+        if (filterType === "releaseDate") {
+            minInput.placeholder = "From Date";
+            maxInput.placeholder = "To Date";
+            minInput.type = "text"; 
+            maxInput.type = "text";
+        } else {
+            minInput.type = "text";
+            maxInput.type = "text";
+            minInput.placeholder = filterType === "playCount" ? "Min Plays" : 
+                                  filterType === "popularity" ? "Min" : "Min Duration";
+            maxInput.placeholder = filterType === "playCount" ? "Max Plays" : 
+                                  filterType === "popularity" ? "Max" : "Max Duration";
+        }
+
+        const sliderTrack = modalContainer.querySelector(".slider-track");
+        if (sliderTrack) {
+            const sliderMaxValue = parseInt(slider1.max);
+            const sliderMinValue = parseInt(slider1.min);
+            const totalRange = sliderMaxValue - sliderMinValue;
+
+            const value1 = parseInt(slider1.value);
+            const value2 = parseInt(slider2.value);
+
+            let percent1 = totalRange === 0 ? 0 : ((value1 - sliderMinValue) / totalRange) * 100;
+            let percent2 = totalRange === 0 ? 100 : ((value2 - sliderMinValue) / totalRange) * 100;
+
+            percent1 = Math.max(0, Math.min(100, percent1));
+            percent2 = Math.max(0, Math.min(100, percent2));
+            sliderTrack.style.background = `linear-gradient(to right, #4d4d4d ${percent1}% , #1ed760 ${percent1}% , #1ed760 ${percent2}%, #4d4d4d ${percent2}%)`;
+        }
+    }
+
+    const debouncedUpdateTrackFilters = debounce(() => {
+        updateTrackFilters();
+        setTimeout(() => {
+            setupIntersectionObserver();
+        }, 100);
+        updatePlaylistStats();
+    }, 800);
+
+
+
+    let initialRange = calculateMinMax(tracks, activeRangeFilter);
+    let minRangeValue = initialRange.min;
+    let maxRangeValue = initialRange.max;
+
+    modalContainer.innerHTML = `
+    <style>
+    .custom-filter-modal {
+        width: 100%;
+        max-width: 1200px;
+        color: #fff;
+    }
+    .GenericModal__overlay .GenericModal {
+        border-radius: 30px;
+        overflow: hidden;
+    }
+
+    .text-overflow {
+        position: relative;
+    }
+
+    .playlist-player-wrapper {
+        background-color: #1c1c1c;
+        border-radius: 20px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
+        border: 4px solid #1c1c1c;
+    }
+
+    .playlist-wrapper {
+        max-height: 30vh;
+        background-color: #121212;
+        overflow: auto;
+        padding: 0 0px;
+        scrollbar-width: thin;
+        scrollbar-color: #232323 transparent;
+        position: relative;
+    }
+
+    .playlist-wrapper::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .playlist-wrapper::-webkit-scrollbar-thumb {
+        background-color: #ffffff40;
+        border-radius: 4px;
+    }
+
+    .playlist-wrapper::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .tracklist-table {
+        width: 100%;
+        border-collapse: separate;
+        color: #b3b3b3;
+        font-size: 14px;
+        table-layout: fixed;
+    }
+
+    .tracklist-table th {
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid #282828;
+        font-weight: 400;
+        color: #b3b3b3;
+        position: sticky;
+        top: 0;
+        background: #121212;
+        z-index: 2;
+        height: 45px;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+    .tracklist-table th:hover {
+        color: #ffffff;
+    }
+
+    .tracklist-table th.sorted {
+        color: #1ED760;
+    }
+    .tracklist-table .index-col {
+        width: 52px;
+    }
+
+    .tracklist-table th.index-col {
+        text-align: center;
+    }
+
+    .tracklist-table .title-col {
+        width: 340px;
+        padding-right: 16px;
+    }
+
+    .tracklist-table .artist-col {
+        width: 200px;
+    }
+
+    .tracklist-table th:nth-child(4) {
+        width: 200px;
+    }
+    .tracklist-table th:nth-child(6) {
+        width: 85px;
+        text-align: center;
+    }
+
+    .tracklist-table th:nth-child(8) {
+        width: 90px;
+        text-align: center;
+    }
+
+
+    .tracklist-table th:nth-child(7) {
+        width: 120px;
+        text-align: center;
+    }
+
+    .tracklist-table th:nth-child(5) {
+        width: 100px;
+        text-align: center;
+        white-space: normal;
+    }
+
+    .tracklist-table th:nth-child(n+9) {
+        text-align: center;
+    }
+
+    .tracklist-table th:nth-child(9) {
+        width: 70px;
+    }
+
+    .tracklist-table th:nth-child(10) {
+        width: 110px;
+    }
+
+    .tracklist-table th:nth-child(11) {
+        width: 80px;
+    }
+
+    .tracklist-table th:nth-child(12) {
+        width: 80px;
+    }
+
+    .tracklist-table th:nth-child(13) {
+        width: 80px;
+    }
+
+    .tracklist-table th:nth-child(14) {
+        width: 100px;
+    }
+
+    .tracklist-table th:nth-child(15) {
+        width: 110px;
+    }
+
+    .tracklist-table th:nth-child(16) {
+        width: 140px;
+    }
+
+    .tracklist-table th:nth-child(17) {
+        width: 90px;
+    }
+
+    .sticky-col {
+        position: sticky;
+        background: #121212;
+        z-index: 1;
+    }
+
+    .index-col {
+        left: 0;
+        text-align: center;
+    }
+
+    .title-col {
+        left: 52px;
+    }
+
+    .artist-col {
+        left: 392px;
+        width: 200px;
+    }
+
+    .tracklist-table td:nth-child(n+6) {
+        text-align: center;
+    }
+
+    .tracklist-table td:nth-child(4) {
+        width: 200px;
+    }
+    .tracklist-table td:nth-child(5) {
+        width: 100px;
+        text-align: center;
+    }
+
+    .tracklist-table .actions-col {
+        width: 60px;
+        right: 0;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+
+    .actions-col {
+        right: 0;
+        padding: 0 !important;
+    }
+
+    .actions-col::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        width: 1px;
+        background: #282828;
+        pointer-events: none;
+    }
+
+    .tracklist-table td:nth-child(n+6):not(:last-child) {
+        text-align: center;
+    }
+
+    .tracklist-table tr.removed {
+        background-color: #4a1515 !important;
+    }
+
+    .tracklist-table tr.removed:hover {
+        background-color: #5a1919 !important;
+    }
+
+    .tracklist-table tr.removed .sticky-col {
+        background-color: #4a1515 !important;
+    }
+
+    .tracklist-table tr.removed:hover .sticky-col {
+        background-color: #5a1919 !important;
+    }
+
+    .tracklist-table tr.removed.active {
+        background-color: #6a1d1d !important;
+    }
+
+    .tracklist-table tr.removed.active .sticky-col {
+        background-color: #6a1d1d !important;
+    }
+
+    .custom-filter-modal .sort-type-select {
+      padding: 7px;
+      border-radius: 4px;
+      border: 1px solid #434343;
+      background: #282828;
+      color: white;
+      width: 170px;
+      cursor: pointer;
+      margin-right: 100px;
+    }
+
+    #customFilterCreatePlaylist {
+        margin: 0;
+        padding: 8px 32px;
+        border-radius: 500px;
+        border: none;
+        background: #1db954;
+        color: black;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+
+    #customFilterCreatePlaylist:hover {
+        background: #1ed760;
+    }
+
+    .remove-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+    }
+
+    .remove-icon {
+        width: 14px;
+        height: 14px;
+        fill: #b3b3b3;
+        transition: fill 0.2s ease;
+    }
+
+    .remove-button:hover .remove-icon {
+        fill: #ffffff;
+    }
+    .text-overflow {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+        width: 100%;
+    }
+
+    th.sticky-col {
+        z-index: 3;
+    }
+
+    .artist-col::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: 1px;
+        background: #282828;
+        pointer-events: none;
+    }
+
+    .tracklist-table tr {
+        height: 35px;
+    }
+
+    .tracklist-table tr:hover {
+        background-color: #282828;
+    }
+     .tracklist-table tr.active {
+        background-color: #5A5A5A !important;
+    }
+
+    .tracklist-table tbody tr {
+        height: 35px;
+    }
+
+    .tracklist-table tbody tr:hover {
+        background-color: #282828;
+    }
+     .tracklist-table tr.active .sticky-col {
+        background-color: #5A5A5A !important;
+    }
+
+
+    .tracklist-table tbody tr:hover .sticky-col {
+        background-color: #282828;
+    }
+
+    .tracklist-table thead tr .sticky-col {
+        background-color: #121212;
+    }
+
+    .tracklist-table td {
+        padding: 8px;
+        border: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        vertical-align: middle;
+        height: 35px;
+    }
+
+    .main-image-container {
+        width: 33px;
+        height: 33px;
+        min-width: 33px;
+        min-height: 33px;
+        border-radius: 4px;
+        background-color: #282828;
+        position: relative;
+        aspect-ratio: 1 / 1;
+        flex-shrink: 0;
+    }
+
+    .main-image-image2 {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        transition: opacity 0.3s ease;
+        object-fit: cover;
+    }
+
+    .song-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        height: 100%;
+        min-width: 0;
+        padding-right: 16px;
+    }
+
+    .song-info img {
+        width: 33px;
+        height: 33px;
+        border-radius: 4px;
+        object-fit: cover;
+    }
+
+    .song-title {
+        color: #fff;
+        font-weight: 400;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: block;
+    }
+
+
+    .main-embedWidgetGenerator-container {
+        width: 1200px !important;
+        max-width: 1500px !important;
+        max-height: 90vh !important;
+        border-radius: 30px;
+        overflow: hidden;
+        background-color: #121212;
+        border: 2px solid #282828;
+    }
+
+    .GenericModal__overlay .GenericModal {
+        border-radius: 30px;
+        overflow: hidden;
+    }
+
+    .main-trackCreditsModal-mainSection {
+        overflow-y: hidden !important;
+        padding: 16px 32px 9px 32px;
+    }
+
+    .main-trackCreditsModal-header {
+        padding: 16px 32px 12px !important;
+    }
+
+    .custom-filter-modal .main-popupModal-content {
+        overflow-y: auto;
+    }
+    .GenericModal {
+        position: relative;
+        z-index: 1000;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.25);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        z-index: 999;
+    }
+    .playlist-title-container {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+    }
+
+    .playlist-stats-container {
+        display: flex;
+        gap: 12px;
+        color: #b3b3b3;
+        font-size: 14px;
+        margin-left: auto;
+    }
+    .player-controls2 {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 20px;
+    }
+
+    .control-button2 {
+        background-color: transparent;
+        border: 0;
+        color: #ffffff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: color 0.2s ease;
+    }
+
+    .progress-bar2-container {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #b3b3b3;
+        font-size: 12px;
+        width: 450px;
+        max-width: 450px;
+    }
+
+    #currentTime, #duration {
+        min-width: 45px;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+    }
+    #currentTime {
+        text-align: right;
+    }
+
+    #duration {
+        text-align: left;
+    }
+    .progress-bar2 {
+        flex: 1;
+        height: 4px;
+        background-color: #4d4d4d;
+        border-radius: 2px;
+        cursor: pointer;
+        position: relative;
+        min-width: 0;
+    }
+
+    .progress-bar2-inner {
+        position: absolute;
+        height: 100%;
+        background-color: #ffffff;
+        border-radius: 2px;
+        transition: width 0.1s linear;
+    }
+
+    .progress-bar2:hover .progress-bar2-inner {
+        background-color: #1db954;
+    }
+
+
+    .track-info-container {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        max-width: 300px;
+        min-width: 200px;
+    }
+
+    .track-info-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+    }
+
+    .track-title {
+        color: #fff;
+        font-size: 14px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .track-artist {
+        color: #b3b3b3;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .track-album-art {
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+        background-color: #282828;
+        flex-shrink: 0;
+    }
+
+
+    .max-rows-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .max-rows-label {
+        color: #b3b3b3;
+        font-size: 12px;
+    }
+
+    .max-rows-select {
+        padding: 3px 4px;
+        border-radius: 4px;
+        border: 1px solid #434343;
+        background: #282828;
+        color: white;
+        cursor: pointer;
+    }
+    .filter-settings-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .settings-left-wrapper,
+    .settings-right-wrapper {
+        background-color: #1c1c1c;
+        border-radius: 20px;
+        padding: 20px;
+        position: relative;
+    }
+
+    .settings-left-wrapper {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      display: flex;
+      flex-direction: column;
+      gap: 0px;
+      position: relative;
+    }
+    .settings-right-wrapper {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 0px;
+        position: relative;
+    }
+
+    .buttons-wrapper {
+        grid-column: 2;
+        grid-row: 2;
+        background-color: #1c1c1c;
+        border-radius: 20px;
+        padding: 15px 20px;
+         display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+
+    .settings-left-wrapper.disabled > *:not(.settings-title-wrapper) {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    .settings-left-wrapper.disabled .settings-title-wrapper {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    .settings-left-wrapper.disabled #keywordFilterToggle {
+        pointer-events: all;
+    }
+
+    .settings-left-wrapper.disabled .settings-title {
+        opacity: 1;
+    }
+
+    .settings-title {
+        color: white;
+        font-weight: bold;
+        font-size: 15px;
+        margin-bottom: 5px;
+    }
+    .settings-title-wrapper {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 8px;
+    }
+
+    #rangeFilterType {
+        padding: 6px;
+        border-radius: 4px;
+        border: 1px solid #434343;
+        background: #282828;
+        color: white;
+        width: 150px;
+        cursor: pointer;
+    }
+
+    .range-filter-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .range-filter-title-wrapper {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 15px;
+    }
+
+    .range-filter-label {
+        color: #fff;
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .range-filter-title {
+        color: #fff;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .range-input-container {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .range-input {
+        width: 85px;
+        padding: 4px;
+        border-radius: 4px;
+        border: 1px solid #434343;
+        background: #282828;
+        color: white;
+        text-align: center;
+    }
+    .dual-range-slider-container {
+        position: relative;
+        width: 100%;
+        height: 20px;
+        flex: 1;
+    }
+
+    .dual-range-slider-container input[type="range"] {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        width: 100%;
+        outline: none;
+        position: absolute;
+        margin: auto;
+        top: 0;
+        bottom: 0;
+        background-color: transparent;
+        pointer-events: none;
+    }
+
+    .slider-track {
+        width: 100%;
+        height: 5px;
+        position: absolute;
+        margin: auto;
+        top: 0;
+        bottom: 0;
+        border-radius: 5px;
+        background-color: #4d4d4d;
+    }
+
+    .dual-range-slider-container input[type="range"]::-webkit-slider-runnable-track {
+        -webkit-appearance: none;
+        height: 5px;
+    }
+
+    .dual-range-slider-container input[type="range"]::-moz-range-track {
+        -moz-appearance: none;
+        height: 5px;
+    }
+
+    .dual-range-slider-container input[type="range"]::-ms-track {
+        appearance: none;
+        height: 5px;
+    }
+
+    .dual-range-slider-container input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 16px;
+        width: 16px;
+        background-color: #fff;
+        cursor: pointer;
+        margin-top: -6px;
+        pointer-events: auto;
+        border-radius: 50%;
+        border: 1px solid #434343;
+    }
+    .dual-range-slider-container input[type="range"]::-webkit-slider-thumb:hover {
+        border: 1px solid #b3b3b3;
+    }
+
+    .dual-range-slider-container input[type="range"]::-moz-range-thumb {
+        -webkit-appearance: none;
+        height: 16px;
+        width: 16px;
+        cursor: pointer;
+        border-radius: 50%;
+        background-color: #fff;
+        pointer-events: auto;
+        border: 1px solid #434343;
+    }
+
+    .dual-range-slider-container input[type="range"]::-ms-thumb {
+        appearance: none;
+        height: 16px;
+        width: 16px;
+        cursor: pointer;
+        border-radius: 50%;
+        background-color: #fff;
+        pointer-events: auto;
+          border: 1px solid #434343;
+    }
+    .range-filters-items {
+        max-height: 170px;
+        overflow-y: auto;
+        padding-top: 9px;
+        scrollbar-width: thin;
+        scrollbar-color: #ffffff40 transparent;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    .range-filters-items::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .range-filters-items::-webkit-scrollbar-thumb {
+        background-color: #ffffff40;
+        border-radius: 4px;
+    }
+
+    .range-filters-items::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-filter-modal .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+
+    .custom-filter-modal .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .custom-filter-modal .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #484848;
+      border-radius: 24px;
+      transition: .2s;
+    }
+
+    .custom-filter-modal .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      border-radius: 50%;
+      transition: .2s;
+    }
+
+    .custom-filter-modal input:checked + .slider {
+      background-color: #1DB954;
+    }
+
+    .custom-filter-modal input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+    .keyword-filter-container {
+        display: flex;
+        gap: 15px;
+        width: 100%;
+    }
+
+    .filter-group {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .filter-group-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 20px;
+      justify-content: space-between;
+    }
+
+    .filter-group-title {
+        color: #fff;
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .toggle-group {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+    }
+
+    .filter-mode-toggle-label {
+        color: #b3b3b3;
+        font-size: 13px;
+    }
+
+    .keyword-input-container {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        background: #282828;
+        border-radius: 6px;
+        min-height: 0px;
+        max-height: 96px;
+        width: 100%;
+    }
+    .keyword-tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 6px;
+        overflow-y: auto;
+        min-height: 68px;
+        max-height: 68px;
+        max-width: 252px;
+        scrollbar-width: thin;
+        scrollbar-color: #ffffff40 transparent;
+    }
+
+    .keyword-input-wrapper {
+        position: relative;
+        padding: 3px;
+        border-top: 1px solid #444;
+        background: #313131;
+        border-bottom-left-radius: 6px;
+        border-bottom-right-radius: 6px;
+        display: flex;
+        align-items: center;
+    }
+    .keyword-input {
+        background: none;
+        border: none;
+        color: white;
+        padding: 4px;
+        width: 100%;
+        height: 24px;
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .keyword-actions-container {
+        display: flex;
+        margin-left: auto;
+        flex-shrink: 0;
+    }
+
+    .keyword-action-button {
+        background-color: transparent;
+        border: none;
+        color: white;
+        padding: 2px 7px;
+        border-radius: 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        height: 24px;
+        white-space: nowrap;
+    }
+
+    .keyword-action-button:hover {
+        background-color: #484848;
+    }
+
+    .keyword-action-button svg {
+        width: 14px;
+        height: 14px;
+        fill: #fff;
+        display: block;
+        margin: 0 auto;
+    }
+    .keyword-tag {
+        display: inline-flex;
+        align-items: center;
+        background: #383838;
+        border-radius: 12px;
+        padding: 2px 8px;
+        color: white;
+        font-size: 12px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        height: 24px;
+    }
+
+    .keyword-tag-remove {
+        margin-left: 4px;
+        cursor: pointer;
+        color: #ccc;
+        font-size: 14px;
+    }
+
+    .keyword-input:focus {
+        outline: none;
+    }
+      .filter-mode-radio-group {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin: 10px 0;
+    }
+
+    .radio-button-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    .radio-button {
+        width: 16px;
+        height: 16px;
+        border: 2px solid #b3b3b3;
+        border-radius: 50%;
+        display: flex;
+        padding: 2px;
+    }
+
+    .radio-button input {
+        display: none;
+    }
+
+    .radio-button-inner {
+        width: 8px;
+        height: 8px;
+        background-color: #1DB954;
+        border-radius: 50%;
+        display: none;
+    }
+
+    .radio-button input:checked + .radio-button-inner {
+        display: block;
+    }
+
+    .radio-label {
+        color: #b3b3b3;
+        font-size: 13px;
+    }
+
+    .radio-button-container:hover .radio-button {
+        border-color: #ffffff;
+    }
+
+    .radio-button-container:hover .radio-label {
+        color: #ffffff;
+    }
+    .load-more-row {
+        cursor: pointer;
+        background-color: #3e3e3e;
+        text-align: center;
+        position: sticky;
+        left: 0;
+        z-index: 1;
+    }
+    .load-more-cell {
+        padding: 10px;
+        font-size: 12px;
+        text-align: center;
+        transition: background-color 0.2s;
+    }
+    .load-more-row:hover .load-more-cell {
+        background-color: #4c4c4c;
+    }
+     .buttons-container {
+        display: flex;
+        justify-content: flex-start;
+        padding: 16px 32px;
+    }
+    </style>
+    <div class="playlist-player-wrapper">
+        <div class="playlist-title-container">
+          <span class="playlist-title" style="color: #fff; font-size: 15px; font-weight: bold;">Playlist Name</span>
+          <div class="playlist-stats-container">
+              <! -- Stats will go here -->
+          </div>
+      </div>
+      <div class="playlist-wrapper">
+          <table class="tracklist-table">
+              <thead>
+                  <tr>
+                      ${tableHeaders}
+                  </tr>
+              </thead>
+              <tbody>
+                  ${generateTableRows(displayedTracks)}
+              </tbody>
+          </table>
+      </div>
+        <div class="player-controls2">
+          <div class="track-info-container">
+              <div class="track-album-art">
+              </div>
+              <div class="track-info-text">
+                  <span class="track-title">Track Title</span>
+                  <span class="track-artist">Artist Name</span>
+              </div>
+          </div>
+          <div class="progress-bar2-container">
+              <button class="control-button2" id="playPauseButton">
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/>
+                  </svg>
+              </button>
+              <span id="currentTime">0:00</span>
+              <div class="progress-bar2" id="progressBar">
+                  <div class="progress-bar2-inner" id="progressBarInner"></div>
+              </div>
+              <span id="duration">0:00</span>
+          </div>
+          <div class="max-rows-container">
+              <span class="max-rows-label">Max Rows:</span>
+              <select class="max-rows-select">
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="200">200</option>
+                  <option value="300">300</option>
+                  <option value="500">500</option>
+                  <option value="700">800</option>
+                  <option value="1000">1000</option>
+                  <option value="all">All</option>
+              </select>
+          </div>
+      </div>
+    </div>
+    <div class="filter-settings-container">
+      <div class="settings-left-wrapper">
+          <div class="settings-title-wrapper">
+              <div class="settings-title">Keyword Filters</div>
+              <label class="switch">
+                  <input type="checkbox" id="keywordFilterToggle">
+                  <span class="slider"></span>
+              </label>
+          </div>
+          <div class="filter-mode-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
+            <div class="filter-mode-radio-group" style="display: flex; align-items: center; gap: 16px;">
+              <div class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-right: 8px;">Filter Mode:</div>
+              <label class="radio-button-container">
+                <span class="radio-button">
+                  <input type="radio" name="filterMode" value="exclude">
+                  <span class="radio-button-inner"></span>
+                </span>
+                <span class="radio-label">Exclude</span>
+              </label>
+              <label class="radio-button-container">
+                <span class="radio-button">
+                  <input type="radio" name="filterMode" value="keep">
+                  <span class="radio-button-inner"></span>
+                </span>
+                <span class="radio-label">Keep</span>
+              </label>
+              <span class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-left: 14px;">Match Whole Word:</span>
+            </div>
+
+            <label class="switch">
+              <input type="checkbox" id="matchWholeWordToggle">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="keyword-filter-container">
+              <div class="filter-group">
+                  <div class="filter-group-header">
+                      <span class="filter-group-title">Titles/Albums</span>
+                      <div class="toggle-group">
+                          <span class="filter-mode-toggle-label">Title</span>
+                          <label class="switch">
+                              <input type="checkbox" id="titleToggle" checked>
+                              <span class="slider"></span>
+                          </label>
+                          <span class="filter-mode-toggle-label">Album</span>
+                          <label class="switch">
+                          <input type="checkbox" id="albumToggle" checked>
+                          <span class="slider"></span>
+                      </label>
+                      </div>
+                  </div>
+                  <div class="keyword-input-container" id="titleAlbumKeywords">
+                      <div class="keyword-tags-container">
+                      </div>
+                      <div class="keyword-input-wrapper">
+                        <input type="text" class="keyword-input" placeholder="Add keywords...">
+                          <div class="keyword-actions-container">
+                              <button class="keyword-action-button keyword-save-button" title="Save Keywords">${saveIconSVG}</button>
+                              <button class="keyword-action-button keyword-load-button" title="Load Keywords">${loadIconSVG}</button>
+                              <button class="keyword-action-button keyword-remove-all-button" title="Clear Keywords">${clearIconSVG}</button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="filter-group">
+                <div class="filter-group-header">
+                  <span class="filter-group-title">Artists</span>
+                    <div class="toggle-group">
+                      <label class="switch">
+                        <input type="checkbox" id="artistToggle" checked>
+                        <span class="slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="keyword-input-container" id="artistKeywords">
+                      <div class="keyword-tags-container">
+                      </div>
+                      <div class="keyword-input-wrapper">
+                          <input type="text" class="keyword-input" placeholder="Add keywords...">
+                      </div>
+                  </div>
+              </div>
+            </div>
+      </div>
+      <div class="settings-right-wrapper">
+            <div class="settings-title-wrapper">
+                <div class="settings-title">Range Filters</div>
+                  <label class="switch">
+                    <input type="checkbox" id="rangeFilterToggle" checked>
+                  <span class="slider"></span>
+              </label>
+            </div>
+            <div class="range-filters-items">
+                <div class="range-filter-container">
+                  <div class="range-filter-title-wrapper">
+                      <span class="range-filter-label">Filter by:</span>
+                          <div class="range-filter-title">
+                              <select id="rangeFilterType">
+                                  <option value="releaseDate" ${activeRangeFilter === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                                  <option value="durationMs" ${activeRangeFilter === 'durationMs' ? 'selected' : ''}>Duration</option>
+                                  <option value="playCount" ${activeRangeFilter === 'playCount' ? 'selected' : ''}>Plays</option>
+                                  <option value="popularity" ${activeRangeFilter === 'popularity' ? 'selected' : ''}>Popularity</option>
+                                  <option value="features.energy" ${activeRangeFilter === 'features.energy' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Energy</option>
+                                  <option value="features.danceability" ${activeRangeFilter === 'features.danceability' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Danceability</option>
+                                  <option value="features.valence" ${activeRangeFilter === 'features.valence' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Valence</option>
+                                  <option value="features.tempo" ${activeRangeFilter === 'features.tempo' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Tempo</option>
+                              </select>
+                          </div>
+                    </div>
+                    <div class="range-input-container">
+                        <input type="text" class="range-input" id="rangeMin" placeholder="Min">
+                        <div class="dual-range-slider-container" id="rangeSlider">
+                            <div class="slider-track"></div>
+                            <input type="range"  id="rangeSlider-1">
+                            <input type="range"  id="rangeSlider-2">
+                        </div>
+                        <input type="text" class="range-input" id="rangeMax" placeholder="Max">
+                    </div>
+                </div>
+            </div>
+      </div>
+      <div class="buttons-wrapper">
+          <label for="sort-type-select" style="color: #fff; font-size: 13px; margin-right: 8px;">Sort Type:</label>
+            <select class="sort-type-select" id="sort-type-select">
+                <option value="default">Original Order</option>
+                <option value="current">Current Order</option>
+                <option value="playCount">Play Count</option>
+                <option value="popularity">Popularity</option>
+                <option value="releaseDate">Release Date</option>
+                <option value="shuffle">Shuffle</option>
+            </select>
+            <button id="customFilterCreatePlaylist">Create Playlist</button>
+      </div>
+  </div>
+    `;
+
+    Spicetify.PopupModal.display({
+        title: "<span style='font-size: 24px; font-weight: 700;'>Custom Filter</span>",
+        content: modalContainer,
+        isLarge: true,
+    });
+    
+    const playlistTitleElement = modalContainer.querySelector(".playlist-title");
+    updatePlaylistStats();
+    const currentUri = getCurrentUri();
+    if (URI.isPlaylistV1OrV2(currentUri)) {
+        const playlistId = currentUri.split(":")[2];
+        Spicetify.CosmosAsync.get(
+            `https://api.spotify.com/v1/playlists/${playlistId}`
+        ).then((r) => {
+            playlistTitleElement.textContent = r.name;
+            playlistTitleElement.title = r.name;
+        });
+    } else if (URI.isArtist(currentUri)) {
+        Spicetify.CosmosAsync.get(
+            `https://api.spotify.com/v1/artists/${currentUri.split(":")[2]}`
+        ).then((r) => {
+            playlistTitleElement.textContent = `All tracks by ${r.name}`;
+            playlistTitleElement.title = `All tracks by ${r.name}`;
+
+        });
+    } else if (isLikedSongsPage(currentUri)) {
+        playlistTitleElement.textContent = "Liked Songs";
+        playlistTitleElement.title = "Liked Songs";
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    const genericModalOverlay = document.querySelector(".GenericModal__overlay");
+
+    if (genericModalOverlay) {
+        genericModalOverlay.appendChild(overlay);
+    }
+
+    if (overlay) {
+        overlay.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+    }
+
+    const modalContainerElement = document.querySelector(".main-popupModal-container");
+    if (modalContainerElement) {
+        modalContainerElement.style.zIndex = "2000";
+    }
+
+    tableBody = modalContainer.querySelector(".tracklist-table tbody");
+    let activeRow = null;
+    setupTableEventListeners(tableBody, originalTracks);
+
+    settingsLeftWrapper = modalContainer.querySelector('.settings-left-wrapper');
+    keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
+    rangeFilterToggle = modalContainer.querySelector("#rangeFilterToggle");
+    rangeFilterTypeSelect = modalContainer.querySelector("#rangeFilterType");
+    filterModeRadios = modalContainer.querySelectorAll('input[name="filterMode"]');
+    titleToggle = modalContainer.querySelector("#titleToggle");
+    albumToggle = modalContainer.querySelector("#albumToggle");
+    const titleAlbumContainer = modalContainer.querySelector("#titleAlbumKeywords");
+    const artistContainer = modalContainer.querySelector("#artistKeywords");
+    matchWholeWordToggle = modalContainer.querySelector("#matchWholeWordToggle");
+    artistToggle = modalContainer.querySelector("#artistToggle");
+    maxRowsSelect = modalContainer.querySelector(".max-rows-select");
+
+    keepMatchingMode = localStorage.getItem("sort-play-keep-matching-mode") === "true";
+    titleToggle.checked = localStorage.getItem("sort-play-filter-title") !== "false";
+    albumToggle.checked = localStorage.getItem("sort-play-filter-album") !== "false";
+    artistToggle.checked = localStorage.getItem("sort-play-filter-artist") !== "false";
+    matchWholeWord = localStorage.getItem("sort-play-match-whole-word") === "true";
+    const savedPageSize = localStorage.getItem("sort-play-page-size");
+    maxRowsSelect.value = savedPageSize || "100";
+    matchWholeWordToggle.checked = matchWholeWord;
+
+
+    pageSize = maxRowsSelect.value === "all" ? tracks.length : parseInt(maxRowsSelect.value);
+
+
+    maxRowsSelect.addEventListener("change", () => {
+        const selectedValue = maxRowsSelect.value;
+
+        if (selectedValue === "all") {
+            pageSize = tracks.length;
+        } else {
+            pageSize = parseInt(selectedValue);
+        }
+
+        localStorage.setItem("sort-play-page-size", selectedValue);
+
+        startIndex = 0;
+        isFirstLoad = true;
+        isLastLoad = tracks.length <= pageSize + paginationThreshold;
+        displayedTracks = tracks.slice(startIndex, isLastLoad ? tracks.length : pageSize);
+        updateTable(displayedTracks);
+
+        const playlistWrapper = modalContainer.querySelector(".playlist-wrapper");
+        if (playlistWrapper) {
+            playlistWrapper.scrollTop = 0;
+        }
+    });
+
+    startIndex = 0;
+    isFirstLoad = true;
+    isLastLoad = tracks.length <= pageSize + paginationThreshold;
+
+    displayedTracks = tracks.slice(startIndex, isLastLoad ? tracks.length : pageSize);
+    updateTable(displayedTracks);
+    loadKeywords();
+    setupKeywordInput(titleAlbumContainer, titleAlbumKeywords);
+    setupKeywordInput(artistContainer, artistKeywords);
+
+    tableBody.addEventListener("click", (event) => {
+        const row = event.target.closest("tr");
+        if (!row) return;
+
+        if (event.target.closest(".actions-col")) {
+            return;
+        }
+
+        if (activeRow) {
+            activeRow.classList.remove("active");
+        }
+
+        row.classList.add("active");
+        activeRow = row;
+    });
+
+    function updateTrackInfo(track) {
+        const trackTitleElement = modalContainer.querySelector(".track-title");
+        const trackArtistElement = modalContainer.querySelector(".track-artist");
+        const trackAlbumArtElement = modalContainer.querySelector(".track-album-art");
+
+        trackTitleElement.textContent = track.songTitle || track.name;
+        trackTitleElement.title = track.songTitle || track.name;
+        trackArtistElement.textContent = track.allArtists;
+        trackArtistElement.title = track.allArtists;
+
+        trackAlbumArtElement.innerHTML = '';
+
+        const newAlbumArt = document.createElement("img");
+        newAlbumArt.src = "/api/placeholder/40/40";
+        newAlbumArt.alt = "";
+        newAlbumArt.className = "player-album-art";
+        newAlbumArt.width = 40;
+        newAlbumArt.height = 40;
+        newAlbumArt.style.borderRadius = "4px";
+        newAlbumArt.dataset.trackUri = track.uri;
+
+        trackAlbumArtElement.appendChild(newAlbumArt);
+        trackAlbumArtElement.title = `${track.songTitle || track.name} - ${track.allArtists}`;
+        loadAlbumArt(track, newAlbumArt);
+    }
+
+    tableBody.addEventListener("dblclick", async (event) => {
+        const row = event.target.closest("tr");
+        if (!row) return;
+
+        const trackUri = row.dataset.trackUri;
+        if (trackUri) {
+
+            if (activeRow && activeRow !== row) {
+                activeRow.classList.remove("active");
+            }
+
+            row.classList.add("active");
+            activeRow = row;
+            await Spicetify.Player.playUri(trackUri);
+
+            const track = originalTracks.find(t => t.uri === trackUri);
+            if (track) {
+                updateTrackInfo(track);
+            }
+        }
+    });
+
+    tableBody.addEventListener("click", (event) => {
+        if (event.target.tagName === "svg" || event.target.tagName === "path") {
+            event.stopPropagation();
+        }
+
+        const removeButton = event.target.closest(".remove-button");
+        if (!removeButton) return;
+
+        const row = removeButton.closest("tr");
+        const trackUri = row.dataset.trackUri;
+        const track = originalTracks.find(t => t.uri === trackUri);
+
+        if (track) {
+            track.isRemoved = !track.isRemoved;
+            row.classList.toggle("removed");
+            const svgIcon = removeButton.querySelector("svg");
+            svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
+            updatePlaylistStats();
+        }
+    });
+
+    let isRemoveDragging = false;
+    let lastRemovedState = null;
+
+    tableBody.addEventListener("mousedown", (event) => {
+        const removeButton = event.target.closest(".remove-button");
+        if (!removeButton) return;
+
+        isRemoveDragging = true;
+        const row = removeButton.closest("tr");
+        const trackUri = row.dataset.trackUri;
+        const track = originalTracks.find(t => t.uri === trackUri);
+
+        if (track) {
+            track.isRemoved = !track.isRemoved;
+            lastRemovedState = track.isRemoved;
+            row.classList.toggle("removed");
+
+            const svgIcon = removeButton.querySelector("svg");
+            svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
+        }
+
+        event.preventDefault();
+    });
+
+    tableBody.addEventListener("mouseover", (event) => {
+        if (!isRemoveDragging) return;
+
+        const removeButton = event.target.closest(".remove-button");
+        if (!removeButton) return;
+
+        const row = removeButton.closest("tr");
+        const trackUri = row.dataset.trackUri;
+        const track = originalTracks.find(t => t.uri === trackUri);
+
+        if (track && track.isRemoved !== lastRemovedState) {
+            track.isRemoved = lastRemovedState;
+            row.classList.toggle("removed", lastRemovedState);
+
+            const svgIcon = removeButton.querySelector("svg");
+            svgIcon.outerHTML = lastRemovedState ? restoreIconSVG : removeIconSVG;
+        }
+    });
+
+    document.addEventListener("mouseup", () => {
+        isRemoveDragging = false;
+        lastRemovedState = null;
+    });
+
+    tableBody.addEventListener("click", (event) => {
+        if (event.target.tagName === "svg" || event.target.tagName === "path") {
+            event.stopPropagation();
+        }
+
+        const removeButton = event.target.closest(".remove-button");
+        if (!removeButton) return;
+
+        const row = removeButton.closest("tr");
+        const trackUri = row.dataset.trackUri;
+        const track = originalTracks.find(t => t.uri === trackUri);
+
+        if (track) {
+            track.isRemoved = !track.isRemoved;
+            row.classList.toggle("removed");
+
+            const svgIcon = removeButton.querySelector("svg");
+            svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
+            updatePlaylistStats();
+        }
+    });
+
+    let currentSort = { key: null, direction: 'none' };
+    function updateHeaderText(header, direction) {
+        const sortKey = header.dataset.sortKey;
+        const baseText = header.textContent.split(' ')[0];
+
+        if (direction === 'none') {
+            header.textContent = baseText;
+            header.classList.remove('sorted');
+        } else {
+            const arrow = direction === 'ascending' ? ' ▲' : ' ▼';
+            header.textContent = baseText + arrow;
+            header.classList.toggle("sorted", direction !== 'none');
+            header.classList.add('sorted');
+        }
+    }
+
+
+    updateTable(displayedTracks);
+
+
+    modalContainer.querySelectorAll(".tracklist-table th[data-sort-key]").forEach(header => {
+        header.addEventListener('click', () => {
+            const sortKey = header.dataset.sortKey;
+
+            modalContainer.querySelectorAll(".tracklist-table th[data-sort-key]").forEach(h => {
+                if (h !== header) {
+                    updateHeaderText(h, 'none');
+                }
+            });
+
+            if (currentSort.key === sortKey) {
+                currentSort.direction = currentSort.direction === 'ascending' ? 'descending' :
+                    (currentSort.direction === 'descending' ? 'none' : 'ascending');
+            } else {
+                currentSort.key = sortKey;
+                currentSort.direction = 'ascending';
+            }
+
+            updateHeaderText(header, currentSort.direction);
+
+            let sortedTracks;
+            if (currentSort.direction === 'none') {
+                sortedTracks = [...originalTracks];
+            } else {
+                sortedTracks = sortTracks(tracks, currentSort.key, currentSort.direction);
+            }
+            tracks = sortedTracks;
+            startIndex = 0;
+            isFirstLoad = true;
+            isLastLoad = tracks.length <= pageSize + paginationThreshold;
+            displayedTracks = tracks.slice(startIndex, isLastLoad ? tracks.length : pageSize);
+            updateTable(displayedTracks);
+        });
+    });
+
+
+    const playPauseButton = modalContainer.querySelector('#playPauseButton');
+    const progressBar = modalContainer.querySelector('#progressBar');
+    const progressBarInner = modalContainer.querySelector('#progressBarInner');
+    const currentTimeElement = modalContainer.querySelector('#currentTime');
+    const durationElement = modalContainer.querySelector('#duration');
+
+    let isDragging = false;
+
+    function updatePlayButton(isPlaying) {
+        playPauseButton.innerHTML = isPlaying
+            ? '<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>'
+            : '<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>';
+    }
+
+    updatePlayButton(Spicetify.Player.isPlaying());
+
+    playPauseButton.addEventListener('click', () => {
+        Spicetify.Player.togglePlay();
+    });
+
+    progressBar.addEventListener('mousedown', (e) => {
+        e.stopPropagation();
+        isDragging = true;
+        const rect = progressBar.getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        const duration = Spicetify.Player.getDuration();
+        Spicetify.Player.seek(pos * duration);
+    });
+
+
+    progressBar.addEventListener('mousemove', (e) => {
+        e.stopPropagation();
+        if (!isDragging) return;
+        const rect = progressBar.getBoundingClientRect();
+        const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        progressBarInner.style.width = `${pos * 100}%`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    function updateProgress() {
+        if (!isDragging) {
+            const progress = Spicetify.Player.getProgress();
+            const duration = Spicetify.Player.getDuration();
+            const progressPercent = (progress / duration) * 100;
+            progressBarInner.style.width = `${progressPercent}%`;
+            currentTimeElement.textContent = Spicetify.Player.formatTime(progress);
+            durationElement.textContent = Spicetify.Player.formatTime(duration);
+        }
+    }
+
+    const playerStateHandler = ({ data: { isPaused } }) => {
+        updatePlayButton(!isPaused);
+    };
+
+    Spicetify.Player.addEventListener('onplaypause', playerStateHandler);
+
+    const progressInterval = setInterval(updateProgress, 100);
+
+    const cleanup = () => {
+        if (observer) {
+            observer.disconnect();
+        }
+        clearInterval(progressInterval);
+        Spicetify.Player.removeEventListener('onplaypause', playerStateHandler);
+        if (closeButton) {
+            closeButton.removeEventListener("click", cleanup);
+        }
+
+
+        document.removeEventListener("mousemove", handleTrackMove);
+        activeRow = null;
+
+        Spicetify.PopupModal.hide();
+
+    };
+    const closeButton = document.querySelector('.main-trackCreditsModal-closeBtn');
+    if (closeButton) {
+        closeButton.addEventListener("click", cleanup);
+    }
+
+
+    const modalContainerElementForMutation = document.querySelector('.main-popupModal-container');
+    if (modalContainerElementForMutation) {
+        const mutationObserver = new MutationObserver((mutations) => {
+            const closeButton = modalContainerElementForMutation.querySelector('.main-trackCreditsModal-closeBtn');
+            if (closeButton && !closeButton.hasAttribute('data-cleanup-attached')) {
+                closeButton.setAttribute('data-cleanup-attached', 'true');
+                closeButton.addEventListener("click", cleanup);
+            }
+        });
+
+        mutationObserver.observe(modalContainerElementForMutation, {
+            childList: true,
+            subtree: true
+        });
+    }
+    setupDualRangeSlider("rangeSlider", "rangeMin", "rangeMax");
+    updateRangeUI(activeRangeFilter);
+
+    rangeFilterTypeSelect.addEventListener("change", (e) => {
+        activeRangeFilter = e.target.value;
+        localStorage.setItem("sort-play-active-range-filter", activeRangeFilter);
+        updateRangeUI(activeRangeFilter);
+        debouncedUpdateTrackFilters();
+    });
+
+    rangeFilterToggle.addEventListener("change", () => {
+        updateTrackFilters();
+    });
+
+    matchWholeWordToggle.addEventListener("change", (e) => {
+        matchWholeWord = e.target.checked;
+        updateTrackFilters();
+    });
+
+
+    settingsLeftWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
+
+    keywordFilterToggle.addEventListener("change", (e) => {
+        settingsLeftWrapper.classList.toggle('disabled', !e.target.checked);
+
+        if (!e.target.checked) {
+            tracks.forEach(track => {
+                track.isRemovedByKeyword = false;
+            });
+        }
+        updateTrackFilters();
+    });
+
+    filterModeRadios.forEach(radio => {
+        if ((keepMatchingMode && radio.value === "keep") || (!keepMatchingMode && radio.value === "exclude")) {
+            radio.checked = true;
+        }
+    });
+
+    filterModeRadios.forEach(radio => {
+        radio.addEventListener("change", (e) => {
+            keepMatchingMode = e.target.value === "keep";
+            updateTrackFilters();
+        });
+    });
+
+    matchWholeWordToggle.addEventListener("change", (e) => {
+        matchWholeWord = e.target.checked;
+        updateTrackFilters();
+    });
+
+
+    titleToggle.addEventListener("change", updateTrackFilters);
+    albumToggle.addEventListener("change", updateTrackFilters);
+    artistToggle.addEventListener("change", updateTrackFilters);
+
+    const createPlaylistButton = modalContainer.querySelector("#customFilterCreatePlaylist");
+    const sortTypeSelect = modalContainer.querySelector(".sort-type-select");
+    let selectedSortType = "default";
+
+    sortTypeSelect.addEventListener("change", () => {
+        selectedSortType = sortTypeSelect.value;
+    });
+
+    function setupTableEventListeners(tableBody, originalTracks) {
+      if (!tableBody) return;
+
+      let isRemoveDragging = false;
+      let lastRemovedState = null;
+      let activeRow = null;
+
+      tableBody.addEventListener("mousedown", (event) => {
+          const removeButton = event.target.closest(".remove-button");
+          if (!removeButton) return;
+
+          isRemoveDragging = true;
+          const row = removeButton.closest("tr");
+          const trackUri = row.dataset.trackUri;
+          const track = originalTracks.find(t => t.uri === trackUri);
+
+          if (track) {
+              track.isRemoved = !track.isRemoved;
+              lastRemovedState = track.isRemoved;
+              row.classList.toggle("removed");
+
+              const svgIcon = removeButton.querySelector("svg");
+              svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
+              updatePlaylistStats(); // update here
+          }
+
+          event.preventDefault();
+      });
+
+      tableBody.addEventListener("mouseover", (event) => {
+          if (!isRemoveDragging) return;
+
+          const removeButton = event.target.closest(".remove-button");
+          if (!removeButton) return;
+
+          const row = removeButton.closest("tr");
+          const trackUri = row.dataset.trackUri;
+          const track = originalTracks.find(t => t.uri === trackUri);
+
+          if (track && track.isRemoved !== lastRemovedState) {
+              track.isRemoved = lastRemovedState;
+              row.classList.toggle("removed", lastRemovedState);
+
+              const svgIcon = removeButton.querySelector("svg");
+              svgIcon.outerHTML = lastRemovedState ? restoreIconSVG : removeIconSVG;
+              updatePlaylistStats(); 
+          }
+      });
+
+      document.addEventListener("mouseup", () => {
+          isRemoveDragging = false;
+          lastRemovedState = null;
+          updatePlaylistStats();
+      });
+
+      tableBody.addEventListener("click", async (event) => {
+        const row = event.target.closest("tr");
+        if (!row) return;
+
+        const removeButton = event.target.closest(".remove-button");
+        if (removeButton) {
+            const trackUri = row.dataset.trackUri;
+            const track = originalTracks.find(t => t.uri === trackUri);
+
+            if (track) {
+                track.isRemoved = !track.isRemoved;
+                row.classList.toggle("removed", track.isRemoved);
+                const svgIcon = removeButton.querySelector("svg");
+                svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
+            }
+            return; 
+        }
+
+        if (!event.target.closest(".actions-col")) {
+          if (activeRow) {
+            activeRow.classList.remove("active");
+          }
+          row.classList.add("active");
+          activeRow = row;
+        }
+      });
+
+      tableBody.addEventListener("dblclick", async (event) => {
+        const row = event.target.closest("tr");
+        if (!row) return;
+
+        const trackUri = row.dataset.trackUri;
+        if (trackUri) {
+          if (activeRow && activeRow !== row) {
+            activeRow.classList.remove("active");
+          }
+          row.classList.add("active");
+          activeRow = row;
+          await Spicetify.Player.playUri(trackUri);
+
+          const track = originalTracks.find(t => t.uri === trackUri);
+          if (track) {
+            updateTrackInfo(track);
+          }
+        }
+      });
+    }
+      
+    createPlaylistButton.addEventListener("click", async () => {
+        const filteredTracks = tracks.filter(track => !track.isRemoved);
+
+        if (filteredTracks.length === 0) {
+            Spicetify.showNotification("No tracks selected to create a playlist.");
+            return;
+        }
+
+        Spicetify.PopupModal.hide();
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        mainButton.innerHTML = "0%";
+
+        try {
+            let sortedTracksForPlaylist;
+            selectedSortType = sortTypeSelect.value;
+
+            if (selectedSortType === "default") {
+                sortedTracksForPlaylist = [...originalTracks].filter(track => !track.isRemoved);
+
+            } else if (selectedSortType === "current") {
+                sortedTracksForPlaylist = [...tracks].filter(track => !track.isRemoved);
+            } else if (selectedSortType === "shuffle") {
+                sortedTracksForPlaylist = shuffleArray(filteredTracks);
+            }
+            else {
+                sortedTracksForPlaylist = sortTracks(filteredTracks, selectedSortType, sortOrderState[selectedSortType] ? "ascending" : "descending");
+            }
+            mainButton.innerText = "100%";
+
+            const sourceUri = getCurrentUri();
+            let sourceName;
+            if (URI.isArtist(sourceUri)) {
+                sourceName = await Spicetify.CosmosAsync.get(
+                    `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
+                ).then((r) => r.name);
+            } else if (isLikedSongsPage(sourceUri)) {
+                sourceName = "Liked Songs";
+            } else {
+                sourceName = await Spicetify.CosmosAsync.get(
+                    `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+                ).then((r) => r.name);
+            }
+            const possibleSuffixes = [
+                "\\(PlayCount\\)",
+                "\\(Popularity\\)",
+                "\\(ReleaseDate\\)",
+                "\\(LFM Scrobbles\\)",
+                "\\(LFM My Scrobbles\\)",
+                "\\(Shuffle\\)",
+                "\\(AI Pick\\)",
+                "\\(Custom Filter\\)",
+            ];
+
+            let suffixPattern = new RegExp(
+                `\\s*(${possibleSuffixes.join("|")})\\s*`
+            );
+
+            while (suffixPattern.test(sourceName)) {
+                sourceName = sourceName.replace(suffixPattern, "");
+            }
+
+
+            let baseDescription = `Filtered using Sort-Play`;
+            if (URI.isArtist(sourceUri)) {
+                baseDescription = `Tracks by ${sourceName} Filtered using Sort-Play`;
+            }
+
+            let playlistDescription = baseDescription;
+
+            const playlistName = `${sourceName} (Custom Filter)`;
+
+            try {
+                const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+                mainButton.innerText = "Saving...";
+                const trackUris = sortedTracksForPlaylist.map((track) => track.uri);
+                await addTracksToPlaylist(newPlaylist.id, trackUris);
+
+                const sortTypeInfo = {
+                    playCount: { fullName: "play count", shortName: "PlayCount" },
+                    popularity: { fullName: "popularity", shortName: "Popularity" },
+                    releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
+                    scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
+                    personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
+                    shuffle: { fullName: "shuffle", shortName: "Shuffle" },
+                    aiPick: { fullName: "AI pick", shortName: "AI Pick" },
+                    default: { fullName: "Default", shortName: "Default" },
+                    current: { fullName: "Current", shortName: "Current" },
+
+                }[selectedSortType];
+
+                Spicetify.showNotification(
+                    `Playlist created with ${sortTypeInfo.fullName} and custom filter!`
+                );
+            } catch (error) {
+                console.error("Error creating or updating playlist:", error);
+                Spicetify.showNotification(
+                    `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
+                );
+            }
+        }
+        finally {
+            resetButtons();
+        }
+
+    });
+
+
+    if (isMenuOpen) {
+        toggleMenu();
+        isButtonClicked = false;
+        mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
+        mainButton.style.color = buttonStyles.main.color;
+        svgElement.style.fill = buttonStyles.main.color;
+        mainButton.style.filter = "brightness(1)";
+    }
+  }
+  
   async function showGenreFilterModal(tracks, trackGenreMap) {
     const allGenres = new Set();
     trackGenreMap.forEach((genres) => {
@@ -1997,6 +5545,8 @@
       max-width: 620px !important;
       border-radius: 30px;
       overflow: hidden; 
+      background-color: #181818;
+      border: 2px solid #282828;
     }
     .GenericModal__overlay .GenericModal {
       border-radius: 30px;
@@ -2129,7 +5679,9 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: transparent;
+      background: rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
       z-index: 999;
     }
     .GenericModal {
@@ -2390,6 +5942,7 @@
     if (modalContainerElement) {
       modalContainerElement.style.zIndex = "2000";
     }
+    preventDragCloseModal();
 
     const matchAllGenresToggle = modalContainer.querySelector("#matchAllGenresToggle");
     const genreContainer = modalContainer.querySelector(".genre-container");
@@ -2702,7 +6255,7 @@
   
   
       if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
-          mainButton.disabled = true;
+          setButtonProcessing(true);
           mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
           mainButton.style.color = buttonStyles.main.disabledColor;
           mainButton.style.cursor = "default";
@@ -2753,23 +6306,23 @@
           }
   
           if (sortType === "playCount") {
-              sortedTracks = uniqueTracks
-                  .filter((track) => track.playCount !== "N/A")
-                  .sort((a, b) => b.playCount - a.playCount);
+            sortedTracks = uniqueTracks
+              .filter((track) => track.playCount !== "N/A")
+              .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount);
           } else if (sortType === "popularity") {
-              sortedTracks = uniqueTracks
-                  .filter((track) => track.popularity !== null)
-                  .sort((a, b) => b.popularity - a.popularity);
+            sortedTracks = uniqueTracks
+              .filter((track) => track.popularity !== null)
+              .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity);
           } else if (sortType === "releaseDate") {
-              sortedTracks = uniqueTracks
-                  .filter((track) => track.releaseDate !== null)
-                  .sort((a, b) => {
-                      return releaseDateReverse
-                          ? a.releaseDate - b.releaseDate
-                          : b.releaseDate - a.releaseDate;
-                  });
+            sortedTracks = uniqueTracks
+              .filter((track) => track.releaseDate !== null)
+              .sort((a, b) => {
+                return sortOrderState.releaseDate
+                  ? a.releaseDate - b.releaseDate
+                  : b.releaseDate - a.releaseDate;
+              });
           } else if (sortType === "shuffle") {
-              sortedTracks = shuffleArray(uniqueTracks);
+            sortedTracks = shuffleArray(uniqueTracks);
           }
   
           mainButton.innerText = "100%";
@@ -2779,7 +6332,7 @@
   
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
           try {
-              mainButton.disabled = true;
+              setButtonProcessing(true);
               mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
               mainButton.style.color = buttonStyles.main.disabledColor;
               mainButton.style.cursor = "default";
@@ -3170,18 +6723,15 @@
             CONFIG.lastfm.retryDelay
           );
 
-          // Check if response is ok before trying to parse JSON
           if (!artistResponse.ok) {
             throw new Error(`Artist API request failed with status ${artistResponse.status}`);
           }
 
-          // Get the response text first to check if it's empty
           const artistResponseText = await artistResponse.text();
           if (!artistResponseText) {
             throw new Error('Empty response from artist API');
           }
 
-          // Try to parse the JSON
           const artistData = JSON.parse(artistResponseText);
           genres = artistData?.artist?.tags?.tag?.map(tag => tag.name.toLowerCase()) || [];
       }
@@ -3189,7 +6739,6 @@
       lastfmCache.set(cacheKey, genres);
       return genres;
     } catch (error) {
-      // Log more specific error information
       console.warn(`Last.fm fetch failed for ${artist} - ${track}:`, {
         error: error.message,
         stack: error.stack,
@@ -3482,6 +7031,7 @@
         albumName: item.album.name,
         artistUris: item.artists.map((artist) => artist.uri),
         artistName: item.artists[0].name,
+        allArtists: item.artists.map(artist => artist.name).join(", "),
         durationMilis: item.duration.milliseconds,
         playCount: "N/A",    
         popularity: null,    
@@ -3514,6 +7064,7 @@
     albumUri: track.album.uri,
     albumName: track.album.name,
     artistUris: track.artists.map((artist) => artist.uri),
+    allArtists: track.artists.map((artist) => artist.name).join(", "),
     artistName: track.artists[0].name,
     durationMilis: track.duration.milliseconds,
     playcount: 0,
@@ -3638,7 +7189,7 @@
     };
   
     mainButton.innerHTML = '<div class="loader"></div>';
-    mainButton.disabled = true;
+    setButtonProcessing(true);
   
     try {
       const artistData = await GraphQL.Request(queryArtistOverview, {
@@ -3723,13 +7274,14 @@
                   uid: track.uid,
                   name: track.name,
                   albumUri: track.albumOfTrack?.uri || albumUri,
-                  albumName: track.albumOfTrack?.name || "Unknown Album",
+                  albumName: track.albumOfTrack?.name || albumRes.data.albumUnion.name || "Unknown Album",
                   artistUris: (track.artists?.items || []).map(
                     (artist) => artist?.uri || "unknown"
                   ),
                   artistName:
                     (track.artists?.items || [])[0]?.profile?.name ||
                     "Unknown Artist",
+                  allArtists: (track.artists?.items || []).map(artist => artist.profile?.name || "Unknown Artist").join(", "),
                   durationMilis: track.duration?.totalMilliseconds || 0,
                   playcount: 0,
                   popularity: 0,
@@ -4004,7 +7556,8 @@
         durationMs: track.track.duration_ms,
         playCount: playCount,
         uri: `spotify:track:${track.track.id}`,
-        artistName: track.artistName 
+        artistName: track.artistName,
+        allArtists: track.allArtists,
       };
     } catch (error) {
       console.error(
@@ -4413,7 +7966,7 @@
       }, 350);
     });
   }
-    
+
   function getSortArrowSvg(reverse) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 16 16");
@@ -4476,7 +8029,7 @@
 
     return innerButton;
   }
-    
+
   const buttonStyles = {
     main: {
       backgroundColor: "transparent",
@@ -4536,6 +8089,12 @@
         color: "white",
         text: "Genre Filter",
         sortType: "genreFilter",
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
+        text: "Custom Filter",
+        sortType: "customFilter",
       },
       {
         backgroundColor: "transparent",
@@ -4615,14 +8174,16 @@
   let isButtonClicked = false;
 
   mainButton.addEventListener("mouseenter", () => {
-    if (!mainButton.disabled) {
-      mainButton.style.cursor = "pointer";
+    mainButton.style.cursor = "pointer";
+    if (!isProcessing) { 
       mainButton.style.color = buttonStyles.main.hoverColor;
       svgElement.style.fill = buttonStyles.main.hoverColor;
     }
   });
+  
   mainButton.addEventListener("mouseleave", () => {
-    if (!mainButton.disabled) {
+    mainButton.style.cursor = "pointer"; 
+    if (!isProcessing) {  
       mainButton.style.color = isButtonClicked ? buttonStyles.main.clickColor : buttonStyles.main.color;
       svgElement.style.fill = isButtonClicked ? buttonStyles.main.clickColor : buttonStyles.main.color;
     }
@@ -4705,8 +8266,6 @@
   menuContainer.style.boxShadow = "rgba(0, 0, 0, 0.3) 0px 16px 24px 0px";
   menuContainer.classList.add('main-contextMenu-menu');
   createBackgroundObserver(menuContainer);
-
-  let releaseDateReverse = localStorage.getItem("sort-play-release-date-reverse") === "true";
   
   const menuButtons = buttonStyles.menuItems.map((style) => {
     if (style.type === "divider") {
@@ -4813,59 +8372,6 @@
       const buttonTextSpan = document.createElement("span");
       buttonTextSpan.innerText = style.text;
       button.appendChild(buttonTextSpan);
-      
-
-      if (style.hasInnerButton) {
-        if (style.text === "Release Date") {
-            const innerButton = document.createElement("button");
-            innerButton.title = "Toggle Order (Newest/Oldest First)";
-            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            svg.setAttribute("viewBox", "0 0 16 16");
-            svg.setAttribute("width", "50%");
-            svg.setAttribute("height", "50%");
-            svg.style.fill = "#ffffffe6";  
-
-            const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
-
-            svg.appendChild(path);
-            innerButton.appendChild(svg);
-            
-            innerButton.style.cssText = `
-              background-color: transparent;
-              border: none;
-              border-radius: 2px;
-              padding: 0;
-              cursor: pointer;
-              position: absolute;
-              right: 0px; 
-              top: 50%;
-              transform: translateY(-50%);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              width: 32px;
-              height: 32px;
-            `;
-
-            innerButton.addEventListener("mouseenter", () => {
-              svg.style.fill = "#1ED760"; 
-            });
-            
-            innerButton.addEventListener("mouseleave", () => {
-              svg.style.fill = "#ffffffe6";  
-            });
-
-            innerButton.addEventListener("click", (event) => {
-              event.stopPropagation();
-              releaseDateReverse = !releaseDateReverse;
-              localStorage.setItem("sort-play-release-date-reverse", releaseDateReverse);
-              path.setAttribute("d", releaseDateReverse ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z" : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z");
-            });
-            
-            button.appendChild(innerButton);
-        }
-      }
 
     if (style.isSetting) {
       button.addEventListener("click", () => {
@@ -5067,7 +8573,7 @@
   
       if (item.hasInnerButton) {
         const svg = getSortArrowSvg(sortOrderState[item.sortType]); 
-        const innerButton = createInnerButton(item.sortType, button, svg);
+        const innerButton = createInnerButton(item.sortType, button, svg); 
         button.appendChild(innerButton);
       }
   
@@ -5092,26 +8598,72 @@
 
   window.addEventListener('scroll', closeAllMenus);
 
+  const setButtonProcessing = (processing) => {
+    isProcessing = processing;
+    mainButton.style.cursor = "pointer"; 
+    
+    if (processing) {
+      mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+      mainButton.style.color = buttonStyles.main.disabledColor;
+      svgElement.style.fill = buttonStyles.main.disabledColor;
+    } else {
+      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
+      mainButton.style.color = buttonStyles.main.color;
+      svgElement.style.fill = buttonStyles.main.color;
+    }
+  };
+  
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+
   mainButton.addEventListener("click", (event) => {
     event.stopPropagation();
-    if (!mainButton.disabled) {
-      isButtonClicked = !isButtonClicked;
-      
-      if (isButtonClicked) {
-        mainButton.style.backgroundColor = buttonStyles.main.clickBackgroundColor;
-        mainButton.style.color = buttonStyles.main.clickColor;
-        svgElement.style.fill = buttonStyles.main.clickColor;
-      } else {
-        mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-        mainButton.style.color = buttonStyles.main.color;
-        svgElement.style.fill = buttonStyles.main.color;
-      }
+    if (isProcessing) {
+      Spicetify.ReactDOM.render(
+        Spicetify.React.createElement(Spicetify.ReactComponent.ConfirmDialog, {
+          isOpen: true,
+          titleText: "Stop and Reload Spotify?",
+          descriptionText: "This will stop the current Sort-Play operation and reload Spotify. Unsaved changes may be lost.",
+          confirmText: "Confirm",
+          cancelText: "Cancel",
+          onConfirm: () => {
+            closeAllMenus();
+            isButtonClicked = false;
+            mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
+            mainButton.innerText = "stopping...";
+            mainButton.style.color = buttonStyles.main.color;
+            svgElement.style.fill = buttonStyles.main.color;
+            mainButton.style.filter = "brightness(1)";
+            setButtonProcessing(false);
+            Spicetify.ReactDOM.unmountComponentAtNode(container);
+            location.reload();
+          },
+          onClose: () => {
+            Spicetify.ReactDOM.unmountComponentAtNode(container);
+          },
+          onOutside: () => {
+            Spicetify.ReactDOM.unmountComponentAtNode(container);
+          }
+        }),
+        container 
+      );
+      return;
+    }
   
-      if (!isMenuOpen) {
-        toggleMenu();
-      } else {
-        closeAllMenus();
-      }
+    isButtonClicked = !isButtonClicked;
+    if (isButtonClicked) {
+      mainButton.style.backgroundColor = buttonStyles.main.clickBackgroundColor;
+      mainButton.style.color = buttonStyles.main.clickColor;
+      svgElement.style.fill = buttonStyles.main.clickColor;
+    } else {
+      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
+      mainButton.style.color = buttonStyles.main.color;
+      svgElement.style.fill = buttonStyles.main.color;
+    }
+    if (!isMenuOpen) {
+      toggleMenu();
+    } else {
+      closeAllMenus();
     }
   });
   
@@ -5177,7 +8729,7 @@
     attributes: true,
     attributeFilter: ['style', 'class']
   });
-    
+
   async function processBatchesWithDelay(
     tracks,
     batchSize = 200,
@@ -5314,7 +8866,7 @@
     if (sortType === "sortByParent") {
       return;
     }
-    mainButton.disabled = true;
+    setButtonProcessing(true);
     mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
     mainButton.style.color = buttonStyles.main.disabledColor;
     mainButton.style.cursor = "default";
@@ -5412,11 +8964,11 @@
         if (sortType === "playCount") {
           sortedTracks = uniqueTracks
             .filter((track) => track.playCount !== "N/A")
-            .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount); // Use sortOrderState
+            .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount); 
         } else if (sortType === "popularity") {
           sortedTracks = uniqueTracks
             .filter((track) => track.popularity !== null)
-            .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity); // Use sortOrderState
+            .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity);
         } else if (sortType === "releaseDate") {
           sortedTracks = uniqueTracks
             .filter((track) => track.releaseDate !== null)
@@ -5424,7 +8976,7 @@
               return sortOrderState.releaseDate
                 ? a.releaseDate - b.releaseDate
                 : b.releaseDate - a.releaseDate;
-            }); // Use sortOrderState
+            }); 
         } else if (sortType === "shuffle") {
           sortedTracks = shuffleArray(uniqueTracks);
         }
@@ -5878,11 +9430,11 @@
       const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
       sortedTracks = tracksWithScrobbles
         .filter((track) => includeZeroScrobbles || track.personalScrobbles > 0)
-        .sort((a, b) => sortOrderState.personalScrobbles ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0)); // Use sortOrderState and nullish
+        .sort((a, b) => sortOrderState.personalScrobbles ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
     } else {
       sortedTracks = tracksWithScrobbles
         .filter((track) => track.scrobbles !== null)
-        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles);  // Use sortOrderState
+        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles); 
     }
 
     if (sortedTracks.length === 0) {
@@ -5922,7 +9474,7 @@
             if (buttonStyle.onClick) {
                 await buttonStyle.onClick(event);
             } else if (sortType === "genreFilter") {
-                mainButton.disabled = true;
+                setButtonProcessing(true);
                 mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
                 mainButton.style.color = buttonStyles.main.disabledColor;
                 mainButton.style.cursor = "default";
@@ -5986,7 +9538,7 @@
 
   
   function resetButtons() {
-    mainButton.disabled = false;
+    setButtonProcessing(false);
     mainButton.innerText = "Sort Play"; 
     mainButton.appendChild(svgElement); 
     mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
