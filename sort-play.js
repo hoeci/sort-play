@@ -2318,7 +2318,7 @@
         <th class="sticky-col title-col" data-sort-key="songTitle">Title</th>
         <th class="sticky-col artist-col" data-sort-key="allArtists">Artist</th>
         <th data-sort-key="albumName">Album</th>
-        <th data-sort-key="releaseDate">Rel Date</th>
+        <th data-sort-key="releaseDate">Rel-Date</th>
         <th data-sort-key="durationMs">Duration</th>
         <th data-sort-key="playCount">Plays</th>
         <th data-sort-key="popularity">Popularity</th>
@@ -2568,7 +2568,7 @@
     function generateLoadMoreRow(direction) {
         const row = document.createElement("tr");
         row.className = `load-more-row load-more-row-${direction}`;
-        row.innerHTML = `<td colspan="100%" class="load-more-cell">. . . Load More . . .ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ. . . Load More . . .ㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤㅤ. . . Load More . . .</td>`;
+        row.innerHTML = `<td colspan="100%" class="load-more-cell">. . . Load More . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Load More . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . Load More . . .</td>`;
 
         row.addEventListener("click", (e) => {
             e.preventDefault();
