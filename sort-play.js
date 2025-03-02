@@ -5633,6 +5633,8 @@
       border-bottom-right-radius: 0;
       border-top-left-radius: 20px;
       border-top-right-radius: 20px;
+      scrollbar-width: thin;
+      scrollbar-color: #3b3b3b transparent;
     }
     .genre-filter-modal .genre-container::-webkit-scrollbar {
       width: 6px;
@@ -8324,7 +8326,7 @@
 
       parentButton.addEventListener("mouseenter", () => {
         if (!parentButton.disabled) {
-          parentButton.style.backgroundColor = "#3e3e3e";
+          parentButton.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
           openSubMenu(parentButton, style.children);
         }
       });
@@ -8364,7 +8366,7 @@
 
       button.addEventListener("mouseenter", () => {
         if (!button.disabled) {
-          button.style.backgroundColor = "#3e3e3e";
+          button.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
         }
       });
     
@@ -8519,7 +8521,7 @@
     menuContainer.style.bottom = '0';
 
     subMenu.addEventListener('mouseenter', () => {
-        parentButton.style.backgroundColor = "#3e3e3e";
+        parentButton.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
     });
 
     subMenu.addEventListener('mouseleave', (event) => {
@@ -8569,7 +8571,7 @@
       button.style.justifyContent = "space-between";
       button.innerText = item.text;
       button.addEventListener("mouseenter", () => {
-        button.style.backgroundColor = "#3e3e3e";
+      button.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
       });
   
       button.addEventListener("mouseleave", () => {
