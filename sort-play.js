@@ -5622,7 +5622,7 @@
       display: flex;
       flex-wrap: wrap;
       margin-bottom: 5px;
-      max-height: 300px;
+      max-height: 20vh;
       overflow-y: auto;
       background-color: #1e1e1e; 
       border-radius: 20px; 
