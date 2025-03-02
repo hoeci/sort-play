@@ -279,6 +279,9 @@
         border-radius: 30px;
         overflow: hidden; 
       }
+      .main-trackCreditsModal-originalCredits{
+        padding-bottom: 20px !important;
+      }
       .main-trackCreditsModal-header {
         padding: 27px 32px 12px !important;
       }
@@ -427,7 +430,7 @@
       border-radius: 30px;
       overflow: hidden;
       border: 2px solid #282828; 
-      background-color: #181818;
+      background-color: #181818 !important;
     }
     .GenericModal__overlay {
       backdrop-filter: blur(5px);
@@ -443,6 +446,9 @@
     }
     .main-trackCreditsModal-header {
       padding: 27px 32px 12px !important;
+    }
+    .main-trackCreditsModal-originalCredits{
+      padding-bottom: 20px !important;
     }
     .sort-play-settings .col {
         padding: 0;
@@ -900,7 +906,7 @@
           max-width: 620px !important;
           border-radius: 30px;
           overflow: hidden; 
-          background-color: #181818;
+          background-color: #181818 !important;
           border: 2px solid #282828;
         }
         .GenericModal__overlay .GenericModal {
@@ -913,6 +919,9 @@
         }
         .main-trackCreditsModal-header {
           padding: 27px 32px 12px !important;
+        }
+        .main-trackCreditsModal-originalCredits{
+          padding-bottom: 20px !important;
         }
         .ai-pick-modal .setting-row::after {
           content: "";
@@ -1956,7 +1965,7 @@
         width: 420px !important;
         border-radius: 30px;
         overflow: hidden; 
-        background-color: #181818;
+        background-color: #181818 !important;
         border: 2px solid #282828;
       }
       .GenericModal__overlay .GenericModal {
@@ -1968,6 +1977,12 @@
       }
       .main-trackCreditsModal-header {
         padding: 27px 32px 12px !important;
+      }
+      .main-trackCreditsModal-originalCredits{
+        padding-bottom: 20px !important;
+      }
+      .main-trackCreditsModal-originalCredits{
+        padding-bottom: 20px !important;
       }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -3559,7 +3574,9 @@
         border-radius: 30px;
         overflow: hidden;
     }
-
+    .main-trackCreditsModal-originalCredits{
+      padding-bottom: 20px !important;
+    }
     .text-overflow {
         position: relative;
     }
@@ -3963,7 +3980,7 @@
         max-height: 90vh !important;
         border-radius: 30px;
         overflow: hidden;
-        background-color: #121212;
+        background-color: #121212 !important;
         border: 2px solid #282828;
     }
 
@@ -5550,7 +5567,7 @@
       max-width: 620px !important;
       border-radius: 30px;
       overflow: hidden; 
-      background-color: #181818;
+      background-color: #181818 !important;
       border: 2px solid #282828;
     }
     .GenericModal__overlay .GenericModal {
@@ -5560,6 +5577,9 @@
     .main-trackCreditsModal-mainSection {
       overflow-y: hidden !important;
       padding: 16px 32px 9px 32px;
+    }
+    .main-trackCreditsModal-originalCredits{
+      padding-bottom: 20px !important;
     }
     .main-trackCreditsModal-header {
       padding: 27px 32px 12px !important;
@@ -7927,6 +7947,9 @@
       }
       .main-trackCreditsModal-header {
         padding: 27px 32px 12px !important;
+      }
+      .main-trackCreditsModal-originalCredits{
+        padding-bottom: 20px !important;
       }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
