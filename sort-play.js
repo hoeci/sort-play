@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.0.0";
+  const SORT_PLAY_VERSION = "4.0.1";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -9270,57 +9270,63 @@
   
 
   function deduplicateTracks(tracks) {
-    const currentUri = getCurrentUri();
-    if (!playlistDeduplicate && URI.isPlaylistV1OrV2(currentUri)) {
-      return { unique: tracks, removed: [] };
-    }
-  
-    const duplicateGroups = new Map();
-  
-    tracks.forEach((track) => {
-      const hasValidPlayCount = track.playCount !== "N/A" && track.playCount !== 0;
-      const primaryKey = `${track.playCount}-${track.durationMilis}`;
-      const secondaryKey = `${track.songTitle}-${track.durationMilis}`;
-      const key = hasValidPlayCount ? primaryKey : secondaryKey;
-  
-      if (!duplicateGroups.has(key)) {
-        duplicateGroups.set(key, []);
+      const currentUri = getCurrentUri();
+      if (!playlistDeduplicate && URI.isPlaylistV1OrV2(currentUri)) {
+          return { unique: tracks, removed: [] };
       }
-      duplicateGroups.get(key).push(track);
-    });
-  
-    const uniqueTracks = [];
-    const removedTracks = [];
-    duplicateGroups.forEach((group) => {
-      if (group.length > 1) {
-        const validPlayCountTracks = group.filter(
-          (track) => track.playCount !== "N/A" && track.playCount !== 0
-        );
-        const noOrZeroPlayCountTracks = group.filter(
-          (track) => track.playCount === "N/A" || track.playCount === 0
-        );
-  
-        let trackToKeep;
-        if (validPlayCountTracks.length > 0) {
-          validPlayCountTracks.sort(
-            (a, b) => (b.popularity || 0) - (a.popularity || 0)
-          );
-          trackToKeep = validPlayCountTracks[0];
-        } else if (noOrZeroPlayCountTracks.length > 0) {
-          noOrZeroPlayCountTracks.sort(
-            (a, b) => (b.popularity || 0) - (a.popularity || 0)
-          );
-          trackToKeep = noOrZeroPlayCountTracks[0];
-        }
-  
-        uniqueTracks.push(trackToKeep);
-        removedTracks.push(...group.filter(track => track !== trackToKeep));
-      } else {
-        uniqueTracks.push(group[0]);
-      }
-    });
-  
-    return { unique: uniqueTracks, removed: removedTracks };
+
+      const duplicateGroups = new Map();
+
+      tracks.forEach((track) => {
+          const hasValidPlayCount = track.playCount !== "N/A" && track.playCount !== 0 && track.playCount !== null && track.playCount !== undefined; 
+          const rawTitle = track.name || track.songTitle || "Unknown Title"; 
+          const normalizedTitle = rawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
+          const firstWord = normalizedTitle.split(/\s+/)[0];
+
+          const primaryKey = `${track.playCount}-${firstWord}`;  
+          const secondaryKey = `${normalizedTitle}-${track.durationMilis}`;
+          const key = hasValidPlayCount ? primaryKey : secondaryKey;
+
+
+          if (!duplicateGroups.has(key)) {
+              duplicateGroups.set(key, []);
+          }
+          duplicateGroups.get(key).push(track);
+      });
+
+      const uniqueTracks = [];
+      const removedTracks = [];
+
+      duplicateGroups.forEach((group) => {
+          if (group.length > 1) {
+              const validPlayCountTracks = group.filter(
+                  (track) => track.playCount !== "N/A" && track.playCount !== 0 && track.playCount !== null && track.playCount !== undefined 
+              );
+              const noOrZeroPlayCountTracks = group.filter(
+                  (track) => track.playCount === "N/A" || track.playCount === 0 || track.playCount === null || track.playCount === undefined
+              );
+
+              let trackToKeep;
+              if (validPlayCountTracks.length > 0) {
+                  validPlayCountTracks.sort(
+                      (a, b) => (b.popularity || 0) - (a.popularity || 0)
+                  );
+                  trackToKeep = validPlayCountTracks[0];
+              } else if (noOrZeroPlayCountTracks.length > 0) {
+                  noOrZeroPlayCountTracks.sort(
+                      (a, b) => (b.popularity || 0) - (a.popularity || 0)
+                  );
+                  trackToKeep = noOrZeroPlayCountTracks[0];
+              }
+
+              uniqueTracks.push(trackToKeep);
+              removedTracks.push(...group.filter(track => track !== trackToKeep));
+          } else {
+              uniqueTracks.push(group[0]);
+          }
+      });
+
+      return { unique: uniqueTracks, removed: removedTracks };
   }
 
   async function handleScrobblesSorting(tracks, sortType, updateProgress) {
