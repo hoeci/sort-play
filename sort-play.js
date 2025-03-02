@@ -584,7 +584,7 @@
     <div style="display: flex; flex-direction: column; gap: 12px;">
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        API Key Settings
+        Credentials
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
         <div style="display: flex; gap: 16px; justify-content: flex-start; margin-top: 10px;">
@@ -599,7 +599,7 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Playlist Column Options
+        Playlist Column
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
   
