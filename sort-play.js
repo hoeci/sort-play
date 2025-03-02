@@ -278,6 +278,8 @@
         width: 420px !important;
         border-radius: 30px;
         overflow: hidden; 
+        background-color: #181818 !important;
+        border: 2px solid #282828;
       }
       .main-trackCreditsModal-originalCredits{
         padding-bottom: 20px !important;
@@ -7934,6 +7936,8 @@
         width: 425px !important;
         border-radius: 30px;
         overflow: hidden; 
+        background-color: #181818 !important;
+        border: 2px solid #282828;
       }
       .GenericModal__overlay .GenericModal {
         border-radius: 30px;
