@@ -26,7 +26,7 @@
   let includeLyrics = true;
   let matchAllGenres  = false;
   let includeaudiofeatures = false;
-  let selectedAiModel = "gemini-2.0-flash-exp";
+  let selectedAiModel = "gemini-2.5-pro-exp-03-25";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
@@ -1328,19 +1328,13 @@
             <div class="model-row">
               <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:<span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Free API Limits:<br>
-                - Flash: 1M tokens/min<br>
-                - Pro: 32K tokens/min<br><br>
-                Pro models are best for up to ~180 songs (no lyrics included).
-                </span></label>
+                <span class="custom-tooltip">Added Gemini 2.5 models</span></label>
               <select id="aiModel">
-                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.0-pro-exp-02-05" ? "selected" : ""}>Gemini 2.0 Pro Experimental</option>
+                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.5-pro-exp-03-25" ? "selected" : ""}>Gemini 2.5 Pro Experimental</option>
+                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.5-flash-preview-04-17" ? "selected" : ""}>Gemini 2.5 Flash Preview</option>
                 <option value="gemini-2.0-flash" ${selectedAiModel === "gemini-2.0-flash" ? "selected" : ""}>Gemini 2.0 Flash</option>
                 <option value="gemini-2.0-flash-lite-preview-02-05" ${selectedAiModel === "gemini-2.0-flash-lite-preview-02-05" ? "selected" : ""}>Gemini 2.0 Flash-Lite Preview</option>
                 <option value="gemini-2.0-flash-exp" ${selectedAiModel === "gemini-2.0-flash-exp" ? "selected" : ""}>Gemini 2.0 Flash Exp</option>
-                <option value="gemini-1.5-pro" ${selectedAiModel === "gemini-1.5-pro" ? "selected" : ""}>Gemini 1.5 Pro</option>
-                <option value="gemini-1.5-flash" ${selectedAiModel === "gemini-1.5-flash" ? "selected" : ""}>Gemini 1.5 Flash</option>
-                <option value="gemini-1.5-flash-8b" ${selectedAiModel === "gemini-1.5-flash-8b" ? "selected" : ""}>Gemini 1.5 Flash-8B</option>
               </select>
             </div>
             <div class="button-row">
