@@ -12,13 +12,15 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.0.1";
+  const SORT_PLAY_VERSION = "4.1.0";
   
   const LFMApiKey = "***REMOVED***";
   
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   let isProcessing = false;
-  let columnPlayCount = false;
+  let showAdditionalColumn = false;
+  let selectedColumnType = 'playCount';
+  let releaseDateFormat = 'YYYY-MM-DD';
   let removeDateAdded = false;
   let playlistDeduplicate = true;
   let showRemovedDuplicates = false;
@@ -43,7 +45,9 @@
   let sortOrderState;
 
   function loadSettings() {
-    columnPlayCount = localStorage.getItem("sort-play-column-play-count") === "true";
+    showAdditionalColumn = localStorage.getItem("sort-play-show-additional-column") === "true";
+    selectedColumnType = localStorage.getItem("sort-play-selected-column-type") || "playCount"; 
+    releaseDateFormat = localStorage.getItem("sort-play-release-date-format") || 'YYYY-MM-DD';
     removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
     playlistDeduplicate = localStorage.getItem("sort-play-playlist-deduplicate") !== "false";
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
@@ -53,7 +57,7 @@
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
-
+  
     sortOrderState = {
         playCount: false,
         popularity: false,
@@ -61,17 +65,19 @@
         scrobbles: false,
         personalScrobbles: false
     };
-
+  
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
-        if (storedValue !== null) { 
-            sortOrderState[sortType] = storedValue === "true"; 
+        if (storedValue !== null) {
+            sortOrderState[sortType] = storedValue === "true";
         }
     }
   }
-
+  
   function saveSettings() {
-    localStorage.setItem("sort-play-column-play-count", columnPlayCount);
+    localStorage.setItem("sort-play-show-additional-column", showAdditionalColumn); 
+    localStorage.setItem("sort-play-selected-column-type", selectedColumnType);
+    localStorage.setItem("sort-play-release-date-format", releaseDateFormat);
     localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
     localStorage.setItem("sort-play-playlist-deduplicate", playlistDeduplicate);
     localStorage.setItem("sort-play-show-removed-duplicates", showRemovedDuplicates);
@@ -475,6 +481,88 @@
       align-items: center;
       justify-content: flex-end;
       text-align: right;
+      gap: 8px; 
+      position: relative;
+    }
+    .sort-play-settings select {
+        padding: 4px 8px;
+        border-radius: 15px;
+        border: 1px solid #434343;
+        background: #282828;
+        color: white;
+        cursor: pointer;
+        font-size: 13px;
+        max-width: 120px;
+    }
+    .sort-play-settings select.column-type-select {
+        flex-grow: 1;
+        margin-right: 10px; 
+    }
+    .sort-play-settings select:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .date-format-settings-button {
+        background: none;
+        border: none;
+        margin: 0;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px; 
+        height: 24px; 
+        opacity: 0.7; 
+        transition: opacity 0.2s;
+    }
+    .date-format-settings-button:hover {
+        opacity: 1;
+    }
+    .date-format-settings-button svg {
+        width: 16px;
+        height: 16px;
+        fill: #b3b3b3; 
+    }
+    .date-format-settings-button:hover svg {
+        fill: #ffffff; 
+    }
+    .date-format-settings-button:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+    }
+    .date-format-dropdown {
+        display: none;
+        position: absolute;
+        background-color: #282828; 
+        min-width: 130px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+        z-index: 1001; 
+        border-radius: 4px;
+        padding: 4px 0;
+        top: calc(100% + 4px);
+        left: 13px; 
+        margin-top: 5px;
+    }
+    .date-format-dropdown button {
+        color: #b3b3b3;
+        padding: 8px 12px;
+        text-decoration: none;
+        display: block;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 13px;
+    }
+    .date-format-dropdown button:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #ffffff;
+    }
+    .date-format-dropdown button.selected {
+        color: #1ed760; 
+        background-color: rgba(30, 215, 96, 0.1);
     }
 
     .sort-play-settings .setting-row#githubLink {
@@ -602,27 +690,46 @@
         Playlist Column
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-  
-    <div class="setting-row" id="columnPlayCount">
+
+    <div class="setting-row" id="additionalColumnSetting">
           <label class="col description">
-              Play Count Column in Playlist
+              Show Additional Column
               <span class="tooltip-container">
                   <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                  <span class="custom-tooltip">Play counts are cached for 2 days</span>
+                  <span class="custom-tooltip">Adds a column for Play Count or Release Date. Data is cached for 2 days.</span>
               </span>
           </label>
-        <div class="col action">
+        <div class="col action" style="position: relative;"> <!-- Added relative positioning -->
+            <!-- Settings Button for Date Format -->
+            <button id="dateFormatSettingsBtn" class="date-format-settings-button" title="Release Date Format Settings" style="display: ${selectedColumnType === 'releaseDate' && showAdditionalColumn ? 'flex' : 'none'};" ${!showAdditionalColumn ? 'disabled' : ''}>
+                ${settingsSvg}
+            </button>
+            <!-- Dropdown for selecting column type -->
+            <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
+                <option value="playCount" ${selectedColumnType === 'playCount' ? 'selected' : ''}>Play Count</option>
+                <option value="releaseDate" ${selectedColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+            </select>
+            <!-- Toggle for showing/hiding the column -->
             <label class="switch">
-                <input type="checkbox" ${columnPlayCount ? 'checked' : ''}>
+                <input type="checkbox" id="showAdditionalColumnToggle" ${showAdditionalColumn ? 'checked' : ''}>
                 <span class="slider"></span>
             </label>
+             <!-- Date Format Dropdown Container -->
+            <div id="dateFormatDropdownContainer" class="date-format-dropdown">
+                <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
+                <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
+                <button data-format="MM-DD-YYYY" class="${releaseDateFormat === 'MM-DD-YYYY' ? 'selected' : ''}">MM-DD-YYYY</button>
+                <button data-format="YYYY-MM" class="${releaseDateFormat === 'YYYY-MM' ? 'selected' : ''}">YYYY-MM</button>
+                <button data-format="MM-YYYY" class="${releaseDateFormat === 'MM-YYYY' ? 'selected' : ''}">MM-YYYY</button>
+                <button data-format="YYYY" class="${releaseDateFormat === 'YYYY' ? 'selected' : ''}">YYYY</button>
+            </div>
         </div>
     </div>
     <div class="setting-row" id="removeDateAdded">
         <label class="col description">Remove "Date Added" Column</label>
         <div class="col action">
             <label class="switch">
-                <input type="checkbox" ${removeDateAdded ? 'checked' : ''}>
+                <input type="checkbox" ${removeDateAdded ? 'checked' : ''} ${!showAdditionalColumn ? 'disabled' : ''}>
                 <span class="slider"></span>
             </label>
         </div>
@@ -703,7 +810,9 @@
     
     preventDragCloseModal();
 
-    const columnPlayCountToggle = modalContainer.querySelector("#columnPlayCount input");
+    const showAdditionalColumnToggle = modalContainer.querySelector("#showAdditionalColumnToggle");
+    const columnTypeSelect = modalContainer.querySelector("#columnTypeSelect");
+    const dateFormatSettingsBtn = modalContainer.querySelector("#dateFormatSettingsBtn");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
@@ -743,8 +852,9 @@
       setLastFmUsernameButton.style.backgroundColor = "#333333";
     });
 
-    removeDateAddedToggle.disabled = !columnPlayCount;
-    removeDateAddedToggle.parentElement.classList.toggle("disabled", !columnPlayCount);
+    removeDateAddedToggle.disabled = !showAdditionalColumn; 
+    removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn);
+    columnTypeSelect.disabled = !showAdditionalColumn; 
 
     setTimeout(() => {
         const sliders = modalContainer.querySelectorAll('.slider');
@@ -753,25 +863,75 @@
         });
     }, 50);
 
-    columnPlayCountToggle.addEventListener("change", () => {
-        columnPlayCount = columnPlayCountToggle.checked;
-        removeDateAddedToggle.disabled = !columnPlayCount;
-        removeDateAddedToggle.parentElement.classList.toggle("disabled", !columnPlayCount);
-        if (!columnPlayCount) {
-            const oldRemoveDateAdded = removeDateAdded;
+
+    const updateDateFormatButtonVisibility = () => {
+        const showButton = showAdditionalColumn && selectedColumnType === 'releaseDate';
+        dateFormatSettingsBtn.style.display = showButton ? 'flex' : 'none';
+        dateFormatSettingsBtn.disabled = !showButton;
+        if (!showButton) {
+            dateFormatDropdownContainer.style.display = 'none';
+        }
+    };
+
+    updateDateFormatButtonVisibility();
+
+    showAdditionalColumnToggle.addEventListener("change", () => {
+        showAdditionalColumn = showAdditionalColumnToggle.checked;
+        columnTypeSelect.disabled = !showAdditionalColumn;
+        removeDateAddedToggle.disabled = !showAdditionalColumn;
+        removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn);
+        if (!showAdditionalColumn) {
             removeDateAdded = false;
             removeDateAddedToggle.checked = false;
-            saveSettings();
-            removeDateAdded = oldRemoveDateAdded;
-            saveSettings();
-        } else {
-            saveSettings();
         }
+        updateDateFormatButtonVisibility();
+        saveSettings();
         updateTracklist();
     });
 
+    columnTypeSelect.addEventListener("change", () => {
+        selectedColumnType = columnTypeSelect.value;
+        updateDateFormatButtonVisibility(); 
+        saveSettings();
+        updateTracklist();
+    });
+    
+    dateFormatDropdownContainer.querySelectorAll("button").forEach(button => {
+      button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const newFormat = button.getAttribute("data-format");
+          releaseDateFormat = newFormat;
+
+          dateFormatDropdownContainer.querySelectorAll("button").forEach(btn => btn.classList.remove("selected"));
+          button.classList.add("selected");
+
+          dateFormatDropdownContainer.style.display = 'none'; 
+          saveSettings();
+          updateTracklist(); 
+      });
+  });
+
+    dateFormatSettingsBtn.addEventListener("click", (event) => {
+        event.stopPropagation(); 
+        const currentDisplay = dateFormatDropdownContainer.style.display;
+        dateFormatDropdownContainer.style.display = currentDisplay === 'block' ? 'none' : 'block';
+    });
+
+
+    document.addEventListener('click', (event) => {
+        const dropdownContainer = document.getElementById("dateFormatDropdownContainer"); 
+        const settingsButton = document.getElementById("dateFormatSettingsBtn");
+
+        if (dropdownContainer && settingsButton) {
+            if (!settingsButton.contains(event.target) && !dropdownContainer.contains(event.target)) {
+                dropdownContainer.style.display = 'none';
+            }
+        }
+    });
+
+
     removeDateAddedToggle.addEventListener("change", () => {
-        if (columnPlayCount) {
+        if (showAdditionalColumn) {
             removeDateAdded = removeDateAddedToggle.checked;
             saveSettings();
             updateTracklist();
@@ -5346,7 +5506,7 @@
 
               const svgIcon = removeButton.querySelector("svg");
               svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
-              updatePlaylistStats(); // update here
+              updatePlaylistStats(); 
           }
 
           event.preventDefault();
@@ -9619,11 +9779,108 @@
     });
   };
 
+
+  const RELEASE_DATE_CACHE_KEY = 'spotify-release-date-cache';
+  const RELEASE_DATE_CACHE_TIMESTAMP_KEY = 'spotify-release-date-cache-timestamp';
+  const RELEASE_DATE_CACHE_EXPIRY_DAYS = 2; 
+  
+  function initializeReleaseDateCache() {
+    const timestamp = localStorage.getItem(RELEASE_DATE_CACHE_TIMESTAMP_KEY);
+    if (!timestamp) {
+      localStorage.setItem(RELEASE_DATE_CACHE_TIMESTAMP_KEY, Date.now().toString());
+      localStorage.setItem(RELEASE_DATE_CACHE_KEY, JSON.stringify({}));
+      return;
+    }
+  
+    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
+    if (daysPassed >= RELEASE_DATE_CACHE_EXPIRY_DAYS) {
+      localStorage.setItem(RELEASE_DATE_CACHE_TIMESTAMP_KEY, Date.now().toString());
+      localStorage.setItem(RELEASE_DATE_CACHE_KEY, JSON.stringify({}));
+    }
+  }
+  
+  function getCachedReleaseDate(trackId) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(RELEASE_DATE_CACHE_KEY) || '{}');
+      return cache[trackId] !== undefined ? cache[trackId] : null;
+    } catch (error) {
+      console.error('Error reading from release date cache:', error);
+      return null;
+    }
+  }
+  
+  function setCachedReleaseDate(trackId, rawReleaseDate) { 
+    try {
+      const cache = JSON.parse(localStorage.getItem(RELEASE_DATE_CACHE_KEY) || '{}');
+      cache[trackId] = rawReleaseDate;
+      localStorage.setItem(RELEASE_DATE_CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      console.error('Error writing to release date cache:', error);
+    }
+  }
+  
+  function formatReleaseDate(rawDate, format = 'YYYY-MM-DD') {
+    if (!rawDate || rawDate === "_") {
+        return "_";
+    }
+
+    let dateObj;
+    if (typeof rawDate === 'number') {
+        dateObj = new Date(rawDate);
+    } else if (typeof rawDate === 'string') {
+        let dateStrToParse = rawDate;
+        if (rawDate.length === 4) { 
+             if (format === 'YYYY') return rawDate;
+             if (format === 'MM-YYYY') return `??-${rawDate}`;
+             if (format === 'YYYY-MM') return `${rawDate}-??`;
+             dateStrToParse = `${rawDate}-01-01`;
+        } else if (rawDate.length === 7) {
+             if (format === 'YYYY') return rawDate.substring(0, 4);
+             if (format === 'MM-YYYY') return `${rawDate.substring(5, 7)}-${rawDate.substring(0, 4)}`;
+             if (format === 'YYYY-MM') return rawDate;
+             dateStrToParse = `${rawDate}-01`;
+        }
+        dateObj = new Date(dateStrToParse);
+    } else {
+        return "_"; 
+    }
+
+
+    if (isNaN(dateObj.getTime())) {
+         if (typeof rawDate === 'string' && /^\d{4}$/.test(rawDate) && format === 'YYYY') {
+             return rawDate;
+         }
+        return "_";
+    }
+
+    const year = dateObj.getFullYear();
+    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const day = dateObj.getDate().toString().padStart(2, '0');
+
+    switch (format) {
+        case 'YYYY-MM-DD':
+            return `${year}-${month}-${day}`;
+        case 'DD-MM-YYYY':
+            return `${day}-${month}-${year}`;
+        case 'MM-DD-YYYY':
+            return `${month}-${day}-${year}`;
+        case 'YYYY':
+            return year.toString();
+         case 'YYYY-MM':
+            return `${year}-${month}`;
+        case 'MM-YYYY':
+            return `${month}-${year}`;
+        default:
+            return `${year}-${month}-${day}`;
+    }
+  }
+
+
   const CACHE_KEY = 'spotify-play-count-cache';
   const CACHE_TIMESTAMP_KEY = 'spotify-play-count-cache-timestamp';
   const CACHE_EXPIRY_DAYS = 2;
 
-  function initializeCache() {
+  function initializePlayCountCache() {
     const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
     if (!timestamp) {
       localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
@@ -9658,106 +9915,119 @@
     }
   }
 
-  async function loadPlayCounts(tracklist_) {
-    initializeCache();
+  async function loadAdditionalColumnData(tracklist_) {
+    if (selectedColumnType === 'playCount') {
+        initializePlayCountCache();
+    } else if (selectedColumnType === 'releaseDate') {
+        initializeReleaseDateCache();
+    }
 
     const tracks = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
         .filter(track => {
-            const playCountElement = track.querySelector(".sort-play-playcount");
+            const dataElement = track.querySelector(".sort-play-data");
             const trackUri = getTracklistTrackUri(track);
             const isTrack = trackUri && trackUri.includes("track");
-            return playCountElement && playCountElement.textContent === "" && isTrack && trackUri;
+            return dataElement && dataElement.textContent === "" && isTrack && trackUri;
         });
-        
+
     const BATCH_SIZE = 10;
     for (let i = 0; i < tracks.length; i += BATCH_SIZE) {
         const batch = tracks.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (track) => {
             try {
-                const playCountElement = track.querySelector(".sort-play-playcount");
-                if (!playCountElement) return;
+                const dataElement = track.querySelector(".sort-play-data");
+                if (!dataElement) return;
 
                 const trackUri = getTracklistTrackUri(track);
                 if (!trackUri) {
-                    playCountElement.textContent = "_";
+                    updateDisplay(dataElement, "_", selectedColumnType);
                     return;
                 }
 
                 const trackId = trackUri.split(":")[2];
+                const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
 
-                const cachedCount = getCachedPlayCount(trackId);
-                if (cachedCount !== null) {
-                    updatePlayCountDisplay(playCountElement, cachedCount);
-                    return;
-                }
+                if (selectedColumnType === 'playCount') {
+                    const cachedCount = getCachedPlayCount(trackId);
+                    if (cachedCount !== null) {
+                        updateDisplay(dataElement, cachedCount, selectedColumnType);
+                        return;
+                    }
+                    const albumLinkElement = track.querySelector(albumLinkSelector);
+                    if (!albumLinkElement?.href) { /* ... */ setCachedPlayCount(trackId, "_"); return; }
+                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
+                    const albumId = albumIdMatch ? albumIdMatch[1] : null;
+                    if (!albumId) { /* ... */ setCachedPlayCount(trackId, "_"); return; }
+                    const trackDetails = { /* ... */ track: { album: { id: albumId }, id: trackId } };
+                    const result = await Promise.race([ getTrackDetailsWithPlayCount(trackDetails), /* timeout */]);
+                    const playCount = result?.playCount;
+                    updateDisplay(dataElement, playCount, selectedColumnType);
+                    setCachedPlayCount(trackId, playCount === null || playCount === 0 ? "_" : playCount);
 
-                const albumLinkElement = track.querySelector(
-                    ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line"
-                );
+                } else if (selectedColumnType === 'releaseDate') {
+                    const cachedPreciseDate = getCachedReleaseDate(trackId);
 
-                if (!albumLinkElement?.href) {
-                    updatePlayCountDisplay(playCountElement, "_");
-                    setCachedPlayCount(trackId, "_");
-                    return;
-                }
+                    if (cachedPreciseDate !== null) { 
+                        updateDisplay(dataElement, cachedPreciseDate, selectedColumnType);
+                        return;
+                    }
 
-                const albumId = albumLinkElement.href.split("/album/")[1];
-                if (!albumId) {
-                    updatePlayCountDisplay(playCountElement, "_");
-                    setCachedPlayCount(trackId, "_");
-                    return;
-                }
+                    const albumLinkElement = track.querySelector(albumLinkSelector);
+                    if (!albumLinkElement?.href) {
+                        updateDisplay(dataElement, "_", selectedColumnType);
+                        setCachedReleaseDate(trackId, "_");
+                        return;
+                    }
+                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
+                    const albumId = albumIdMatch ? albumIdMatch[1] : null;
+                    if (!albumId) {
+                        updateDisplay(dataElement, "_", selectedColumnType);
+                        setCachedReleaseDate(trackId, "_");
+                        return;
+                    }
 
-                const trackDetails = {
-                    uri: trackUri,
-                    name: track.querySelector(".main-trackList-rowTitle")?.textContent || "",
-                    albumUri: `spotify:album:${albumId}`,
-                    track: { album: { id: albumId }, id: trackId }
-                };
+                    const preciseDateString = await getReleaseDatesForAlbum(albumId);
 
-                const result = await Promise.race([
-                    getTrackDetailsWithPlayCount(trackDetails),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
-                ]);
-
-                if (result?.playCount === null || result?.playCount === 0) {
-                    updatePlayCountDisplay(playCountElement, "_");
-                    setCachedPlayCount(trackId, "_");
-                } else {
-                    updatePlayCountDisplay(playCountElement, result.playCount);
-                    setCachedPlayCount(trackId, result.playCount);
+                    updateDisplay(dataElement, preciseDateString, selectedColumnType); 
+                    setCachedReleaseDate(trackId, preciseDateString); 
                 }
 
             } catch (error) {
                 console.error("Error processing track:", error);
-                const playCountElement = track.querySelector(".sort-play-playcount");
-                if (playCountElement) {
-                    updatePlayCountDisplay(playCountElement, "_");
+                const dataElement = track.querySelector(".sort-play-data");
+                if (dataElement) {
+                    updateDisplay(dataElement, "_", selectedColumnType);
                 }
             }
         }));
     }
   }
 
-  function updatePlayCountDisplay(element, count) {
-    if (!element) return;
-    if (count !== "_" && (isNaN(count) || count === null || count === undefined)) {
-        element.textContent = "_";
-    } else {
-        element.textContent = count === "_" ? "_" : new Intl.NumberFormat('en-US').format(count);
-    }
-    
-    element.style.fontSize = "14px";
-    element.style.fontWeight = "400";
-    element.style.color = "var(--spice-subtext)";
+  function updateDisplay(element, value, type) {
+      if (!element) return;
+
+      let displayValue = "_"; 
+
+      if (type === 'playCount') {
+          if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== 0) {
+              displayValue = new Intl.NumberFormat('en-US').format(value);
+          }
+      } else if (type === 'releaseDate') {
+          displayValue = formatReleaseDate(value, releaseDateFormat);
+      }
+
+      element.textContent = displayValue;
+      element.style.fontSize = "14px";
+      element.style.fontWeight = "400";
+      element.style.color = "var(--spice-subtext)";
   }
 
 
   let isUpdatingTracklist = false;
   let tracklistObserver;
   async function updateTracklist() {
-    if (isUpdatingTracklist || !columnPlayCount) return;
-
+    if (isUpdatingTracklist || !showAdditionalColumn) return;
+  
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
   
@@ -9769,11 +10039,11 @@
   
       for (const tracklist_ of tracklists) {
         if (!tracklist_) continue;
-
+  
         await updateTracklistStructure(tracklist_);
-
+  
         requestAnimationFrame(() => {
-          loadPlayCounts(tracklist_);
+          loadAdditionalColumnData(tracklist_);
         });
       }
     } finally {
@@ -9784,96 +10054,175 @@
   async function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
-    
+
     const currentPlaylistName = getCurrentPlaylistName();
     const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
     const shouldRemoveDateAdded = removeDateAdded && !isExcludedPlaylist;
-  
-    const gridCss = getGridCss(shouldRemoveDateAdded);
-  
-    const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
-    if (tracklistHeader && !tracklistHeader.querySelector(".sort-play-header")) {
-      const hasPlaysColumn = !!tracklistHeader.querySelector(".main-trackList-playsHeader");
-      if (hasPlaysColumn) return; 
 
-      let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-      let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-  
-      switch (colIndexInt) {
-        case 4: tracklistHeader.setAttribute("style", gridCss.fiveColumnGridCss); break;
-        case 5: tracklistHeader.setAttribute("style", gridCss.sixColumnGridCss); break;
-        case 6: tracklistHeader.setAttribute("style", gridCss.sevenColumnGridCss); break;
-      }
-  
-      const headerInsertionPoint = !shouldRemoveDateAdded
-        ? lastColumn
-        : tracklistHeader.querySelector('[aria-colindex="4"]');
-      
-      lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-      let headerColumn = document.createElement("div");
-      headerColumn.style.display = "flex";
-      headerColumn.classList.add("main-trackList-rowSectionVariable");
-      headerColumn.classList.add("sort-play-column");
-      headerColumn.role = "columnheader";
-      tracklistHeader.insertBefore(headerColumn, headerInsertionPoint);
-  
-      var btn = document.createElement("button");
-      btn.classList.add("main-trackList-column");
-      btn.classList.add("main-trackList-sortable");
-      btn.classList.add("sort-play-header");
-      var title = document.createElement("span");
-      title.classList.add("TypeElement-mesto-type");
-      title.classList.add("standalone-ellipsis-one-line");
-      title.innerText = "Plays";
-      btn.appendChild(title);
-      headerColumn.appendChild(btn);
+    const gridCss = getGridCss(shouldRemoveDateAdded);
+    const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
+    if (!tracklistHeader) return; 
+
+    const existingPlaysHeader = tracklistHeader.querySelector(".sort-play-header");
+    const currentHeaderText = existingPlaysHeader?.parentElement.querySelector("span")?.innerText;
+    const expectedHeaderText = selectedColumnType === 'playCount' ? "Plays" : "Rel. Date";
+    const columnTypeChanged = existingPlaysHeader && currentHeaderText !== expectedHeaderText;
+    const columnVisibilityChanged = (existingPlaysHeader && !showAdditionalColumn) || (!existingPlaysHeader && showAdditionalColumn);
+
+    if (columnVisibilityChanged || columnTypeChanged) {
+        if (existingPlaysHeader) {
+            let headerColumnDiv = existingPlaysHeader.parentElement;
+            let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+            if (lastColumn && headerColumnDiv) {
+                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                headerColumnDiv.remove();
+                lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+
+                switch (colIndexInt - 1) {
+                   case 4: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                   case 5: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                   case 6: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                    default:
+                         console.warn("Unexpected number of columns after header removal:", colIndexInt - 1);
+                         break;
+                }
+            }
+        }
+
+        if (showAdditionalColumn) {
+            const hasSpotifyPlaysColumn = !!tracklistHeader.querySelector(".main-trackList-playsHeader");
+            if (!hasSpotifyPlaysColumn) { 
+                let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+                if (lastColumn) {
+                    let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+
+                    switch (colIndexInt) {
+                        case 4: tracklistHeader.style.cssText = gridCss.fiveColumnGridCss; break;
+                        case 5: tracklistHeader.style.cssText = gridCss.sixColumnGridCss; break;
+                        case 6: tracklistHeader.style.cssText = gridCss.sevenColumnGridCss; break;
+                         default:
+                            console.warn("Unexpected number of columns before header addition:", colIndexInt);
+                            break; 
+                    }
+
+                    const insertionPoint = shouldRemoveDateAdded
+                        ? tracklistHeader.querySelector('[aria-colindex="4"]')
+                        : lastColumn;
+
+                    let headerColumn = document.createElement("div");
+                    headerColumn.style.display = "flex";
+                    headerColumn.classList.add("main-trackList-rowSectionVariable", "sort-play-column");
+                    headerColumn.role = "columnheader";
+                    headerColumn.setAttribute("aria-colindex", colIndexInt.toString());
+
+                    tracklistHeader.insertBefore(headerColumn, insertionPoint);
+                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+
+                    var btn = document.createElement("button");
+                    btn.classList.add("main-trackList-column", "main-trackList-sortable", "sort-play-header");
+                    var title = document.createElement("span");
+                    title.classList.add("TypeElement-mesto-type", "standalone-ellipsis-one-line");
+                    title.innerText = expectedHeaderText; 
+                    btn.appendChild(title);
+                    headerColumn.appendChild(btn);
+                }
+            }
+        }
     }
-  
+
+    const dateAddedHeader = tracklistHeader.querySelector('[aria-colindex="4"]');
+    if (dateAddedHeader) {
+        dateAddedHeader.style.display = shouldRemoveDateAdded ? 'none' : '';
+    }
+
     const tracks = tracklist_.getElementsByClassName("main-trackList-trackListRow");
     for (const track of tracks) {
-      if (track.querySelector(".sort-play-playcount-column")) continue;
-      
-      const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
-      const hasPlaysColumn = !!tracklistHeader.querySelector(".main-trackList-playsHeader");
-      if (hasPlaysColumn) continue;
+        const existingDataColumn = track.querySelector(".sort-play-data-column");
 
-      let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-      if (!lastColumn) continue;
-      
-      let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-  
-      switch (colIndexInt) {
-        case 4: track.setAttribute("style", gridCss.fiveColumnGridCss); break;
-        case 5: track.setAttribute("style", gridCss.sixColumnGridCss); break;
-        case 6: track.setAttribute("style", gridCss.sevenColumnGridCss); break;
-      }
-  
-      const insertionPoint = !shouldRemoveDateAdded
-        ? lastColumn
-        : track.querySelector('[aria-colindex="4"]');
-      
-      lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-      
-      let playCountColumn = document.createElement("div");
-      playCountColumn.setAttribute("aria-colindex", colIndexInt.toString());
-      playCountColumn.style.display = "flex";
-      playCountColumn.style.justifyContent = "center";
-      playCountColumn.style.alignItems = "center";
-      playCountColumn.classList.add("main-trackList-rowSectionVariable");
-      playCountColumn.classList.add("sort-play-playcount-column");
-      playCountColumn.classList.add("sort-play-column");
-  
-      const playCountElement = document.createElement("span");
-      playCountElement.classList.add("sort-play-playcount");
-      playCountElement.textContent = "";
-      playCountElement.style.fontSize = "14px";
-      playCountElement.style.fontWeight = "400";
-      playCountElement.style.color = "var(--spice-subtext)";
-      playCountColumn.appendChild(playCountElement);
-      
-      track.insertBefore(playCountColumn, insertionPoint);
+        if (existingDataColumn && !showAdditionalColumn) {
+            let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+             if(lastColumn) {
+                 let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                 existingDataColumn.remove();
+                 lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+                 switch (colIndexInt - 1) {
+                     case 4: track.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                     case 5: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                     case 6: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                      default:
+                          console.warn("Unexpected number of columns after cell removal:", colIndexInt - 1);
+                          break;
+                 }
+            }
+        }
+        else if (showAdditionalColumn && !existingDataColumn) {
+            const hasSpotifyPlaysColumn = !!track.querySelector(".main-trackList-rowSectionPlays");
+            if (!hasSpotifyPlaysColumn) { 
+                let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+                if (lastColumn) {
+                    let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+
+                    switch (colIndexInt) {
+                        case 4: track.style.cssText = gridCss.fiveColumnGridCss; break;
+                        case 5: track.style.cssText = gridCss.sixColumnGridCss; break;
+                        case 6: track.style.cssText = gridCss.sevenColumnGridCss; break;
+                         default:
+                            console.warn("Unexpected number of columns before cell addition:", colIndexInt);
+                            break;
+                    }
+
+                    const insertionPoint = shouldRemoveDateAdded
+                        ? track.querySelector('[aria-colindex="4"]')
+                        : lastColumn;
+
+                    let dataColumn = document.createElement("div");
+                    dataColumn.setAttribute("aria-colindex", colIndexInt.toString());
+                    dataColumn.style.display = "flex";
+                    dataColumn.style.justifyContent = "center";
+                    dataColumn.style.alignItems = "center";
+                    dataColumn.classList.add("main-trackList-rowSectionVariable", "sort-play-data-column", "sort-play-column");
+
+                    const dataElement = document.createElement("span");
+                    dataElement.classList.add("sort-play-data");
+                    dataElement.textContent = ""; 
+                    dataElement.style.fontSize = "14px";
+                    dataElement.style.fontWeight = "400";
+                    dataElement.style.color = "var(--spice-subtext)";
+                    dataColumn.appendChild(dataElement);
+
+                    track.insertBefore(dataColumn, insertionPoint);
+                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+                }
+            }
+        }
+        else if (existingDataColumn && columnTypeChanged) {
+            const dataSpan = existingDataColumn.querySelector('.sort-play-data');
+            if (dataSpan) {
+                dataSpan.textContent = "";
+            }
+        }
+        else if (existingDataColumn && selectedColumnType === 'releaseDate') {
+             const dataSpan = existingDataColumn.querySelector('.sort-play-data');
+             if(dataSpan) {
+                 const trackUri = getTracklistTrackUri(track);
+                 if (trackUri) {
+                     const trackId = trackUri.split(":")[2];
+                     const cachedRawDate = getCachedReleaseDate(trackId);
+                     if (cachedRawDate !== null && dataSpan.textContent !== formatReleaseDate(cachedRawDate, releaseDateFormat)) {
+                         updateDisplay(dataSpan, cachedRawDate, 'releaseDate');
+                     }
+                 }
+             }
+        }
+
+
+        const dateAddedCell = track.querySelector('[aria-colindex="4"]');
+        if (dateAddedCell) {
+            dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
+        }
     }
-  }
+}
+
   
   const getGridCss = (removeDateAdded) => {
     if (removeDateAdded) {
@@ -9976,7 +10325,8 @@
     subtree: true,
   });
     loadSettings();
-    initializeCache();
+    initializePlayCountCache();
+    initializeReleaseDateCache();
     console.log(`Sort-Play loaded`);
   }
 
