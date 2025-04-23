@@ -485,7 +485,7 @@
       position: relative;
     }
     .sort-play-settings select {
-        padding: 4px 8px;
+        padding: 2px 8px;
         border-radius: 15px;
         border: 1px solid #434343;
         background: #282828;
