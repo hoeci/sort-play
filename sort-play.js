@@ -696,7 +696,7 @@
               Show Additional Column
               <span class="tooltip-container">
                   <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                  <span class="custom-tooltip">Adds a column for Play Count or Release Date. Data is cached for 2 days.</span>
+                  <span class="custom-tooltip">Adds a new column for Play Count or Release Date in playlists.</span>
               </span>
           </label>
         <div class="col action" style="position: relative;"> <!-- Added relative positioning -->
@@ -9782,7 +9782,7 @@
 
   const RELEASE_DATE_CACHE_KEY = 'spotify-release-date-cache';
   const RELEASE_DATE_CACHE_TIMESTAMP_KEY = 'spotify-release-date-cache-timestamp';
-  const RELEASE_DATE_CACHE_EXPIRY_DAYS = 2; 
+  const RELEASE_DATE_CACHE_EXPIRY_DAYS = 10; 
   
   function initializeReleaseDateCache() {
     const timestamp = localStorage.getItem(RELEASE_DATE_CACHE_TIMESTAMP_KEY);
