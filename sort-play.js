@@ -465,7 +465,7 @@
       padding: 16px 25px 0 25px;
       flex-grow: 1; 
        scrollbar-width: thin;
-       scrollbar-color: #5a5a5a #282828;
+       scrollbar-color: #333333 #181818;
     }
     .main-trackCreditsModal-mainSection::-webkit-scrollbar {
         width: 8px;
