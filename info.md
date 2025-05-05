@@ -13,6 +13,7 @@
 + Smart Shuffle considering track similarity and artist diversity.
 + Toggle ascending/descending in release date sorting.
 + Save sorted tracks to a new private playlist.
++ Add sorted tracks to the playback queue.
 
 ## 📷 Screenshots 
 <img src="https://github.com/user-attachments/assets/09922cc1-6d18-486a-a634-7e99835342ec" alt="show" width="100%">
