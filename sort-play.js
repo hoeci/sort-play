@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.1.0";
+  const SORT_PLAY_VERSION = "4.2.0";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -28,10 +28,13 @@
   let includeLyrics = true;
   let matchAllGenres  = false;
   let includeaudiofeatures = false;
+  let addToQueueEnabled = false; 
+  let createPlaylistAfterSort = true; 
   let selectedAiModel = "gemini-2.5-pro-exp-03-25";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
-  
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
+  const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
+  const STORAGE_KEY_CREATE_PLAYLIST = "sort-play-create-playlist";
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
   - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
@@ -57,6 +60,8 @@
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
+    addToQueueEnabled = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE) === "true";
+    createPlaylistAfterSort = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST) !== "false";
   
     sortOrderState = {
         playCount: false,
@@ -87,6 +92,8 @@
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
     localStorage.setItem("sort-play-match-all-genres", matchAllGenres);
     localStorage.setItem("sort-play-include-audio-features", includeaudiofeatures);
+    localStorage.setItem(STORAGE_KEY_ADD_TO_QUEUE, addToQueueEnabled);
+    localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST, createPlaylistAfterSort);
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
     }
@@ -433,12 +440,17 @@
     modalContainer.className = "sort-play-settings";
     modalContainer.innerHTML = `
     <style>
+    .GenericModal__overlay .main-embedWidgetGenerator-container {
+      max-height: 90vh !important;
+    }
     .main-embedWidgetGenerator-container {
       width: 550px !important;
       border-radius: 30px;
       overflow: hidden;
-      border: 2px solid #282828; 
+      border: 2px solid #282828;
       background-color: #181818 !important;
+      display: flex; 
+      flex-direction: column;
     }
     .GenericModal__overlay {
       backdrop-filter: blur(5px);
@@ -449,14 +461,33 @@
       overflow: hidden;
     }
     .main-trackCreditsModal-mainSection {
-      overflow-y: hidden !important;
+      overflow-y: auto !important; 
       padding: 16px 32px 0 32px;
+      flex-grow: 1; /
+       scrollbar-width: thin;
+       scrollbar-color: #5a5a5a #282828;
+    }
+    .main-trackCreditsModal-mainSection::-webkit-scrollbar {
+        width: 8px;
+    }
+    .main-trackCreditsModal-mainSection::-webkit-scrollbar-track {
+        background: #282828;
+        border-radius: 4px;
+    }
+    .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb {
+        background-color: #5a5a5a;
+        border-radius: 4px;
+    }
+    .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb:hover {
+        background-color: #7a7a7a;
     }
     .main-trackCreditsModal-header {
       padding: 27px 32px 12px !important;
+      flex-shrink: 0;
     }
     .main-trackCreditsModal-originalCredits{
-      padding-bottom: 20px !important;
+      padding: 0 16px 20px 16px !important;
+      flex-shrink: 0; 
     }
     .sort-play-settings .col {
         padding: 0;
@@ -475,13 +506,15 @@
         padding-right: 15px;
         width: auto;
         color: #c1c1c1;
+        font-family: 'SpotifyMixUI' !important;
     }
     .sort-play-settings .setting-row .col.action {
-      display: flex;
+      display: flex;  
+      float: right;
       align-items: center;
       justify-content: flex-end;
       text-align: right;
-      gap: 8px; 
+      gap: 8px;
       position: relative;
     }
     .sort-play-settings select {
@@ -496,7 +529,7 @@
     }
     .sort-play-settings select.column-type-select {
         flex-grow: 1;
-        margin-right: 10px; 
+        margin-right: 10px;
     }
     .sort-play-settings select:disabled {
         opacity: 0.5;
@@ -504,169 +537,83 @@
     }
 
     .date-format-settings-button {
-        background: none;
-        border: none;
-        margin: 0;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px; 
-        height: 24px; 
-        opacity: 0.7; 
-        transition: opacity 0.2s;
+        background: none; border: none; margin: 0; cursor: pointer; display: flex;
+        align-items: center; justify-content: center; width: 24px; height: 24px;
+        opacity: 0.7; transition: opacity 0.2s;
     }
-    .date-format-settings-button:hover {
-        opacity: 1;
-    }
-    .date-format-settings-button svg {
-        width: 16px;
-        height: 16px;
-        fill: #b3b3b3; 
-    }
-    .date-format-settings-button:hover svg {
-        fill: #ffffff; 
-    }
-    .date-format-settings-button:disabled {
-        opacity: 0.3;
-        cursor: not-allowed;
-    }
+    .date-format-settings-button:hover { opacity: 1; }
+    .date-format-settings-button svg { width: 16px; height: 16px; fill: #b3b3b3; }
+    .date-format-settings-button:hover svg { fill: #ffffff; }
+    .date-format-settings-button:disabled { opacity: 0.3; cursor: not-allowed; }
     .date-format-dropdown {
-        display: none;
-        position: absolute;
-        background-color: #282828; 
-        min-width: 130px;
-        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-        z-index: 1001; 
-        border-radius: 4px;
-        padding: 4px 0;
-        top: calc(100% + 4px);
-        left: 13px; 
-        margin-top: 5px;
+        display: none; position: absolute; background-color: #282828; min-width: 130px;
+        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px;
+        padding: 4px 0; top: calc(100% + 4px); left: 13px; margin-top: 5px;
     }
     .date-format-dropdown button {
-        color: #b3b3b3;
-        padding: 8px 12px;
-        text-decoration: none;
-        display: block;
-        width: 100%;
-        text-align: left;
-        background: none;
-        border: none;
-        cursor: pointer;
+        color: #b3b3b3; padding: 8px 12px; text-decoration: none; display: block;
+        width: 100%; text-align: left; background: none; border: none; cursor: pointer;
         font-size: 13px;
     }
-    .date-format-dropdown button:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        color: #ffffff;
-    }
-    .date-format-dropdown button.selected {
-        color: #1ed760; 
-        background-color: rgba(30, 215, 96, 0.1);
-    }
+    .date-format-dropdown button:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
+    .date-format-dropdown button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
 
     .sort-play-settings .setting-row#githubLink {
       display: flex;
       justify-content: center;
       margin-top: 5px;
     }
-    
+
     .sort-play-settings .setting-row#githubLink .col.description {
         float: none;
         text-align: center;
         width: auto;
         padding: 0;
     }
-    .sort-play-settings .main-popupModal-content {
-        overflow-y: auto;
-    }
+
     .sort-play-settings .switch {
-        position: relative;
-        display: inline-block;
-        width: 40px;
-        height: 24px;
+        position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0;
     }
-    .sort-play-settings .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
+    .sort-play-settings .switch input { opacity: 0; width: 0; height: 0; }
     .sort-play-settings .slider {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #484848;
-        border-radius: 24px;
-        transition: .2s;
+        position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #484848; border-radius: 24px; transition: .2s;
     }
     .sort-play-settings .slider:before {
-        position: absolute;
-        content: "";
-        height: 18px;
-        width: 18px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        border-radius: 50%;
-        transition: .2s;
+        position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+        background-color: white; border-radius: 50%; transition: .2s;
     }
-    .sort-play-settings input:checked + .slider {
-        background-color: #1DB954;
-    }
-    .sort-play-settings input:checked + .slider:before {
-        transform: translateX(16px);
-    }
-    .sort-play-settings .switch.disabled .slider {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
+    .sort-play-settings input:checked + .slider { background-color: #1DB954; }
+    .sort-play-settings input:checked + .slider:before { transform: translateX(16px); }
+    .sort-play-settings .switch.disabled .slider { opacity: 0.5; cursor: not-allowed; }
 
-    .tooltip-container {
-      position: relative;
-      display: inline-block;
-    }
-    
+    .tooltip-container { position: relative; display: inline-block; vertical-align: middle;}
+
     .custom-tooltip {
-        visibility: hidden;
-        position: absolute;
-        z-index: 1;
-        background-color: #282828;
-        color: white;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-size: 14px;
-        max-width: 240px;
-        width: max-content;
-        bottom: 100%;   
-        left: 50%;       
-        transform: translateX(-50%);  
-        margin-bottom: 5px;   
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        line-height: 1.4;
-        word-wrap: break-word;
+        visibility: hidden; position: absolute; z-index: 1; background-color: #282828;
+        color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px;
+        max-width: 240px; width: max-content; bottom: 100%; left: 50%;
+        transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        line-height: 1.4; word-wrap: break-word;
     }
     .custom-tooltip::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #282828 transparent transparent transparent;
+        content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+        border-width: 5px; border-style: solid; border-color: #282828 transparent transparent transparent;
     }
-    
-    .tooltip-container:hover .custom-tooltip {
-        visibility: visible;
+    .tooltip-container:hover .custom-tooltip { visibility: visible; }
+    .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
+    .sort-play-settings .switch.disabled .slider { opacity: 0.5; cursor: not-allowed; }
+    .sort-play-settings .setting-row.forced .col.description { opacity: 0.7; }
+     .sort-play-settings .github-link-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+      padding-bottom: 10px;
     }
-    .version-tag {
-      font-size: 14px;
-      color: #888;
-      margin-left: 12px;
-      vertical-align: middle;
+    .sort-play-settings .github-link-container a {
+        color: #1ED760;
+        font-size: 14px;
+        text-decoration: none;
     }
     </style>
     <div style="display: flex; flex-direction: column; gap: 12px;">
@@ -699,22 +646,18 @@
                   <span class="custom-tooltip">Adds a new column for Play Count or Release Date in playlists.</span>
               </span>
           </label>
-        <div class="col action" style="position: relative;"> <!-- Added relative positioning -->
-            <!-- Settings Button for Date Format -->
+        <div class="col action" style="position: relative;">
             <button id="dateFormatSettingsBtn" class="date-format-settings-button" title="Release Date Format Settings" style="display: ${selectedColumnType === 'releaseDate' && showAdditionalColumn ? 'flex' : 'none'};" ${!showAdditionalColumn ? 'disabled' : ''}>
                 ${settingsSvg}
             </button>
-            <!-- Dropdown for selecting column type -->
             <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
                 <option value="playCount" ${selectedColumnType === 'playCount' ? 'selected' : ''}>Play Count</option>
                 <option value="releaseDate" ${selectedColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
             </select>
-            <!-- Toggle for showing/hiding the column -->
             <label class="switch">
                 <input type="checkbox" id="showAdditionalColumnToggle" ${showAdditionalColumn ? 'checked' : ''}>
                 <span class="slider"></span>
             </label>
-             <!-- Date Format Dropdown Container -->
             <div id="dateFormatDropdownContainer" class="date-format-dropdown">
                 <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
                 <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
@@ -766,6 +709,42 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Queue Behavior
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="addToQueueSetting">
+        <label class="col description">
+            Add Sorted Tracks to Queue
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Adds tracks to queue after direct sorts (Play Count, Popularity, Date, LFM, Shuffle). Filters & AI Pick excluded.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="addToQueueToggle" ${addToQueueEnabled ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="createPlaylistSettingRow">
+        <label class="col description">
+            Create Playlist After Sorting
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Creates a new playlist with the sorted tracks. Applies only when sorting directly (not using filters or AI).</span>
+            </span>
+        </label>
+        <div class="col action"><label class="switch" id="createPlaylistSwitchLabel">
+                <input type="checkbox" id="createPlaylistToggle" ${createPlaylistAfterSort ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Custom Filter
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
@@ -779,12 +758,11 @@
             </label>
         </div>
     </div>
-    
-    <div class="setting-row" id="githubLink" style="margin-top: 10px; justify-content: center;">
-        <label class="col description" style="text-align: center; width: auto; float: none; padding: 0;">
-            <a href="https://github.com/hoeci/sort-play" style="color: #1ED760; font-size: 14px; text-decoration: none;" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
-        </label>
+
+    <div class="github-link-container">
+        <a href="https://github.com/hoeci/sort-play" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
     </div>
+
     </div>
     `;
 
@@ -819,6 +797,31 @@
     const includeAudioFeaturesToggle = modalContainer.querySelector("#includeAudioFeatures input");
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
+    const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
+    const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
+    const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
+    const createPlaylistSettingRow = modalContainer.querySelector("#createPlaylistSettingRow");
+
+    function updateCreatePlaylistToggleState() {
+      const isAddToQueueOn = addToQueueToggle.checked;
+
+      if (!isAddToQueueOn) {
+        createPlaylistToggle.checked = true;
+        createPlaylistToggle.disabled = true;
+        createPlaylistSwitchLabel.classList.add("disabled");
+        createPlaylistSettingRow.classList.add("forced"); 
+
+        if (!createPlaylistAfterSort) { 
+             createPlaylistAfterSort = true;
+             saveSettings();
+        }
+      } else {
+        createPlaylistToggle.disabled = false;
+        createPlaylistSwitchLabel.classList.remove("disabled");
+        createPlaylistSettingRow.classList.remove("forced");
+        createPlaylistToggle.checked = createPlaylistAfterSort;
+      }
+    }
 
     setGeminiApiKeyButton.addEventListener("click", () => {
         Spicetify.PopupModal.hide();
@@ -851,6 +854,21 @@
     setLastFmUsernameButton.addEventListener("mouseleave", () => {
       setLastFmUsernameButton.style.backgroundColor = "#333333";
     });
+
+    addToQueueToggle.addEventListener("change", () => {
+      addToQueueEnabled = addToQueueToggle.checked;
+      saveSettings();
+      updateCreatePlaylistToggleState();
+    });
+
+    createPlaylistToggle.addEventListener("change", () => {
+      if (!createPlaylistToggle.disabled) {
+          createPlaylistAfterSort = createPlaylistToggle.checked;
+          saveSettings();
+      }
+    });
+
+    updateCreatePlaylistToggleState();
 
     removeDateAddedToggle.disabled = !showAdditionalColumn; 
     removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn);
@@ -1009,6 +1027,92 @@
         Spicetify.PopupModal.hide();
       });
     }
+  }
+
+    const createQueueItem = (isLikedSource) => ({ uri, uid = "" }) => ({
+      contextTrack: {
+          uri,
+          uid,
+          metadata: {
+              is_queued: isLikedSource ? "true" : "false"
+          }
+      },
+      removed: [],
+      blocked: [],
+      provider: isLikedSource ? "queue" : "context"
+  });
+
+  /**
+   * @param {Array<object>} tracks 
+   * @param {string} [contextUri]
+   */
+  async function setQueueFromTracks(tracks, contextUri) {
+      const { PlayerAPI } = Spicetify.Platform;
+      if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state) {
+          Spicetify.showNotification("Player API not available for queue manipulation.", true);
+          console.error("Player API components missing for queue operation.");
+          return;
+      }
+
+      if (!tracks || tracks.length === 0) {
+          Spicetify.showNotification("No tracks to add to the queue.", true);
+          console.log("Attempted to set queue with empty track list.");
+          return;
+      }
+
+      const { _queue, _client } = PlayerAPI._queue;
+      const { prevTracks, queueRevision } = _queue;
+
+      const isLiked = contextUri ? isLikedSongsPage(contextUri) : false;
+
+      const nextTracksFormatted = tracks.map(createQueueItem(isLiked));
+
+      try {
+          console.log("Setting queue with tracks:", nextTracksFormatted);
+          await _client.setQueue({
+              nextTracks: nextTracksFormatted,
+              prevTracks,
+              queueRevision
+          });
+
+          console.log("Skipping to next track in new queue.");
+          await PlayerAPI.skipToNext();
+
+          await new Promise(resolve => setTimeout(resolve, 100)); 
+          if (contextUri && !isLiked && PlayerAPI._state?.sessionId) {
+            try {
+                console.log("Updating player context to:", contextUri);
+                await PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri });
+            } catch (contextError) {
+                console.warn("Failed to update player context:", contextError);
+            }
+          } else {
+              console.log("Skipping context update (Liked Songs or no context URI).");
+          }
+
+          Spicetify.showNotification("Sorted tracks added to queue.");
+
+      } catch (error) {
+          console.error("Error setting queue:", error);
+          Spicetify.showNotification("Failed to set the playback queue.", true);
+          throw error;
+      }
+  }
+
+  /**
+   * @param {string} sortType
+   * @returns {boolean}
+   */
+  function isDirectSortType(sortType) {
+      const directSortTypes = [
+          "playCount",
+          "popularity",
+          "releaseDate",
+          "scrobbles",
+          "personalScrobbles",
+          "shuffle"
+      ];
+      return directSortTypes.includes(sortType);
   }
 
   async function handleAiPick(tracks) {
@@ -3784,7 +3888,7 @@
         padding: 8px;
         border-bottom: 1px solid #282828;
         font-weight: 400;
-        font-family: 'SpotifyMixUI';
+        font-family: 'SpotifyMixUI' !important;
         color: #b3b3b3;
         position: sticky;
         top: 0;
@@ -9090,11 +9194,6 @@
           throw new Error('No tracks found to sort');
       }
 
-      if (!tracks || tracks.length === 0) {
-        resetButtons();
-        Spicetify.showNotification("Could not fetch tracks. Please try again.");
-        return;
-      }
       mainButton.innerText = "0%";
 
       const tracksWithPlayCounts = await processBatchesWithDelay(
@@ -9142,17 +9241,19 @@
             },
             getTrackDetailsWithReleaseDate
           );
-          uniqueTracks = deduplicateTracks(tracksWithReleaseDates).unique;
-          removedTracks = deduplicateTracks(tracksWithReleaseDates).removed;
+          const deduplicationResult = deduplicateTracks(tracksWithReleaseDates);
+          uniqueTracks = deduplicationResult.unique;
+          removedTracks = deduplicationResult.removed;
         } else {
-          uniqueTracks = deduplicateTracks(tracksWithPopularity).unique;
-          removedTracks = deduplicateTracks(tracksWithPopularity).removed;
+          const deduplicationResult = deduplicateTracks(tracksWithPopularity);
+          uniqueTracks = deduplicationResult.unique;
+          removedTracks = deduplicationResult.removed;
         }
 
         if (sortType === "playCount") {
           sortedTracks = uniqueTracks
             .filter((track) => track.playCount !== "N/A")
-            .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount); 
+            .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount);
         } else if (sortType === "popularity") {
           sortedTracks = uniqueTracks
             .filter((track) => track.popularity !== null)
@@ -9164,18 +9265,19 @@
               return sortOrderState.releaseDate
                 ? a.releaseDate - b.releaseDate
                 : b.releaseDate - a.releaseDate;
-            }); 
+            });
         } else if (sortType === "shuffle") {
           sortedTracks = shuffleArray(uniqueTracks);
         }
 
-        if (sortedTracks.length === 0) {
-          resetButtons();
-          Spicetify.showNotification(`No tracks found with ${sortType} data.`);
-          return;
+        if (!sortedTracks || sortedTracks.length === 0) {
+            resetButtons();
+            Spicetify.showNotification(`No tracks found with ${sortType} data.`);
+            return;
         }
 
         mainButton.innerText = "100%";
+
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
           try {
               const result = await handleScrobblesSorting(
@@ -9192,6 +9294,7 @@
                 const progress = 90 + Math.floor(((index + 1) / totalTracks) * 10);
                 mainButton.innerText = `${progress}%`;
               });
+               mainButton.innerText = "100%";
             } catch (error) {
               resetButtons();
               Spicetify.showNotification(error.message);
@@ -9205,109 +9308,139 @@
           }
         );
         removedTracks = removedTracksFromAi;
-  
+
         if (uniqueTracks.length === 0) {
           resetButtons();
           Spicetify.showNotification("No tracks available for AI to pick from.");
           return;
         }
-  
+
         let artistImageUrl = null;
         if (isArtistPage) {
           try {
-            artistImageUrl = await getArtistImageUrl(sourceUri.split(":")[2]);
+            artistImageUrl = await getArtistImageUrl(currentUri.split(":")[2]);
           } catch (error) {
             console.error("Error fetching artist image URL:", error);
           }
         }
-  
-        await showAiPickModal(uniqueTracks, artistImageUrl); 
+
+        await showAiPickModal(uniqueTracks, artistImageUrl);
         return;
       }
-  
-      const sourceUri = currentUri;
-      let sourceName;
 
-      if (URI.isArtist(sourceUri)) {
-          sourceName = await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-          ).then((r) => r.name);
-      } else if (isLikedSongsPage(sourceUri)) {
-          sourceName = "Liked Songs";
-      } else {
-          sourceName = await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-          ).then((r) => r.name);
+
+      if (addToQueueEnabled && isDirectSortType(sortType) && sortedTracks && sortedTracks.length > 0) {
+        try {
+          await setQueueFromTracks(sortedTracks, currentUri);
+        } catch (queueError) {
+          console.error("Failed to add sorted tracks to queue:", queueError);
+          Spicetify.showNotification("Failed to add to queue.", true);
+        }
       }
 
-      const possibleSuffixes = [
-        "\\(PlayCount\\)",
-        "\\(Popularity\\)",
-        "\\(ReleaseDate\\)",
-        "\\(LFM Scrobbles\\)",
-        "\\(LFM My Scrobbles\\)",
-        "\\(Shuffle\\)",
-        "\\(AI Pick\\)",
-      ];
 
-      let suffixPattern = new RegExp(
-        `\\s*(${possibleSuffixes.join("|")})\\s*`
-      );
+      if (createPlaylistAfterSort && isDirectSortType(sortType)) {
 
-      while (suffixPattern.test(sourceName)) {
-        sourceName = sourceName.replace(suffixPattern, "");
-      }
-
-      const sortTypeInfo = {
-        playCount: { fullName: "play count", shortName: "PlayCount" },
-        popularity: { fullName: "popularity", shortName: "Popularity" },
-        releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-        scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
-        personalScrobbles: {
-          fullName: "Last.fm personal scrobbles",
-          shortName: "LFM My Scrobbles",
-        },
-        shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-        aiPick: { fullName: "AI pick", shortName: "AI Pick" },
-      }[sortType];
-
-      try {
-        if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
-          showRemovedTracksModal(removedTracks);
+        if (!sortedTracks || sortedTracks.length === 0) {
+           console.log("No tracks left after sorting/filtering to create playlist.");
+           if (!addToQueueEnabled || !(isDirectSortType(sortType))) {
+                Spicetify.showNotification("No tracks to create playlist from.");
+           }
+           return;
         }
 
-        let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
+        const sourceUri = currentUri;
+        let sourceName;
 
-        if(isArtistPage) {
-          playlistDescription = `Discography of ${sourceName}: created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
+        if (URI.isArtist(sourceUri)) {
+            sourceName = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name);
+        } else if (isLikedSongsPage(sourceUri)) {
+            sourceName = "Liked Songs";
+        } else {
+            sourceName = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name);
         }
 
-        const newPlaylist = await createPlaylist(
-          `${sourceName} (${sortTypeInfo.shortName})`,
-          playlistDescription
+        const possibleSuffixes = [
+          "\\(PlayCount\\)",
+          "\\(Popularity\\)",
+          "\\(ReleaseDate\\)",
+          "\\(LFM Scrobbles\\)",
+          "\\(LFM My Scrobbles\\)",
+          "\\(Shuffle\\)",
+          "\\(AI Pick\\)",
+        ];
+
+        let suffixPattern = new RegExp(
+          `\\s*(${possibleSuffixes.join("|")})\\s*`
         );
-        mainButton.innerText = "Saving...";
-        if (isArtistPage && sortType !== "aiPick") {
-          try {
-            const artistImageUrl = await getArtistImageUrl(sourceUri.split(":")[2]);
-            if (artistImageUrl) {
-              const base64Image = await toBase64(artistImageUrl);
-              await setPlaylistImage(newPlaylist.id, base64Image);
-            }
-          } catch (error) {
-            console.error("Error setting playlist image:", error);
+
+        while (suffixPattern.test(sourceName)) {
+          sourceName = sourceName.replace(suffixPattern, "");
+        }
+
+        const sortTypeInfo = {
+          playCount: { fullName: "play count", shortName: "PlayCount" },
+          popularity: { fullName: "popularity", shortName: "Popularity" },
+          releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
+          scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
+          personalScrobbles: {
+            fullName: "Last.fm personal scrobbles",
+            shortName: "LFM My Scrobbles",
+          },
+          shuffle: { fullName: "shuffle", shortName: "Shuffle" },
+          aiPick: { fullName: "AI pick", shortName: "AI Pick" },
+        }[sortType];
+
+        try {
+          if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
+            showRemovedTracksModal(removedTracks);
           }
-        }
-        const trackUris = sortedTracks.map((track) => track.uri);
-        await addTracksToPlaylist(newPlaylist.id, trackUris);
 
-        Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
-      } catch (error) {
-        console.error("Error creating or updating playlist:", error);
-        Spicetify.showNotification(
-          `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
-        );
+          let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
+          if (isArtistPage) {
+            playlistDescription = `Discography of ${sourceName}: created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
+          }
+
+          const newPlaylist = await createPlaylist(
+            `${sourceName} (${sortTypeInfo.shortName})`,
+            playlistDescription
+          );
+          mainButton.innerText = "Saving...";
+
+          if (isArtistPage && sortType !== "aiPick") {
+            try {
+              const artistImageUrl = await getArtistImageUrl(sourceUri.split(":")[2]);
+              if (artistImageUrl) {
+                const base64Image = await toBase64(artistImageUrl);
+                await setPlaylistImage(newPlaylist.id, base64Image);
+              }
+            } catch (error) {
+              console.error("Error setting playlist image:", error);
+            }
+          }
+
+          const trackUris = sortedTracks.map((track) => track.uri);
+          await addTracksToPlaylist(newPlaylist.id, trackUris);
+
+          Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
+
+        } catch (error) {
+          console.error("Error creating or updating playlist:", error);
+          Spicetify.showNotification(
+            `An error occurred while creating the playlist.`
+          );
+        }
+      } else if (isDirectSortType(sortType)) {
+        if (!addToQueueEnabled) {
+             Spicetify.showNotification(`Sorting complete for ${sortType}.`);
+        }
+        console.log(`Playlist creation skipped for ${sortType} due to setting.`);
       }
+
     } catch (error) {
       console.error("Error during sorting process:", error);
       Spicetify.showNotification(`An error occurred during the sorting process.`);
