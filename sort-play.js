@@ -634,6 +634,42 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Queue Behavior
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="addToQueueSetting">
+        <label class="col description">
+            Add Sorted Tracks to Queue
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Adds tracks to queue after direct sorts (Play Count, Popularity, Date, LFM, Shuffle). Filters & AI Pick excluded.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="addToQueueToggle" ${addToQueueEnabled ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="createPlaylistSettingRow">
+        <label class="col description">
+            Create Playlist After Sorting
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Creates a new playlist with the sorted tracks. Applies only when sorting directly (not using filters or AI).</span>
+            </span>
+        </label>
+        <div class="col action"><label class="switch" id="createPlaylistSwitchLabel">
+                <input type="checkbox" id="createPlaylistToggle" ${createPlaylistAfterSort ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Playlist Column
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
@@ -678,6 +714,7 @@
         </div>
     </div>
 
+    
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Duplicate Removal
     </div>
@@ -703,42 +740,6 @@
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${showRemovedDuplicates ? 'checked' : ''}>
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
-
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Queue Behavior
-    </div>
-    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="addToQueueSetting">
-        <label class="col description">
-            Add Sorted Tracks to Queue
-            <span class="tooltip-container">
-                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Adds tracks to queue after direct sorts (Play Count, Popularity, Date, LFM, Shuffle). Filters & AI Pick excluded.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" id="addToQueueToggle" ${addToQueueEnabled ? 'checked' : ''}>
-                <span class="slider"></span>
-            </label>
-        </div>
-    </div>
-
-    <div class="setting-row" id="createPlaylistSettingRow">
-        <label class="col description">
-            Create Playlist After Sorting
-            <span class="tooltip-container">
-                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Creates a new playlist with the sorted tracks. Applies only when sorting directly (not using filters or AI).</span>
-            </span>
-        </label>
-        <div class="col action"><label class="switch" id="createPlaylistSwitchLabel">
-                <input type="checkbox" id="createPlaylistToggle" ${createPlaylistAfterSort ? 'checked' : ''}>
                 <span class="slider"></span>
             </label>
         </div>
