@@ -462,8 +462,8 @@
     }
     .main-trackCreditsModal-mainSection {
       overflow-y: auto !important; 
-      padding: 16px 32px 0 32px;
-      flex-grow: 1; /
+      padding: 16px 25px 0 25px;
+      flex-grow: 1; 
        scrollbar-width: thin;
        scrollbar-color: #5a5a5a #282828;
     }
