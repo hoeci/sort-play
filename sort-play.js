@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.2.0";
+  const SORT_PLAY_VERSION = "4.2.5";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -546,9 +546,31 @@
     .date-format-settings-button:hover svg { fill: #ffffff; }
     .date-format-settings-button:disabled { opacity: 0.3; cursor: not-allowed; }
     .date-format-dropdown {
-        display: none; position: absolute; background-color: #282828; min-width: 130px;
+        display: none; position: absolute; background-color: #282828; min-width: 140px;
         box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px;
-        padding: 4px 0; top: calc(100% + 4px); left: 13px; margin-top: 5px;
+        padding: 4px 0; top: calc(100% + 4px); left: -55px; margin-top: 5px;
+        max-height: 225px;
+        overflow-y: auto;
+        scrollbar-width: thin; 
+        scrollbar-color: #555 #282828;
+    }
+    .date-format-dropdown::-webkit-scrollbar {
+        width: 8px; 
+    }
+
+    .date-format-dropdown::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1); 
+        border-radius: 4px;
+    }
+
+    .date-format-dropdown::-webkit-scrollbar-thumb {
+        background-color: #555;
+        border-radius: 4px;
+        border: 2px solid #282828; 
+    }
+
+    .date-format-dropdown::-webkit-scrollbar-thumb:hover {
+        background-color: #777;
     }
     .date-format-dropdown button {
         color: #b3b3b3; padding: 8px 12px; text-decoration: none; display: block;
@@ -696,8 +718,11 @@
             </label>
             <div id="dateFormatDropdownContainer" class="date-format-dropdown">
                 <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
-                <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
                 <button data-format="MM-DD-YYYY" class="${releaseDateFormat === 'MM-DD-YYYY' ? 'selected' : ''}">MM-DD-YYYY</button>
+                <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
+                <button data-format="MMM D, YYYY" class="${releaseDateFormat === 'MMM D, YYYY' ? 'selected' : ''}">Month D, YYYY</button>
+                <button data-format="D MMM, YYYY" class="${releaseDateFormat === 'D MMM, YYYY' ? 'selected' : ''}">D Month, YYYY</button>
+                <button data-format="YYYY, MMM D" class="${releaseDateFormat === 'YYYY, MMM D' ? 'selected' : ''}">YYYY, Month D</button>
                 <button data-format="YYYY-MM" class="${releaseDateFormat === 'YYYY-MM' ? 'selected' : ''}">YYYY-MM</button>
                 <button data-format="MM-YYYY" class="${releaseDateFormat === 'MM-YYYY' ? 'selected' : ''}">MM-YYYY</button>
                 <button data-format="YYYY" class="${releaseDateFormat === 'YYYY' ? 'selected' : ''}">YYYY</button>
@@ -9198,33 +9223,20 @@
       mainButton.innerText = "0%";
 
       const tracksWithPlayCounts = await processBatchesWithDelay(
-        tracks,
-        200,
-        1000,
-        (progress) => {
-          mainButton.innerText = `${Math.floor(progress * 0.20)}%`;
-        },
-        getTrackDetailsWithPlayCount
+        tracks, 200, 1000, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithPlayCount
       );
       const tracksWithIds = await processBatchesWithDelay(
-        tracksWithPlayCounts,
-        200,
-        1000,
-        (progress) => {
-          mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`;
-        },
-        collectTrackIdsForPopularity
+        tracksWithPlayCounts, 200, 1000, (progress) => { mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`; }, collectTrackIdsForPopularity
       );
       const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-        tracksWithIds,
-        (progress) => {
-          mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`;
-        }
+        tracksWithIds, (progress) => { mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`; }
       );
 
       let sortedTracks;
       let uniqueTracks;
       let removedTracks = [];
+      let playlistUriForQueue = currentUri;
+      let playlistWasCreated = false;
 
       if (
         sortType === "playCount" ||
@@ -9234,13 +9246,7 @@
       ) {
         if (sortType === "releaseDate") {
           const tracksWithReleaseDates = await processBatchesWithDelay(
-            tracksWithPopularity,
-            200,
-            1000,
-            (progress) => {
-              mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
-            },
-            getTrackDetailsWithReleaseDate
+            tracksWithPopularity, 200, 1000, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithReleaseDate
           );
           const deduplicationResult = deduplicateTracks(tracksWithReleaseDates);
           uniqueTracks = deduplicationResult.unique;
@@ -9276,170 +9282,124 @@
             Spicetify.showNotification(`No tracks found with ${sortType} data.`);
             return;
         }
-
         mainButton.innerText = "100%";
 
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
           try {
               const result = await handleScrobblesSorting(
-                tracks,
-                sortType,
-                (progress) => {
-                  mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`;
-                }
+                tracks, sortType, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
               );
               sortedTracks = result.sortedTracks;
               removedTracks = result.removedTracks;
-              const totalTracks = sortedTracks.length;
+              const totalTracksProgress = sortedTracks.length;
               sortedTracks.forEach((_, index) => {
-                const progress = 90 + Math.floor(((index + 1) / totalTracks) * 10);
+                const progress = 90 + Math.floor(((index + 1) / totalTracksProgress) * 10);
                 mainButton.innerText = `${progress}%`;
               });
-               mainButton.innerText = "100%";
+              mainButton.innerText = "100%";
             } catch (error) {
               resetButtons();
               Spicetify.showNotification(error.message);
               return;
             }
       } else if (sortType === "aiPick") {
-        const { uniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
-          tracks,
-          (progress) => {
-            mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`;
-          }
+        const { uniqueTracks: aiUniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
+          tracks, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
         );
         removedTracks = removedTracksFromAi;
-
-        if (uniqueTracks.length === 0) {
+        if (aiUniqueTracks.length === 0) {
           resetButtons();
           Spicetify.showNotification("No tracks available for AI to pick from.");
           return;
         }
-
         let artistImageUrl = null;
         if (isArtistPage) {
           try {
             artistImageUrl = await getArtistImageUrl(currentUri.split(":")[2]);
-          } catch (error) {
-            console.error("Error fetching artist image URL:", error);
-          }
+          } catch (error) { console.error("Error fetching artist image URL:", error); }
         }
-
-        await showAiPickModal(uniqueTracks, artistImageUrl);
+        await showAiPickModal(aiUniqueTracks, artistImageUrl);
         return;
       }
 
-
-      if (addToQueueEnabled && isDirectSortType(sortType) && sortedTracks && sortedTracks.length > 0) {
-        try {
-          await setQueueFromTracks(sortedTracks, currentUri);
-        } catch (queueError) {
-          console.error("Failed to add sorted tracks to queue:", queueError);
-          Spicetify.showNotification("Failed to add to queue.", true);
-        }
-      }
-
-
       if (createPlaylistAfterSort && isDirectSortType(sortType)) {
-
         if (!sortedTracks || sortedTracks.length === 0) {
            console.log("No tracks left after sorting/filtering to create playlist.");
-           if (!addToQueueEnabled || !(isDirectSortType(sortType))) {
+           if (!addToQueueEnabled) {
                 Spicetify.showNotification("No tracks to create playlist from.");
            }
            return;
         }
-
         const sourceUri = currentUri;
         let sourceName;
-
         if (URI.isArtist(sourceUri)) {
-            sourceName = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
+            sourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`).then((r) => r.name);
         } else if (isLikedSongsPage(sourceUri)) {
             sourceName = "Liked Songs";
         } else {
-            sourceName = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
+            sourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`).then((r) => r.name);
         }
-
-        const possibleSuffixes = [
-          "\\(PlayCount\\)",
-          "\\(Popularity\\)",
-          "\\(ReleaseDate\\)",
-          "\\(LFM Scrobbles\\)",
-          "\\(LFM My Scrobbles\\)",
-          "\\(Shuffle\\)",
-          "\\(AI Pick\\)",
-        ];
-
-        let suffixPattern = new RegExp(
-          `\\s*(${possibleSuffixes.join("|")})\\s*`
-        );
-
+        const possibleSuffixes = ["\\(PlayCount\\)","\\(Popularity\\)","\\(ReleaseDate\\)","\\(LFM Scrobbles\\)","\\(LFM My Scrobbles\\)","\\(Shuffle\\)","\\(AI Pick\\)"];
+        let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
         while (suffixPattern.test(sourceName)) {
           sourceName = sourceName.replace(suffixPattern, "");
         }
-
         const sortTypeInfo = {
           playCount: { fullName: "play count", shortName: "PlayCount" },
           popularity: { fullName: "popularity", shortName: "Popularity" },
           releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
           scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
-          personalScrobbles: {
-            fullName: "Last.fm personal scrobbles",
-            shortName: "LFM My Scrobbles",
-          },
+          personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-          aiPick: { fullName: "AI pick", shortName: "AI Pick" },
         }[sortType];
-
         try {
           if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
             showRemovedTracksModal(removedTracks);
           }
-
           let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
           if (isArtistPage) {
             playlistDescription = `Discography of ${sourceName}: created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
           }
-
-          const newPlaylist = await createPlaylist(
-            `${sourceName} (${sortTypeInfo.shortName})`,
-            playlistDescription
-          );
+          mainButton.innerText = "Creating...";
+          const newPlaylist = await createPlaylist(`${sourceName} (${sortTypeInfo.shortName})`, playlistDescription);
+          playlistUriForQueue = newPlaylist.uri;
+          playlistWasCreated = true;
           mainButton.innerText = "Saving...";
-
-          if (isArtistPage && sortType !== "aiPick") {
+          if (isArtistPage) {
             try {
               const artistImageUrl = await getArtistImageUrl(sourceUri.split(":")[2]);
               if (artistImageUrl) {
                 const base64Image = await toBase64(artistImageUrl);
                 await setPlaylistImage(newPlaylist.id, base64Image);
               }
-            } catch (error) {
-              console.error("Error setting playlist image:", error);
-            }
+            } catch (error) { console.error("Error setting playlist image:", error); }
           }
-
           const trackUris = sortedTracks.map((track) => track.uri);
           await addTracksToPlaylist(newPlaylist.id, trackUris);
-
           Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
-
         } catch (error) {
           console.error("Error creating or updating playlist:", error);
-          Spicetify.showNotification(
-            `An error occurred while creating the playlist.`
-          );
+          Spicetify.showNotification(`An error occurred while creating the playlist.`);
+          playlistWasCreated = false;
+          playlistUriForQueue = currentUri;
         }
-      } else if (isDirectSortType(sortType)) {
-        if (!addToQueueEnabled) {
-             Spicetify.showNotification(`Sorting complete for ${sortType}.`);
+      }
+
+      if (addToQueueEnabled && isDirectSortType(sortType) && sortedTracks && sortedTracks.length > 0) {
+        try {
+          await setQueueFromTracks(sortedTracks, playlistUriForQueue);
+        } catch (queueError) {
+          console.error("Failed to add sorted tracks to queue:", queueError);
+          Spicetify.showNotification("Failed to add to queue.", true);
         }
-        console.log(`Playlist creation skipped for ${sortType} due to setting.`);
+      }
+
+      if (isDirectSortType(sortType) && !playlistWasCreated && !addToQueueEnabled) {
+        Spicetify.showNotification(`Sorting complete for ${sortType}.`);
+      } else if (isDirectSortType(sortType) && !createPlaylistAfterSort && addToQueueEnabled) {
+        console.log(`Playlist creation skipped for ${sortType} due to setting, tracks added to queue.`);
+      } else if (isDirectSortType(sortType) && !createPlaylistAfterSort && !addToQueueEnabled) {
+        console.log(`Playlist creation and queueing skipped for ${sortType} due to settings.`);
       }
 
     } catch (error) {
@@ -9959,53 +9919,79 @@
     }
 
     let dateObj;
-    if (typeof rawDate === 'number') {
+    let yearOnly = false;
+    let monthYearOnly = false;
+
+    if (typeof rawDate === 'number') { 
         dateObj = new Date(rawDate);
     } else if (typeof rawDate === 'string') {
         let dateStrToParse = rawDate;
         if (rawDate.length === 4) { 
-             if (format === 'YYYY') return rawDate;
-             if (format === 'MM-YYYY') return `??-${rawDate}`;
-             if (format === 'YYYY-MM') return `${rawDate}-??`;
+             yearOnly = true;
              dateStrToParse = `${rawDate}-01-01`;
         } else if (rawDate.length === 7) {
-             if (format === 'YYYY') return rawDate.substring(0, 4);
-             if (format === 'MM-YYYY') return `${rawDate.substring(5, 7)}-${rawDate.substring(0, 4)}`;
-             if (format === 'YYYY-MM') return rawDate;
-             dateStrToParse = `${rawDate}-01`;
+             monthYearOnly = true;
+             dateStrToParse = `${rawDate}-01`; 
         }
         dateObj = new Date(dateStrToParse);
     } else {
-        return "_"; 
+        return "_";
     }
 
-
     if (isNaN(dateObj.getTime())) {
-         if (typeof rawDate === 'string' && /^\d{4}$/.test(rawDate) && format === 'YYYY') {
-             return rawDate;
-         }
         return "_";
     }
 
     const year = dateObj.getFullYear();
-    const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-    const day = dateObj.getDate().toString().padStart(2, '0');
+    const monthNumeric = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const dayNumeric = dateObj.getDate().toString().padStart(2, '0');
+    const monthShort = dateObj.toLocaleString('default', { month: 'short' });
+
+    if (yearOnly) {
+        switch (format) {
+            case 'YYYY': return year.toString();
+            case 'MM-YYYY': return `??-${year}`;
+            case 'YYYY-MM': return `${year}-??`;
+            case 'MMM D, YYYY': return `???, ${year}`; 
+            case 'D MMM, YYYY': return `???, ${year}`; 
+            case 'YYYY, MMM D': return `${year}, ???`;
+            default: return year.toString();
+        }
+    }
+
+    if (monthYearOnly) {
+        switch (format) {
+            case 'YYYY': return year.toString();
+            case 'MM-YYYY': return `${monthNumeric}-${year}`;
+            case 'YYYY-MM': return `${year}-${monthNumeric}`;
+            case 'MMM D, YYYY': return `${monthShort}, ${year}`; 
+            case 'D MMM, YYYY': return `${monthShort}, ${year}`; 
+            case 'YYYY, MMM D': return `${year}, ${monthShort}`;
+            default: return `${year}-${monthNumeric}`;
+        }
+    }
 
     switch (format) {
         case 'YYYY-MM-DD':
-            return `${year}-${month}-${day}`;
+            return `${year}-${monthNumeric}-${dayNumeric}`;
         case 'DD-MM-YYYY':
-            return `${day}-${month}-${year}`;
+            return `${dayNumeric}-${monthNumeric}-${year}`;
         case 'MM-DD-YYYY':
-            return `${month}-${day}-${year}`;
+            return `${monthNumeric}-${dayNumeric}-${year}`;
         case 'YYYY':
             return year.toString();
-         case 'YYYY-MM':
-            return `${year}-${month}`;
+        case 'YYYY-MM':
+            return `${year}-${monthNumeric}`;
         case 'MM-YYYY':
-            return `${month}-${year}`;
+            return `${monthNumeric}-${year}`;
+        case 'MMM D, YYYY':
+            return `${monthShort} ${dateObj.getDate()}, ${year}`;
+        case 'D MMM, YYYY':
+            return `${dateObj.getDate()} ${monthShort}, ${year}`;
+        case 'YYYY, MMM D':
+            return `${year}, ${monthShort} ${dateObj.getDate()}`;
         default:
-            return `${year}-${month}-${day}`;
+            return `${year}-${monthNumeric}-${dayNumeric}`;
     }
   }
 
