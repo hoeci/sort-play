@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.2.5";
+  const SORT_PLAY_VERSION = "4.2.6";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -1082,7 +1082,6 @@
 
       if (!tracks || tracks.length === 0) {
           Spicetify.showNotification("No tracks to add to the queue.", true);
-          console.log("Attempted to set queue with empty track list.");
           return;
       }
 
@@ -1094,20 +1093,17 @@
       const nextTracksFormatted = tracks.map(createQueueItem(isLiked));
 
       try {
-          console.log("Setting queue with tracks:", nextTracksFormatted);
           await _client.setQueue({
               nextTracks: nextTracksFormatted,
               prevTracks,
               queueRevision
           });
 
-          console.log("Skipping to next track in new queue.");
           await PlayerAPI.skipToNext();
 
           await new Promise(resolve => setTimeout(resolve, 100)); 
           if (contextUri && !isLiked && PlayerAPI._state?.sessionId) {
             try {
-                console.log("Updating player context to:", contextUri);
                 await PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri });
             } catch (contextError) {
                 console.warn("Failed to update player context:", contextError);
@@ -9552,58 +9548,77 @@
           return { unique: tracks, removed: [] };
       }
 
-      const duplicateGroups = new Map();
+      const DURATION_THRESHOLD = 2000; 
+      const finalUniqueTracks = [];
+      const finalRemovedTracks = [];
 
-      tracks.forEach((track) => {
-          const hasValidPlayCount = track.playCount !== "N/A" && track.playCount !== 0 && track.playCount !== null && track.playCount !== undefined; 
-          const rawTitle = track.name || track.songTitle || "Unknown Title"; 
-          const normalizedTitle = rawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
-          const firstWord = normalizedTitle.split(/\s+/)[0];
-
-          const primaryKey = `${track.playCount}-${firstWord}`;  
-          const secondaryKey = `${normalizedTitle}-${track.durationMilis}`;
-          const key = hasValidPlayCount ? primaryKey : secondaryKey;
-
-
-          if (!duplicateGroups.has(key)) {
-              duplicateGroups.set(key, []);
+      const sortedInputTracks = [...tracks].sort((a, b) => {
+          const popA = a.popularity || 0;
+          const popB = b.popularity || 0;
+          if (popB !== popA) {
+              return popB - popA;
           }
-          duplicateGroups.get(key).push(track);
+          return (a.uri || "").localeCompare(b.uri || "");
       });
 
-      const uniqueTracks = [];
-      const removedTracks = [];
+      sortedInputTracks.forEach(candidateTrack => {
+          let isConsideredDuplicateOfAnExistingUnique = false;
 
-      duplicateGroups.forEach((group) => {
-          if (group.length > 1) {
-              const validPlayCountTracks = group.filter(
-                  (track) => track.playCount !== "N/A" && track.playCount !== 0 && track.playCount !== null && track.playCount !== undefined 
-              );
-              const noOrZeroPlayCountTracks = group.filter(
-                  (track) => track.playCount === "N/A" || track.playCount === 0 || track.playCount === null || track.playCount === undefined
-              );
+          for (const existingUniqueTrack of finalUniqueTracks) {
+              const candidateHasValidPlayCount = candidateTrack.playCount !== "N/A" &&
+                                                candidateTrack.playCount !== 0 &&
+                                                candidateTrack.playCount !== null &&
+                                                candidateTrack.playCount !== undefined;
+              const existingHasValidPlayCount = existingUniqueTrack.playCount !== "N/A" &&
+                                                existingUniqueTrack.playCount !== 0 &&
+                                                existingUniqueTrack.playCount !== null &&
+                                                existingUniqueTrack.playCount !== undefined;
 
-              let trackToKeep;
-              if (validPlayCountTracks.length > 0) {
-                  validPlayCountTracks.sort(
-                      (a, b) => (b.popularity || 0) - (a.popularity || 0)
-                  );
-                  trackToKeep = validPlayCountTracks[0];
-              } else if (noOrZeroPlayCountTracks.length > 0) {
-                  noOrZeroPlayCountTracks.sort(
-                      (a, b) => (b.popularity || 0) - (a.popularity || 0)
-                  );
-                  trackToKeep = noOrZeroPlayCountTracks[0];
+              const candidateRawTitle = candidateTrack.songTitle || candidateTrack.name || "Unknown Title";
+              const candidateNormalizedTitle = candidateRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
+              const candidateFirstWord = candidateNormalizedTitle.split(/\s+/)[0];
+              const candidateDuration = candidateTrack.durationMs;
+
+              const existingRawTitle = existingUniqueTrack.songTitle || existingUniqueTrack.name || "Unknown Title";
+              const existingNormalizedTitle = existingRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
+              const existingFirstWord = existingNormalizedTitle.split(/\s+/)[0];
+              const existingDuration = existingUniqueTrack.durationMs; 
+
+              let areDuplicatesByNewRules = false;
+
+              if (candidateHasValidPlayCount && existingHasValidPlayCount) {
+                  if (Number(candidateTrack.playCount) === Number(existingUniqueTrack.playCount)) {
+                      const durationDiff = Math.abs(candidateDuration - existingDuration);
+                      if (candidateFirstWord === existingFirstWord) {
+                          if (durationDiff <= DURATION_THRESHOLD) {
+                              areDuplicatesByNewRules = true;
+                          }
+                      } else {
+                          if (durationDiff <= DURATION_THRESHOLD) {
+                              areDuplicatesByNewRules = true;
+                          }
+                      }
+                  }
+              } else if (!candidateHasValidPlayCount && !existingHasValidPlayCount) {
+                  if (candidateNormalizedTitle === existingNormalizedTitle && candidateDuration === existingDuration) {
+                      areDuplicatesByNewRules = true;
+                  }
               }
 
-              uniqueTracks.push(trackToKeep);
-              removedTracks.push(...group.filter(track => track !== trackToKeep));
+              if (areDuplicatesByNewRules) {
+                  isConsideredDuplicateOfAnExistingUnique = true;
+                  break;
+              }
+          }
+
+          if (isConsideredDuplicateOfAnExistingUnique) {
+              finalRemovedTracks.push(candidateTrack);
           } else {
-              uniqueTracks.push(group[0]);
+              finalUniqueTracks.push(candidateTrack);
           }
       });
 
-      return { unique: uniqueTracks, removed: removedTracks };
+      return { unique: finalUniqueTracks, removed: finalRemovedTracks };
   }
 
   async function handleScrobblesSorting(tracks, sortType, updateProgress) {
