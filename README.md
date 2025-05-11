@@ -12,7 +12,7 @@
 + Remove duplicate tracks, keeping the most popular version.
 + Smart Shuffle considering track similarity and artist diversity.
 + Toggle ascending/descending in release date sorting.
-+ Save sorted tracks to a new private playlist.
++ Save sorted tracks to a new private playlist or reorder the current playlist.
 + Add sorted tracks to the playback queue.
 
 ## 📷 Screenshots 
