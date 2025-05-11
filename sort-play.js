@@ -492,6 +492,22 @@
     .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb:hover {
         background-color: #7a7a7a;
     }
+    .sort-play-settings-footer {
+        flex-shrink: 0;
+        padding: 15px 25px 20px 25px; 
+        background-color: #181818; 
+        border-top: 1px solid #282828;
+    }
+    .sort-play-settings-footer .github-link-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .sort-play-settings-footer .github-link-container a {
+        color: #1ED760;
+        font-size: 14px;
+        text-decoration: none;
+    }
     .main-trackCreditsModal-header {
       padding: 27px 32px 12px !important;
       flex-shrink: 0;
@@ -592,9 +608,9 @@
     .date-format-dropdown button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
 
     .sort-play-settings .setting-row#githubLink {
-      display: flex;
-      justify-content: center;
-      margin-top: 5px;
+        display: flex;
+        justify-content: center;
+        margin-top: 5px;
     }
 
     .sort-play-settings .setting-row#githubLink .col.description {
@@ -827,11 +843,6 @@
             </label>
         </div>
     </div>
-
-    <div class="github-link-container">
-        <a href="https://github.com/hoeci/sort-play" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
-    </div>
-
     </div>
     `;
 
@@ -840,6 +851,22 @@
         content: modalContainer,
         isLarge: true,
     });
+
+    const modalRootElement = document.querySelector(".main-embedWidgetGenerator-container");
+    if (modalRootElement) {
+        const existingFooter = modalRootElement.querySelector(".sort-play-settings-footer");
+        if (existingFooter) {
+            existingFooter.remove();
+        }
+        const footerElement = document.createElement("div");
+        footerElement.className = "sort-play-settings-footer";
+        footerElement.innerHTML = `
+            <div class="github-link-container">
+                <a href="https://github.com/hoeci/sort-play" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
+            </div>
+        `;
+        modalRootElement.appendChild(footerElement);
+    }
 
     if (isMenuOpen) {
         toggleMenu();
