@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.2.6";
+  const SORT_PLAY_VERSION = "4.3.0";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -25,16 +25,20 @@
   let playlistDeduplicate = true;
   let showRemovedDuplicates = false;
   let includeSongStats = true;
-  let includeLyrics = true;
+  let includeLyrics = false;
   let matchAllGenres  = false;
   let includeaudiofeatures = false;
-  let addToQueueEnabled = false; 
+  let addToQueueEnabled = true; 
   let createPlaylistAfterSort = true; 
-  let selectedAiModel = "gemini-2.5-pro-exp-03-25";
+  let sortCurrentPlaylistEnabled = false;
+  let openPlaylistAfterSortEnabled = true;
+  let selectedAiModel = "gemini-2.5-pro-exp-05-06";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
   const STORAGE_KEY_CREATE_PLAYLIST = "sort-play-create-playlist";
+  const STORAGE_KEY_SORT_CURRENT_PLAYLIST = "sort-play-sort-current-playlist";
+  const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort";
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
   - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
@@ -56,12 +60,17 @@
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
-    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.0-flash-exp";
+    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.5-pro-exp-05-06";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
-    addToQueueEnabled = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE) === "true";
+    const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
+    addToQueueEnabled = addToQueueStored === null ? true : addToQueueStored === "true";
     createPlaylistAfterSort = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST) !== "false";
+    const sortCurrentPlaylistStored = localStorage.getItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST);
+    sortCurrentPlaylistEnabled = sortCurrentPlaylistStored === null ? false : sortCurrentPlaylistStored === "true";
+    const openPlaylistStored = localStorage.getItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT);
+    openPlaylistAfterSortEnabled = openPlaylistStored === null ? true : openPlaylistStored === "true";
   
     sortOrderState = {
         playCount: false,
@@ -94,6 +103,8 @@
     localStorage.setItem("sort-play-include-audio-features", includeaudiofeatures);
     localStorage.setItem(STORAGE_KEY_ADD_TO_QUEUE, addToQueueEnabled);
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST, createPlaylistAfterSort);
+    localStorage.setItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST, sortCurrentPlaylistEnabled);
+    localStorage.setItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, openPlaylistAfterSortEnabled);
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
     }
@@ -486,7 +497,7 @@
       flex-shrink: 0;
     }
     .main-trackCreditsModal-originalCredits{
-      padding: 0 16px 20px 16px !important;
+      padding: 0 22px 20px 22px !important;
       flex-shrink: 0; 
     }
     .sort-play-settings .col {
@@ -638,25 +649,25 @@
         text-decoration: none;
     }
     </style>
-    <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
 
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 8px;">
         Credentials
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-        <div style="display: flex; gap: 16px; justify-content: flex-start; margin-top: 10px;">
+        <div style="display: flex; gap: 16px; justify-content: flex-start; margin-top: 8px;">
         <button id="setLastFmUsername" class="main-buttons-button"
-                style="padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                style="padding: 4px 16px; height: 32px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
           Set Last.fm Username
         </button>
         <button id="setGeminiApiKey" class="main-buttons-button"
-                style="padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                style="padding: 4px 16px; height: 32px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
           Set Gemini API Key
         </button>
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Queue Behavior
+        Sorting Behavior
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
@@ -686,6 +697,38 @@
         </label>
         <div class="col action"><label class="switch" id="createPlaylistSwitchLabel">
                 <input type="checkbox" id="createPlaylistToggle" ${createPlaylistAfterSort ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="sortCurrentPlaylistSettingRow">
+        <label class="col description">
+            Modify Current Playlist
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">If 'Create Playlist' is on, this sorts your owned playlist directly instead of making a new one.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="sortCurrentPlaylistSwitchLabel">
+                <input type="checkbox" id="sortCurrentPlaylistToggle" ${sortCurrentPlaylistEnabled ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="openPlaylistAfterSortSettingRow">
+        <label class="col description">
+            Open Playlist After Sorting
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Automatically navigates to the created or modified playlist after sorting is complete.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="openPlaylistAfterSortSwitchLabel">
+                <input type="checkbox" id="openPlaylistAfterSortToggle" ${openPlaylistAfterSortEnabled ? 'checked' : ''}>
                 <span class="slider"></span>
             </label>
         </div>
@@ -827,6 +870,37 @@
     const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
     const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
     const createPlaylistSettingRow = modalContainer.querySelector("#createPlaylistSettingRow");
+    const sortCurrentPlaylistToggle = modalContainer.querySelector("#sortCurrentPlaylistToggle");
+    const sortCurrentPlaylistSwitchLabel = modalContainer.querySelector("#sortCurrentPlaylistSwitchLabel");
+    const sortCurrentPlaylistSettingRow = modalContainer.querySelector("#sortCurrentPlaylistSettingRow");
+    const openPlaylistAfterSortToggle = modalContainer.querySelector("#openPlaylistAfterSortToggle");
+    const openPlaylistAfterSortSwitchLabel = modalContainer.querySelector("#openPlaylistAfterSortSwitchLabel");
+    const openPlaylistAfterSortSettingRow = modalContainer.querySelector("#openPlaylistAfterSortSettingRow");
+
+
+    function updateOpenPlaylistAfterSortToggleState() {
+      const isCreatePlaylistOn = createPlaylistToggle.checked;
+      const isModifyCurrentPlaylistActive = sortCurrentPlaylistToggle.checked && !sortCurrentPlaylistToggle.disabled;
+      const shouldBeEnabled = (isCreatePlaylistOn && !isModifyCurrentPlaylistActive) || isModifyCurrentPlaylistActive;
+
+      openPlaylistAfterSortToggle.disabled = !shouldBeEnabled;
+      openPlaylistAfterSortSwitchLabel.classList.toggle("disabled", !shouldBeEnabled);
+      openPlaylistAfterSortSettingRow.classList.toggle("dependent-disabled", !shouldBeEnabled);
+      openPlaylistAfterSortToggle.checked = openPlaylistAfterSortEnabled;
+    }
+
+    function updateSortCurrentPlaylistToggleState() {
+        const isCreatePlaylistOn = createPlaylistToggle.checked;
+        sortCurrentPlaylistToggle.disabled = !isCreatePlaylistOn;
+        sortCurrentPlaylistSwitchLabel.classList.toggle("disabled", !isCreatePlaylistOn);
+        sortCurrentPlaylistSettingRow.classList.toggle("dependent-disabled", !isCreatePlaylistOn);
+
+        if (!isCreatePlaylistOn) {
+        } else {
+            sortCurrentPlaylistToggle.checked = sortCurrentPlaylistEnabled;
+        }
+        updateOpenPlaylistAfterSortToggleState();
+    }
 
     function updateCreatePlaylistToggleState() {
       const isAddToQueueOn = addToQueueToggle.checked;
@@ -847,6 +921,7 @@
         createPlaylistSettingRow.classList.remove("forced");
         createPlaylistToggle.checked = createPlaylistAfterSort;
       }
+      updateSortCurrentPlaylistToggleState();
     }
 
     setGeminiApiKeyButton.addEventListener("click", () => {
@@ -883,15 +958,31 @@
 
     addToQueueToggle.addEventListener("change", () => {
       addToQueueEnabled = addToQueueToggle.checked;
+      updateCreatePlaylistToggleState(); 
       saveSettings();
-      updateCreatePlaylistToggleState();
     });
 
     createPlaylistToggle.addEventListener("change", () => {
       if (!createPlaylistToggle.disabled) {
           createPlaylistAfterSort = createPlaylistToggle.checked;
+          updateSortCurrentPlaylistToggleState(); 
           saveSettings();
       }
+    });
+
+    sortCurrentPlaylistToggle.addEventListener("change", () => {
+        if (!sortCurrentPlaylistToggle.disabled) {
+            sortCurrentPlaylistEnabled = sortCurrentPlaylistToggle.checked;
+            updateOpenPlaylistAfterSortToggleState();
+            saveSettings();
+        }
+    });
+
+    openPlaylistAfterSortToggle.addEventListener("change", () => {
+        if (!openPlaylistAfterSortToggle.disabled) {
+            openPlaylistAfterSortEnabled = openPlaylistAfterSortToggle.checked;
+            saveSettings();
+        }
     });
 
     updateCreatePlaylistToggleState();
@@ -1073,52 +1164,55 @@
    * @param {string} [contextUri]
    */
   async function setQueueFromTracks(tracks, contextUri) {
-      const { PlayerAPI } = Spicetify.Platform;
-      if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state) {
-          Spicetify.showNotification("Player API not available for queue manipulation.", true);
-          console.error("Player API components missing for queue operation.");
-          return;
-      }
+    const { PlayerAPI } = Spicetify.Platform;
+    if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state) {
+        Spicetify.showNotification("Player API not available for queue manipulation.", true);
+        console.error("Player API components missing for queue operation.");
+        return;
+    }
 
-      if (!tracks || tracks.length === 0) {
-          Spicetify.showNotification("No tracks to add to the queue.", true);
-          return;
-      }
+    if (!tracks || tracks.length === 0) {
+        Spicetify.showNotification("No tracks to add to the queue.", true);
+        return;
+    }
 
-      const { _queue, _client } = PlayerAPI._queue;
-      const { prevTracks, queueRevision } = _queue;
+    const { _queue, _client } = PlayerAPI._queue;
+    const { prevTracks, queueRevision } = _queue;
 
-      const isLiked = contextUri ? isLikedSongsPage(contextUri) : false;
+    const isLiked = contextUri ? isLikedSongsPage(contextUri) : false;
 
-      const nextTracksFormatted = tracks.map(createQueueItem(isLiked));
+    const nextTracksFormatted = tracks.map(createQueueItem(isLiked));
 
-      try {
-          await _client.setQueue({
-              nextTracks: nextTracksFormatted,
-              prevTracks,
-              queueRevision
-          });
+    try {
+        await new Promise(resolve => setTimeout(resolve, 200)); 
 
-          await PlayerAPI.skipToNext();
+        await _client.setQueue({
+            nextTracks: nextTracksFormatted,
+            prevTracks,
+            queueRevision
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 400)); 
+        await PlayerAPI.skipToNext();
+        await new Promise(resolve => setTimeout(resolve, 750)); 
 
-          await new Promise(resolve => setTimeout(resolve, 100)); 
-          if (contextUri && !isLiked && PlayerAPI._state?.sessionId) {
-            try {
-                await PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri });
-            } catch (contextError) {
-                console.warn("Failed to update player context:", contextError);
-            }
-          } else {
-              console.log("Skipping context update (Liked Songs or no context URI).");
+        if (contextUri && !isLiked && PlayerAPI._state?.sessionId) {
+          try {
+              await PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri });
+          } catch (contextError) {
+              console.warn("Failed to update player context:", contextError);
           }
+        } else {
+            console.log("Skipping context update (Liked Songs or no context URI).");
+        }
 
-          Spicetify.showNotification("Sorted tracks added to queue.");
+        Spicetify.showNotification("Sorted tracks added to queue.");
 
-      } catch (error) {
-          console.error("Error setting queue:", error);
-          Spicetify.showNotification("Failed to set the playback queue.", true);
-          throw error;
-      }
+    } catch (error) {
+        console.error("Error setting queue:", error);
+        Spicetify.showNotification("Failed to set the playback queue.", true);
+        throw error;
+    }
   }
 
   /**
@@ -1616,7 +1710,7 @@
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
                 <span class="custom-tooltip">Added Gemini 2.5 models</span></label>
               <select id="aiModel">
-                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.5-pro-exp-03-25" ? "selected" : ""}>Gemini 2.5 Pro Experimental</option>
+                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.5-pro-exp-05-06" ? "selected" : ""}>Gemini 2.5 Pro Experimental</option>
                 <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.5-flash-preview-04-17" ? "selected" : ""}>Gemini 2.5 Flash Preview</option>
                 <option value="gemini-2.0-flash" ${selectedAiModel === "gemini-2.0-flash" ? "selected" : ""}>Gemini 2.0 Flash</option>
                 <option value="gemini-2.0-flash-lite-preview-02-05" ${selectedAiModel === "gemini-2.0-flash-lite-preview-02-05" ? "selected" : ""}>Gemini 2.0 Flash-Lite Preview</option>
@@ -7295,8 +7389,13 @@
   }
 
   function isLikedSongsPage(uri) {
-    const uriObj = Spicetify.URI.fromString(uri);
-    return uriObj.type === Spicetify.URI.Type.COLLECTION && uriObj.category === "tracks";
+    if (!uri || typeof uri !== 'string') return false;
+    try {
+      const uriObj = Spicetify.URI.fromString(uri);
+      return uriObj && uriObj.type === Spicetify.URI.Type.COLLECTION && uriObj.category === "tracks";
+    } catch (e) {
+      return false;
+    }
   }
 
   function getCurrentUri() {
@@ -9079,6 +9178,49 @@
     return results;
   }
 
+  async function removeAllTracksFromPlaylist(playlistId, maxRetries = 5, initialDelay = 1000) {
+    const playlistUri = `spotify:playlist:${playlistId}`;
+    const currentTracks = await getPlaylistTracks(playlistId); 
+    if (!currentTracks || currentTracks.length === 0) {
+        console.log("No tracks to remove from playlist:", playlistId);
+        return;
+    }
+
+    const trackUrisToRemove = currentTracks.map(track => ({ uri: track.uri }));
+    const BATCH_SIZE = 100; 
+
+    for (let i = 0; i < trackUrisToRemove.length; i += BATCH_SIZE) {
+        const batch = trackUrisToRemove.slice(i, i + BATCH_SIZE);
+        let retries = 0;
+        let currentDelay = initialDelay;
+
+        while (retries <= maxRetries) {
+            try {
+                await Spicetify.CosmosAsync.del(
+                    `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+                    { tracks: batch }
+                );
+                break; 
+            } catch (error) {
+                console.error(
+                    `Error removing batch ${Math.floor(i / BATCH_SIZE) + 1} from playlist ${playlistId} (Attempt ${retries + 1}):`,
+                    error
+                );
+                if (retries === maxRetries) {
+                    Spicetify.showNotification("Error removing all tracks from current playlist.", true);
+                    throw new Error(
+                        `Failed to remove batch ${Math.floor(i / BATCH_SIZE) + 1} from playlist ${playlistId} after ${maxRetries} retries.`,
+                        { cause: error }
+                    );
+                }
+                retries++;
+                await new Promise((resolve) => setTimeout(resolve, currentDelay));
+                currentDelay *= 2;
+            }
+        }
+    }
+  }
+
   async function addTracksToPlaylist(playlistId, trackUris, maxRetries = 5, initialDelay = 1000) {
     const BATCH_SIZE = 100;
     const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
@@ -9189,9 +9331,11 @@
     toggleMenu();
     closeAllMenus();
 
+    const initialPagePath = Spicetify.Platform.History.location.pathname; 
+
     try {
-      const currentUri = getCurrentUri();
-      if (!currentUri) {
+      const currentUriAtStart = getCurrentUri(); 
+      if (!currentUriAtStart) {
         resetButtons();
         Spicetify.showNotification("Please select a playlist or artist first");
         return;
@@ -9199,22 +9343,77 @@
 
       let tracks;
       let isArtistPage = false;
+      let currentPlaylistDetails = null;
+      let sourceNameForDialog = "Current Playlist"; 
 
-      if (URI.isPlaylistV1OrV2(currentUri)) {
-        const playlistId = currentUri.split(":")[2];
+      if (URI.isPlaylistV1OrV2(currentUriAtStart)) {
+        const playlistId = currentUriAtStart.split(":")[2];
         tracks = await getPlaylistTracks(playlistId);
-      } else if (URI.isArtist(currentUri)) {
-        tracks = await getArtistTracks(currentUri);
+        try {
+            currentPlaylistDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+            sourceNameForDialog = currentPlaylistDetails?.name || "Current Playlist";
+        } catch (e) {
+            console.warn("Could not fetch current playlist details for ownership check/dialog", e);
+        }
+      } else if (URI.isArtist(currentUriAtStart)) {
+        tracks = await getArtistTracks(currentUriAtStart);
         isArtistPage = true;
-      } else if (isLikedSongsPage(currentUri)) {
+      } else if (isLikedSongsPage(currentUriAtStart)) {
         tracks = await getLikedSongs();
       } else {
         throw new Error('Invalid playlist or artist page');
       }
 
       if (!tracks || tracks.length === 0) {
-          throw new Error('No tracks found to sort');
+          Spicetify.showNotification('No tracks found to sort');
+          resetButtons();
+          return;
       }
+
+      const user = await Spicetify.Platform.UserAPI.getUser();
+      const canModifyCurrentPlaylist = sortCurrentPlaylistEnabled &&
+                                       createPlaylistAfterSort && 
+                                       isDirectSortType(sortType) &&
+                                       URI.isPlaylistV1OrV2(currentUriAtStart) &&
+                                       !isArtistPage &&
+                                       !isLikedSongsPage(currentUriAtStart) &&
+                                       currentPlaylistDetails &&
+                                       currentPlaylistDetails.owner &&
+                                       currentPlaylistDetails.owner.id === user.username;
+
+      if (canModifyCurrentPlaylist) {
+        const proceedWithModification = await new Promise((resolve) => {
+            Spicetify.ReactDOM.render(
+                Spicetify.React.createElement(Spicetify.ReactComponent.ConfirmDialog, {
+                    isOpen: true,
+                    titleText: "Sort Current Playlist?",
+                    descriptionText: `This will replace all tracks in "${sourceNameForDialog}" with the sorted version. This action cannot be undone. Are you sure?`,
+                    confirmText: "Confirm & Sort",
+                    cancelText: "Cancel",
+                    onConfirm: () => {
+                        Spicetify.ReactDOM.unmountComponentAtNode(container);
+                        resolve(true);
+                    },
+                    onClose: () => {
+                        Spicetify.ReactDOM.unmountComponentAtNode(container);
+                        resolve(false);
+                    },
+                    onOutside: () => {
+                        Spicetify.ReactDOM.unmountComponentAtNode(container);
+                        resolve(false);
+                    }
+                }),
+                container
+            );
+        });
+
+        if (!proceedWithModification) {
+            Spicetify.showNotification("Sorting current playlist cancelled.");
+            resetButtons();
+            return;
+        }
+      }
+
 
       mainButton.innerText = "0%";
 
@@ -9231,8 +9430,11 @@
       let sortedTracks;
       let uniqueTracks;
       let removedTracks = [];
-      let playlistUriForQueue = currentUri;
-      let playlistWasCreated = false;
+      let playlistUriForQueue = currentUriAtStart; 
+      let playlistWasModifiedOrCreated = false;
+      let newPlaylistObjectForNavigation = null; 
+      let modifiedPlaylistOriginalPath = null;
+
 
       if (
         sortType === "playCount" ||
@@ -9272,12 +9474,6 @@
         } else if (sortType === "shuffle") {
           sortedTracks = shuffleArray(uniqueTracks);
         }
-
-        if (!sortedTracks || sortedTracks.length === 0) {
-            resetButtons();
-            Spicetify.showNotification(`No tracks found with ${sortType} data.`);
-            return;
-        }
         mainButton.innerText = "100%";
 
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
@@ -9311,7 +9507,7 @@
         let artistImageUrl = null;
         if (isArtistPage) {
           try {
-            artistImageUrl = await getArtistImageUrl(currentUri.split(":")[2]);
+            artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
           } catch (error) { console.error("Error fetching artist image URL:", error); }
         }
         await showAiPickModal(aiUniqueTracks, artistImageUrl);
@@ -9320,25 +9516,27 @@
 
       if (createPlaylistAfterSort && isDirectSortType(sortType)) {
         if (!sortedTracks || sortedTracks.length === 0) {
-           console.log("No tracks left after sorting/filtering to create playlist.");
+           console.log("No tracks left after sorting/filtering to create/modify playlist.");
            if (!addToQueueEnabled) {
-                Spicetify.showNotification("No tracks to create playlist from.");
+                Spicetify.showNotification("No tracks to process for playlist.");
+                resetButtons();
+                return;
            }
-           return;
         }
-        const sourceUri = currentUri;
-        let sourceName;
-        if (URI.isArtist(sourceUri)) {
-            sourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`).then((r) => r.name);
-        } else if (isLikedSongsPage(sourceUri)) {
-            sourceName = "Liked Songs";
+        
+        const sourceUriForNaming = currentUriAtStart; 
+        let finalSourceName;
+        if (URI.isArtist(sourceUriForNaming)) {
+            finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUriForNaming.split(":")[2]}`).then((r) => r.name);
+        } else if (isLikedSongsPage(sourceUriForNaming)) {
+            finalSourceName = "Liked Songs";
         } else {
-            sourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`).then((r) => r.name);
+            finalSourceName = currentPlaylistDetails?.name || "Current Playlist";
         }
         const possibleSuffixes = ["\\(PlayCount\\)","\\(Popularity\\)","\\(ReleaseDate\\)","\\(LFM Scrobbles\\)","\\(LFM My Scrobbles\\)","\\(Shuffle\\)","\\(AI Pick\\)"];
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
-        while (suffixPattern.test(sourceName)) {
-          sourceName = sourceName.replace(suffixPattern, "");
+        while (suffixPattern.test(finalSourceName)) {
+          finalSourceName = finalSourceName.replace(suffixPattern, "");
         }
         const sortTypeInfo = {
           playCount: { fullName: "play count", shortName: "PlayCount" },
@@ -9348,36 +9546,67 @@
           personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
         }[sortType];
-        try {
-          if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
-            showRemovedTracksModal(removedTracks);
-          }
-          let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
-          if (isArtistPage) {
-            playlistDescription = `Discography of ${sourceName}: created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
-          }
-          mainButton.innerText = "Creating...";
-          const newPlaylist = await createPlaylist(`${sourceName} (${sortTypeInfo.shortName})`, playlistDescription);
-          playlistUriForQueue = newPlaylist.uri;
-          playlistWasCreated = true;
-          mainButton.innerText = "Saving...";
-          if (isArtistPage) {
+
+        if (canModifyCurrentPlaylist) {
+            const playlistIdToModify = currentUriAtStart.split(":")[2];
+            modifiedPlaylistOriginalPath = initialPagePath; 
+
             try {
-              const artistImageUrl = await getArtistImageUrl(sourceUri.split(":")[2]);
-              if (artistImageUrl) {
-                const base64Image = await toBase64(artistImageUrl);
-                await setPlaylistImage(newPlaylist.id, base64Image);
+                mainButton.innerText = "Clearing...";
+                await removeAllTracksFromPlaylist(playlistIdToModify);
+                
+                mainButton.innerText = "Saving...";
+                const trackUris = sortedTracks.map((track) => track.uri);
+                await addTracksToPlaylist(playlistIdToModify, trackUris);
+                
+                Spicetify.showNotification(`"${finalSourceName}" sorted by ${sortTypeInfo.fullName}!`);
+                playlistUriForQueue = currentUriAtStart; 
+                playlistWasModifiedOrCreated = true; 
+
+            } catch (error) {
+                console.error("Error modifying current playlist:", error);
+                Spicetify.showNotification(`An error occurred while modifying the current playlist.`);
+                playlistWasModifiedOrCreated = false;
+                playlistUriForQueue = currentUriAtStart; 
+                modifiedPlaylistOriginalPath = null; 
+            }
+        } else {
+            if (sortCurrentPlaylistEnabled && URI.isPlaylistV1OrV2(currentUriAtStart) && (!currentPlaylistDetails || !currentPlaylistDetails.owner || currentPlaylistDetails.owner.id !== user.username)) {
+            }
+            try {
+              if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
+                showRemovedTracksModal(removedTracks);
               }
-            } catch (error) { console.error("Error setting playlist image:", error); }
-          }
-          const trackUris = sortedTracks.map((track) => track.uri);
-          await addTracksToPlaylist(newPlaylist.id, trackUris);
-          Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
-        } catch (error) {
-          console.error("Error creating or updating playlist:", error);
-          Spicetify.showNotification(`An error occurred while creating the playlist.`);
-          playlistWasCreated = false;
-          playlistUriForQueue = currentUri;
+              let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
+              if (isArtistPage) {
+                playlistDescription = `Discography of ${finalSourceName}: created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
+              }
+              mainButton.innerText = "Creating...";
+              const newPlaylist = await createPlaylist(`${finalSourceName} (${sortTypeInfo.shortName})`, playlistDescription);
+              playlistUriForQueue = newPlaylist.uri;
+              newPlaylistObjectForNavigation = newPlaylist; 
+              playlistWasModifiedOrCreated = true;
+              mainButton.innerText = "Saving...";
+              if (isArtistPage) {
+                try {
+                  const artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
+                  if (artistImageUrl) {
+                    const base64Image = await toBase64(artistImageUrl);
+                    await setPlaylistImage(newPlaylist.id, base64Image);
+                  }
+                } catch (error) { console.error("Error setting playlist image:", error); }
+              }
+              const trackUris = sortedTracks.map((track) => track.uri);
+              await addTracksToPlaylist(newPlaylist.id, trackUris);
+              Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
+
+            } catch (error) {
+              console.error("Error creating or updating playlist:", error);
+              Spicetify.showNotification(`An error occurred while creating the playlist.`);
+              playlistWasModifiedOrCreated = false;
+              playlistUriForQueue = currentUriAtStart;
+              newPlaylistObjectForNavigation = null;
+            }
         }
       }
 
@@ -9388,19 +9617,48 @@
           console.error("Failed to add sorted tracks to queue:", queueError);
           Spicetify.showNotification("Failed to add to queue.", true);
         }
+      } else if (addToQueueEnabled && isDirectSortType(sortType) && (!sortedTracks || sortedTracks.length === 0)) {
+          Spicetify.showNotification("No tracks to add to queue after sorting/filtering.", true);
       }
 
-      if (isDirectSortType(sortType) && !playlistWasCreated && !addToQueueEnabled) {
-        Spicetify.showNotification(`Sorting complete for ${sortType}.`);
+      if (isDirectSortType(sortType) && !playlistWasModifiedOrCreated && !addToQueueEnabled) {
+        if (sortedTracks && sortedTracks.length > 0) {
+             Spicetify.showNotification(`Sorting complete for ${sortType}. No playlist created or queue modified as per settings.`);
+        }
       } else if (isDirectSortType(sortType) && !createPlaylistAfterSort && addToQueueEnabled) {
         console.log(`Playlist creation skipped for ${sortType} due to setting, tracks added to queue.`);
       } else if (isDirectSortType(sortType) && !createPlaylistAfterSort && !addToQueueEnabled) {
         console.log(`Playlist creation and queueing skipped for ${sortType} due to settings.`);
       }
 
+      if (playlistWasModifiedOrCreated) {
+          if (modifiedPlaylistOriginalPath) { 
+              const currentPathAfterSort = Spicetify.Platform.History.location.pathname;
+              if (openPlaylistAfterSortEnabled || currentPathAfterSort === modifiedPlaylistOriginalPath) {
+                  const tempPath = "/library"; 
+                  Spicetify.Platform.History.push(tempPath);
+                  await new Promise(resolve => setTimeout(resolve, 400));
+                  Spicetify.Platform.History.push(modifiedPlaylistOriginalPath); 
+              } else {
+              }
+          } else if (openPlaylistAfterSortEnabled && newPlaylistObjectForNavigation && newPlaylistObjectForNavigation.uri) { 
+              console.log("Attempting to navigate to new playlist:", newPlaylistObjectForNavigation.uri);
+              const tempPath = "/library"; 
+              Spicetify.Platform.History.push(tempPath);
+              await new Promise(resolve => setTimeout(resolve, 450)); 
+              const newPlaylistPath = Spicetify.URI.fromString(newPlaylistObjectForNavigation.uri).toURLPath(true);
+              if (newPlaylistPath) {
+                Spicetify.Platform.History.push(newPlaylistPath);
+              } else {
+                console.warn("Could not determine path for new playlist URI:", newPlaylistObjectForNavigation.uri);
+              }
+          }
+      }
+
+
     } catch (error) {
       console.error("Error during sorting process:", error);
-      Spicetify.showNotification(`An error occurred during the sorting process.`);
+      Spicetify.showNotification(`An error occurred during the sorting process: ${error.message}`);
     } finally {
       resetButtons();
     }
