@@ -10578,27 +10578,27 @@
   }
 
   function updateDisplay(element, value, type) {
-    if (!element) return;
+      if (!element) return;
 
-    let displayValue = "_"; 
+      let displayValue = "_"; 
 
-    if (type === 'playCount') {
-        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== 0) {
-            displayValue = new Intl.NumberFormat('en-US').format(value);
-        }
-    } else if (type === 'scrobbles' || type === 'personalScrobbles') {
-        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined) {
-            displayValue = new Intl.NumberFormat('en-US').format(value);
-        }
-    } else if (type === 'releaseDate') {
-        displayValue = formatReleaseDate(value, releaseDateFormat);
-    }
+      if (type === 'playCount' || type === 'personalScrobbles') {
+          if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== 0) {
+              displayValue = new Intl.NumberFormat('en-US').format(value);
+          }
+      } else if (type === 'scrobbles') {
+          if (value !== "_" && !isNaN(value) && value !== null && value !== undefined) {
+              displayValue = new Intl.NumberFormat('en-US').format(value);
+          }
+      } else if (type === 'releaseDate') {
+          displayValue = formatReleaseDate(value, releaseDateFormat);
+      }
 
-    element.textContent = displayValue;
-    element.style.fontSize = "14px";
-    element.style.fontWeight = "400";
-    element.style.color = "var(--spice-subtext)";
-}
+      element.textContent = displayValue;
+      element.style.fontSize = "14px";
+      element.style.fontWeight = "400";
+      element.style.color = "var(--spice-subtext)";
+  }
 
 
   let isUpdatingTracklist = false;
