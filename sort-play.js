@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.3.5";
+  const SORT_PLAY_VERSION = "4.4.0";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -32,7 +32,7 @@
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
   let openPlaylistAfterSortEnabled = true;
-  let selectedAiModel = "gemini-2.5-pro-exp-05-06";
+  let selectedAiModel = "gemini-2.5-flash-preview-05-20";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
@@ -60,7 +60,7 @@
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
-    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.5-pro-exp-05-06";
+    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.5-flash-preview-05-20";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
@@ -1739,8 +1739,8 @@
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
                 <span class="custom-tooltip">Added Gemini 2.5 models</span></label>
               <select id="aiModel">
-                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.5-pro-exp-05-06" ? "selected" : ""}>Gemini 2.5 Pro Experimental</option>
-                <option value="gemini-2.0-pro-exp-02-05" ${selectedAiModel === "gemini-2.5-flash-preview-04-17" ? "selected" : ""}>Gemini 2.5 Flash Preview</option>
+                <option value="gemini-2.5-pro-exp-06-05" ${selectedAiModel === "gemini-2.5-pro-exp-06-05" ? "selected" : ""}>Gemini 2.5 Pro Preview</option>
+                <option value="gemini-2.5-flash-preview-05-20" ${selectedAiModel === "gemini-2.5-flash-preview-05-20" ? "selected" : ""}>Gemini 2.5 Flash Preview</option>
                 <option value="gemini-2.0-flash" ${selectedAiModel === "gemini-2.0-flash" ? "selected" : ""}>Gemini 2.0 Flash</option>
                 <option value="gemini-2.0-flash-lite-preview-02-05" ${selectedAiModel === "gemini-2.0-flash-lite-preview-02-05" ? "selected" : ""}>Gemini 2.0 Flash-Lite Preview</option>
                 <option value="gemini-2.0-flash-exp" ${selectedAiModel === "gemini-2.0-flash-exp" ? "selected" : ""}>Gemini 2.0 Flash Exp</option>
