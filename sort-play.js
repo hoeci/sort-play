@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.3.0";
+  const SORT_PLAY_VERSION = "4.3.5";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -770,6 +770,8 @@
             <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
                 <option value="playCount" ${selectedColumnType === 'playCount' ? 'selected' : ''}>Play Count</option>
                 <option value="releaseDate" ${selectedColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                <option value="scrobbles" ${selectedColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
+                <option value="personalScrobbles" ${selectedColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
             </select>
             <label class="switch">
                 <input type="checkbox" id="showAdditionalColumnToggle" ${showAdditionalColumn ? 'checked' : ''}>
@@ -10173,6 +10175,85 @@
     });
   };
 
+  const CACHE_KEY_SCROBBLES = 'spotify-scrobbles-cache';
+  const CACHE_TIMESTAMP_KEY_SCROBBLES = 'spotify-scrobbles-cache-timestamp';
+  const CACHE_EXPIRY_DAYS_SCROBBLES = 7;
+
+  function initializeScrobblesCache() {
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_SCROBBLES);
+    if (!timestamp) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY_SCROBBLES, Date.now().toString());
+      localStorage.setItem(CACHE_KEY_SCROBBLES, JSON.stringify({}));
+      return;
+    }
+
+    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
+    if (daysPassed >= CACHE_EXPIRY_DAYS_SCROBBLES) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY_SCROBBLES, Date.now().toString());
+      localStorage.setItem(CACHE_KEY_SCROBBLES, JSON.stringify({}));
+    }
+  }
+
+  function getCachedScrobbles(trackId) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_SCROBBLES) || '{}');
+      return cache[trackId] !== undefined ? cache[trackId] : null;
+    } catch (error) {
+      console.error('Error reading from scrobbles cache:', error);
+      return null;
+    }
+  }
+
+  function setCachedScrobbles(trackId, scrobbleCount) {
+    try {
+        const cache = JSON.parse(localStorage.getItem(CACHE_KEY_SCROBBLES) || '{}');
+        cache[trackId] = scrobbleCount;
+        localStorage.setItem(CACHE_KEY_SCROBBLES, JSON.stringify(cache));
+    } catch (error) {
+        console.error('Error writing to scrobbles cache:', error);
+    }
+  }
+
+  const CACHE_KEY_PERSONAL_SCROBBLES = 'spotify-personal-scrobbles-cache';
+  const CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES = 'spotify-personal-scrobbles-cache-timestamp';
+  const CACHE_EXPIRY_DAYS_PERSONAL_SCROBBLES = 2;
+
+  function initializePersonalScrobblesCache() {
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES);
+    if (!timestamp) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
+      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
+      return;
+    }
+
+    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
+    if (daysPassed >= CACHE_EXPIRY_DAYS_PERSONAL_SCROBBLES) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
+      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
+    }
+  }
+
+  function getCachedPersonalScrobbles(trackId) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
+      return cache[trackId] !== undefined ? cache[trackId] : null;
+    } catch (error) {
+      console.error('Error reading from personal scrobbles cache:', error);
+      return null;
+    }
+  }
+
+  function setCachedPersonalScrobbles(trackId, scrobbleCount) {
+    try {
+        const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
+        cache[trackId] = scrobbleCount;
+        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify(cache));
+    } catch (error) {
+        console.error('Error writing to personal scrobbles cache:', error);
+    }
+  }
+
+
 
   const RELEASE_DATE_CACHE_KEY = 'spotify-release-date-cache';
   const RELEASE_DATE_CACHE_TIMESTAMP_KEY = 'spotify-release-date-cache-timestamp';
@@ -10340,10 +10421,17 @@
         initializePlayCountCache();
     } else if (selectedColumnType === 'releaseDate') {
         initializeReleaseDateCache();
+    } else if (selectedColumnType === 'personalScrobbles') {
+        initializePersonalScrobblesCache();
+    } else if (selectedColumnType === 'scrobbles') {
+        initializeScrobblesCache();
     }
 
     const tracks = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
         .filter(track => {
+            if (track.classList.contains('sort-play-processing')) {
+                return false; 
+            }
             const dataElement = track.querySelector(".sort-play-data");
             const trackUri = getTracklistTrackUri(track);
             const isTrack = trackUri && trackUri.includes("track");
@@ -10354,6 +10442,7 @@
     for (let i = 0; i < tracks.length; i += BATCH_SIZE) {
         const batch = tracks.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (track) => {
+            track.classList.add('sort-play-processing');
             try {
                 const dataElement = track.querySelector(".sort-play-data");
                 if (!dataElement) return;
@@ -10365,7 +10454,6 @@
                 }
 
                 const trackId = trackUri.split(":")[2];
-                const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
 
                 if (selectedColumnType === 'playCount') {
                     const cachedCount = getCachedPlayCount(trackId);
@@ -10373,25 +10461,25 @@
                         updateDisplay(dataElement, cachedCount, selectedColumnType);
                         return;
                     }
+                    const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
                     const albumLinkElement = track.querySelector(albumLinkSelector);
-                    if (!albumLinkElement?.href) { /* ... */ setCachedPlayCount(trackId, "_"); return; }
+                    if (!albumLinkElement?.href) { setCachedPlayCount(trackId, "_"); return; }
                     const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
                     const albumId = albumIdMatch ? albumIdMatch[1] : null;
-                    if (!albumId) { /* ... */ setCachedPlayCount(trackId, "_"); return; }
-                    const trackDetails = { /* ... */ track: { album: { id: albumId }, id: trackId } };
-                    const result = await Promise.race([ getTrackDetailsWithPlayCount(trackDetails), /* timeout */]);
+                    if (!albumId) { setCachedPlayCount(trackId, "_"); return; }
+                    const trackDetails = { track: { album: { id: albumId }, id: trackId } };
+                    const result = await getTrackDetailsWithPlayCount(trackDetails);
                     const playCount = result?.playCount;
                     updateDisplay(dataElement, playCount, selectedColumnType);
                     setCachedPlayCount(trackId, playCount === null || playCount === 0 ? "_" : playCount);
 
                 } else if (selectedColumnType === 'releaseDate') {
                     const cachedPreciseDate = getCachedReleaseDate(trackId);
-
                     if (cachedPreciseDate !== null) { 
                         updateDisplay(dataElement, cachedPreciseDate, selectedColumnType);
                         return;
                     }
-
+                    const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
                     const albumLinkElement = track.querySelector(albumLinkSelector);
                     if (!albumLinkElement?.href) {
                         updateDisplay(dataElement, "_", selectedColumnType);
@@ -10407,40 +10495,110 @@
                     }
 
                     const preciseDateString = await getReleaseDatesForAlbum(albumId);
-
                     updateDisplay(dataElement, preciseDateString, selectedColumnType); 
                     setCachedReleaseDate(trackId, preciseDateString); 
-                }
+                } else if (selectedColumnType === 'scrobbles') {
+                    const cachedScrobbles = getCachedScrobbles(trackId);
+                    if (cachedScrobbles !== null && cachedScrobbles !== "_") {
+                        updateDisplay(dataElement, cachedScrobbles, selectedColumnType);
+                        return;
+                    }
+                    
+                    const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                    if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
+                        setCachedScrobbles(trackId, "_");
+                        updateDisplay(dataElement, "_", selectedColumnType);
+                        return;
+                    }
 
+                    const result = await getTrackDetailsWithScrobbles({
+                        name: trackDetails.name,
+                        artists: [{ name: trackDetails.artists[0].name }]
+                    });
+                    const scrobbles = result?.scrobbles;
+                    
+                    updateDisplay(dataElement, scrobbles, selectedColumnType);
+                    const valueToCache = (scrobbles === null || scrobbles === undefined) ? "_" : scrobbles;
+                    setCachedScrobbles(trackId, valueToCache);
+                } else if (selectedColumnType === 'personalScrobbles') {
+                    const lastFmUsername = loadLastFmUsername();
+                    if (!lastFmUsername) {
+                        console.log(`[Sort-Play] MyScrobbles: No Last.fm username set for track ${trackId}. Displaying '_'.`);
+                        updateDisplay(dataElement, "_", selectedColumnType);
+                        return;
+                    }
+
+                    const cachedScrobbles = getCachedPersonalScrobbles(trackId);
+                    if (cachedScrobbles !== null && cachedScrobbles !== "_") {
+                        console.log(`[Sort-Play] MyScrobbles: Found valid cached scrobbles for ${trackId}: ${cachedScrobbles}`);
+                        updateDisplay(dataElement, cachedScrobbles, selectedColumnType);
+                        return;
+                    }
+                    
+                    console.log(`[Sort-Play] MyScrobbles: No valid cache for ${trackId} (cached value: ${cachedScrobbles}). Fetching from Last.fm.`);
+                    
+                    const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                    
+                    if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
+                        console.warn(`[Sort-Play] MyScrobbles: Could not fetch track details from Spotify for trackId: ${trackId}`);
+                        updateDisplay(dataElement, "_", selectedColumnType);
+                        setCachedPersonalScrobbles(trackId, "_");
+                        return;
+                    }
+
+                    const trackName = trackDetails.name;
+                    const artistName = trackDetails.artists[0].name;
+                    console.log(`[Sort-Play] MyScrobbles: Fetching for Spotify Track="${trackName}", Artist="${artistName}"`);
+
+                    const result = await getTrackDetailsWithPersonalScrobbles({
+                        name: trackName,
+                        artists: [{ name: artistName }]
+                    });
+                    const scrobbles = result?.personalScrobbles;
+
+                    console.log(`[Sort-Play] MyScrobbles: Last.fm returned ${scrobbles} scrobbles for track ${trackId}.`);
+
+                    updateDisplay(dataElement, scrobbles, selectedColumnType);
+                    
+                    const valueToCache = (scrobbles === null || scrobbles === undefined) ? "_" : scrobbles;
+                    console.log(`[Sort-Play] MyScrobbles: Caching value for ${trackId}: ${valueToCache}`);
+                    setCachedPersonalScrobbles(trackId, valueToCache);
+                }
             } catch (error) {
-                console.error("Error processing track:", error);
+                console.error(`[Sort-Play] Error processing track ${trackId}:`, error);
                 const dataElement = track.querySelector(".sort-play-data");
                 if (dataElement) {
                     updateDisplay(dataElement, "_", selectedColumnType);
                 }
+            } finally {
+                track.classList.remove('sort-play-processing');
             }
         }));
     }
   }
 
   function updateDisplay(element, value, type) {
-      if (!element) return;
+    if (!element) return;
 
-      let displayValue = "_"; 
+    let displayValue = "_"; 
 
-      if (type === 'playCount') {
-          if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== 0) {
-              displayValue = new Intl.NumberFormat('en-US').format(value);
-          }
-      } else if (type === 'releaseDate') {
-          displayValue = formatReleaseDate(value, releaseDateFormat);
-      }
+    if (type === 'playCount') {
+        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== 0) {
+            displayValue = new Intl.NumberFormat('en-US').format(value);
+        }
+    } else if (type === 'scrobbles' || type === 'personalScrobbles') {
+        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined) {
+            displayValue = new Intl.NumberFormat('en-US').format(value);
+        }
+    } else if (type === 'releaseDate') {
+        displayValue = formatReleaseDate(value, releaseDateFormat);
+    }
 
-      element.textContent = displayValue;
-      element.style.fontSize = "14px";
-      element.style.fontWeight = "400";
-      element.style.color = "var(--spice-subtext)";
-  }
+    element.textContent = displayValue;
+    element.style.fontSize = "14px";
+    element.style.fontWeight = "400";
+    element.style.color = "var(--spice-subtext)";
+}
 
 
   let isUpdatingTracklist = false;
@@ -10485,7 +10643,23 @@
 
     const existingPlaysHeader = tracklistHeader.querySelector(".sort-play-header");
     const currentHeaderText = existingPlaysHeader?.parentElement.querySelector("span")?.innerText;
-    const expectedHeaderText = selectedColumnType === 'playCount' ? "Plays" : "Rel. Date";
+    let expectedHeaderText;
+    switch (selectedColumnType) {
+        case 'playCount':
+            expectedHeaderText = "Plays";
+            break;
+        case 'releaseDate':
+            expectedHeaderText = "Rel. Date";
+            break;
+        case 'scrobbles':
+            expectedHeaderText = "Scrobbles";
+            break;
+        case 'personalScrobbles':
+            expectedHeaderText = "My Scrobbles";
+            break;
+        default:
+            expectedHeaderText = "Plays";
+    }
     const columnTypeChanged = existingPlaysHeader && currentHeaderText !== expectedHeaderText;
     const columnVisibilityChanged = (existingPlaysHeader && !showAdditionalColumn) || (!existingPlaysHeader && showAdditionalColumn);
 
@@ -10740,13 +10914,15 @@
     }
   });
 
-    observer.observe(document.body, {
+  observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
     loadSettings();
     initializePlayCountCache();
     initializeReleaseDateCache();
+    initializePersonalScrobblesCache();
+    initializeScrobblesCache();
     console.log(`Sort-Play loaded`);
   }
 
