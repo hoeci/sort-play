@@ -10542,7 +10542,7 @@
     } else if (type === 'personalScrobbles') {
         if (value > 0 && !isNaN(value)) {
             if (myScrobblesDisplayMode === 'sign') {
-                displayValue = '✅';
+                displayValue = '\u2705';
             } else { 
                 displayValue = new Intl.NumberFormat('en-US').format(value);
             }
