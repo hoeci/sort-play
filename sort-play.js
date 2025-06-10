@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.4.0";
+  const SORT_PLAY_VERSION = "4.4.1";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -10214,45 +10214,6 @@
     }
   }
 
-  const CACHE_KEY_PERSONAL_SCROBBLES = 'spotify-personal-scrobbles-cache';
-  const CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES = 'spotify-personal-scrobbles-cache-timestamp';
-  const CACHE_EXPIRY_DAYS_PERSONAL_SCROBBLES = 2;
-
-  function initializePersonalScrobblesCache() {
-    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES);
-    if (!timestamp) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
-      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
-      return;
-    }
-
-    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
-    if (daysPassed >= CACHE_EXPIRY_DAYS_PERSONAL_SCROBBLES) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
-      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
-    }
-  }
-
-  function getCachedPersonalScrobbles(trackId) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
-      return cache[trackId] !== undefined ? cache[trackId] : null;
-    } catch (error) {
-      console.error('Error reading from personal scrobbles cache:', error);
-      return null;
-    }
-  }
-
-  function setCachedPersonalScrobbles(trackId, scrobbleCount) {
-    try {
-        const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
-        cache[trackId] = scrobbleCount;
-        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify(cache));
-    } catch (error) {
-        console.error('Error writing to personal scrobbles cache:', error);
-    }
-  }
-
 
 
   const RELEASE_DATE_CACHE_KEY = 'spotify-release-date-cache';
@@ -10421,8 +10382,6 @@
         initializePlayCountCache();
     } else if (selectedColumnType === 'releaseDate') {
         initializeReleaseDateCache();
-    } else if (selectedColumnType === 'personalScrobbles') {
-        initializePersonalScrobblesCache();
     } else if (selectedColumnType === 'scrobbles') {
         initializeScrobblesCache();
     }
@@ -10527,22 +10486,12 @@
                         updateDisplay(dataElement, "_", selectedColumnType);
                         return;
                     }
-
-                    const cachedScrobbles = getCachedPersonalScrobbles(trackId);
-                    if (cachedScrobbles !== null && cachedScrobbles !== "_") {
-                        console.log(`[Sort-Play] MyScrobbles: Found valid cached scrobbles for ${trackId}: ${cachedScrobbles}`);
-                        updateDisplay(dataElement, cachedScrobbles, selectedColumnType);
-                        return;
-                    }
-                    
-                    console.log(`[Sort-Play] MyScrobbles: No valid cache for ${trackId} (cached value: ${cachedScrobbles}). Fetching from Last.fm.`);
                     
                     const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
                     
                     if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
                         console.warn(`[Sort-Play] MyScrobbles: Could not fetch track details from Spotify for trackId: ${trackId}`);
                         updateDisplay(dataElement, "_", selectedColumnType);
-                        setCachedPersonalScrobbles(trackId, "_");
                         return;
                     }
 
@@ -10559,10 +10508,6 @@
                     console.log(`[Sort-Play] MyScrobbles: Last.fm returned ${scrobbles} scrobbles for track ${trackId}.`);
 
                     updateDisplay(dataElement, scrobbles, selectedColumnType);
-                    
-                    const valueToCache = (scrobbles === null || scrobbles === undefined) ? "_" : scrobbles;
-                    console.log(`[Sort-Play] MyScrobbles: Caching value for ${trackId}: ${valueToCache}`);
-                    setCachedPersonalScrobbles(trackId, valueToCache);
                 }
             } catch (error) {
                 console.error(`[Sort-Play] Error processing track ${trackId}:`, error);
@@ -10921,7 +10866,6 @@
     loadSettings();
     initializePlayCountCache();
     initializeReleaseDateCache();
-    initializePersonalScrobblesCache();
     initializeScrobblesCache();
     console.log(`Sort-Play loaded`);
   }
