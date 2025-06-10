@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.4.0";
+  const SORT_PLAY_VERSION = "4.3.5";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -59,7 +59,7 @@
     playlistDeduplicate = localStorage.getItem("sort-play-playlist-deduplicate") !== "false";
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
-    includeLyrics = localStorage.getItem("sort-play-include-lyrics") !== "false";
+    includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
     selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.5-flash-preview-05-20";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
