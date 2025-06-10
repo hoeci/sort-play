@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.3.5";
+  const SORT_PLAY_VERSION = "4.4.0";
   
   const LFMApiKey = "***REMOVED***";
   
