@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.4.1";
+  const SORT_PLAY_VERSION = "4.4.5";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -32,6 +32,7 @@
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
   let openPlaylistAfterSortEnabled = true;
+  let myScrobblesDisplayMode = 'number';
   let selectedAiModel = "gemini-2.5-flash-preview-05-20";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
@@ -71,6 +72,7 @@
     sortCurrentPlaylistEnabled = sortCurrentPlaylistStored === null ? false : sortCurrentPlaylistStored === "true";
     const openPlaylistStored = localStorage.getItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT);
     openPlaylistAfterSortEnabled = openPlaylistStored === null ? true : openPlaylistStored === "true";
+    myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
   
     sortOrderState = {
         playCount: false,
@@ -105,6 +107,7 @@
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST, createPlaylistAfterSort);
     localStorage.setItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST, sortCurrentPlaylistEnabled);
     localStorage.setItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, openPlaylistAfterSortEnabled);
+    localStorage.setItem("sort-play-my-scrobbles-display-mode", myScrobblesDisplayMode);
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
     }
@@ -563,16 +566,16 @@
         cursor: not-allowed;
     }
 
-    .date-format-settings-button {
+    .column-settings-button {
         background: none; border: none; margin: 0; cursor: pointer; display: flex;
         align-items: center; justify-content: center; width: 24px; height: 24px;
         opacity: 0.7; transition: opacity 0.2s;
     }
-    .date-format-settings-button:hover { opacity: 1; }
-    .date-format-settings-button svg { width: 16px; height: 16px; fill: #b3b3b3; }
-    .date-format-settings-button:hover svg { fill: #ffffff; }
-    .date-format-settings-button:disabled { opacity: 0.3; cursor: not-allowed; }
-    .date-format-dropdown {
+    .column-settings-button:hover { opacity: 1; }
+    .column-settings-button svg { width: 16px; height: 16px; fill: #b3b3b3; }
+    .column-settings-button:hover svg { fill: #ffffff; }
+    .column-settings-button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .column-settings-dropdown {
         display: none; position: absolute; background-color: #282828; min-width: 140px;
         box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px;
         padding: 4px 0; top: calc(100% + 4px); left: -55px; margin-top: 5px;
@@ -581,31 +584,17 @@
         scrollbar-width: thin; 
         scrollbar-color: #555 #282828;
     }
-    .date-format-dropdown::-webkit-scrollbar {
-        width: 8px; 
-    }
-
-    .date-format-dropdown::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.1); 
-        border-radius: 4px;
-    }
-
-    .date-format-dropdown::-webkit-scrollbar-thumb {
-        background-color: #555;
-        border-radius: 4px;
-        border: 2px solid #282828; 
-    }
-
-    .date-format-dropdown::-webkit-scrollbar-thumb:hover {
-        background-color: #777;
-    }
-    .date-format-dropdown button {
+    .column-settings-dropdown::-webkit-scrollbar { width: 8px; }
+    .column-settings-dropdown::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
+    .column-settings-dropdown::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #282828; }
+    .column-settings-dropdown::-webkit-scrollbar-thumb:hover { background-color: #777; }
+    .column-settings-dropdown button {
         color: #b3b3b3; padding: 8px 12px; text-decoration: none; display: block;
         width: 100%; text-align: left; background: none; border: none; cursor: pointer;
         font-size: 13px;
     }
-    .date-format-dropdown button:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
-    .date-format-dropdown button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
+    .column-settings-dropdown button:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
+    .column-settings-dropdown button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
 
     .sort-play-settings .setting-row#githubLink {
         display: flex;
@@ -764,7 +753,10 @@
               </span>
           </label>
         <div class="col action" style="position: relative;">
-            <button id="dateFormatSettingsBtn" class="date-format-settings-button" title="Release Date Format Settings" style="display: ${selectedColumnType === 'releaseDate' && showAdditionalColumn ? 'flex' : 'none'};" ${!showAdditionalColumn ? 'disabled' : ''}>
+            <button id="dateFormatSettingsBtn" class="column-settings-button" title="Release Date Format Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
+            <button id="myScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
             <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
@@ -777,7 +769,7 @@
                 <input type="checkbox" id="showAdditionalColumnToggle" ${showAdditionalColumn ? 'checked' : ''}>
                 <span class="slider"></span>
             </label>
-            <div id="dateFormatDropdownContainer" class="date-format-dropdown">
+            <div id="dateFormatDropdownContainer" class="column-settings-dropdown">
                 <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
                 <button data-format="MM-DD-YYYY" class="${releaseDateFormat === 'MM-DD-YYYY' ? 'selected' : ''}">MM-DD-YYYY</button>
                 <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
@@ -787,6 +779,10 @@
                 <button data-format="YYYY-MM" class="${releaseDateFormat === 'YYYY-MM' ? 'selected' : ''}">YYYY-MM</button>
                 <button data-format="MM-YYYY" class="${releaseDateFormat === 'MM-YYYY' ? 'selected' : ''}">MM-YYYY</button>
                 <button data-format="YYYY" class="${releaseDateFormat === 'YYYY' ? 'selected' : ''}">YYYY</button>
+            </div>
+            <div id="myScrobblesDropdownContainer" class="column-settings-dropdown">
+                <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
+                <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
             </div>
         </div>
     </div>
@@ -889,6 +885,9 @@
     const showAdditionalColumnToggle = modalContainer.querySelector("#showAdditionalColumnToggle");
     const columnTypeSelect = modalContainer.querySelector("#columnTypeSelect");
     const dateFormatSettingsBtn = modalContainer.querySelector("#dateFormatSettingsBtn");
+    const myScrobblesSettingsBtn = modalContainer.querySelector("#myScrobblesSettingsBtn");
+    const dateFormatDropdownContainer = modalContainer.querySelector("#dateFormatDropdownContainer");
+    const myScrobblesDropdownContainer = modalContainer.querySelector("#myScrobblesDropdownContainer");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
@@ -1027,17 +1026,19 @@
         });
     }, 50);
 
+    const updateColumnSettingsVisibility = () => {
+        const showDateSettings = showAdditionalColumn && selectedColumnType === 'releaseDate';
+        dateFormatSettingsBtn.style.display = showDateSettings ? 'flex' : 'none';
+        dateFormatSettingsBtn.disabled = !showDateSettings;
+        if (!showDateSettings) dateFormatDropdownContainer.style.display = 'none';
 
-    const updateDateFormatButtonVisibility = () => {
-        const showButton = showAdditionalColumn && selectedColumnType === 'releaseDate';
-        dateFormatSettingsBtn.style.display = showButton ? 'flex' : 'none';
-        dateFormatSettingsBtn.disabled = !showButton;
-        if (!showButton) {
-            dateFormatDropdownContainer.style.display = 'none';
-        }
+        const showScrobbleSettings = showAdditionalColumn && selectedColumnType === 'personalScrobbles';
+        myScrobblesSettingsBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
+        myScrobblesSettingsBtn.disabled = !showScrobbleSettings;
+        if (!showScrobbleSettings) myScrobblesDropdownContainer.style.display = 'none';
     };
 
-    updateDateFormatButtonVisibility();
+    updateColumnSettingsVisibility();
 
     showAdditionalColumnToggle.addEventListener("change", () => {
         showAdditionalColumn = showAdditionalColumnToggle.checked;
@@ -1048,14 +1049,14 @@
             removeDateAdded = false;
             removeDateAddedToggle.checked = false;
         }
-        updateDateFormatButtonVisibility();
+        updateColumnSettingsVisibility();
         saveSettings();
         updateTracklist();
     });
 
     columnTypeSelect.addEventListener("change", () => {
         selectedColumnType = columnTypeSelect.value;
-        updateDateFormatButtonVisibility(); 
+        updateColumnSettingsVisibility(); 
         saveSettings();
         updateTracklist();
     });
@@ -1065,34 +1066,53 @@
           event.stopPropagation();
           const newFormat = button.getAttribute("data-format");
           releaseDateFormat = newFormat;
-
           dateFormatDropdownContainer.querySelectorAll("button").forEach(btn => btn.classList.remove("selected"));
           button.classList.add("selected");
-
           dateFormatDropdownContainer.style.display = 'none'; 
           saveSettings();
           updateTracklist(); 
       });
-  });
+    });
+
+    myScrobblesDropdownContainer.querySelectorAll("button").forEach(button => {
+        button.addEventListener("click", (event) => {
+            event.stopPropagation();
+            const newMode = button.getAttribute("data-mode");
+            myScrobblesDisplayMode = newMode;
+            myScrobblesDropdownContainer.querySelectorAll("button").forEach(btn => btn.classList.remove("selected"));
+            button.classList.add("selected");
+            myScrobblesDropdownContainer.style.display = 'none';
+            saveSettings();
+            updateTracklist();
+        });
+    });
 
     dateFormatSettingsBtn.addEventListener("click", (event) => {
         event.stopPropagation(); 
         const currentDisplay = dateFormatDropdownContainer.style.display;
+        myScrobblesDropdownContainer.style.display = 'none';
         dateFormatDropdownContainer.style.display = currentDisplay === 'block' ? 'none' : 'block';
     });
 
+    myScrobblesSettingsBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const currentDisplay = myScrobblesDropdownContainer.style.display;
+        dateFormatDropdownContainer.style.display = 'none';
+        myScrobblesDropdownContainer.style.display = currentDisplay === 'block' ? 'none' : 'block';
+    });
 
     document.addEventListener('click', (event) => {
-        const dropdownContainer = document.getElementById("dateFormatDropdownContainer"); 
-        const settingsButton = document.getElementById("dateFormatSettingsBtn");
-
-        if (dropdownContainer && settingsButton) {
-            if (!settingsButton.contains(event.target) && !dropdownContainer.contains(event.target)) {
-                dropdownContainer.style.display = 'none';
+        if (dateFormatDropdownContainer && dateFormatSettingsBtn) {
+            if (!dateFormatSettingsBtn.contains(event.target) && !dateFormatDropdownContainer.contains(event.target)) {
+                dateFormatDropdownContainer.style.display = 'none';
+            }
+        }
+        if (myScrobblesDropdownContainer && myScrobblesSettingsBtn) {
+            if (!myScrobblesSettingsBtn.contains(event.target) && !myScrobblesDropdownContainer.contains(event.target)) {
+                myScrobblesDropdownContainer.style.display = 'none';
             }
         }
     });
-
 
     removeDateAddedToggle.addEventListener("change", () => {
         if (showAdditionalColumn) {
@@ -10402,119 +10422,107 @@
         const batch = tracks.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(async (track) => {
             track.classList.add('sort-play-processing');
+            const dataElement = track.querySelector(".sort-play-data");
+            const trackUri = getTracklistTrackUri(track);
+            const trackId = trackUri ? trackUri.split(":")[2] : null;
+
             try {
-                const dataElement = track.querySelector(".sort-play-data");
-                if (!dataElement) return;
+                if (!dataElement || !trackId) return;
 
-                const trackUri = getTracklistTrackUri(track);
-                if (!trackUri) {
-                    updateDisplay(dataElement, "_", selectedColumnType);
-                    return;
+                const maxRetries = 3;
+                let initialDelay = 1500;
+
+                for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        if (selectedColumnType === 'playCount') {
+                            const cachedCount = getCachedPlayCount(trackId);
+                            if (cachedCount !== null) {
+                                updateDisplay(dataElement, cachedCount, selectedColumnType);
+                                return;
+                            }
+                            const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
+                            const albumLinkElement = track.querySelector(albumLinkSelector);
+                            if (!albumLinkElement?.href) { setCachedPlayCount(trackId, "_"); return; }
+                            const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
+                            const albumId = albumIdMatch ? albumIdMatch[1] : null;
+                            if (!albumId) { setCachedPlayCount(trackId, "_"); return; }
+                            const trackDetails = { track: { album: { id: albumId }, id: trackId } };
+                            const result = await getTrackDetailsWithPlayCount(trackDetails);
+                            const playCount = result?.playCount;
+                            updateDisplay(dataElement, playCount, selectedColumnType);
+                            setCachedPlayCount(trackId, playCount === null || playCount === 0 ? "_" : playCount);
+                            return; 
+                        } else if (selectedColumnType === 'releaseDate') {
+                            const cachedPreciseDate = getCachedReleaseDate(trackId);
+                            if (cachedPreciseDate !== null) { 
+                                updateDisplay(dataElement, cachedPreciseDate, selectedColumnType);
+                                return;
+                            }
+                            const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
+                            const albumLinkElement = track.querySelector(albumLinkSelector);
+                            if (!albumLinkElement?.href) {
+                                updateDisplay(dataElement, "_", selectedColumnType);
+                                setCachedReleaseDate(trackId, "_");
+                                return;
+                            }
+                            const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
+                            const albumId = albumIdMatch ? albumIdMatch[1] : null;
+                            if (!albumId) {
+                                updateDisplay(dataElement, "_", selectedColumnType);
+                                setCachedReleaseDate(trackId, "_");
+                                return;
+                            }
+                            const preciseDateString = await getReleaseDatesForAlbum(albumId);
+                            updateDisplay(dataElement, preciseDateString, selectedColumnType); 
+                            setCachedReleaseDate(trackId, preciseDateString);
+                            return;
+                        }
+
+                        const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                        if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
+                            throw new Error(`Could not fetch valid track details from Spotify.`);
+                        }
+                        const trackName = trackDetails.name;
+                        const artistName = trackDetails.artists[0].name;
+
+                        if (selectedColumnType === 'scrobbles') {
+                            const cachedScrobbles = getCachedScrobbles(trackId);
+                            if (cachedScrobbles !== null && cachedScrobbles !== "_") {
+                                updateDisplay(dataElement, cachedScrobbles, selectedColumnType);
+                                return;
+                            }
+                            const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                            const scrobbles = result?.scrobbles;
+                            updateDisplay(dataElement, scrobbles, selectedColumnType);
+                            const valueToCache = (scrobbles === null || scrobbles === undefined) ? "_" : scrobbles;
+                            setCachedScrobbles(trackId, valueToCache);
+                            return;
+                        } else if (selectedColumnType === 'personalScrobbles') {
+                            const lastFmUsername = loadLastFmUsername();
+                            if (!lastFmUsername) {
+                                updateDisplay(dataElement, "_", selectedColumnType);
+                                return;
+                            }
+                            const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                            const scrobbles = result?.personalScrobbles;
+                            updateDisplay(dataElement, scrobbles, selectedColumnType);
+                            return;
+                        }
+                    } catch (error) {
+                        const errorMessage = error.message || 'Unknown error';
+                        console.warn(`[Sort-Play] Attempt ${attempt}/${maxRetries} failed for track ${trackId}: ${errorMessage}`);
+                        if (attempt === maxRetries) {
+                            console.error(`[Sort-Play] Final attempt failed for track ${trackId}. Displaying '_'.`);
+                            updateDisplay(dataElement, "_", selectedColumnType);
+                        } else {
+                            await new Promise(resolve => setTimeout(resolve, initialDelay));
+                            initialDelay *= 2; 
+                        }
+                    }
                 }
-
-                const trackId = trackUri.split(":")[2];
-
-                if (selectedColumnType === 'playCount') {
-                    const cachedCount = getCachedPlayCount(trackId);
-                    if (cachedCount !== null) {
-                        updateDisplay(dataElement, cachedCount, selectedColumnType);
-                        return;
-                    }
-                    const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
-                    const albumLinkElement = track.querySelector(albumLinkSelector);
-                    if (!albumLinkElement?.href) { setCachedPlayCount(trackId, "_"); return; }
-                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
-                    const albumId = albumIdMatch ? albumIdMatch[1] : null;
-                    if (!albumId) { setCachedPlayCount(trackId, "_"); return; }
-                    const trackDetails = { track: { album: { id: albumId }, id: trackId } };
-                    const result = await getTrackDetailsWithPlayCount(trackDetails);
-                    const playCount = result?.playCount;
-                    updateDisplay(dataElement, playCount, selectedColumnType);
-                    setCachedPlayCount(trackId, playCount === null || playCount === 0 ? "_" : playCount);
-
-                } else if (selectedColumnType === 'releaseDate') {
-                    const cachedPreciseDate = getCachedReleaseDate(trackId);
-                    if (cachedPreciseDate !== null) { 
-                        updateDisplay(dataElement, cachedPreciseDate, selectedColumnType);
-                        return;
-                    }
-                    const albumLinkSelector = ".main-trackList-rowSectionVariable:nth-child(3) a.standalone-ellipsis-one-line";
-                    const albumLinkElement = track.querySelector(albumLinkSelector);
-                    if (!albumLinkElement?.href) {
-                        updateDisplay(dataElement, "_", selectedColumnType);
-                        setCachedReleaseDate(trackId, "_");
-                        return;
-                    }
-                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
-                    const albumId = albumIdMatch ? albumIdMatch[1] : null;
-                    if (!albumId) {
-                        updateDisplay(dataElement, "_", selectedColumnType);
-                        setCachedReleaseDate(trackId, "_");
-                        return;
-                    }
-
-                    const preciseDateString = await getReleaseDatesForAlbum(albumId);
-                    updateDisplay(dataElement, preciseDateString, selectedColumnType); 
-                    setCachedReleaseDate(trackId, preciseDateString); 
-                } else if (selectedColumnType === 'scrobbles') {
-                    const cachedScrobbles = getCachedScrobbles(trackId);
-                    if (cachedScrobbles !== null && cachedScrobbles !== "_") {
-                        updateDisplay(dataElement, cachedScrobbles, selectedColumnType);
-                        return;
-                    }
-                    
-                    const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                    if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
-                        setCachedScrobbles(trackId, "_");
-                        updateDisplay(dataElement, "_", selectedColumnType);
-                        return;
-                    }
-
-                    const result = await getTrackDetailsWithScrobbles({
-                        name: trackDetails.name,
-                        artists: [{ name: trackDetails.artists[0].name }]
-                    });
-                    const scrobbles = result?.scrobbles;
-                    
-                    updateDisplay(dataElement, scrobbles, selectedColumnType);
-                    const valueToCache = (scrobbles === null || scrobbles === undefined) ? "_" : scrobbles;
-                    setCachedScrobbles(trackId, valueToCache);
-                } else if (selectedColumnType === 'personalScrobbles') {
-                    const lastFmUsername = loadLastFmUsername();
-                    if (!lastFmUsername) {
-                        console.log(`[Sort-Play] MyScrobbles: No Last.fm username set for track ${trackId}. Displaying '_'.`);
-                        updateDisplay(dataElement, "_", selectedColumnType);
-                        return;
-                    }
-                    
-                    const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                    
-                    if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
-                        console.warn(`[Sort-Play] MyScrobbles: Could not fetch track details from Spotify for trackId: ${trackId}`);
-                        updateDisplay(dataElement, "_", selectedColumnType);
-                        return;
-                    }
-
-                    const trackName = trackDetails.name;
-                    const artistName = trackDetails.artists[0].name;
-                    console.log(`[Sort-Play] MyScrobbles: Fetching for Spotify Track="${trackName}", Artist="${artistName}"`);
-
-                    const result = await getTrackDetailsWithPersonalScrobbles({
-                        name: trackName,
-                        artists: [{ name: artistName }]
-                    });
-                    const scrobbles = result?.personalScrobbles;
-
-                    console.log(`[Sort-Play] MyScrobbles: Last.fm returned ${scrobbles} scrobbles for track ${trackId}.`);
-
-                    updateDisplay(dataElement, scrobbles, selectedColumnType);
-                }
-            } catch (error) {
-                console.error(`[Sort-Play] Error processing track ${trackId}:`, error);
-                const dataElement = track.querySelector(".sort-play-data");
-                if (dataElement) {
-                    updateDisplay(dataElement, "_", selectedColumnType);
-                }
+            } catch (finalError) {
+                console.error(`[Sort-Play] Unrecoverable error for track ${trackId}:`, finalError);
+                updateDisplay(dataElement, "_", selectedColumnType);
             } finally {
                 track.classList.remove('sort-play-processing');
             }
@@ -10523,26 +10531,34 @@
   }
 
   function updateDisplay(element, value, type) {
-      if (!element) return;
+    if (!element) return;
 
-      let displayValue = "_"; 
+    let displayValue = "_"; 
 
-      if (type === 'playCount' || type === 'personalScrobbles') {
-          if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== 0) {
-              displayValue = new Intl.NumberFormat('en-US').format(value);
-          }
-      } else if (type === 'scrobbles') {
-          if (value !== "_" && !isNaN(value) && value !== null && value !== undefined) {
-              displayValue = new Intl.NumberFormat('en-US').format(value);
-          }
-      } else if (type === 'releaseDate') {
-          displayValue = formatReleaseDate(value, releaseDateFormat);
-      }
+    if (type === 'playCount') {
+        if (value > 0 && !isNaN(value)) {
+            displayValue = new Intl.NumberFormat('en-US').format(value);
+        }
+    } else if (type === 'personalScrobbles') {
+        if (value > 0 && !isNaN(value)) {
+            if (myScrobblesDisplayMode === 'sign') {
+                displayValue = '✅';
+            } else { 
+                displayValue = new Intl.NumberFormat('en-US').format(value);
+            }
+        }
+    } else if (type === 'scrobbles') {
+        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined) {
+            displayValue = new Intl.NumberFormat('en-US').format(value);
+        }
+    } else if (type === 'releaseDate') {
+        displayValue = formatReleaseDate(value, releaseDateFormat);
+    }
 
-      element.textContent = displayValue;
-      element.style.fontSize = "14px";
-      element.style.fontWeight = "400";
-      element.style.color = "var(--spice-subtext)";
+    element.textContent = displayValue;
+    element.style.fontSize = "14px";
+    element.style.fontWeight = "400";
+    element.style.color = "var(--spice-subtext)";
   }
 
 
@@ -10600,7 +10616,7 @@
             expectedHeaderText = "Scrobbles";
             break;
         case 'personalScrobbles':
-            expectedHeaderText = "My Scrobbles";
+            expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles";
             break;
         default:
             expectedHeaderText = "Plays";
