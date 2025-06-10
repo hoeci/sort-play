@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.4.5";
+  const SORT_PLAY_VERSION = "4.4.6";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -9270,6 +9270,27 @@
     }
   }
 
+  async function replacePlaylistTracks(playlistId, trackUris) {
+    const BATCH_SIZE = 100;
+    const validUris = trackUris.filter(uri => typeof uri === 'string' && uri.startsWith("spotify:track:"));
+    
+    const firstBatch = validUris.slice(0, BATCH_SIZE);
+    try {
+        await Spicetify.CosmosAsync.put(
+            `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
+            { uris: firstBatch }
+        );
+    } catch (error) {
+        console.error(`Error replacing tracks in playlist ${playlistId} (first batch):`, error);
+        throw error;
+    }
+
+    if (validUris.length > BATCH_SIZE) {
+        const remainingUris = validUris.slice(BATCH_SIZE);
+        await addTracksToPlaylist(playlistId, remainingUris);
+    }
+  }
+
   async function addTracksToPlaylist(playlistId, trackUris, maxRetries = 5, initialDelay = 1000) {
     const BATCH_SIZE = 100;
     const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
@@ -9601,12 +9622,9 @@
             modifiedPlaylistOriginalPath = initialPagePath; 
 
             try {
-                mainButton.innerText = "Clearing...";
-                await removeAllTracksFromPlaylist(playlistIdToModify);
-                
                 mainButton.innerText = "Saving...";
                 const trackUris = sortedTracks.map((track) => track.uri);
-                await addTracksToPlaylist(playlistIdToModify, trackUris);
+                await replacePlaylistTracks(playlistIdToModify, trackUris);
                 
                 Spicetify.showNotification(`"${finalSourceName}" sorted by ${sortTypeInfo.fullName}!`);
                 playlistUriForQueue = currentUriAtStart; 
