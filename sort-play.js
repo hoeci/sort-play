@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.4.6";
+  const SORT_PLAY_VERSION = "4.4.7";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -6765,17 +6765,23 @@
             sortedTracks = uniqueTracks
               .filter((track) => track.popularity !== null)
               .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity);
-          } else if (sortType === "releaseDate") {
-            sortedTracks = uniqueTracks
-              .filter((track) => track.releaseDate !== null)
-              .sort((a, b) => {
-                return sortOrderState.releaseDate
-                  ? a.releaseDate - b.releaseDate
-                  : b.releaseDate - a.releaseDate;
-              });
-          } else if (sortType === "shuffle") {
-            sortedTracks = shuffleArray(uniqueTracks);
-          }
+        } else if (sortType === "releaseDate") {
+          sortedTracks = uniqueTracks
+            .filter((track) => track.releaseDate !== null)
+            .sort((a, b) => {
+              const dateComparison = sortOrderState.releaseDate
+                ? (a.releaseDate || 0) - (b.releaseDate || 0)
+                : (b.releaseDate || 0) - (a.releaseDate || 0);
+
+              if (dateComparison !== 0) {
+                return dateComparison;
+              }
+              
+              return (a.trackNumber || 0) - (b.trackNumber || 0);
+            });
+        } else if (sortType === "shuffle") {
+          sortedTracks = shuffleArray(uniqueTracks);
+        }
   
           mainButton.innerText = "100%";
   
@@ -7879,6 +7885,7 @@
                 return {
                   uri: track.uri,
                   name: track.name,
+                  trackNumber: parseInt(track.trackNumber, 10) || 0,
                   playcount: parseInt(track.playcount, 10) || 0,
                 };
               })
@@ -8005,7 +8012,7 @@
       }
 
       return {
-        trackNumber: 0,
+        trackNumber: foundTrack ? foundTrack.trackNumber : 0,
         songTitle: track.name, 
         albumName: track.albumName || (track.album && track.album.name) ||  "Unknown Album",
         trackId: track.track.id,
@@ -9537,9 +9544,15 @@
           sortedTracks = uniqueTracks
             .filter((track) => track.releaseDate !== null)
             .sort((a, b) => {
-              return sortOrderState.releaseDate
-                ? a.releaseDate - b.releaseDate
-                : b.releaseDate - a.releaseDate;
+              const dateComparison = sortOrderState.releaseDate
+                ? (a.releaseDate || 0) - (b.releaseDate || 0)
+                : (b.releaseDate || 0) - (a.releaseDate || 0);
+
+              if (dateComparison !== 0) {
+                return dateComparison;
+              }
+
+              return (a.trackNumber || 0) - (b.trackNumber || 0);
             });
         } else if (sortType === "shuffle") {
           sortedTracks = shuffleArray(uniqueTracks);
