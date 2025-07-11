@@ -7560,6 +7560,12 @@
         text-align: center;
         margin: auto;
     }
+      div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3) {
+        justify-content: center;
+    }
+    div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3) {
+        justify-content: center;
+    }
   `;
   document.head.appendChild(styleElement);
 
@@ -10485,7 +10491,7 @@
 
   const CACHE_KEY = 'spotify-play-count-cache2';
   const CACHE_TIMESTAMP_KEY = 'spotify-play-count-cache-timestamp2';
-  const CACHE_EXPIRY_DAYS = 2;
+  const CACHE_EXPIRY_HOURS = 6;
 
   function initializePlayCountCache() {
     const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
@@ -10495,8 +10501,8 @@
       return;
     }
 
-    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
-    if (daysPassed >= CACHE_EXPIRY_DAYS) {
+    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60); 
+    if (daysPassed >= CACHE_EXPIRY_HOURS) {
       localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
       localStorage.setItem(CACHE_KEY, JSON.stringify({}));
     }
