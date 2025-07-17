@@ -3429,7 +3429,8 @@
       const clearButton = container.querySelector(".keyword-remove-all-button");
       const saveButton = container.querySelector(".keyword-save-button");
       const loadButton = container.querySelector(".keyword-load-button");
-      if(!input || !clearButton || !saveButton || !loadButton) return;
+      
+      if(!input) return;
 
       input.addEventListener("click", (e) => {
           e.preventDefault();
@@ -3451,15 +3452,17 @@
           }
       });
 
-      clearButton.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const tagsContainer = container.querySelector(".keyword-tags-container");
-          tagsContainer.innerHTML = "";
-          keywordSet.clear();
-          updateTrackFilters();
-          saveKeywords();
-      });
+      if (clearButton) {
+        clearButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const tagsContainer = container.querySelector(".keyword-tags-container");
+            tagsContainer.innerHTML = "";
+            keywordSet.clear();
+            updateTrackFilters();
+            saveKeywords();
+        });
+      }
 
       input.addEventListener("blur", () => {
           const keyword = input.value.trim().toLowerCase();
@@ -3474,268 +3477,272 @@
           saveKeywords();
       });
 
-      saveButton.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+      if (saveButton) {
+        saveButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-          if (keywordSet.size === 0) {
-              Spicetify.showNotification("No keywords to save.");
-              return;
-          }
+            if (keywordSet.size === 0) {
+                Spicetify.showNotification("No keywords to save.");
+                return;
+            }
 
-          const saveModal = document.createElement("div");
-          saveModal.className = "save-keywords-modal";
-          saveModal.innerHTML = `
-              <style>
-              .save-keywords-modal {
-                  background-color: #282828;
-                  border-radius: 8px;
-                  padding: 16px;
-                  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-                  position: absolute;
-                  top: 50%;
-                  left: 50%;
-                  transform: translate(-50%, -50%);
-                  z-index: 1001;
-                  width: 300px;
-              }
-              .save-keywords-title {
-                  color: #fff;
-                  font-size: 14px;
-                  font-weight: bold;
-                  margin-bottom: 12px;
-              }
-              .save-keywords-input {
-                  width: 100%;
-                  padding: 8px;
-                  border-radius: 4px;
-                  border: 1px solid #434343;
-                  background: #121212;
-                  color: white;
-                  margin-bottom: 12px;
-                  box-sizing: border-box;
-              }
-              .save-keywords-button {
-                  background-color: #1db954;
-                  border: none;
-                  color: black;
-                  padding: 8px 16px;
-                  border-radius: 20px;
-                  font-weight: bold;
-                  cursor: pointer;
-                  display: block;
-                  width: auto;
-                  margin: 0 auto;
-              }
+            const saveModal = document.createElement("div");
+            saveModal.className = "save-keywords-modal";
+            saveModal.innerHTML = `
+                <style>
+                .save-keywords-modal {
+                    background-color: #282828;
+                    border-radius: 8px;
+                    padding: 16px;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 1001;
+                    width: 300px;
+                }
+                .save-keywords-title {
+                    color: #fff;
+                    font-size: 14px;
+                    font-weight: bold;
+                    margin-bottom: 12px;
+                }
+                .save-keywords-input {
+                    width: 100%;
+                    padding: 8px;
+                    border-radius: 4px;
+                    border: 1px solid #434343;
+                    background: #121212;
+                    color: white;
+                    margin-bottom: 12px;
+                    box-sizing: border-box;
+                }
+                .save-keywords-button {
+                    background-color: #1db954;
+                    border: none;
+                    color: black;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    display: block;
+                    width: auto;
+                    margin: 0 auto;
+                }
 
-              .save-keywords-button:hover {
-                  background-color: #1ed760;
-              }
+                .save-keywords-button:hover {
+                    background-color: #1ed760;
+                }
 
-              .save-keywords-overlay {
-                  position: fixed;
-                  top: 0;
-                  left: 0;
-                  right: 0;
-                  bottom: 0;
-                  background-color: rgba(0, 0, 0, 0.5);
-                  z-index: 1000;
-              }
-              </style>
-              <div class="save-keywords-title">Enter Keywords Group Name</div>
-              <input type="text" class="save-keywords-input" placeholder="Group Name">
-              <button class="save-keywords-button">Save</button>
-          `;
-          const overlay = document.createElement("div");
-          overlay.className = "save-keywords-overlay";
+                .save-keywords-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: rgba(0, 0, 0, 0.5);
+                    z-index: 1000;
+                }
+                </style>
+                <div class="save-keywords-title">Enter Keywords Group Name</div>
+                <input type="text" class="save-keywords-input" placeholder="Group Name">
+                <button class="save-keywords-button">Save</button>
+            `;
+            const overlay = document.createElement("div");
+            overlay.className = "save-keywords-overlay";
 
-          document.body.appendChild(overlay);
-          document.body.appendChild(saveModal);
+            document.body.appendChild(overlay);
+            document.body.appendChild(saveModal);
 
-          const saveInput = saveModal.querySelector(".save-keywords-input");
-          const saveBtn = saveModal.querySelector(".save-keywords-button");
+            const saveInput = saveModal.querySelector(".save-keywords-input");
+            const saveBtn = saveModal.querySelector(".save-keywords-button");
 
-          const closeModal = () => {
-              saveModal.remove();
-              overlay.remove();
-          };
+            const closeModal = () => {
+                saveModal.remove();
+                overlay.remove();
+            };
 
-          saveBtn.addEventListener("click", () => {
-              const groupName = saveInput.value.trim();
-              if (groupName) {
-                  let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
-                  savedKeywordGroups[groupName] = [...keywordSet];
-                  localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
-                  Spicetify.showNotification(`Keywords saved as "${groupName}"`);
-                  closeModal();
-              } else {
-                  Spicetify.showNotification("Please enter a group name.");
-              }
-          });
-          overlay.addEventListener("click", closeModal);
-      });
+            saveBtn.addEventListener("click", () => {
+                const groupName = saveInput.value.trim();
+                if (groupName) {
+                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                    savedKeywordGroups[groupName] = [...keywordSet];
+                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+                    Spicetify.showNotification(`Keywords saved as "${groupName}"`);
+                    closeModal();
+                } else {
+                    Spicetify.showNotification("Please enter a group name.");
+                }
+            });
+            overlay.addEventListener("click", closeModal);
+        });
+      }
 
-      loadButton.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
+      if (loadButton) {
+        loadButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
 
-          let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
-          const groupNames = Object.keys(savedKeywordGroups).reverse();
+            let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+            const groupNames = Object.keys(savedKeywordGroups).reverse();
 
-          if (groupNames.length === 0) {
-              Spicetify.showNotification("No saved keyword groups.");
-              return;
-          }
+            if (groupNames.length === 0) {
+                Spicetify.showNotification("No saved keyword groups.");
+                return;
+            }
 
-          const dropdown = document.createElement("div");
-          dropdown.className = "load-keywords-dropdown";
-          dropdown.innerHTML = `
-              <style>
-              .load-keywords-dropdown {
-                  background-color: #282828;
-                  border-radius: 4px;
-                  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-                  position: absolute;
-                  right: 0;
-                  z-index: 1002;
-                  min-width: 180px;
-                  max-width: 250px;
-                  max-height: 200px;
-                  overflow-y: auto;
-              }
-              .load-keywords-option {
-                  color: #fff;
-                  padding-top: 8px;
-                  padding-right: 5px;
-                  padding-bottom: 8px;
-                  padding-left: 12px;
-                  cursor: pointer;
-                  white-space: nowrap;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  display: flex;
-                  justify-content: space-between;
-                  align-items: center;
-              }
-              .load-keywords-option:hover {
-                  background-color: #383838;
-              }
-              .load-keywords-option:active, .load-keywords-option.selected {
-                  background-color: #1db954;
-                  color: black;
-              }
-              .load-keywords-option .remove-button {
-                  opacity: 0;
-                  transition: opacity 0.2s;
-                  cursor: pointer;
-                  padding: 4px;
-                  display: flex;
-                  align-items: center;
-                  max-width: 30px;
-              }
-              .load-keywords-option:hover .remove-button {
-                  opacity: 1;
-              }
-              .remove-icon {
-                  width: 12px;
-                  height: 12px;
-                  fill: currentColor;
-              }
-              .load-keywords-option-text {
-                  flex-grow: 1;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                  font-size: 14px;
-              }
-              .load-keywords-dropdown::-webkit-scrollbar {
-                  width: 8px;
-              }
-              .load-keywords-dropdown::-webkit-scrollbar-track {
-                  background: transparent;
-              }
-              .load-keywords-dropdown::-webkit-scrollbar-thumb {
-                  background-color: #4d4d4d;
-                  border-radius: 4px;
-              }
-              </style>
-          `;
+            const dropdown = document.createElement("div");
+            dropdown.className = "load-keywords-dropdown";
+            dropdown.innerHTML = `
+                <style>
+                .load-keywords-dropdown {
+                    background-color: #282828;
+                    border-radius: 4px;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+                    position: absolute;
+                    right: 0;
+                    z-index: 1002;
+                    min-width: 180px;
+                    max-width: 250px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                }
+                .load-keywords-option {
+                    color: #fff;
+                    padding-top: 8px;
+                    padding-right: 5px;
+                    padding-bottom: 8px;
+                    padding-left: 12px;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .load-keywords-option:hover {
+                    background-color: #383838;
+                }
+                .load-keywords-option:active, .load-keywords-option.selected {
+                    background-color: #1db954;
+                    color: black;
+                }
+                .load-keywords-option .remove-button {
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                    cursor: pointer;
+                    padding: 4px;
+                    display: flex;
+                    align-items: center;
+                    max-width: 30px;
+                }
+                .load-keywords-option:hover .remove-button {
+                    opacity: 1;
+                }
+                .remove-icon {
+                    width: 12px;
+                    height: 12px;
+                    fill: currentColor;
+                }
+                .load-keywords-option-text {
+                    flex-grow: 1;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    font-size: 14px;
+                }
+                .load-keywords-dropdown::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .load-keywords-dropdown::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .load-keywords-dropdown::-webkit-scrollbar-thumb {
+                    background-color: #4d4d4d;
+                    border-radius: 4px;
+                }
+                </style>
+            `;
 
-          let selectedOption = null;
+            let selectedOption = null;
 
-          groupNames.forEach(groupName => {
-              const option = document.createElement("div");
-              option.className = "load-keywords-option";
+            groupNames.forEach(groupName => {
+                const option = document.createElement("div");
+                option.className = "load-keywords-option";
 
-              const optionContent = document.createElement("span");
-              optionContent.className = "load-keywords-option-text";
-              optionContent.textContent = groupName.length > 30 ? groupName.substring(0, 30) + "..." : groupName;
-              optionContent.dataset.fullName = groupName;
+                const optionContent = document.createElement("span");
+                optionContent.className = "load-keywords-option-text";
+                optionContent.textContent = groupName.length > 30 ? groupName.substring(0, 30) + "..." : groupName;
+                optionContent.dataset.fullName = groupName;
 
-              const removeButton = document.createElement("div");
-              removeButton.className = "remove-button";
-              removeButton.innerHTML = removeIconSVG;
+                const removeButton = document.createElement("div");
+                removeButton.className = "remove-button";
+                removeButton.innerHTML = removeIconSVG;
 
-              option.appendChild(optionContent);
-              option.appendChild(removeButton);
+                option.appendChild(optionContent);
+                option.appendChild(removeButton);
 
-              optionContent.addEventListener("click", (e) => {
-                  const tagsContainer = container.querySelector(".keyword-tags-container");
-                  tagsContainer.innerHTML = "";
-                  keywordSet.clear();
+                optionContent.addEventListener("click", (e) => {
+                    const tagsContainer = container.querySelector(".keyword-tags-container");
+                    tagsContainer.innerHTML = "";
+                    keywordSet.clear();
 
-                  savedKeywordGroups[groupName].forEach(keyword => {
-                      keywordSet.add(keyword);
-                      createKeywordTag(keyword, container, keywordSet);
-                  });
+                    savedKeywordGroups[groupName].forEach(keyword => {
+                        keywordSet.add(keyword);
+                        createKeywordTag(keyword, container, keywordSet);
+                    });
 
-                  updateTrackFilters();
-                  saveKeywords();
-                  Spicetify.showNotification(`Keywords loaded from "${groupName}"`);
+                    updateTrackFilters();
+                    saveKeywords();
+                    Spicetify.showNotification(`Keywords loaded from "${groupName}"`);
 
-                  if (selectedOption) {
-                      selectedOption.classList.remove("selected");
-                  }
-                  option.classList.add("selected");
-                  selectedOption = option;
+                    if (selectedOption) {
+                        selectedOption.classList.remove("selected");
+                    }
+                    option.classList.add("selected");
+                    selectedOption = option;
 
-                  dropdown.remove();
-              });
+                    dropdown.remove();
+                });
 
-              removeButton.addEventListener("click", (e) => {
-                  e.stopPropagation();
+                removeButton.addEventListener("click", (e) => {
+                    e.stopPropagation();
 
-                  let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
-                  delete savedKeywordGroups[groupName];
-                  localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                    delete savedKeywordGroups[groupName];
+                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
 
-                  option.remove();
-                  Spicetify.showNotification(`Removed keyword group "${groupName}"`);
+                    option.remove();
+                    Spicetify.showNotification(`Removed keyword group "${groupName}"`);
 
-                  if (Object.keys(savedKeywordGroups).length === 0) {
-                      dropdown.remove();
-                      Spicetify.showNotification("No more saved keyword groups.");
-                  }
-              });
+                    if (Object.keys(savedKeywordGroups).length === 0) {
+                        dropdown.remove();
+                        Spicetify.showNotification("No more saved keyword groups.");
+                    }
+                });
 
-              dropdown.appendChild(option);
-          });
+                dropdown.appendChild(option);
+            });
 
-          loadButton.parentNode.appendChild(dropdown);
+            loadButton.parentNode.appendChild(dropdown);
 
-          const buttonRect = loadButton.getBoundingClientRect();
-          dropdown.style.bottom = `${buttonRect.height + 4}px`;
-          dropdown.style.right = `-50px`;
+            const buttonRect = loadButton.getBoundingClientRect();
+            dropdown.style.bottom = `${buttonRect.height + 4}px`;
+            dropdown.style.right = `-50px`;
 
-          const removeDropdown = (event) => {
-              if (!dropdown.contains(event.target)) {
-                  dropdown.remove();
-                  document.removeEventListener('click', removeDropdown);
-              }
-          };
-          setTimeout(() => {
-              document.addEventListener('click', removeDropdown);
-          }, 0);
-      });
+            const removeDropdown = (event) => {
+                if (!dropdown.contains(event.target)) {
+                    dropdown.remove();
+                    document.removeEventListener('click', removeDropdown);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', removeDropdown);
+            }, 0);
+        });
+      }
 
       container.addEventListener("click", (e) => {
           e.preventDefault();
@@ -9759,7 +9766,7 @@
               }
               let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
               if (isArtistPage) {
-                playlistDescription = `Discography of ${finalSourceName}: created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
+                playlistDescription = `Discography of ${finalSourceName} - created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
               }
               mainButton.innerText = "Creating...";
               const newPlaylist = await createPlaylist(`${finalSourceName} (${sortTypeInfo.shortName})`, playlistDescription);
