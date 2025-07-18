@@ -1,5 +1,5 @@
 # Sort Play
-<img src="https://github.com/user-attachments/assets/98dc5ea0-4324-4840-992f-7aecca71c5a6" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/52d8dea1-2fe3-46ba-a201-817cf7a31408" alt="show" width="100%">
 
 ## ⚡️ Features
 + Sort playlists & artist pages by play count, popularity, release date, Last.fm scrobbles and more.
