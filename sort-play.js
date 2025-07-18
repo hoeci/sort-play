@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.6.0";
+  const SORT_PLAY_VERSION = "4.7.0";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -820,6 +820,12 @@
                 <option value="releaseDate" ${selectedColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
                 <option value="scrobbles" ${selectedColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
                 <option value="personalScrobbles" ${selectedColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
+                <option value="djInfo" ${selectedColumnType === 'djInfo' ? 'selected' : ''}>DJ Info</option>
+                <option value="key" ${selectedColumnType === 'key' ? 'selected' : ''}>Key</option>
+                <option value="tempo" ${selectedColumnType === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
+                <option value="energy" ${selectedColumnType === 'energy' ? 'selected' : ''}>Energy</option>
+                <option value="danceability" ${selectedColumnType === 'danceability' ? 'selected' : ''}>Danceability</option>
+                <option value="valence" ${selectedColumnType === 'valence' ? 'selected' : ''}>Valence</option>
             </select>
             <label class="switch">
                 <input type="checkbox" id="showAdditionalColumnToggle" ${showAdditionalColumn ? 'checked' : ''}>
@@ -858,6 +864,12 @@
                 <option value="releaseDate" ${selectedAlbumColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
                 <option value="scrobbles" ${selectedAlbumColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
                 <option value="personalScrobbles" ${selectedAlbumColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
+                <option value="djInfo" ${selectedAlbumColumnType === 'djInfo' ? 'selected' : ''}>DJ Info</option>
+                <option value="key" ${selectedAlbumColumnType === 'key' ? 'selected' : ''}>Key</option>
+                <option value="tempo" ${selectedAlbumColumnType === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
+                <option value="energy" ${selectedAlbumColumnType === 'energy' ? 'selected' : ''}>Energy</option>
+                <option value="danceability" ${selectedAlbumColumnType === 'danceability' ? 'selected' : ''}>Danceability</option>
+                <option value="valence" ${selectedAlbumColumnType === 'valence' ? 'selected' : ''}>Valence</option>
             </select>
             <label class="switch">
                 <input type="checkbox" id="showAlbumColumnToggle" ${showAlbumColumn ? 'checked' : ''}>
@@ -896,6 +908,12 @@
                 <option value="releaseDate" ${selectedArtistColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
                 <option value="scrobbles" ${selectedArtistColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
                 <option value="personalScrobbles" ${selectedArtistColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
+                <option value="djInfo" ${selectedArtistColumnType === 'djInfo' ? 'selected' : ''}>DJ Info</option>
+                <option value="key" ${selectedArtistColumnType === 'key' ? 'selected' : ''}>Key</option>
+                <option value="tempo" ${selectedArtistColumnType === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
+                <option value="energy" ${selectedArtistColumnType === 'energy' ? 'selected' : ''}>Energy</option>
+                <option value="danceability" ${selectedArtistColumnType === 'danceability' ? 'selected' : ''}>Danceability</option>
+                <option value="valence" ${selectedArtistColumnType === 'valence' ? 'selected' : ''}>Valence</option>
             </select>
             <label class="switch">
                 <input type="checkbox" id="showArtistColumnToggle" ${showArtistColumn ? 'checked' : ''}>
@@ -10605,6 +10623,53 @@
     });
   }
 
+  async function getBatchTrackStats(trackIds) {
+    if (trackIds.length === 0) {
+        return {};
+    }
+
+    const results = {};
+    try {
+        const audioFeaturesResponse = await Spicetify.CosmosAsync.get(
+            `https://api.spotify.com/v1/audio-features?ids=${trackIds.join(',')}`
+        );
+        const trackDetailsResponse = await Spicetify.CosmosAsync.get(
+            `https://api.spotify.com/v1/tracks?ids=${trackIds.join(',')}`
+        );
+
+        if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
+            console.warn('Failed to fetch batch track data');
+            return {};
+        }
+
+        const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+        
+        audioFeaturesResponse.audio_features.forEach((features, index) => {
+            if (features) {
+                const trackDetails = trackDetailsResponse.tracks[index];
+                results[features.id] = {
+                    danceability: features.danceability ? Math.round(100 * features.danceability) : null,
+                    energy: features.energy ? Math.round(100 * features.energy) : null,
+                    key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
+                    loudness: features.loudness ?? null,
+                    speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
+                    acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
+                    instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
+                    liveness: features.liveness ? Math.round(100 * features.liveness) : null,
+                    valence: features.valence ? Math.round(100 * features.valence) : null,
+                    tempo: features.tempo ? Math.round(features.tempo) : null,
+                    popularity: trackDetails?.popularity ?? null,
+                    releaseDate: trackDetails?.album?.release_date ?? null
+                };
+            }
+        });
+
+    } catch (error) {
+        console.error('Error fetching batch track stats:', error);
+    }
+    return results;
+  }
+
   function getTracklistTrackUri(tracklistElement) {
       let values = Object.values(tracklistElement);
       if (!values) {
@@ -10844,6 +10909,7 @@
     const currentUri = getCurrentUri();
     let isColumnEnabled = false;
     let activeColumnType = 'playCount';
+    const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo'];
 
     if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
         isColumnEnabled = showAdditionalColumn;
@@ -10874,121 +10940,179 @@
             const isTrack = trackUri && trackUri.includes("track");
             return dataElement && (dataElement.textContent === "" || dataElement.textContent === "_") && isTrack && trackUri;
         });
-
-    const BATCH_SIZE = 10;
+    
+    const BATCH_SIZE = audioFeatureTypes.includes(activeColumnType) ? 50 : 10;
+    
     for (let i = 0; i < tracks.length; i += BATCH_SIZE) {
         const batch = tracks.slice(i, i + BATCH_SIZE);
-        await Promise.all(batch.map(async (track) => {
-            track.classList.add('sort-play-processing');
-            const dataElement = track.querySelector(".sort-play-data");
-            const trackUri = getTracklistTrackUri(track);
-            const trackId = trackUri ? trackUri.split(":")[2] : null;
+        
+        if (audioFeatureTypes.includes(activeColumnType)) {
+            const trackIdsToFetch = [];
+            const elementMap = new Map();
 
-            try {
-                if (!dataElement || !trackId) return;
+            for (const trackElement of batch) {
+                trackElement.classList.add('sort-play-processing');
+                const trackUri = getTracklistTrackUri(trackElement);
+                const trackId = trackUri ? trackUri.split(":")[2] : null;
+                const dataElement = trackElement.querySelector(".sort-play-data");
+                if (!trackId || !dataElement) continue;
 
-                const maxRetries = 3;
-                let initialDelay = 1500;
+                const statsCacheModel = "stats-column";
+                const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
+                let needsFetching = true;
 
-                for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                    try {
-                        if (activeColumnType === 'playCount') {
-                            const cachedCount = getCachedPlayCount(trackId);
-                            if (cachedCount !== null && cachedCount !== "_") {
-                                updateDisplay(dataElement, cachedCount, activeColumnType);
-                                return;
-                            }
-                            let albumId = null;
-                            const albumLinkElement = track.querySelector("a[href*='/album/']");
-                            if (albumLinkElement) {
-                                const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
-                                albumId = albumIdMatch ? albumIdMatch[1] : null;
-                            } else {
-                                const trackDetailsFromApi = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                                albumId = trackDetailsFromApi?.album?.id;
-                            }
-                            if (!albumId) { throw new Error("Could not find Album ID."); }
-                            
-                            const trackDetails = { track: { album: { id: albumId }, id: trackId } };
-                            const result = await getTrackDetailsWithPlayCount(trackDetails);
-                            const playCount = result?.playCount;
-                            updateDisplay(dataElement, playCount, activeColumnType);
-                            if (playCount !== null && playCount !== "N/A") {
-                                setCachedPlayCount(trackId, playCount);
-                            }
-                            return; 
-                        } else if (activeColumnType === 'releaseDate') {
-                            const cachedPreciseDate = getCachedReleaseDate(trackId);
-                            if (cachedPreciseDate !== null && cachedPreciseDate !== "_") { 
-                                updateDisplay(dataElement, cachedPreciseDate, activeColumnType);
-                                return;
-                            }
-                            let albumId = null;
-                            const albumLinkElement = track.querySelector("a[href*='/album/']");
-                             if (albumLinkElement) {
-                                const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
-                                albumId = albumIdMatch ? albumIdMatch[1] : null;
-                            } else {
-                                const trackDetailsFromApi = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                                albumId = trackDetailsFromApi?.album?.id;
-                            }
-                            if (!albumId) { throw new Error("Could not find Album ID."); }
-
-                            const preciseDateString = await getReleaseDatesForAlbum(albumId);
-                            updateDisplay(dataElement, preciseDateString, activeColumnType);
-                            if (preciseDateString !== null && preciseDateString !== "_") {
-                                setCachedReleaseDate(trackId, preciseDateString);
-                            }
-                            return;
+                if (cachedData) {
+                    if (activeColumnType === 'djInfo') {
+                        if (cachedData.key !== undefined && cachedData.tempo !== undefined && cachedData.energy !== undefined) {
+                            updateDisplay(dataElement, cachedData, 'djInfo');
+                            needsFetching = false;
                         }
-
-                        const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                        if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
-                            throw new Error(`Could not fetch valid track details from Spotify.`);
-                        }
-                        const trackName = trackDetails.name;
-                        const artistName = trackDetails.artists[0].name;
-
-                        if (activeColumnType === 'scrobbles') {
-                            const cachedScrobbles = getCachedScrobbles(trackId);
-                            if (cachedScrobbles !== null && cachedScrobbles !== "_") {
-                                updateDisplay(dataElement, cachedScrobbles, activeColumnType);
-                                return;
-                            }
-                            const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                            const scrobbles = result?.scrobbles;
-                            updateDisplay(dataElement, scrobbles, activeColumnType);
-                            if (scrobbles !== null && scrobbles !== undefined) {
-                                setCachedScrobbles(trackId, scrobbles);
-                            }
-                            return;
-                        } else if (activeColumnType === 'personalScrobbles') {
-                            const lastFmUsername = loadLastFmUsername();
-                            if (!lastFmUsername) {
-                                updateDisplay(dataElement, "_", activeColumnType);
-                                return;
-                            }
-
-                            const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                            const scrobbles = result?.personalScrobbles;
-                            updateDisplay(dataElement, scrobbles, activeColumnType);
-                            return;
-                        }
-                    } catch (error) {
-                        if (attempt === maxRetries) {
-                            updateDisplay(dataElement, "_", activeColumnType);
-                        } else {
-                            await new Promise(resolve => setTimeout(resolve, initialDelay));
-                            initialDelay *= 2; 
+                    } else {
+                        if (cachedData[activeColumnType] !== undefined) {
+                            updateDisplay(dataElement, cachedData[activeColumnType], activeColumnType);
+                            needsFetching = false;
                         }
                     }
                 }
-            } catch (finalError) {
-                updateDisplay(dataElement, "_", activeColumnType);
-            } finally {
-                track.classList.remove('sort-play-processing');
+
+                if (needsFetching) {
+                    trackIdsToFetch.push(trackId);
+                    elementMap.set(trackId, dataElement);
+                }
             }
-        }));
+
+            if (trackIdsToFetch.length > 0) {
+                const batchStats = await getBatchTrackStats(trackIdsToFetch);
+                for (const trackId of trackIdsToFetch) {
+                    const dataElement = elementMap.get(trackId);
+                    const stats = batchStats[trackId];
+                    if (stats) {
+                        const value = activeColumnType === 'djInfo' ? stats : stats[activeColumnType];
+                        updateDisplay(dataElement, value, activeColumnType);
+                        
+                        const statsCacheModel = "stats-column";
+                        const currentCache = getTrackCache(trackId, true, false, statsCacheModel) || {};
+                        const newCache = { ...currentCache, ...stats };
+                        setTrackCache(trackId, newCache, true, false, statsCacheModel);
+                    } else {
+                        updateDisplay(dataElement, "_", activeColumnType);
+                    }
+                }
+            }
+            batch.forEach(track => track.classList.remove('sort-play-processing'));
+        } else {
+            await Promise.all(batch.map(async (track) => {
+                track.classList.add('sort-play-processing');
+                const dataElement = track.querySelector(".sort-play-data");
+                const trackUri = getTracklistTrackUri(track);
+                const trackId = trackUri ? trackUri.split(":")[2] : null;
+
+                try {
+                    if (!dataElement || !trackId) return;
+
+                    const maxRetries = 3;
+                    let initialDelay = 1500;
+
+                    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                        try {
+                            if (activeColumnType === 'playCount') {
+                                const cachedCount = getCachedPlayCount(trackId);
+                                if (cachedCount !== null && cachedCount !== "_") {
+                                    updateDisplay(dataElement, cachedCount, activeColumnType);
+                                    return;
+                                }
+                                let albumId = null;
+                                const albumLinkElement = track.querySelector("a[href*='/album/']");
+                                if (albumLinkElement) {
+                                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
+                                    albumId = albumIdMatch ? albumIdMatch[1] : null;
+                                } else {
+                                    const trackDetailsFromApi = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                                    albumId = trackDetailsFromApi?.album?.id;
+                                }
+                                if (!albumId) { throw new Error("Could not find Album ID."); }
+                                
+                                const trackDetails = { track: { album: { id: albumId }, id: trackId } };
+                                const result = await getTrackDetailsWithPlayCount(trackDetails);
+                                const playCount = result?.playCount;
+                                updateDisplay(dataElement, playCount, activeColumnType);
+                                if (playCount !== null && playCount !== "N/A") {
+                                    setCachedPlayCount(trackId, playCount);
+                                }
+                                return; 
+                            } else if (activeColumnType === 'releaseDate') {
+                                const cachedPreciseDate = getCachedReleaseDate(trackId);
+                                if (cachedPreciseDate !== null && cachedPreciseDate !== "_") { 
+                                    updateDisplay(dataElement, cachedPreciseDate, activeColumnType);
+                                    return;
+                                }
+                                let albumId = null;
+                                const albumLinkElement = track.querySelector("a[href*='/album/']");
+                                 if (albumLinkElement) {
+                                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
+                                    albumId = albumIdMatch ? albumIdMatch[1] : null;
+                                } else {
+                                    const trackDetailsFromApi = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                                    albumId = trackDetailsFromApi?.album?.id;
+                                }
+                                if (!albumId) { throw new Error("Could not find Album ID."); }
+
+                                const preciseDateString = await getReleaseDatesForAlbum(albumId);
+                                updateDisplay(dataElement, preciseDateString, activeColumnType);
+                                if (preciseDateString !== null && preciseDateString !== "_") {
+                                    setCachedReleaseDate(trackId, preciseDateString);
+                                }
+                                return;
+                            }
+
+                            const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                            if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
+                                throw new Error(`Could not fetch valid track details from Spotify.`);
+                            }
+                            const trackName = trackDetails.name;
+                            const artistName = trackDetails.artists[0].name;
+
+                            if (activeColumnType === 'scrobbles') {
+                                const cachedScrobbles = getCachedScrobbles(trackId);
+                                if (cachedScrobbles !== null && cachedScrobbles !== "_") {
+                                    updateDisplay(dataElement, cachedScrobbles, activeColumnType);
+                                    return;
+                                }
+                                const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                const scrobbles = result?.scrobbles;
+                                updateDisplay(dataElement, scrobbles, activeColumnType);
+                                if (scrobbles !== null && scrobbles !== undefined) {
+                                    setCachedScrobbles(trackId, scrobbles);
+                                }
+                                return;
+                            } else if (activeColumnType === 'personalScrobbles') {
+                                const lastFmUsername = loadLastFmUsername();
+                                if (!lastFmUsername) {
+                                    updateDisplay(dataElement, "_", activeColumnType);
+                                    return;
+                                }
+
+                                const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                const scrobbles = result?.personalScrobbles;
+                                updateDisplay(dataElement, scrobbles, activeColumnType);
+                                return;
+                            }
+                        } catch (error) {
+                            if (attempt === maxRetries) {
+                                updateDisplay(dataElement, "_", activeColumnType);
+                            } else {
+                                await new Promise(resolve => setTimeout(resolve, initialDelay));
+                                initialDelay *= 2; 
+                            }
+                        }
+                    }
+                } catch (finalError) {
+                    updateDisplay(dataElement, "_", activeColumnType);
+                } finally {
+                    track.classList.remove('sort-play-processing');
+                }
+            }));
+        }
     }
   }
 
@@ -11016,6 +11140,20 @@
         }
     } else if (type === 'releaseDate') {
         displayValue = formatReleaseDate(value, releaseDateFormat);
+    } else if (type === 'djInfo') {
+        if (value && typeof value === 'object') {
+            const parts = [];
+            if (value.key && value.key !== 'Undefined') parts.push(value.key);
+            if (value.tempo) parts.push(`${value.tempo}♫`);
+            if (value.energy) parts.push(`E${value.energy}`);
+            if (parts.length > 0) {
+                displayValue = parts.join(' | ');
+            }
+        }
+    } else if (['key', 'tempo', 'energy', 'danceability', 'valence'].includes(type)) {
+        if (value !== null && value !== undefined) {
+            displayValue = String(value);
+        }
     }
 
     element.textContent = displayValue;
@@ -11086,6 +11224,24 @@
             break;
         case 'personalScrobbles':
             expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles";
+            break;
+        case 'djInfo':
+            expectedHeaderText = "DJ Info";
+            break;
+        case 'key':
+            expectedHeaderText = "Key";
+            break;
+        case 'tempo':
+            expectedHeaderText = "BPM";
+            break;
+        case 'energy':
+            expectedHeaderText = "Energy";
+            break;
+        case 'danceability':
+            expectedHeaderText = "Dance";
+            break;
+        case 'valence':
+            expectedHeaderText = "Valence";
             break;
         default:
             expectedHeaderText = "Plays";
@@ -11298,6 +11454,12 @@
         case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
         case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
         case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+        case 'djInfo': expectedHeaderText = "DJ Info"; break;
+        case 'key': expectedHeaderText = "Key"; break;
+        case 'tempo': expectedHeaderText = "BPM"; break;
+        case 'energy': expectedHeaderText = "Energy"; break;
+        case 'danceability': expectedHeaderText = "Dance"; break;
+        case 'valence': expectedHeaderText = "Valence"; break;
         default: expectedHeaderText = "Plays";
     }
 
@@ -11385,6 +11547,12 @@
         case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
         case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
         case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+        case 'djInfo': expectedHeaderText = "DJ Info"; break;
+        case 'key': expectedHeaderText = "Key"; break;
+        case 'tempo': expectedHeaderText = "BPM"; break;
+        case 'energy': expectedHeaderText = "Energy"; break;
+        case 'danceability': expectedHeaderText = "Dance"; break;
+        case 'valence': expectedHeaderText = "Valence"; break;
         default: expectedHeaderText = "Plays";
     }
     
