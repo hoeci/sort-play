@@ -2,7 +2,7 @@
 <img src="https://github.com/user-attachments/assets/98dc5ea0-4324-4840-992f-7aecca71c5a6" alt="show" width="100%">
 
 ## ⚡️ Features
-+ Sort playlists & artist pages by play count, popularity, release date, and Last.fm scrobbles.
++ Sort playlists & artist pages by play count, popularity, release date, Last.fm scrobbles and more.
 + Get artists full discography (singles, albums, compilation).
 + Custom Filter:  Filter tracks using keywords, ranges (play count, release date, duration, tempo, and more).
 + Filter playlists by genre using data from Spotify and Last.fm.
