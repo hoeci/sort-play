@@ -7,7 +7,7 @@
 + Custom Filter:  Filter tracks using keywords, ranges (play count, release date, duration, tempo, and more).
 + Filter playlists by genre using data from Spotify and Last.fm.
 + Generate AI playlists from prompts, using the current playlist or artist as a base.
-+ Add extra column for Play Count, Release Date, LFM Scrobbles in Playlists, Albums, and Artist pages.
++ Add extra column for Play Count, Release Date, LFM Scrobbles and more in Playlists, Albums, and Artist pages.
 + Connects to your Last.fm account.
 + Remove duplicate tracks, keeping the most popular version.
 + Smart Shuffle considering track similarity and artist diversity.
