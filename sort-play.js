@@ -6293,7 +6293,7 @@
                     personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
                     shuffle: { fullName: "shuffle", shortName: "Shuffle" },
                     aiPick: { fullName: "AI pick", shortName: "AI Pick" },
-                    averageColor: { fullName: "color", shortName: "Color" },
+                    averageColor: { fullName: "album color", shortName: "Color" },
                     default: { fullName: "Default", shortName: "Default" },
                     current: { fullName: "Current", shortName: "Current" },
 
@@ -6979,7 +6979,7 @@
                   personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
                   shuffle: { fullName: "shuffle", shortName: "Shuffle" },
                   aiPick: { fullName: "AI pick", shortName: "AI Pick" },
-                  averageColor: { fullName: "color", shortName: "Color" },
+                  averageColor: { fullName: "album color", shortName: "Color" },
               }[sortType];
               Spicetify.showNotification(
                   `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
@@ -8913,7 +8913,7 @@
           {
             backgroundColor: "transparent",
             color: "white",
-            text: "Color",
+            text: "Album Color",
             sortType: "averageColor",
             hasInnerButton: true,
           },
@@ -10039,7 +10039,7 @@
           scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
           personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-          averageColor: { fullName: "color", shortName: "Color" },
+          averageColor: { fullName: "album color", shortName: "Color" },
         }[sortType];
 
         if (canModifyCurrentPlaylist) {
