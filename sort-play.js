@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.5.0";
+  const SORT_PLAY_VERSION = "4.6.0";
   
   const LFMApiKey = "***REMOVED***";
   
@@ -38,12 +38,15 @@
   let selectedAlbumColumnType = 'releaseDate';
   let selectedArtistColumnType = 'releaseDate';
   let selectedAiModel = "gemini-2.5-flash";
+  let colorThiefLib = null;
+  let colorSortMode = 'perceptual';
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
   const STORAGE_KEY_CREATE_PLAYLIST = "sort-play-create-playlist";
   const STORAGE_KEY_SORT_CURRENT_PLAYLIST = "sort-play-sort-current-playlist";
   const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort";
+  const STORAGE_KEY_COLOR_SORT_MODE = "sort-play-color-sort-mode";
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
   - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
@@ -81,13 +84,15 @@
     const openPlaylistStored = localStorage.getItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT);
     openPlaylistAfterSortEnabled = openPlaylistStored === null ? true : openPlaylistStored === "true";
     myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
+    colorSortMode = localStorage.getItem(STORAGE_KEY_COLOR_SORT_MODE) || 'perceptual';
   
     sortOrderState = {
         playCount: false,
         popularity: false,
         releaseDate: false,
         scrobbles: false,
-        personalScrobbles: false
+        personalScrobbles: false,
+        averageColor: false
     };
   
     for (const sortType in sortOrderState) {
@@ -120,9 +125,36 @@
     localStorage.setItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST, sortCurrentPlaylistEnabled);
     localStorage.setItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, openPlaylistAfterSortEnabled);
     localStorage.setItem("sort-play-my-scrobbles-display-mode", myScrobblesDisplayMode);
+    localStorage.setItem(STORAGE_KEY_COLOR_SORT_MODE, colorSortMode);
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
     }
+  }
+
+
+  async function loadColorThief() {
+    if (colorThiefLib) {
+        return colorThiefLib;
+    }
+    try {
+        const response = await fetch("https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js");
+        const scriptText = await response.text();
+        const getLibrary = new Function('exports', 'module', `(function(exports, module) { ${scriptText} }).call(this, exports, module); return module.exports || this.ColorThief;`);
+        colorThiefLib = getLibrary({}, {});
+        if (!colorThiefLib) {
+            throw new Error('ColorThief constructor not found in loaded script');
+        }
+        return colorThiefLib;
+    } catch (error) {
+        console.error('Error loading ColorThief library:', error);
+        throw error;
+    }
+  }
+
+  try {
+    await loadColorThief();
+  } catch (error) {
+      console.error("Failed to load Color Thief library, color sorting will not be available.", error);
   }
 
   const AI_DATA_CACHE_VERSION = '1';
@@ -751,6 +783,22 @@
         </div>
     </div>
 
+    <div class="setting-row" id="colorSortModeSetting">
+        <label class="col description">
+            Color Sort Mode
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">"Perceptual" groups black & white albums first. "Hue Gradient" creates a pure rainbow effect.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <select id="colorSortModeSelect" style="max-width: 180px;">
+                <option value="perceptual" ${colorSortMode === 'perceptual' ? 'selected' : ''}>Perceptual</option>
+                <option value="hue_gradient" ${colorSortMode === 'hue_gradient' ? 'selected' : ''}>Hue Gradient</option>
+            </select>
+        </div>
+    </div>
+
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Column Settings
     </div>
@@ -1001,6 +1049,7 @@
     const openPlaylistAfterSortToggle = modalContainer.querySelector("#openPlaylistAfterSortToggle");
     const openPlaylistAfterSortSwitchLabel = modalContainer.querySelector("#openPlaylistAfterSortSwitchLabel");
     const openPlaylistAfterSortSettingRow = modalContainer.querySelector("#openPlaylistAfterSortSettingRow");
+    const colorSortModeSelect = modalContainer.querySelector("#colorSortModeSelect");
 
     function updateOpenPlaylistAfterSortToggleState() {
       const isCreatePlaylistOn = createPlaylistToggle.checked;
@@ -1042,6 +1091,12 @@
       }
       updateSortCurrentPlaylistToggleState();
     }
+
+
+    colorSortModeSelect.addEventListener("change", () => {
+        colorSortMode = colorSortModeSelect.value;
+        saveSettings();
+    });
 
     setGeminiApiKeyButton.addEventListener("click", () => {
         Spicetify.PopupModal.hide();
@@ -1414,7 +1469,8 @@
           "releaseDate",
           "scrobbles",
           "personalScrobbles",
-          "shuffle"
+          "shuffle",
+          "averageColor"
       ];
       return directSortTypes.includes(sortType);
   }
@@ -2085,13 +2141,16 @@
           }
   
           const possibleSuffixes = [
-            "\\(PlayCount\\)",
-            "\\(Popularity\\)",
-            "\\(ReleaseDate\\)",
-            "\\(LFM Scrobbles\\)",
-            "\\(LFM My Scrobbles\\)",
-            "\\(Shuffle\\)",
-            "\\(AI Pick\\)",
+              "\\(PlayCount\\)",
+              "\\(Popularity\\)",
+              "\\(ReleaseDate\\)",
+              "\\(LFM Scrobbles\\)",
+              "\\(LFM My Scrobbles\\)",
+              "\\(Shuffle\\)",
+              "\\(AI Pick\\)",
+              "\\(Color\\)",
+              "\\(Genre Filter\\)",
+              "\\(Custom Filter\\)",
           ];
           let suffixPattern = new RegExp(
             `\\s*(${possibleSuffixes.join("|")})\\s*`
@@ -2660,6 +2719,151 @@
     });
   }
 
+  function rgbToHsl(r, g, b) {
+    r /= 255, g /= 255, b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if (max === min) {
+      h = s = 0;
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
+    }
+    return { h: h * 360, s, l };
+  }
+
+  /**
+   * Loads an image directly from its URL. This is faster and cleaner when CORS policies allow it.
+   * @param {string} imageUrl The original URL of the image to load.
+   * @returns {Promise<HTMLImageElement>} A promise that resolves with a loaded image element.
+   */
+  async function loadImageDirectly(imageUrl) {
+      return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = (err) => {
+              const error = new Error(`Failed to load image directly from ${imageUrl}`);
+              reject(error);
+          };
+          img.src = imageUrl;
+      });
+  }
+
+  /**
+   * Analyzes an image's 5-color palette.
+   * @param {string} imageUrl The original URL of the image to load.
+   * @returns {Promise<object>} A promise that resolves with an analysis object.
+   */
+  async function getPaletteAnalysis(imageUrl) {
+      if (!colorThiefLib) {
+          throw new Error("ColorThief library not loaded.");
+      }
+
+      try {
+          const img = await loadImageDirectly(imageUrl);
+          const colorThief = new colorThiefLib();
+          const paletteRgb = colorThief.getPalette(img, 5);
+
+          if (!paletteRgb || paletteRgb.length === 0) {
+              throw new Error("ColorThief could not extract a palette.");
+          }
+
+          const paletteHsl = paletteRgb.map(rgb => rgbToHsl(...rgb));
+          const dominantHsl = paletteHsl[0];
+
+          const MONOCHROME_SATURATION_THRESHOLD = 0.10;
+          const isMonochrome = paletteHsl.every(color => color.s < MONOCHROME_SATURATION_THRESHOLD);
+
+          return {
+              isMonochrome: isMonochrome,
+              dominantHsl: dominantHsl
+          };
+      } catch (error) {
+          console.error("Failed to get palette analysis:", error);
+          throw error;
+      }
+  }
+
+  const PALETTE_ANALYSIS_CACHE_KEY = 'sort-play-palette-cache-v1';
+  const PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY = 'sort-play-palette-cache-timestamp-v1';
+  const PALETTE_ANALYSIS_CACHE_EXPIRY_DAYS = 15;
+
+  function initializePaletteAnalysisCache() {
+      const timestamp = localStorage.getItem(PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY);
+      if (!timestamp || (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24) > PALETTE_ANALYSIS_CACHE_EXPIRY_DAYS) {
+          localStorage.setItem(PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY, Date.now().toString());
+          localStorage.setItem(PALETTE_ANALYSIS_CACHE_KEY, JSON.stringify({}));
+      }
+  }
+
+  function getCachedPaletteAnalysis(albumId) {
+      try {
+          const cache = JSON.parse(localStorage.getItem(PALETTE_ANALYSIS_CACHE_KEY) || '{}');
+          return cache[albumId] || null;
+      } catch (error) {
+          return null;
+      }
+  }
+
+  function setCachedPaletteAnalysis(albumId, analysisData) {
+      try {
+          const cache = JSON.parse(localStorage.getItem(PALETTE_ANALYSIS_CACHE_KEY) || '{}');
+          cache[albumId] = analysisData;
+          localStorage.setItem(PALETTE_ANALYSIS_CACHE_KEY, JSON.stringify(cache));
+      } catch (error) {
+          console.error('Error writing to palette analysis cache:', error);
+      }
+  }
+
+  async function getAlbumColorAnalysis(albumId) {
+      const cachedAnalysis = getCachedPaletteAnalysis(albumId);
+      if (cachedAnalysis) {
+          return cachedAnalysis;
+      }
+
+      try {
+          const albumDetails = await withRetry(
+            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`),
+            CONFIG.spotify.retryAttempts,
+            CONFIG.spotify.retryDelay
+          );
+
+          const images = albumDetails?.images;
+          if (!images || images.length === 0) {
+              throw new Error(`No images found for album ${albumId}`);
+          }
+
+          const imageUrl = images[images.length - 1].url;
+          const analysisData = await getPaletteAnalysis(imageUrl);
+
+          setCachedPaletteAnalysis(albumId, analysisData);
+          return analysisData;
+      } catch (error) {
+          console.warn(`Could not get palette analysis for album ${albumId}:`, error);
+          setCachedPaletteAnalysis(albumId, null);
+          return null;
+      }
+  }
+
+  async function getTrackDetailsWithPaletteAnalysis(track) {
+      const albumId = track.albumId || track.track?.album?.id;
+      if (!albumId) {
+          console.warn(`Could not determine album ID for track ${track.songTitle}`);
+          return { ...track, averageColor: null };
+      }
+      
+      const analysisData = await getAlbumColorAnalysis(albumId);
+      
+      return { ...track, averageColor: analysisData };
+  }
 
   async function getTrackDetailsWithReleaseDateForFilter(track) {
     const trackWithStandardReleaseDate = await getTrackDetailsWithReleaseDate(track);
@@ -6052,6 +6256,8 @@
                 "\\(LFM My Scrobbles\\)",
                 "\\(Shuffle\\)",
                 "\\(AI Pick\\)",
+                "\\(Color\\)",
+                "\\(Genre Filter\\)",
                 "\\(Custom Filter\\)",
             ];
 
@@ -6087,6 +6293,7 @@
                     personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
                     shuffle: { fullName: "shuffle", shortName: "Shuffle" },
                     aiPick: { fullName: "AI pick", shortName: "AI Pick" },
+                    averageColor: { fullName: "color", shortName: "Color" },
                     default: { fullName: "Default", shortName: "Default" },
                     current: { fullName: "Current", shortName: "Current" },
 
@@ -6639,34 +6846,33 @@
         });
       });
     
-      const groupedGenres = {};
-      filteredGenres.forEach((genre) => {
-        const count = genreCounts[genre] || 0;
-        if (!groupedGenres[count]) {
-          groupedGenres[count] = [];
-        }
-        groupedGenres[count].push(genre);
-      });
+      const sortedGenres = filteredGenres.sort((a, b) => {
+        const mainGenreIndexA = getMainGenreVariantIndex(a);
+        const mainGenreIndexB = getMainGenreVariantIndex(b);
+        const countA = genreCounts[a] || 0;
+        const countB = genreCounts[b] || 0;
     
-      const sortedCounts = Object.keys(groupedGenres).sort((a, b) => b - a);
+        const isAMain = mainGenreIndexA !== -1;
+        const isBMain = mainGenreIndexB !== -1;
     
-      let sortedGenres = [];
-      sortedCounts.forEach((count) => {
-        const group = groupedGenres[count].sort((a, b) => {
-          const mainGenreIndexA = getMainGenreVariantIndex(a);
-          const mainGenreIndexB = getMainGenreVariantIndex(b);
+        if (isAMain && !isBMain) return -1;
+        if (!isAMain && isBMain) return 1;
     
-          if (mainGenreIndexA !== -1 && mainGenreIndexB !== -1) {
+        if (isAMain && isBMain) {
+            if (countB !== countA) {
+                return countB - countA;
+            }
             return mainGenreIndexA - mainGenreIndexB;
-          } else if (mainGenreIndexA !== -1) {
-            return -1; 
-          } else if (mainGenreIndexB !== -1) {
-            return 1; 
-          } else {
-            return a.localeCompare(b); 
-          }
-        });
-        sortedGenres = sortedGenres.concat(group);
+        }
+    
+        if (!isAMain && !isBMain) {
+            if (countB !== countA) {
+                return countB - countA;
+            }
+            return a.localeCompare(b);
+        }
+        
+        return 0;
       });
     
       if (sortedGenres.length === 0) {
@@ -6773,6 +6979,7 @@
                   personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
                   shuffle: { fullName: "shuffle", shortName: "Shuffle" },
                   aiPick: { fullName: "AI pick", shortName: "AI Pick" },
+                  averageColor: { fullName: "color", shortName: "Color" },
               }[sortType];
               Spicetify.showNotification(
                   `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
@@ -6809,7 +7016,9 @@
           "\\(LFM My Scrobbles\\)",
           "\\(Shuffle\\)",
           "\\(AI Pick\\)",
+          "\\(Color\\)",
           "\\(Genre Filter\\)",
+          "\\(Custom Filter\\)",
       ];
   
       let suffixPattern = new RegExp(
@@ -8701,6 +8910,13 @@
             sortType: "personalScrobbles",
             hasInnerButton: true,
           },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Color",
+            sortType: "averageColor",
+            hasInnerButton: true,
+          },
         ],
       },
       {
@@ -9624,20 +9840,63 @@
         sortType === "playCount" ||
         sortType === "popularity" ||
         sortType === "shuffle" ||
-        sortType === "releaseDate"
+        sortType === "releaseDate" ||
+        sortType === "averageColor"
       ) {
+        let tracksForDeduplication;
         if (sortType === "releaseDate") {
           const tracksWithReleaseDates = await processBatchesWithDelay(
             tracksWithPopularity, 200, 1000, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithReleaseDate
           );
-          const deduplicationResult = deduplicateTracks(tracksWithReleaseDates);
-          uniqueTracks = deduplicationResult.unique;
-          removedTracks = deduplicationResult.removed;
+          tracksForDeduplication = tracksWithReleaseDates;
+        } else if (sortType === "averageColor") {
+            const cachedTracks = [];
+            const uncachedTracks = [];
+            for (const track of tracksWithPopularity) {
+                const albumId = track.albumId || track.track?.album?.id;
+                if (albumId && getCachedPaletteAnalysis(albumId)) {
+                    cachedTracks.push(track);
+                } else {
+                    uncachedTracks.push(track);
+                }
+            }
+
+            let tracksWithColor = [];
+            const totalColorTracks = tracksWithPopularity.length;
+
+            if (cachedTracks.length > 0) {
+                const cachedResults = await processBatchesWithDelay(
+                    cachedTracks, 50, 500,
+                    (progress) => {
+                        const overallProgress = (cachedTracks.length / totalColorTracks) * progress;
+                        mainButton.innerText = `${60 + Math.floor(overallProgress * 0.40)}%`;
+                    },
+                    getTrackDetailsWithPaletteAnalysis
+                );
+                tracksWithColor.push(...cachedResults);
+            }
+
+            if (uncachedTracks.length > 0) {
+                const uncachedResults = await processBatchesWithDelay(
+                    uncachedTracks, 15, 1500,
+                    (progress) => {
+                        const cachedPortion = (cachedTracks.length / totalColorTracks) * 40;
+                        const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress * 0.40;
+                        mainButton.innerText = `${60 + Math.floor(cachedPortion + uncachedPortion)}%`;
+                    },
+                    getTrackDetailsWithPaletteAnalysis
+                );
+                tracksWithColor.push(...uncachedResults);
+            }
+
+            tracksForDeduplication = tracksWithColor;
         } else {
-          const deduplicationResult = deduplicateTracks(tracksWithPopularity);
-          uniqueTracks = deduplicationResult.unique;
-          removedTracks = deduplicationResult.removed;
+          tracksForDeduplication = tracksWithPopularity;
         }
+        
+        const deduplicationResult = deduplicateTracks(tracksForDeduplication);
+        uniqueTracks = deduplicationResult.unique;
+        removedTracks = deduplicationResult.removed;
 
         if (sortType === "playCount") {
           sortedTracks = uniqueTracks
@@ -9661,6 +9920,40 @@
 
               return (a.trackNumber || 0) - (b.trackNumber || 0);
             });
+        } else if (sortType === "averageColor") {
+            sortedTracks = uniqueTracks
+                .filter(track => track.averageColor && track.averageColor.dominantHsl)
+                .sort((a, b) => {
+                    const analysisA = a.averageColor;
+                    const analysisB = b.averageColor;
+                    const sortOrder = sortOrderState.averageColor ? -1 : 1;
+
+                    if (colorSortMode === 'perceptual') {
+                        if (analysisA.isMonochrome && !analysisB.isMonochrome) return -1;
+                        if (!analysisA.isMonochrome && analysisB.isMonochrome) return 1;
+
+                        if (analysisA.isMonochrome) {
+                            return (analysisB.dominantHsl.l - analysisA.dominantHsl.l);
+                        } else {
+                            const colorA = analysisA.dominantHsl;
+                            const colorB = analysisB.dominantHsl;
+                            if (colorA.h !== colorB.h) {
+                                return (colorA.h - colorB.h) * sortOrder;
+                            }
+                            return colorB.l - colorA.l;
+                        }
+                    } else {
+                        const colorA = analysisA.dominantHsl;
+                        const colorB = analysisB.dominantHsl;
+                        if (colorA.h !== colorB.h) {
+                            return (colorA.h - colorB.h) * sortOrder;
+                        }
+                        if (colorA.l !== colorB.l) {
+                            return (colorA.l - colorB.l) * sortOrder;
+                        }
+                        return (colorA.s - colorB.s) * sortOrder;
+                    }
+                });
         } else if (sortType === "shuffle") {
           sortedTracks = shuffleArray(uniqueTracks);
         }
@@ -9723,7 +10016,18 @@
         } else {
             finalSourceName = currentPlaylistDetails?.name || "Current Playlist";
         }
-        const possibleSuffixes = ["\\(PlayCount\\)","\\(Popularity\\)","\\(ReleaseDate\\)","\\(LFM Scrobbles\\)","\\(LFM My Scrobbles\\)","\\(Shuffle\\)","\\(AI Pick\\)"];
+        const possibleSuffixes = [
+            "\\(PlayCount\\)",
+            "\\(Popularity\\)",
+            "\\(ReleaseDate\\)",
+            "\\(LFM Scrobbles\\)",
+            "\\(LFM My Scrobbles\\)",
+            "\\(Shuffle\\)",
+            "\\(AI Pick\\)",
+            "\\(Color\\)",
+            "\\(Genre Filter\\)",
+            "\\(Custom Filter\\)",
+        ];
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
         while (suffixPattern.test(finalSourceName)) {
           finalSourceName = finalSourceName.replace(suffixPattern, "");
@@ -9735,6 +10039,7 @@
           scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
           personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
+          averageColor: { fullName: "color", shortName: "Color" },
         }[sortType];
 
         if (canModifyCurrentPlaylist) {
@@ -11324,6 +11629,7 @@
   initializePlayCountCache();
   initializeReleaseDateCache();
   initializeScrobblesCache();
+  initializePaletteAnalysisCache();
   console.log(`Sort-Play loaded`);
   }
 
