@@ -1,13 +1,13 @@
 [
   {
     "name": "Sort Play",
-    "description": "Sort playlists/artists by plays, Lastfm, and more. Filter by genre. Generate AI playlists.",
+    "description": "The ultimate toolkit for your music library. Sort, filter, and create playlists.",
     "preview": "cover.png",
     "main": "sort-play-loader.mjs",
     "readme": "info.md",
     "authors": [
         { "name": "hoeci", "url": "https://github.com/hoeci" }
     ],
-    "tags": ["sort", "play count", "genre", "AI", "discography", "genre filter", "sort-play", "plays", "playlist"]
+    "tags": ["sort", "play count", "column", "last.fm", "duplicate", "discography", "sort-play", "genre", "AI", "playlist"]
   }
 ]
