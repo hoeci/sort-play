@@ -10635,8 +10635,21 @@
 
     try {
         mainButton.innerText = "Get library...";
+        const updateProgress = (message) => { mainButton.innerText = message; };
+        const profileData = await getAffinityProfileData(updateProgress);
         const allLikedSongs = await getLikedSongs();
-        const likedSongUrisSet = new Set(allLikedSongs.map(t => t.uri));
+        const completeLikedSongUrisSet = new Set();
+        const likedSongsFingerprintMap = new Map();
+
+        allLikedSongs.forEach(song => {
+            completeLikedSongUrisSet.add(song.uri);
+            const title = song.name.toLowerCase().trim();
+            if (!likedSongsFingerprintMap.has(title)) {
+                likedSongsFingerprintMap.set(title, new Set());
+            }
+            const artistUrisForTitle = likedSongsFingerprintMap.get(title);
+            song.artistUris.forEach(uri => artistUrisForTitle.add(uri));
+        });
 
         let targetFeatures = {};
         
@@ -10679,7 +10692,7 @@
             const seed_tracks = chosenSeedTracks.map(t => t.id);
             
             mainButton.innerText = "Profiling..."; 
-            const tasteProfile = await buildAdvancedTasteProfile(shuffleArray(allLikedSongs).slice(0, 200));
+            const tasteProfile = await buildAdvancedTasteProfile(shuffleArray(profileData.enhancedLikedSongs).slice(0, 200));
             if (tasteProfile) {
                 const featuresToTarget = ['energy', 'danceability', 'valence'];
                 for (const feature of featuresToTarget) {
@@ -10705,7 +10718,23 @@
             if (!recommendations?.tracks?.length) throw new Error("Spotify didn't return any recommendations. Try again!");
             
             mainButton.innerText = "Excluding...";
-            let newRecommendedTracks = recommendations.tracks.filter(track => !likedSongUrisSet.has(track.uri) && track.artists.every(artist => !knownArtistIds.has(artist.id)));
+            let newRecommendedTracks = recommendations.tracks.filter(track => {
+                if (completeLikedSongUrisSet.has(track.uri)) {
+                    return false;
+                }
+                const title = track.name.toLowerCase().trim();
+                const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
+                if (!likedArtistUrisForTitle) {
+                    return true; 
+                }
+                const recommendedArtistUris = track.artists.map(a => a.uri);
+                const hasCommonArtist = recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri));
+                if (hasCommonArtist) {
+                    return false; 
+                }
+
+                return true;
+            }).filter(track => track.artists.every(artist => !knownArtistIds.has(artist.id)));
             
             if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
             
@@ -10735,14 +10764,14 @@
             playlistName = "Based on Recent Taste";
             time_range = 'short_term';
             contrast_time_range = 'long_term';
-            if (allLikedSongs.length < 20) throw new Error("Not enough liked songs for a recent profile.");
-            songsToProfile = allLikedSongs.slice(0, 100);
+            if (profileData.enhancedLikedSongs.length < 20) throw new Error("Not enough liked songs for a recent profile.");
+            songsToProfile = profileData.enhancedLikedSongs.slice(0, 100);
         } else if (vibeType === 'recommendAllTime') {
             playlistName = "Based on All-Time Taste";
             time_range = 'long_term';
             contrast_time_range = 'short_term';
-            if (allLikedSongs.length < 50) throw new Error("Not enough liked songs for an all-time profile.");
-            songsToProfile = shuffleArray(allLikedSongs).slice(0, 200);
+            if (profileData.enhancedLikedSongs.length < 50) throw new Error("Not enough liked songs for an all-time profile.");
+            songsToProfile = shuffleArray(profileData.enhancedLikedSongs).slice(0, 200);
         }
 
         mainButton.innerText = "Get top...";
@@ -10773,9 +10802,9 @@
 
         let likedSongSeedUris = [];
         if (vibeType === 'recommendRecentVibe') {
-            likedSongSeedUris = shuffleArray(allLikedSongs.slice(0, 10)).slice(0, 5).map(t => t.uri.split(':')[2]);
+            likedSongSeedUris = shuffleArray(profileData.enhancedLikedSongs.slice(0, 10)).slice(0, 5).map(t => t.uri.split(':')[2]);
         } else {
-            likedSongSeedUris = shuffleArray(allLikedSongs.slice(-100)).slice(0, 5).map(t => t.uri.split(':')[2]);
+            likedSongSeedUris = shuffleArray(profileData.enhancedLikedSongs.slice(-100)).slice(0, 5).map(t => t.uri.split(':')[2]);
         }
 
         const smartSongSeeds = new Set();
@@ -10787,7 +10816,7 @@
         smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
         smartSongSeeds.add(deepCutPool[0]);
         if (contrastTopTracks.length > 0) smartSongSeeds.add(contrastTopTracks[0]);
-        const randomLikedTopTrackPool = topTracks.filter(t => likedSongUrisSet.has(t.uri));
+        const randomLikedTopTrackPool = topTracks.filter(t => completeLikedSongUrisSet.has(t.uri));
         if(randomLikedTopTrackPool.length > 0) smartSongSeeds.add(shuffleArray(randomLikedTopTrackPool)[0]);
         
         const finalSmartSeeds = Array.from(smartSongSeeds);
@@ -10886,7 +10915,23 @@
         });
 
         mainButton.innerText = "Excluding...";
-        let newRecommendedTracks = uniqueMixedTracks.filter(track => !likedSongUrisSet.has(track.uri));
+        let newRecommendedTracks = uniqueMixedTracks.filter(track => {
+            if (completeLikedSongUrisSet.has(track.uri)) {
+                return false;
+            }
+            const title = track.name.toLowerCase().trim();
+            const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
+            if (!likedArtistUrisForTitle) {
+                return true; 
+            }
+            const recommendedArtistUris = track.artists.map(a => a.uri);
+            const hasCommonArtist = recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri));
+            if (hasCommonArtist) {
+                return false;
+            }
+
+            return true;
+        });
 
         if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
         
