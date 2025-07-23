@@ -10644,7 +10644,7 @@
             playlistName = "Pure Discovery";
             
             mainButton.innerText = "Filtering...";
-            knownArtistIds = await getComprehensiveKnownArtistsSet();
+            const knownArtistIds = await getComprehensiveKnownArtistsSet();
             const topArtistsForSeeding = await getTopItems('artists', 'long_term', 100);
             const topTracksForSeeding = await getTopItems('tracks', 'long_term', 50);
 
@@ -11266,7 +11266,11 @@
     
         const profileData = await getAffinityProfileData(updateProgress);
         const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced');
-        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced');
+        
+        const audioFeaturesForScoring = await getAudioFeaturesForTracks(tracksToProcess.map(t => t.uri.split(':')[2]));
+        const audioFeaturesMapForScoring = new Map(audioFeaturesForScoring.map(f => [f.id, f]));
+
+        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced', audioFeaturesMapForScoring);
     
         if (scoredTracks.length === 0) {
             throw new Error("No tracks matched your affinity profile.");
@@ -11520,7 +11524,11 @@
 
         const profileData = await getAffinityProfileData(updateProgress);
         const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced');
-        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced');
+        
+        const audioFeaturesForScoring = await getAudioFeaturesForTracks(tracksToProcess.map(t => t.uri.split(':')[2]));
+        const audioFeaturesMapForScoring = new Map(audioFeaturesForScoring.map(f => [f.id, f]));
+
+        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced', audioFeaturesMapForScoring);
         
         if (scoredTracks.length === 0) {
             throw new Error("No tracks matched your affinity profile.");
@@ -11642,6 +11650,7 @@
         resetButtons();
     }
   }
+
   async function handleSortAndCreatePlaylist(sortType) {
     if (sortType === "sortByParent" || sortType === "affinityParent" || sortType === "createNewPlaylist") {
       return;
