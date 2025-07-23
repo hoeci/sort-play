@@ -12,11 +12,9 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "4.7.0";
-  
+  const SORT_PLAY_VERSION = "5.0.0";
+
   const LFMApiKey = "***REMOVED***";
-  
-  const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   let isProcessing = false;
   let showAdditionalColumn = false;
   let selectedColumnType = 'playCount';
@@ -38,8 +36,13 @@
   let selectedAlbumColumnType = 'releaseDate';
   let selectedArtistColumnType = 'releaseDate';
   let selectedAiModel = "gemini-2.5-flash";
+  let topTracksLimit = 100;
+  let discoveryPlaylistSize = 50;
+  let newReleasesDaysLimit = 14;
+  let followedReleasesAlbumLimit = 'all';
   let colorThiefLib = null;
   let colorSortMode = 'perceptual';
+  const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
@@ -47,6 +50,10 @@
   const STORAGE_KEY_SORT_CURRENT_PLAYLIST = "sort-play-sort-current-playlist";
   const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort";
   const STORAGE_KEY_COLOR_SORT_MODE = "sort-play-color-sort-mode";
+  const STORAGE_KEY_TOP_TRACKS_LIMIT = "sort-play-top-tracks-limit";
+  const STORAGE_KEY_NEW_RELEASES_LIMIT = "sort-play-new-releases-limit";
+  const STORAGE_KEY_FOLLOWED_RELEASES_LIMIT = "sort-play-followed-releases-limit";
+  const STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE = "sort-play-discovery-playlist-size";
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
   - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
@@ -85,6 +92,10 @@
     openPlaylistAfterSortEnabled = openPlaylistStored === null ? true : openPlaylistStored === "true";
     myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
     colorSortMode = localStorage.getItem(STORAGE_KEY_COLOR_SORT_MODE) || 'perceptual';
+    topTracksLimit = parseInt(localStorage.getItem(STORAGE_KEY_TOP_TRACKS_LIMIT), 10) || 100;
+    newReleasesDaysLimit = parseInt(localStorage.getItem(STORAGE_KEY_NEW_RELEASES_LIMIT), 10) || 14;
+    followedReleasesAlbumLimit = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT) || 'all';
+    discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
   
     sortOrderState = {
         playCount: false,
@@ -126,12 +137,25 @@
     localStorage.setItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, openPlaylistAfterSortEnabled);
     localStorage.setItem("sort-play-my-scrobbles-display-mode", myScrobblesDisplayMode);
     localStorage.setItem(STORAGE_KEY_COLOR_SORT_MODE, colorSortMode);
+    localStorage.setItem(STORAGE_KEY_TOP_TRACKS_LIMIT, topTracksLimit);
+    localStorage.setItem(STORAGE_KEY_NEW_RELEASES_LIMIT, newReleasesDaysLimit);
+    localStorage.setItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT, followedReleasesAlbumLimit);
+    localStorage.setItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, discoveryPlaylistSize);
+
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
     }
   }
 
-
+  function tagActiveModalWithFontScope() {
+    setTimeout(() => {
+      const modalContainer = document.querySelector(".main-popupModal-container");
+      if (modalContainer) {
+        modalContainer.classList.add('sort-play-font-scope');
+      }
+    }, 50);
+  }
+  
   async function loadColorThief() {
     if (colorThiefLib) {
         return colorThiefLib;
@@ -397,14 +421,10 @@
       content: modalContainer,
       isLarge: true,
     });
+    tagActiveModalWithFontScope();
     
     if (isMenuOpen) {
-      toggleMenu();
-      isButtonClicked = false;
-      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      svgElement.style.fill = buttonStyles.main.color;
-      mainButton.style.filter = "brightness(1)";
+      closeAllMenus();
     }
 
     const modalContainerElement = document.querySelector(".main-popupModal-container");
@@ -622,7 +642,7 @@
     .column-settings-dropdown {
         display: none; position: absolute; background-color: #282828; min-width: 140px;
         box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px;
-        padding: 4px 0; top: calc(100% + 4px); left: -55px; margin-top: 5px;
+        padding: 4px 0; left: -55px;
         max-height: 225px;
         overflow-y: auto;
         scrollbar-width: thin; 
@@ -633,7 +653,7 @@
     .column-settings-dropdown::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #282828; }
     .column-settings-dropdown::-webkit-scrollbar-thumb:hover { background-color: #777; }
     .column-settings-dropdown button {
-        color: #b3b3b3; padding: 8px 12px; text-decoration: none; display: block;
+        color: #b3b3b3; padding: 6px 12px; text-decoration: none; display: block;
         width: 100%; text-align: left; background: none; border: none; cursor: pointer;
         font-size: 13px;
     }
@@ -979,6 +999,82 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Dedicated Playlist Creation
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="topTracksLimitSetting">
+        <label class="col description">
+            Top Tracks Playlist Size
+        </label>
+        <div class="col action">
+            <select id="topTracksLimitSelect" style="max-width: 120px;">
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="150">150</option>
+                <option value="200">200</option>
+                <option value="250">250</option>
+                <option value="500">500</option>
+                <option value="1000">1000</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="setting-row" id="discoveryPlaylistSizeSetting">
+        <label class="col description">
+            Discovery Playlist Size
+        </label>
+        <div class="col action">
+            <select id="discoveryPlaylistSizeSelect" style="max-width: 120px;">
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="75">75</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="setting-row" id="newReleasesLimitSetting">
+        <label class="col description">
+            New Releases Time Window
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Set the lookback period for New Releases playlists.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <select id="newReleasesLimitSelect" style="max-width: 120px;">
+                <option value="1">7 Days</option>
+                <option value="3">7 Days</option>
+                <option value="7">7 Days</option>
+                <option value="14">14 Days</option>
+                <option value="21">21 Days</option>
+                <option value="30">30 Days</option>
+                <option value="60">60 Days</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="setting-row" id="followedReleasesLimitSetting">
+        <label class="col description">
+            Followed Artist (Full) Tracks Per Album
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Limit the number of tracks added from each album in the "Followed Artist (Full)" playlist.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <select id="followedReleasesLimitSelect" style="max-width: 120px;">
+                <option value="1">1 Track</option>
+                <option value="2">2 Tracks</option>
+                <option value="3">3 Tracks</option>
+                <option value="5">5 Tracks</option>
+                <option value="all">All Tracks</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Custom Filter
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
@@ -996,10 +1092,11 @@
     `;
 
     Spicetify.PopupModal.display({
-        title: `<span style='font-size: 30px;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span>`,
+        title: `<span style='font-size: 30px; color: white;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span>`,
         content: modalContainer,
         isLarge: true,
     });
+    tagActiveModalWithFontScope();
 
     const modalRootElement = document.querySelector(".main-embedWidgetGenerator-container");
     if (modalRootElement) {
@@ -1018,12 +1115,7 @@
     }
 
     if (isMenuOpen) {
-        toggleMenu();
-        isButtonClicked = false;
-        mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-        mainButton.style.color = buttonStyles.main.color;
-        svgElement.style.fill = buttonStyles.main.color;
-        mainButton.style.filter = "brightness(1)";
+      closeAllMenus();
     }
 
     const modalContainerElement = document.querySelector(".main-popupModal-container");
@@ -1068,6 +1160,10 @@
     const openPlaylistAfterSortSwitchLabel = modalContainer.querySelector("#openPlaylistAfterSortSwitchLabel");
     const openPlaylistAfterSortSettingRow = modalContainer.querySelector("#openPlaylistAfterSortSettingRow");
     const colorSortModeSelect = modalContainer.querySelector("#colorSortModeSelect");
+    const topTracksLimitSelect = modalContainer.querySelector("#topTracksLimitSelect");
+    const newReleasesLimitSelect = modalContainer.querySelector("#newReleasesLimitSelect");
+    const followedReleasesLimitSelect = modalContainer.querySelector("#followedReleasesLimitSelect");
+    const discoveryPlaylistSizeSelect = modalContainer.querySelector("#discoveryPlaylistSizeSelect");
 
     function updateOpenPlaylistAfterSortToggleState() {
       const isCreatePlaylistOn = createPlaylistToggle.checked;
@@ -1113,6 +1209,31 @@
 
     colorSortModeSelect.addEventListener("change", () => {
         colorSortMode = colorSortModeSelect.value;
+        saveSettings();
+    });
+
+    topTracksLimitSelect.value = topTracksLimit;
+    topTracksLimitSelect.addEventListener("change", () => {
+        topTracksLimit = parseInt(topTracksLimitSelect.value, 10);
+        saveSettings();
+    });
+
+
+    newReleasesLimitSelect.value = newReleasesDaysLimit;
+    newReleasesLimitSelect.addEventListener("change", () => {
+        newReleasesDaysLimit = parseInt(newReleasesLimitSelect.value, 10);
+        saveSettings();
+    });
+    
+    followedReleasesLimitSelect.value = followedReleasesAlbumLimit;
+    followedReleasesLimitSelect.addEventListener("change", () => {
+        followedReleasesAlbumLimit = followedReleasesLimitSelect.value;
+        saveSettings();
+    });
+    
+    discoveryPlaylistSizeSelect.value = discoveryPlaylistSize;
+    discoveryPlaylistSizeSelect.addEventListener("change", () => {
+        discoveryPlaylistSize = parseInt(discoveryPlaylistSizeSelect.value, 10);
         saveSettings();
     });
 
@@ -1224,6 +1345,26 @@
     updateAlbumColumnSettingsVisibility();
     updateArtistColumnSettingsVisibility();
 
+    const allDropdownsForScroll = [
+        dateFormatDropdownContainer, myScrobblesDropdownContainer,
+        albumDateFormatDropdownContainer, albumMyScrobblesDropdownContainer,
+        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer
+    ];
+    
+    allDropdownsForScroll.forEach(dropdown => {
+        if (dropdown) {
+            dropdown.addEventListener('wheel', (event) => {
+                const { scrollTop, clientHeight, scrollHeight } = dropdown;
+                if (event.deltaY < 0 && scrollTop === 0) {
+                    event.preventDefault();
+                }
+                else if (event.deltaY > 0 && Math.abs(scrollHeight - clientHeight - scrollTop) < 1) {
+                    event.preventDefault();
+                }
+            }, { passive: false });
+        }
+    });
+
     showAdditionalColumnToggle.addEventListener("change", () => {
         showAdditionalColumn = showAdditionalColumnToggle.checked;
         columnTypeSelect.disabled = !showAdditionalColumn;
@@ -1317,9 +1458,46 @@
     const setupSettingsButtonToggle = (button, dropdown, otherDropdowns) => {
         button.addEventListener("click", (event) => {
             event.stopPropagation();
-            const currentDisplay = dropdown.style.display;
+            const isCurrentlyVisible = dropdown.style.display === 'block';
+
             otherDropdowns.forEach(d => d.style.display = 'none');
-            dropdown.style.display = currentDisplay === 'block' ? 'none' : 'block';
+            if (isCurrentlyVisible) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            dropdown.style.visibility = 'hidden';
+            dropdown.style.display = 'block';
+            const dropdownRect = dropdown.getBoundingClientRect();
+            dropdown.style.display = 'none';
+            dropdown.style.visibility = 'visible';
+
+            const buttonRect = button.getBoundingClientRect();
+            const modal = document.querySelector(".main-embedWidgetGenerator-container");
+            const modalRect = modal.getBoundingClientRect();
+
+            const spaceAbove = buttonRect.top - modalRect.top;
+            const spaceBelow = modalRect.bottom - buttonRect.bottom;
+            const dropdownHeight = dropdownRect.height;
+            const margin = 9;
+
+            dropdown.style.top = 'auto';
+            dropdown.style.bottom = 'auto';
+            dropdown.style.marginTop = 'auto';
+            dropdown.style.marginBottom = 'auto';
+
+            if (spaceAbove >= dropdownHeight + margin) {
+                dropdown.style.bottom = '100%';
+                dropdown.style.marginBottom = `${margin}px`;
+            } else if (spaceBelow >= dropdownHeight + margin) {
+                dropdown.style.top = '100%';
+                dropdown.style.marginTop = `${margin}px`;
+            } else {
+                dropdown.style.bottom = '100%';
+                dropdown.style.marginBottom = `${margin}px`;
+            }
+
+            dropdown.style.display = 'block';
         });
     };
 
@@ -1421,10 +1599,6 @@
       provider: isLikedSource ? "queue" : "context"
   });
 
-  /**
-   * @param {Array<object>} tracks 
-   * @param {string} [contextUri]
-   */
   async function setQueueFromTracks(tracks, contextUri) {
     const { PlayerAPI } = Spicetify.Platform;
     if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state) {
@@ -1476,10 +1650,7 @@
     }
   }
 
-  /**
-   * @param {string} sortType
-   * @returns {boolean}
-   */
+
   function isDirectSortType(sortType) {
       const directSortTypes = [
           "playCount",
@@ -1488,7 +1659,14 @@
           "scrobbles",
           "personalScrobbles",
           "shuffle",
-          "averageColor"
+          "averageColor",
+          "affinityBalanced",
+          "affinityShortTerm",
+          "affinityLongTerm",
+          "affinityPowerHour",
+          "affinityMellowMood",
+          "affinityHiddenGems",
+          "deduplicateOnly"
       ];
       return directSortTypes.includes(sortType);
   }
@@ -2006,7 +2184,9 @@
       content: modalContainer,
       isLarge: true,
     });
-  
+
+    tagActiveModalWithFontScope();
+
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
   
@@ -2169,6 +2349,10 @@
               "\\(Color\\)",
               "\\(Genre Filter\\)",
               "\\(Custom Filter\\)",
+              "\\(Personalized\\)",
+              "\\(Power Hour\\)",
+              "\\(Mellow Mood\\)",
+              "\\(Hidden Gems\\)"
           ];
           let suffixPattern = new RegExp(
             `\\s*(${possibleSuffixes.join("|")})\\s*`
@@ -2654,30 +2838,10 @@
       content: modalContainer,
       isLarge: true,
     });
+    tagActiveModalWithFontScope();
 
     if (isMenuOpen) {
-      toggleMenu();
-      isButtonClicked = false;
-      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      svgElement.style.fill = buttonStyles.main.color;
-      mainButton.style.filter = "brightness(1)";
-
-      const geminiApiKeyButton = menuButtons.find(
-        (btn) => btn.querySelector("span")?.innerText === "AI Pick"
-      )?.querySelector("button:nth-child(2)");
-      if (geminiApiKeyButton) {
-        const svg = geminiApiKeyButton.querySelector("svg");
-        if (svg) {
-          svg.style.fill = "#ffffffe6";
-        }
-      }
-      const aiPickButton = menuButtons.find(
-        (btn) => btn.querySelector("span")?.innerText === "AI Pick"
-      );
-      if (aiPickButton) {
-        aiPickButton.style.backgroundColor = "transparent";
-      }
+      closeAllMenus();
     }
 
     const modalContainerElement = document.querySelector(".main-popupModal-container");
@@ -2757,11 +2921,7 @@
     return { h: h * 360, s, l };
   }
 
-  /**
-   * Loads an image directly from its URL. This is faster and cleaner when CORS policies allow it.
-   * @param {string} imageUrl The original URL of the image to load.
-   * @returns {Promise<HTMLImageElement>} A promise that resolves with a loaded image element.
-   */
+
   async function loadImageDirectly(imageUrl) {
       return new Promise((resolve, reject) => {
           const img = new Image();
@@ -2775,11 +2935,7 @@
       });
   }
 
-  /**
-   * Analyzes an image's 5-color palette.
-   * @param {string} imageUrl The original URL of the image to load.
-   * @returns {Promise<object>} A promise that resolves with an analysis object.
-   */
+
   async function getPaletteAnalysis(imageUrl) {
       if (!colorThiefLib) {
           throw new Error("ColorThief library not loaded.");
@@ -5634,6 +5790,7 @@
         content: modalContainer,
         isLarge: true,
     });
+    tagActiveModalWithFontScope();
     
     const playlistTitleElement = modalContainer.querySelector(".playlist-title");
     updatePlaylistStats();
@@ -6277,6 +6434,10 @@
                 "\\(Color\\)",
                 "\\(Genre Filter\\)",
                 "\\(Custom Filter\\)",
+                "\\(Personalized\\)",
+                "\\(Power Hour\\)",
+                "\\(Mellow Mood\\)",
+                "\\(Hidden Gems\\)"
             ];
 
             let suffixPattern = new RegExp(
@@ -6335,12 +6496,7 @@
 
 
     if (isMenuOpen) {
-        toggleMenu();
-        isButtonClicked = false;
-        mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-        mainButton.style.color = buttonStyles.main.color;
-        svgElement.style.fill = buttonStyles.main.color;
-        mainButton.style.filter = "brightness(1)";
+      closeAllMenus();
     }
   }
   
@@ -6731,14 +6887,10 @@
       content: modalContainer,
       isLarge: true,
     });
+    tagActiveModalWithFontScope();
 
     if (isMenuOpen) {
-      toggleMenu();
-      isButtonClicked = false;
-      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      svgElement.style.fill = buttonStyles.main.color;
-      mainButton.style.filter = "brightness(1)";
+      closeAllMenus();
     }
 
     const overlay = document.createElement("div");
@@ -7715,6 +7867,10 @@
 
   const styleElement = document.createElement("style");
   styleElement.innerHTML = `
+    .sort-play-font-scope,
+    .sort-play-font-scope * {
+      font-family: 'SpotifyMixUI', sans-serif !important;
+    }
     .loader {
       position: relative;
       width: 8px;
@@ -8791,6 +8947,7 @@
       content: modalContainer,
       isLarge: true,
     });
+    tagActiveModalWithFontScope();
   
     const continueButton = document.getElementById("continueAnyway");
     const addApiKeyButton = document.getElementById("addApiKey");
@@ -8818,8 +8975,7 @@
     svg.setAttribute("viewBox", "0 0 16 16");
     svg.setAttribute("width", "50%");
     svg.setAttribute("height", "50%");
-    svg.style.fill = "#ffffffe6";
-
+    svg.style.fill = '#ffffffe6'; 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", reverse
       ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z"
@@ -8857,7 +9013,13 @@
     });
 
     innerButton.addEventListener("mouseleave", () => {
-      svg.style.fill = "#ffffffe6";
+        const parentMenu = svg.closest('.main-contextMenu-menu');
+        if (parentMenu) {
+            const defaultColor = window.getComputedStyle(parentMenu).getPropertyValue('color');
+            svg.style.fill = defaultColor;
+        } else {
+            svg.style.fill = '#ffffffe6';
+        }
     });
 
     innerButton.addEventListener("click", (event) => {
@@ -8880,9 +9042,7 @@
     main: {
       backgroundColor: "transparent",
       color: "#FFFFFFB3",
-      hoverColor: "white",
       clickBackgroundColor: "transparent",
-      clickColor: "#FFFFFFB3",
       disabledBackgroundColor: "#FFFFFFB3",
       disabledColor: "#666",
     },
@@ -8938,6 +9098,134 @@
         ],
       },
       {
+        type: "parent",
+        text: "Personalized Sort",
+        sortType: "affinityParent",
+        children: [
+          {
+            type: "title",
+            text: "Taste Profiles",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Balanced",
+            sortType: "affinityBalanced",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Recent Vibe",
+            sortType: "affinityShortTerm",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "All-Time Favorites",
+            sortType: "affinityLongTerm",
+          },
+          {
+            type: "title",
+            text: "Mood Mixes",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "My Power Hour",
+            sortType: "affinityPowerHour",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "My Mellow Mood",
+            sortType: "affinityMellowMood",
+          },
+          {
+            type: "title",
+            text: "Discovery",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Your Hidden Gems",
+            sortType: "affinityHiddenGems",
+          },
+        ],
+      },
+      {
+        type: "parent",
+        text: "Create Playlist",
+        sortType: "createNewPlaylist",
+        children: [
+          {
+            type: "title",
+            text: "New Releases",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Followed Artist Picks",
+            sortType: "followedArtistPicks",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "New Music Picks",
+            sortType: "newDiscoveryPicks",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Followed Artist (Full)",
+            sortType: "followedReleasesChronological",
+          },
+          {
+            type: "title",
+            text: "Discovery",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Recent Based",
+            sortType: "recommendRecentVibe",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "All-Time Based",
+            sortType: "recommendAllTime",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Pure Discovery",
+            sortType: "pureDiscovery",
+          },
+          {
+            type: "title",
+            text: "My Top Tracks",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Top This Month",
+            sortType: "topThisMonth",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Top Last 6 Months",
+            sortType: "topLast6Months",
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Top All-Time",
+            sortType: "topAllTime",
+          },
+        ],
+      },
+      {
         backgroundColor: "transparent",
         color: "white",
         text: "Genre Filter",
@@ -8976,6 +9264,12 @@
         sortType: "shuffle",
       },
       {
+        backgroundColor: "transparent",
+        color: "white",
+        text: "Deduplicate",
+        sortType: "deduplicateOnly",
+      },
+      {
         type: "divider",
       },
       {
@@ -8991,6 +9285,53 @@
   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 256 256" enable-background="new 0 0 256 256" xml:space="preserve">
   <g><g><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></g></g>
   </svg>`;
+
+  const sortIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  
+  const personalizedSortIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M10.5 21H4C4 17.4735 6.60771 14.5561 10 14.0709M16.4976 16.2119C15.7978 15.4328 14.6309 15.2232 13.7541 15.9367C12.8774 16.6501 12.7539 17.843 13.4425 18.6868C13.8312 19.1632 14.7548 19.9983 15.4854 20.6353C15.8319 20.9374 16.0051 21.0885 16.2147 21.1503C16.3934 21.203 16.6018 21.203 16.7805 21.1503C16.9901 21.0885 17.1633 20.9374 17.5098 20.6353C18.2404 19.9983 19.164 19.1632 19.5527 18.6868C20.2413 17.843 20.1329 16.6426 19.2411 15.9367C18.3492 15.2307 17.1974 15.4328 16.4976 16.2119ZM15 7C15 9.20914 13.2091 11 11 11C8.79086 11 7 9.20914 7 7C7 4.79086 8.79086 3 11 3C13.2091 3 15 4.79086 15 7Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  
+  const createPlaylistIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M16 5V18M16 18C16 19.1046 14.6569 20 13 20C11.3431 20 10 19.1046 10 18C10 16.8954 11.3431 16 13 16C14.6569 16 16 16.8954 16 18ZM4 5H12M4 9H12M4 13H8M16 4L20 3V7L16 8V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const genreFilterIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M20 20L18.2678 18.2678M18.2678 18.2678C18.7202 17.8154 19 17.1904 19 16.5C19 15.1193 17.8807 14 16.5 14C15.1193 14 14 15.1193 14 16.5C14 17.8807 15.1193 19 16.5 19C17.1904 19 17.8154 18.7202 18.2678 18.2678ZM15.6 10H18.4C18.9601 10 19.2401 10 19.454 9.89101C19.6422 9.79513 19.7951 9.64215 19.891 9.45399C20 9.24008 20 8.96005 20 8.4V5.6C20 5.03995 20 4.75992 19.891 4.54601C19.7951 4.35785 19.6422 4.20487 19.454 4.10899C19.2401 4 18.9601 4 18.4 4H15.6C15.0399 4 14.7599 4 14.546 4.10899C14.3578 4.20487 14.2049 4.35785 14.109 4.54601C14 4.75992 14 5.03995 14 5.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM5.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V5.6C10 5.03995 10 4.75992 9.89101 4.54601C9.79513 4.35785 9.64215 4.20487 9.45399 4.10899C9.24008 4 8.96005 4 8.4 4H5.6C5.03995 4 4.75992 4 4.54601 4.10899C4.35785 4.20487 4.20487 4.35785 4.10899 4.54601C4 4.75992 4 5.03995 4 5.6V8.4C4 8.96005 4 9.24008 4.10899 9.45399C4.20487 9.64215 4.35785 9.79513 4.54601 9.89101C4.75992 10 5.03995 10 5.6 10ZM5.6 20H8.4C8.96005 20 9.24008 20 9.45399 19.891C9.64215 19.7951 9.79513 19.6422 9.89101 19.454C10 19.2401 10 18.9601 10 18.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H5.6C5.03995 14 4.75992 14 4.54601 14.109C4.35785 14.2049 4.20487 14.3578 4.10899 14.546C4 14.7599 4 15.0399 4 15.6V18.4C4 18.9601 4 19.2401 4.10899 19.454C4.20487 19.6422 4.35785 19.7951 4.54601 19.891C4.75992 20 5.03995 20 5.6 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  
+  const customFilterIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M7 9H17M7 15H17M15 13V17M9 7V11M7.2 20H16.8C17.9201 20 18.4802 20 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H7.2C6.0799 4 5.51984 4 5.09202 4.21799C4.71569 4.40973 4.40973 4.71569 4.21799 5.09202C4 5.51984 4 6.07989 4 7.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.07989 20 7.2 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const aiPickIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M12 3L14.0357 8.16153C14.2236 8.63799 14.3175 8.87622 14.4614 9.0771C14.5889 9.25516 14.7448 9.41106 14.9229 9.53859C15.1238 9.68245 15.362 9.77641 15.8385 9.96432L21 12L15.8385 14.0357C15.362 14.2236 15.1238 14.3175 14.9229 14.4614C14.7448 14.5889 14.5889 14.7448 14.4614 14.9229C14.3175 15.1238 14.2236 15.362 14.0357 15.8385L12 21L9.96432 15.8385C9.77641 15.362 9.68245 15.1238 9.53859 14.9229C9.41106 14.7448 9.25516 14.5889 9.0771 14.4614C8.87622 14.3175 8.63799 14.2236 8.16153 14.0357L3 12L8.16153 9.96432C8.63799 9.77641 8.87622 9.68245 9.0771 9.53859C9.25516 9.41106 9.41106 9.25516 9.53859 9.0771C9.68245 8.87622 9.77641 8.63799 9.96432 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const shuffleIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M18 4L21 7M21 7L18 10M21 7H17C16.0707 7 15.606 7 15.2196 7.07686C13.6329 7.39249 12.3925 8.63288 12.0769 10.2196C12 10.606 12 11.0707 12 12C12 12.9293 12 13.394 11.9231 13.7804C11.6075 15.3671 10.3671 16.6075 8.78036 16.9231C8.39397 17 7.92931 17 7 17H3M18 20L21 17M21 17L18 14M21 17H17C16.0707 17 15.606 17 15.2196 16.9231C15.1457 16.9084 15.0724 16.8917 15 16.873M3 7H7C7.92931 7 8.39397 7 8.78036 7.07686C8.85435 7.09158 8.92758 7.1083 9 7.12698" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const deduplicateIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M8 8H7.2C6.0799 8 5.51984 8 5.09202 8.21799C4.71569 8.40973 4.40973 8.71569 4.21799 9.09202C4 9.51984 4 10.0799 4 11.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.0799 20 7.2 20H12.8C13.9201 20 14.4802 20 14.908 19.782C15.2843 19.5903 15.5903 19.2843 15.782 18.908C16 18.4802 16 17.9201 16 16.8V16M11.2 16H16.8C17.9201 16 18.4802 16 18.908 15.782C19.2843 15.5903 19.5903 15.2843 19.782 14.908C20 14.4802 20 13.9201 20 12.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H11.2C10.0799 4 9.51984 4 9.09202 4.21799C8.71569 4.40973 8.40973 4.71569 8.21799 5.09202C8 5.51984 8 6.07989 8 7.2V12.8C8 13.9201 8 14.4802 8.21799 14.908C8.40973 15.2843 8.71569 15.5903 9.09202 15.782C9.51984 16 10.0799 16 11.2 16Z M17.186 6.814L10.814 13.186 M10.814 6.814L17.186 13.186" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const settingsIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path fill="none" d="M12.9046 3.06005C12.6988 3 12.4659 3 12 3C11.5341 3 11.3012 3 11.0954 3.06005C10.7942 3.14794 10.5281 3.32808 10.3346 3.57511C10.2024 3.74388 10.1159 3.96016 9.94291 4.39272C9.69419 5.01452 9.00393 5.33471 8.36857 5.123L7.79779 4.93281C7.3929 4.79785 7.19045 4.73036 6.99196 4.7188C6.70039 4.70181 6.4102 4.77032 6.15701 4.9159C5.98465 5.01501 5.83376 5.16591 5.53197 5.4677C5.21122 5.78845 5.05084 5.94882 4.94896 6.13189C4.79927 6.40084 4.73595 6.70934 4.76759 7.01551C4.78912 7.2239 4.87335 7.43449 5.04182 7.85566C5.30565 8.51523 5.05184 9.26878 4.44272 9.63433L4.16521 9.80087C3.74031 10.0558 3.52786 10.1833 3.37354 10.3588C3.23698 10.5141 3.13401 10.696 3.07109 10.893C3 11.1156 3 11.3658 3 11.8663C3 12.4589 3 12.7551 3.09462 13.0088C3.17823 13.2329 3.31422 13.4337 3.49124 13.5946C3.69158 13.7766 3.96395 13.8856 4.50866 14.1035C5.06534 14.3261 5.35196 14.9441 5.16236 15.5129L4.94721 16.1584C4.79819 16.6054 4.72367 16.829 4.7169 17.0486C4.70875 17.3127 4.77049 17.5742 4.89587 17.8067C5.00015 18.0002 5.16678 18.1668 5.5 18.5C5.83323 18.8332 5.99985 18.9998 6.19325 19.1041C6.4258 19.2295 6.68733 19.2913 6.9514 19.2831C7.17102 19.2763 7.39456 19.2018 7.84164 19.0528L8.36862 18.8771C9.00393 18.6654 9.6942 18.9855 9.94291 19.6073C10.1159 20.0398 10.2024 20.2561 10.3346 20.4249C10.5281 20.6719 10.7942 20.8521 11.0954 20.94C11.3012 21 11.5341 21 12 21C12.4659 21 12.6988 21 12.9046 20.94C13.2058 20.8521 13.4719 20.6719 13.6654 20.4249C13.7976 20.2561 13.8841 20.0398 14.0571 19.6073C14.3058 18.9855 14.9961 18.6654 15.6313 18.8773L16.1579 19.0529C16.605 19.2019 16.8286 19.2764 17.0482 19.2832C17.3123 19.2913 17.5738 19.2296 17.8063 19.1042C17.9997 18.9999 18.1664 18.8333 18.4996 18.5001C18.8328 18.1669 18.9994 18.0002 19.1037 17.8068C19.2291 17.5743 19.2908 17.3127 19.2827 17.0487C19.2759 16.8291 19.2014 16.6055 19.0524 16.1584L18.8374 15.5134C18.6477 14.9444 18.9344 14.3262 19.4913 14.1035C20.036 13.8856 20.3084 13.7766 20.5088 13.5946C20.6858 13.4337 20.8218 13.2329 20.9054 13.0088C21 12.7551 21 12.4589 21 11.8663C21 11.3658 21 11.1156 20.9289 10.893C20.866 10.696 20.763 10.5141 20.6265 10.3588C20.4721 10.1833 20.2597 10.0558 19.8348 9.80087L19.5569 9.63416C18.9478 9.26867 18.6939 8.51514 18.9578 7.85558C19.1262 7.43443 19.2105 7.22383 19.232 7.01543C19.2636 6.70926 19.2003 6.40077 19.0506 6.13181C18.9487 5.94875 18.7884 5.78837 18.4676 5.46762C18.1658 5.16584 18.0149 5.01494 17.8426 4.91583C17.5894 4.77024 17.2992 4.70174 17.0076 4.71872C16.8091 4.73029 16.6067 4.79777 16.2018 4.93273L15.6314 5.12287C14.9961 5.33464 14.3058 5.0145 14.0571 4.39272C13.8841 3.96016 13.7976 3.74388 13.6654 3.57511C13.4719 3.32808 13.2058 3.14794 12.9046 3.06005Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
   const buttonContainer = document.createElement("div");
   buttonContainer.style.position = "relative";
   buttonContainer.style.display = "inline-block";
@@ -9000,7 +9341,7 @@
   mainButton.className = "Button-sc-qlcn5g-0 Button-small-buttonTertiary-useBrowserDefaultFocusStyle";
   mainButton.innerText = "Sort Play"; 
   mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-  mainButton.style.color = buttonStyles.main.color;
+  mainButton.style.color = 'var(--sort-play-text-color)';
   mainButton.style.borderRadius = "16px";
   mainButton.style.border = "none";
   mainButton.style.padding = "4px 10px";
@@ -9029,84 +9370,44 @@
   mainButton.addEventListener("mouseenter", () => {
     mainButton.style.cursor = "pointer";
     if (!isProcessing) { 
-      mainButton.style.color = buttonStyles.main.hoverColor;
-      svgElement.style.fill = buttonStyles.main.hoverColor;
+      mainButton.style.filter = "brightness(1.5)";
     }
   });
   
   mainButton.addEventListener("mouseleave", () => {
     mainButton.style.cursor = "pointer"; 
     if (!isProcessing) {  
-      mainButton.style.color = isButtonClicked ? buttonStyles.main.clickColor : buttonStyles.main.color;
-      svgElement.style.fill = isButtonClicked ? buttonStyles.main.clickColor : buttonStyles.main.color;
+      if (!isButtonClicked) {
+        mainButton.style.filter = "brightness(1)";
+      }
     }
   });
 
-  function getRawContextMenuStyle() {
-    const style = document.createElement('style');
-    document.head.appendChild(style);
-    
-    const sheets = document.styleSheets;
-    
-    for (let sheet of sheets) {
-        try {
-            const rules = sheet.cssRules || sheet.rules;
-            for (let rule of rules) {
-                if (rule.selectorText === '.main-contextMenu-menu') {
-                    return rule.style.backgroundColor;
-                }
-            }
-        } catch (e) {
-            continue;
-        }
-    }
-    
-    const tempElement = document.createElement("div");
-    tempElement.className = "main-contextMenu-menu";
-    document.body.appendChild(tempElement);
-    
-    const styles = window.getComputedStyle(tempElement);
-    const backgroundColor = styles.getPropertyValue('background-color');
-    
-    document.body.removeChild(tempElement);
-    return backgroundColor;
+
+  function getNativeMenuTextColor() {
+    const tempContainer = document.createElement('div');
+    tempContainer.className = 'main-contextMenu-menu';
+    tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+    const tempButton = document.createElement('button');
+    tempButton.className = 'main-contextMenu-menuItemButton';
+    tempContainer.appendChild(tempButton);
+    document.body.appendChild(tempContainer);
+    const textColor = window.getComputedStyle(tempButton).color;
+    document.body.removeChild(tempContainer);
+    return textColor;
   }
 
+  function getNativeTertiaryButtonColor() {
+    const targetClass = 'Button-sc-qlcn5g-0 Button-buttonTertiary-large-iconOnly-useBrowserDefaultFocusStyle-condensed';
+    const tempButton = document.createElement('button');
+    tempButton.className = targetClass;
+    tempButton.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+    document.body.appendChild(tempButton);
+    const textColor = window.getComputedStyle(tempButton).color;
+    document.body.removeChild(tempButton);
+    return textColor;
+  }
 
-  function createBackgroundObserver(menuElement) {
-    menuElement.style.removeProperty('background-color');
-    
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach((mutation) => {
-        if (mutation.attributeName === 'class') {
-          const rawStyle = getRawContextMenuStyle();
-          if (rawStyle.includes('var(--spice-rgb-card)')) {
-            menuElement.style.removeProperty('background-color');
-          }
-        }
-      });
-    });
-  
-    observer.observe(document.body, {
-      attributes: true,
-      attributeFilter: ['class']
-    });
-  
-    menuElement._backgroundObserver = observer;
-  
-    setTimeout(() => {
-      cleanupBackgroundObserver(menuElement);
-    }, 15000);
-  
-    return observer;
-  }
-  
-  function cleanupBackgroundObserver(element) {
-    if (element._backgroundObserver) {
-      element._backgroundObserver.disconnect();
-      delete element._backgroundObserver;
-    }
-  }
 
   const menuContainer = document.createElement("div");
   menuContainer.style.position = "fixed";
@@ -9118,7 +9419,7 @@
   menuContainer.style.borderRadius = "4px";
   menuContainer.style.boxShadow = "rgba(0, 0, 0, 0.3) 0px 16px 24px 0px";
   menuContainer.classList.add('main-contextMenu-menu');
-  createBackgroundObserver(menuContainer);
+  menuContainer.classList.add('sort-play-font-scope');
   
   const menuButtons = buttonStyles.menuItems.map((style) => {
     if (style.type === "divider") {
@@ -9135,15 +9436,15 @@
     if (style.type === "parent") {
       const parentButton = document.createElement("button");
       parentButton.style.backgroundColor = "transparent";
-      parentButton.style.color = "#ffffffe6";
+      parentButton.style.color = '#ffffffe6';
       parentButton.style.border = "none";
       parentButton.style.borderRadius = "2px";
       parentButton.style.margin = "0";
-      parentButton.style.padding = "4px 10px";
+      parentButton.style.padding = "4px 10px 4px 8px";
       parentButton.style.fontWeight = "400";
       parentButton.style.fontSize = "0.875rem";
-      parentButton.style.height = "44px";
-      parentButton.style.width = "155px";
+      parentButton.style.height = "39px";
+      parentButton.style.width = "183px";
       parentButton.style.textAlign = "center";
       parentButton.style.opacity = "0";
       parentButton.style.transform = "translateY(-10px)";
@@ -9153,15 +9454,32 @@
       parentButton.style.justifyContent = "space-between";
       parentButton.dataset.isParent = 'true';
 
+      const leftContainer = document.createElement("div");
+      leftContainer.style.display = "flex";
+      leftContainer.style.alignItems = "center";
+      leftContainer.style.gap = "10px";
+
+      let iconSvgString;
+      if (style.text === "Personalized Sort") {
+        iconSvgString = personalizedSortIconSvg;
+      } else if (style.text === "Create Playlist") {
+        iconSvgString = createPlaylistIconSvg;
+      } else {
+        iconSvgString = sortIconSvg;
+      }
+      const icon = new DOMParser().parseFromString(iconSvgString, "image/svg+xml").documentElement;
+      leftContainer.appendChild(icon);
+
       const buttonTextSpan = document.createElement("span");
       buttonTextSpan.innerText = style.text;
-      parentButton.appendChild(buttonTextSpan);
+      leftContainer.appendChild(buttonTextSpan);
+      parentButton.appendChild(leftContainer);
      
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
       svg.setAttribute("viewBox", "0 0 16 16");
       svg.setAttribute("width", "16px");
       svg.setAttribute("height", "16px");
-      svg.style.fill = "currentcolor";
+      svg.style.fill = 'var(--sort-play-icon-color)';
       svg.style.transform = "translateX(2px)";
     
       const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -9172,7 +9490,7 @@
 
       parentButton.addEventListener("mouseenter", () => {
         if (!parentButton.disabled) {
-          parentButton.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+          parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
           openSubMenu(parentButton, style.children);
         }
       });
@@ -9193,27 +9511,26 @@
     } else {
       const button = document.createElement("button");
       button.style.backgroundColor = "transparent";
-      button.style.color = "#ffffffe6";
+      button.style.color = '#ffffffe6';
       button.style.border = "none";
       button.style.borderRadius = "2px";
       button.style.margin = "0"; 
-      button.style.padding = "4px 10px";
+      button.style.padding = "4px 10px 4px 8px";
       button.style.fontWeight = "400";
       button.style.fontSize = "0.875rem";
-      button.style.height = "44px";
-      button.style.width = "155px"; 
-      button.style.textAlign = "center";
+      button.style.height = "39px";
+      button.style.width = "183px";
+      button.style.textAlign = "left";
       button.style.opacity = "0";
       button.style.transform = "translateY(-10px)";
       button.style.position = "relative"; 
       button.style.display = "flex";  
       button.style.alignItems = "center";  
-      button.style.justifyContent = "space-between";  
+      button.style.justifyContent = "flex-start";
+      button.style.gap = "10px";
 
       button.addEventListener("mouseenter", () => {
-        if (!button.disabled) {
-          button.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-        }
+        button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
       });
     
       button.addEventListener("mouseleave", () => {
@@ -9221,7 +9538,26 @@
           button.style.backgroundColor = "transparent";
         }
       });
-    
+      
+      let iconSvgString;
+      if (style.text === "Genre Filter") {
+        iconSvgString = genreFilterIconSvg;
+      } else if (style.text === "Custom Filter") {
+        iconSvgString = customFilterIconSvg;
+      } else if (style.text === "AI Pick") {
+        iconSvgString = aiPickIconSvg;
+      } else if (style.text === "Shuffle") {
+        iconSvgString = shuffleIconSvg;
+      } else if (style.text === "Deduplicate") {
+        iconSvgString = deduplicateIconSvg;
+      } else if (style.isSetting) {
+        iconSvgString = settingsIconSvg;
+      } else {
+        iconSvgString = sortIconSvg;
+      }
+      const icon = new DOMParser().parseFromString(iconSvgString, "image/svg+xml").documentElement;
+      button.appendChild(icon);
+
       const buttonTextSpan = document.createElement("span");
       buttonTextSpan.innerText = style.text;
       button.appendChild(buttonTextSpan);
@@ -9241,53 +9577,29 @@
   function toggleMenu() {
     isMenuOpen = !isMenuOpen;
     if (isMenuOpen) {
+      applyCurrentThemeColors();
       const buttonRect = mainButton.getBoundingClientRect();
-      const { height: headerHeight, bottom: headerBottom } = getHeaderInfo();
-      
-      if (buttonRect.top <= headerHeight || buttonRect.bottom <= headerBottom) {
+      const { bottom: headerBottom } = getHeaderInfo();
+
+      if (buttonRect.bottom <= headerBottom) {
         isMenuOpen = false;
         return;
       }
       
-      const scrollTop = window.scrollY || document.documentElement.scrollTop;
-      const menuHeight = menuButtons.length * 34 + 16;
-      const spaceBelow = window.innerHeight - buttonRect.bottom;
-      
-      let topPosition = buttonRect.bottom + scrollTop + 8;
-      if (spaceBelow < menuHeight) {
-        topPosition = buttonRect.top + scrollTop - menuHeight - 8;
-        if (topPosition < scrollTop + headerHeight) {
-          isMenuOpen = false;
-          return;
-        }
-      }
-      
-      const menuWidth = 163; 
-      const buttonCenter = buttonRect.left + (buttonRect.width / 2);
-      const leftPosition = buttonCenter - (menuWidth / 2);
-      
-      menuContainer.style.top = `${topPosition}px`;
-      menuContainer.style.left = `${leftPosition}px`;
-      menuContainer.style.transform = "none";
-      menuContainer.style.display = "flex";
-      
+      menuContainer.style.top = '0px';
+      menuContainer.style.left = '0px';
+      menuContainer.style.transform = 'none';
+      menuContainer.style.display = 'flex';
       document.body.appendChild(menuContainer);
+
+      checkAndUpdateMenuPosition();
+
       menuButtons.forEach((button) => {
         button.style.opacity = "1";
         button.style.transform = "translateY(0)";
       });
     } else {
-      menuContainer.style.display = "none";
-      if (menuContainer.parentElement === document.body) {
-        document.body.removeChild(menuContainer);
-      }
-      
-      const submenus = document.querySelectorAll('.submenu');
-      submenus.forEach(submenu => {
-        if (submenu.parentElement) {
-          submenu.parentElement.removeChild(submenu);
-        }
-      });
+      closeAllMenus();
     }
   }
 
@@ -9301,17 +9613,18 @@
     const submenus = document.querySelectorAll('.submenu');
     submenus.forEach(submenu => {
       if (submenu.parentElement) {
-        cleanupBackgroundObserver(submenu);
         submenu.parentElement.removeChild(submenu);
       }
     });
+
+    isButtonClicked = false;
+    mainButton.style.filter = "brightness(1)";
   }
   
   function openSubMenu(parentButton, items) {
     const existingSubmenus = document.querySelectorAll('.submenu');
     existingSubmenus.forEach(submenu => {
         if (submenu.parentElement && submenu !== parentButton.querySelector('.submenu')) {
-            cleanupBackgroundObserver(submenu);
             submenu.parentElement.removeChild(submenu);
         }
     });
@@ -9325,6 +9638,7 @@
     subMenu = document.createElement("div");
     subMenu.classList.add("submenu");
     subMenu.classList.add('main-contextMenu-menu');
+    subMenu.classList.add('sort-play-font-scope');
     subMenu.style.position = "absolute";
     subMenu.style.display = "flex";
     subMenu.style.flexDirection = "column";
@@ -9333,24 +9647,109 @@
     subMenu.style.borderRadius = "4px";
     subMenu.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
 
-    createBackgroundObserver(subMenu);
+    items.forEach((item) => {
+      if (item.type === "title") {
+        const titleElement = document.createElement("div");
+        titleElement.innerText = item.text;
+        titleElement.style.cssText = `
+          color: #878787;
+          font-size: 0.600rem;
+          font-weight: 700;
+          letter-spacing: .08em;
+          line-height: 16px;
+          text-transform: uppercase;
+          padding: 8px 12px 4px;
+          pointer-events: none;
+          margin-left: -2px;
+        `;
+        subMenu.appendChild(titleElement);
+        return;
+      }
+      const button = document.createElement("button");
+      button.style.backgroundColor = item.backgroundColor;
+      button.style.color = '#ffffffe6';
+      button.style.border = "none";
+      button.style.borderRadius = "2px";
+      button.style.margin = "0";
+      button.style.padding = "4px 10px";
+      button.style.fontWeight = "400";
+      button.style.fontSize = "0.875rem";
+      button.style.height = "37px";
+      button.style.width = "155px";
+      button.style.textAlign = "center";
+      button.style.position = "relative";
+      button.style.display = "flex";
+      button.style.alignItems = "center";
+      button.style.justifyContent = "space-between";
+      button.innerText = item.text;
+      button.addEventListener("mouseenter", () => {
+        if (!button.disabled) {
+          button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
+        }
+      });
+  
+      button.addEventListener("mouseleave", () => {
+        button.style.backgroundColor = item.backgroundColor;
+      });
+  
+      if (item.hasInnerButton) {
+        const svg = getSortArrowSvg(sortOrderState[item.sortType]); 
+        const innerButton = createInnerButton(item.sortType, button, svg); 
+        button.appendChild(innerButton);
+      }
+  
+      button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        if (item.onClick) {
+          await item.onClick(event);
+        } else {
+          await handleSortAndCreatePlaylist(item.sortType);
+        }
+        
+        parentButton.style.backgroundColor = "transparent";
+      });
+  
+      subMenu.appendChild(button);
+    });
+
+    subMenu.style.visibility = 'hidden';
+    subMenu.style.top = '-9999px';
+    document.body.appendChild(subMenu);
+    const subMenuHeight = subMenu.offsetHeight;
 
     const parentRect = parentButton.getBoundingClientRect();
     const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    const spaceRight = window.innerWidth - parentRect.right;
+    const viewportHeight = window.innerHeight;
     const subMenuWidth = 163;
+    const spaceRight = window.innerWidth - parentRect.right;
+
+    let finalTop;
+    let finalLeft;
 
     if (spaceRight < subMenuWidth) {
-        subMenu.style.left = `${parentRect.left - subMenuWidth}px`;
+        finalLeft = parentRect.left - subMenuWidth;
     } else {
-        subMenu.style.left = `${parentRect.right}px`;
+        finalLeft = parentRect.right;
     }
 
-    subMenu.style.top = `${parentRect.top + scrollTop}px`;
+    const canOpenDown = parentRect.top + subMenuHeight <= viewportHeight;
+    const canOpenUp = parentRect.bottom - subMenuHeight >= 0;
 
+    if (canOpenDown) {
+        finalTop = parentRect.top + scrollTop;
+    } else if (canOpenUp) {
+        finalTop = parentRect.bottom + scrollTop - subMenuHeight;
+    } else {
+        finalTop = scrollTop + (viewportHeight - subMenuHeight) / 2;
+        finalTop = Math.max(scrollTop, finalTop);
+    }
+    
+    subMenu.style.left = `${finalLeft}px`;
+    subMenu.style.top = `${finalTop}px`;
+    subMenu.style.visibility = 'visible';
+    
     const handleSubMenuRemoval = () => {
         if (subMenu.parentElement) {
-            cleanupBackgroundObserver(subMenu);
             subMenu.parentElement.removeChild(subMenu);
             parentButton.classList.remove('submenu-open');
             parentButton.style.backgroundColor = "transparent";
@@ -9359,15 +9758,8 @@
 
     parentButton.classList.add('submenu-open');
 
-    const menuContainer = document.createElement('div');
-    menuContainer.style.position = 'absolute';
-    menuContainer.style.top = '0';
-    menuContainer.style.left = '0';
-    menuContainer.style.right = '0';
-    menuContainer.style.bottom = '0';
-
     subMenu.addEventListener('mouseenter', () => {
-        parentButton.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+      parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
     });
 
     subMenu.addEventListener('mouseleave', (event) => {
@@ -9398,55 +9790,10 @@
             }
         });
     });
-    items.forEach((item) => {
-      const button = document.createElement("button");
-      button.style.backgroundColor = item.backgroundColor;
-      button.style.color = item.color;
-      button.style.border = "none";
-      button.style.borderRadius = "2px";
-      button.style.margin = "0";
-      button.style.padding = "4px 10px";
-      button.style.fontWeight = "400";
-      button.style.fontSize = "0.875rem";
-      button.style.height = "44px";
-      button.style.width = "155px";
-      button.style.textAlign = "center";
-      button.style.position = "relative";
-      button.style.display = "flex";
-      button.style.alignItems = "center";
-      button.style.justifyContent = "space-between";
-      button.innerText = item.text;
-      button.addEventListener("mouseenter", () => {
-      button.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-      });
-  
-      button.addEventListener("mouseleave", () => {
-        button.style.backgroundColor = item.backgroundColor;
-      });
-  
-      if (item.hasInnerButton) {
-        const svg = getSortArrowSvg(sortOrderState[item.sortType]); 
-        const innerButton = createInnerButton(item.sortType, button, svg); 
-        button.appendChild(innerButton);
-      }
-  
-      button.addEventListener("click", async (event) => {
-        event.stopPropagation();
-        if (item.onClick) {
-          await item.onClick(event);
-        } else {
-          await handleSortAndCreatePlaylist(item.sortType);
-        }
-        
-        parentButton.style.backgroundColor = "transparent";
-      });
-  
-      subMenu.appendChild(button);
-    });
-  
-    parentButton.appendChild(subMenu);
-    document.body.appendChild(subMenu);
+    
+    applyCurrentThemeColors(subMenu);
   }
+  
   window.addEventListener('resize', closeAllMenus);
 
   window.addEventListener('scroll', closeAllMenus);
@@ -9481,12 +9828,8 @@
           cancelText: "Cancel",
           onConfirm: () => {
             closeAllMenus();
-            isButtonClicked = false;
             mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
             mainButton.innerText = "stopping...";
-            mainButton.style.color = buttonStyles.main.color;
-            svgElement.style.fill = buttonStyles.main.color;
-            mainButton.style.filter = "brightness(1)";
             setButtonProcessing(false);
             Spicetify.ReactDOM.unmountComponentAtNode(container);
             location.reload();
@@ -9503,16 +9846,8 @@
       return;
     }
   
-    isButtonClicked = !isButtonClicked;
-    if (isButtonClicked) {
-      mainButton.style.backgroundColor = buttonStyles.main.clickBackgroundColor;
-      mainButton.style.color = buttonStyles.main.clickColor;
-      svgElement.style.fill = buttonStyles.main.clickColor;
-    } else {
-      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      svgElement.style.fill = buttonStyles.main.color;
-    }
+    isButtonClicked = !isMenuOpen; 
+    
     if (!isMenuOpen) {
       toggleMenu();
     } else {
@@ -9522,12 +9857,7 @@
   
   document.addEventListener("click", (event) => {
     if (isMenuOpen && !mainButton.contains(event.target) && !menuContainer.contains(event.target)) {
-      toggleMenu();
-      isButtonClicked = false;
-      mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      svgElement.style.fill = buttonStyles.main.color;
-      mainButton.style.filter = "brightness(1)";
+      closeAllMenus(); 
     }
   });
 
@@ -9536,43 +9866,53 @@
     if (!header) return { height: 0, bottom: 0 };
     const headerRect = header.getBoundingClientRect();
     return {
-      height: headerRect.height,
-      bottom: headerRect.bottom
+        height: headerRect.height,
+        bottom: headerRect.bottom
     };
   }
 
   function checkAndUpdateMenuPosition() {
     if (!isMenuOpen) return;
-    
+
     const buttonRect = mainButton.getBoundingClientRect();
-    const { height: headerHeight, bottom: headerBottom } = getHeaderInfo();
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    const menuHeight = menuButtons.length * 34 + 16;
-    const menuWidth = 163; 
-    
-    if (buttonRect.top <= headerHeight || buttonRect.bottom <= headerBottom) {
-      closeAllMenus();
-      return;
-    }
-    
-    const spaceBelow = window.innerHeight - buttonRect.bottom;
-    let topPosition = buttonRect.bottom + scrollTop + 8;
-    
-    if (spaceBelow < menuHeight) {
-      topPosition = buttonRect.top + scrollTop - menuHeight - 8;
-      if (topPosition < scrollTop + headerHeight) {
+    const { bottom: headerBottom } = getHeaderInfo();
+    const menuHeight = menuContainer.offsetHeight;
+    const menuWidth = menuContainer.offsetWidth;
+
+    if (buttonRect.bottom <= headerBottom) {
         closeAllMenus();
         return;
-      }
     }
+
+    const spaceBelow = window.innerHeight - buttonRect.bottom;
+    const usableSpaceAbove = buttonRect.top - headerBottom;
     
-    const buttonCenter = buttonRect.left + (buttonRect.width / 2);
-    const leftPosition = buttonCenter - (menuWidth / 2);
-    
+    let topPosition;
+    let leftPosition;
+
+    if (spaceBelow >= menuHeight + 8) {
+        topPosition = buttonRect.bottom + 8;
+        leftPosition = buttonRect.right - menuWidth;
+    } 
+    else if (usableSpaceAbove >= menuHeight + 8) {
+        topPosition = buttonRect.top - menuHeight - 8;
+        leftPosition = buttonRect.right - menuWidth;
+    } 
+    else {
+        topPosition = Math.max(headerBottom + 8, (window.innerHeight - menuHeight) / 2);
+        leftPosition = Math.max(8, buttonRect.left - menuWidth - 8);
+        
+        if (leftPosition + menuWidth < 20 || topPosition + menuHeight > window.innerHeight) {
+            closeAllMenus();
+            return;
+        }
+    }
+
     menuContainer.style.top = `${topPosition}px`;
     menuContainer.style.left = `${leftPosition}px`;
     menuContainer.style.transform = "none";
   }
+
   window.addEventListener("scroll", checkAndUpdateMenuPosition, true);
   window.addEventListener("resize", checkAndUpdateMenuPosition);
   const menuPositionObserver = new MutationObserver(checkAndUpdateMenuPosition);
@@ -9736,10 +10076,1653 @@
     }
   }
 
+  async function getTopItems(type, time_range, totalLimit) {
+    let allItems = [];
+    let offset = 0;
+    const limitPerRequest = 50;
+
+    while (allItems.length < totalLimit) {
+        const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/me/top/${type}`, {
+            time_range: time_range,
+            limit: limitPerRequest,
+            offset: offset
+        });
+
+        if (!res.items || res.items.length === 0) {
+            break;
+        }
+
+        allItems = allItems.concat(res.items);
+        offset += limitPerRequest;
+
+        if (res.items.length < limitPerRequest) {
+            break;
+        }
+    }
+    return allItems.slice(0, totalLimit);
+  }
+
+
+  function findPeaks(profileArray) {
+      const totalWeight = profileArray.reduce((a, b) => a + b, 0);
+      if (totalWeight === 0) return [];
+
+      const PEAK_THRESHOLD = 0.02;
+
+      const peaks = [];
+      let currentPeak = null;
+
+      for (let i = 0; i < profileArray.length; i++) {
+          if (profileArray[i] > totalWeight * PEAK_THRESHOLD) {
+              if (!currentPeak) {
+                  currentPeak = { start: i, end: i, totalWeight: profileArray[i], maxBinValue: profileArray[i] };
+              } else {
+                  currentPeak.end = i;
+                  currentPeak.totalWeight += profileArray[i];
+                  currentPeak.maxBinValue = Math.max(currentPeak.maxBinValue, profileArray[i]);
+              }
+          } else {
+              if (currentPeak) {
+                  peaks.push(currentPeak);
+                  currentPeak = null;
+              }
+          }
+      }
+
+      if (currentPeak) {
+          peaks.push(currentPeak);
+      }
+
+      return peaks;
+  }
+
+  const AFFINITY_PROFILE_CACHE_KEY = "sort-play-affinity-profile-cache-v1";
+  const AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY = "sort-play-affinity-cache-timestamp-v1";
+  const AFFINITY_CACHE_EXPIRY_DAYS = 30;
+
+  async function getAffinityProfileData(updateProgress) {
+    updateProgress("Get liked...");
+    const likedTracksData = await Spicetify.Platform.LibraryAPI.getTracks({ limit: 3000 });
+    
+    if (!likedTracksData || !likedTracksData.items || likedTracksData.items.length === 0) {
+        throw new Error("No liked songs found to build a profile.");
+    }
+    const freshLikedSongs = likedTracksData.items;
+    updateProgress("Load cache...");
+    let cachedEnhancedSongs = [];
+    const cacheTimestamp = localStorage.getItem(AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY);
+    const daysPassed = (Date.now() - parseInt(cacheTimestamp)) / (1000 * 60 * 60 * 24);
+
+    if (cacheTimestamp && daysPassed < AFFINITY_CACHE_EXPIRY_DAYS) {
+        try {
+            cachedEnhancedSongs = JSON.parse(localStorage.getItem(AFFINITY_PROFILE_CACHE_KEY)) || [];
+        } catch (e) {
+            console.error("Failed to parse affinity cache.", e);
+            cachedEnhancedSongs = [];
+        }
+    }
+
+    const cachedSongsMap = new Map(cachedEnhancedSongs.map(song => [song.uri, song]));
+    const newSongsToProcess = [];
+    const existingStillRelevantSongs = [];
+
+    freshLikedSongs.forEach(song => {
+        if (cachedSongsMap.has(song.uri)) {
+            existingStillRelevantSongs.push(cachedSongsMap.get(song.uri));
+        } else {
+            newSongsToProcess.push(song);
+        }
+    });
+
+    let newlyEnhancedSongs = [];
+    if (newSongsToProcess.length > 0) {
+        updateProgress(`Get liked...`);
+        
+        const newTrackIds = newSongsToProcess.map(item => item.uri.split(':')[2]);
+        const newArtistIds = [...new Set(newSongsToProcess.flatMap(item => item.artists.map(artist => artist.uri.split(':')[2])))];
+        
+        const audioFeaturesMap = new Map();
+        const artistGenreMap = new Map();
+
+        for (let i = 0; i < newTrackIds.length; i += 100) {
+            const batch = newTrackIds.slice(i, i + 100);
+            const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batch.join(',')}`);
+            response.audio_features.forEach(features => features && audioFeaturesMap.set(features.id, features));
+        }
+
+        for (let i = 0; i < newArtistIds.length; i += 50) {
+            const batch = newArtistIds.slice(i, i + 50);
+            const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
+            response.artists.forEach(artist => artist && artistGenreMap.set(artist.id, artist.genres));
+        }
+        
+        newlyEnhancedSongs = newSongsToProcess.map(song => {
+            const full_audio_features = audioFeaturesMap.get(song.uri.split(':')[2]);
+            let lean_audio_features = null;
+
+            if (full_audio_features) {
+                lean_audio_features = {
+                    energy: full_audio_features.energy,
+                    danceability: full_audio_features.danceability,
+                    valence: full_audio_features.valence,
+                    acousticness: full_audio_features.acousticness,
+                    instrumentalness: full_audio_features.instrumentalness,
+                    speechiness: full_audio_features.speechiness,
+                    tempo: full_audio_features.tempo,
+                };
+            }
+
+            return {
+                uri: song.uri,
+                added_at: song.added_at,
+                artistUris: song.artists.map(artist => artist.uri),
+                audio_features: lean_audio_features,
+                artist_genres: song.artists.flatMap(artist => artistGenreMap.get(artist.uri.split(':')[2]) || [])
+            };
+        });
+    }
+
+    let allEnhancedSongs = [...existingStillRelevantSongs, ...newlyEnhancedSongs];
+    
+    const freshLikedSongUris = new Set(freshLikedSongs.map(s => s.uri));
+    
+    let finalCacheData = allEnhancedSongs.filter(song => freshLikedSongUris.has(song.uri));
+
+    if (finalCacheData.length > 3000) {
+        finalCacheData.sort((a, b) => new Date(b.added_at).getTime() - new Date(a.added_at).getTime());
+        finalCacheData = finalCacheData.slice(0, 3000);
+    }
+    
+    updateProgress("Upd-cache...");
+    try {
+        localStorage.setItem(AFFINITY_PROFILE_CACHE_KEY, JSON.stringify(finalCacheData));
+
+        if (!cacheTimestamp || daysPassed >= AFFINITY_CACHE_EXPIRY_DAYS) {
+            localStorage.setItem(AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY, Date.now().toString());
+        }
+    } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+            console.error("Cache size is still too large even after aggressive pruning. Could not save affinity profile.", e);
+            Spicetify.showNotification("Your liked songs library is too large to cache, personalized sort may be slow.", true);
+        } else {
+            console.error("An error occurred while saving the cache.", e);
+        }
+    }
+
+    updateProgress("Get top...");
+    const topItemsLimits = {
+        short_term: 150,
+        medium_term: 200,
+        long_term: 300
+    };
+    const timeRanges = ['short_term', 'medium_term', 'long_term'];
+    const topItems = {};
+    for (const range of timeRanges) {
+        const limit = topItemsLimits[range];
+        topItems[range] = {
+            tracks: await getTopItems('tracks', range, limit),
+            artists: await getTopItems('artists', range, limit)
+        };
+    }
+    
+    return { enhancedLikedSongs: finalCacheData, topItems };
+  }
+  
+  function buildAffinityProfile(profileData, updateProgress, timeRangeScope = 'balanced') {
+    updateProgress("Profiling...");
+    const { enhancedLikedSongs, topItems } = profileData;
+    const timeRanges = ['short_term', 'medium_term', 'long_term'];
+
+    let profileSourceSongs = enhancedLikedSongs;
+    let multipliers;
+    let recencyDecayFactor;
+
+    switch (timeRangeScope) {
+        case 'recent':
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+            profileSourceSongs = enhancedLikedSongs.filter(song => new Date(song.added_at) > sixMonthsAgo);
+            multipliers = { short_term: 4.0, medium_term: 0.5, long_term: 0 };
+            recencyDecayFactor = 90;
+            break;
+        case 'all_time':
+            multipliers = { short_term: 0, medium_term: 1.0, long_term: 3.0 };
+            recencyDecayFactor = 1825;
+            break;
+        case 'energy':
+            profileSourceSongs = enhancedLikedSongs.filter(song => 
+                song.audio_features && song.audio_features.energy > 0.6 && song.audio_features.danceability > 0.5
+            );
+            multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
+            recencyDecayFactor = 365;
+            break;
+        case 'mellow':
+            profileSourceSongs = enhancedLikedSongs.filter(song => 
+                song.audio_features && song.audio_features.energy < 0.4 && song.audio_features.acousticness > 0.5
+            );
+            multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
+            recencyDecayFactor = 365;
+            break;
+        case 'balanced':
+        default:
+            multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
+            recencyDecayFactor = 365;
+            break;
+    }
+
+    if (profileSourceSongs.length < 25) {
+        console.warn(`[Sort-Play] Not enough songs for a '${timeRangeScope}' profile (${profileSourceSongs.length} found). Falling back to 'Balanced'.`);
+        Spicetify.showNotification(`Not enough data for ${timeRangeScope} profile, using Balanced instead.`);
+        profileSourceSongs = enhancedLikedSongs;
+        multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
+        recencyDecayFactor = 365;
+    }
+
+    const topTrackPositions = { short_term: new Map(), medium_term: new Map(), long_term: new Map() };
+    for (const range of timeRanges) {
+        topItems[range].tracks.forEach((track, index) => {
+            topTrackPositions[range].set(track.uri, index);
+        });
+    }
+
+    const weightedSongs = profileSourceSongs.map(song => {
+        let weight = 1.0;
+
+        for (const range of timeRanges) {
+            const position = topTrackPositions[range].get(song.uri);
+            if (position !== undefined) { 
+                const baseMultiplier = multipliers[range];
+                if (baseMultiplier === 0) continue;
+
+                let positionalMultiplier = 0; 
+                if (position < 25) positionalMultiplier = 1.0;
+                else if (position < 50) positionalMultiplier = 0.90;
+                else if (position < 100) positionalMultiplier = 0.75;
+                else if (position < 200) positionalMultiplier = 0.50;
+                else positionalMultiplier = 0.25;
+
+                weight += baseMultiplier * positionalMultiplier;
+            }
+        }
+        
+        let days_since_added = (new Date() - new Date(song.added_at)) / (1000 * 60 * 60 * 24);
+        
+        if (isNaN(days_since_added)) {
+            days_since_added = 365 * 5; 
+        }
+
+        const date_weight = Math.exp(-days_since_added / recencyDecayFactor);
+        const final_weight = weight * date_weight;
+        
+        return { ...song, final_weight };
+    });
+
+    const sonicProfile = {
+        energy: Array(10).fill(0), danceability: Array(10).fill(0), valence: Array(10).fill(0),
+        acousticness: Array(10).fill(0), instrumentalness: Array(10).fill(0), speechiness: Array(10).fill(0),
+        tempo: Array(10).fill(0)
+    };
+    const genreProfile = {};
+    const artistProfile = {};
+    const min_tempo = 50, max_tempo = 200;
+
+    weightedSongs.forEach(song => {
+        if (song.audio_features) {
+            const features = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
+            features.forEach(feature => {
+                const value = song.audio_features[feature];
+                if (typeof value === 'number') {
+                    const bin = Math.min(9, Math.floor(value * 10));
+                    sonicProfile[feature][bin] += song.final_weight;
+                }
+            });
+            if (typeof song.audio_features.tempo === 'number') {
+                const normalized_tempo = (song.audio_features.tempo - min_tempo) / (max_tempo - min_tempo);
+                const tempo_bin = Math.min(9, Math.max(0, Math.floor(normalized_tempo * 10)));
+                sonicProfile.tempo[tempo_bin] += song.final_weight;
+            }
+        }
+
+        if (song.artist_genres) {
+            song.artist_genres.forEach(genre => {
+                genreProfile[genre] = (genreProfile[genre] || 0) + song.final_weight;
+            });
+        }
+
+        if (song.artistUris) {
+            song.artistUris.forEach(artistUri => {
+                const artistId = artistUri.split(':')[2];
+                artistProfile[artistId] = (artistProfile[artistId] || 0) + song.final_weight;
+            });
+        }
+    });
+
+    const peakSonicProfile = {};
+    for (const feature in sonicProfile) {
+        peakSonicProfile[feature] = findPeaks(sonicProfile[feature]);
+    }
+
+    return { rawSonicProfile: sonicProfile, peakSonicProfile, genreProfile, artistProfile };
+  }
+
+  function getPeakScore(value, peaks, rawProfile) {
+    if (!peaks || peaks.length === 0) return 0;
+
+    const bin = Math.min(9, Math.floor(value * 10));
+
+    for (const peak of peaks) {
+        if (bin >= peak.start && bin <= peak.end) {
+            return rawProfile[bin] / peak.maxBinValue;
+        }
+    }
+
+    return 0;
+  }
+
+  async function scoreAndSortPlaylist(targetTracks, affinityProfile, updateProgress, timeRangeScope = 'balanced', preFetchedAudioFeatures) {
+    updateProgress("Ranking...");
+    const { rawSonicProfile, peakSonicProfile, genreProfile, artistProfile } = affinityProfile;
+
+    const targetTrackIds = targetTracks.map(t => t.uri.split(':')[2]);
+    const targetAudioFeaturesMap = preFetchedAudioFeatures;
+    const artistCache = new Map();
+    const popularityMap = new Map();
+
+    for (let i = 0; i < targetTrackIds.length; i += 50) {
+        const batch = targetTrackIds.slice(i, i + 50);
+        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
+        response.tracks.forEach(track => track && popularityMap.set(track.id, track.popularity));
+    }
+
+    const targetArtistIds = [...new Set(targetTracks.flatMap(t => (t.artistUris || t.artists.map(a => a.uri)).map(uri => uri.split(':')[2])))];
+    for (let i = 0; i < targetArtistIds.length; i += 50) {
+        const batch = targetArtistIds.slice(i, i + 50);
+        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
+        response.artists.forEach(artist => artist && artistCache.set(artist.id, artist.genres));
+    }
+    
+    const releaseDateMap = new Map();
+    for (let i = 0; i < targetTrackIds.length; i += 50) {
+        const batch = targetTrackIds.slice(i, i+50);
+        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
+        response.tracks.forEach(track => {
+            if (track && track.album && track.album.release_date) {
+                releaseDateMap.set(track.id, track.album.release_date);
+            }
+        });
+    }
+
+    const scoredTracks = targetTracks.map(track => {
+        const trackId = track.uri.split(':')[2];
+        const audio_features = targetAudioFeaturesMap.get(trackId);
+        const artist_genres = (track.artistUris || track.artists.map(a => a.uri)).flatMap(uri => artistCache.get(uri.split(':')[2]) || []);
+        const popularity = popularityMap.get(trackId) || 0;
+
+        let sonicScoreSum = 0;
+        let genreScore = 0;
+        let artistScore = 0;
+        let featureCount = 0;
+
+        if (audio_features) {
+            const features = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
+            features.forEach(feature => {
+                const value = audio_features[feature];
+                if (typeof value === 'number' && peakSonicProfile[feature].length > 0) {
+                    sonicScoreSum += getPeakScore(value, peakSonicProfile[feature], rawSonicProfile[feature]);
+                    featureCount++;
+                }
+            });
+
+            const min_tempo = 50, max_tempo = 200;
+            if (typeof audio_features.tempo === 'number' && peakSonicProfile.tempo.length > 0) {
+                const normalized_tempo = (audio_features.tempo - min_tempo) / (max_tempo - min_tempo);
+                sonicScoreSum += getPeakScore(normalized_tempo, peakSonicProfile.tempo, rawSonicProfile.tempo);
+                featureCount++;
+            }
+        }
+
+        const rawSonicScore = featureCount > 0 ? (sonicScoreSum / featureCount) * 100 : 0;
+
+        artist_genres.forEach(genre => {
+            genreScore += (genreProfile[genre] || 0);
+        });
+
+        (track.artistUris || track.artists.map(a => a.uri)).forEach(uri => {
+            const artistId = uri.split(':')[2];
+            artistScore += (artistProfile[artistId] || 0);
+        });
+
+        let finalScore = (rawSonicScore * 0.5) + (genreScore * 0.25) + (artistScore * 0.25);
+
+        const releaseDateStr = releaseDateMap.get(trackId);
+        if (releaseDateStr) {
+            const releaseYear = parseInt(releaseDateStr.substring(0, 4));
+            if (!isNaN(releaseYear)) {
+                if (timeRangeScope === 'recent' && releaseYear >= new Date().getFullYear() - 2) {
+                    finalScore *= 1.15; 
+                } else if (timeRangeScope === 'all_time' && releaseYear < 2005) {
+                    finalScore *= 1.10; 
+                }
+            }
+        }
+        
+        if (timeRangeScope === 'energy') {
+            if (!audio_features || audio_features.energy <= 0.65 || audio_features.danceability <= 0.5) {
+                finalScore *= 0.25;
+            }
+        } else if (timeRangeScope === 'mellow') {
+            if (!audio_features || audio_features.energy >= 0.4 || audio_features.acousticness <= 0.5 || audio_features.speechiness >= 0.33) {
+                finalScore *= 0.25; 
+            }
+        }
+
+        return { ...track, finalScore, popularity };
+    });
+    
+    const sortedTracks = scoredTracks.sort((a, b) => b.finalScore - a.finalScore);
+
+    let finalTracks = sortedTracks;
+    if (timeRangeScope === 'energy' || timeRangeScope === 'mellow') {
+        if (sortedTracks.length > 0) {
+            const topScore = sortedTracks[0].finalScore;
+            const scoreThreshold = topScore * 0.20;
+            
+            finalTracks = sortedTracks.filter(track => track.finalScore >= scoreThreshold);
+        }
+    }
+
+    return finalTracks;
+  }
+
+  async function getAudioFeaturesForTracks(trackIds) {
+    if (!trackIds || trackIds.length === 0) return [];
+    const allAudioFeatures = [];
+    for (let i = 0; i < trackIds.length; i += 100) {
+        const batchIds = trackIds.slice(i, i + 100);
+        try {
+            const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`);
+            if (response.audio_features) {
+                allAudioFeatures.push(...response.audio_features.filter(f => f));
+            }
+        } catch (error) {
+            console.error("Failed to fetch a batch of audio features:", error);
+        }
+    }
+    return allAudioFeatures;
+  }
+
+  async function buildAdvancedTasteProfile(songsToProfile) {
+    if (!songsToProfile || songsToProfile.length === 0) return null;
+
+    const tasteProfileTrackIds = songsToProfile.map(t => t.uri.split(':')[2]);
+    const audioFeatures = await getAudioFeaturesForTracks(tasteProfileTrackIds);
+    if (audioFeatures.length === 0) return null;
+
+    const sonicProfile = {
+        energy: Array(10).fill(0),
+        danceability: Array(10).fill(0),
+        valence: Array(10).fill(0),
+    };
+
+    audioFeatures.forEach(features => {
+        if (!features) return;
+        const featuresToBin = ['energy', 'danceability', 'valence'];
+        featuresToBin.forEach(feature => {
+            const value = features[feature];
+            if (typeof value === 'number') {
+                const bin = Math.min(9, Math.floor(value * 10));
+                sonicProfile[feature][bin] += 1; 
+            }
+        });
+    });
+
+    const peakSonicProfile = {
+        energy: findPeaks(sonicProfile.energy),
+        danceability: findPeaks(sonicProfile.danceability),
+        valence: findPeaks(sonicProfile.valence),
+    };
+    
+    return peakSonicProfile;
+  }
+
+  async function getAllFollowedArtists() {
+    let allArtists = [];
+    let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
+
+    try {
+        while (nextUrl) {
+            const response = await Spicetify.CosmosAsync.get(nextUrl);
+            if (response?.artists?.items) {
+                allArtists.push(...response.artists.items);
+                nextUrl = response.artists.next;
+            } else {
+                nextUrl = null;
+            }
+        }
+    } catch (error) {
+        console.error("Failed to fetch all followed artists:", error);
+    }
+    return allArtists;
+  }
+
+  async function getComprehensiveKnownArtistsSet() {
+    mainButton.innerText = "Filtering...";
+    
+    const [longTerm, mediumTerm, shortTerm, followedArtists] = await Promise.all([
+        getTopItems('artists', 'long_term', 300),
+        getTopItems('artists', 'medium_term', 150),
+        getTopItems('artists', 'short_term', 150),
+        getAllFollowedArtists()
+    ]);
+
+    const knownArtistIds = new Set([
+        ...longTerm.map(a => a.id),
+        ...mediumTerm.map(a => a.id),
+        ...shortTerm.map(a => a.id),
+        ...followedArtists.map(a => a.id)
+    ]);
+
+    return knownArtistIds;
+  }
+
+  async function generatePersonalizedRecommendations(vibeType) {
+    let playlistName = "";
+    let playlistDescription = "";
+
+    try {
+        mainButton.innerText = "Get library...";
+        const allLikedSongs = await getLikedSongs();
+        const likedSongUrisSet = new Set(allLikedSongs.map(t => t.uri));
+
+        let targetFeatures = {};
+        
+        if (vibeType === 'pureDiscovery') {
+            playlistName = "Pure Discovery";
+            
+            mainButton.innerText = "Filtering...";
+            knownArtistIds = await getComprehensiveKnownArtistsSet();
+            const topArtistsForSeeding = await getTopItems('artists', 'long_term', 100);
+            const topTracksForSeeding = await getTopItems('tracks', 'long_term', 50);
+
+            if (topArtistsForSeeding.length === 0 || topTracksForSeeding.length === 0) {
+                throw new Error("Need more listening history to build a discovery profile.");
+            }
+
+            mainButton.innerText = "Related...";
+            let relatedArtistPool = new Map();
+            const shuffledTopArtists = shuffleArray(topArtistsForSeeding);
+
+            for (const artist of shuffledTopArtists) {
+                if (relatedArtistPool.size > 500) break; 
+                try {
+                    const related = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artist.id}/related-artists`);
+                    related.artists.forEach(relArtist => {
+                        if (!knownArtistIds.has(relArtist.id)) {
+                            relatedArtistPool.set(relArtist.id, relArtist);
+                        }
+                    });
+                } catch (e) { console.warn(`Could not get related artists for ${artist.name}`); }
+            }
+            const unknownRelatedArtists = Array.from(relatedArtistPool.values());
+            if (unknownRelatedArtists.length < 3) {
+                throw new Error("Couldn't find enough new artists related to your taste.");
+            }
+
+            const chosenUnknownArtists = shuffleArray(unknownRelatedArtists).slice(0, 3);
+            const chosenSeedTracks = shuffleArray(topTracksForSeeding).slice(0, 2);
+            
+            const seed_artists = chosenUnknownArtists.map(a => a.id);
+            const seed_tracks = chosenSeedTracks.map(t => t.id);
+            
+            mainButton.innerText = "Profiling..."; 
+            const tasteProfile = await buildAdvancedTasteProfile(shuffleArray(allLikedSongs).slice(0, 200));
+            if (tasteProfile) {
+                const featuresToTarget = ['energy', 'danceability', 'valence'];
+                for (const feature of featuresToTarget) {
+                    if (tasteProfile[feature].length > 0) {
+                        const randomPeak = tasteProfile[feature][Math.floor(Math.random() * tasteProfile[feature].length)];
+                        const targetValue = (randomPeak.start + randomPeak.end) / 2 / 10;
+                        targetFeatures[`target_${feature}`] = targetValue;
+                    }
+                }
+            }
+
+            playlistDescription = "Discover new music from artists related to your all-time favorites. Created by Sort-Play.";
+
+            mainButton.innerText = "Get recs...";
+            const params = new URLSearchParams({ limit: 100 });
+            if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
+            if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
+            for (const [key, value] of Object.entries(targetFeatures)) {
+                if (value !== undefined && !isNaN(value)) params.append(key, value.toFixed(3));
+            }
+            const recommendations = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
+            
+            if (!recommendations?.tracks?.length) throw new Error("Spotify didn't return any recommendations. Try again!");
+            
+            mainButton.innerText = "Excluding...";
+            let newRecommendedTracks = recommendations.tracks.filter(track => !likedSongUrisSet.has(track.uri) && track.artists.every(artist => !knownArtistIds.has(artist.id)));
+            
+            if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
+            
+            const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
+            mainButton.innerText = "Creating...";
+            const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+            
+            Spicetify.showNotification(`Playlist "${playlistName}" created successfully!`);
+
+            if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
+                const tempPath = "/library"; 
+                Spicetify.Platform.History.push(tempPath);
+                await new Promise(resolve => setTimeout(resolve, 450)); 
+                const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
+                if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
+            }
+            return;
+        } 
+
+        let time_range = 'medium_term';
+        let contrast_time_range = 'long_term';
+        let top_pool_size = 100;
+        let songsToProfile = [];
+
+        if (vibeType === 'recommendRecentVibe') {
+            playlistName = "Based on Recent Taste";
+            time_range = 'short_term';
+            contrast_time_range = 'long_term';
+            if (allLikedSongs.length < 20) throw new Error("Not enough liked songs for a recent profile.");
+            songsToProfile = allLikedSongs.slice(0, 100);
+        } else if (vibeType === 'recommendAllTime') {
+            playlistName = "Based on All-Time Taste";
+            time_range = 'long_term';
+            contrast_time_range = 'short_term';
+            if (allLikedSongs.length < 50) throw new Error("Not enough liked songs for an all-time profile.");
+            songsToProfile = shuffleArray(allLikedSongs).slice(0, 200);
+        }
+
+        mainButton.innerText = "Get top...";
+        const [topArtists, topTracks, contrastTopTracks] = await Promise.all([
+            getTopItems('artists', time_range, top_pool_size),
+            getTopItems('tracks', time_range, top_pool_size),
+            getTopItems('tracks', contrast_time_range, 1)
+        ]);
+
+        if (topArtists.length < 10 || topTracks.length < 10) {
+            throw new Error("Not enough listening history for diverse recommendations.");
+        }
+        
+        const allGenres = new Set(topArtists.flatMap(a => a.genres));
+        const shuffledGenres = shuffleArray(Array.from(allGenres));
+        let genreBridgeSeeds = [];
+        if (shuffledGenres.length >= 2) {
+            const genre1 = shuffledGenres[0];
+            const genre2 = shuffledGenres[1];
+            const artistsForGenre1 = shuffleArray(topArtists.filter(a => a.genres.includes(genre1))).slice(0, 3);
+            const artistsForGenre2 = shuffleArray(topArtists.filter(a => a.genres.includes(genre2))).slice(0, 2);
+            genreBridgeSeeds = [...artistsForGenre1, ...artistsForGenre2].map(a => a.id);
+        }
+
+        const sortedByPopAsc = [...topTracks].sort((a, b) => a.popularity - b.popularity);
+        const deepCutPool = sortedByPopAsc.slice(0, 50);
+        const deepCutSeeds = shuffleArray(deepCutPool).slice(0, 5).map(t => t.id);
+
+        let likedSongSeedUris = [];
+        if (vibeType === 'recommendRecentVibe') {
+            likedSongSeedUris = shuffleArray(allLikedSongs.slice(0, 10)).slice(0, 5).map(t => t.uri.split(':')[2]);
+        } else {
+            likedSongSeedUris = shuffleArray(allLikedSongs.slice(-100)).slice(0, 5).map(t => t.uri.split(':')[2]);
+        }
+
+        const smartSongSeeds = new Set();
+        if (vibeType === 'recommendAllTime') {
+            smartSongSeeds.add(shuffleArray(topTracks.slice(0, 20))[0]);
+        } else {
+            smartSongSeeds.add(shuffleArray(topTracks.slice(0, 5))[0]);
+        }
+        smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
+        smartSongSeeds.add(deepCutPool[0]);
+        if (contrastTopTracks.length > 0) smartSongSeeds.add(contrastTopTracks[0]);
+        const randomLikedTopTrackPool = topTracks.filter(t => likedSongUrisSet.has(t.uri));
+        if(randomLikedTopTrackPool.length > 0) smartSongSeeds.add(shuffleArray(randomLikedTopTrackPool)[0]);
+        
+        const finalSmartSeeds = Array.from(smartSongSeeds);
+        let seedIdx = 0;
+        while (finalSmartSeeds.length < 5 && seedIdx < topTracks.length) {
+            if (!finalSmartSeeds.some(s => s.uri === topTracks[seedIdx].uri)) finalSmartSeeds.push(topTracks[seedIdx]);
+            seedIdx++;
+        }
+        const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
+
+        mainButton.innerText = "Profiling...";
+        const tasteProfile = await buildAdvancedTasteProfile(songsToProfile);
+        if (tasteProfile) {
+            const featuresToTarget = ['energy', 'danceability', 'valence'];
+            for (const feature of featuresToTarget) {
+                if (tasteProfile[feature].length > 0) {
+                    const randomPeak = tasteProfile[feature][Math.floor(Math.random() * tasteProfile[feature].length)];
+                    const targetValue = (randomPeak.start + randomPeak.end) / 2 / 10;
+                    targetFeatures[`target_${feature}`] = targetValue;
+                }
+            }
+        }
+        if (vibeType === 'recommendAllTime') {
+            if (Math.random() < 0.4) {
+                targetFeatures.target_popularity = Math.floor(Math.random() * 25) + 20;
+            }
+        }
+
+        playlistDescription = vibeType === 'recommendRecentVibe' 
+            ? "A diverse mix based on your recent taste. Created by Sort-Play." 
+            : "A diverse mix based on your all-time taste. Created by Sort-Play.";
+
+        mainButton.innerText = "Get recs...";
+        const recommendationBatches = [];
+        const NUM_CALLS = 6;
+        
+        for (let i = 0; i < NUM_CALLS; i++) {
+            mainButton.innerText = "Get recs...";
+            const params = new URLSearchParams({ limit: 100 });
+            let seed_artists = [], seed_tracks = [];
+
+            if (i < 2) {
+                seed_artists = shuffleArray(topArtists).slice(0, 3).map(a => a.id);
+                seed_tracks = shuffleArray(topTracks).slice(0, 2).map(t => t.id);
+            } else if (i === 2) {
+                seed_artists = genreBridgeSeeds;
+            } else if (i === 3) {
+                seed_tracks = deepCutSeeds;
+                params.append('max_popularity', '40');
+            } else if (i === 4) {
+                seed_tracks = likedSongSeedUris;
+            } else {
+                seed_tracks = smartSeedUris;
+            }
+
+            if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
+            if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
+            for (const [key, value] of Object.entries(targetFeatures)) {
+                if (value !== undefined && !isNaN(value)) params.append(key, value.toFixed(3));
+            }
+
+            try {
+                const recsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
+                if (recsResponse?.tracks?.length > 0) {
+                    recommendationBatches.push(recsResponse.tracks);
+                }
+            } catch (e) {
+                console.warn(`Recommendation call ${i+1} failed.`, e);
+            }
+            await new Promise(resolve => setTimeout(resolve, 250));
+        }
+
+        if (recommendationBatches.length === 0) {
+            throw new Error("Spotify didn't return any recommendations. Try again!");
+        }
+
+        mainButton.innerText = "Mixing...";
+        let interleavedTracks = [];
+        const maxBatchLength = Math.max(...recommendationBatches.map(batch => batch.length));
+        for (let i = 0; i < maxBatchLength; i++) {
+            for (let j = 0; j < recommendationBatches.length; j++) {
+                if (recommendationBatches[j][i]) {
+                    interleavedTracks.push(recommendationBatches[j][i]);
+                }
+            }
+        }
+        
+        const seenUris = new Set();
+        const uniqueMixedTracks = interleavedTracks.filter(track => {
+            if (seenUris.has(track.uri)) {
+                return false;
+            } else {
+                seenUris.add(track.uri);
+                return true;
+            }
+        });
+
+        mainButton.innerText = "Excluding...";
+        let newRecommendedTracks = uniqueMixedTracks.filter(track => !likedSongUrisSet.has(track.uri));
+
+        if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
+        
+        const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
+        
+        mainButton.innerText = "Creating...";
+        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        await addTracksToPlaylist(newPlaylist.id, trackUris);
+
+        Spicetify.showNotification(`Playlist "${playlistName}" created successfully!`);
+
+        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
+            const tempPath = "/library"; 
+            Spicetify.Platform.History.push(tempPath);
+            await new Promise(resolve => setTimeout(resolve, 450)); 
+            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
+            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
+        }
+
+    } catch (error) {
+        console.error(`Error in generatePersonalizedRecommendations (${vibeType}):`, error);
+        Spicetify.showNotification(error.message, true);
+    } finally {
+        resetButtons();
+    }
+  }
+
+  async function generateFollowedReleasesChronological() {
+    const { GraphQL, CosmosAsync } = Spicetify;
+    setButtonProcessing(true);
+    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+    mainButton.style.color = buttonStyles.main.disabledColor;
+    mainButton.style.cursor = "default";
+    svgElement.style.fill = buttonStyles.main.disabledColor;
+    menuButtons.forEach((button) => (button.disabled = true));
+    toggleMenu();
+    closeAllMenus();
+
+    try {
+        const updateProgress = (message) => { mainButton.innerText = message; };
+
+        updateProgress("Get artists...");
+        
+        async function getFollowedArtists() {
+            let artists = [];
+            let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
+            while (nextUrl) {
+                const response = await Spicetify.CosmosAsync.get(nextUrl);
+                if (response.artists?.items) {
+                    artists.push(...response.artists.items);
+                    nextUrl = response.artists.next;
+                } else {
+                    nextUrl = null;
+                }
+            }
+            return artists;
+        }
+
+        const followedArtists = await getFollowedArtists();
+        if (followedArtists.length === 0) {
+            throw new Error("You are not following any artists.");
+        }
+
+        const dateLimit = new Date();
+        dateLimit.setDate(dateLimit.getDate() - newReleasesDaysLimit);
+        const newReleasesMap = new Map();
+        
+        const BATCH_SIZE = 300;
+        for (let i = 0; i < followedArtists.length; i += BATCH_SIZE) {
+            const artistBatch = followedArtists.slice(i, i + BATCH_SIZE);
+            updateProgress(`Scan ${i + artistBatch.length}/${followedArtists.length}`);
+
+            const batchPromises = artistBatch.map(artist => {
+                const variables = { uri: artist.uri, order: "DATE_DESC", offset: 0, limit: 10 };
+                return GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, variables)
+                    .catch(err => {
+                        console.warn(`Failed to fetch discography for ${artist.name}`, err);
+                        return null;
+                    });
+            });
+
+            const batchResponses = await Promise.all(batchPromises);
+
+            for (const response of batchResponses) {
+                if (!response || response.errors || !response.data?.artistUnion) continue;
+                
+                const releases = response.data.artistUnion.discography?.all?.items;
+                if (releases) {
+                    for (const release of releases) {
+                        const album = release.releases.items[0];
+                        if (album?.date?.isoString) {
+                            const releaseDate = new Date(album.date.isoString);
+                            if (releaseDate >= dateLimit) {
+                                newReleasesMap.set(album.uri, album);
+                            }
+                        }
+                    }
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        const allNewReleases = Array.from(newReleasesMap.values());
+        if (allNewReleases.length === 0) {
+            throw new Error("No new releases found in the last 14 days.");
+        }
+
+        updateProgress(`Get tracks...`);
+        let initialTracks = [];
+        const albumUris = allNewReleases.map(album => album.uri);
+        
+        for (let i = 0; i < albumUris.length; i += 20) {
+            const albumIdBatch = albumUris.slice(i, i + 20).map(uri => uri.split(':')[2]);
+            const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumIdBatch.join(',')}`);
+            if (albumsData.albums) {
+                for (const album of albumsData.albums) {
+                    if (album && album.tracks && album.tracks.items) {
+                        let tracksFromAlbum = album.tracks.items;
+                        if (followedReleasesAlbumLimit !== 'all') {
+                            tracksFromAlbum = tracksFromAlbum.slice(0, parseInt(followedReleasesAlbumLimit, 10));
+                        }
+                        initialTracks.push(...tracksFromAlbum);
+                    }
+                }
+            }
+        }
+        
+        if (initialTracks.length === 0) {
+            throw new Error("Could not fetch any tracks from the new releases.");
+        }
+        
+        updateProgress("Verifying...");
+        let genuinelyNewTracks = [];
+        const initialTrackIds = [...new Map(initialTracks.map(item => [item.id, item])).values()].map(t => t.id).filter(Boolean);
+
+        for (let i = 0; i < initialTrackIds.length; i += 50) {
+            const trackIdBatch = initialTrackIds.slice(i, i + 50);
+            const fullTrackData = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdBatch.join(',')}`);
+            if (fullTrackData.tracks) {
+                for (const track of fullTrackData.tracks) {
+                    if (track && track.album && track.album.release_date) {
+                        const trackReleaseDate = new Date(track.album.release_date);
+                        if (trackReleaseDate >= dateLimit) {
+                            genuinelyNewTracks.push(track);
+                        }
+                    }
+                }
+            }
+        }
+
+        if (genuinelyNewTracks.length === 0) {
+            throw new Error("No genuinely new tracks found after filtering out old songs.");
+        }
+
+        updateProgress("Sorting...");
+        genuinelyNewTracks.sort((a, b) => {
+            const dateA = new Date(a.album.release_date).getTime();
+            const dateB = new Date(b.album.release_date).getTime();
+            if (dateB !== dateA) {
+                return dateB - dateA; 
+            }
+        
+            const albumNameA = a.album.name || '';
+            const albumNameB = b.album.name || '';
+            const albumCompare = albumNameA.localeCompare(albumNameB);
+            if (albumCompare !== 0) {
+                return albumCompare; 
+            }
+        
+            return a.track_number - b.track_number;
+        });
+
+        const trackUris = genuinelyNewTracks.map(track => track.uri);
+        const playlistName = "Followed Releases (Full)";
+        const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Created by Sort-Play.`;
+        
+        updateProgress("Creating...");
+        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        
+        updateProgress("Saving...");
+        await addTracksToPlaylist(newPlaylist.id, trackUris);
+        
+        Spicetify.showNotification(`Playlist "${playlistName}" created with ${trackUris.length} tracks!`);
+
+        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
+            const tempPath = "/library"; 
+            Spicetify.Platform.History.push(tempPath);
+            await new Promise(resolve => setTimeout(resolve, 450)); 
+            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
+            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
+        }
+
+    } catch (error) {
+        console.error("Error generating Chronological Followed Releases:", error);
+        Spicetify.showNotification(error.message, true);
+    } finally {
+        resetButtons();
+    }
+  }
+
+  async function generateFollowedArtistPicks() {
+    const { GraphQL, CosmosAsync } = Spicetify;
+    setButtonProcessing(true);
+    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+    mainButton.style.color = buttonStyles.main.disabledColor;
+    mainButton.style.cursor = "default";
+    svgElement.style.fill = buttonStyles.main.disabledColor;
+    menuButtons.forEach((button) => (button.disabled = true));
+    toggleMenu();
+    closeAllMenus();
+
+    try {
+        const updateProgress = (message) => { mainButton.innerText = message; };
+
+        updateProgress("Get artists...");
+        
+        async function getFollowedArtists() {
+            let artists = [];
+            let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
+            while (nextUrl) {
+                const response = await Spicetify.CosmosAsync.get(nextUrl);
+                if (response.artists?.items) {
+                    artists.push(...response.artists.items);
+                    nextUrl = response.artists.next;
+                } else {
+                    nextUrl = null;
+                }
+            }
+            return artists;
+        }
+
+        const followedArtists = await getFollowedArtists();
+        if (followedArtists.length === 0) {
+            throw new Error("You are not following any artists.");
+        }
+
+        const dateLimit = new Date();
+        dateLimit.setDate(dateLimit.getDate() - newReleasesDaysLimit);
+        const newReleasesMap = new Map();
+        
+        const BATCH_SIZE = 300;
+        for (let i = 0; i < followedArtists.length; i += BATCH_SIZE) {
+            const artistBatch = followedArtists.slice(i, i + BATCH_SIZE);
+            updateProgress(`Scanning...`);
+
+            const batchPromises = artistBatch.map(artist => {
+                const variables = { uri: artist.uri, order: "DATE_DESC", offset: 0, limit: 5 };
+                return GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, variables)
+                    .catch(err => {
+                        console.warn(`Failed to fetch discography for ${artist.name}`, err);
+                        return null;
+                    });
+            });
+
+            const batchResponses = await Promise.all(batchPromises);
+
+            for (const response of batchResponses) {
+                if (!response || response.errors || !response.data?.artistUnion) continue;
+                
+                const releases = response.data.artistUnion.discography?.all?.items;
+                if (releases) {
+                    for (const release of releases) {
+                        const album = release.releases.items[0];
+                        if (album?.date?.isoString) {
+                            const releaseDate = new Date(album.date.isoString);
+                            if (releaseDate >= dateLimit) {
+                                newReleasesMap.set(album.uri, album);
+                            }
+                        }
+                    }
+                }
+            }
+            await new Promise(resolve => setTimeout(resolve, 200));
+        }
+
+        const allNewReleases = Array.from(newReleasesMap.values());
+        if (allNewReleases.length === 0) {
+            throw new Error("No new releases found in the last 14 days.");
+        }
+
+        updateProgress(`Get tracks...`);
+        let initialTracks = [];
+        const albumUris = allNewReleases.map(album => album.uri);
+        
+        for (let i = 0; i < albumUris.length; i += 20) {
+            const albumBatchUris = albumUris.slice(i, i + 20);
+            const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumBatchUris.map(uri => uri.split(':')[2]).join(',')}`);
+            
+            if (albumsData.albums) {
+                for (const album of albumsData.albums) {
+                    if (album && album.tracks && album.tracks.items) {
+                        initialTracks.push(...album.tracks.items);
+                    }
+                }
+            }
+        }
+        
+        if (initialTracks.length === 0) {
+            throw new Error("Could not fetch any tracks from the new releases.");
+        }
+        
+        updateProgress("Verifying...");
+        let genuinelyNewTracks = [];
+        const initialTrackIds = initialTracks.map(t => t.id).filter(Boolean);
+
+        for (let i = 0; i < initialTrackIds.length; i += 50) {
+            const trackIdBatch = initialTrackIds.slice(i, i + 50);
+            const fullTrackData = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdBatch.join(',')}`);
+            if (fullTrackData.tracks) {
+                for (const track of fullTrackData.tracks) {
+                    if (track && track.album && track.album.release_date) {
+                        const trackReleaseDate = new Date(track.album.release_date);
+                        if (trackReleaseDate >= dateLimit) {
+                            genuinelyNewTracks.push({
+                                ...track,
+                                allArtists: track.artists.map(a => a.name).join(', '),
+                                artistUris: track.artists.map(a => a.uri),
+                                durationMilis: track.duration_ms,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if (genuinelyNewTracks.length === 0) {
+            throw new Error("No genuinely new tracks found after filtering out old songs.");
+        }
+
+        const MAX_TRACKS_TO_PROCESS = 1000;
+        let tracksToProcess = [...new Map(genuinelyNewTracks.map(item => [item.uri, item])).values()];
+
+        if (tracksToProcess.length > MAX_TRACKS_TO_PROCESS) {
+            tracksToProcess.sort((a, b) => new Date(b.album.release_date) - new Date(a.album.release_date));
+            tracksToProcess = tracksToProcess.slice(0, MAX_TRACKS_TO_PROCESS);
+        }
+    
+        updateProgress("Enriching...");
+        const tracksWithPlayCounts = await processBatchesWithDelay(
+            tracksToProcess, 200, 1000, 
+            () => {},
+            async (track) => {
+                const adaptedTrackForPlayCount = {
+                    name: track.name,
+                    albumName: track.album.name,
+                    artistName: track.artists[0].name,
+                    allArtists: track.artists.map(a => a.name).join(", "),
+                    track: {
+                        album: { id: track.album.id },
+                        id: track.id,
+                        duration_ms: track.duration_ms
+                    }
+                };
+                const playCountDetails = await getTrackDetailsWithPlayCount(adaptedTrackForPlayCount);
+                return { ...track, ...playCountDetails };
+            }
+        );
+    
+        const tracksWithIdsForPop = await processBatchesWithDelay(
+            tracksWithPlayCounts, 200, 1000,
+            () => {},
+            collectTrackIdsForPopularity
+        );
+        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
+            tracksWithIdsForPop,
+            () => {}
+        );
+    
+        updateProgress("Deduplicating...");
+        const { unique: uniqueTracks, removed: removedDuplicates } = deduplicateTracks(tracksWithPopularity);
+
+        if (uniqueTracks.length === 0) {
+            throw new Error("No unique new tracks found after deduplication.");
+        }
+        
+        tracksToProcess = uniqueTracks;
+    
+        const profileData = await getAffinityProfileData(updateProgress);
+        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced');
+        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced');
+    
+        if (scoredTracks.length === 0) {
+            throw new Error("No tracks matched your affinity profile.");
+        }
+        
+        updateProgress("Balancing...");
+        
+        const tracksByAlbum = scoredTracks.reduce((acc, track) => {
+            const albumUri = track.album.uri;
+            if (!acc[albumUri]) acc[albumUri] = [];
+            acc[albumUri].push(track);
+            return acc;
+        }, {});
+
+        let candidateTracks = [];
+        for (const albumUri in tracksByAlbum) {
+            const topTracksFromAlbum = tracksByAlbum[albumUri]
+                .sort((a, b) => b.finalScore - a.finalScore)
+                .slice(0, 2);
+            candidateTracks.push(...topTracksFromAlbum);
+        }
+        candidateTracks.sort((a, b) => b.finalScore - a.finalScore);
+
+        const FINAL_PLAYLIST_SIZE = 200;
+        const candidateTrackIds = candidateTracks.map(t => t.uri.split(':')[2]);
+        const audioFeatures = await getAudioFeaturesForTracks(candidateTrackIds);
+        const audioFeaturesMap = new Map(audioFeatures.map(f => [f.id, f]));
+        
+        const energyProfile = affinityProfile.rawSonicProfile.energy;
+        const totalWeight = energyProfile.reduce((a, b) => a + b, 0);
+        const lowEnergyWeight = energyProfile.slice(0, 4).reduce((a, b) => a + b, 0);
+        const mediumEnergyWeight = energyProfile.slice(4, 7).reduce((a, b) => a + b, 0);
+        const highEnergyWeight = energyProfile.slice(7, 10).reduce((a, b) => a + b, 0);
+
+        const lowRatio = totalWeight > 0 ? lowEnergyWeight / totalWeight : 0.33;
+        const mediumRatio = totalWeight > 0 ? mediumEnergyWeight / totalWeight : 0.34;
+        const highRatio = totalWeight > 0 ? highEnergyWeight / totalWeight : 0.33;
+
+        let targetLow = Math.round(FINAL_PLAYLIST_SIZE * lowRatio);
+        let targetMedium = Math.round(FINAL_PLAYLIST_SIZE * mediumRatio);
+        let targetHigh = Math.round(FINAL_PLAYLIST_SIZE * highRatio);
+        
+        let totalTarget = targetLow + targetMedium + targetHigh;
+        while(totalTarget !== FINAL_PLAYLIST_SIZE) {
+            if (totalTarget > FINAL_PLAYLIST_SIZE) targetMedium--;
+            else targetHigh++;
+            totalTarget = targetLow + targetMedium + targetHigh;
+        }
+
+        const lowEnergyBin = [], mediumEnergyBin = [], highEnergyBin = [];
+        for(const track of candidateTracks) {
+            const features = audioFeaturesMap.get(track.uri.split(':')[2]);
+            if (features) {
+                if (features.energy < 0.4) lowEnergyBin.push(track);
+                else if (features.energy <= 0.7) mediumEnergyBin.push(track);
+                else highEnergyBin.push(track);
+            }
+        }
+
+        const artistCountMap = new Map();
+        const albumCountMap = new Map();
+        const topTracks = [];
+        const MAX_SONGS_PER_ARTIST = 3;
+        const MAX_SONGS_PER_ALBUM = 3;
+
+        const binPointers = { low: 0, medium: 0, high: 0 };
+        const binArrays = { low: lowEnergyBin, medium: mediumEnergyBin, high: highEnergyBin };
+        const binTargets = { low: targetLow, medium: targetMedium, high: targetHigh };
+        const binCounts = { low: 0, medium: 0, high: 0 };
+
+        while (topTracks.length < FINAL_PLAYLIST_SIZE) {
+            let trackAddedInCycle = false;
+            const pickOrder = ['high', 'medium', 'low'].sort((a,b) => (binCounts[b] / binTargets[b]) - (binCounts[a] / binTargets[a]));
+
+            for (const binName of pickOrder) {
+                if (topTracks.length >= FINAL_PLAYLIST_SIZE) break;
+
+                while (binArrays[binName].length > binPointers[binName] && binCounts[binName] < binTargets[binName]) {
+                    const track = binArrays[binName][binPointers[binName]];
+                    binPointers[binName]++;
+
+                    const primaryArtistUri = track.artists[0].uri;
+                    const albumUri = track.album.uri;
+                    const artistCount = artistCountMap.get(primaryArtistUri) || 0;
+                    const albumCount = albumCountMap.get(albumUri) || 0;
+
+                    if (artistCount < MAX_SONGS_PER_ARTIST && albumCount < MAX_SONGS_PER_ALBUM) {
+                        topTracks.push(track);
+                        artistCountMap.set(primaryArtistUri, artistCount + 1);
+                        albumCountMap.set(albumUri, albumCount + 1);
+                        binCounts[binName]++;
+                        trackAddedInCycle = true;
+                        break;
+                    }
+                }
+            }
+             if (!trackAddedInCycle) {
+                break;
+            }
+        }
+        
+        const trackUris = topTracks.map(track => track.uri);
+        const playlistName = "Followed Artist Picks";
+        const playlistDescription = `The latest releases from artists you follow, personalized for your taste. Created by Sort-Play.`;
+        
+        updateProgress("Creating...");
+        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        
+        updateProgress("Saving...");
+        await addTracksToPlaylist(newPlaylist.id, trackUris);
+        
+        Spicetify.showNotification(`Playlist "${playlistName}" created with ${topTracks.length} tracks!`);
+
+        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
+            const tempPath = "/library"; 
+            Spicetify.Platform.History.push(tempPath);
+            await new Promise(resolve => setTimeout(resolve, 450)); 
+            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
+            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
+        }
+
+    } catch (error) {
+        console.error("Error generating Followed Artist Picks:", error);
+        Spicetify.showNotification(error.message, true);
+    } finally {
+        resetButtons();
+    }
+  }
+
+  async function generateNewDiscoveryPicks() {
+    const { GraphQL, CosmosAsync } = Spicetify;
+    setButtonProcessing(true);
+    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+    mainButton.style.color = buttonStyles.main.disabledColor;
+    mainButton.style.cursor = "default";
+    svgElement.style.fill = buttonStyles.main.disabledColor;
+    menuButtons.forEach((button) => (button.disabled = true));
+    toggleMenu();
+    closeAllMenus();
+
+    try {
+        const updateProgress = (message) => { mainButton.innerText = message; };
+
+        updateProgress("Scanning...");
+
+        const formatItem = (item) => {
+            const artists = Array.isArray(item.artists) ? item.artists.map(a => a.name).join(', ') : 'N/A';
+            return { uri: item.uri, name: item.name, artists, release_date: item.release_date, id: item.id };
+        };
+
+        async function fetchBrowseNewReleases() {
+            const browseAlbums = [];
+            let nextUrl = 'https://api.spotify.com/v1/browse/new-releases?limit=50';
+            while (nextUrl) {
+                try {
+                    const res = await CosmosAsync.get(nextUrl);
+                    if (res.albums?.items) {
+                        browseAlbums.push(...res.albums.items.map(formatItem));
+                        nextUrl = res.albums.next;
+                    } else nextUrl = null;
+                } catch (e) { console.warn("Error fetching Browse releases:", e); nextUrl = null; }
+            }
+            return browseAlbums;
+        }
+
+        async function fetchSearchNewAlbums() {
+            const searchAlbums = [];
+            let nextUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(`year:${new Date().getFullYear()}`)}&type=album&limit=50`;
+            while (nextUrl && searchAlbums.length < 1000) {
+                try {
+                    const res = await CosmosAsync.get(nextUrl);
+                    if (res.albums?.items) {
+                        searchAlbums.push(...res.albums.items);
+                        nextUrl = res.albums.next;
+                    } else nextUrl = null;
+                } catch (e) { console.warn("Error fetching Search releases:", e); nextUrl = null; }
+            }
+            const twoMonthsAgo = new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1);
+            return searchAlbums.filter(album => new Date(album.release_date) >= twoMonthsAgo).map(formatItem);
+        }
+
+        const [browseResults, searchResults] = await Promise.all([
+            fetchBrowseNewReleases(),
+            fetchSearchNewAlbums()
+        ]);
+
+        const combinedResults = [...browseResults, ...searchResults];
+        const uniqueAlbums = Array.from(new Map(combinedResults.map(item => [item.uri, item])).values());
+        
+        if (uniqueAlbums.length === 0) {
+            throw new Error("Could not find any new releases from Spotify's sources.");
+        }
+
+        updateProgress(`Get tracks...`);
+        let initialTracks = [];
+        const albumIds = uniqueAlbums.map(album => album.id);
+
+        for (let i = 0; i < albumIds.length; i += 20) {
+            const albumIdBatch = albumIds.slice(i, i + 20);
+            const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumIdBatch.join(',')}`);
+            if (albumsData.albums) {
+                for (const album of albumsData.albums) {
+                    if (album && album.tracks && album.tracks.items) {
+                        initialTracks.push(...album.tracks.items);
+                    }
+                }
+            }
+        }
+        
+        if (initialTracks.length === 0) {
+            throw new Error("Could not fetch any tracks from the new releases.");
+        }
+
+        updateProgress("Verifying...");
+        const dateLimit = new Date();
+        dateLimit.setDate(dateLimit.getDate() - newReleasesDaysLimit);
+        let genuinelyNewTracks = [];
+        const initialTrackIds = initialTracks.map(t => t.id).filter(Boolean);
+
+        for (let i = 0; i < initialTrackIds.length; i += 50) {
+            const trackIdBatch = initialTrackIds.slice(i, i + 50);
+            const fullTrackData = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdBatch.join(',')}`);
+            if (fullTrackData.tracks) {
+                for (const track of fullTrackData.tracks) {
+                    if (track && track.album && track.album.release_date) {
+                        const trackReleaseDate = new Date(track.album.release_date);
+                        if (trackReleaseDate >= dateLimit) {
+                            genuinelyNewTracks.push({
+                                ...track,
+                                allArtists: track.artists.map(a => a.name).join(', '),
+                                artistUris: track.artists.map(a => a.uri),
+                                durationMilis: track.duration_ms,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        if (genuinelyNewTracks.length === 0) {
+            throw new Error("No genuinely new tracks found after filtering out old songs.");
+        }
+
+        const MAX_TRACKS_TO_PROCESS = 1000;
+        let tracksToProcess = [...new Map(genuinelyNewTracks.map(item => [item.uri, item])).values()];
+
+        if (tracksToProcess.length > MAX_TRACKS_TO_PROCESS) {
+            tracksToProcess.sort((a, b) => new Date(b.album.release_date) - new Date(a.album.release_date));
+            tracksToProcess = tracksToProcess.slice(0, MAX_TRACKS_TO_PROCESS);
+        }
+
+        const profileData = await getAffinityProfileData(updateProgress);
+        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced');
+        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced');
+        
+        if (scoredTracks.length === 0) {
+            throw new Error("No tracks matched your affinity profile.");
+        }
+
+        updateProgress("Balancing...");
+
+        const tracksByAlbum = scoredTracks.reduce((acc, track) => {
+            const albumUri = track.album.uri;
+            if (!acc[albumUri]) acc[albumUri] = [];
+            acc[albumUri].push(track);
+            return acc;
+        }, {});
+
+        let candidateTracks = [];
+        for (const albumUri in tracksByAlbum) {
+            const bestTrackFromAlbum = tracksByAlbum[albumUri].sort((a, b) => b.finalScore - a.finalScore)[0];
+            candidateTracks.push(bestTrackFromAlbum);
+        }
+        candidateTracks.sort((a, b) => b.finalScore - a.finalScore);
+
+        const FINAL_PLAYLIST_SIZE = 100;
+        const candidateTrackIds = candidateTracks.map(t => t.uri.split(':')[2]);
+        const audioFeatures = await getAudioFeaturesForTracks(candidateTrackIds);
+        const audioFeaturesMap = new Map(audioFeatures.map(f => [f.id, f]));
+        
+        const energyProfile = affinityProfile.rawSonicProfile.energy;
+        const totalWeight = energyProfile.reduce((a, b) => a + b, 0);
+        const lowEnergyWeight = energyProfile.slice(0, 4).reduce((a, b) => a + b, 0);
+        const mediumEnergyWeight = energyProfile.slice(4, 7).reduce((a, b) => a + b, 0);
+        const highEnergyWeight = energyProfile.slice(7, 10).reduce((a, b) => a + b, 0);
+
+        const lowRatio = totalWeight > 0 ? lowEnergyWeight / totalWeight : 0.33;
+        const mediumRatio = totalWeight > 0 ? mediumEnergyWeight / totalWeight : 0.34;
+        const highRatio = totalWeight > 0 ? highEnergyWeight / totalWeight : 0.33;
+
+        let targetLow = Math.round(FINAL_PLAYLIST_SIZE * lowRatio);
+        let targetMedium = Math.round(FINAL_PLAYLIST_SIZE * mediumRatio);
+        let targetHigh = Math.round(FINAL_PLAYLIST_SIZE * highRatio);
+        
+        let totalTarget = targetLow + targetMedium + targetHigh;
+        while(totalTarget !== FINAL_PLAYLIST_SIZE) {
+            if (totalTarget > FINAL_PLAYLIST_SIZE) targetMedium--;
+            else targetHigh++;
+            totalTarget = targetLow + targetMedium + targetHigh;
+        }
+
+        const lowEnergyBin = [], mediumEnergyBin = [], highEnergyBin = [];
+        for(const track of candidateTracks) {
+            const features = audioFeaturesMap.get(track.uri.split(':')[2]);
+            if (features) {
+                if (features.energy < 0.4) lowEnergyBin.push(track);
+                else if (features.energy <= 0.7) mediumEnergyBin.push(track);
+                else highEnergyBin.push(track);
+            }
+        }
+
+        const artistCountMap = new Map();
+        const albumCountMap = new Map();
+        const topTracks = [];
+        const MAX_SONGS_PER_ARTIST = 3;
+        const MAX_SONGS_PER_ALBUM = 1;
+
+        const binPointers = { low: 0, medium: 0, high: 0 };
+        const binArrays = { low: lowEnergyBin, medium: mediumEnergyBin, high: highEnergyBin };
+        const binTargets = { low: targetLow, medium: targetMedium, high: targetHigh };
+        const binCounts = { low: 0, medium: 0, high: 0 };
+
+        while (topTracks.length < FINAL_PLAYLIST_SIZE) {
+            let trackAddedInCycle = false;
+            const pickOrder = ['high', 'medium', 'low'].sort((a,b) => (binCounts[b] / binTargets[b]) - (binCounts[a] / binTargets[a]));
+
+            for (const binName of pickOrder) {
+                if (topTracks.length >= FINAL_PLAYLIST_SIZE) break;
+                while (binArrays[binName].length > binPointers[binName] && binCounts[binName] < binTargets[binName]) {
+                    const track = binArrays[binName][binPointers[binName]];
+                    binPointers[binName]++;
+                    const primaryArtistUri = track.artists[0].uri;
+                    const albumUri = track.album.uri;
+                    const artistCount = artistCountMap.get(primaryArtistUri) || 0;
+                    const albumCount = albumCountMap.get(albumUri) || 0;
+                    if (artistCount < MAX_SONGS_PER_ARTIST && albumCount < MAX_SONGS_PER_ALBUM) {
+                        topTracks.push(track);
+                        artistCountMap.set(primaryArtistUri, artistCount + 1);
+                        albumCountMap.set(albumUri, albumCount + 1);
+                        binCounts[binName]++;
+                        trackAddedInCycle = true;
+                        break;
+                    }
+                }
+            }
+             if (!trackAddedInCycle) break;
+        }
+        
+        const trackUris = topTracks.map(track => track.uri);
+        const playlistName = "New Discovery Picks";
+        const playlistDescription = `A personalized mix of new music from across Spotify, tailored to your taste by Sort-Play.`;
+        
+        updateProgress("Creating...");
+        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        
+        updateProgress("Saving...");
+        await addTracksToPlaylist(newPlaylist.id, trackUris);
+        
+        Spicetify.showNotification(`Playlist "${playlistName}" created with ${topTracks.length} tracks!`);
+
+        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
+            const tempPath = "/library"; 
+            Spicetify.Platform.History.push(tempPath);
+            await new Promise(resolve => setTimeout(resolve, 450)); 
+            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
+            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
+        }
+
+    } catch (error) {
+        console.error("Error generating New Discovery Picks:", error);
+        Spicetify.showNotification(error.message, true);
+    } finally {
+        resetButtons();
+    }
+  }
   async function handleSortAndCreatePlaylist(sortType) {
-    if (sortType === "sortByParent") {
+    if (sortType === "sortByParent" || sortType === "affinityParent" || sortType === "createNewPlaylist") {
       return;
     }
+
+    const topTrackSortTypes = {
+        topThisMonth:    { time_range: 'short_term',  name: 'This Month',      description: 'from this month' },
+        topLast6Months:  { time_range: 'medium_term', name: 'Last 6 Months',   description: 'from the last 6 months' },
+        topAllTime:      { time_range: 'long_term',   name: 'All-Time',        description: 'of all time' }
+    };
+
+    const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedArtistPicks', 'newDiscoveryPicks', 'followedReleasesChronological'];
+    if (recommendationSortTypes.includes(sortType)) {
+        if (sortType === 'followedArtistPicks') {
+            await generateFollowedArtistPicks();
+        } else if (sortType === 'newDiscoveryPicks') {
+            await generateNewDiscoveryPicks();
+        } else if (sortType === 'followedReleasesChronological') {
+            await generateFollowedReleasesChronological();
+        } else {
+            setButtonProcessing(true);
+            mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+            mainButton.style.color = buttonStyles.main.disabledColor;
+            mainButton.style.cursor = "default";
+            svgElement.style.fill = buttonStyles.main.disabledColor;
+            menuButtons.forEach((button) => (button.disabled = true));
+            toggleMenu();
+            closeAllMenus();
+            await generatePersonalizedRecommendations(sortType);
+        }
+        return; 
+    }
+    
+    if (topTrackSortTypes[sortType]) {
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        toggleMenu();
+        closeAllMenus();
+        
+        try {
+            mainButton.innerText = "Fetching...";
+            const topTracksData = await getTopItems('tracks', topTrackSortTypes[sortType].time_range, topTracksLimit);
+            
+            if (!topTracksData || topTracksData.length === 0) {
+                Spicetify.showNotification(`No top tracks found for "${topTrackSortTypes[sortType].name}".`, true);
+                resetButtons();
+                return;
+            }
+
+            const trackUris = topTracksData.map(track => track.uri);
+            const playlistName = `My Top Tracks: ${topTrackSortTypes[sortType].name}`;
+            const playlistDescription = `Your top tracks ${topTrackSortTypes[sortType].description}, created by Sort-Play.`;
+            
+            mainButton.innerText = "Creating...";
+            const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+            
+            mainButton.innerText = "Saving...";
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+            
+            Spicetify.showNotification(`Playlist "${playlistName}" created successfully!`);
+
+            if (openPlaylistAfterSortEnabled && newPlaylist && newPlaylist.uri) { 
+                const tempPath = "/library"; 
+                Spicetify.Platform.History.push(tempPath);
+                await new Promise(resolve => setTimeout(resolve, 450)); 
+                const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
+                if (newPlaylistPath) {
+                  Spicetify.Platform.History.push(newPlaylistPath);
+                } else {
+                  console.warn("Could not determine path for new playlist URI:", newPlaylist.uri);
+                }
+            }
+        } catch (error) {
+            console.error("Error creating top tracks playlist:", error);
+            Spicetify.showNotification("Failed to create top tracks playlist.", true);
+        } finally {
+            resetButtons();
+        }
+        return; 
+    }
+
     setButtonProcessing(true);
     mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
     mainButton.style.color = buttonStyles.main.disabledColor;
@@ -9789,7 +11772,7 @@
       }
 
       const user = await Spicetify.Platform.UserAPI.getUser();
-      const canModifyCurrentPlaylist = sortCurrentPlaylistEnabled &&
+      let canModifyCurrentPlaylist = sortCurrentPlaylistEnabled &&
                                        createPlaylistAfterSort && 
                                        isDirectSortType(sortType) &&
                                        URI.isPlaylistV1OrV2(currentUriAtStart) &&
@@ -9798,6 +11781,10 @@
                                        currentPlaylistDetails &&
                                        currentPlaylistDetails.owner &&
                                        currentPlaylistDetails.owner.id === user.username;
+
+      if (sortType === 'affinityPowerHour' || sortType === 'affinityMellowMood') {
+          canModifyCurrentPlaylist = false;
+      }
 
       if (canModifyCurrentPlaylist) {
         const proceedWithModification = await new Promise((resolve) => {
@@ -9832,19 +11819,6 @@
         }
       }
 
-
-      mainButton.innerText = "0%";
-
-      const tracksWithPlayCounts = await processBatchesWithDelay(
-        tracks, 200, 1000, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithPlayCount
-      );
-      const tracksWithIds = await processBatchesWithDelay(
-        tracksWithPlayCounts, 200, 1000, (progress) => { mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`; }, collectTrackIdsForPopularity
-      );
-      const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-        tracksWithIds, (progress) => { mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`; }
-      );
-
       let sortedTracks;
       let uniqueTracks;
       let removedTracks = [];
@@ -9852,78 +11826,157 @@
       let playlistWasModifiedOrCreated = false;
       let newPlaylistObjectForNavigation = null; 
       let modifiedPlaylistOriginalPath = null;
+      
+      const isAffinitySort = ['affinityBalanced', 'affinityShortTerm', 'affinityLongTerm', 'affinityPowerHour', 'affinityMellowMood', 'affinityHiddenGems'].includes(sortType);
 
+      if (isAffinitySort) {
+        const updateProgress = (message) => { mainButton.innerText = message; };
+        try {
+            updateProgress("Analyzing...");
+            const trackIds = tracks.map(t => t.uri.split(':')[2]);
+            const audioFeatures = await getAudioFeaturesForTracks(trackIds);
+            const audioFeaturesMap = new Map(audioFeatures.map(f => [f.id, f]));
 
-      if (
-        sortType === "playCount" ||
-        sortType === "popularity" ||
-        sortType === "shuffle" ||
-        sortType === "releaseDate" ||
-        sortType === "averageColor"
-      ) {
-        let tracksForDeduplication;
-        if (sortType === "releaseDate") {
-          const tracksWithReleaseDates = await processBatchesWithDelay(
-            tracksWithPopularity, 200, 1000, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithReleaseDate
-          );
-          tracksForDeduplication = tracksWithReleaseDates;
-        } else if (sortType === "averageColor") {
-            const cachedTracks = [];
-            const uncachedTracks = [];
-            for (const track of tracksWithPopularity) {
-                const albumId = track.albumId || track.track?.album?.id;
-                if (albumId && getCachedPaletteAnalysis(albumId)) {
-                    cachedTracks.push(track);
-                } else {
-                    uncachedTracks.push(track);
+            let hasPotentialCandidates = false;
+            if (sortType === 'affinityPowerHour') {
+                hasPotentialCandidates = tracks.some(track => {
+                    const features = audioFeaturesMap.get(track.uri.split(':')[2]);
+                    return features && features.energy > 0.65 && features.danceability > 0.5;
+                });
+            } else if (sortType === 'affinityMellowMood') {
+                hasPotentialCandidates = tracks.some(track => {
+                    const features = audioFeaturesMap.get(track.uri.split(':')[2]);
+                    return features && features.energy < 0.4 && features.acousticness > 0.5 && features.speechiness < 0.33;
+                });
+            } else {
+                hasPotentialCandidates = true; 
+            }
+
+            if (!hasPotentialCandidates) {
+                Spicetify.showNotification("This playlist contains no tracks suitable for this mood mix.");
+                resetButtons();
+                return;
+            }
+
+            const profileData = await getAffinityProfileData(updateProgress);
+            
+            let timeScope;
+            switch(sortType) {
+                case 'affinityShortTerm': timeScope = 'recent'; break;
+                case 'affinityLongTerm': timeScope = 'all_time'; break;
+                case 'affinityPowerHour': timeScope = 'energy'; break;
+                case 'affinityMellowMood': timeScope = 'mellow'; break;
+                case 'affinityBalanced':
+                case 'affinityHiddenGems':
+                default: timeScope = 'balanced'; break;
+            }
+            const affinityProfile = buildAffinityProfile(profileData, updateProgress, timeScope);
+            
+            sortedTracks = await scoreAndSortPlaylist(tracks, affinityProfile, updateProgress, timeScope, audioFeaturesMap);
+            
+            if (sortType === 'affinityHiddenGems') {
+                if (sortedTracks.length > 0) {
+                    sortedTracks.forEach(track => {
+                        const popularityScore = track.popularity || 0;
+                        const discoveryScore = track.finalScore / Math.log10(popularityScore + 2);
+                        track.discoveryScore = discoveryScore;
+                    });
+                    sortedTracks.sort((a, b) => b.discoveryScore - a.discoveryScore);
                 }
             }
 
-            let tracksWithColor = [];
-            const totalColorTracks = tracksWithPopularity.length;
-
-            if (cachedTracks.length > 0) {
-                const cachedResults = await processBatchesWithDelay(
-                    cachedTracks, 50, 500,
-                    (progress) => {
-                        const overallProgress = (cachedTracks.length / totalColorTracks) * progress;
-                        mainButton.innerText = `${60 + Math.floor(overallProgress * 0.40)}%`;
-                    },
-                    getTrackDetailsWithPaletteAnalysis
-                );
-                tracksWithColor.push(...cachedResults);
-            }
-
-            if (uncachedTracks.length > 0) {
-                const uncachedResults = await processBatchesWithDelay(
-                    uncachedTracks, 15, 1500,
-                    (progress) => {
-                        const cachedPortion = (cachedTracks.length / totalColorTracks) * 40;
-                        const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress * 0.40;
-                        mainButton.innerText = `${60 + Math.floor(cachedPortion + uncachedPortion)}%`;
-                    },
-                    getTrackDetailsWithPaletteAnalysis
-                );
-                tracksWithColor.push(...uncachedResults);
-            }
-
-            tracksForDeduplication = tracksWithColor;
-        } else {
-          tracksForDeduplication = tracksWithPopularity;
+            uniqueTracks = sortedTracks; 
+            removedTracks = [];
+            mainButton.innerText = "100%";
+        } catch (error) {
+            Spicetify.showNotification(error.message, true);
+            resetButtons();
+            return;
         }
-        
-        const deduplicationResult = deduplicateTracks(tracksForDeduplication);
-        uniqueTracks = deduplicationResult.unique;
-        removedTracks = deduplicationResult.removed;
+      } else {
+        mainButton.innerText = "0%";
 
-        if (sortType === "playCount") {
-          sortedTracks = uniqueTracks
-            .filter((track) => track.playCount !== "N/A")
-            .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount);
-        } else if (sortType === "popularity") {
-          sortedTracks = uniqueTracks
-            .filter((track) => track.popularity !== null)
-            .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity);
+        const tracksWithPlayCounts = await processBatchesWithDelay(
+          tracks, 200, 1000, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithPlayCount
+        );
+        const tracksWithIds = await processBatchesWithDelay(
+          tracksWithPlayCounts, 200, 1000, (progress) => { mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`; }, collectTrackIdsForPopularity
+        );
+        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
+          tracksWithIds, (progress) => { mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`; }
+        );
+
+        if (
+          sortType === "playCount" ||
+          sortType === "popularity" ||
+          sortType === "shuffle" ||
+          sortType === "releaseDate" ||
+          sortType === "averageColor" ||
+          sortType === "deduplicateOnly"
+        ) {
+          let tracksForDeduplication;
+          if (sortType === "releaseDate") {
+            const tracksWithReleaseDates = await processBatchesWithDelay(
+              tracksWithPopularity, 200, 1000, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithReleaseDate
+            );
+            tracksForDeduplication = tracksWithReleaseDates;
+          } else if (sortType === "averageColor") {
+              const cachedTracks = [];
+              const uncachedTracks = [];
+              for (const track of tracksWithPopularity) {
+                  const albumId = track.albumId || track.track?.album?.id;
+                  if (albumId && getCachedPaletteAnalysis(albumId)) {
+                      cachedTracks.push(track);
+                  } else {
+                      uncachedTracks.push(track);
+                  }
+              }
+
+              let tracksWithColor = [];
+              const totalColorTracks = tracksWithPopularity.length;
+
+              if (cachedTracks.length > 0) {
+                  const cachedResults = await processBatchesWithDelay(
+                      cachedTracks, 50, 500,
+                      (progress) => {
+                          const overallProgress = (cachedTracks.length / totalColorTracks) * progress;
+                          mainButton.innerText = `${60 + Math.floor(overallProgress * 0.40)}%`;
+                      },
+                      getTrackDetailsWithPaletteAnalysis
+                  );
+                  tracksWithColor.push(...cachedResults);
+              }
+
+              if (uncachedTracks.length > 0) {
+                  const uncachedResults = await processBatchesWithDelay(
+                      uncachedTracks, 15, 1500,
+                      (progress) => {
+                          const cachedPortion = (cachedTracks.length / totalColorTracks) * 40;
+                          const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress * 0.40;
+                          mainButton.innerText = `${60 + Math.floor(cachedPortion + uncachedPortion)}%`;
+                      },
+                      getTrackDetailsWithPaletteAnalysis
+                  );
+                  tracksWithColor.push(...uncachedResults);
+              }
+
+              tracksForDeduplication = tracksWithColor;
+          } else {
+            tracksForDeduplication = tracksWithPopularity;
+          }
+          
+          const deduplicationResult = deduplicateTracks(tracksForDeduplication);
+          uniqueTracks = deduplicationResult.unique;
+          removedTracks = deduplicationResult.removed;
+
+          if (sortType === "playCount") {
+            sortedTracks = uniqueTracks
+              .filter((track) => track.playCount !== "N/A")
+              .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount);
+          } else if (sortType === "popularity") {
+            sortedTracks = uniqueTracks
+              .filter((track) => track.popularity !== null)
+              .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity);
         } else if (sortType === "releaseDate") {
           sortedTracks = uniqueTracks
             .filter((track) => track.releaseDate !== null)
@@ -9935,94 +11988,116 @@
               if (dateComparison !== 0) {
                 return dateComparison;
               }
-
+              
               return (a.trackNumber || 0) - (b.trackNumber || 0);
             });
         } else if (sortType === "averageColor") {
-            sortedTracks = uniqueTracks
-                .filter(track => track.averageColor && track.averageColor.dominantHsl)
-                .sort((a, b) => {
-                    const analysisA = a.averageColor;
-                    const analysisB = b.averageColor;
-                    const sortOrder = sortOrderState.averageColor ? -1 : 1;
+              sortedTracks = uniqueTracks
+                  .filter(track => track.averageColor && track.averageColor.dominantHsl)
+                  .sort((a, b) => {
+                      const analysisA = a.averageColor;
+                      const analysisB = b.averageColor;
+                      const sortOrder = sortOrderState.averageColor ? -1 : 1;
 
-                    if (colorSortMode === 'perceptual') {
-                        if (analysisA.isMonochrome && !analysisB.isMonochrome) return -1;
-                        if (!analysisA.isMonochrome && analysisB.isMonochrome) return 1;
+                      if (colorSortMode === 'perceptual') {
+                          if (analysisA.isMonochrome && !analysisB.isMonochrome) return -1;
+                          if (!analysisA.isMonochrome && analysisB.isMonochrome) return 1;
 
-                        if (analysisA.isMonochrome) {
-                            return (analysisB.dominantHsl.l - analysisA.dominantHsl.l);
-                        } else {
-                            const colorA = analysisA.dominantHsl;
-                            const colorB = analysisB.dominantHsl;
-                            if (colorA.h !== colorB.h) {
-                                return (colorA.h - colorB.h) * sortOrder;
-                            }
-                            return colorB.l - colorA.l;
-                        }
-                    } else {
-                        const colorA = analysisA.dominantHsl;
-                        const colorB = analysisB.dominantHsl;
-                        if (colorA.h !== colorB.h) {
-                            return (colorA.h - colorB.h) * sortOrder;
-                        }
-                        if (colorA.l !== colorB.l) {
-                            return (colorA.l - colorB.l) * sortOrder;
-                        }
-                        return (colorA.s - colorB.s) * sortOrder;
-                    }
-                });
-        } else if (sortType === "shuffle") {
-          sortedTracks = shuffleArray(uniqueTracks);
-        }
-        mainButton.innerText = "100%";
-
-      } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
-          try {
-              const result = await handleScrobblesSorting(
-                tracks, sortType, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
-              );
-              sortedTracks = result.sortedTracks;
-              removedTracks = result.removedTracks;
-              const totalTracksProgress = sortedTracks.length;
-              sortedTracks.forEach((_, index) => {
-                const progress = 90 + Math.floor(((index + 1) / totalTracksProgress) * 10);
-                mainButton.innerText = `${progress}%`;
-              });
-              mainButton.innerText = "100%";
-            } catch (error) {
-              resetButtons();
-              Spicetify.showNotification(error.message);
-              return;
-            }
-      } else if (sortType === "aiPick") {
-        const { uniqueTracks: aiUniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
-          tracks, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
-        );
-        removedTracks = removedTracksFromAi;
-        if (aiUniqueTracks.length === 0) {
-          resetButtons();
-          Spicetify.showNotification("No tracks available for AI to pick from.");
-          return;
-        }
-        let artistImageUrl = null;
-        if (isArtistPage) {
-          try {
-            artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
-          } catch (error) { console.error("Error fetching artist image URL:", error); }
-        }
-        await showAiPickModal(aiUniqueTracks, artistImageUrl);
-        return;
-      }
-
-      if (createPlaylistAfterSort && isDirectSortType(sortType)) {
-        if (!sortedTracks || sortedTracks.length === 0) {
-           console.log("No tracks left after sorting/filtering to create/modify playlist.");
-           if (!addToQueueEnabled) {
-                Spicetify.showNotification("No tracks to process for playlist.");
+                          if (analysisA.isMonochrome) {
+                              return (analysisB.dominantHsl.l - analysisA.dominantHsl.l);
+                          } else {
+                              const colorA = analysisA.dominantHsl;
+                              const colorB = analysisB.dominantHsl;
+                              if (colorA.h !== colorB.h) {
+                                  return (colorA.h - colorB.h) * sortOrder;
+                              }
+                              return colorB.l - colorA.l;
+                          }
+                      } else {
+                          const colorA = analysisA.dominantHsl;
+                          const colorB = analysisB.dominantHsl;
+                          if (colorA.h !== colorB.h) {
+                              return (colorA.h - colorB.h) * sortOrder;
+                          }
+                          if (colorA.l !== colorB.l) {
+                              return (colorA.l - colorB.l) * sortOrder;
+                          }
+                          return (colorA.s - colorB.s) * sortOrder;
+                      }
+                  });
+          } else if (sortType === "shuffle") {
+            sortedTracks = shuffleArray(uniqueTracks);
+          } else if (sortType === "deduplicateOnly") {
+            if (removedTracks.length === 0) {
+                Spicetify.showNotification("No duplicate tracks found.");
                 resetButtons();
                 return;
-           }
+            }
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => {
+                if (track.uri) {
+                    originalOrderMap.set(track.uri, index);
+                }
+            });
+            sortedTracks = uniqueTracks.sort((a, b) => {
+                const orderA = originalOrderMap.get(a.uri);
+                const orderB = originalOrderMap.get(b.uri);
+                return orderA - orderB;
+            });
+          }
+          mainButton.innerText = "100%";
+
+        } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
+            try {
+                const result = await handleScrobblesSorting(
+                  tracks, sortType, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
+                );
+                sortedTracks = result.sortedTracks;
+                removedTracks = result.removedTracks;
+                const totalTracksProgress = sortedTracks.length;
+                sortedTracks.forEach((_, index) => {
+                  const progress = 90 + Math.floor(((index + 1) / totalTracksProgress) * 10);
+                  mainButton.innerText = `${progress}%`;
+                });
+                mainButton.innerText = "100%";
+              } catch (error) {
+                resetButtons();
+                Spicetify.showNotification(error.message);
+                return;
+              }
+        } else if (sortType === "aiPick") {
+          const { uniqueTracks: aiUniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
+            tracks, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
+          );
+          removedTracks = removedTracksFromAi;
+          if (aiUniqueTracks.length === 0) {
+            resetButtons();
+            Spicetify.showNotification("No tracks available for AI to pick from.");
+            return;
+          }
+          let artistImageUrl = null;
+          if (isArtistPage) {
+            try {
+              artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
+            } catch (error) { console.error("Error fetching artist image URL:", error); }
+          }
+          await showAiPickModal(aiUniqueTracks, artistImageUrl);
+          return;
+        }
+      }
+      
+      if (createPlaylistAfterSort && isDirectSortType(sortType)) {
+        if (!sortedTracks || sortedTracks.length === 0) {
+            if (sortType === 'affinityPowerHour' || sortType === 'affinityMellowMood') {
+                Spicetify.showNotification("No tracks matched the criteria for this personalized sort.");
+            } else {
+                console.log("No tracks left after sorting/filtering to create/modify playlist.");
+                if (!addToQueueEnabled) {
+                    Spicetify.showNotification("No tracks to process for playlist.");
+                }
+            }
+            resetButtons();
+            return;
         }
         
         const sourceUriForNaming = currentUriAtStart; 
@@ -10045,6 +12120,10 @@
             "\\(Color\\)",
             "\\(Genre Filter\\)",
             "\\(Custom Filter\\)",
+            "\\(Personalized\\)",
+            "\\(Power Hour\\)",
+            "\\(Mellow Mood\\)",
+            "\\(Hidden Gems\\)"
         ];
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
         while (suffixPattern.test(finalSourceName)) {
@@ -10058,6 +12137,13 @@
           personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
           averageColor: { fullName: "album color", shortName: "Color" },
+          deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
+          affinityBalanced: { fullName: "your taste", shortName: "Personalized" },
+          affinityShortTerm: { fullName: "your recent vibe", shortName: "Personalized" },
+          affinityLongTerm: { fullName: "your all-time favorites", shortName: "Personalized" },
+          affinityPowerHour: { fullName: "your power hour", shortName: "Power Hour" },
+          affinityMellowMood: { fullName: "your mellow mood", shortName: "Mellow Mood" },
+          affinityHiddenGems: { fullName: "your hidden gems", shortName: "Hidden Gems" }
         }[sortType];
 
         if (canModifyCurrentPlaylist) {
@@ -10152,7 +12238,6 @@
               } else {
               }
           } else if (openPlaylistAfterSortEnabled && newPlaylistObjectForNavigation && newPlaylistObjectForNavigation.uri) { 
-              console.log("Attempting to navigate to new playlist:", newPlaylistObjectForNavigation.uri);
               const tempPath = "/library"; 
               Spicetify.Platform.History.push(tempPath);
               await new Promise(resolve => setTimeout(resolve, 450)); 
@@ -10614,8 +12699,7 @@
     mainButton.appendChild(svgElement); 
     mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
     mainButton.style.cursor = "pointer";
-    mainButton.style.color = buttonStyles.main.color;
-    svgElement.style.fill = buttonStyles.main.color; 
+    applyCurrentThemeColors(); 
     mainButton.style.filter = "brightness(1)";
     isButtonClicked = false;
     menuButtons.forEach((button) => {
@@ -10905,7 +12989,7 @@
     }
   }
 
-  async function loadAdditionalColumnData(tracklist_) {
+  async function loadAdditionalColumnData(tracks) {
     const currentUri = getCurrentUri();
     let isColumnEnabled = false;
     let activeColumnType = 'playCount';
@@ -10922,7 +13006,7 @@
         activeColumnType = selectedArtistColumnType;
     }
 
-    if (!isColumnEnabled) return;
+    if (!isColumnEnabled || tracks.length === 0) return;
 
     if (activeColumnType === 'playCount') {
         initializePlayCountCache();
@@ -10931,15 +13015,6 @@
     } else if (activeColumnType === 'scrobbles') {
         initializeScrobblesCache();
     }
-
-    const tracks = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
-        .filter(track => {
-            if (track.classList.contains('sort-play-processing')) return false;
-            const dataElement = track.querySelector(".sort-play-data");
-            const trackUri = getTracklistTrackUri(track);
-            const isTrack = trackUri && trackUri.includes("track");
-            return dataElement && (dataElement.textContent === "" || dataElement.textContent === "_") && isTrack && trackUri;
-        });
     
     const BATCH_SIZE = audioFeatureTypes.includes(activeColumnType) ? 50 : 10;
     
@@ -10951,11 +13026,13 @@
             const elementMap = new Map();
 
             for (const trackElement of batch) {
+                const dataElement = trackElement.querySelector(".sort-play-data");
+                if (!dataElement) continue;
+
                 trackElement.classList.add('sort-play-processing');
                 const trackUri = getTracklistTrackUri(trackElement);
                 const trackId = trackUri ? trackUri.split(":")[2] : null;
-                const dataElement = trackElement.querySelector(".sort-play-data");
-                if (!trackId || !dataElement) continue;
+                if (!trackId) continue;
 
                 const statsCacheModel = "stats-column";
                 const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
@@ -11197,7 +13274,7 @@
   }
 
   
-  async function updateTracklistStructure(tracklist_) {
+  async function updateTracklistStructure(tracklist_, rows) {
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
 
@@ -11207,106 +13284,47 @@
 
     const gridCss = getGridCss(shouldRemoveDateAdded);
     const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
-    if (!tracklistHeader) return; 
+    if (!tracklistHeader) return;
 
     const existingPlaysHeader = tracklistHeader.querySelector(".sort-play-header");
-    const currentHeaderText = existingPlaysHeader?.parentElement.querySelector("span")?.innerText;
     let expectedHeaderText;
     switch (selectedColumnType) {
-        case 'playCount':
-            expectedHeaderText = "Plays";
-            break;
-        case 'releaseDate':
-            expectedHeaderText = "Rel. Date";
-            break;
-        case 'scrobbles':
-            expectedHeaderText = "Scrobbles";
-            break;
-        case 'personalScrobbles':
-            expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles";
-            break;
-        case 'djInfo':
-            expectedHeaderText = "DJ Info";
-            break;
-        case 'key':
-            expectedHeaderText = "Key";
-            break;
-        case 'tempo':
-            expectedHeaderText = "BPM";
-            break;
-        case 'energy':
-            expectedHeaderText = "Energy";
-            break;
-        case 'danceability':
-            expectedHeaderText = "Dance";
-            break;
-        case 'valence':
-            expectedHeaderText = "Valence";
-            break;
-        default:
-            expectedHeaderText = "Plays";
+        case 'playCount': expectedHeaderText = "Plays"; break;
+        case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
+        case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
+        case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+        case 'djInfo': expectedHeaderText = "DJ Info"; break;
+        case 'key': expectedHeaderText = "Key"; break;
+        case 'tempo': expectedHeaderText = "BPM"; break;
+        case 'energy': expectedHeaderText = "Energy"; break;
+        case 'danceability': expectedHeaderText = "Dance"; break;
+        case 'valence': expectedHeaderText = "Valence"; break;
+        default: expectedHeaderText = "Plays";
     }
-    const columnTypeChanged = existingPlaysHeader && currentHeaderText !== expectedHeaderText;
-    const columnVisibilityChanged = (existingPlaysHeader && !showAdditionalColumn) || (!existingPlaysHeader && showAdditionalColumn);
 
-    if (columnVisibilityChanged || columnTypeChanged) {
-        if (existingPlaysHeader) {
-            let headerColumnDiv = existingPlaysHeader.parentElement;
-            let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-            if (lastColumn && headerColumnDiv) {
-                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                headerColumnDiv.remove();
-                lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+    if (!existingPlaysHeader && showAdditionalColumn) {
+        let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+        if (lastColumn) {
+            let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+            const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
+            tracklistHeader.style.cssText = newGridTemplate;
 
-                switch (colIndexInt - 1) {
-                   case 4: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                   case 5: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                   case 6: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                    default:
-                         console.warn("Unexpected number of columns after header removal:", colIndexInt - 1);
-                         break;
-                }
-            }
+            let headerColumn = document.createElement("div");
+            headerColumn.className = "main-trackList-rowSectionVariable sort-play-column";
+            headerColumn.role = "columnheader";
+            headerColumn.setAttribute("aria-colindex", colIndexInt.toString());
+            headerColumn.innerHTML = `<button class="main-trackList-column main-trackList-sortable sort-play-header"><span class="TypeElement-mesto-type standalone-ellipsis-one-line">${expectedHeaderText}</span></button>`;
+            
+            const insertionPoint = shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn;
+            tracklistHeader.insertBefore(headerColumn, insertionPoint);
+            lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
         }
-
-        if (showAdditionalColumn) {
-            const hasSpotifyPlaysColumn = !!tracklistHeader.querySelector(".main-trackList-playsHeader");
-            if (!hasSpotifyPlaysColumn) { 
-                let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-                if (lastColumn) {
-                    let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-
-                    switch (colIndexInt) {
-                        case 4: tracklistHeader.style.cssText = gridCss.fiveColumnGridCss; break;
-                        case 5: tracklistHeader.style.cssText = gridCss.sixColumnGridCss; break;
-                        case 6: tracklistHeader.style.cssText = gridCss.sevenColumnGridCss; break;
-                         default:
-                            console.warn("Unexpected number of columns before header addition:", colIndexInt);
-                            break; 
-                    }
-
-                    const insertionPoint = shouldRemoveDateAdded
-                        ? tracklistHeader.querySelector('[aria-colindex="4"]')
-                        : lastColumn;
-
-                    let headerColumn = document.createElement("div");
-                    headerColumn.style.display = "flex";
-                    headerColumn.classList.add("main-trackList-rowSectionVariable", "sort-play-column");
-                    headerColumn.role = "columnheader";
-                    headerColumn.setAttribute("aria-colindex", colIndexInt.toString());
-
-                    tracklistHeader.insertBefore(headerColumn, insertionPoint);
-                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-
-                    var btn = document.createElement("button");
-                    btn.classList.add("main-trackList-column", "main-trackList-sortable", "sort-play-header");
-                    var title = document.createElement("span");
-                    title.classList.add("TypeElement-mesto-type", "standalone-ellipsis-one-line");
-                    title.innerText = expectedHeaderText; 
-                    btn.appendChild(title);
-                    headerColumn.appendChild(btn);
-                }
-            }
+    } else if (existingPlaysHeader && !showAdditionalColumn) {
+        existingPlaysHeader.parentElement.remove();
+    } else if (existingPlaysHeader && showAdditionalColumn) {
+        const headerTextSpan = existingPlaysHeader.querySelector('span');
+        if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
+            headerTextSpan.innerText = expectedHeaderText;
         }
     }
 
@@ -11315,93 +13333,35 @@
         dateAddedHeader.style.display = shouldRemoveDateAdded ? 'none' : '';
     }
 
-    const tracks = tracklist_.getElementsByClassName("main-trackList-trackListRow");
-    for (const track of tracks) {
-        const existingDataColumn = track.querySelector(".sort-play-data-column");
-
-        if (existingDataColumn && !showAdditionalColumn) {
-            let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-             if(lastColumn) {
-                 let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                 existingDataColumn.remove();
-                 lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
-                 switch (colIndexInt - 1) {
-                     case 4: track.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                     case 5: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                     case 6: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                      default:
-                          console.warn("Unexpected number of columns after cell removal:", colIndexInt - 1);
-                          break;
-                 }
-            }
-        }
-        else if (showAdditionalColumn && !existingDataColumn) {
-            const hasSpotifyPlaysColumn = !!track.querySelector(".main-trackList-rowSectionPlays");
-            if (!hasSpotifyPlaysColumn) { 
-                let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-                if (lastColumn) {
-                    let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-
-                    switch (colIndexInt) {
-                        case 4: track.style.cssText = gridCss.fiveColumnGridCss; break;
-                        case 5: track.style.cssText = gridCss.sixColumnGridCss; break;
-                        case 6: track.style.cssText = gridCss.sevenColumnGridCss; break;
-                         default:
-                            console.warn("Unexpected number of columns before cell addition:", colIndexInt);
-                            break;
-                    }
-
-                    const insertionPoint = shouldRemoveDateAdded
-                        ? track.querySelector('[aria-colindex="4"]')
-                        : lastColumn;
-
-                    let dataColumn = document.createElement("div");
-                    dataColumn.setAttribute("aria-colindex", colIndexInt.toString());
-                    dataColumn.style.display = "flex";
-                    dataColumn.style.justifyContent = "center";
-                    dataColumn.style.alignItems = "center";
-                    dataColumn.classList.add("main-trackList-rowSectionVariable", "sort-play-data-column", "sort-play-column");
-
-                    const dataElement = document.createElement("span");
-                    dataElement.classList.add("sort-play-data");
-                    dataElement.textContent = ""; 
-                    dataElement.style.fontSize = "14px";
-                    dataElement.style.fontWeight = "400";
-                    dataElement.style.color = "var(--spice-subtext)";
-                    dataColumn.appendChild(dataElement);
-
-                    track.insertBefore(dataColumn, insertionPoint);
-                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-                }
-            }
-        }
-        else if (existingDataColumn && columnTypeChanged) {
-            const dataSpan = existingDataColumn.querySelector('.sort-play-data');
-            if (dataSpan) {
-                dataSpan.textContent = "";
-            }
-        }
-        else if (existingDataColumn && selectedColumnType === 'releaseDate') {
-             const dataSpan = existingDataColumn.querySelector('.sort-play-data');
-             if(dataSpan) {
-                 const trackUri = getTracklistTrackUri(track);
-                 if (trackUri) {
-                     const trackId = trackUri.split(":")[2];
-                     const cachedRawDate = getCachedReleaseDate(trackId);
-                     if (cachedRawDate !== null && dataSpan.textContent !== formatReleaseDate(cachedRawDate, releaseDateFormat)) {
-                         updateDisplay(dataSpan, cachedRawDate, 'releaseDate');
-                     }
-                 }
-             }
-        }
-
-
+    for (const track of rows) {
         const dateAddedCell = track.querySelector('[aria-colindex="4"]');
         if (dateAddedCell) {
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
         }
+
+        const existingDataColumn = track.querySelector(".sort-play-data-column");
+        if (showAdditionalColumn && !existingDataColumn) {
+            let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+            if (lastColumn) {
+                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
+                track.style.cssText = newGridTemplate;
+
+                let dataColumn = document.createElement("div");
+                dataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
+                dataColumn.setAttribute("aria-colindex", colIndexInt.toString());
+                dataColumn.style.display = "flex";
+                dataColumn.style.justifyContent = "center";
+                dataColumn.style.alignItems = "center";
+                dataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+
+                const insertionPoint = shouldRemoveDateAdded ? track.querySelector('[aria-colindex="4"]') : lastColumn;
+                track.insertBefore(dataColumn, insertionPoint);
+                lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+            }
+        }
     }
-}
+  }
 
   
   const getGridCss = (removeDateAdded) => {
@@ -11640,28 +13600,42 @@
     const tracklist = await waitForElement(".main-trackList-indexable");
     if (!tracklist) return;
 
-    updateTracklist();
+    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
+    if (!rowContainer) {
+        console.warn("Sort-Play: Could not find the specific row container to observe.");
+        return;
+    }
+
+    const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
+    await updateTracklistStructure(tracklist, initialRows);
+    loadAdditionalColumnData(initialRows);
 
     if (tracklistObserver) tracklistObserver.disconnect();
 
-    tracklistObserver = new MutationObserver(async (mutations) => {
-      clearTimeout(updateDebounceTimeout);
-      updateDebounceTimeout = setTimeout(() => {
+    const observerCallback = (mutations) => {
+        const addedRows = [];
         for (const mutation of mutations) {
-          for (const addedNode of mutation.addedNodes) {
-            if (addedNode.classList?.contains("main-trackList-indexable")) {
-              updateTracklist();
-              return; 
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")) {
+                    addedRows.push(node);
+                }
             }
-          }
         }
-        updateTracklist();
-      }, 100);
-    });
-    
-    tracklistObserver.observe(tracklist.parentElement, {
+
+        if (addedRows.length > 0) {
+            clearTimeout(updateDebounceTimeout);
+            updateDebounceTimeout = setTimeout(() => {
+                updateTracklistStructure(tracklist, addedRows);
+                loadAdditionalColumnData(addedRows);
+            }, 150);
+        }
+    };
+
+    tracklistObserver = new MutationObserver(observerCallback);
+
+    tracklistObserver.observe(rowContainer, {
       childList: true,
-      subtree: true,
+      subtree: false,
     });
   }
 
@@ -11743,7 +13717,6 @@
         }
       }
     } 
-    /* 
     else if (URI.isAlbum(currentUri)) {
         const newContainer = document.querySelector(".yLmA5f7x65en2MdKbIhX");
 
@@ -11763,9 +13736,38 @@
             }
         }
     }
-    */
   }
-  
+
+  function applyCurrentThemeColors(elementToUpdate = null) {
+    requestAnimationFrame(() => {
+        if (!elementToUpdate) {
+            const nativeButtonColor = getNativeTertiaryButtonColor();
+            if (mainButton && !isProcessing) { 
+                mainButton.style.color = nativeButtonColor;
+                if (svgElement) svgElement.style.fill = nativeButtonColor;
+            }
+        }
+
+        const menu = elementToUpdate || (menuContainer && document.body.contains(menuContainer) ? menuContainer : null);
+
+        if (menu) {
+            const nativeMenuColor = getNativeMenuTextColor();
+
+            const childButtons = menu.querySelectorAll('button');
+            childButtons.forEach(button => {
+                button.style.color = nativeMenuColor;
+            });
+
+            const childIcons = menu.querySelectorAll('svg');
+            childIcons.forEach(svg => {
+                if (svg.style.fill !== 'rgb(30, 215, 96)') { 
+                    svg.style.fill = nativeMenuColor;
+                }
+            });
+        }
+    });
+  }
+
   function onPageChange() {
     if (tracklistObserver) tracklistObserver.disconnect();
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
@@ -11792,6 +13794,24 @@
   });
 
   Spicetify.Platform.History.listen(onPageChange);
+
+  const themeObserver = new MutationObserver(() => {
+    requestAnimationFrame(() => {
+      applyCurrentThemeColors();
+    });
+  });
+  
+  themeObserver.observe(document.body, {
+    attributes: true,
+    attributeFilter: ['class'],
+  });
+
+  const startupInterval = setInterval(() => {
+    if (Spicetify.Player?.data) {
+      clearInterval(startupInterval);
+      applyCurrentThemeColors();
+    }
+  }, 100);
 
   loadSettings();
   initializePlayCountCache();
