@@ -10187,13 +10187,17 @@
         for (let i = 0; i < newTrackIds.length; i += 100) {
             const batch = newTrackIds.slice(i, i + 100);
             const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batch.join(',')}`);
-            response.audio_features.forEach(features => features && audioFeaturesMap.set(features.id, features));
+            if (response && response.audio_features) {
+                response.audio_features.forEach(features => features && audioFeaturesMap.set(features.id, features));
+            }
         }
 
         for (let i = 0; i < newArtistIds.length; i += 50) {
             const batch = newArtistIds.slice(i, i + 50);
             const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
-            response.artists.forEach(artist => artist && artistGenreMap.set(artist.id, artist.genres));
+            if (response && response.artists) {
+                response.artists.forEach(artist => artist && artistGenreMap.set(artist.id, artist.genres));
+            }
         }
         
         newlyEnhancedSongs = newSongsToProcess.map(song => {
