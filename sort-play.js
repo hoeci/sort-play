@@ -64,7 +64,14 @@
   - Only provide a raw list of Spotify track URIs (e.g., spotify:track:123, spotify:track:456).
   - Do not include any additional text, explanations, or formatting.`;
 
-  let sortOrderState;
+  let sortOrderState = {
+    playCount: false,
+    popularity: false,
+    releaseDate: false,
+    scrobbles: false,
+    personalScrobbles: false,
+    averageColor: false
+  };
 
   function loadSettings() {
     showAdditionalColumn = localStorage.getItem("sort-play-show-additional-column") === "true";
@@ -96,15 +103,6 @@
     newReleasesDaysLimit = parseInt(localStorage.getItem(STORAGE_KEY_NEW_RELEASES_LIMIT), 10) || 14;
     followedReleasesAlbumLimit = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT) || 'all';
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
-  
-    sortOrderState = {
-        playCount: false,
-        popularity: false,
-        releaseDate: false,
-        scrobbles: false,
-        personalScrobbles: false,
-        averageColor: false
-    };
   
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -9433,6 +9431,7 @@
       `;
       return divider;
     }
+
     if (style.type === "parent") {
       const parentButton = document.createElement("button");
       parentButton.style.backgroundColor = "transparent";
@@ -9453,6 +9452,7 @@
       parentButton.style.alignItems = "center";
       parentButton.style.justifyContent = "space-between";
       parentButton.dataset.isParent = 'true';
+      parentButton.dataset.sortType = style.sortType;
 
       const leftContainer = document.createElement("div");
       leftContainer.style.display = "flex";
@@ -9487,20 +9487,20 @@
       
       svg.appendChild(path);
       parentButton.appendChild(svg);
-
+      
       parentButton.addEventListener("mouseenter", () => {
         if (!parentButton.disabled) {
           parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
-          openSubMenu(parentButton, style.children);
+          showSubMenu(parentButton);
         }
       });
-
-      parentButton.addEventListener("mouseleave", () => {
+      
+      parentButton.addEventListener("mouseleave", (event) => {
         if (!parentButton.disabled) {
           parentButton.style.backgroundColor = "transparent";
         }
       });
-
+      
       parentButton.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -9531,6 +9531,7 @@
 
       button.addEventListener("mouseenter", () => {
         button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
+        hideAllSubMenus();
       });
     
       button.addEventListener("mouseleave", () => {
@@ -9562,21 +9563,37 @@
       buttonTextSpan.innerText = style.text;
       button.appendChild(buttonTextSpan);
 
-    if (style.isSetting) {
-      button.addEventListener("click", () => {
-        button.style.backgroundColor = "transparent";
-      });
-    }
-    return button;
+      if (style.isSetting) {
+        button.addEventListener("click", () => {
+          button.style.backgroundColor = "transparent";
+        });
+      }
+      return button;
     }
   });
 
   menuButtons.forEach(button => menuContainer.appendChild(button));
+  
   let isMenuOpen = false;
+  let areSubMenusCreated = false;
 
   function toggleMenu() {
     isMenuOpen = !isMenuOpen;
     if (isMenuOpen) {
+      if (!areSubMenusCreated) {
+        menuButtons.forEach(button => {
+          if (button.dataset.isParent === 'true') {
+            const style = buttonStyles.menuItems.find(item => item.sortType === button.dataset.sortType);
+            if (style && style.children) {
+              const subMenu = createSubMenu(style.children);
+              document.body.appendChild(subMenu);
+              button._submenu = subMenu;
+            }
+          }
+        });
+        areSubMenusCreated = true;
+      }
+
       applyCurrentThemeColors();
       const buttonRect = mainButton.getBoundingClientRect();
       const { bottom: headerBottom } = getHeaderInfo();
@@ -9593,6 +9610,8 @@
       document.body.appendChild(menuContainer);
 
       checkAndUpdateMenuPosition();
+      
+      menuContainer.addEventListener("mouseleave", handleMouseLeaveMenuArea);
 
       menuButtons.forEach((button) => {
         button.style.opacity = "1";
@@ -9610,42 +9629,43 @@
       document.body.removeChild(menuContainer);
     }
     
-    const submenus = document.querySelectorAll('.submenu');
-    submenus.forEach(submenu => {
-      if (submenu.parentElement) {
-        submenu.parentElement.removeChild(submenu);
-      }
-    });
+    hideAllSubMenus();
+    
+    menuContainer.removeEventListener("mouseleave", handleMouseLeaveMenuArea);
 
     isButtonClicked = false;
     mainButton.style.filter = "brightness(1)";
   }
   
-  function openSubMenu(parentButton, items) {
-    const existingSubmenus = document.querySelectorAll('.submenu');
-    existingSubmenus.forEach(submenu => {
-        if (submenu.parentElement && submenu !== parentButton.querySelector('.submenu')) {
-            submenu.parentElement.removeChild(submenu);
-        }
-    });
+  function hideAllSubMenus() {
+    document.querySelectorAll('.submenu').forEach(sm => sm.style.display = 'none');
+  }
 
-    let subMenu = parentButton.querySelector('.submenu');
-    
-    if (subMenu) {
-        return;
+  function handleMouseLeaveMenuArea(event) {
+    const toElement = event.relatedTarget;
+    const isEnteringMainMenu = menuContainer.contains(toElement);
+    const isEnteringSubMenu = toElement && (toElement.classList.contains('submenu') || toElement.closest('.submenu'));
+
+    if (isEnteringMainMenu || isEnteringSubMenu) {
+      return;
     }
+    hideAllSubMenus();
+  }
 
-    subMenu = document.createElement("div");
-    subMenu.classList.add("submenu");
-    subMenu.classList.add('main-contextMenu-menu');
-    subMenu.classList.add('sort-play-font-scope');
-    subMenu.style.position = "absolute";
-    subMenu.style.display = "flex";
-    subMenu.style.flexDirection = "column";
-    subMenu.style.zIndex = "2000";
-    subMenu.style.padding = "4px 4px";
-    subMenu.style.borderRadius = "4px";
-    subMenu.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
+  function createSubMenu(items) {
+    const subMenu = document.createElement("div");
+    subMenu.classList.add("submenu", "main-contextMenu-menu", "sort-play-font-scope");
+    subMenu.style.cssText = `
+      position: fixed;
+      display: none;
+      flex-direction: column;
+      z-index: 2000;
+      padding: 4px;
+      border-radius: 4px;
+      box-shadow: 0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2);
+    `;
+
+    subMenu.addEventListener("mouseleave", handleMouseLeaveMenuArea);
 
     items.forEach((item) => {
       if (item.type === "title") {
@@ -9682,6 +9702,7 @@
       button.style.alignItems = "center";
       button.style.justifyContent = "space-between";
       button.innerText = item.text;
+
       button.addEventListener("mouseenter", () => {
         if (!button.disabled) {
           button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
@@ -9705,93 +9726,54 @@
         } else {
           await handleSortAndCreatePlaylist(item.sortType);
         }
-        
-        parentButton.style.backgroundColor = "transparent";
+        closeAllMenus();
       });
   
       subMenu.appendChild(button);
     });
 
-    subMenu.style.visibility = 'hidden';
-    subMenu.style.top = '-9999px';
-    document.body.appendChild(subMenu);
-    const subMenuHeight = subMenu.offsetHeight;
+    return subMenu;
+  }
 
+  function showSubMenu(parentButton) {
+    hideAllSubMenus();
+
+    const subMenu = parentButton._submenu;
+    if (!subMenu) return;
+    
     const parentRect = parentButton.getBoundingClientRect();
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const menuRect = menuContainer.getBoundingClientRect();
+    const subMenuHeight = subMenu.offsetHeight;
+    const subMenuWidth = subMenu.offsetWidth;
     const viewportHeight = window.innerHeight;
-    const subMenuWidth = 163;
-    const spaceRight = window.innerWidth - parentRect.right;
 
     let finalTop;
     let finalLeft;
 
-    if (spaceRight < subMenuWidth) {
-        finalLeft = parentRect.left - subMenuWidth;
+    const spaceRight = window.innerWidth - menuRect.right;
+    const spaceLeft = menuRect.left;
+
+    if (spaceRight >= subMenuWidth) {
+        finalLeft = menuRect.right;
+    } else if (spaceLeft >= subMenuWidth) {
+        finalLeft = menuRect.left - subMenuWidth;
     } else {
-        finalLeft = parentRect.right;
+        finalLeft = menuRect.right;
+    }
+    
+    const canFitBelow = parentRect.top + subMenuHeight <= viewportHeight;
+
+    if (canFitBelow) {
+        finalTop = parentRect.top;
+    } else {
+        finalTop = parentRect.bottom - subMenuHeight;
     }
 
-    const canOpenDown = parentRect.top + subMenuHeight <= viewportHeight;
-    const canOpenUp = parentRect.bottom - subMenuHeight >= 0;
-
-    if (canOpenDown) {
-        finalTop = parentRect.top + scrollTop;
-    } else if (canOpenUp) {
-        finalTop = parentRect.bottom + scrollTop - subMenuHeight;
-    } else {
-        finalTop = scrollTop + (viewportHeight - subMenuHeight) / 2;
-        finalTop = Math.max(scrollTop, finalTop);
-    }
+    finalTop = Math.max(8, Math.min(finalTop, viewportHeight - subMenuHeight - 8));
     
     subMenu.style.left = `${finalLeft}px`;
     subMenu.style.top = `${finalTop}px`;
-    subMenu.style.visibility = 'visible';
-    
-    const handleSubMenuRemoval = () => {
-        if (subMenu.parentElement) {
-            subMenu.parentElement.removeChild(subMenu);
-            parentButton.classList.remove('submenu-open');
-            parentButton.style.backgroundColor = "transparent";
-        }
-    };
-
-    parentButton.classList.add('submenu-open');
-
-    subMenu.addEventListener('mouseenter', () => {
-      parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
-    });
-
-    subMenu.addEventListener('mouseleave', (event) => {
-        const toElement = event.relatedTarget;
-        if (!parentButton.contains(toElement)) {
-            parentButton.style.backgroundColor = "transparent";
-        }
-    });
-
-    parentButton.addEventListener('mouseleave', (event) => {
-        const toElement = event.relatedTarget;
-        if (!subMenu.contains(toElement)) {
-            parentButton.style.backgroundColor = "transparent";
-            handleSubMenuRemoval();
-        }
-    });
-
-    document.addEventListener('click', (event) => {
-        if (!subMenu.contains(event.target) && !parentButton.contains(event.target)) {
-            handleSubMenuRemoval();
-        }
-    });
-
-    menuButtons.forEach(mainMenuButton => {
-        mainMenuButton.addEventListener('mouseenter', () => {
-            if (mainMenuButton !== parentButton && subMenu.parentElement) {
-                handleSubMenuRemoval();
-            }
-        });
-    });
-    
-    applyCurrentThemeColors(subMenu);
+    subMenu.style.display = 'flex';
   }
   
   window.addEventListener('resize', closeAllMenus);
