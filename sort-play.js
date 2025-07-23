@@ -1044,8 +1044,8 @@
         </label>
         <div class="col action">
             <select id="newReleasesLimitSelect" style="max-width: 120px;">
-                <option value="1">7 Days</option>
-                <option value="3">7 Days</option>
+                <option value="1">1 Days</option>
+                <option value="3">3 Days</option>
                 <option value="7">7 Days</option>
                 <option value="14">14 Days</option>
                 <option value="21">21 Days</option>
