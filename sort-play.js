@@ -9740,40 +9740,52 @@
 
     const subMenu = parentButton._submenu;
     if (!subMenu) return;
-    
-    const parentRect = parentButton.getBoundingClientRect();
-    const menuRect = menuContainer.getBoundingClientRect();
+
+    subMenu.style.visibility = 'hidden';
+    subMenu.style.display = 'flex';
     const subMenuHeight = subMenu.offsetHeight;
     const subMenuWidth = subMenu.offsetWidth;
+    
+    const parentRect = parentButton.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const margin = 8;
 
     let finalTop;
     let finalLeft;
 
-    const spaceRight = window.innerWidth - menuRect.right;
-    const spaceLeft = menuRect.left;
+    const spaceRight = viewportWidth - parentRect.right;
+    const spaceLeft = parentRect.left;
 
-    if (spaceRight >= subMenuWidth) {
-        finalLeft = menuRect.right;
-    } else if (spaceLeft >= subMenuWidth) {
-        finalLeft = menuRect.left - subMenuWidth;
+    if (spaceRight >= subMenuWidth + margin) {
+        finalLeft = parentRect.right;
+    } else if (spaceLeft >= subMenuWidth + margin) {
+        finalLeft = parentRect.left - subMenuWidth;
     } else {
-        finalLeft = menuRect.right;
+        finalLeft = (spaceRight > spaceLeft) 
+            ? viewportWidth - subMenuWidth - margin 
+            : margin;
     }
-    
-    const canFitBelow = parentRect.top + subMenuHeight <= viewportHeight;
+    const topAlignedTop = parentRect.top;
+    if ((topAlignedTop + subMenuHeight) <= (viewportHeight - margin)) {
+        finalTop = topAlignedTop;
+    } 
 
-    if (canFitBelow) {
-        finalTop = parentRect.top;
-    } else {
-        finalTop = parentRect.bottom - subMenuHeight;
+    else {
+        const centerAlignedTop = parentRect.top + (parentRect.height / 2) - (subMenuHeight / 2);
+        if (centerAlignedTop >= margin && (centerAlignedTop + subMenuHeight) <= (viewportHeight - margin)) {
+            finalTop = centerAlignedTop;
+        } 
+        else {
+            finalTop = parentRect.bottom - subMenuHeight;
+        }
     }
 
-    finalTop = Math.max(8, Math.min(finalTop, viewportHeight - subMenuHeight - 8));
-    
+    finalTop = Math.max(margin, Math.min(finalTop, viewportHeight - subMenuHeight - margin));
+
     subMenu.style.left = `${finalLeft}px`;
     subMenu.style.top = `${finalTop}px`;
-    subMenu.style.display = 'flex';
+    subMenu.style.visibility = 'visible';
   }
   
   window.addEventListener('resize', closeAllMenus);
