@@ -2,9 +2,9 @@
   {
     "name": "Sort Play",
     "description": "The ultimate toolkit for your music library. Sort, filter, and create playlists.",
-    "preview": "cover.png",
+    "preview": "assets/cover.png",
     "main": "sort-play-loader.mjs",
-    "readme": "info.md",
+    "readme": "assets/info.md",
     "authors": [
         { "name": "hoeci", "url": "https://github.com/hoeci" }
     ],
