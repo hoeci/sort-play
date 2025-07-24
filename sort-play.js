@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.0.0";
+  const SORT_PLAY_VERSION = "5.1.0";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -32,6 +32,8 @@
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
   let openPlaylistAfterSortEnabled = true;
+  let placePlaylistsInFolder = false;
+  let sortPlayFolderName = "Sort-Play Library";
   let myScrobblesDisplayMode = 'number';
   let selectedAlbumColumnType = 'releaseDate';
   let selectedArtistColumnType = 'releaseDate';
@@ -49,6 +51,10 @@
   const STORAGE_KEY_CREATE_PLAYLIST = "sort-play-create-playlist";
   const STORAGE_KEY_SORT_CURRENT_PLAYLIST = "sort-play-sort-current-playlist";
   const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort";
+  const STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER = "sort-play-place-playlists-in-folder";
+  const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
+  const STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS = "sort-play-update-behavior-settings";
+  const STORAGE_KEY_DEDICATED_PLAYLIST_MAP = "sort-play-dedicated-playlist-map";
   const STORAGE_KEY_COLOR_SORT_MODE = "sort-play-color-sort-mode";
   const STORAGE_KEY_TOP_TRACKS_LIMIT = "sort-play-top-tracks-limit";
   const STORAGE_KEY_NEW_RELEASES_LIMIT = "sort-play-new-releases-limit";
@@ -103,6 +109,8 @@
     newReleasesDaysLimit = parseInt(localStorage.getItem(STORAGE_KEY_NEW_RELEASES_LIMIT), 10) || 14;
     followedReleasesAlbumLimit = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT) || 'all';
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
+    placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
+    sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
   
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -139,6 +147,8 @@
     localStorage.setItem(STORAGE_KEY_NEW_RELEASES_LIMIT, newReleasesDaysLimit);
     localStorage.setItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT, followedReleasesAlbumLimit);
     localStorage.setItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, discoveryPlaylistSize);
+    localStorage.setItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, placePlaylistsInFolder);
+    localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -801,6 +811,25 @@
         </div>
     </div>
 
+    <div class="setting-row" id="placePlaylistsInFolderSettingRow">
+        <label class="col description">
+            Place Playlists in Folder
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Automatically place all created playlists inside a dedicated folder named "${sortPlayFolderName}".</span>
+            </span>
+        </label>
+        <div class="col action">
+            <button id="folderNameSettingsBtn" class="column-settings-button" title="Customize Folder Name">
+                ${settingsSvg}
+            </button>
+            <label class="switch" id="placePlaylistsInFolderSwitchLabel">
+                <input type="checkbox" id="placePlaylistsInFolderToggle" ${placePlaylistsInFolder ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
     <div class="setting-row" id="colorSortModeSetting">
         <label class="col description">
             Color Sort Mode
@@ -1001,6 +1030,21 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
+    <div class="setting-row" id="playlistBehaviorSettingRow">
+        <label class="col description">
+            Update Existing Playlists
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Instead of creating new playlists each time, update a single, persistent playlist for each type.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <button id="playlistBehaviorSettingsBtn" class="column-settings-button" title="Configure Playlist Update Behavior">
+                ${settingsSvg}
+            </button>
+        </div>
+    </div>
+
     <div class="setting-row" id="topTracksLimitSetting">
         <label class="col description">
             Top Tracks Playlist Size
@@ -1162,6 +1206,9 @@
     const newReleasesLimitSelect = modalContainer.querySelector("#newReleasesLimitSelect");
     const followedReleasesLimitSelect = modalContainer.querySelector("#followedReleasesLimitSelect");
     const discoveryPlaylistSizeSelect = modalContainer.querySelector("#discoveryPlaylistSizeSelect");
+    const placePlaylistsInFolderToggle = modalContainer.querySelector("#placePlaylistsInFolderToggle");
+    const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
+    const playlistBehaviorSettingsBtn = modalContainer.querySelector("#playlistBehaviorSettingsBtn");
 
     function updateOpenPlaylistAfterSortToggleState() {
       const isCreatePlaylistOn = createPlaylistToggle.checked;
@@ -1178,7 +1225,16 @@
         sortCurrentPlaylistToggle.disabled = !isCreatePlaylistOn;
         sortCurrentPlaylistSwitchLabel.classList.toggle("disabled", !isCreatePlaylistOn);
         sortCurrentPlaylistSettingRow.classList.toggle("dependent-disabled", !isCreatePlaylistOn);
-        if (!isCreatePlaylistOn) {} else {
+
+        const isModifyCurrentOn = sortCurrentPlaylistToggle.checked && !sortCurrentPlaylistToggle.disabled;
+        placePlaylistsInFolderToggle.disabled = isModifyCurrentOn;
+        document.getElementById('placePlaylistsInFolderSwitchLabel').classList.toggle("disabled", isModifyCurrentOn);
+        document.getElementById('placePlaylistsInFolderSettingRow').classList.toggle("dependent-disabled", isModifyCurrentOn);
+        folderNameSettingsBtn.disabled = isModifyCurrentOn || !placePlaylistsInFolderToggle.checked;
+
+        if (!isCreatePlaylistOn) {
+            sortCurrentPlaylistToggle.checked = false;
+        } else {
             sortCurrentPlaylistToggle.checked = sortCurrentPlaylistEnabled;
         }
         updateOpenPlaylistAfterSortToggleState();
@@ -1204,6 +1260,9 @@
       updateSortCurrentPlaylistToggleState();
     }
 
+    playlistBehaviorSettingsBtn.addEventListener("click", () => {
+        showPlaylistBehaviorModal();
+    });
 
     colorSortModeSelect.addEventListener("change", () => {
         colorSortMode = colorSortModeSelect.value;
@@ -1292,6 +1351,26 @@
     });
 
     updateCreatePlaylistToggleState();
+
+    folderNameSettingsBtn.disabled = !placePlaylistsInFolderToggle.checked || placePlaylistsInFolderToggle.disabled;
+
+    placePlaylistsInFolderToggle.addEventListener("change", () => {
+        if (!placePlaylistsInFolderToggle.disabled) {
+            placePlaylistsInFolder = placePlaylistsInFolderToggle.checked;
+            folderNameSettingsBtn.disabled = !placePlaylistsInFolder;
+            saveSettings();
+            const tooltip = document.querySelector("#placePlaylistsInFolderSettingRow .custom-tooltip");
+            if (tooltip) {
+                tooltip.textContent = `Automatically place all created playlists inside a dedicated folder named "${sortPlayFolderName}".`;
+            }
+        }
+    });
+
+    folderNameSettingsBtn.addEventListener("click", () => {
+        if (!folderNameSettingsBtn.disabled) {
+            showFolderNameModal();
+        }
+    });
 
     removeDateAddedToggle.disabled = !showAdditionalColumn;
     removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn);
@@ -1524,6 +1603,209 @@
         includeaudiofeatures = includeAudioFeaturesToggle.checked;
         saveSettings();
     });
+  }
+
+  function showPlaylistBehaviorModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-behavior-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 500px !important;
+        display: flex;
+        flex-direction: column;
+    `;
+    
+    let updateBehaviorSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS) || '{}');
+
+    const playlistTypes = [
+        { key: 'newReleases', title: 'New Releases' },
+        { key: 'followedArtistPicks', name: 'Followed Artist Picks' },
+        { key: 'newDiscoveryPicks', name: 'New Music Picks' },
+        { key: 'followedReleasesChronological', name: 'Followed Artist (Full)' },
+        { key: 'discovery', title: 'Discovery' },
+        { key: 'recommendRecentVibe', name: 'Recent Based' },
+        { key: 'recommendAllTime', name: 'All-Time Based' },
+        { key: 'pureDiscovery', name: 'Pure Discovery' },
+        { key: 'topTracks', title: 'My Top Tracks' },
+        { key: 'topThisMonth', name: 'Top This Month' },
+        { key: 'topLast6Months', name: 'Top Last 6 Months' },
+        { key: 'topAllTime', name: 'Top All-Time' }
+    ];
+
+    let settingsHtml = '';
+    playlistTypes.forEach(playlist => {
+        if (playlist.title) {
+            settingsHtml += `<div style="color: white; font-weight: bold; font-size: 18px; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #555; padding-bottom: 5px;">${playlist.title}</div>`;
+        } else {
+            const isChecked = updateBehaviorSettings[playlist.key] || false;
+            settingsHtml += `
+                <div class="setting-row">
+                    <label class="col description">${playlist.name}</label>
+                    <div class="col action">
+                        <label class="switch">
+                            <input type="checkbox" id="update-toggle-${playlist.key}" ${isChecked ? 'checked' : ''}>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    modalContainer.innerHTML = `
+      <style>
+        .sort-play-behavior-modal .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+        .sort-play-behavior-modal .col.description { color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
+        .sort-play-behavior-modal .col.action { display: flex; align-items: center; }
+        .sort-play-behavior-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+        .sort-play-behavior-modal .switch input { opacity: 0; width: 0; height: 0; }
+        .sort-play-behavior-modal .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+        .sort-play-behavior-modal .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+        .sort-play-behavior-modal input:checked + .slider { background-color: #1DB954; }
+        .sort-play-behavior-modal input:checked + .slider:before { transform: translateX(16px); }
+      </style>
+      <div class="main-trackCreditsModal-header">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Playlist Update Behavior</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-mainSection sort-play-behavior-modal" style="padding: 22px 47px 20px !important; max-height: 60vh; flex-grow: 1;">
+        <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 25px;">Update one playlist instead of creating new ones for:</p>
+        <div style="display: flex; justify-content: flex-end; margin-bottom: -40px;">
+            <button id="selectAllTogglesBtn" class="main-buttons-button" style="background-color: #333333; color: white; padding: 2px 16px; border-radius: 20px; font-weight: 500; font-size: 13px; border: none; cursor: pointer;">
+                Select All
+            </button>
+        </div>
+        ${settingsHtml}
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
+        <div style="display: flex; justify-content: flex-end;">
+            <button id="closeBehaviorModal" class="main-buttons-button main-button-primary" 
+                    style="background-color: #1ED760; color: black; padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                Done
+            </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    playlistTypes.forEach(playlist => {
+        if (!playlist.title) {
+            const toggle = modalContainer.querySelector(`#update-toggle-${playlist.key}`);
+            if(toggle) {
+                toggle.addEventListener('change', () => {
+                    updateBehaviorSettings[playlist.key] = toggle.checked;
+                    localStorage.setItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS, JSON.stringify(updateBehaviorSettings));
+                });
+            }
+        }
+    });
+
+    const selectAllButton = modalContainer.querySelector("#selectAllTogglesBtn");
+    if (selectAllButton) {
+        selectAllButton.addEventListener("click", () => {
+            const allToggles = modalContainer.querySelectorAll('.setting-row input[type="checkbox"]');
+            const allAreChecked = Array.from(allToggles).every(toggle => toggle.checked);
+            const newState = !allAreChecked;
+
+            allToggles.forEach(toggle => {
+                toggle.checked = newState;
+                const key = toggle.id.replace('update-toggle-', '');
+                updateBehaviorSettings[key] = newState;
+            });
+            localStorage.setItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS, JSON.stringify(updateBehaviorSettings));
+        });
+        
+        selectAllButton.addEventListener("mouseenter", () => {
+            selectAllButton.style.backgroundColor = "#444444";
+        });
+        selectAllButton.addEventListener("mouseleave", () => {
+            selectAllButton.style.backgroundColor = "#333333";
+        });
+    }
+
+    const closeModal = () => overlay.remove();
+    
+    const doneButton = modalContainer.querySelector("#closeBehaviorModal");
+    if (doneButton) {
+        doneButton.addEventListener("click", closeModal);
+        
+        doneButton.addEventListener("mouseenter", () => {
+            doneButton.style.backgroundColor = "#3BE377";
+        });
+        doneButton.addEventListener("mouseleave", () => {
+            doneButton.style.backgroundColor = "#1ED760";
+        });
+    }
+
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+            closeModal();
+        }
+    });
+  }
+
+  function showFolderNameModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-folder-name-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.zIndex = "2003";
+    modalContainer.innerHTML = `
+      <div class="main-trackCreditsModal-header">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Customize Folder Name</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px 20px !important;">
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+              <div style="display: flex; flex-direction: column; gap: 5px;">
+                  <label for="sortPlayFolderNameInput">Folder Name:</label>
+                  <input type="text" id="sortPlayFolderNameInput" value="${sortPlayFolderName}" 
+                        style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
+              </div>
+              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+                  <button id="cancelFolderName" class="main-buttons-button" style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase;">Cancel</button>
+                  <button id="saveFolderName" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase;">Save</button>
+              </div>
+          </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+    document.getElementById("sortPlayFolderNameInput").focus();
+
+    const closeModal = () => overlay.remove();
+
+    document.getElementById("saveFolderName").addEventListener("click", () => {
+      const newName = document.getElementById("sortPlayFolderNameInput").value.trim();
+      if (newName) {
+        sortPlayFolderName = newName;
+        saveSettings();
+        const tooltip = document.querySelector("#placePlaylistsInFolderSettingRow .custom-tooltip");
+        if (tooltip) {
+            tooltip.textContent = `Automatically place all created playlists inside a dedicated folder named "${sortPlayFolderName}".`;
+        }
+        closeModal();
+      }
+    });
+
+    document.getElementById("cancelFolderName").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
 
   function preventDragCloseModal() {
@@ -10035,40 +10317,186 @@
     );
   }
 
+  async function movePlaylistToTop(playlistUri) {
+    const { RootlistAPI } = Spicetify.Platform;
+    if (!RootlistAPI) return;
+
+    try {
+        const rootlist = await RootlistAPI.getContents();
+        const folder = placePlaylistsInFolder ? rootlist.items.find(item => item.type === 'folder' && item.name === sortPlayFolderName) : null;
+
+        if (placePlaylistsInFolder && folder) {
+            const isAlreadyInFolder = folder.items.some(item => item.uri === playlistUri);
+
+            if (isAlreadyInFolder) {
+                console.log(`Playlist ${playlistUri} is already in the correct folder. Skipping move.`);
+                return;
+            }
+            
+            await RootlistAPI.move({ uri: playlistUri }, { after: folder.uri });
+
+        } else {
+            await RootlistAPI.move({ uri: playlistUri }, { before: "start" });
+        }
+    } catch (error) {
+        console.warn(`Could not move playlist ${playlistUri} to top.`, error);
+    }
+  }
+
+  async function getActiveUserPlaylistUris() {
+    try {
+        const allPlaylists = [];
+        let nextUrl = 'https://api.spotify.com/v1/me/playlists?limit=50';
+
+        while (nextUrl) {
+            const response = await Spicetify.CosmosAsync.get(nextUrl);
+            if (response && response.items) {
+                allPlaylists.push(...response.items);
+                nextUrl = response.next;
+            } else {
+                nextUrl = null;
+            }
+        }
+        
+        const playlistUris = new Set(allPlaylists.map(p => p.uri));
+        return playlistUris;
+
+    } catch (error) {
+        console.error("An error occurred while fetching user playlists for verification:", error);
+        return new Set();
+    }
+  }
+
+  async function getOrCreateDedicatedPlaylist(sortType, name, description, maxRetries = 5, initialDelay = 1000) {
+    const updateBehaviorSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS) || '{}');
+    const isUpdateEnabled = updateBehaviorSettings[sortType] || false;
+
+    if (isUpdateEnabled) {
+        let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
+        const playlistUri = dedicatedPlaylistMap[sortType];
+
+        if (playlistUri) {
+            const activePlaylistsSet = await getActiveUserPlaylistUris();
+
+            if (activePlaylistsSet.has(playlistUri)) {
+                try {
+                    const playlistId = playlistUri.split(':')[2];
+                    const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                    await movePlaylistToTop(playlistUri);
+                    return { playlist: playlistData, wasUpdated: true };
+                } catch (e) {
+
+                    console.warn(`Error verifying linked playlist ${playlistUri}, creating a new one.`, e);
+                }
+            } else {
+                console.warn(`Linked playlist for ${sortType} (${playlistUri}) was not found in the user's library. It was likely deleted. Creating a new one.`);
+                delete dedicatedPlaylistMap[sortType];
+                localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
+            }
+        }
+    }
+
+    const newPlaylist = await createPlaylist(name, description, maxRetries, initialDelay);
+
+    if (isUpdateEnabled && newPlaylist) {
+        let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
+        dedicatedPlaylistMap[sortType] = newPlaylist.uri;
+        localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
+    }
+
+    return { playlist: newPlaylist, wasUpdated: false };
+  }
+
   async function createPlaylist(
     name = "Sorted by Play Count",
     description = "Created with Spotify Playlist Sorter",
-    maxRetries = 5,
-    initialDelay = 1000
   ) {
-    const user = await Spicetify.Platform.UserAPI.getUser();
-    const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
-    let retries = 0;
-    let currentDelay = initialDelay;
-    let newPlaylist = null;
+    const { CosmosAsync, Platform } = Spicetify;
+    if (!CosmosAsync || !Platform) {
+        console.error("Spicetify APIs not available.");
+        throw new Error("Spicetify APIs not available.");
+    }
+    const { RootlistAPI } = Platform;
 
-    while (retries <= maxRetries) {
-        try {
-            newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, {
-                name: name,
-                description: description
-            });
-            await setPlaylistVisibility(newPlaylist.uri, false);
+    let requestBody = {
+        operation: "create",
+        name: name,
+        playlist: true,
+        before: "start", 
+    };
 
-            return newPlaylist;
-        } catch (error) {
-            console.error(`Error creating playlist (Attempt ${retries + 1}):`, error);
-
-            if (retries === maxRetries) {
-                throw new Error(`Failed to create playlist after ${maxRetries} retries.`, error);
-            }
-
-            retries++;
-            await new Promise((resolve) => setTimeout(resolve, currentDelay));
-            currentDelay *= 2;
+    if (placePlaylistsInFolder) {
+        const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
+        if (folderUri) {
+            requestBody = { ...requestBody, after: folderUri, before: undefined };
+        } else {
+            Spicetify.showNotification("Failed to find or create folder. Creating playlist in root.", true);
         }
     }
+
+    let newPlaylist;
+    try {
+        newPlaylist = await CosmosAsync.post("sp://core-playlist/v1/rootlist", requestBody);
+
+        if (!newPlaylist || !newPlaylist.uri) {
+            throw new Error("Internal playlist creation request did not return a valid playlist object.");
+        }
+    } catch (error) {
+        console.error("Error during internal playlist creation:", error);
+        Spicetify.showNotification("Failed to create playlist using internal API.", true);
+        const user = await Spicetify.Platform.UserAPI.getUser();
+        const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
+        newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { name, description });
+    }
+
+    if (!newPlaylist || !newPlaylist.uri) {
+        throw new Error("Failed to create playlist after all attempts.");
+    }
+    
+    try {
+      await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${newPlaylist.uri.split(':')[2]}`, {
+          description: description,
+      });
+    } catch (descriptionError) {
+        const isExpectedJsonError = descriptionError instanceof SyntaxError && descriptionError.message.includes("Unexpected end of JSON input");
+        if (!isExpectedJsonError) {
+            console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
+        }
+    }
+    
+    await setPlaylistVisibility(newPlaylist.uri, false);
+    
+    return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
   }
+
+  async function findOrCreatePlaylistFolder(folderName) {
+      const { RootlistAPI } = Spicetify.Platform;
+      if (!RootlistAPI) {
+          console.error("Spicetify.Platform.RootlistAPI is not available.");
+          Spicetify.showNotification("Error: Cannot manage folders.", true);
+          return null;
+      }
+      try {
+          const rootlist = await RootlistAPI.getContents();
+          const existingFolder = rootlist.items.find(
+              item => item.type === 'folder' && item.name === folderName
+          );
+          if (existingFolder) {
+              return existingFolder.uri;
+          }
+          const newFolder = await RootlistAPI.createFolder(folderName, { before: "start" });
+          if (newFolder && newFolder.uri) {
+              return newFolder.uri;
+          } else {
+              throw new Error("Folder creation did not return a valid URI.");
+          }
+      } catch (error) {
+          console.error(`Error in findOrCreatePlaylistFolder for "${folderName}":`, error);
+          Spicetify.showNotification(`Error managing folder: ${folderName}`, true);
+          return null;
+      }
+  }
+
 
   async function getTopItems(type, time_range, totalLimit) {
     let allItems = [];
@@ -10733,11 +11161,17 @@
             if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
             
             const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
-            mainButton.innerText = "Creating...";
-            const newPlaylist = await createPlaylist(playlistName, playlistDescription);
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
             
-            Spicetify.showNotification(`Playlist "${playlistName}" created successfully!`);
+            mainButton.innerText = "Creating...";
+            const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
+            
+            if (wasUpdated) {
+                await replacePlaylistTracks(newPlaylist.id, trackUris);
+            } else {
+                await addTracksToPlaylist(newPlaylist.id, trackUris);
+            }
+            
+            Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
 
             if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
                 const tempPath = "/library"; 
@@ -10932,10 +11366,15 @@
         const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
         
         mainButton.innerText = "Creating...";
-        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
-        await addTracksToPlaylist(newPlaylist.id, trackUris);
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
+        
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
 
-        Spicetify.showNotification(`Playlist "${playlistName}" created successfully!`);
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
 
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
@@ -11748,12 +12187,16 @@
             const playlistDescription = `Your top tracks ${topTrackSortTypes[sortType].description}, created by Sort-Play.`;
             
             mainButton.innerText = "Creating...";
-            const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+            const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(sortType, playlistName, playlistDescription);
             
             mainButton.innerText = "Saving...";
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
+            if (wasUpdated) {
+                await replacePlaylistTracks(newPlaylist.id, trackUris);
+            } else {
+                await addTracksToPlaylist(newPlaylist.id, trackUris);
+            }
             
-            Spicetify.showNotification(`Playlist "${playlistName}" created successfully!`);
+            Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
 
             if (openPlaylistAfterSortEnabled && newPlaylist && newPlaylist.uri) { 
                 const tempPath = "/library"; 
