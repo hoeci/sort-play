@@ -45,6 +45,7 @@
   let colorThiefLib = null;
   let colorSortMode = 'perceptual';
   let setDedicatedPlaylistCovers = true;
+  let isNavigatingAfterSort = false;
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
@@ -1113,18 +1114,16 @@
             New Releases Time Window
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Set the lookback period for New Releases playlists.</span>
+                <span class="custom-tooltip">Set the lookback period for New Releases playlists, anchored to the music industry's Friday release schedule.</span>
             </span>
         </label>
         <div class="col action">
-            <select id="newReleasesLimitSelect" style="max-width: 120px;">
-                <option value="1">1 Days</option>
-                <option value="3">3 Days</option>
-                <option value="7">7 Days</option>
-                <option value="14">14 Days</option>
-                <option value="21">21 Days</option>
-                <option value="30">30 Days</option>
-                <option value="60">60 Days</option>
+            <select id="newReleasesLimitSelect" style="max-width: 180px;">
+                <option value="7">This Release Week</option>
+                <option value="14">Last 2 Release Weeks</option>
+                <option value="21">Last 3 Release Weeks</option>
+                <option value="30">Last 5 Release Weeks</option>
+                <option value="60">Last 9 Release Weeks</option>
             </select>
         </div>
     </div>
@@ -1313,8 +1312,12 @@
         saveSettings();
     });
 
-
-    newReleasesLimitSelect.value = newReleasesDaysLimit;
+    let currentNewReleasesLimit = newReleasesDaysLimit;
+    if ([1, 3].includes(currentNewReleasesLimit)) {
+        currentNewReleasesLimit = 7;
+    }
+    
+    newReleasesLimitSelect.value = currentNewReleasesLimit;
     newReleasesLimitSelect.addEventListener("change", () => {
         newReleasesDaysLimit = parseInt(newReleasesLimitSelect.value, 10);
         saveSettings();
@@ -10608,6 +10611,30 @@
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
   }
 
+  async function navigateToUri(uri, isModification = false, originalPath = null) {
+    if (openPlaylistAfterSortEnabled && uri) {
+        isNavigatingAfterSort = true;
+        
+        if (isModification && originalPath) {
+            const tempPath = "/library"; 
+            Spicetify.Platform.History.push(tempPath);
+            await new Promise(resolve => setTimeout(resolve, 450));
+            Spicetify.Platform.History.push(originalPath);
+        } else {
+            const tempPath = "/library"; 
+            Spicetify.Platform.History.push(tempPath);
+            await new Promise(resolve => setTimeout(resolve, 450)); 
+            const newPlaylistPath = Spicetify.URI.fromString(uri).toURLPath(true);
+            if (newPlaylistPath) {
+                Spicetify.Platform.History.push(newPlaylistPath);
+            } else {
+                console.warn("Could not determine path for new playlist URI:", uri);
+                isNavigatingAfterSort = false;
+            }
+        }
+    }
+  }
+
   async function findOrCreatePlaylistFolder(folderName) {
       const { RootlistAPI } = Spicetify.Platform;
       if (!RootlistAPI) {
@@ -11734,7 +11761,10 @@
 
         const dateLimit = new Date();
         dateLimit.setUTCHours(0, 0, 0, 0);
-        dateLimit.setUTCDate(dateLimit.getUTCDate() - (newReleasesDaysLimit - 1));
+        const daysSinceLastFriday = (dateLimit.getUTCDay() + 2) % 7;
+        const numberOfWeeks = Math.ceil(newReleasesDaysLimit / 7);
+        const totalDaysToSubtract = daysSinceLastFriday + (numberOfWeeks - 1) * 7;
+        dateLimit.setUTCDate(dateLimit.getUTCDate() - totalDaysToSubtract);
         const newReleasesMap = new Map();
         
         const BATCH_SIZE = 300;
@@ -11909,12 +11939,14 @@
         if (followedArtists.length === 0) {
             throw new Error("You are not following any artists.");
         }
-
         const dateLimit = new Date();
         dateLimit.setUTCHours(0, 0, 0, 0);
-        dateLimit.setUTCDate(dateLimit.getUTCDate() - (newReleasesDaysLimit - 1));
+        const daysSinceLastFriday = (dateLimit.getUTCDay() + 2) % 7;
+        const numberOfWeeks = Math.ceil(newReleasesDaysLimit / 7);
+        const totalDaysToSubtract = daysSinceLastFriday + (numberOfWeeks - 1) * 7;
+        dateLimit.setUTCDate(dateLimit.getUTCDate() - totalDaysToSubtract);
         const newReleasesMap = new Map();
-        
+
         const BATCH_SIZE = 300;
         for (let i = 0; i < followedArtists.length; i += BATCH_SIZE) {
             const artistBatch = followedArtists.slice(i, i + BATCH_SIZE);
@@ -13071,27 +13103,10 @@
         console.log(`Playlist creation and queueing skipped for ${sortType} due to settings.`);
       }
 
-      if (playlistWasModifiedOrCreated) {
-          if (modifiedPlaylistOriginalPath) { 
-              const currentPathAfterSort = Spicetify.Platform.History.location.pathname;
-              if (openPlaylistAfterSortEnabled || currentPathAfterSort === modifiedPlaylistOriginalPath) {
-                  const tempPath = "/library"; 
-                  Spicetify.Platform.History.push(tempPath);
-                  await new Promise(resolve => setTimeout(resolve, 400));
-                  Spicetify.Platform.History.push(modifiedPlaylistOriginalPath); 
-              } else {
-              }
-          } else if (openPlaylistAfterSortEnabled && newPlaylistObjectForNavigation && newPlaylistObjectForNavigation.uri) { 
-              const tempPath = "/library"; 
-              Spicetify.Platform.History.push(tempPath);
-              await new Promise(resolve => setTimeout(resolve, 450)); 
-              const newPlaylistPath = Spicetify.URI.fromString(newPlaylistObjectForNavigation.uri).toURLPath(true);
-              if (newPlaylistPath) {
-                Spicetify.Platform.History.push(newPlaylistPath);
-              } else {
-                console.warn("Could not determine path for new playlist URI:", newPlaylistObjectForNavigation.uri);
-              }
-          }
+      if (canModifyCurrentPlaylist) {
+          await navigateToUri(playlistUriForQueue, true, modifiedPlaylistOriginalPath);
+      } else {
+          await navigateToUri(newPlaylistObjectForNavigation?.uri);
       }
 
 
@@ -13935,12 +13950,37 @@
                 const trackUri = getTracklistTrackUri(trackElement);
                 const trackId = trackUri ? trackUri.split(":")[2] : null;
                 const dataElement = trackElement.querySelector(".sort-play-data");
+                if (!trackId || !dataElement) {
+                    trackElement.classList.remove('sort-play-processing');
+                    continue;
+                }
 
-                if (trackId && dataElement) {
+                let isCached = false;
+                if (activeColumnType === 'playCount') {
+                    const cachedCount = getCachedPlayCount(trackId);
+                    if (cachedCount !== null) {
+                        updateDisplay(dataElement, cachedCount, activeColumnType);
+                        isCached = true;
+                    }
+                } else if (activeColumnType === 'releaseDate') {
+                    const cachedDate = getCachedReleaseDate(trackId);
+                    if (cachedDate !== null) {
+                        updateDisplay(dataElement, cachedDate, activeColumnType);
+                        isCached = true;
+                    }
+                } else if (activeColumnType === 'scrobbles') {
+                    const cachedScrobbles = getCachedScrobbles(trackId);
+                     if (cachedScrobbles !== null) {
+                        updateDisplay(dataElement, cachedScrobbles, activeColumnType);
+                        isCached = true;
+                    }
+                }
+
+                if (isCached) {
+                    trackElement.classList.remove('sort-play-processing');
+                } else {
                     elementMap.set(trackId, { trackElement, dataElement });
                     trackIdsToFetch.push(trackId);
-                } else {
-                    trackElement.classList.remove('sort-play-processing');
                 }
             }
 
@@ -13959,8 +13999,11 @@
                                 if (activeColumnType === 'playCount') {
                                     const result = await getTrackDetailsWithPlayCount({ track: { album: { id: trackDetails.album.id }, id: trackDetails.id } });
                                     updateDisplay(dataElement, result.playCount, activeColumnType);
+                                    if (result.playCount !== null && result.playCount !== "N/A") setCachedPlayCount(trackDetails.id, result.playCount);
                                 } else if (activeColumnType === 'releaseDate') {
-                                    updateDisplay(dataElement, trackDetails.album.release_date, activeColumnType);
+                                    const releaseDate = trackDetails.album.release_date;
+                                    updateDisplay(dataElement, releaseDate, activeColumnType);
+                                    if (releaseDate) setCachedReleaseDate(trackDetails.id, releaseDate);
                                 } else if (activeColumnType === 'scrobbles' || activeColumnType === 'personalScrobbles') {
                                     const trackName = trackDetails.name;
                                     const artistName = trackDetails.artists?.[0]?.name;
@@ -13969,6 +14012,7 @@
                                     if (activeColumnType === 'scrobbles') {
                                         const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
                                         updateDisplay(dataElement, result.scrobbles, activeColumnType);
+                                        if (result.scrobbles !== null) setCachedScrobbles(trackDetails.id, result.scrobbles);
                                     } else {
                                         if (!loadLastFmUsername()) {
                                             updateDisplay(dataElement, "_", activeColumnType);
@@ -14637,17 +14681,26 @@
     if (tracklistObserver) tracklistObserver.disconnect();
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
     if (artistTracklistObserver) artistTracklistObserver.disconnect();
-    
-    insertButton();
-    const currentUri = getCurrentUri();
-    if (!currentUri) return;
-    
-    if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
-        initializeTracklistObserver();
-    } else if (URI.isAlbum(currentUri)) {
-        initializeAlbumTracklistObserver();
-    } else if (URI.isArtist(currentUri)) {
-        initializeArtistTracklistObserver();
+
+    const runInitialization = () => {
+        insertButton();
+        const currentUri = getCurrentUri();
+        if (!currentUri) return;
+        
+        if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+            initializeTracklistObserver();
+        } else if (URI.isAlbum(currentUri)) {
+            initializeAlbumTracklistObserver();
+        } else if (URI.isArtist(currentUri)) {
+            initializeArtistTracklistObserver();
+        }
+    };
+
+    if (isNavigatingAfterSort) {
+        isNavigatingAfterSort = false;
+        setTimeout(runInitialization, 1000);
+    } else {
+        runInitialization();
     }
   }
 
