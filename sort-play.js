@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.6";
+  const SORT_PLAY_VERSION = "5.1.7";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -45,7 +45,6 @@
   let colorThiefLib = null;
   let colorSortMode = 'perceptual';
   let setDedicatedPlaylistCovers = true;
-  let isNavigatingAfterSort = false;
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
@@ -10527,7 +10526,7 @@
 
     const newPlaylist = await createPlaylist(name, description, maxRetries, initialDelay);
 
-    if (isUpdateEnabled && newPlaylist) {
+    if (newPlaylist) {
         if (setDedicatedPlaylistCovers) {
             try {
                 const user = await Spicetify.Platform.UserAPI.getUser();
@@ -10541,9 +10540,11 @@
             }
         }
 
-        let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
-        dedicatedPlaylistMap[sortType] = newPlaylist.uri;
-        localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
+        if (isUpdateEnabled) {
+            let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
+            dedicatedPlaylistMap[sortType] = newPlaylist.uri;
+            localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
+        }
     }
 
     return { playlist: newPlaylist, wasUpdated: false };
@@ -10609,30 +10610,6 @@
     await setPlaylistVisibility(newPlaylist.uri, false);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
-  }
-
-  async function navigateToUri(uri, isModification = false, originalPath = null) {
-    if (openPlaylistAfterSortEnabled && uri) {
-        isNavigatingAfterSort = true;
-        
-        if (isModification && originalPath) {
-            const tempPath = "/library"; 
-            Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 450));
-            Spicetify.Platform.History.push(originalPath);
-        } else {
-            const tempPath = "/library"; 
-            Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 450)); 
-            const newPlaylistPath = Spicetify.URI.fromString(uri).toURLPath(true);
-            if (newPlaylistPath) {
-                Spicetify.Platform.History.push(newPlaylistPath);
-            } else {
-                console.warn("Could not determine path for new playlist URI:", uri);
-                isNavigatingAfterSort = false;
-            }
-        }
-    }
   }
 
   async function findOrCreatePlaylistFolder(folderName) {
@@ -13103,10 +13080,27 @@
         console.log(`Playlist creation and queueing skipped for ${sortType} due to settings.`);
       }
 
-      if (canModifyCurrentPlaylist) {
-          await navigateToUri(playlistUriForQueue, true, modifiedPlaylistOriginalPath);
-      } else {
-          await navigateToUri(newPlaylistObjectForNavigation?.uri);
+      if (playlistWasModifiedOrCreated) {
+          if (modifiedPlaylistOriginalPath) { 
+              const currentPathAfterSort = Spicetify.Platform.History.location.pathname;
+              if (openPlaylistAfterSortEnabled || currentPathAfterSort === modifiedPlaylistOriginalPath) {
+                  const tempPath = "/library"; 
+                  Spicetify.Platform.History.push(tempPath);
+                  await new Promise(resolve => setTimeout(resolve, 400));
+                  Spicetify.Platform.History.push(modifiedPlaylistOriginalPath); 
+              } else {
+              }
+          } else if (openPlaylistAfterSortEnabled && newPlaylistObjectForNavigation && newPlaylistObjectForNavigation.uri) { 
+              const tempPath = "/library"; 
+              Spicetify.Platform.History.push(tempPath);
+              await new Promise(resolve => setTimeout(resolve, 450)); 
+              const newPlaylistPath = Spicetify.URI.fromString(newPlaylistObjectForNavigation.uri).toURLPath(true);
+              if (newPlaylistPath) {
+                Spicetify.Platform.History.push(newPlaylistPath);
+              } else {
+                console.warn("Could not determine path for new playlist URI:", newPlaylistObjectForNavigation.uri);
+              }
+          }
       }
 
 
@@ -14220,8 +14214,7 @@
         dateAddedHeader.style.display = shouldRemoveDateAdded ? 'none' : '';
     }
 
-    const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
-    for (const track of allRows) {
+    for (const track of rows) {
         const dateAddedCell = track.querySelector('[aria-colindex="4"]');
         if (dateAddedCell) {
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
@@ -14463,39 +14456,23 @@
     const tracklist = await waitForElement(".main-trackList-indexable");
     if (!tracklist) return;
 
+    updateTracklist();
+
+    if (tracklistObserver) tracklistObserver.disconnect();
+
     const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
     if (!rowContainer) {
         console.warn("Sort-Play: Could not find the specific row container to observe.");
         return;
     }
 
-    const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
-    await updateTracklistStructure(tracklist, initialRows);
-    loadAdditionalColumnData(tracklist);
-
-    if (tracklistObserver) tracklistObserver.disconnect();
-
-    const observerCallback = (mutations) => {
-        const addedRows = [];
-        for (const mutation of mutations) {
-            for (const node of mutation.addedNodes) {
-                if (node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")) {
-                    addedRows.push(node);
-                }
-            }
-        }
-
-        if (addedRows.length > 0) {
-            clearTimeout(updateDebounceTimeout);
-            updateDebounceTimeout = setTimeout(() => {
-                updateTracklistStructure(tracklist, addedRows);
-                loadAdditionalColumnData(tracklist);
-            }, 150);
-        }
-    };
-
-    tracklistObserver = new MutationObserver(observerCallback);
-
+    tracklistObserver = new MutationObserver(() => {
+      clearTimeout(updateDebounceTimeout);
+      updateDebounceTimeout = setTimeout(() => {
+        updateTracklist();
+      }, 150);
+    });
+    
     tracklistObserver.observe(rowContainer, {
       childList: true,
       subtree: false,
@@ -14509,27 +14486,20 @@
     const tracklist = await waitForElement(".main-trackList-trackList.main-trackList-indexable");
     if (!tracklist) return;
 
-    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
-    if (!rowContainer) {
-        console.warn("Sort-Play: Could not find the specific row container for album to observe.");
-        return;
-    }
-
     const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
     updateAlbumTracklist(tracklist, initialRows);
     loadAdditionalColumnData(tracklist);
 
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
 
+    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
+    if (!rowContainer) {
+        console.warn("Sort-Play: Could not find the specific row container for album to observe.");
+        return;
+    }
+    
     const observerCallback = (mutations) => {
-        const addedRows = [];
-        for (const mutation of mutations) {
-            for (const node of mutation.addedNodes) {
-                if (node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")) {
-                    addedRows.push(node);
-                }
-            }
-        }
+        const addedRows = mutations.flatMap(m => Array.from(m.addedNodes)).filter(n => n.nodeType === 1 && n.classList.contains("main-trackList-trackListRow"));
         if (addedRows.length > 0) {
             clearTimeout(updateDebounceTimeout);
             updateDebounceTimeout = setTimeout(() => {
@@ -14554,27 +14524,20 @@
     const tracklist = await waitForElement('div.main-trackList-trackList[aria-label="popular tracks"]');
     if (!tracklist) return;
 
-    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
-    if (!rowContainer) {
-        console.warn("Sort-Play: Could not find the specific row container for artist to observe.");
-        return;
-    }
-
     const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
     updateArtistTracklist(tracklist, initialRows);
     loadAdditionalColumnData(tracklist);
 
     if (artistTracklistObserver) artistTracklistObserver.disconnect();
+
+    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
+    if (!rowContainer) {
+        console.warn("Sort-Play: Could not find the specific row container for artist to observe.");
+        return;
+    }
     
     const observerCallback = (mutations) => {
-        const addedRows = [];
-        for (const mutation of mutations) {
-            for (const node of mutation.addedNodes) {
-                if (node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")) {
-                    addedRows.push(node);
-                }
-            }
-        }
+        const addedRows = mutations.flatMap(m => Array.from(m.addedNodes)).filter(n => n.nodeType === 1 && n.classList.contains("main-trackList-trackListRow"));
         if (addedRows.length > 0) {
             clearTimeout(updateDebounceTimeout);
             updateDebounceTimeout = setTimeout(() => {
@@ -14681,26 +14644,17 @@
     if (tracklistObserver) tracklistObserver.disconnect();
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
     if (artistTracklistObserver) artistTracklistObserver.disconnect();
-
-    const runInitialization = () => {
-        insertButton();
-        const currentUri = getCurrentUri();
-        if (!currentUri) return;
-        
-        if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
-            initializeTracklistObserver();
-        } else if (URI.isAlbum(currentUri)) {
-            initializeAlbumTracklistObserver();
-        } else if (URI.isArtist(currentUri)) {
-            initializeArtistTracklistObserver();
-        }
-    };
-
-    if (isNavigatingAfterSort) {
-        isNavigatingAfterSort = false;
-        setTimeout(runInitialization, 1000);
-    } else {
-        runInitialization();
+    
+    insertButton();
+    const currentUri = getCurrentUri();
+    if (!currentUri) return;
+    
+    if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+        initializeTracklistObserver();
+    } else if (URI.isAlbum(currentUri)) {
+        initializeAlbumTracklistObserver();
+    } else if (URI.isArtist(currentUri)) {
+        initializeArtistTracklistObserver();
     }
   }
 
