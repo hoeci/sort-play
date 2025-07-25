@@ -7507,6 +7507,10 @@
           "\\(Color\\)",
           "\\(Genre Filter\\)",
           "\\(Custom Filter\\)",
+          "\\(Personalized\\)",
+          "\\(Power Hour\\)",
+          "\\(Mellow Mood\\)",
+          "\\(Hidden Gems\\)"
       ];
   
       let suffixPattern = new RegExp(
@@ -9463,7 +9467,7 @@
           {
             backgroundColor: "transparent",
             color: "white",
-            text: "Your Hidden Gems",
+            text: "My Hidden Gems",
             sortType: "affinityHiddenGems",
           },
         ],
@@ -12800,11 +12804,29 @@
             modifiedPlaylistOriginalPath = initialPagePath; 
 
             try {
+                const newPlaylistName = `${finalSourceName} (${sortTypeInfo.shortName})`;
+                const newPlaylistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
+
+                try {
+                    await Spicetify.CosmosAsync.put(
+                        `https://api.spotify.com/v1/playlists/${playlistIdToModify}`,
+                        {
+                            name: newPlaylistName,
+                            description: newPlaylistDescription,
+                        }
+                    );
+                } catch (error) {
+                    const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
+                    if (!isExpectedJsonError) {
+                        console.warn("An unexpected error occurred while updating playlist details. Proceeding with track replacement.", error);
+                    }
+                }
+
                 mainButton.innerText = "Saving...";
                 const trackUris = sortedTracks.map((track) => track.uri);
                 await replacePlaylistTracks(playlistIdToModify, trackUris);
                 
-                Spicetify.showNotification(`"${finalSourceName}" sorted by ${sortTypeInfo.fullName}!`);
+                Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
                 playlistUriForQueue = currentUriAtStart; 
                 playlistWasModifiedOrCreated = true; 
 
