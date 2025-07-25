@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.0";
+  const SORT_PLAY_VERSION = "5.1.5";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -44,6 +44,7 @@
   let followedReleasesAlbumLimit = 'all';
   let colorThiefLib = null;
   let colorSortMode = 'perceptual';
+  let setDedicatedPlaylistCovers = true;
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
@@ -60,6 +61,22 @@
   const STORAGE_KEY_NEW_RELEASES_LIMIT = "sort-play-new-releases-limit";
   const STORAGE_KEY_FOLLOWED_RELEASES_LIMIT = "sort-play-followed-releases-limit";
   const STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE = "sort-play-discovery-playlist-size";
+  const STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS = "sort-play-set-dedicated-playlist-covers";
+
+
+
+
+  const DEDICATED_PLAYLIST_COVERS = {
+    'topThisMonth': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-m.png',
+    'topLast6Months': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-6.png',
+    'topAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-all.png',
+    'followedReleasesChronological': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/new-followed-full.png',
+    'followedArtistPicks': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/new-followed-pick.png',
+    'newDiscoveryPicks': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/new-picks.png',
+    'recommendRecentVibe': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-recent.png',
+    'recommendAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-all.png',
+    'pureDiscovery': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-pure.png',
+  };
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
   - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
@@ -111,6 +128,8 @@
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
     placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
+    const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
+    setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
   
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -149,6 +168,7 @@
     localStorage.setItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, discoveryPlaylistSize);
     localStorage.setItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, placePlaylistsInFolder);
     localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
+    localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -1045,6 +1065,18 @@
         </div>
     </div>
 
+    <div class="setting-row" id="setDedicatedCoversSettingRow">
+        <label class="col description">
+            Set Custom Playlist Covers
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="setDedicatedCoversToggle" ${setDedicatedPlaylistCovers ? 'checked' : ''}>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
     <div class="setting-row" id="topTracksLimitSetting">
         <label class="col description">
             Top Tracks Playlist Size
@@ -1209,6 +1241,7 @@
     const placePlaylistsInFolderToggle = modalContainer.querySelector("#placePlaylistsInFolderToggle");
     const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
     const playlistBehaviorSettingsBtn = modalContainer.querySelector("#playlistBehaviorSettingsBtn");
+    const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
 
     function updateOpenPlaylistAfterSortToggleState() {
       const isCreatePlaylistOn = createPlaylistToggle.checked;
@@ -1262,6 +1295,11 @@
 
     playlistBehaviorSettingsBtn.addEventListener("click", () => {
         showPlaylistBehaviorModal();
+    });
+
+    setDedicatedCoversToggle.addEventListener("change", () => {
+        setDedicatedPlaylistCovers = setDedicatedCoversToggle.checked;
+        saveSettings();
     });
 
     colorSortModeSelect.addEventListener("change", () => {
@@ -8620,20 +8658,18 @@
   
   async function setPlaylistImage(playlistId, base64Image) {
     try {
-      const response = await Spicetify.CosmosAsync.put(
+      await Spicetify.CosmosAsync.put(
         `https://api.spotify.com/v1/playlists/${playlistId}/images`,
         base64Image.split("base64,")[1]
       );
   
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-          `Spotify API request failed with status ${response.status}: ${errorText}`
-        );
-      }
-  
     } catch (error) {
-      console.error("Error setting playlist image:", error);
+  
+      const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
+      
+      if (!isExpectedJsonError) {
+        console.error("Error setting playlist image:", error);
+      }
     }
   }
 
@@ -10367,9 +10403,83 @@
     }
   }
 
+
+  async function generatePlaylistCover(userName, baseImageUrl, usernameColor) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const size = 640;
+    canvas.width = size;
+    canvas.height = size;
+
+    try {
+        const baseImage = new Image();
+        baseImage.crossOrigin = 'Anonymous';
+        baseImage.src = baseImageUrl;
+        await new Promise((resolve, reject) => {
+            baseImage.onload = resolve;
+            baseImage.onerror = reject;
+        });
+
+        ctx.drawImage(baseImage, 0, 0, size, size);
+    } catch (error) {
+        console.error("Sort-Play: Failed to load base cover image. Using a black background.", error);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    const MAX_USERNAME_LENGTH = 35;
+    let displayName = userName;
+
+    if (userName.length > MAX_USERNAME_LENGTH) {
+      displayName = userName.substring(0, MAX_USERNAME_LENGTH) + '...';
+    }
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.fillStyle = usernameColor || '#24bf70'; 
+    
+    let userNameFontSize = 50;
+    ctx.font = `bold ${userNameFontSize}px 'SpotifyMixUI', sans-serif`;
+    const maxUserNameWidth = size * 0.8;
+
+    while (ctx.measureText(displayName).width > maxUserNameWidth && userNameFontSize > 20) {
+        userNameFontSize -= 2;
+        ctx.font = `bold ${userNameFontSize}px 'SpotifyMixUI', sans-serif`;
+    }
+
+    const userNameY = size * 0.76; 
+    ctx.fillText(displayName, size / 2, userNameY);
+
+    const timestamp = new Date().toISOString();
+    ctx.font = "10px sans-serif";
+    ctx.fillStyle = "rgba(0, 0, 0, 0.01)";
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(timestamp, 5, 5);
+
+    return canvas.toDataURL('image/jpeg');
+  }
+
   async function getOrCreateDedicatedPlaylist(sortType, name, description, maxRetries = 5, initialDelay = 1000) {
     const updateBehaviorSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS) || '{}');
     const isUpdateEnabled = updateBehaviorSettings[sortType] || false;
+
+    const releasePlaylistColor = '#3798a5';
+    const discoveryPlaylistColor = '#8f46d7';
+    const defaultUsernameColor = '#24bf70';
+
+    const releasePlaylistTypes = ['followedReleasesChronological', 'followedArtistPicks', 'newDiscoveryPicks'];
+    const discoveryPlaylistTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery'];
+
+    let usernameColor;
+    if (discoveryPlaylistTypes.includes(sortType)) {
+        usernameColor = discoveryPlaylistColor;
+    } else if (releasePlaylistTypes.includes(sortType)) {
+        usernameColor = releasePlaylistColor;
+    } else {
+        usernameColor = defaultUsernameColor;
+    }
 
     if (isUpdateEnabled) {
         let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
@@ -10382,14 +10492,25 @@
                 try {
                     const playlistId = playlistUri.split(':')[2];
                     const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+
+                    if (setDedicatedPlaylistCovers) {
+                        try {
+                            const user = await Spicetify.Platform.UserAPI.getUser();
+                            let finalUserName = user.displayName;
+                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                            const coverBase64 = await generatePlaylistCover(finalUserName, baseImageUrl, usernameColor);
+                            await setPlaylistImage(playlistId, coverBase64);
+                        } catch (coverError) {
+                            console.error("Failed to update custom playlist cover:", coverError);
+                        }
+                    }
+
                     await movePlaylistToTop(playlistUri);
                     return { playlist: playlistData, wasUpdated: true };
                 } catch (e) {
-
                     console.warn(`Error verifying linked playlist ${playlistUri}, creating a new one.`, e);
                 }
             } else {
-                console.warn(`Linked playlist for ${sortType} (${playlistUri}) was not found in the user's library. It was likely deleted. Creating a new one.`);
                 delete dedicatedPlaylistMap[sortType];
                 localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
             }
@@ -10399,6 +10520,19 @@
     const newPlaylist = await createPlaylist(name, description, maxRetries, initialDelay);
 
     if (isUpdateEnabled && newPlaylist) {
+        if (setDedicatedPlaylistCovers) {
+            try {
+                const user = await Spicetify.Platform.UserAPI.getUser();
+                let finalUserName = user.displayName;
+
+                const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                const coverBase64 = await generatePlaylistCover(finalUserName, baseImageUrl, usernameColor);
+                await setPlaylistImage(newPlaylist.id, coverBase64);
+            } catch (coverError) {
+                console.error("Failed to generate or set custom playlist cover:", coverError);
+            }
+        }
+
         let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
         dedicatedPlaylistMap[sortType] = newPlaylist.uri;
         localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
@@ -10849,6 +10983,8 @@
     updateProgress("Ranking...");
     const { rawSonicProfile, peakSonicProfile, genreProfile, artistProfile } = affinityProfile;
 
+    const getArtistUris = (track) => track.artistUris || (Array.isArray(track.artists) ? track.artists.map(a => a.uri) : []);
+
     const targetTrackIds = targetTracks.map(t => t.uri.split(':')[2]);
     const targetAudioFeaturesMap = preFetchedAudioFeatures;
     const artistCache = new Map();
@@ -10860,7 +10996,7 @@
         response.tracks.forEach(track => track && popularityMap.set(track.id, track.popularity));
     }
 
-    const targetArtistIds = [...new Set(targetTracks.flatMap(t => (t.artistUris || t.artists.map(a => a.uri)).map(uri => uri.split(':')[2])))];
+    const targetArtistIds = [...new Set(targetTracks.flatMap(t => getArtistUris(t).map(uri => uri.split(':')[2])))];
     for (let i = 0; i < targetArtistIds.length; i += 50) {
         const batch = targetArtistIds.slice(i, i + 50);
         const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
@@ -10881,7 +11017,8 @@
     const scoredTracks = targetTracks.map(track => {
         const trackId = track.uri.split(':')[2];
         const audio_features = targetAudioFeaturesMap.get(trackId);
-        const artist_genres = (track.artistUris || track.artists.map(a => a.uri)).flatMap(uri => artistCache.get(uri.split(':')[2]) || []);
+        const artistUris = getArtistUris(track);
+        const artist_genres = artistUris.flatMap(uri => artistCache.get(uri.split(':')[2]) || []);
         const popularity = popularityMap.get(trackId) || 0;
 
         let sonicScoreSum = 0;
@@ -10913,7 +11050,7 @@
             genreScore += (genreProfile[genre] || 0);
         });
 
-        (track.artistUris || track.artists.map(a => a.uri)).forEach(uri => {
+        artistUris.forEach(uri => {
             const artistId = uri.split(':')[2];
             artistScore += (artistProfile[artistId] || 0);
         });
@@ -10959,6 +11096,7 @@
 
     return finalTracks;
   }
+
 
   async function getAudioFeaturesForTracks(trackIds) {
     if (!trackIds || trackIds.length === 0) return [];
@@ -11538,16 +11676,20 @@
         });
 
         const trackUris = genuinelyNewTracks.map(track => track.uri);
-        const playlistName = "Followed Releases (Full)";
+        const playlistName = "Followed Artists: Full Releases";
         const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Created by Sort-Play.`;
         
         updateProgress("Creating...");
-        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('followedReleasesChronological', playlistName, playlistDescription);
         
         updateProgress("Saving...");
-        await addTracksToPlaylist(newPlaylist.id, trackUris);
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
         
-        Spicetify.showNotification(`Playlist "${playlistName}" created with ${trackUris.length} tracks!`);
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
 
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
@@ -11825,7 +11967,6 @@
 
             for (const binName of pickOrder) {
                 if (topTracks.length >= FINAL_PLAYLIST_SIZE) break;
-
                 while (binArrays[binName].length > binPointers[binName] && binCounts[binName] < binTargets[binName]) {
                     const track = binArrays[binName][binPointers[binName]];
                     binPointers[binName]++;
@@ -11851,16 +11992,20 @@
         }
         
         const trackUris = topTracks.map(track => track.uri);
-        const playlistName = "Followed Artist Picks";
+        const playlistName = "Followed Artists: Fresh Picks";
         const playlistDescription = `The latest releases from artists you follow, personalized for your taste. Created by Sort-Play.`;
         
         updateProgress("Creating...");
-        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('followedArtistPicks', playlistName, playlistDescription);
         
         updateProgress("Saving...");
-        await addTracksToPlaylist(newPlaylist.id, trackUris);
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
         
-        Spicetify.showNotification(`Playlist "${playlistName}" created with ${topTracks.length} tracks!`);
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${topTracks.length} tracks!`);
 
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
@@ -11877,6 +12022,7 @@
         resetButtons();
     }
   }
+
 
   async function generateNewDiscoveryPicks() {
     const { GraphQL, CosmosAsync } = Spicetify;
@@ -12102,16 +12248,20 @@
         }
         
         const trackUris = topTracks.map(track => track.uri);
-        const playlistName = "New Discovery Picks";
+        const playlistName = "New Music Picks";
         const playlistDescription = `A personalized mix of new music from across Spotify, tailored to your taste by Sort-Play.`;
         
         updateProgress("Creating...");
-        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('newDiscoveryPicks', playlistName, playlistDescription);
         
         updateProgress("Saving...");
-        await addTracksToPlaylist(newPlaylist.id, trackUris);
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
         
-        Spicetify.showNotification(`Playlist "${playlistName}" created with ${topTracks.length} tracks!`);
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${topTracks.length} tracks!`);
 
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
@@ -12240,6 +12390,7 @@
       let tracks;
       let isArtistPage = false;
       let currentPlaylistDetails = null;
+      let sourcePlaylistCoverUrl = null;
       let sourceNameForDialog = "Current Playlist"; 
 
       if (URI.isPlaylistV1OrV2(currentUriAtStart)) {
@@ -12248,6 +12399,9 @@
         try {
             currentPlaylistDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
             sourceNameForDialog = currentPlaylistDetails?.name || "Current Playlist";
+            if (currentPlaylistDetails?.images?.length > 0) {
+                sourcePlaylistCoverUrl = currentPlaylistDetails.images[0].url;
+            }
         } catch (e) {
             console.warn("Could not fetch current playlist details for ownership check/dialog", e);
         }
@@ -12686,6 +12840,13 @@
                     await setPlaylistImage(newPlaylist.id, base64Image);
                   }
                 } catch (error) { console.error("Error setting playlist image:", error); }
+              } else if (sourcePlaylistCoverUrl) {
+                try {
+                  const base64Image = await toBase64(sourcePlaylistCoverUrl);
+                  await setPlaylistImage(newPlaylist.id, base64Image);
+                } catch (error) {
+                  console.warn("Could not apply original playlist cover:", error);
+                }
               }
               const trackUris = sortedTracks.map((track) => track.uri);
               await addTracksToPlaylist(newPlaylist.id, trackUris);
