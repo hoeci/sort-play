@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.6";
+  const SORT_PLAY_VERSION = "5.1.5";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -11128,21 +11128,21 @@
     for (let i = 0; i < targetTrackIds.length; i += 50) {
         const batch = targetTrackIds.slice(i, i + 50);
         const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-        response.tracks.forEach(track => track && popularityMap.set(track.id, track.popularity));
+        (response.tracks || []).forEach(track => track && popularityMap.set(track.id, track.popularity));
     }
 
     const targetArtistIds = [...new Set(targetTracks.flatMap(t => getArtistUris(t).map(uri => uri.split(':')[2])))];
     for (let i = 0; i < targetArtistIds.length; i += 50) {
         const batch = targetArtistIds.slice(i, i + 50);
         const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
-        response.artists.forEach(artist => artist && artistCache.set(artist.id, artist.genres));
+        (response.artists || []).forEach(artist => artist && artistCache.set(artist.id, artist.genres));
     }
     
     const releaseDateMap = new Map();
     for (let i = 0; i < targetTrackIds.length; i += 50) {
         const batch = targetTrackIds.slice(i, i+50);
         const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-        response.tracks.forEach(track => {
+        (response.tracks || []).forEach(track => {
             if (track && track.album && track.album.release_date) {
                 releaseDateMap.set(track.id, track.album.release_date);
             }
