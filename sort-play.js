@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.5";
+  const SORT_PLAY_VERSION = "5.1.6";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -3286,7 +3286,7 @@
 
   const PALETTE_ANALYSIS_CACHE_KEY = 'sort-play-palette-cache-v1';
   const PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY = 'sort-play-palette-cache-timestamp-v1';
-  const PALETTE_ANALYSIS_CACHE_EXPIRY_DAYS = 15;
+  const PALETTE_ANALYSIS_CACHE_EXPIRY_DAYS = 7;
 
   function initializePaletteAnalysisCache() {
       const timestamp = localStorage.getItem(PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY);
@@ -8343,7 +8343,7 @@
 
       const likedTracks = likedTracksData.items.map((item) => ({
         uri: item.uri,
-        uid: item.uid,  
+        uid: item.uid,
         name: item.name,
         albumUri: item.album.uri,
         albumName: item.album.name,
@@ -8351,9 +8351,10 @@
         artistName: item.artists[0].name,
         allArtists: item.artists.map(artist => artist.name).join(", "),
         durationMilis: item.duration.milliseconds,
-        playCount: "N/A",    
-        popularity: null,    
-        releaseDate: null,   
+        addedAt: item.addedAt,
+        playCount: "N/A",
+        popularity: null,
+        releaseDate: null,
         track: {
             album: {
                 id: item.album.uri.split(":")[2]
@@ -8366,7 +8367,7 @@
 
       return likedTracks;
 
-    } catch (error) {
+    } catch (error)      {
       console.error("Error fetching liked songs:", error);
       Spicetify.showNotification("Failed to fetch liked songs.", true);
       return [];
@@ -10696,11 +10697,46 @@
       return peaks;
   }
 
-  const AFFINITY_PROFILE_CACHE_KEY = "sort-play-affinity-profile-cache-v1";
-  const AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY = "sort-play-affinity-cache-timestamp-v1";
-  const AFFINITY_CACHE_EXPIRY_DAYS = 30;
+  const AFFINITY_PROFILE_CACHE_KEY = "sort-play-affinity-profile-cache-v1-5";
+  const AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY = "sort-play-affinity-cache-timestamp-v1-5";
+  const AFFINITY_CACHE_EXPIRY_DAYS = 50;
+
+  function cleanupOldAffinityCaches() {
+    const currentCacheKey = AFFINITY_PROFILE_CACHE_KEY;
+    const currentTimestampKey = AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY;
+
+    const cachePrefix = "sort-play-affinity-profile-cache-";
+    const timestampPrefix = "sort-play-affinity-cache-timestamp-";
+
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+
+        if (key.startsWith(cachePrefix) && key !== currentCacheKey) {
+            keysToRemove.push(key);
+        }
+
+        if (key.startsWith(timestampPrefix) && key !== currentTimestampKey) {
+            keysToRemove.push(key);
+        }
+    }
+
+    if (keysToRemove.length > 0) {
+        console.log("Sort-Play: Cleaning up old affinity cache versions:", keysToRemove);
+        keysToRemove.forEach(key => {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.error(`Failed to remove old cache key: ${key}`, e);
+            }
+        });
+    }
+  }
 
   async function getAffinityProfileData(updateProgress) {
+    cleanupOldAffinityCaches();
+
     updateProgress("Get liked...");
     const likedTracksData = await Spicetify.Platform.LibraryAPI.getTracks({ limit: 3000 });
     
@@ -10778,7 +10814,7 @@
 
             return {
                 uri: song.uri,
-                added_at: song.added_at,
+                addedAt: song.addedAt,
                 artistUris: song.artists.map(artist => artist.uri),
                 audio_features: lean_audio_features,
                 artist_genres: song.artists.flatMap(artist => artistGenreMap.get(artist.uri.split(':')[2]) || [])
@@ -10814,11 +10850,7 @@
     }
 
     updateProgress("Get top...");
-    const topItemsLimits = {
-        short_term: 150,
-        medium_term: 200,
-        long_term: 300
-    };
+    const topItemsLimits = { short_term: 200, medium_term: 300, long_term: 550 };
     const timeRanges = ['short_term', 'medium_term', 'long_term'];
     const topItems = {};
     for (const range of timeRanges) {
@@ -10834,6 +10866,7 @@
   
   function buildAffinityProfile(profileData, updateProgress, timeRangeScope = 'balanced') {
     updateProgress("Profiling...");
+    let finalTimeScope = timeRangeScope;
     const { enhancedLikedSongs, topItems } = profileData;
     const timeRanges = ['short_term', 'medium_term', 'long_term'];
 
@@ -10845,32 +10878,32 @@
         case 'recent':
             const sixMonthsAgo = new Date();
             sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
-            profileSourceSongs = enhancedLikedSongs.filter(song => new Date(song.added_at) > sixMonthsAgo);
-            multipliers = { short_term: 4.0, medium_term: 0.5, long_term: 0 };
-            recencyDecayFactor = 90;
+            profileSourceSongs = enhancedLikedSongs.filter(song => new Date(song.addedAt) > sixMonthsAgo);
+            multipliers = { short_term: 4.0, medium_term: 1.0, long_term: 0.5 };
+            recencyDecayFactor = 110;
             break;
         case 'all_time':
-            multipliers = { short_term: 0, medium_term: 1.0, long_term: 3.0 };
-            recencyDecayFactor = 1825;
+            multipliers = { short_term: 0.5, medium_term: 1.5, long_term: 3.5 };
+            recencyDecayFactor = 10000;
             break;
         case 'energy':
             profileSourceSongs = enhancedLikedSongs.filter(song => 
                 song.audio_features && song.audio_features.energy > 0.6 && song.audio_features.danceability > 0.5
             );
-            multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
-            recencyDecayFactor = 365;
+            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
+            recencyDecayFactor = 500;
             break;
         case 'mellow':
             profileSourceSongs = enhancedLikedSongs.filter(song => 
                 song.audio_features && song.audio_features.energy < 0.4 && song.audio_features.acousticness > 0.5
             );
-            multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
-            recencyDecayFactor = 365;
+            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
+            recencyDecayFactor = 500;
             break;
         case 'balanced':
         default:
-            multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
-            recencyDecayFactor = 365;
+            multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
+            recencyDecayFactor = 600;
             break;
     }
 
@@ -10878,8 +10911,9 @@
         console.warn(`[Sort-Play] Not enough songs for a '${timeRangeScope}' profile (${profileSourceSongs.length} found). Falling back to 'Balanced'.`);
         Spicetify.showNotification(`Not enough data for ${timeRangeScope} profile, using Balanced instead.`);
         profileSourceSongs = enhancedLikedSongs;
-        multipliers = { long_term: 0.5, medium_term: 1.0, short_term: 2.0 };
-        recencyDecayFactor = 365;
+        multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
+        recencyDecayFactor = 600;
+        finalTimeScope = 'balanced';
     }
 
     const topTrackPositions = { short_term: new Map(), medium_term: new Map(), long_term: new Map() };
@@ -10898,18 +10932,40 @@
                 const baseMultiplier = multipliers[range];
                 if (baseMultiplier === 0) continue;
 
-                let positionalMultiplier = 0; 
-                if (position < 25) positionalMultiplier = 1.0;
-                else if (position < 50) positionalMultiplier = 0.90;
-                else if (position < 100) positionalMultiplier = 0.75;
-                else if (position < 200) positionalMultiplier = 0.50;
-                else positionalMultiplier = 0.25;
+                let positionalMultiplier = 0;
+
+                switch (range) {
+                    case 'long_term':
+                        if (position < 25) positionalMultiplier = 1.0;
+                        else if (position < 50) positionalMultiplier = 0.95;
+                        else if (position < 100) positionalMultiplier = 0.85;
+                        else if (position < 200) positionalMultiplier = 0.70;
+                        else if (position < 300) positionalMultiplier = 0.55;
+                        else if (position < 400) positionalMultiplier = 0.40;
+                        else positionalMultiplier = 0.25;
+                        break;
+
+                    case 'medium_term':
+                        if (position < 25) positionalMultiplier = 1.0;
+                        else if (position < 50) positionalMultiplier = 0.85;
+                        else if (position < 100) positionalMultiplier = 0.68;
+                        else if (position < 200) positionalMultiplier = 0.45;
+                        else positionalMultiplier = 0.20;
+                        break;
+                        
+                    case 'short_term':
+                        if (position < 25) positionalMultiplier = 1.0;
+                        else if (position < 50) positionalMultiplier = 0.85;
+                        else if (position < 100) positionalMultiplier = 0.50;
+                        else positionalMultiplier = 0.15;
+                        break;
+                }
 
                 weight += baseMultiplier * positionalMultiplier;
             }
         }
         
-        let days_since_added = (new Date() - new Date(song.added_at)) / (1000 * 60 * 60 * 24);
+        let days_since_added = (new Date() - new Date(song.addedAt)) / (1000 * 60 * 60 * 24);
         
         if (isNaN(days_since_added)) {
             days_since_added = 365 * 5; 
@@ -10966,7 +11022,8 @@
         peakSonicProfile[feature] = findPeaks(sonicProfile[feature]);
     }
 
-    return { rawSonicProfile: sonicProfile, peakSonicProfile, genreProfile, artistProfile };
+    const affinityProfile = { rawSonicProfile: sonicProfile, peakSonicProfile, genreProfile, artistProfile };
+    return { affinityProfile, finalTimeScope };
   }
 
   function getPeakScore(value, peaks, rawProfile) {
@@ -10983,14 +11040,88 @@
     return 0;
   }
 
-  async function scoreAndSortPlaylist(targetTracks, affinityProfile, updateProgress, timeRangeScope = 'balanced', preFetchedAudioFeatures) {
+  function getContinuousSimilarityBoost(featuresA, featuresB) {
+    if (!featuresA || !featuresB) return 0.0;
+
+    const MIN_BOOST = 4.0;
+    const MAX_BOOST = 25.0;
+    const MAX_ALLOWED_TEMPO_DIFF = 5.0;
+    const MAX_ALLOWED_OTHER_DIFF = 0.10;
+
+    const FEATURE_WEIGHTS = {
+        tempo: 1.5,
+        energy: 1.2,
+        danceability: 1.2,
+        valence: 1.0,
+        acousticness: 0.8,
+        instrumentalness: 0.7,
+        speechiness: 0.6,
+    };
+
+    let totalWeightedScore = 0;
+    let totalWeight = 0;
+
+    const tempoDiff = Math.abs(featuresA.tempo - featuresB.tempo);
+    if (tempoDiff > MAX_ALLOWED_TEMPO_DIFF) {
+        return 0.0;
+    }
+    const tempoSimilarity = 1 - (tempoDiff / MAX_ALLOWED_TEMPO_DIFF);
+    totalWeightedScore += tempoSimilarity * FEATURE_WEIGHTS.tempo;
+    totalWeight += FEATURE_WEIGHTS.tempo;
+
+    const otherFeatures = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
+    for (const feature of otherFeatures) {
+        const diff = Math.abs(featuresA[feature] - featuresB[feature]);
+        if (diff > MAX_ALLOWED_OTHER_DIFF) {
+            return 0.0;
+        }
+        const similarity = 1 - (diff / MAX_ALLOWED_OTHER_DIFF);
+        totalWeightedScore += similarity * FEATURE_WEIGHTS[feature];
+        totalWeight += FEATURE_WEIGHTS[feature];
+    }
+    
+    if (totalWeight === 0) return 0.0;
+    const averageSimilarity = totalWeightedScore / totalWeight;
+
+    const boost = MIN_BOOST + (MAX_BOOST - MIN_BOOST) * averageSimilarity;
+    
+    return boost;
+  }
+
+
+  async function scoreAndSortPlaylist(targetTracks, affinityProfile, profileData, updateProgress, timeRangeScope = 'balanced', preFetchedAudioFeatures) {
     updateProgress("Ranking...");
     const { rawSonicProfile, peakSonicProfile, genreProfile, artistProfile } = affinityProfile;
 
+    const POPULARITY_WEIGHT = 5.0; 
+
     const getArtistUris = (track) => track.artistUris || (Array.isArray(track.artists) ? track.artists.map(a => a.uri) : []);
 
+    const artistCounts = new Map();
+    targetTracks.forEach(track => {
+        const artistUris = getArtistUris(track);
+        artistUris.forEach(uri => {
+            const artistId = uri.split(':')[2];
+            artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
+        });
+    });
+
+    const maxArtistCount = artistCounts.size > 0 ? Math.max(...artistCounts.values()) : 0;
+    
+    let sonicWeight, genreWeight, artistWeight;
+    if (maxArtistCount > 10) {
+        console.log("Sort-Play: High artist concentration detected. Applying sonic-focused weights.");
+        sonicWeight = 0.85;
+        genreWeight = 0.0;
+        artistWeight = 0.15;
+    } else {
+        console.log("Sort-Play: Normal artist diversity. Applying balanced weights.");
+        sonicWeight = 0.70;
+        genreWeight = 0.1;
+        artistWeight = 0.20;
+    }
+
     const targetTrackIds = targetTracks.map(t => t.uri.split(':')[2]);
-    const targetAudioFeaturesMap = preFetchedAudioFeatures;
     const artistCache = new Map();
     const popularityMap = new Map();
 
@@ -11018,9 +11149,13 @@
         });
     }
 
+    const likedSongsFeatures = profileData.enhancedLikedSongs
+        .map(song => song.audio_features)
+        .filter(features => features);
+
     const scoredTracks = targetTracks.map(track => {
         const trackId = track.uri.split(':')[2];
-        const audio_features = targetAudioFeaturesMap.get(trackId);
+        const audio_features = preFetchedAudioFeatures.get(trackId);
         const artistUris = getArtistUris(track);
         const artist_genres = artistUris.flatMap(uri => artistCache.get(uri.split(':')[2]) || []);
         const popularity = popularityMap.get(trackId) || 0;
@@ -11059,7 +11194,34 @@
             artistScore += (artistProfile[artistId] || 0);
         });
 
-        let finalScore = (rawSonicScore * 0.5) + (genreScore * 0.25) + (artistScore * 0.25);
+
+
+        let similarityBoost = 0.0;
+        const MAX_BOOST = 25.0;
+
+        if (audio_features) {
+            for (const likedFeatures of likedSongsFeatures) {
+                const currentBoost = getContinuousSimilarityBoost(audio_features, likedFeatures);
+                
+                if (currentBoost > similarityBoost) {
+                    similarityBoost = currentBoost;
+                }
+
+                if (similarityBoost >= MAX_BOOST) {
+                    break;
+                }
+            }
+        }
+
+        let affinityScore = (rawSonicScore * sonicWeight) + (genreScore * genreWeight) + (artistScore * artistWeight);
+
+        let popularityBonus = 0;
+        if (popularity > 40) {
+            const popularity_factor = Math.min(1.0, (popularity - 40) / (90 - 40));
+            popularityBonus = POPULARITY_WEIGHT * popularity_factor;
+        }
+        
+        let finalScore = affinityScore + popularityBonus + similarityBoost;
 
         const releaseDateStr = releaseDateMap.get(trackId);
         if (releaseDateStr) {
@@ -11889,12 +12051,12 @@
         tracksToProcess = uniqueTracks;
     
         const profileData = await getAffinityProfileData(updateProgress);
-        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced');
+        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced').affinityProfile;
         
         const audioFeaturesForScoring = await getAudioFeaturesForTracks(tracksToProcess.map(t => t.uri.split(':')[2]));
         const audioFeaturesMapForScoring = new Map(audioFeaturesForScoring.map(f => [f.id, f]));
 
-        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced', audioFeaturesMapForScoring);
+        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, profileData, updateProgress, 'balanced', audioFeaturesMapForScoring);
     
         if (scoredTracks.length === 0) {
             throw new Error("No tracks matched your affinity profile.");
@@ -12151,12 +12313,12 @@
         }
 
         const profileData = await getAffinityProfileData(updateProgress);
-        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced');
+        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced').affinityProfile;
         
         const audioFeaturesForScoring = await getAudioFeaturesForTracks(tracksToProcess.map(t => t.uri.split(':')[2]));
         const audioFeaturesMapForScoring = new Map(audioFeaturesForScoring.map(f => [f.id, f]));
 
-        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, updateProgress, 'balanced', audioFeaturesMapForScoring);
+        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, profileData, updateProgress, 'balanced', audioFeaturesMapForScoring);
         
         if (scoredTracks.length === 0) {
             throw new Error("No tracks matched your affinity profile.");
@@ -12523,9 +12685,9 @@
                 case 'affinityHiddenGems':
                 default: timeScope = 'balanced'; break;
             }
-            const affinityProfile = buildAffinityProfile(profileData, updateProgress, timeScope);
+            const { affinityProfile, finalTimeScope } = buildAffinityProfile(profileData, updateProgress, timeScope);
             
-            sortedTracks = await scoreAndSortPlaylist(tracks, affinityProfile, updateProgress, timeScope, audioFeaturesMap);
+            sortedTracks = await scoreAndSortPlaylist(tracks, affinityProfile, profileData, updateProgress, finalTimeScope, audioFeaturesMap);
             
             if (sortType === 'affinityHiddenGems') {
                 if (sortedTracks.length > 0) {
@@ -12778,6 +12940,7 @@
             "\\(Mellow Mood\\)",
             "\\(Hidden Gems\\)"
         ];
+        
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
         while (suffixPattern.test(finalSourceName)) {
           finalSourceName = finalSourceName.replace(suffixPattern, "");
@@ -13465,8 +13628,8 @@
     });
   };
 
-  const CACHE_KEY_SCROBBLES = 'spotify-scrobbles-cache2';
-  const CACHE_TIMESTAMP_KEY_SCROBBLES = 'spotify-scrobbles-cache-timestamp2';
+  const CACHE_KEY_SCROBBLES = 'spotify-scrobbles-cache3';
+  const CACHE_TIMESTAMP_KEY_SCROBBLES = 'spotify-scrobbles-cache-timestamp3';
   const CACHE_EXPIRY_DAYS_SCROBBLES = 7;
 
   function initializeScrobblesCache() {
