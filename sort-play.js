@@ -11733,13 +11733,14 @@
         }
 
         const dateLimit = new Date();
-        dateLimit.setDate(dateLimit.getDate() - newReleasesDaysLimit);
+        dateLimit.setUTCHours(0, 0, 0, 0);
+        dateLimit.setUTCDate(dateLimit.getUTCDate() - (newReleasesDaysLimit - 1));
         const newReleasesMap = new Map();
         
         const BATCH_SIZE = 300;
         for (let i = 0; i < followedArtists.length; i += BATCH_SIZE) {
             const artistBatch = followedArtists.slice(i, i + BATCH_SIZE);
-            updateProgress(`Scan ${i + artistBatch.length}/${followedArtists.length}`);
+            updateProgress(`Scanning...`);
 
             const batchPromises = artistBatch.map(artist => {
                 const variables = { uri: artist.uri, order: "DATE_DESC", offset: 0, limit: 10 };
@@ -11773,7 +11774,7 @@
 
         const allNewReleases = Array.from(newReleasesMap.values());
         if (allNewReleases.length === 0) {
-            throw new Error("No new releases found in the last 14 days.");
+            throw new Error(`No new releases found in the last ${newReleasesDaysLimit} days.`);
         }
 
         updateProgress(`Get tracks...`);
@@ -11910,7 +11911,8 @@
         }
 
         const dateLimit = new Date();
-        dateLimit.setDate(dateLimit.getDate() - newReleasesDaysLimit);
+        dateLimit.setUTCHours(0, 0, 0, 0);
+        dateLimit.setUTCDate(dateLimit.getUTCDate() - (newReleasesDaysLimit - 1));
         const newReleasesMap = new Map();
         
         const BATCH_SIZE = 300;
@@ -12276,7 +12278,8 @@
 
         updateProgress("Verifying...");
         const dateLimit = new Date();
-        dateLimit.setDate(dateLimit.getDate() - newReleasesDaysLimit);
+        dateLimit.setUTCHours(0, 0, 0, 0);
+        dateLimit.setUTCDate(dateLimit.getUTCDate() - (newReleasesDaysLimit - 1));
         let genuinelyNewTracks = [];
         const initialTrackIds = initialTracks.map(t => t.id).filter(Boolean);
 
