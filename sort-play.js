@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.5";
+  const SORT_PLAY_VERSION = "5.1.6";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -13830,7 +13830,7 @@
     }
   }
 
-  async function loadAdditionalColumnData(tracks) {
+  async function loadAdditionalColumnData(tracklist_) {
     const currentUri = getCurrentUri();
     let isColumnEnabled = false;
     let activeColumnType = 'playCount';
@@ -13847,55 +13847,60 @@
         activeColumnType = selectedArtistColumnType;
     }
 
-    if (!isColumnEnabled || tracks.length === 0) return;
+    if (!isColumnEnabled) return;
 
-    if (activeColumnType === 'playCount') {
-        initializePlayCountCache();
-    } else if (activeColumnType === 'releaseDate') {
-        initializeReleaseDateCache();
-    } else if (activeColumnType === 'scrobbles') {
-        initializeScrobblesCache();
-    }
+    const tracksToProcess = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
+        .filter(track => {
+            if (track.classList.contains('sort-play-processing') || track.hasAttribute('data-sp-fetch-failed')) {
+                return false;
+            }
+            const dataElement = track.querySelector(".sort-play-data");
+            const trackUri = getTracklistTrackUri(track);
+            const isTrack = trackUri && trackUri.includes("track");
+            return dataElement && (dataElement.textContent === "" || dataElement.textContent === "_") && isTrack && trackUri;
+        });
     
-    const BATCH_SIZE = audioFeatureTypes.includes(activeColumnType) ? 50 : 10;
+    if (tracksToProcess.length === 0) return;
+
+    if (activeColumnType === 'playCount') initializePlayCountCache();
+    else if (activeColumnType === 'releaseDate') initializeReleaseDateCache();
+    else if (activeColumnType === 'scrobbles') initializeScrobblesCache();
     
-    for (let i = 0; i < tracks.length; i += BATCH_SIZE) {
-        const batch = tracks.slice(i, i + BATCH_SIZE);
+    const BATCH_SIZE = 50;
+    
+    for (let i = 0; i < tracksToProcess.length; i += BATCH_SIZE) {
+        const batch = tracksToProcess.slice(i, i + BATCH_SIZE);
         
         if (audioFeatureTypes.includes(activeColumnType)) {
             const trackIdsToFetch = [];
             const elementMap = new Map();
 
             for (const trackElement of batch) {
-                const dataElement = trackElement.querySelector(".sort-play-data");
-                if (!dataElement) continue;
-
                 trackElement.classList.add('sort-play-processing');
                 const trackUri = getTracklistTrackUri(trackElement);
                 const trackId = trackUri ? trackUri.split(":")[2] : null;
-                if (!trackId) continue;
+                const dataElement = trackElement.querySelector(".sort-play-data");
+                if (!trackId || !dataElement) continue;
 
                 const statsCacheModel = "stats-column";
                 const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
                 let needsFetching = true;
 
                 if (cachedData) {
-                    if (activeColumnType === 'djInfo') {
-                        if (cachedData.key !== undefined && cachedData.tempo !== undefined && cachedData.energy !== undefined) {
-                            updateDisplay(dataElement, cachedData, 'djInfo');
-                            needsFetching = false;
-                        }
-                    } else {
-                        if (cachedData[activeColumnType] !== undefined) {
-                            updateDisplay(dataElement, cachedData[activeColumnType], activeColumnType);
-                            needsFetching = false;
-                        }
+                    if (activeColumnType === 'djInfo' && cachedData.key !== undefined) {
+                        updateDisplay(dataElement, cachedData, 'djInfo');
+                        needsFetching = false;
+                    } else if (cachedData[activeColumnType] !== undefined) {
+                        updateDisplay(dataElement, cachedData[activeColumnType], activeColumnType);
+                        needsFetching = false;
                     }
                 }
 
                 if (needsFetching) {
                     trackIdsToFetch.push(trackId);
                     elementMap.set(trackId, dataElement);
+                } else {
+                    trackElement.classList.remove('sort-play-processing');
                 }
             }
 
@@ -13907,7 +13912,6 @@
                     if (stats) {
                         const value = activeColumnType === 'djInfo' ? stats : stats[activeColumnType];
                         updateDisplay(dataElement, value, activeColumnType);
-                        
                         const statsCacheModel = "stats-column";
                         const currentCache = getTrackCache(trackId, true, false, statsCacheModel) || {};
                         const newCache = { ...currentCache, ...stats };
@@ -13915,121 +13919,88 @@
                     } else {
                         updateDisplay(dataElement, "_", activeColumnType);
                     }
+                    const trackElement = dataElement.closest('.main-trackList-trackListRow');
+                    if (trackElement) trackElement.classList.remove('sort-play-processing');
                 }
             }
-            batch.forEach(track => track.classList.remove('sort-play-processing'));
         } else {
-            await Promise.all(batch.map(async (track) => {
-                track.classList.add('sort-play-processing');
-                const dataElement = track.querySelector(".sort-play-data");
-                const trackUri = getTracklistTrackUri(track);
+            const trackIdsToFetch = [];
+            const elementMap = new Map();
+
+            for (const trackElement of batch) {
+                trackElement.classList.add('sort-play-processing');
+                const trackUri = getTracklistTrackUri(trackElement);
                 const trackId = trackUri ? trackUri.split(":")[2] : null;
+                const dataElement = trackElement.querySelector(".sort-play-data");
 
-                try {
-                    if (!dataElement || !trackId) return;
-
-                    const maxRetries = 3;
-                    let initialDelay = 1500;
-
-                    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-                        try {
-                            if (activeColumnType === 'playCount') {
-                                const cachedCount = getCachedPlayCount(trackId);
-                                if (cachedCount !== null && cachedCount !== "_") {
-                                    updateDisplay(dataElement, cachedCount, activeColumnType);
-                                    return;
-                                }
-                                let albumId = null;
-                                const albumLinkElement = track.querySelector("a[href*='/album/']");
-                                if (albumLinkElement) {
-                                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
-                                    albumId = albumIdMatch ? albumIdMatch[1] : null;
-                                } else {
-                                    const trackDetailsFromApi = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                                    albumId = trackDetailsFromApi?.album?.id;
-                                }
-                                if (!albumId) { throw new Error("Could not find Album ID."); }
-                                
-                                const trackDetails = { track: { album: { id: albumId }, id: trackId } };
-                                const result = await getTrackDetailsWithPlayCount(trackDetails);
-                                const playCount = result?.playCount;
-                                updateDisplay(dataElement, playCount, activeColumnType);
-                                if (playCount !== null && playCount !== "N/A") {
-                                    setCachedPlayCount(trackId, playCount);
-                                }
-                                return; 
-                            } else if (activeColumnType === 'releaseDate') {
-                                const cachedPreciseDate = getCachedReleaseDate(trackId);
-                                if (cachedPreciseDate !== null && cachedPreciseDate !== "_") { 
-                                    updateDisplay(dataElement, cachedPreciseDate, activeColumnType);
-                                    return;
-                                }
-                                let albumId = null;
-                                const albumLinkElement = track.querySelector("a[href*='/album/']");
-                                 if (albumLinkElement) {
-                                    const albumIdMatch = albumLinkElement.href.match(/\/album\/([a-zA-Z0-9]+)/);
-                                    albumId = albumIdMatch ? albumIdMatch[1] : null;
-                                } else {
-                                    const trackDetailsFromApi = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                                    albumId = trackDetailsFromApi?.album?.id;
-                                }
-                                if (!albumId) { throw new Error("Could not find Album ID."); }
-
-                                const preciseDateString = await getReleaseDatesForAlbum(albumId);
-                                updateDisplay(dataElement, preciseDateString, activeColumnType);
-                                if (preciseDateString !== null && preciseDateString !== "_") {
-                                    setCachedReleaseDate(trackId, preciseDateString);
-                                }
-                                return;
-                            }
-
-                            const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                            if (!trackDetails || !trackDetails.name || !trackDetails.artists || trackDetails.artists.length === 0) {
-                                throw new Error(`Could not fetch valid track details from Spotify.`);
-                            }
-                            const trackName = trackDetails.name;
-                            const artistName = trackDetails.artists[0].name;
-
-                            if (activeColumnType === 'scrobbles') {
-                                const cachedScrobbles = getCachedScrobbles(trackId);
-                                if (cachedScrobbles !== null && cachedScrobbles !== "_") {
-                                    updateDisplay(dataElement, cachedScrobbles, activeColumnType);
-                                    return;
-                                }
-                                const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                const scrobbles = result?.scrobbles;
-                                updateDisplay(dataElement, scrobbles, activeColumnType);
-                                if (scrobbles !== null && scrobbles !== undefined) {
-                                    setCachedScrobbles(trackId, scrobbles);
-                                }
-                                return;
-                            } else if (activeColumnType === 'personalScrobbles') {
-                                const lastFmUsername = loadLastFmUsername();
-                                if (!lastFmUsername) {
-                                    updateDisplay(dataElement, "_", activeColumnType);
-                                    return;
-                                }
-
-                                const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                const scrobbles = result?.personalScrobbles;
-                                updateDisplay(dataElement, scrobbles, activeColumnType);
-                                return;
-                            }
-                        } catch (error) {
-                            if (attempt === maxRetries) {
-                                updateDisplay(dataElement, "_", activeColumnType);
-                            } else {
-                                await new Promise(resolve => setTimeout(resolve, initialDelay));
-                                initialDelay *= 2; 
-                            }
-                        }
-                    }
-                } catch (finalError) {
-                    updateDisplay(dataElement, "_", activeColumnType);
-                } finally {
-                    track.classList.remove('sort-play-processing');
+                if (trackId && dataElement) {
+                    elementMap.set(trackId, { trackElement, dataElement });
+                    trackIdsToFetch.push(trackId);
+                } else {
+                    trackElement.classList.remove('sort-play-processing');
                 }
-            }));
+            }
+
+            if (trackIdsToFetch.length > 0) {
+                try {
+                    const trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdsToFetch.join(',')}`);
+                    
+                    if (trackDetailsResponse && trackDetailsResponse.tracks) {
+                        const processingPromises = trackDetailsResponse.tracks.map(async (trackDetails) => {
+                            if (!trackDetails) return;
+
+                            const { trackElement, dataElement } = elementMap.get(trackDetails.id) || {};
+                            if (!trackElement || !dataElement) return;
+
+                            try {
+                                if (activeColumnType === 'playCount') {
+                                    const result = await getTrackDetailsWithPlayCount({ track: { album: { id: trackDetails.album.id }, id: trackDetails.id } });
+                                    updateDisplay(dataElement, result.playCount, activeColumnType);
+                                } else if (activeColumnType === 'releaseDate') {
+                                    updateDisplay(dataElement, trackDetails.album.release_date, activeColumnType);
+                                } else if (activeColumnType === 'scrobbles' || activeColumnType === 'personalScrobbles') {
+                                    const trackName = trackDetails.name;
+                                    const artistName = trackDetails.artists?.[0]?.name;
+                                    if (!artistName || !trackName) throw new Error("Missing artist/track name.");
+
+                                    if (activeColumnType === 'scrobbles') {
+                                        const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                        updateDisplay(dataElement, result.scrobbles, activeColumnType);
+                                    } else {
+                                        if (!loadLastFmUsername()) {
+                                            updateDisplay(dataElement, "_", activeColumnType);
+                                        } else {
+                                            const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                            updateDisplay(dataElement, result.personalScrobbles, activeColumnType);
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                updateDisplay(dataElement, "_", activeColumnType);
+                                trackElement.setAttribute('data-sp-fetch-failed', 'true');
+                            } finally {
+                                trackElement.classList.remove('sort-play-processing');
+                            }
+                        });
+                        await Promise.all(processingPromises);
+                    } else {
+                        throw new Error("Spotify API request for track details failed.");
+                    }
+                } catch (spotifyError) {
+                    console.error("Error fetching batch track details:", spotifyError);
+                    trackIdsToFetch.forEach(trackId => {
+                        const { trackElement, dataElement } = elementMap.get(trackId) || {};
+                        if (trackElement && dataElement) {
+                            updateDisplay(dataElement, "_", activeColumnType);
+                            trackElement.setAttribute('data-sp-fetch-failed', 'true');
+                            trackElement.classList.remove('sort-play-processing');
+                        }
+                    });
+                }
+            }
+        }
+        if (i < tracksToProcess.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200));
         }
     }
   }
@@ -14103,8 +14074,8 @@
       for (const tracklist_ of tracklists) {
         if (!tracklist_) continue;
   
-        await updateTracklistStructure(tracklist_);
-  
+        await updateTracklistStructure(tracklist_, Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow")));
+
         requestAnimationFrame(() => {
           loadAdditionalColumnData(tracklist_);
         });
@@ -14149,6 +14120,11 @@
     const columnVisibilityChanged = (existingPlaysHeader && !showAdditionalColumn) || (!existingPlaysHeader && showAdditionalColumn);
 
     if (columnVisibilityChanged || columnTypeChanged) {
+        if (columnTypeChanged) {
+            const allDataCells = tracklist_.querySelectorAll('.sort-play-data');
+            allDataCells.forEach(cell => cell.textContent = '');
+        }
+
         if (existingPlaysHeader) {
             let headerColumnDiv = existingPlaysHeader.parentElement;
             let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
@@ -14197,7 +14173,8 @@
         dateAddedHeader.style.display = shouldRemoveDateAdded ? 'none' : '';
     }
 
-    for (const track of rows) {
+    const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
+    for (const track of allRows) {
         const dateAddedCell = track.querySelector('[aria-colindex="4"]');
         if (dateAddedCell) {
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
@@ -14447,7 +14424,7 @@
 
     const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
     await updateTracklistStructure(tracklist, initialRows);
-    loadAdditionalColumnData(initialRows);
+    loadAdditionalColumnData(tracklist);
 
     if (tracklistObserver) tracklistObserver.disconnect();
 
@@ -14465,7 +14442,7 @@
             clearTimeout(updateDebounceTimeout);
             updateDebounceTimeout = setTimeout(() => {
                 updateTracklistStructure(tracklist, addedRows);
-                loadAdditionalColumnData(addedRows);
+                loadAdditionalColumnData(tracklist);
             }, 150);
         }
     };
@@ -14493,7 +14470,7 @@
 
     const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
     updateAlbumTracklist(tracklist, initialRows);
-    loadAdditionalColumnData(initialRows);
+    loadAdditionalColumnData(tracklist);
 
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
 
@@ -14510,7 +14487,7 @@
             clearTimeout(updateDebounceTimeout);
             updateDebounceTimeout = setTimeout(() => {
                 updateAlbumTracklist(tracklist, addedRows);
-                loadAdditionalColumnData(addedRows);
+                loadAdditionalColumnData(tracklist);
             }, 150);
         }
     };
@@ -14538,7 +14515,7 @@
 
     const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
     updateArtistTracklist(tracklist, initialRows);
-    loadAdditionalColumnData(initialRows);
+    loadAdditionalColumnData(tracklist);
 
     if (artistTracklistObserver) artistTracklistObserver.disconnect();
     
@@ -14555,7 +14532,7 @@
             clearTimeout(updateDebounceTimeout);
             updateDebounceTimeout = setTimeout(() => {
                 updateArtistTracklist(tracklist, addedRows);
-                loadAdditionalColumnData(addedRows);
+                loadAdditionalColumnData(tracklist);
             }, 150);
         }
     };
