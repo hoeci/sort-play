@@ -14115,7 +14115,7 @@
       for (const tracklist_ of tracklists) {
         if (!tracklist_) continue;
   
-        await updateTracklistStructure(tracklist_, Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow")));
+        await updateTracklistStructure(tracklist_);
 
         requestAnimationFrame(() => {
           loadAdditionalColumnData(tracklist_);
@@ -14127,7 +14127,7 @@
   }
 
   
-  async function updateTracklistStructure(tracklist_, rows) {
+  async function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
 
@@ -14214,7 +14214,8 @@
         dateAddedHeader.style.display = shouldRemoveDateAdded ? 'none' : '';
     }
 
-    for (const track of rows) {
+    const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
+    for (const track of allRows) {
         const dateAddedCell = track.querySelector('[aria-colindex="4"]');
         if (dateAddedCell) {
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
@@ -14460,23 +14461,19 @@
 
     if (tracklistObserver) tracklistObserver.disconnect();
 
-    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
-    if (!rowContainer) {
-        console.warn("Sort-Play: Could not find the specific row container to observe.");
-        return;
-    }
-
-    tracklistObserver = new MutationObserver(() => {
+    tracklistObserver = new MutationObserver(async (mutations) => {
       clearTimeout(updateDebounceTimeout);
       updateDebounceTimeout = setTimeout(() => {
         updateTracklist();
       }, 150);
     });
     
-    tracklistObserver.observe(rowContainer, {
-      childList: true,
-      subtree: false,
-    });
+    if (tracklist.parentElement) {
+        tracklistObserver.observe(tracklist.parentElement, {
+          childList: true,
+          subtree: true,
+        });
+    }
   }
 
   async function initializeAlbumTracklistObserver() {
@@ -14486,20 +14483,27 @@
     const tracklist = await waitForElement(".main-trackList-trackList.main-trackList-indexable");
     if (!tracklist) return;
 
+    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
+    if (!rowContainer) {
+        console.warn("Sort-Play: Could not find the specific row container for album to observe.");
+        return;
+    }
+
     const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
     updateAlbumTracklist(tracklist, initialRows);
     loadAdditionalColumnData(tracklist);
 
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
 
-    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
-    if (!rowContainer) {
-        console.warn("Sort-Play: Could not find the specific row container for album to observe.");
-        return;
-    }
-    
     const observerCallback = (mutations) => {
-        const addedRows = mutations.flatMap(m => Array.from(m.addedNodes)).filter(n => n.nodeType === 1 && n.classList.contains("main-trackList-trackListRow"));
+        const addedRows = [];
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")) {
+                    addedRows.push(node);
+                }
+            }
+        }
         if (addedRows.length > 0) {
             clearTimeout(updateDebounceTimeout);
             updateDebounceTimeout = setTimeout(() => {
@@ -14524,20 +14528,27 @@
     const tracklist = await waitForElement('div.main-trackList-trackList[aria-label="popular tracks"]');
     if (!tracklist) return;
 
-    const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
-    updateArtistTracklist(tracklist, initialRows);
-    loadAdditionalColumnData(tracklist);
-
-    if (artistTracklistObserver) artistTracklistObserver.disconnect();
-
     const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
     if (!rowContainer) {
         console.warn("Sort-Play: Could not find the specific row container for artist to observe.");
         return;
     }
+
+    const initialRows = Array.from(tracklist.getElementsByClassName("main-trackList-trackListRow"));
+    updateArtistTracklist(tracklist, initialRows);
+    loadAdditionalColumnData(tracklist);
+
+    if (artistTracklistObserver) artistTracklistObserver.disconnect();
     
     const observerCallback = (mutations) => {
-        const addedRows = mutations.flatMap(m => Array.from(m.addedNodes)).filter(n => n.nodeType === 1 && n.classList.contains("main-trackList-trackListRow"));
+        const addedRows = [];
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")) {
+                    addedRows.push(node);
+                }
+            }
+        }
         if (addedRows.length > 0) {
             clearTimeout(updateDebounceTimeout);
             updateDebounceTimeout = setTimeout(() => {
