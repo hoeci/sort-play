@@ -11785,52 +11785,42 @@
         }
 
         updateProgress(`Get tracks...`);
-        let initialTracks = [];
+        let genuinelyNewTracks = [];
         const albumUris = allNewReleases.map(album => album.uri);
-        
+
         for (let i = 0; i < albumUris.length; i += 20) {
             const albumIdBatch = albumUris.slice(i, i + 20).map(uri => uri.split(':')[2]);
             const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumIdBatch.join(',')}`);
             if (albumsData.albums) {
                 for (const album of albumsData.albums) {
                     if (album && album.tracks && album.tracks.items) {
-                        let tracksFromAlbum = album.tracks.items;
+                        const trackReleaseDate = new Date(album.release_date);
+                        if (trackReleaseDate < dateLimit) continue;
+
+                        const augmentedTracks = album.tracks.items.map(track => ({
+                            ...track,
+                            album: {
+                                release_date: album.release_date,
+                                name: album.name,
+                                uri: album.uri,
+                                id: album.id
+                            }
+                        }));
+
+                        let tracksFromAlbum = augmentedTracks;
                         if (followedReleasesAlbumLimit !== 'all') {
                             tracksFromAlbum = tracksFromAlbum.slice(0, parseInt(followedReleasesAlbumLimit, 10));
                         }
-                        initialTracks.push(...tracksFromAlbum);
+                        genuinelyNewTracks.push(...tracksFromAlbum);
                     }
                 }
             }
         }
         
-        if (initialTracks.length === 0) {
+        if (genuinelyNewTracks.length === 0) {
             throw new Error("Could not fetch any tracks from the new releases.");
         }
         
-        updateProgress("Verifying...");
-        let genuinelyNewTracks = [];
-        const initialTrackIds = [...new Map(initialTracks.map(item => [item.id, item])).values()].map(t => t.id).filter(Boolean);
-
-        for (let i = 0; i < initialTrackIds.length; i += 50) {
-            const trackIdBatch = initialTrackIds.slice(i, i + 50);
-            const fullTrackData = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdBatch.join(',')}`);
-            if (fullTrackData.tracks) {
-                for (const track of fullTrackData.tracks) {
-                    if (track && track.album && track.album.release_date) {
-                        const trackReleaseDate = new Date(track.album.release_date);
-                        if (trackReleaseDate >= dateLimit) {
-                            genuinelyNewTracks.push(track);
-                        }
-                    }
-                }
-            }
-        }
-
-        if (genuinelyNewTracks.length === 0) {
-            throw new Error("No genuinely new tracks found after filtering out old songs.");
-        }
-
         updateProgress("Sorting...");
         genuinelyNewTracks.sort((a, b) => {
             const dateA = new Date(a.album.release_date).getTime();
@@ -11965,9 +11955,9 @@
         }
 
         updateProgress(`Get tracks...`);
-        let initialTracks = [];
+        let genuinelyNewTracks = [];
         const albumUris = allNewReleases.map(album => album.uri);
-        
+
         for (let i = 0; i < albumUris.length; i += 20) {
             const albumBatchUris = albumUris.slice(i, i + 20);
             const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumBatchUris.map(uri => uri.split(':')[2]).join(',')}`);
@@ -11975,42 +11965,29 @@
             if (albumsData.albums) {
                 for (const album of albumsData.albums) {
                     if (album && album.tracks && album.tracks.items) {
-                        initialTracks.push(...album.tracks.items);
+                        const trackReleaseDate = new Date(album.release_date);
+                        if (trackReleaseDate < dateLimit) continue;
+                        
+                        const augmentedTracks = album.tracks.items.map(track => ({
+                            ...track,
+                            album: {
+                                release_date: album.release_date,
+                                name: album.name,
+                                uri: album.uri,
+                                id: album.id
+                            },
+                            allArtists: track.artists.map(a => a.name).join(', '),
+                            artistUris: track.artists.map(a => a.uri),
+                            durationMilis: track.duration_ms,
+                        }));
+                        genuinelyNewTracks.push(...augmentedTracks);
                     }
                 }
             }
         }
         
-        if (initialTracks.length === 0) {
-            throw new Error("Could not fetch any tracks from the new releases.");
-        }
-        
-        updateProgress("Verifying...");
-        let genuinelyNewTracks = [];
-        const initialTrackIds = initialTracks.map(t => t.id).filter(Boolean);
-
-        for (let i = 0; i < initialTrackIds.length; i += 50) {
-            const trackIdBatch = initialTrackIds.slice(i, i + 50);
-            const fullTrackData = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdBatch.join(',')}`);
-            if (fullTrackData.tracks) {
-                for (const track of fullTrackData.tracks) {
-                    if (track && track.album && track.album.release_date) {
-                        const trackReleaseDate = new Date(track.album.release_date);
-                        if (trackReleaseDate >= dateLimit) {
-                            genuinelyNewTracks.push({
-                                ...track,
-                                allArtists: track.artists.map(a => a.name).join(', '),
-                                artistUris: track.artists.map(a => a.uri),
-                                durationMilis: track.duration_ms,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
         if (genuinelyNewTracks.length === 0) {
-            throw new Error("No genuinely new tracks found after filtering out old songs.");
+            throw new Error("Could not fetch any tracks from the new releases.");
         }
 
         const MAX_TRACKS_TO_PROCESS = 1000;
