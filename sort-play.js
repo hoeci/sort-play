@@ -8663,20 +8663,35 @@
     return artistData.images[0]?.url;
   }
   
-  async function setPlaylistImage(playlistId, base64Image) {
-    try {
-      await Spicetify.CosmosAsync.put(
-        `https://api.spotify.com/v1/playlists/${playlistId}/images`,
-        base64Image.split("base64,")[1]
-      );
-  
-    } catch (error) {
-  
-      const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
-      
-      if (!isExpectedJsonError) {
-        console.error("Error setting playlist image:", error);
-      }
+  async function setPlaylistImage(playlistId, base64Image, maxRetries = 3, initialDelay = 500) {
+    let attempt = 0;
+    let delay = initialDelay;
+
+    while (attempt < maxRetries) {
+        try {
+            await Spicetify.CosmosAsync.put(
+                `https://api.spotify.com/v1/playlists/${playlistId}/images`,
+                base64Image.split("base64,")[1]
+            );
+            return; 
+        } catch (error) {
+            attempt++;
+            const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
+            
+            if (isExpectedJsonError) {
+                return;
+            }
+
+            console.warn(`Sort-Play: Error setting playlist image (Attempt ${attempt}/${maxRetries}):`, error);
+
+            if (attempt >= maxRetries) {
+                console.error("Sort-Play: Failed to set playlist image after all retries.");
+                return;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2;
+        }
     }
   }
 
@@ -10527,6 +10542,8 @@
     const newPlaylist = await createPlaylist(name, description, maxRetries, initialDelay);
 
     if (newPlaylist) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         if (setDedicatedPlaylistCovers) {
             try {
                 const user = await Spicetify.Platform.UserAPI.getUser();
