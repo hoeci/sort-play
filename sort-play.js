@@ -14125,17 +14125,21 @@
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
 
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
+    if (!tracklistHeader) {
+      return;
+    }
+
     const currentPlaylistName = getCurrentPlaylistName();
     const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
     const shouldRemoveDateAdded = removeDateAdded && !isExcludedPlaylist;
-
     const gridCss = getGridCss(shouldRemoveDateAdded);
-    const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
-    if (!tracklistHeader) return;
 
-    const existingPlaysHeader = tracklistHeader.querySelector(".sort-play-header");
-    const currentHeaderText = existingPlaysHeader?.parentElement.querySelector("span")?.innerText;
-    
+    const existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
+    const headerTextSpan = existingHeaderColumn?.querySelector("span");
+
     let expectedHeaderText;
     switch (selectedColumnType) {
         case 'playCount': expectedHeaderText = "Plays"; break;
@@ -14151,54 +14155,51 @@
         default: expectedHeaderText = "Plays";
     }
 
-    const columnTypeChanged = existingPlaysHeader && currentHeaderText !== expectedHeaderText;
-    const columnVisibilityChanged = (existingPlaysHeader && !showAdditionalColumn) || (!existingPlaysHeader && showAdditionalColumn);
+    const columnTypeChanged = existingHeaderColumn && headerTextSpan?.innerText !== expectedHeaderText;
 
-    if (columnVisibilityChanged || columnTypeChanged) {
-        if (columnTypeChanged) {
-            const allDataCells = tracklist_.querySelectorAll('.sort-play-data');
-            allDataCells.forEach(cell => cell.textContent = '');
-        }
-
-        if (existingPlaysHeader) {
-            let headerColumnDiv = existingPlaysHeader.parentElement;
-            let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-            if (lastColumn && headerColumnDiv) {
-                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                headerColumnDiv.remove();
-                lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
-                switch (colIndexInt - 1) {
-                   case 4: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                   case 5: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                   case 6: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                }
-            }
-        }
-
-        if (showAdditionalColumn) {
-            let lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+    if (showAdditionalColumn) {
+        if (!existingHeaderColumn) {
+            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
             if (lastColumn) {
-                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
                 const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
                 tracklistHeader.style.cssText = newGridTemplate;
-                
-                const insertionPoint = shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn;
 
+                const insertionPoint = shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn;
                 let headerColumn = document.createElement("div");
+                headerColumn.className = "main-trackList-rowSectionVariable sort-play-column";
+                headerColumn.setAttribute("role", "columnheader");
                 headerColumn.style.display = "flex";
-                headerColumn.classList.add("main-trackList-rowSectionVariable", "sort-play-column");
-                headerColumn.role = "columnheader";
                 headerColumn.setAttribute("aria-colindex", colIndexInt.toString());
-                tracklistHeader.insertBefore(headerColumn, insertionPoint);
-                lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
                 
-                var btn = document.createElement("button");
-                btn.classList.add("main-trackList-column", "main-trackList-sortable", "sort-play-header");
-                var title = document.createElement("span");
-                title.classList.add("TypeElement-mesto-type", "standalone-ellipsis-one-line");
-                title.innerText = expectedHeaderText; 
+                const btn = document.createElement("button");
+                btn.className = "main-trackList-column main-trackList-sortable sort-play-header";
+                const title = document.createElement("span");
+                title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
+                title.innerText = expectedHeaderText;
                 btn.appendChild(title);
                 headerColumn.appendChild(btn);
+
+                if (insertionPoint) {
+                    tracklistHeader.insertBefore(headerColumn, insertionPoint);
+                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+                }
+            }
+        } else if (columnTypeChanged) {
+            if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
+        }
+    } else { 
+        if (existingHeaderColumn) {
+            existingHeaderColumn.remove();
+            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+            if (lastColumn) {
+                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+                switch (colIndexInt - 1) {
+                    case 4: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                    case 5: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                    case 6: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                }
             }
         }
     }
@@ -14210,31 +14211,51 @@
 
     const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
     for (const track of allRows) {
+        const existingDataColumn = track.querySelector(".sort-play-data-column");
+
+        if (showAdditionalColumn) {
+            if (!existingDataColumn) {
+                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+                if (lastColumn) {
+                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                    const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
+                    track.style.cssText = newGridTemplate;
+
+                    let dataColumn = document.createElement("div");
+                    dataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
+                    dataColumn.setAttribute("aria-colindex", colIndexInt.toString());
+                    dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
+                    dataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+
+                    const insertionPoint = shouldRemoveDateAdded ? track.querySelector('[aria-colindex="4"]') : lastColumn;
+                    if (insertionPoint) {
+                        track.insertBefore(dataColumn, insertionPoint);
+                        lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+                    }
+                }
+            } else if (columnTypeChanged) {
+                const dataSpan = existingDataColumn.querySelector('.sort-play-data');
+                if (dataSpan) dataSpan.textContent = "";
+            }
+        } else { 
+            if (existingDataColumn) {
+                existingDataColumn.remove();
+                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+                if(lastColumn) {
+                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                    lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+                    switch (colIndexInt - 1) {
+                         case 4: track.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                         case 5: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                         case 6: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
+                    }
+                }
+            }
+        }
+
         const dateAddedCell = track.querySelector('[aria-colindex="4"]');
         if (dateAddedCell) {
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
-        }
-
-        const existingDataColumn = track.querySelector(".sort-play-data-column");
-        if (showAdditionalColumn && !existingDataColumn) {
-            let lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-            if (lastColumn) {
-                let colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
-                track.style.cssText = newGridTemplate;
-
-                let dataColumn = document.createElement("div");
-                dataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
-                dataColumn.setAttribute("aria-colindex", colIndexInt.toString());
-                dataColumn.style.display = "flex";
-                dataColumn.style.justifyContent = "center";
-                dataColumn.style.alignItems = "center";
-                dataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-
-                const insertionPoint = shouldRemoveDateAdded ? track.querySelector('[aria-colindex="4"]') : lastColumn;
-                track.insertBefore(dataColumn, insertionPoint);
-                lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-            }
         }
     }
   }
@@ -14255,7 +14276,10 @@
     };
   };
 
-  function updateAlbumTracklist(tracklistContainer, rowsToProcess) {
+  function updateAlbumTracklist() {
+    const tracklistContainer = document.querySelector(".main-trackList-trackList.main-trackList-indexable");
+    if (!tracklistContainer) return;
+
     const currentUri = getCurrentUri();
 
     if (!showAlbumColumn || !currentUri || !URI.isAlbum(currentUri)) {
@@ -14321,8 +14345,9 @@
             allCells.forEach(cell => cell.textContent = "");
         }
     }
-
-    rowsToProcess.forEach(row => {
+    
+    const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
+    trackRows.forEach(row => {
         if (row.querySelector('.sort-play-album-col')) return;
         row.style.gridTemplateColumns = newGridTemplate;
         const newCell = document.createElement('div');
@@ -14341,9 +14366,14 @@
             if (lastCell) lastCell.setAttribute('aria-colindex', '5');
         }
     });
+
+    loadAdditionalColumnData(tracklistContainer);
   }
 
-  function updateArtistTracklist(tracklistContainer, rowsToProcess) {
+  function updateArtistTracklist() {
+    const tracklistContainer = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks"]');
+    if (!tracklistContainer) return;
+
     const currentUri = getCurrentUri();
 
     if (!showArtistColumn || !currentUri || !URI.isArtist(currentUri)) {
@@ -14407,7 +14437,8 @@
         }
     }
 
-    rowsToProcess.forEach(row => {
+    const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
+    trackRows.forEach(row => {
         if (row.querySelector('.sort-play-artist-col')) return;
         row.style.gridTemplateColumns = newGridTemplate;
         const newCell = document.createElement('div');
@@ -14426,149 +14457,79 @@
             if (endSection) endSection.setAttribute('aria-colindex', '5');
         }
     });
+
+    loadAdditionalColumnData(tracklistContainer);
   }
   
   let updateDebounceTimeout;
-  tracklistObserver = new MutationObserver(async (mutations) => {
-    clearTimeout(updateDebounceTimeout);
-    updateDebounceTimeout = setTimeout(() => {
-      for (const mutation of mutations) {
-        for (const addedNode of mutation.addedNodes) {
-          if (addedNode.classList?.contains("main-trackList-indexable")) {
-            updateTracklist();
-            return;
-          }
-        }
-      }
-      updateTracklist();
-    }, 100);
-  });
 
-
-  let currentPlaylistTracklist = null;
-  let currentAlbumTracklist = null;
-  let currentArtistTracklist = null;
-  let columnUpdateDebounce;
-
-  const columnObserverCallback = async () => {
+  async function initializeTracklistObserver() {
     const currentUri = getCurrentUri();
+    if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
 
-    const playlistTracklist = document.querySelector(".main-trackList-indexable");
-    if (playlistTracklist && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) {
-        if (playlistTracklist !== currentPlaylistTracklist) {
-            currentPlaylistTracklist = playlistTracklist;
-            currentAlbumTracklist = null;
-            currentArtistTracklist = null;
+    const tracklist = await waitForElement(".main-trackList-indexable");
+    if (!tracklist) return;
 
-            if (tracklistObserver) tracklistObserver.disconnect();
-            if (albumTracklistObserver) albumTracklistObserver.disconnect();
-            if (artistTracklistObserver) artistTracklistObserver.disconnect();
+    updateTracklist();
 
-            await updateTracklist();
+    if (tracklistObserver) tracklistObserver.disconnect();
 
-            tracklistObserver = new MutationObserver(() => {
-                clearTimeout(columnUpdateDebounce);
-                columnUpdateDebounce = setTimeout(updateTracklist, 150);
-            });
-
-            if (playlistTracklist.parentElement) {
-                tracklistObserver.observe(playlistTracklist.parentElement, {
-                    childList: true,
-                    subtree: true,
-                });
-            }
-        }
-    } 
-    else if (URI.isAlbum(currentUri)) {
-        const albumTracklist = document.querySelector(".main-trackList-trackList.main-trackList-indexable");
-        if (albumTracklist && albumTracklist !== currentAlbumTracklist) {
-            currentAlbumTracklist = albumTracklist;
-            currentPlaylistTracklist = null;
-            currentArtistTracklist = null;
-
-            if (tracklistObserver) tracklistObserver.disconnect();
-            if (albumTracklistObserver) albumTracklistObserver.disconnect();
-            if (artistTracklistObserver) artistTracklistObserver.disconnect();
-            
-            const rowContainer = albumTracklist.querySelector(':scope > [role="presentation"]');
-            if (rowContainer) {
-                const initialRows = Array.from(albumTracklist.getElementsByClassName("main-trackList-trackListRow"));
-                updateAlbumTracklist(albumTracklist, initialRows);
-                loadAdditionalColumnData(albumTracklist);
-
-                albumTracklistObserver = new MutationObserver((mutations) => {
-                    const addedRows = mutations.flatMap(mutation => 
-                        Array.from(mutation.addedNodes).filter(node => 
-                            node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")
-                        )
-                    );
-                    if (addedRows.length > 0) {
-                        clearTimeout(columnUpdateDebounce);
-                        columnUpdateDebounce = setTimeout(() => {
-                            updateAlbumTracklist(albumTracklist, addedRows);
-                            loadAdditionalColumnData(albumTracklist);
-                        }, 150);
-                    }
-                });
-                
-                albumTracklistObserver.observe(rowContainer, { childList: true, subtree: false });
-            }
-        }
-    } 
-    else if (URI.isArtist(currentUri)) {
-        const artistTracklist = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks"]');
-        if (artistTracklist && artistTracklist !== currentArtistTracklist) {
-            currentArtistTracklist = artistTracklist;
-            currentPlaylistTracklist = null;
-            currentAlbumTracklist = null;
-            
-            if (tracklistObserver) tracklistObserver.disconnect();
-            if (albumTracklistObserver) albumTracklistObserver.disconnect();
-            if (artistTracklistObserver) artistTracklistObserver.disconnect();
-
-            const rowContainer = artistTracklist.querySelector(':scope > [role="presentation"]');
-            if (rowContainer) {
-                const initialRows = Array.from(artistTracklist.getElementsByClassName("main-trackList-trackListRow"));
-                updateArtistTracklist(artistTracklist, initialRows);
-                loadAdditionalColumnData(artistTracklist);
-
-                artistTracklistObserver = new MutationObserver((mutations) => {
-                     const addedRows = mutations.flatMap(mutation => 
-                        Array.from(mutation.addedNodes).filter(node => 
-                            node.nodeType === 1 && node.classList.contains("main-trackList-trackListRow")
-                        )
-                    );
-                    if (addedRows.length > 0) {
-                        clearTimeout(columnUpdateDebounce);
-                        columnUpdateDebounce = setTimeout(() => {
-                            updateArtistTracklist(artistTracklist, addedRows);
-                            loadAdditionalColumnData(artistTracklist);
-                        }, 150);
-                    }
-                });
-                
-                artistTracklistObserver.observe(rowContainer, { childList: true, subtree: false });
-            }
-        }
+    tracklistObserver = new MutationObserver(() => {
+        clearTimeout(updateDebounceTimeout);
+        updateDebounceTimeout = setTimeout(updateTracklist, 150);
+    });
+    
+    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
+    if (rowContainer) {
+        tracklistObserver.observe(rowContainer, { childList: true });
+    } else {
+        tracklistObserver.observe(tracklist, { childList: true, subtree: true });
     }
-    else {
-        if (currentPlaylistTracklist || currentAlbumTracklist || currentArtistTracklist) {
-            if (tracklistObserver) tracklistObserver.disconnect();
-            if (albumTracklistObserver) albumTracklistObserver.disconnect();
-            if (artistTracklistObserver) artistTracklistObserver.disconnect();
-            currentPlaylistTracklist = null;
-            currentAlbumTracklist = null;
-            currentArtistTracklist = null;
-        }
-    }
-  };
+  }
 
-  const columnObserver = new MutationObserver(columnObserverCallback);
-  columnObserverCallback();
-  columnObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
+  async function initializeAlbumTracklistObserver() {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isAlbum(currentUri)) return;
+
+    const tracklist = await waitForElement(".main-trackList-trackList.main-trackList-indexable");
+    if (!tracklist) return;
+
+    updateAlbumTracklist();
+
+    if (albumTracklistObserver) albumTracklistObserver.disconnect();
+
+    albumTracklistObserver = new MutationObserver(() => {
+        clearTimeout(updateDebounceTimeout);
+        updateDebounceTimeout = setTimeout(updateAlbumTracklist, 150);
+    });
+    
+    albumTracklistObserver.observe(tracklist, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  async function initializeArtistTracklistObserver() {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isArtist(currentUri)) return;
+
+    const tracklist = await waitForElement('div.main-trackList-trackList[aria-label="popular tracks"]');
+    if (!tracklist) return;
+
+    updateArtistTracklist();
+
+    if (artistTracklistObserver) artistTracklistObserver.disconnect();
+
+    artistTracklistObserver = new MutationObserver(() => {
+        clearTimeout(updateDebounceTimeout);
+        updateDebounceTimeout = setTimeout(updateArtistTracklist, 150);
+    });
+    
+    artistTracklistObserver.observe(tracklist, {
+      childList: true,
+      subtree: true,
+    });
+  }
     
   function insertButton() {
     const currentUri = getCurrentUri();
@@ -14658,7 +14619,21 @@
   }
 
   function onPageChange() {
+    if (tracklistObserver) tracklistObserver.disconnect();
+    if (albumTracklistObserver) albumTracklistObserver.disconnect();
+    if (artistTracklistObserver) artistTracklistObserver.disconnect();
+    
     insertButton();
+    const currentUri = getCurrentUri();
+    if (!currentUri) return;
+    
+    if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+        initializeTracklistObserver();
+    } else if (URI.isAlbum(currentUri)) {
+        initializeAlbumTracklistObserver();
+    } else if (URI.isArtist(currentUri)) {
+        initializeArtistTracklistObserver();
+    }
   }
 
   const mainPageObserver = new MutationObserver(onPageChange);
