@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.8";
+  const SORT_PLAY_VERSION = "5.1.9";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -884,6 +884,7 @@
             </button>
             <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
                 <option value="playCount" ${selectedColumnType === 'playCount' ? 'selected' : ''}>Play Count</option>
+                <option value="popularity" ${selectedColumnType === 'popularity' ? 'selected' : ''}>Popularity</option>
                 <option value="releaseDate" ${selectedColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
                 <option value="scrobbles" ${selectedColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
                 <option value="personalScrobbles" ${selectedColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
@@ -929,6 +930,7 @@
             </button>
             <select id="albumColumnTypeSelect" class="column-type-select" ${!showAlbumColumn ? 'disabled' : ''}>
                 <option value="releaseDate" ${selectedAlbumColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                <option value="popularity" ${selectedAlbumColumnType === 'popularity' ? 'selected' : ''}>Popularity</option>
                 <option value="scrobbles" ${selectedAlbumColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
                 <option value="personalScrobbles" ${selectedAlbumColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
                 <option value="djInfo" ${selectedAlbumColumnType === 'djInfo' ? 'selected' : ''}>DJ Info</option>
@@ -973,6 +975,7 @@
             </button>
             <select id="artistColumnTypeSelect" class="column-type-select" ${!showArtistColumn ? 'disabled' : ''}>
                 <option value="releaseDate" ${selectedArtistColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                <option value="popularity" ${selectedArtistColumnType === 'popularity' ? 'selected' : ''}>Popularity</option>
                 <option value="scrobbles" ${selectedArtistColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
                 <option value="personalScrobbles" ${selectedArtistColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
                 <option value="djInfo" ${selectedArtistColumnType === 'djInfo' ? 'selected' : ''}>DJ Info</option>
@@ -13840,7 +13843,7 @@
     const currentUri = getCurrentUri();
     let isColumnEnabled = false;
     let activeColumnType = 'playCount';
-    const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo'];
+    const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo', 'popularity'];
 
     if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
         isColumnEnabled = showAdditionalColumn;
@@ -14074,7 +14077,7 @@
                 displayValue = parts.join(' | ');
             }
         }
-    } else if (['key', 'tempo', 'energy', 'danceability', 'valence'].includes(type)) {
+    } else if (['key', 'tempo', 'energy', 'danceability', 'valence', 'popularity'].includes(type)) {
         if (value !== null && value !== undefined) {
             displayValue = String(value);
         }
@@ -14143,6 +14146,7 @@
     let expectedHeaderText;
     switch (selectedColumnType) {
         case 'playCount': expectedHeaderText = "Plays"; break;
+        case 'popularity': expectedHeaderText = "Popularity"; break;
         case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
         case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
         case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
@@ -14306,6 +14310,7 @@
     let expectedHeaderText;
     switch (selectedAlbumColumnType) {
         case 'playCount': expectedHeaderText = "Plays"; break;
+        case 'popularity': expectedHeaderText = "Popularity"; break;
         case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
         case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
         case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
@@ -14395,6 +14400,7 @@
     let expectedHeaderText;
     switch (selectedArtistColumnType) {
         case 'playCount': expectedHeaderText = "Plays"; break;
+        case 'popularity': expectedHeaderText = "Popularity"; break;
         case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
         case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
         case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
