@@ -9749,16 +9749,42 @@
 
 
   function getNativeMenuTextColor() {
-    const tempContainer = document.createElement('div');
-    tempContainer.className = 'main-contextMenu-menu';
-    tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
-    const tempButton = document.createElement('button');
-    tempButton.className = 'main-contextMenu-menuItemButton';
-    tempContainer.appendChild(tempButton);
-    document.body.appendChild(tempContainer);
-    const textColor = window.getComputedStyle(tempButton).color;
-    document.body.removeChild(tempContainer);
-    return textColor;
+    const primaryClass = 'niXChlbt7kxslMUdfwu9';
+    const fallbackClass = 'main-contextMenu-menuItemButton';
+    let tempContainer = null;
+
+    try {
+      tempContainer = document.createElement('div');
+      tempContainer.className = 'main-contextMenu-menu';
+      tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+      
+      const tempButton = document.createElement('button');
+      tempContainer.appendChild(tempButton);
+      document.body.appendChild(tempContainer);
+
+      tempButton.className = primaryClass;
+      let textColor = window.getComputedStyle(tempButton).color;
+
+      if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
+        return textColor;
+      }
+
+      tempButton.className = fallbackClass;
+      textColor = window.getComputedStyle(tempButton).color;
+
+      if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
+        return textColor;
+      }
+
+      return '#b3b3b3'; 
+
+    } catch (error) {
+      return '#b3b3b3';
+    } finally {
+      if (tempContainer) {
+        document.body.removeChild(tempContainer);
+      }
+    }
   }
 
   function getNativeTertiaryButtonColor() {
@@ -9781,7 +9807,7 @@
   menuContainer.style.padding = "4px 4px";
   menuContainer.style.transform = "translateX(-50%)";
   menuContainer.style.borderRadius = "4px";
-  menuContainer.style.boxShadow = "rgba(0, 0, 0, 0.3) 0px 16px 24px 0px";
+  menuContainer.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
   menuContainer.style.backgroundColor = getNativeMenuBackgroundColor();
   menuContainer.style.backdropFilter = "blur(8px)";
   menuContainer.classList.add('main-contextMenu-menu');
@@ -9962,7 +9988,8 @@
         areSubMenusCreated = true;
       }
 
-      
+      menuContainer.style.backgroundColor = getNativeMenuBackgroundColor();
+
       applyCurrentThemeColors();
       const buttonRect = mainButton.getBoundingClientRect();
       const { bottom: headerBottom } = getHeaderInfo();
