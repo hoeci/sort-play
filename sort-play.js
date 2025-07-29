@@ -11173,7 +11173,7 @@
     updateProgress("Ranking...");
     const { rawSonicProfile, peakSonicProfile, genreProfile, artistProfile } = affinityProfile;
 
-    const POPULARITY_WEIGHT = 5.0; 
+    const POPULARITY_WEIGHT = 2.0; 
 
     const getArtistUris = (track) => track.artistUris || (Array.isArray(track.artists) ? track.artists.map(a => a.uri) : []);
 
