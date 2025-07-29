@@ -9782,6 +9782,8 @@
   menuContainer.style.transform = "translateX(-50%)";
   menuContainer.style.borderRadius = "4px";
   menuContainer.style.boxShadow = "rgba(0, 0, 0, 0.3) 0px 16px 24px 0px";
+  menuContainer.style.backgroundColor = getNativeMenuBackgroundColor();
+  menuContainer.style.backdropFilter = "blur(8px)";
   menuContainer.classList.add('main-contextMenu-menu');
   menuContainer.classList.add('sort-play-font-scope');
   
@@ -9960,6 +9962,7 @@
         areSubMenusCreated = true;
       }
 
+      
       applyCurrentThemeColors();
       const buttonRect = mainButton.getBoundingClientRect();
       const { bottom: headerBottom } = getHeaderInfo();
@@ -10021,6 +10024,7 @@
   function createSubMenu(items) {
     const subMenu = document.createElement("div");
     subMenu.classList.add("submenu", "main-contextMenu-menu", "sort-play-font-scope");
+    const bgColor = getNativeMenuBackgroundColor();
     subMenu.style.cssText = `
       position: fixed;
       display: none;
@@ -10029,6 +10033,8 @@
       padding: 4px;
       border-radius: 4px;
       box-shadow: 0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2);
+      background-color: ${bgColor};
+      backdrop-filter: blur(8px);
     `;
 
     subMenu.addEventListener("mouseleave", handleMouseLeaveMenuArea);
@@ -14628,6 +14634,40 @@
     }
   }
 
+
+  function getNativeMenuBackgroundColor() {
+    const primaryClass = 'main-contextMenu-menu';
+    const fallbackClass = 'wlb3dYO07PZuYfmNfmkS';
+    let tempContainer = null;
+    try {
+      tempContainer = document.createElement('div');
+      tempContainer.className = primaryClass;
+      tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+      document.body.appendChild(tempContainer);
+
+      let bgColor = window.getComputedStyle(tempContainer).backgroundColor;
+
+      if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+        return bgColor;
+      }
+      
+      tempContainer.className = fallbackClass;
+      bgColor = window.getComputedStyle(tempContainer).backgroundColor;
+
+      if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+        return bgColor;
+      }
+
+      return '#282828';
+    } catch (error) {
+      return '#282828';
+    } finally {
+      if (tempContainer) {
+        document.body.removeChild(tempContainer);
+      }
+    }
+  }
+  
   function applyCurrentThemeColors(elementToUpdate = null) {
     requestAnimationFrame(() => {
         if (!elementToUpdate) {
