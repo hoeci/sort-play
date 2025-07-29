@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.9";
+  const SORT_PLAY_VERSION = "5.1.8";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -404,6 +404,9 @@
         background-color: #181818 !important;
         border: 2px solid #282828;
       }
+      .GenericModal > .main-embedWidgetGenerator-container {
+        height: auto !important;
+      } 
       .main-trackCreditsModal-originalCredits{
         padding-bottom: 20px !important;
       }
@@ -549,6 +552,11 @@
     .GenericModal__overlay .main-embedWidgetGenerator-container {
       max-height: 90vh !important;
     }
+
+    .GenericModal > .main-embedWidgetGenerator-container {
+      height: auto !important;
+    } 
+
     .main-embedWidgetGenerator-container {
       width: 550px !important;
       border-radius: 30px;
@@ -705,17 +713,17 @@
         position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0;
     }
     .sort-play-settings .switch input { opacity: 0; width: 0; height: 0; }
-    .sort-play-settings .slider {
+    .sort-play-settings .sliderx {
         position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
         background-color: #484848; border-radius: 24px; transition: .2s;
     }
-    .sort-play-settings .slider:before {
+    .sort-play-settings .sliderx:before {
         position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
         background-color: white; border-radius: 50%; transition: .2s;
     }
-    .sort-play-settings input:checked + .slider { background-color: #1DB954; }
-    .sort-play-settings input:checked + .slider:before { transform: translateX(16px); }
-    .sort-play-settings .switch.disabled .slider { opacity: 0.5; cursor: not-allowed; }
+    .sort-play-settings input:checked + .sliderx { background-color: #1DB954; }
+    .sort-play-settings input:checked + .sliderx:before { transform: translateX(16px); }
+    .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
 
     .tooltip-container { position: relative; display: inline-block; vertical-align: middle;}
 
@@ -732,7 +740,7 @@
     }
     .tooltip-container:hover .custom-tooltip { visibility: visible; }
     .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
-    .sort-play-settings .switch.disabled .slider { opacity: 0.5; cursor: not-allowed; }
+    .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
     .sort-play-settings .setting-row.forced .col.description { opacity: 0.7; }
      .sort-play-settings .github-link-container {
       display: flex;
@@ -779,7 +787,7 @@
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" id="addToQueueToggle" ${addToQueueEnabled ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -794,7 +802,7 @@
         </label>
         <div class="col action"><label class="switch" id="createPlaylistSwitchLabel">
                 <input type="checkbox" id="createPlaylistToggle" ${createPlaylistAfterSort ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -810,7 +818,7 @@
         <div class="col action">
             <label class="switch" id="sortCurrentPlaylistSwitchLabel">
                 <input type="checkbox" id="sortCurrentPlaylistToggle" ${sortCurrentPlaylistEnabled ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -826,7 +834,7 @@
         <div class="col action">
             <label class="switch" id="openPlaylistAfterSortSwitchLabel">
                 <input type="checkbox" id="openPlaylistAfterSortToggle" ${openPlaylistAfterSortEnabled ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -845,7 +853,7 @@
             </button>
             <label class="switch" id="placePlaylistsInFolderSwitchLabel">
                 <input type="checkbox" id="placePlaylistsInFolderToggle" ${placePlaylistsInFolder ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -897,7 +905,7 @@
             </select>
             <label class="switch">
                 <input type="checkbox" id="showAdditionalColumnToggle" ${showAdditionalColumn ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
             <div id="dateFormatDropdownContainer" class="column-settings-dropdown">
                 <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
@@ -942,7 +950,7 @@
             </select>
             <label class="switch">
                 <input type="checkbox" id="showAlbumColumnToggle" ${showAlbumColumn ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
             <div id="albumDateFormatDropdownContainer" class="column-settings-dropdown">
                 <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
@@ -987,7 +995,7 @@
             </select>
             <label class="switch">
                 <input type="checkbox" id="showArtistColumnToggle" ${showArtistColumn ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
             <div id="artistDateFormatDropdownContainer" class="column-settings-dropdown">
                 <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
@@ -1012,7 +1020,7 @@
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${removeDateAdded ? 'checked' : ''} ${!showAdditionalColumn ? 'disabled' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -1034,7 +1042,7 @@
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${playlistDeduplicate ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -1043,7 +1051,7 @@
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${showRemovedDuplicates ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -1075,7 +1083,7 @@
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" id="setDedicatedCoversToggle" ${setDedicatedPlaylistCovers ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -1159,7 +1167,7 @@
         <div class="col action">
             <label class="switch">
                 <input type="checkbox" ${includeaudiofeatures ? 'checked' : ''}>
-                <span class="slider"></span>
+                <span class="sliderx"></span>
             </label>
         </div>
     </div>
@@ -1422,9 +1430,9 @@
     artistColumnTypeSelect.disabled = !showArtistColumn;
 
     setTimeout(() => {
-        const sliders = modalContainer.querySelectorAll('.slider');
-        sliders.forEach(slider => {
-            slider.style.transition = '.3s';
+        const sliderxs = modalContainer.querySelectorAll('.sliderx');
+        sliderxs.forEach(sliderx => {
+            sliderx.style.transition = '.3s';
         });
     }, 50);
 
@@ -1696,7 +1704,7 @@
                     <div class="col action">
                         <label class="switch">
                             <input type="checkbox" id="update-toggle-${playlist.key}" ${isChecked ? 'checked' : ''}>
-                            <span class="slider"></span>
+                            <span class="sliderx"></span>
                         </label>
                     </div>
                 </div>
@@ -1711,10 +1719,10 @@
         .sort-play-behavior-modal .col.action { display: flex; align-items: center; }
         .sort-play-behavior-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
         .sort-play-behavior-modal .switch input { opacity: 0; width: 0; height: 0; }
-        .sort-play-behavior-modal .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
-        .sort-play-behavior-modal .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
-        .sort-play-behavior-modal input:checked + .slider { background-color: #1DB954; }
-        .sort-play-behavior-modal input:checked + .slider:before { transform: translateX(16px); }
+        .sort-play-behavior-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+        .sort-play-behavior-modal .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+        .sort-play-behavior-modal input:checked + .sliderx { background-color: #1DB954; }
+        .sort-play-behavior-modal input:checked + .sliderx:before { transform: translateX(16px); }
       </style>
       <div class="main-trackCreditsModal-header">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Playlist Update Behavior</span></h1>
@@ -2054,6 +2062,9 @@
           background-color: #181818 !important;
           border: 2px solid #282828;
         }
+        .GenericModal > .main-embedWidgetGenerator-container {
+          height: auto !important;
+        }        
         .GenericModal__overlay .GenericModal {
           border-radius: 30px;
           overflow: hidden;
@@ -2148,7 +2159,7 @@
           width: 0;
           height: 0;
         }
-        .ai-pick-modal .slider {
+        .ai-pick-modal .sliderx {
           position: absolute;
           cursor: pointer;
           top: 0;
@@ -2159,7 +2170,7 @@
           border-radius: 24px;
           transition: .2s;
         }
-        .ai-pick-modal .slider:before {
+        .ai-pick-modal .sliderx:before {
           position: absolute;
           content: "";
           height: 18px;
@@ -2170,10 +2181,10 @@
           border-radius: 50%;
           transition: .2s;
         }
-        .ai-pick-modal input:checked + .slider {
+        .ai-pick-modal input:checked + .sliderx {
           background-color: #1DB954;
         }
-        .ai-pick-modal input:checked + .slider:before {
+        .ai-pick-modal input:checked + .sliderx:before {
           transform: translateX(16px);
         }
         .ai-pick-modal select {
@@ -2451,7 +2462,7 @@
               <div class="action">
                 <label class="switch">
                   <input type="checkbox" ${includeSongStats ? 'checked' : ''}>
-                  <span class="slider"></span>
+                  <span class="sliderx"></span>
                 </label>
               </div>
             </div>
@@ -2461,7 +2472,7 @@
               <div class="action">
                 <label class="switch">
                   <input type="checkbox" ${includeLyrics ? 'checked' : ''}>
-                  <span class="slider"></span>
+                  <span class="sliderx"></span>
                 </label>
               </div>
             </div>
@@ -3120,6 +3131,9 @@
         border-radius: 30px;
         overflow: hidden;
       }
+      .GenericModal > .main-embedWidgetGenerator-container {
+        height: auto !important;
+      } 
       .main-trackCreditsModal-mainSection {
         overflow-y: hidden !important;
       }
@@ -4624,21 +4638,21 @@
         updatePlaylistStats();
     }
 
-    function setupDualRangeSlider(sliderContainerId, minInputId, maxInputId) {
-        const sliderContainer = modalContainer.querySelector(`#${sliderContainerId}`);
-        const slider1 = sliderContainer.querySelector(`#${sliderContainerId}-1`);
-        const slider2 = sliderContainer.querySelector(`#${sliderContainerId}-2`);
+    function setupDualRangesliderx(sliderxContainerId, minInputId, maxInputId) {
+        const sliderxContainer = modalContainer.querySelector(`#${sliderxContainerId}`);
+        const sliderx1 = sliderxContainer.querySelector(`#${sliderxContainerId}-1`);
+        const sliderx2 = sliderxContainer.querySelector(`#${sliderxContainerId}-2`);
         const minInput = modalContainer.querySelector(`#${minInputId}`);
         const maxInput = modalContainer.querySelector(`#${maxInputId}`);
-        const sliderTrack = sliderContainer.querySelector(".slider-track");
+        const sliderxTrack = sliderxContainer.querySelector(".sliderx-track");
 
-        if(!sliderContainer         || !slider1 || !slider2 || !minInput || !maxInput || !sliderTrack) return;
+        if(!sliderxContainer         || !sliderx1 || !sliderx2 || !minInput || !maxInput || !sliderxTrack) return;
 
         let minGap = 0;
 
         function slideOne() {
-            if (parseInt(slider2.value) - parseInt(slider1.value) <= minGap) {
-                slider1.value = parseInt(slider2.value) - minGap;
+            if (parseInt(sliderx2.value) - parseInt(sliderx1.value) <= minGap) {
+                sliderx1.value = parseInt(sliderx2.value) - minGap;
             }
             updateInputs();
             fillColor();
@@ -4646,8 +4660,8 @@
         }
 
         function slideTwo() {
-            if (parseInt(slider2.value) - parseInt(slider1.value) <= minGap) {
-                slider2.value = parseInt(slider1.value) + minGap;
+            if (parseInt(sliderx2.value) - parseInt(sliderx1.value) <= minGap) {
+                sliderx2.value = parseInt(sliderx1.value) + minGap;
             }
             updateInputs();
             fillColor();
@@ -4655,33 +4669,33 @@
         }
 
         function fillColor() {
-            const sliderMaxValue = parseInt(slider1.max);
-            const sliderMinValue = parseInt(slider1.min);
-            const totalRange = sliderMaxValue - sliderMinValue;
+            const sliderxMaxValue = parseInt(sliderx1.max);
+            const sliderxMinValue = parseInt(sliderx1.min);
+            const totalRange = sliderxMaxValue - sliderxMinValue;
     
-            const value1 = parseInt(slider1.value);
-            const value2 = parseInt(slider2.value);
+            const value1 = parseInt(sliderx1.value);
+            const value2 = parseInt(sliderx2.value);
     
-            const percent1 = totalRange === 0 ? 0 : ((value1 - sliderMinValue) / totalRange) * 100;
-            const percent2 = totalRange === 0 ? 100 : ((value2 - sliderMinValue) / totalRange) * 100;
+            const percent1 = totalRange === 0 ? 0 : ((value1 - sliderxMinValue) / totalRange) * 100;
+            const percent2 = totalRange === 0 ? 100 : ((value2 - sliderxMinValue) / totalRange) * 100;
     
     
-            sliderTrack.style.background = `linear-gradient(to right, #4d4d4d ${percent1}% , #1ed760 ${percent1}% , #1ed760 ${percent2}%, #4d4d4d ${percent2}%)`;
+            sliderxTrack.style.background = `linear-gradient(to right, #4d4d4d ${percent1}% , #1ed760 ${percent1}% , #1ed760 ${percent2}%, #4d4d4d ${percent2}%)`;
         }
 
         function updateInputs() {
-            minInput.value = formatNumber(parseInt(slider1.value), true, activeRangeFilter);
-            maxInput.value = formatNumber(parseInt(slider2.value), false, activeRangeFilter);
+            minInput.value = formatNumber(parseInt(sliderx1.value), true, activeRangeFilter);
+            maxInput.value = formatNumber(parseInt(sliderx2.value), false, activeRangeFilter);
         }
 
-        const debouncedUpdateSliders = debounce(updateSliders, 800);
+        const debouncedUpdatesliderxs = debounce(updatesliderxs, 800);
 
-        function updateSliders() {
+        function updatesliderxs() {
             let minValue = parseFormattedNumber(minInput.value);
             let maxValue = parseFormattedNumber(maxInput.value);
 
-            if (minValue === 0) minValue = parseInt(slider1.value);
-            if (maxValue === 0) maxValue = parseInt(slider2.value);
+            if (minValue === 0) minValue = parseInt(sliderx1.value);
+            if (maxValue === 0) maxValue = parseInt(sliderx2.value);
 
             minValue = Math.max(minRangeValue, Math.min(minValue, maxRangeValue));
             maxValue = Math.max(minRangeValue, Math.min(maxRangeValue, maxValue));
@@ -4691,34 +4705,34 @@
             minInput.value = formatNumber(minValue, true, activeRangeFilter);
             maxInput.value = formatNumber(maxValue, false, activeRangeFilter);
 
-            slider1.value = minValue;
-            slider2.value = maxValue;
+            sliderx1.value = minValue;
+            sliderx2.value = maxValue;
 
             fillColor();
         }
 
-        slider1.addEventListener("input", slideOne);
-        slider2.addEventListener("input", slideTwo);
-        minInput.addEventListener("input", debouncedUpdateSliders);
-        maxInput.addEventListener("input", debouncedUpdateSliders);
-        minInput.addEventListener("blur", updateSliders);
-        maxInput.addEventListener("blur", updateSliders);
+        sliderx1.addEventListener("input", slideOne);
+        sliderx2.addEventListener("input", slideTwo);
+        minInput.addEventListener("input", debouncedUpdatesliderxs);
+        maxInput.addEventListener("input", debouncedUpdatesliderxs);
+        minInput.addEventListener("blur", updatesliderxs);
+        maxInput.addEventListener("blur", updatesliderxs);
         function handleTrackClick(event) {
-            const rect = sliderTrack.getBoundingClientRect();
+            const rect = sliderxTrack.getBoundingClientRect();
             const clickX = event.clientX - rect.left;
             const trackWidth = rect.width;
             const percent = clickX / trackWidth;
             const range = maxRangeValue - minRangeValue;
             const newValue = minRangeValue + (percent * range);
 
-            const diff1 = Math.abs(newValue - parseInt(slider1.value));
-            const diff2 = Math.abs(newValue - parseInt(slider2.value));
+            const diff1 = Math.abs(newValue - parseInt(sliderx1.value));
+            const diff2 = Math.abs(newValue - parseInt(sliderx2.value));
 
             if (diff1 <= diff2) {
-                slider1.value = newValue;
+                sliderx1.value = newValue;
                 slideOne();
             } else {
-                slider2.value = newValue;
+                sliderx2.value = newValue;
                 slideTwo();
             }
         }
@@ -4730,7 +4744,7 @@
             handleTrackClick(event);
         }
 
-        sliderTrack.addEventListener("mousedown", (e) => {
+        sliderxTrack.addEventListener("mousedown", (e) => {
             isDragging = true;
             handleTrackClick(e);
         });
@@ -4743,8 +4757,8 @@
         updateInputs();
         fillColor();
 
-        slider1.addEventListener("input", debouncedUpdateTrackFilters);
-        slider2.addEventListener("input", debouncedUpdateTrackFilters);
+        sliderx1.addEventListener("input", debouncedUpdateTrackFilters);
+        sliderx2.addEventListener("input", debouncedUpdateTrackFilters);
         minInput.addEventListener("input", debouncedUpdateTrackFilters);
         maxInput.addEventListener("input", debouncedUpdateTrackFilters);
     }
@@ -4769,18 +4783,18 @@
         minRangeValue = range.min;
         maxRangeValue = range.max;
 
-        const slider1 = modalContainer.querySelector("#rangeSlider-1");
-        const slider2 = modalContainer.querySelector("#rangeSlider-2");
+        const sliderx1 = modalContainer.querySelector("#rangesliderx-1");
+        const sliderx2 = modalContainer.querySelector("#rangesliderx-2");
         const minInput = modalContainer.querySelector("#rangeMin");
         const maxInput = modalContainer.querySelector("#rangeMax");
-        if(!slider1 || !slider2 || !minInput || !maxInput) return;
+        if(!sliderx1 || !sliderx2 || !minInput || !maxInput) return;
 
-        slider1.min = minRangeValue;
-        slider1.max = maxRangeValue;
-        slider1.value = minRangeValue;
-        slider2.min = minRangeValue;
-        slider2.max = maxRangeValue;
-        slider2.value = maxRangeValue;
+        sliderx1.min = minRangeValue;
+        sliderx1.max = maxRangeValue;
+        sliderx1.value = minRangeValue;
+        sliderx2.min = minRangeValue;
+        sliderx2.max = maxRangeValue;
+        sliderx2.value = maxRangeValue;
 
         minInput.value = formatNumber(minRangeValue, true, filterType);
         maxInput.value = formatNumber(maxRangeValue, false, filterType);
@@ -4799,21 +4813,21 @@
                                   filterType === "popularity" ? "Max" : "Max Duration";
         }
 
-        const sliderTrack = modalContainer.querySelector(".slider-track");
-        if (sliderTrack) {
-            const sliderMaxValue = parseInt(slider1.max);
-            const sliderMinValue = parseInt(slider1.min);
-            const totalRange = sliderMaxValue - sliderMinValue;
+        const sliderxTrack = modalContainer.querySelector(".sliderx-track");
+        if (sliderxTrack) {
+            const sliderxMaxValue = parseInt(sliderx1.max);
+            const sliderxMinValue = parseInt(sliderx1.min);
+            const totalRange = sliderxMaxValue - sliderxMinValue;
 
-            const value1 = parseInt(slider1.value);
-            const value2 = parseInt(slider2.value);
+            const value1 = parseInt(sliderx1.value);
+            const value2 = parseInt(sliderx2.value);
 
-            let percent1 = totalRange === 0 ? 0 : ((value1 - sliderMinValue) / totalRange) * 100;
-            let percent2 = totalRange === 0 ? 100 : ((value2 - sliderMinValue) / totalRange) * 100;
+            let percent1 = totalRange === 0 ? 0 : ((value1 - sliderxMinValue) / totalRange) * 100;
+            let percent2 = totalRange === 0 ? 100 : ((value2 - sliderxMinValue) / totalRange) * 100;
 
             percent1 = Math.max(0, Math.min(100, percent1));
             percent2 = Math.max(0, Math.min(100, percent2));
-            sliderTrack.style.background = `linear-gradient(to right, #4d4d4d ${percent1}% , #1ed760 ${percent1}% , #1ed760 ${percent2}%, #4d4d4d ${percent2}%)`;
+            sliderxTrack.style.background = `linear-gradient(to right, #4d4d4d ${percent1}% , #1ed760 ${percent1}% , #1ed760 ${percent2}%, #4d4d4d ${percent2}%)`;
         }
     }
 
@@ -4842,6 +4856,9 @@
         border-radius: 30px;
         overflow: hidden;
     }
+    .GenericModal > .main-embedWidgetGenerator-container {
+      height: auto !important;
+    } 
     .main-trackCreditsModal-originalCredits{
       padding-bottom: 20px !important;
     }
@@ -5555,14 +5572,14 @@
         color: white;
         text-align: center;
     }
-    .dual-range-slider-container {
+    .dual-range-sliderx-container {
         position: relative;
         width: 100%;
         height: 20px;
         flex: 1;
     }
 
-    .dual-range-slider-container input[type="range"] {
+    .dual-range-sliderx-container input[type="range"] {
         -webkit-appearance: none;
         -moz-appearance: none;
         appearance: none;
@@ -5576,7 +5593,7 @@
         pointer-events: none;
     }
 
-    .slider-track {
+    .sliderx-track {
         width: 100%;
         height: 5px;
         position: absolute;
@@ -5587,22 +5604,22 @@
         background-color: #4d4d4d;
     }
 
-    .dual-range-slider-container input[type="range"]::-webkit-slider-runnable-track {
+    .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-runnable-track {
         -webkit-appearance: none;
         height: 5px;
     }
 
-    .dual-range-slider-container input[type="range"]::-moz-range-track {
+    .dual-range-sliderx-container input[type="range"]::-moz-range-track {
         -moz-appearance: none;
         height: 5px;
     }
 
-    .dual-range-slider-container input[type="range"]::-ms-track {
+    .dual-range-sliderx-container input[type="range"]::-ms-track {
         appearance: none;
         height: 5px;
     }
 
-    .dual-range-slider-container input[type="range"]::-webkit-slider-thumb {
+    .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-thumb {
         -webkit-appearance: none;
         height: 16px;
         width: 16px;
@@ -5613,11 +5630,11 @@
         border-radius: 50%;
         border: 1px solid #434343;
     }
-    .dual-range-slider-container input[type="range"]::-webkit-slider-thumb:hover {
+    .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-thumb:hover {
         border: 1px solid #b3b3b3;
     }
 
-    .dual-range-slider-container input[type="range"]::-moz-range-thumb {
+    .dual-range-sliderx-container input[type="range"]::-moz-range-thumb {
         -webkit-appearance: none;
         height: 16px;
         width: 16px;
@@ -5628,7 +5645,7 @@
         border: 1px solid #434343;
     }
 
-    .dual-range-slider-container input[type="range"]::-ms-thumb {
+    .dual-range-sliderx-container input[type="range"]::-ms-thumb {
         appearance: none;
         height: 16px;
         width: 16px;
@@ -5675,7 +5692,7 @@
       height: 0;
     }
 
-    .custom-filter-modal .slider {
+    .custom-filter-modal .sliderx {
       position: absolute;
       cursor: pointer;
       top: 0;
@@ -5687,7 +5704,7 @@
       transition: .2s;
     }
 
-    .custom-filter-modal .slider:before {
+    .custom-filter-modal .sliderx:before {
       position: absolute;
       content: "";
       height: 14px;
@@ -5699,11 +5716,11 @@
       transition: .2s;
     }
 
-    .custom-filter-modal input:checked + .slider {
+    .custom-filter-modal input:checked + .sliderx {
       background-color: #1DB954;
     }
 
-    .custom-filter-modal input:checked + .slider:before {
+    .custom-filter-modal input:checked + .sliderx:before {
       transform: translateX(16px);
     }
     .keyword-filter-container {
@@ -5977,7 +5994,7 @@
               <div class="settings-title">Keyword Filters</div>
               <label class="switch">
                   <input type="checkbox" id="keywordFilterToggle">
-                  <span class="slider"></span>
+                  <span class="sliderx"></span>
               </label>
           </div>
           <div class="filter-mode-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
@@ -6002,7 +6019,7 @@
 
             <label class="switch">
               <input type="checkbox" id="matchWholeWordToggle">
-              <span class="slider"></span>
+              <span class="sliderx"></span>
             </label>
           </div>
           <div class="keyword-filter-container">
@@ -6013,12 +6030,12 @@
                           <span class="filter-mode-toggle-label">Title</span>
                           <label class="switch">
                               <input type="checkbox" id="titleToggle" checked>
-                              <span class="slider"></span>
+                              <span class="sliderx"></span>
                           </label>
                           <span class="filter-mode-toggle-label">Album</span>
                           <label class="switch">
                           <input type="checkbox" id="albumToggle" checked>
-                          <span class="slider"></span>
+                          <span class="sliderx"></span>
                       </label>
                       </div>
                   </div>
@@ -6042,7 +6059,7 @@
                     <div class="toggle-group">
                       <label class="switch">
                         <input type="checkbox" id="artistToggle" checked>
-                        <span class="slider"></span>
+                        <span class="sliderx"></span>
                       </label>
                     </div>
                   </div>
@@ -6061,7 +6078,7 @@
                 <div class="settings-title">Range Filters</div>
                   <label class="switch">
                     <input type="checkbox" id="rangeFilterToggle" checked>
-                  <span class="slider"></span>
+                  <span class="sliderx"></span>
               </label>
             </div>
             <div class="range-filters-items">
@@ -6083,10 +6100,10 @@
                     </div>
                     <div class="range-input-container">
                         <input type="text" class="range-input" id="rangeMin" placeholder="Min">
-                        <div class="dual-range-slider-container" id="rangeSlider">
-                            <div class="slider-track"></div>
-                            <input type="range"  id="rangeSlider-1">
-                            <input type="range"  id="rangeSlider-2">
+                        <div class="dual-range-sliderx-container" id="rangesliderx">
+                            <div class="sliderx-track"></div>
+                            <input type="range"  id="rangesliderx-1">
+                            <input type="range"  id="rangesliderx-2">
                         </div>
                         <input type="text" class="range-input" id="rangeMax" placeholder="Max">
                     </div>
@@ -6532,7 +6549,7 @@
             subtree: true
         });
     }
-    setupDualRangeSlider("rangeSlider", "rangeMin", "rangeMax");
+    setupDualRangesliderx("rangesliderx", "rangeMin", "rangeMax");
     updateRangeUI(activeRangeFilter);
 
     rangeFilterTypeSelect.addEventListener("change", (e) => {
@@ -6845,6 +6862,9 @@
       border-radius: 30px;
       overflow: hidden;
     }
+    .GenericModal > .main-embedWidgetGenerator-container {
+      height: auto !important;
+    } 
     .main-trackCreditsModal-mainSection {
       overflow-y: hidden !important;
       padding: 16px 32px 9px 32px;
@@ -7018,7 +7038,7 @@
         width: 0;
         height: 0;
     }
-    .genre-filter-modal .slider {
+    .genre-filter-modal .sliderx {
         position: absolute;
         cursor: pointer;
         top: 0;
@@ -7029,7 +7049,7 @@
         border-radius: 24px;
         transition: .2s;
     }
-    .genre-filter-modal .slider:before {
+    .genre-filter-modal .sliderx:before {
         position: absolute;
         content: "";
         height: 18px;
@@ -7040,10 +7060,10 @@
         border-radius: 50%;
         transition: .2s;
     }
-    .genre-filter-modal input:checked + .slider {
+    .genre-filter-modal input:checked + .sliderx {
         background-color: #1DB954;
     }
-    .genre-filter-modal input:checked + .slider:before {
+    .genre-filter-modal input:checked + .sliderx:before {
         transform: translateX(16px);
     }
     .genre-filter-modal .settings-container {
@@ -7182,7 +7202,7 @@
                     <div class="action">
                         <label class="switch">
                             <input type="checkbox" id="matchAllGenresToggle" ${matchAllGenres ? 'checked' : ''}>
-                            <span class="slider"></span>
+                            <span class="sliderx"></span>
                         </label>
                     </div>
                 </div>
@@ -9255,6 +9275,9 @@
       .main-trackCreditsModal-mainSection {
         overflow-y: hidden !important;
       }
+      .GenericModal > .main-embedWidgetGenerator-container {
+        height: auto !important;
+      } 
       .main-buttons-button:hover {
         filter: brightness(1.2); 
       }
@@ -13182,6 +13205,19 @@
   }
 
   function showRemovedTracksModal(removedTracks) {
+
+    const styleId = 'sort-play-global-modal-height-fix';
+    if (!document.getElementById(styleId)) {
+      const styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      styleElement.innerHTML = `
+        .GenericModal > .main-embedWidgetGenerator-container {
+          height: auto !important;
+        }
+      `;
+      document.head.appendChild(styleElement);
+    }
+
     const modalContainer = document.createElement("div");
     modalContainer.style.width = "800px"; 
     modalContainer.style.maxHeight = "auto";
