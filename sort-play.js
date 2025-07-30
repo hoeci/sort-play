@@ -4518,64 +4518,55 @@
                 if (activeRangeFilter === 'releaseDate') {
                     if (!track.releaseDate) {
                         track.isRemovedByRange = true;
-                        return;
+                    } else {
+                        const trackDate = new Date(track.releaseDate);
+                        const trackDateNormalized = new Date(
+                            trackDate.getFullYear(),
+                            trackDate.getMonth(),
+                            trackDate.getDate()
+                        ).getTime();
+        
+                        const minDate = new Date(minRange);
+                        const maxDate = new Date(maxRange);
+        
+                        const minDateNormalized = new Date(
+                            minDate.getFullYear(),
+                            minDate.getMonth(),
+                            minDate.getDate()
+                        ).getTime();
+        
+                        const maxDateNormalized = new Date(
+                            maxDate.getFullYear(),
+                            maxDate.getMonth(),
+                            maxDate.getDate(),
+                            23, 59, 59, 999
+                        ).getTime();
+        
+                        track.isRemovedByRange = trackDateNormalized < minDateNormalized || trackDateNormalized > maxDateNormalized;
                     }
-    
-                    const trackDate = new Date(track.releaseDate);
-                    const trackDateNormalized = new Date(
-                        trackDate.getFullYear(),
-                        trackDate.getMonth(),
-                        trackDate.getDate()
-                    ).getTime();
-    
-                    const minDate = new Date(minRange);
-                    const maxDate = new Date(maxRange);
-    
-                    const minDateNormalized = new Date(
-                        minDate.getFullYear(),
-                        minDate.getMonth(),
-                        minDate.getDate()
-                    ).getTime();
-    
-                    const maxDateNormalized = new Date(
-                        maxDate.getFullYear(),
-                        maxDate.getMonth(),
-                        maxDate.getDate(),
-                        23, 59, 59, 999
-                    ).getTime();
-    
-                    track.isRemovedByRange = trackDateNormalized < minDateNormalized || trackDateNormalized > maxDateNormalized;
-    
                 } else if (activeRangeFilter === 'durationMs') {
                     trackValue = track.durationMs;
                     track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
-                } else {
-                    if (activeRangeFilter === 'playCount') {
-                        trackValue = (parseInt(track.playCount) || 0);
-                    } else if (activeRangeFilter === 'popularity') {
-                        trackValue = (track.popularity || 0);
-                    } else if (activeRangeFilter === 'features.energy') { 
-                        if (includeaudiofeatures) {
-                            trackValue = (track.features?.energy ?? 0);  
-                        }
-                    }
-                    else if (activeRangeFilter === 'features.danceability') {
-                        if (includeaudiofeatures) {
-                            trackValue = (track.features?.danceability ?? 0);
-                        }
-                    }
-                    else if (activeRangeFilter === 'features.valence') {
-                        if (includeaudiofeatures) {
-                            trackValue = (track.features?.valence ?? 0);
-                        }
-                    }
-                    else if (activeRangeFilter === 'features.tempo') {
-                        if (includeaudiofeatures) {
-                            trackValue = (track.features?.tempo ?? 0);
-                        }
-                    }
+                } else if (activeRangeFilter === 'playCount') {
+                    trackValue = parseInt(track.playCount, 10) || 0;
+                    track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
+                } else if (activeRangeFilter === 'popularity') {
+                    trackValue = track.popularity || 0;
+                    track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
+                } else if (activeRangeFilter.startsWith("features.")) {
                     if (includeaudiofeatures) {
+                        if (activeRangeFilter === 'features.energy') {
+                            trackValue = track.features?.energy ?? 0;
+                        } else if (activeRangeFilter === 'features.danceability') {
+                            trackValue = track.features?.danceability ?? 0;
+                        } else if (activeRangeFilter === 'features.valence') {
+                            trackValue = track.features?.valence ?? 0;
+                        } else if (activeRangeFilter === 'features.tempo') {
+                            trackValue = track.features?.tempo ?? 0;
+                        }
                         track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
+                    } else {
+                        track.isRemovedByRange = false;
                     }
                 }
             } else {
@@ -11573,13 +11564,13 @@
         let songsToProfile = [];
 
         if (vibeType === 'recommendRecentVibe') {
-            playlistName = "Based on Recent Taste";
+            playlistName = "Discovery: Recent Taste";
             time_range = 'short_term';
             contrast_time_range = 'long_term';
             if (profileData.enhancedLikedSongs.length < 20) throw new Error("Not enough liked songs for a recent profile.");
             songsToProfile = profileData.enhancedLikedSongs.slice(0, 100);
         } else if (vibeType === 'recommendAllTime') {
-            playlistName = "Based on All-Time Taste";
+            playlistName = "Discovery: All-Time Taste";
             time_range = 'long_term';
             contrast_time_range = 'short_term';
             if (profileData.enhancedLikedSongs.length < 50) throw new Error("Not enough liked songs for an all-time profile.");
