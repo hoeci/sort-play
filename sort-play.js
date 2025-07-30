@@ -2709,8 +2709,12 @@
   
           const trackUris = aiResponse;
           await addTracksToPlaylist(newPlaylist.id, trackUris);
+          
+          await addPlaylistToLibrary(newPlaylist.uri);
   
           Spicetify.showNotification(`AI Pick playlist created!`);
+          
+          await navigateToPlaylist(newPlaylist);
         } else {
           Spicetify.showNotification("AI did not return any track URIs.", true);
         }
@@ -6795,6 +6799,8 @@
                 const trackUris = sortedTracksForPlaylist.map((track) => track.uri);
                 await addTracksToPlaylist(newPlaylist.id, trackUris);
 
+                await addPlaylistToLibrary(newPlaylist.uri);
+
                 const sortTypeInfo = {
                     playCount: { fullName: "play count", shortName: "PlayCount" },
                     popularity: { fullName: "popularity", shortName: "Popularity" },
@@ -6812,6 +6818,8 @@
                 Spicetify.showNotification(
                     `Playlist created with ${sortTypeInfo.fullName} and custom filter!`
                 );
+
+                await navigateToPlaylist(newPlaylist);
             } catch (error) {
                 console.error("Error creating or updating playlist:", error);
                 Spicetify.showNotification(
@@ -7474,8 +7482,10 @@
   
               const trackUris = sortedTracks.map((track) => track.uri);
               await addTracksToPlaylist(newPlaylist.id, trackUris);
+
+              await addPlaylistToLibrary(newPlaylist.uri);
   
-              const sortTypeInfo = { 
+              const sortTypeInfo = {
                   playCount: { fullName: "play count", shortName: "PlayCount" },
                   popularity: { fullName: "popularity", shortName: "Popularity" },
                   releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
@@ -7488,6 +7498,9 @@
               Spicetify.showNotification(
                   `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
               );
+              
+              await navigateToPlaylist(newPlaylist);
+
           } catch (error) {
               console.error("Error creating or updating playlist:", error);
               Spicetify.showNotification(
@@ -10533,6 +10546,29 @@
     return canvas.toDataURL('image/jpeg');
   }
 
+  async function addPlaylistToLibrary(playlistUri) {
+    const { CosmosAsync } = Spicetify;
+    if (!playlistUri) return;
+
+    try {
+        let addRequestBody = {
+            operation: "add",
+            uris: [playlistUri],
+            before: "start",
+        };
+
+        if (placePlaylistsInFolder) {
+            const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
+            if (folderUri) {
+                addRequestBody = { ...addRequestBody, after: folderUri, before: undefined };
+            }
+        }
+        await CosmosAsync.post("sp://core-playlist/v1/rootlist", addRequestBody);
+    } catch (error) {
+        console.error("Error adding playlist to user's library:", error);
+    }
+  }
+
   async function getOrCreateDedicatedPlaylist(sortType, name, description, maxRetries = 5, initialDelay = 1000) {
     const updateBehaviorSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS) || '{}');
     const isUpdateEnabled = updateBehaviorSettings[sortType] || false;
@@ -10606,6 +10642,8 @@
                 console.error("Failed to generate or set custom playlist cover:", coverError);
             }
         }
+        
+        await addPlaylistToLibrary(newPlaylist.uri);
 
         if (isUpdateEnabled) {
             let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
@@ -10626,57 +10664,41 @@
         console.error("Spicetify APIs not available.");
         throw new Error("Spicetify APIs not available.");
     }
-    const { RootlistAPI } = Platform;
-
-    let requestBody = {
-        operation: "create",
-        name: name,
-        playlist: true,
-        before: "start", 
-    };
-
-    if (placePlaylistsInFolder) {
-        const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
-        if (folderUri) {
-            requestBody = { ...requestBody, after: folderUri, before: undefined };
-        } else {
-            Spicetify.showNotification("Failed to find or create folder. Creating playlist in root.", true);
-        }
-    }
 
     let newPlaylist;
     try {
-        newPlaylist = await CosmosAsync.post("sp://core-playlist/v1/rootlist", requestBody);
-
-        if (!newPlaylist || !newPlaylist.uri) {
-            throw new Error("Internal playlist creation request did not return a valid playlist object.");
-        }
-    } catch (error) {
-        console.error("Error during internal playlist creation:", error);
-        Spicetify.showNotification("Failed to create playlist using internal API.", true);
         const user = await Spicetify.Platform.UserAPI.getUser();
         const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
-        newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { name, description });
-    }
+        newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { 
+            name, 
+            description,
+            public: false
+        });
 
-    if (!newPlaylist || !newPlaylist.uri) {
-        throw new Error("Failed to create playlist after all attempts.");
-    }
-    
-    try {
-      await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${newPlaylist.uri.split(':')[2]}`, {
-          description: description,
-      });
-    } catch (descriptionError) {
-        const isExpectedJsonError = descriptionError instanceof SyntaxError && descriptionError.message.includes("Unexpected end of JSON input");
-        if (!isExpectedJsonError) {
-            console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
+        if (!newPlaylist || !newPlaylist.uri) {
+            throw new Error("Playlist creation via Web API did not return a valid playlist object.");
         }
+    } catch (error) {
+        console.error("Error during playlist creation via Web API:", error);
+        Spicetify.showNotification("Failed to create playlist.", true);
+        throw error;
     }
-    
-    await setPlaylistVisibility(newPlaylist.uri, false);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
+  }
+
+  async function navigateToPlaylist(playlistObject) {
+    if (openPlaylistAfterSortEnabled && playlistObject && playlistObject.uri) { 
+        const tempPath = "/library"; 
+        Spicetify.Platform.History.push(tempPath);
+        await new Promise(resolve => setTimeout(resolve, 450)); 
+        const newPlaylistPath = Spicetify.URI.fromString(playlistObject.uri).toURLPath(true);
+        if (newPlaylistPath) {
+          Spicetify.Platform.History.push(newPlaylistPath);
+        } else {
+          console.warn("Could not determine path for new playlist URI:", playlistObject.uri);
+        }
+    }
   }
 
   async function findOrCreatePlaylistFolder(folderName) {
@@ -13069,6 +13091,9 @@
               }
               mainButton.innerText = "Creating...";
               const newPlaylist = await createPlaylist(`${finalSourceName} (${sortTypeInfo.shortName})`, playlistDescription);
+              
+              await new Promise(resolve => setTimeout(resolve, 1250));
+              
               playlistUriForQueue = newPlaylist.uri;
               newPlaylistObjectForNavigation = newPlaylist; 
               playlistWasModifiedOrCreated = true;
@@ -13091,6 +13116,9 @@
               }
               const trackUris = sortedTracks.map((track) => track.uri);
               await addTracksToPlaylist(newPlaylist.id, trackUris);
+
+              await addPlaylistToLibrary(newPlaylist.uri);
+
               Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
 
             } catch (error) {
