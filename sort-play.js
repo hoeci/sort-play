@@ -10488,7 +10488,11 @@
     }
   }
 
-
+  function isDefaultMosaicCover(url) {
+    if (!url) return false;
+    return url.includes("mosaic.scdn.co");
+  }
+  
   async function generatePlaylistCover(userName, baseImageUrl, usernameColor) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -13106,7 +13110,7 @@
                     await setPlaylistImage(newPlaylist.id, base64Image);
                   }
                 } catch (error) { console.error("Error setting playlist image:", error); }
-              } else if (sourcePlaylistCoverUrl) {
+              } else if (sourcePlaylistCoverUrl && !isDefaultMosaicCover(sourcePlaylistCoverUrl)) {
                 try {
                   const base64Image = await toBase64(sourcePlaylistCoverUrl);
                   await setPlaylistImage(newPlaylist.id, base64Image);
