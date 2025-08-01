@@ -17,9 +17,9 @@
 + **Flexible Output:** Save as a new playlist, modify your current playlist (if owned), or just add the sorted tracks to your queue.
 
 ## 📷 Screenshots 
-<img src="https://github.com/user-attachments/assets/09922cc1-6d18-486a-a634-7e99835342ec" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/1519264f-b742-4675-8e02-7e67ff1f7d4f" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/e468faab-26f1-41a5-8cee-fe17384bd42e" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/3a0de92c-3cba-4b5f-9227-0d5ed8db27e1" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/9eae606c-b492-4021-b003-d2d292216d27" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/f8e3d111-959c-441a-8519-146472216bf1" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/7da8f21f-7334-4660-80b0-9276ea5c1adb" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/dd624f5d-2c5a-4f12-81f1-e4f059ef3d04" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/dd6d23c8-acc7-40bd-a943-0379bf4cd406" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/2aebde0b-3d64-4fea-aeed-37fa639d76ba" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/7038c467-b798-4f60-884f-a93614eb7a77" alt="show" width="100%">
