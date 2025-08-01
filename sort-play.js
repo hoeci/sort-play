@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.8";
+  const SORT_PLAY_VERSION = "5.1.9";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -2004,13 +2004,7 @@
 
   async function handleAiPick(tracks) {
     try {
-        const tracksWithPlayCounts = await processBatchesWithDelay(
-            tracks,
-            200,
-            1000,
-            () => {},
-            getTrackDetailsWithPlayCount
-        );
+        const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks, () => {});
 
         const tracksWithIds = await processBatchesWithDelay(
             tracksWithPlayCounts,
@@ -3469,14 +3463,11 @@
         mainButton.innerText = "0%";
 
 
-        const tracksWithPlayCounts = await processBatchesWithDelay(
+        const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
             tracks,
-            200,
-            1000,
             (progress) => {
                 mainButton.innerText = `${Math.floor(progress * 0.25)}%`;
-            },
-            getTrackDetailsWithPlayCount 
+            }
         );
 
         const tracksWithIds = await processBatchesWithDelay(
@@ -7587,14 +7578,11 @@
           menuButtons.forEach((button) => (button.disabled = true));
           mainButton.innerHTML = "0%";
   
-          const tracksWithPlayCounts = await processBatchesWithDelay(
+          const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
               filteredTracks,
-              200,
-              1000,
               (progress) => {
                   mainButton.innerText = `${Math.floor(progress * 0.20)}%`;
-              },
-              getTrackDetailsWithPlayCount
+              }
           );
           const tracksWithIds = await processBatchesWithDelay(
               tracksWithPlayCounts,
@@ -8941,6 +8929,78 @@
         return null;
       }
     }
+  }
+
+  async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}) {
+    const albumGroups = new Map();
+    tracks.forEach(track => {
+        const albumId = track?.track?.album?.id || track?.album?.id;
+        if (albumId) {
+            if (!albumGroups.has(albumId)) {
+                albumGroups.set(albumId, []);
+            }
+            albumGroups.get(albumId).push(track);
+        }
+    });
+
+    const uniqueAlbumIds = Array.from(albumGroups.keys());
+    const albumPlayCountData = new Map();
+    let processedAlbums = 0;
+    const totalAlbums = uniqueAlbumIds.length;
+
+    const albumPromises = uniqueAlbumIds.map(async (albumId) => {
+        try {
+            const albumTracks = await getPlayCountsForAlbum(albumId);
+            albumPlayCountData.set(albumId, new Map(albumTracks.map(t => [t.uri, t])));
+        } catch (error) {
+            console.error(`Failed to get play counts for album ${albumId}`, error);
+            albumPlayCountData.set(albumId, new Map());
+        } finally {
+            processedAlbums++;
+            if (totalAlbums > 0) {
+                updateProgress(Math.floor((processedAlbums / totalAlbums) * 100));
+            }
+        }
+    });
+
+    await Promise.all(albumPromises);
+
+    const enrichedTracks = tracks.map(track => {
+        const albumId = track?.track?.album?.id || track?.album?.id;
+        const trackId = track?.track?.id || track?.id;
+        
+        if (!albumId || !trackId) {
+            return { 
+                ...track, 
+                playCount: "N/A", 
+                trackNumber: 0,
+                songTitle: track.name,
+                trackId: trackId,
+                albumId: albumId,
+                uri: track.uri || (trackId ? `spotify:track:${trackId}` : undefined)
+            };
+        }
+
+        const trackUri = `spotify:track:${trackId}`;
+        const albumData = albumPlayCountData.get(albumId);
+        const foundTrack = albumData ? albumData.get(trackUri) : null;
+
+        const enrichedData = {
+            trackNumber: foundTrack ? foundTrack.trackNumber : 0,
+            songTitle: track.name,
+            albumName: track.albumName || track?.album?.name || (track?.track?.album?.name) || "Unknown Album",
+            trackId: trackId,
+            albumId: albumId,
+            durationMs: track.durationMs || track.duration_ms || track?.track?.duration_ms,
+            playCount: foundTrack ? foundTrack.playcount : "N/A",
+            uri: trackUri,
+            artistName: track.artistName || track?.artists?.[0]?.name,
+            allArtists: track.allArtists || track?.artists?.map(a => a.name).join(", "),
+        };
+        return { ...track, ...enrichedData };
+    });
+
+    return enrichedTracks;
   }
 
   async function collectTrackIdsForPopularity(track) {
@@ -12092,25 +12152,7 @@
         }
     
         updateProgress("Enriching...");
-        const tracksWithPlayCounts = await processBatchesWithDelay(
-            tracksToProcess, 200, 1000, 
-            () => {},
-            async (track) => {
-                const adaptedTrackForPlayCount = {
-                    name: track.name,
-                    albumName: track.album.name,
-                    artistName: track.artists[0].name,
-                    allArtists: track.artists.map(a => a.name).join(", "),
-                    track: {
-                        album: { id: track.album.id },
-                        id: track.id,
-                        duration_ms: track.duration_ms
-                    }
-                };
-                const playCountDetails = await getTrackDetailsWithPlayCount(adaptedTrackForPlayCount);
-                return { ...track, ...playCountDetails };
-            }
-        );
+        const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracksToProcess, () => {});
     
         const tracksWithIdsForPop = await processBatchesWithDelay(
             tracksWithPlayCounts, 200, 1000,
@@ -12793,8 +12835,8 @@
       } else {
         mainButton.innerText = "0%";
 
-        const tracksWithPlayCounts = await processBatchesWithDelay(
-          tracks, 200, 1000, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithPlayCount
+        const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
+          tracks, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.20)}%`; }
         );
         const tracksWithIds = await processBatchesWithDelay(
           tracksWithPlayCounts, 200, 1000, (progress) => { mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`; }, collectTrackIdsForPopularity
@@ -13427,14 +13469,11 @@
       }
     }
 
-    const tracksWithPlayCounts = await processBatchesWithDelay(
+    const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
       tracks,
-      200,
-      1000,
       (progress) => {
         updateProgress(Math.floor(progress * 0.25));
-      },
-      getTrackDetailsWithPlayCount
+      }
     );
 
     const tracksWithIds = await processBatchesWithDelay(
@@ -14068,56 +14107,75 @@
             }
 
             if (trackIdsToFetch.length > 0) {
-                try {
-                    const trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdsToFetch.join(',')}`);
-                    
-                    if (trackDetailsResponse && trackDetailsResponse.tracks) {
-                        const processingPromises = trackDetailsResponse.tracks.map(async (trackDetails) => {
-                            if (!trackDetails) return;
+                let success = false;
+                let retries = 0;
+                const maxRetries = 3;
+                let delay = 500;
+                let trackDetailsResponse;
 
-                            const { trackElement, dataElement } = elementMap.get(trackDetails.id) || {};
-                            if (!trackElement || !dataElement) return;
+                while (!success && retries < maxRetries) {
+                    try {
+                        trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdsToFetch.join(',')}`);
+                        
+                        if (trackDetailsResponse && trackDetailsResponse.tracks) {
+                            success = true;
+                        } else {
+                            throw new Error("Spotify API request for track details failed or returned invalid data.");
+                        }
+                    } catch (error) {
+                        retries++;
+                        console.warn(`Sort-Play: Error fetching track details batch (Attempt ${retries}/${maxRetries}):`, error);
+                        if (retries < maxRetries) {
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2;
+                        }
+                    }
+                }
 
-                            try {
-                                if (activeColumnType === 'playCount') {
-                                    const result = await getTrackDetailsWithPlayCount({ track: { album: { id: trackDetails.album.id }, id: trackDetails.id } });
-                                    updateDisplay(dataElement, result.playCount, activeColumnType);
-                                    if (result.playCount !== null && result.playCount !== "N/A") setCachedPlayCount(trackDetails.id, result.playCount);
-                                } else if (activeColumnType === 'releaseDate') {
-                                    const releaseDate = trackDetails.album.release_date;
-                                    updateDisplay(dataElement, releaseDate, activeColumnType);
-                                    if (releaseDate) setCachedReleaseDate(trackDetails.id, releaseDate);
-                                } else if (activeColumnType === 'scrobbles' || activeColumnType === 'personalScrobbles') {
-                                    const trackName = trackDetails.name;
-                                    const artistName = trackDetails.artists?.[0]?.name;
-                                    if (!artistName || !trackName) throw new Error("Missing artist/track name.");
+                if (success && trackDetailsResponse) {
+                    const processingPromises = trackDetailsResponse.tracks.map(async (trackDetails) => {
+                        if (!trackDetails) return;
 
-                                    if (activeColumnType === 'scrobbles') {
-                                        const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                        updateDisplay(dataElement, result.scrobbles, activeColumnType);
-                                        if (result.scrobbles !== null) setCachedScrobbles(trackDetails.id, result.scrobbles);
+                        const { trackElement, dataElement } = elementMap.get(trackDetails.id) || {};
+                        if (!trackElement || !dataElement) return;
+
+                        try {
+                            if (activeColumnType === 'playCount') {
+                                const result = await getTrackDetailsWithPlayCount({ track: { album: { id: trackDetails.album.id }, id: trackDetails.id } });
+                                updateDisplay(dataElement, result.playCount, activeColumnType);
+                                if (result.playCount !== null && result.playCount !== "N/A") setCachedPlayCount(trackDetails.id, result.playCount);
+                            } else if (activeColumnType === 'releaseDate') {
+                                const releaseDate = trackDetails.album.release_date;
+                                updateDisplay(dataElement, releaseDate, activeColumnType);
+                                if (releaseDate) setCachedReleaseDate(trackDetails.id, releaseDate);
+                            } else if (activeColumnType === 'scrobbles' || activeColumnType === 'personalScrobbles') {
+                                const trackName = trackDetails.name;
+                                const artistName = trackDetails.artists?.[0]?.name;
+                                if (!artistName || !trackName) throw new Error("Missing artist/track name.");
+
+                                if (activeColumnType === 'scrobbles') {
+                                    const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                    updateDisplay(dataElement, result.scrobbles, activeColumnType);
+                                    if (result.scrobbles !== null) setCachedScrobbles(trackDetails.id, result.scrobbles);
+                                } else {
+                                    if (!loadLastFmUsername()) {
+                                        updateDisplay(dataElement, "_", activeColumnType);
                                     } else {
-                                        if (!loadLastFmUsername()) {
-                                            updateDisplay(dataElement, "_", activeColumnType);
-                                        } else {
-                                            const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                            updateDisplay(dataElement, result.personalScrobbles, activeColumnType);
-                                        }
+                                        const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                        updateDisplay(dataElement, result.personalScrobbles, activeColumnType);
                                     }
                                 }
-                            } catch (e) {
-                                updateDisplay(dataElement, "_", activeColumnType);
-                                trackElement.setAttribute('data-sp-fetch-failed', 'true');
-                            } finally {
-                                trackElement.classList.remove('sort-play-processing');
                             }
-                        });
-                        await Promise.all(processingPromises);
-                    } else {
-                        throw new Error("Spotify API request for track details failed.");
-                    }
-                } catch (spotifyError) {
-                    console.error("Error fetching batch track details:", spotifyError);
+                        } catch (e) {
+                            updateDisplay(dataElement, "_", activeColumnType);
+                            trackElement.setAttribute('data-sp-fetch-failed', 'true');
+                        } finally {
+                            trackElement.classList.remove('sort-play-processing');
+                        }
+                    });
+                    await Promise.all(processingPromises);
+                } else {
+                    console.error(`Sort-Play: Failed to fetch batch track details after ${maxRetries} attempts.`);
                     trackIdsToFetch.forEach(trackId => {
                         const { trackElement, dataElement } = elementMap.get(trackId) || {};
                         if (trackElement && dataElement) {
