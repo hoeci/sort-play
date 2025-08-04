@@ -1,5 +1,6 @@
-# Sort Play
-<img src="https://github.com/user-attachments/assets/52d8dea1-2fe3-46ba-a201-817cf7a31408" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/52d8dea1-2fe3-46ba-a201-817cf7a31408" alt="Sort-Play Showcase" width="100%">
+
+# Sort-Play: The Ultimate Toolkit for Your Spotify Library
 
 ## ⚡️ Features
 + **Comprehensive Sorting:** Sort playlists and artist pages by play count, popularity, release date, album color, and Last.fm scrobbles.
