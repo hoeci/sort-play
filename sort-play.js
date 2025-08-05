@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.9";
+  const SORT_PLAY_VERSION = "5.1.10";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -13386,8 +13386,28 @@
       }
 
       const DURATION_THRESHOLD = 2000; 
+      const DURATION_THRESHOLD_SAME_TITLE = 6000;
       const finalUniqueTracks = [];
       const finalRemovedTracks = [];
+
+      const versionKeywords = [
+          'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
+          'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
+          'radio edit', 'radio mix', 'single version', 'single edit', 'album version',
+          'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
+          'special edition', 'original mix', 'original version'
+      ];
+      const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})\\s*[\\)\\]\\-]?`, 'i');
+
+      const getCleanTitle = (rawTitle) => {
+          return rawTitle
+              .toLowerCase()
+              .replace(versionRegex, '')
+              .replace(/['’ʼ]/g, "'")
+              .replace(/[^a-z0-9\s]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+      };
 
       const sortedInputTracks = [...tracks].sort((a, b) => {
           const popA = a.popularity || 0;
@@ -13415,24 +13435,48 @@
               const candidateNormalizedTitle = candidateRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
               const candidateFirstWord = candidateNormalizedTitle.split(/\s+/)[0];
               const candidateDuration = candidateTrack.durationMs;
+              const candidateArtist = candidateTrack.artistName || (candidateTrack.artists && candidateTrack.artists[0]?.name) || "";
 
               const existingRawTitle = existingUniqueTrack.songTitle || existingUniqueTrack.name || "Unknown Title";
               const existingNormalizedTitle = existingRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
               const existingFirstWord = existingNormalizedTitle.split(/\s+/)[0];
               const existingDuration = existingUniqueTrack.durationMs; 
+              const existingArtist = existingUniqueTrack.artistName || (existingUniqueTrack.artists && existingUniqueTrack.artists[0]?.name) || "";
 
               let areDuplicatesByNewRules = false;
 
               if (candidateHasValidPlayCount && existingHasValidPlayCount) {
                   if (Number(candidateTrack.playCount) === Number(existingUniqueTrack.playCount)) {
-                      const durationDiff = Math.abs(candidateDuration - existingDuration);
-                      if (candidateFirstWord === existingFirstWord) {
-                          if (durationDiff <= DURATION_THRESHOLD) {
+                      
+                      const hasVersionKeyword = versionRegex.test(candidateRawTitle) || versionRegex.test(existingRawTitle);
+                      if (hasVersionKeyword && candidateArtist === existingArtist) {
+                          const cleanCandidateTitle = getCleanTitle(candidateRawTitle);
+                          const cleanExistingTitle = getCleanTitle(existingRawTitle);
+                          if (cleanCandidateTitle === cleanExistingTitle) {
                               areDuplicatesByNewRules = true;
                           }
-                      } else {
-                          if (durationDiff <= DURATION_THRESHOLD) {
+                      }
+                      
+                      if (!areDuplicatesByNewRules && 
+                          candidateRawTitle.trim().toLowerCase() === existingRawTitle.trim().toLowerCase() &&
+                          candidateArtist === existingArtist) {
+                          
+                          const durationDiff = Math.abs(candidateDuration - existingDuration);
+                          if (durationDiff <= DURATION_THRESHOLD_SAME_TITLE) {
                               areDuplicatesByNewRules = true;
+                          }
+                      }
+
+                      if (!areDuplicatesByNewRules) {
+                          const durationDiff = Math.abs(candidateDuration - existingDuration);
+                          if (candidateFirstWord === existingFirstWord) {
+                              if (durationDiff <= DURATION_THRESHOLD) {
+                                  areDuplicatesByNewRules = true;
+                              }
+                          } else {
+                              if (durationDiff <= DURATION_THRESHOLD) {
+                                  areDuplicatesByNewRules = true;
+                              }
                           }
                       }
                   }
