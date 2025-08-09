@@ -825,10 +825,10 @@
 
     <div class="setting-row" id="openPlaylistAfterSortSettingRow">
         <label class="col description">
-            Open Playlist After Sorting
+            Open Playlist After Creation
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Automatically navigates to the created or modified playlist after sorting is complete.</span>
+                <span class="custom-tooltip">Automatically navigates to the newly created or modified playlist.</span>
             </span>
         </label>
         <div class="col action">
@@ -13232,7 +13232,7 @@
               if (openPlaylistAfterSortEnabled || currentPathAfterSort === modifiedPlaylistOriginalPath) {
                   const tempPath = "/library"; 
                   Spicetify.Platform.History.push(tempPath);
-                  await new Promise(resolve => setTimeout(resolve, 400));
+                  await new Promise(resolve => setTimeout(resolve, 1000));
                   Spicetify.Platform.History.push(modifiedPlaylistOriginalPath); 
               }
           } else if (newPlaylistObjectForNavigation) { 
