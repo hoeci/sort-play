@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.10";
+  const SORT_PLAY_VERSION = "5.1.11";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -2673,6 +2673,7 @@
               "\\(LFM Scrobbles\\)",
               "\\(LFM My Scrobbles\\)",
               "\\(Shuffle\\)",
+              "\\(Deduplicated\\)",
               "\\(AI Pick\\)",
               "\\(Color\\)",
               "\\(Genre Filter\\)",
@@ -6756,6 +6757,7 @@
                 "\\(LFM Scrobbles\\)",
                 "\\(LFM My Scrobbles\\)",
                 "\\(Shuffle\\)",
+                "\\(Deduplicated\\)",
                 "\\(AI Pick\\)",
                 "\\(Color\\)",
                 "\\(Genre Filter\\)",
@@ -7523,6 +7525,7 @@
           "\\(LFM Scrobbles\\)",
           "\\(LFM My Scrobbles\\)",
           "\\(Shuffle\\)",
+          "\\(Deduplicated\\)",
           "\\(AI Pick\\)",
           "\\(Color\\)",
           "\\(Genre Filter\\)",
@@ -10499,28 +10502,29 @@
   }
 
   async function movePlaylistToTop(playlistUri) {
-    const { RootlistAPI } = Spicetify.Platform;
-    if (!RootlistAPI) return;
+    const { CosmosAsync } = Spicetify.Platform;
+    if (!CosmosAsync) return;
 
     try {
-        const rootlist = await RootlistAPI.getContents();
-        const folder = placePlaylistsInFolder ? rootlist.items.find(item => item.type === 'folder' && item.name === sortPlayFolderName) : null;
+        let moveRequestBody = {
+            operation: "move",
+            uris: [playlistUri],
+        };
 
-        if (placePlaylistsInFolder && folder) {
-            const isAlreadyInFolder = folder.items.some(item => item.uri === playlistUri);
-
-            if (isAlreadyInFolder) {
-                console.log(`Playlist ${playlistUri} is already in the correct folder. Skipping move.`);
-                return;
+        if (placePlaylistsInFolder) {
+            const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
+            if (folderUri) {
+                moveRequestBody.after = folderUri;
+            } else {
+                moveRequestBody.before = "start";
             }
-            
-            await RootlistAPI.move({ uri: playlistUri }, { after: folder.uri });
-
         } else {
-            await RootlistAPI.move({ uri: playlistUri }, { before: "start" });
+            moveRequestBody.before = "start";
         }
+
+        await CosmosAsync.post("sp://core-playlist/v1/rootlist", moveRequestBody);
     } catch (error) {
-        console.warn(`Could not move playlist ${playlistUri} to top.`, error);
+        console.warn(`Could not move playlist ${playlistUri}.`, error);
     }
   }
 
@@ -10621,13 +10625,29 @@
             before: "start",
         };
 
-        if (placePlaylistsInFolder) {
-            const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
-            if (folderUri) {
-                addRequestBody = { ...addRequestBody, after: folderUri, before: undefined };
-            }
+        const folderUri = placePlaylistsInFolder ? await findOrCreatePlaylistFolder(sortPlayFolderName) : null;
+
+        if (folderUri) {
+            addRequestBody = { ...addRequestBody, after: folderUri, before: undefined };
         }
+
         await CosmosAsync.post("sp://core-playlist/v1/rootlist", addRequestBody);
+
+        await new Promise(resolve => setTimeout(resolve, 250));
+
+        let moveRequestBody = {
+            operation: "move",
+            uris: [playlistUri],
+        };
+
+        if (folderUri) {
+            moveRequestBody.after = folderUri;
+        } else {
+            moveRequestBody.before = "start";
+        }
+        
+        await CosmosAsync.post("sp://core-playlist/v1/rootlist", moveRequestBody);
+
     } catch (error) {
         console.error("Error adding playlist to user's library:", error);
     }
@@ -10742,6 +10762,13 @@
         if (!newPlaylist || !newPlaylist.uri) {
             throw new Error("Playlist creation via Web API did not return a valid playlist object.");
         }
+
+        try {
+            await setPlaylistVisibility(newPlaylist.uri, false);
+        } catch (visibilityError) {
+            console.warn("Could not explicitly set playlist to private, it might be public by default.", visibilityError);
+        }
+
     } catch (error) {
         console.error("Error during playlist creation via Web API:", error);
         Spicetify.showNotification("Failed to create playlist.", true);
@@ -10755,7 +10782,7 @@
     if (openPlaylistAfterSortEnabled && playlistObject && playlistObject.uri) { 
         const tempPath = "/library"; 
         Spicetify.Platform.History.push(tempPath);
-        await new Promise(resolve => setTimeout(resolve, 450)); 
+        await new Promise(resolve => setTimeout(resolve, 500)); 
         const newPlaylistPath = Spicetify.URI.fromString(playlistObject.uri).toURLPath(true);
         if (newPlaylistPath) {
           Spicetify.Platform.History.push(newPlaylistPath);
@@ -11840,7 +11867,7 @@
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
             Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 450)); 
+            await new Promise(resolve => setTimeout(resolve, 600)); 
             const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
             if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
         }
@@ -12011,7 +12038,7 @@
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
             Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 450)); 
+            await new Promise(resolve => setTimeout(resolve, 600)); 
             const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
             if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
         }
@@ -12299,7 +12326,7 @@
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
             Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 450)); 
+            await new Promise(resolve => setTimeout(resolve, 600)); 
             const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
             if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
         }
@@ -12556,7 +12583,7 @@
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
             Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 450)); 
+            await new Promise(resolve => setTimeout(resolve, 600)); 
             const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
             if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
         }
@@ -13055,6 +13082,7 @@
             "\\(LFM Scrobbles\\)",
             "\\(LFM My Scrobbles\\)",
             "\\(Shuffle\\)",
+            "\\(Deduplicated\\)",
             "\\(AI Pick\\)",
             "\\(Color\\)",
             "\\(Genre Filter\\)",
@@ -13206,18 +13234,9 @@
                   Spicetify.Platform.History.push(tempPath);
                   await new Promise(resolve => setTimeout(resolve, 400));
                   Spicetify.Platform.History.push(modifiedPlaylistOriginalPath); 
-              } else {
               }
-          } else if (openPlaylistAfterSortEnabled && newPlaylistObjectForNavigation && newPlaylistObjectForNavigation.uri) { 
-              const tempPath = "/library"; 
-              Spicetify.Platform.History.push(tempPath);
-              await new Promise(resolve => setTimeout(resolve, 450)); 
-              const newPlaylistPath = Spicetify.URI.fromString(newPlaylistObjectForNavigation.uri).toURLPath(true);
-              if (newPlaylistPath) {
-                Spicetify.Platform.History.push(newPlaylistPath);
-              } else {
-                console.warn("Could not determine path for new playlist URI:", newPlaylistObjectForNavigation.uri);
-              }
+          } else if (newPlaylistObjectForNavigation) { 
+              await navigateToPlaylist(newPlaylistObjectForNavigation);
           }
       }
 
@@ -13469,14 +13488,8 @@
 
                       if (!areDuplicatesByNewRules) {
                           const durationDiff = Math.abs(candidateDuration - existingDuration);
-                          if (candidateFirstWord === existingFirstWord) {
-                              if (durationDiff <= DURATION_THRESHOLD) {
-                                  areDuplicatesByNewRules = true;
-                              }
-                          } else {
-                              if (durationDiff <= DURATION_THRESHOLD) {
-                                  areDuplicatesByNewRules = true;
-                              }
+                          if (durationDiff <= DURATION_THRESHOLD) {
+                              areDuplicatesByNewRules = true;
                           }
                       }
                   }
@@ -13525,7 +13538,7 @@
       200,
       1000,
       (progress) => {
-        updateProgress(Math.floor(25+progress * 0.25));
+        updateProgress(Math.floor(25 + progress * 0.25));
       },
       collectTrackIdsForPopularity
     );
@@ -13533,7 +13546,7 @@
     const tracksWithPopularity = await fetchPopularityForMultipleTracks(
       tracksWithIds,
       (progress) => {
-        updateProgress(Math.floor(50+progress * 0.1));
+        updateProgress(Math.floor(50 + progress * 0.1));
       }
     );
 
@@ -13547,44 +13560,6 @@
       const deduplicationResult = deduplicateTracks(tracksWithPopularity);
       uniqueTracks = deduplicationResult.unique;
       removedTracks = deduplicationResult.removed;
-      const duplicateGroups = new Map();
-      tracksWithPopularity.forEach((track) => {
-        const hasValidPlayCount = track.playCount !== "N/A" && track.playCount !== 0;
-        const primaryKey = `${track.playCount}-${track.durationMilis}`;
-        const secondaryKey = `${track.songTitle}-${track.durationMilis}`;
-        const key = hasValidPlayCount ? primaryKey : secondaryKey;
-
-        if (!duplicateGroups.has(key)) {
-          duplicateGroups.set(key, []);
-        }
-        duplicateGroups.get(key).push(track);
-      });
-
-      uniqueTracks = [];
-      duplicateGroups.forEach((group) => {
-        if (group.length > 1) {
-          const validPlayCountTracks = group.filter(
-            (track) => track.playCount !== "N/A" && track.playCount !== 0
-          );
-          const noOrZeroPlayCountTracks = group.filter(
-            (track) => track.playCount === "N/A" || track.playCount === 0
-          );
-
-          if (validPlayCountTracks.length > 0) {
-            validPlayCountTracks.sort(
-              (a, b) => (b.popularity || 0) - (a.popularity || 0)
-            );
-            uniqueTracks.push(validPlayCountTracks[0]);
-          } else if (noOrZeroPlayCountTracks.length > 0) {
-            noOrZeroPlayCountTracks.sort(
-              (a, b) => (b.popularity || 0) - (a.popularity || 0)
-            );
-            uniqueTracks.push(noOrZeroPlayCountTracks[0]);
-          }
-        } else {
-          uniqueTracks.push(group[0]);
-        }
-      });
     }
 
     const fetchFunction = sortType === 'personalScrobbles'
@@ -13593,8 +13568,9 @@
 
     const tracksForScrobbleFetching = uniqueTracks.map(track => ({
       ...track,
-      name: track.songTitle,
-      artists: [{ name: track.artistName }]
+      name: track.songTitle || track.name,
+      artistName: track.artistName || (track.artists && track.artists[0]?.name),
+      artists: track.artists || [{ name: track.artistName }]
     }));
 
     const tracksWithScrobbles = await processBatchesWithDelay(
@@ -13602,11 +13578,11 @@
       50,
       1000,
       (progress) => {
-        updateProgress(Math.floor(75+progress*0.25));
+        updateProgress(Math.floor(75 + progress * 0.25));
       },
       fetchFunction
     );
-      let sortedTracks;
+    let sortedTracks;
     if (sortType === 'personalScrobbles') {
       const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
       sortedTracks = tracksWithScrobbles
@@ -13615,7 +13591,7 @@
     } else {
       sortedTracks = tracksWithScrobbles
         .filter((track) => track.scrobbles !== null)
-        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles); 
+        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles);
     }
 
     if (sortedTracks.length === 0) {
