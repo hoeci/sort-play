@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.15";
+  const SORT_PLAY_VERSION = "5.1.16";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -574,13 +574,13 @@
            width: 100%;
            align-items: center;
         }
-         .msgWrapper:has(.received) {
+        .msgWrapper:has(.received) {
            justify-content: flex-start;
         }
-         .msgWrapper:has(.sent) {
+        .msgWrapper:has(.sent) {
            justify-content: flex-end;
         }
-         .allMessages {
+        .allMessages {
            font-family: Helvetica, sans-serif;
            font-size: 10pt;
            margin: 5px;
@@ -591,35 +591,37 @@
            backdrop-filter: blur(7px);
            -webkit-backdrop-filter: blur(7px);
         }
-         .allMessages:hover {
+        .allMessages:hover {
            color: #1db954;
         }
         #background:lastChild {
           margin-bottom: 20px;
         }
-         .sent {
+        .sent {
            border-radius: 20px 20px 0 20px;
            background-color: rgba(35,35, 35, 0.3);
            color: #a0e0b8;
         }
-         .recieved {
-           border-radius: 20px 20px 20px 0;
+        .recieved {
+           border-radius: 10px 10px 10px 0;
            background-color: rgba(30, 215, 96, 0.15);
            color: #a0e0b8;
         }
-         
-         blockquote {
+        blockquote {
            background-color: #333;
            color: #FFF;
            opacity: 0.75;
            border-right: solid 2px #AAA;
         }
-         #background {
+        #background {
            scrollbar-color: #1db954 transparent;
+           padding-top: 10px;
+           height: calc(100% - 108px)
         }
-         #input, #nameEntry {
+        #input, #nameEntry {
            background-color: rgba(0, 0, 0, 0.5);
            color: #1db954;
+           min-height: 25px;
            backdrop-filter: blur(7px);
            -webkit-backdrop-filter: blur(7px);
         }
@@ -634,6 +636,18 @@
         }
         #top_banner {
           background: #1db954;
+          text-align: center;
+        }
+        #top_banner a {
+            font-size: 0;
+            text-decoration: none;
+        }
+        #top_banner a::after {
+            content: 'Sort Play Chat';
+            font-size: 14pt;
+            color: #181818;
+            font-family: sans-serif;
+            font-weight: 700;
         }
         #loadMore {
           color: #1db954;
@@ -671,6 +685,9 @@
         .recieved + #timestamp {
           justify-content: flex-start;
           padding-left: 10px;
+        }
+        .msgBody {
+          padding: 5px 7px 7px 7px;
         }
         .msgBody a {
           color: #1db954 !important;
@@ -730,6 +747,7 @@
 
     chatPanel.appendChild(iframe);
     document.body.appendChild(chatPanel);
+
     return chatPanel;
   }
 
