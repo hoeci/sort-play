@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.11";
+  const SORT_PLAY_VERSION = "5.1.15";
 
   const LFMApiKey = "***REMOVED***";
   let isProcessing = false;
@@ -45,6 +45,8 @@
   let colorThiefLib = null;
   let colorSortMode = 'perceptual';
   let setDedicatedPlaylistCovers = true;
+  let chatPanelVisible = false;
+  const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
@@ -130,6 +132,7 @@
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
+    chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
   
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -169,6 +172,7 @@
     localStorage.setItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, placePlaylistsInFolder);
     localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
     localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
+    localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -544,6 +548,241 @@
     });
   }
 
+  function createAndInitializeChatPanel() {
+    let chatPanel = document.getElementById('sort-play-chat-panel');
+    if (chatPanel) {
+        return chatPanel;
+    }
+
+    chatPanel = document.createElement('div');
+    chatPanel.id = 'sort-play-chat-panel';
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'chattable';
+    iframe.src = 'https://iframe.chat/embed/alternate/?chat=sortplay';
+    iframe.frameBorder = 'none';
+
+    const customChatCSS = `
+        body {
+           background-color: #181818;
+           background-size: 100% 100%;
+           color: #1db954;
+        }
+        .msgWrapper {
+           display: flex;
+           flex-wrap: wrap;
+           width: 100%;
+           align-items: center;
+        }
+         .msgWrapper:has(.received) {
+           justify-content: flex-start;
+        }
+         .msgWrapper:has(.sent) {
+           justify-content: flex-end;
+        }
+         .allMessages {
+           font-family: Helvetica, sans-serif;
+           font-size: 10pt;
+           margin: 5px;
+           display: inline-block;
+           position: relative;
+           min-width: 25vw;
+           max-width: 80vw;
+           backdrop-filter: blur(7px);
+           -webkit-backdrop-filter: blur(7px);
+        }
+         .allMessages:hover {
+           color: #1db954;
+        }
+        #background:lastChild {
+          margin-bottom: 20px;
+        }
+         .sent {
+           border-radius: 20px 20px 0 20px;
+           background-color: rgba(35,35, 35, 0.3);
+           color: #a0e0b8;
+        }
+         .recieved {
+           border-radius: 20px 20px 20px 0;
+           background-color: rgba(30, 215, 96, 0.15);
+           color: #a0e0b8;
+        }
+         
+         blockquote {
+           background-color: #333;
+           color: #FFF;
+           opacity: 0.75;
+           border-right: solid 2px #AAA;
+        }
+         #background {
+           scrollbar-color: #1db954 transparent;
+        }
+         #input, #nameEntry {
+           background-color: rgba(0, 0, 0, 0.5);
+           color: #1db954;
+           backdrop-filter: blur(7px);
+           -webkit-backdrop-filter: blur(7px);
+        }
+        #input:empty::before {
+          color: #1a6333;
+        }
+        .owner, .mod {
+           background-color: transparent;
+           border: 1px solid #1db954;
+           background-size: 100% 100%;
+           border-radius: 50%;
+        }
+        #top_banner {
+          background: #1db954;
+        }
+        #loadMore {
+          color: #1db954;
+          font-size: 10pt;
+          font-family: Verdana;
+        }
+        #loadMore:hover {
+          font-size: 12pt;
+        }
+        #settingsWrapper {
+          background-color: #1db954;
+        }
+        .ctxMenuOption {
+          background-color: transparent !important;
+          color: #1db954;
+        }
+        .ctxMenuOption:hover {
+          background-color: rgba(255, 255, 255, 0.25) !important;
+        }
+        #ctxMenu {
+          backdrop-filter: blur(7px);
+          -webkit-backdrop-filter: blur(7px);
+          background-color: rgba(0, 0, 0, 0.5) !important;
+        }
+        #timestamp {
+          display: flex;
+          align-items: center;
+          width: calc(100% - 10px);
+          font-size: 8pt;
+        }
+        .sent + #timestamp {
+          justify-content: flex-end;
+          padding-right: 10px;
+        }
+        .recieved + #timestamp {
+          justify-content: flex-start;
+          padding-left: 10px;
+        }
+        .msgBody a {
+          color: #1db954 !important;
+        }
+        :where(#emojiTrayToggle) {
+          background-color: #1db954;
+        }
+        #emojiTray {
+          background-color: rgba(30, 215, 96, 0.5);
+          color: #000;
+          border-color: #1db954;
+          backdrop-filter: blur(5px);
+        }
+        #settingsMenu hr {
+          height: 1px;
+          width: 100%;
+          border: none;
+          background: #1db954;
+        }
+        #settingsMenu input[type=text] {
+          border: none;
+          outline: none !important;
+          border-bottom: solid 1px #1db954;
+          color: #1db954;
+          background-color: rgba(0, 0, 0, 0.3);
+          backdrop-filter: blur(10px);
+          padding: 3px;
+        }
+        #save {
+          border: solid 1px #1db954;
+          background-color: transparent;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #1db954;
+          padding: 10px;
+          font-size: 12pt;
+          backdrop-filter: blur(10px);
+          cursor: pointer;
+          border-radius: 3px;
+        }
+        #is_typing {
+          background-color: transparent;
+          height: 15px;
+          border: solid 1px #1db954;
+          border-radius: 8px;
+          backdrop-filter: blur(2px);
+        }
+        #is_typing > span {
+          background-color: #1db954;
+        }
+    `;
+
+    iframe.onload = () => {
+        iframe.contentWindow.postMessage(customChatCSS, "*");
+    };
+
+    chatPanel.appendChild(iframe);
+    document.body.appendChild(chatPanel);
+    return chatPanel;
+  }
+
+  function toggleChatPanel() {
+    const liveChatBtn = document.querySelector("#liveChatBtn");
+    chatPanelVisible = !chatPanelVisible;
+
+    if (chatPanelVisible) {
+        const chatPanel = createAndInitializeChatPanel();
+        positionChatPanel(chatPanel);
+        setTimeout(() => chatPanel.classList.add('visible'), 10);
+        if (liveChatBtn) liveChatBtn.classList.add('active');
+    } else {
+        let chatPanel = document.getElementById('sort-play-chat-panel');
+        if (chatPanel) {
+            chatPanel.classList.remove('visible');
+            setTimeout(() => {
+                if (chatPanel) chatPanel.remove();
+            }, 200);
+        }
+        if (liveChatBtn) liveChatBtn.classList.remove('active');
+    }
+  }
+
+  function positionChatPanel(chatPanel) {
+    if (!chatPanel) return;
+    const settingsModal = document.querySelector(".GenericModal > .main-embedWidgetGenerator-container");
+    if (!settingsModal) return;
+
+    const modalRect = settingsModal.getBoundingClientRect();
+    const panelHeight = chatPanel.offsetHeight;
+    const panelWidth = chatPanel.offsetWidth;
+    const gap = 10;
+
+    let top = modalRect.bottom - panelHeight;
+    let left = modalRect.right + gap;
+
+    if (left + panelWidth > window.innerWidth - gap) {
+        left = modalRect.left - panelWidth - gap;
+    }
+    if (top < gap) {
+        top = gap;
+    }
+
+    chatPanel.style.top = `${top}px`;
+    chatPanel.style.left = `${left}px`;
+  }
+
+  const liveChatIconSVG = `
+  <svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M19.4003 18C19.7837 17.2499 20 16.4002 20 15.5C20 12.4624 17.5376 10 14.5 10C11.4624 10 9 12.4624 9 15.5C9 18.5376 11.4624 21 14.5 21L21 21C21 21 20 20 19.4143 18.0292M18.85 12C18.9484 11.5153 19 11.0137 19 10.5C19 6.35786 15.6421 3 11.5 3C7.35786 3 4 6.35786 4 10.5C4 11.3766 4.15039 12.2181 4.42676 13C5.50098 16.0117 3 18 3 18H9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
   function showSettingsModal() {
     const modalContainer = document.createElement("div");
     modalContainer.className = "sort-play-settings";
@@ -600,11 +839,63 @@
         padding: 15px 25px 20px 25px; 
         background-color: #181818; 
         border-top: 1px solid #282828;
-    }
-    .sort-play-settings-footer .github-link-container {
         display: flex;
-        justify-content: center;
+        justify-content: center; 
         align-items: center;
+        position: relative;
+    }
+    .sort-play-settings-footer .live-chat-button {
+        position: absolute;
+        right: 25px;
+    }
+    .sort-play-settings-footer .github-link-container a {
+        color: #1ED760;
+        font-size: 14px;
+        text-decoration: none;
+    }
+    .live-chat-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        color: white;
+        display: flex;
+        align-items: center;
+        transition: color 0.1s ease-in-out;
+    }
+    .live-chat-button.active {
+        color: #1ED760;
+    }
+    .live-chat-button:hover {
+        color: #1ED760;
+    }
+    #sort-play-chat-panel {
+        position: fixed;
+        width: 380px;
+        height: 60vh;
+        max-height: 600px;
+        background-color: #181818;
+        border: 2px solid #282828;
+        border-radius: 15px;
+        z-index: 9999;
+        opacity: 0;
+        transform: translateY(20px);
+        transition: transform 0.2s ease-in-out, opacity 0.05s ease-in-out;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 16px 24px rgba(0,0,0,.3), 0 6px 8px rgba(0,0,0,.2);
+        pointer-events: none;
+    }
+    #sort-play-chat-panel.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+    #sort-play-chat-panel iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 13px;
     }
     .sort-play-settings-footer .github-link-container a {
         color: #1ED760;
@@ -1193,8 +1484,27 @@
             <div class="github-link-container">
                 <a href="https://github.com/hoeci/sort-play" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
             </div>
+            <button id="liveChatBtn" class="live-chat-button" title="Live Chat">
+                ${liveChatIconSVG}
+            </button>
         `;
         modalRootElement.appendChild(footerElement);
+
+        const liveChatBtn = footerElement.querySelector("#liveChatBtn");
+
+        if (chatPanelVisible) {
+            const chatPanel = createAndInitializeChatPanel();
+            positionChatPanel(chatPanel);
+            setTimeout(() => {
+                const panel = document.getElementById('sort-play-chat-panel');
+                if (panel) panel.classList.add('visible');
+            }, 10);
+            liveChatBtn.classList.add('active');
+        }
+
+        liveChatBtn.addEventListener("click", () => {
+            toggleChatPanel();
+        });
     }
 
     if (isMenuOpen) {
