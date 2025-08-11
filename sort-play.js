@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.1.17";
+  const SORT_PLAY_VERSION = "5.3.00";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -70,12 +70,23 @@
     "***REMOVED***",
     "***REMOVED***",
     "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***",
+    "***REMOVED***",
     "***REMOVED***"
   ];
+  const revokedLfmKeys = new Set();
 
   function L_F_M_Key() {
-    const randomIndex = Math.floor(Math.random() * L_F_M_Key_Pool.length);
-    return L_F_M_Key_Pool[randomIndex];
+    const validKeys = L_F_M_Key_Pool.filter(key => !revokedLfmKeys.has(key));
+    if (validKeys.length === 0) {
+      return null;
+    }
+    const randomIndex = Math.floor(Math.random() * validKeys.length);
+    return validKeys[randomIndex];
   }
 
   const Ge_mini_Key_Pool = [
@@ -2992,6 +3003,7 @@
         if (aiResponse && aiResponse.length > 0) {
           const sourceUri = getCurrentUri();
           const isArtistPage = URI.isArtist(sourceUri); 
+          const isAlbumPage = URI.isAlbum(sourceUri);
           let sourceName;
           
           if (URI.isArtist(sourceUri)) {
@@ -3000,6 +3012,10 @@
               ).then((r) => r.name);
           } else if (isLikedSongsPage(sourceUri)) {
               sourceName = "Liked Songs";
+          } else if (isAlbumPage) {
+              sourceName = await Spicetify.CosmosAsync.get(
+                  `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
+              ).then((r) => r.name);
           } else {
               sourceName = await Spicetify.CosmosAsync.get(
                   `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
@@ -3033,6 +3049,10 @@
           let playlistDescription;
           if (isArtistPage) {
             playlistDescription = `Tracks by ${sourceName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
+          } else if (isAlbumPage) {
+            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
+            const artistName = albumDetails.artists[0].name;
+            playlistDescription = `Tracks from ${sourceName} by ${artistName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
           } else {
             playlistDescription = `Tracks picked by AI using Sort-Play for request: "${userPrompt}"`;
           }
@@ -3793,6 +3813,9 @@
             tracks = await getArtistTracks(currentUri);
         } else if (isLikedSongsPage(currentUri)) {
             tracks = await getLikedSongs();
+        } else if (URI.isAlbum(currentUri)) {
+            const albumId = currentUri.split(":")[2];
+            tracks = await getAlbumTracks(albumId);
         } else {
             throw new Error('Invalid playlist or artist page');
         }
@@ -6481,6 +6504,14 @@
     } else if (isLikedSongsPage(currentUri)) {
         playlistTitleElement.textContent = "Liked Songs";
         playlistTitleElement.title = "Liked Songs";
+    } else if (URI.isAlbum(currentUri)) {
+        const albumId = currentUri.split(":")[2];
+        Spicetify.CosmosAsync.get(
+            `https://api.spotify.com/v1/albums/${albumId}`
+        ).then((r) => {
+            playlistTitleElement.textContent = r.name;
+            playlistTitleElement.title = r.name;
+        });
     }
 
     const overlay = document.createElement("div");
@@ -7085,6 +7116,10 @@
                 ).then((r) => r.name);
             } else if (isLikedSongsPage(sourceUri)) {
                 sourceName = "Liked Songs";
+            } else if (URI.isAlbum(sourceUri)) {
+                sourceName = await Spicetify.CosmosAsync.get(
+                    `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
+                ).then((r) => r.name);
             } else {
                 sourceName = await Spicetify.CosmosAsync.get(
                     `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
@@ -7120,6 +7155,10 @@
             let baseDescription = `Filtered using Sort-Play`;
             if (URI.isArtist(sourceUri)) {
                 baseDescription = `Tracks by ${sourceName} Filtered using Sort-Play`;
+            } else if (URI.isAlbum(sourceUri)) {
+                const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
+                const artistName = albumDetails.artists[0].name;
+                baseDescription = `Tracks from ${sourceName} by ${artistName} Filtered using Sort-Play`;
             }
 
             let playlistDescription = baseDescription;
@@ -7172,10 +7211,331 @@
     }
   }
   
+  const GENRE_MAPPINGS = {
+    "acoustic": ["acoustic", "acoustic's", "acousticmusic", "acoustics"],
+    "adult standards": ["adult standards", "crooner", "easy listening", "lounge", "standards", "traditional pop"],
+    "afro r&b": ["afro r&b", "afro soul", "afrofuturism", "bongo flava"],
+    "afro-funk": ["afro-funk", "highlife", "nigerian hip hop"],
+    "afrobeats": ["afro beats", "afrobeats", "afropop", "afroswing", "azonto", "azontobeats", "coupé-décalé", "ghanaian pop", "makossa", "nigerian pop"],
+    "alternative": ["alt", "alternative", "alternative's", "alternativemusic", "alternatives"],
+    "alternative metal": ["alternative metal", "funk metal", "industrial metal", "nu metal", "rap metal"],
+    "alternative rock": ["alternative rock", "britpop", "modern alternative rock", "modern rock", "permanent wave"],
+    "amapiano": ["afro house", "afro piano", "amapiano", "gqom", "sgija", "south african house"],
+    "ambient": ["ambient", "ambient's", "ambients", "atmospheric"],
+    "art pop": ["art pop", "baroque pop", "chamber pop", "experimental pop"],
+    "art rock": ["art rock", "experimental rock", "rock in opposition", "zeuhl"],
+    "bachata": ["bachata", "bachata dominicana"],
+    "bebop": ["bebop", "bop", "post-bop"],
+    "black metal": ["atmospheric black metal", "black metal", "blackgaze", "cascadian black metal", "melodic black metal", "metal noir quebecois", "pagan black metal", "raw black metal", "symphonic black metal", "viking metal"],
+    "blues": ["blues", "blues'", "bluesier", "bluesiest", "bluesmusic", "bluesy", "punk blues"],
+    "blues rock": ["blues rock", "british blues", "electric blues"],
+    "bollywood pop": ["bollywood pop", "classic bollywood", "desi pop", "filmi", "indian fusion", "kollywood", "modern bollywood", "mollywood", "sandalwood", "tollywood"],
+    "bossa nova": ["bossa nova", "bossa nova cover", "bossa nova jazz", "samba-jazz"],
+    "breakbeat": ["big beat", "breakbeat", "breaks", "funky breaks", "nu skool breaks"],
+    "c-pop": ["c-pop", "cantopop", "chinese pop", "mandopop"],
+    "chillwave": ["chillwave", "hypnagogic pop"],
+    "christian hip hop": ["christian hip hop", "christian trap", "gospel rap"],
+    "christian metal": ["christian death metal", "christian metal", "christian metalcore", "unblack metal"],
+    "christian rock": ["christian alternative rock", "christian emo", "christian hardcore", "christian indie", "christian punk", "christian rock"],
+    "city pop": ["city pop", "japanese funk", "japanese soul", "shibuya-kei"],
+    "classic rock": ["album rock", "classic rock", "soft rock", "southern rock"],
+    "classical": ["baroque", "baroque's", "classic", "classical", "classical music", "classical's", "classics", "orchestra", "orchestral", "orchestral music", "orchestras", "symphonic", "symphonies", "symphony"],
+    "conscious hip hop": ["chillhop", "conscious hip hop", "political hip hop", "rap conscient", "underground hip hop"],
+    "contemporary r&b": ["contemporary r and b", "contemporary r&b", "contemporary rhythm and blues", "contemporary rnb", "modern r&b", "modern rnb"],
+    "corridos tumbados": ["corridos alternativos", "corridos belicos", "corridos tumbados", "sad sierreno", "sierreno"],
+    "country": ["country", "country & western music", "country music", "country's", "countrymusic"],
+    "cumbia": ["cumbia", "cumbia 420", "cumbia andina mexicana", "cumbia boliviana", "cumbia chilena", "cumbia del sureste", "cumbia lagunera", "cumbia peruana", "cumbia pop", "cumbia ranchera", "cumbia salvadorena", "cumbia santafesina", "cumbia sonidera", "cumbia uruguaya", "cumbia villera", "nu-cumbia", "tecnocumbia"],
+    "dance": ["dance", "dance's", "dances", "dancey"],
+    "dark wave": ["coldwave", "dark wave", "gothic", "gothic americana", "neoclassical darkwave"],
+    "death metal": ["brutal death metal", "cavernous death metal", "death 'n' roll", "death metal", "deathgrind", "florida death metal", "gothenburg metal", "melodic death metal", "swedish melodeath", "technical death metal"],
+    "dembow": ["dembow", "dembow dominicano"],
+    "disco": ["disco", "disco music", "disco's", "discomusic", "discos", "future funk"],
+    "doom metal": ["desert rock", "doom metal", "drone metal", "epic doom", "funeral doom", "heavy psych", "psychedelic doom", "sludge metal", "stoner metal", "stoner rock"],
+    "dream pop": ["chillgaze", "dream pop", "ethereal wave", "nu gaze", "shoegaze"],
+    "drill": ["aussie drill", "bronx drill", "brooklyn drill", "chicago drill", "classical drill", "drill", "drill chileno", "drill espanol", "drill francais", "drill tuga", "florida drill", "german drill", "melodic drill", "ny drill", "uk drill"],
+    "drone": ["drone", "drone's", "dronemusic", "drones"],
+    "drum and bass": ["d&b", "dnb", "drum & bass", "drum and bass", "drum n bass", "drumandbass"],
+    "dubstep": ["brostep", "drumstep", "dub step", "dub-step", "dubstep", "dubstep's", "dubstepmusic"],
+    "east coast hip hop": ["boom bap", "east coast hip hop", "hardcore hip hop"],
+    "edm": ["edm", "edm music", "edm's", "edmmusic", "electronic dance", "electronic dance music"],
+    "electro swing": ["electro swing", "swing house"],
+    "electronic": ["electro", "electro's", "electronic", "electronic music", "electronic's", "electronica", "electronicas", "electronico", "electronics", "electronik"],
+    "electropop": ["electro pop", "electro-pop", "electronic pop", "electropop"],
+    "emo": ["emo", "emo rap", "emo trap", "emocore", "midwest emo", "pop emo"],
+    "epic": ["epic", "epic music", "epic's", "epicmusic"],
+    "epiccore": ["epic core", "epic-core", "epiccore"],
+    "eurodance": ["bubblegum dance", "eurobeat", "eurodance", "europop", "hands up", "hi-nrg", "italo dance"],
+    "experimental": ["experiment", "experimental", "experimental electronic", "experimental's", "experimentalmusic", "experiments"],
+    "folk": ["folk", "folk's", "folk-pop", "folkie", "folkier", "folklore", "folkmusic", "folksy"],
+    "forro": ["baiao", "forro", "forro de favela", "forro tradicional", "piseiro", "xote"],
+    "french hip hop": ["french hip hop", "pop urbaine", "r&b francais", "rap francais", "rap marseille"],
+    "french pop": ["chanson", "french indie pop", "french pop", "french synthpop", "nouvelle chanson francaise", "variete francaise", "yeye"],
+    "funk": ["funk", "funk's", "funkier", "funkiest", "funkmusic", "funky"],
+    "funk carioca": ["brega funk", "funk 150 bpm", "funk carioca", "funk mandelao", "funk mtg", "funk ostentacao", "funk paulista", "funk viral", "mega funk", "rave funk"],
+    "future bass": ["future bass", "future bass's", "futurebass", "futurebassmusic"],
+    "gangster rap": ["chicano rap", "crunk", "dirty south rap", "g funk", "gangster rap", "hardcore hip hop", "houston rap", "memphis hip hop", "west coast rap"],
+    "garage rock": ["freakbeat", "garage psych", "garage rock", "garage rock revival", "protopunk", "punk blues"],
+    "german hip hop": ["frauenrap", "german alternative rap", "german cloud rap", "german hip hop", "german underground rap", "oldschool deutschrap"],
+    "german pop": ["deutschrock", "german pop", "neue deutsche welle", "ostrock", "partyschlager", "schlager"],
+    "glam rock": ["glam metal", "glam punk", "glam rock", "hard glam", "sleaze rock"],
+    "global christian": ["african gospel", "celtic worship", "global christian", "latin christian", "reggae cristao", "tagalog worship", "world worship"],
+    "gospel": ["black gospel", "brazilian gospel", "choir", "gospel", "gospel r&b", "gospel soul", "naija worship", "southern gospel", "spirituals"],
+    "gothic metal": ["gothic", "gothic metal", "gothic symphonic metal", "metal gotico"],
+    "gothic rock": ["dark post-punk", "deathrock", "gothabilly", "gothic", "gothic rock"],
+    "grime": ["eskibeat", "grime", "sublow", "uk grime"],
+    "grunge": ["grunge", "grungegaze", "post-grunge", "seattle sound"],
+    "hard bop": ["bebop", "bop", "hard bop", "post-bop", "soul jazz"],
+    "hard rock": ["glam metal", "hard rock", "hard rock music", "hard rock's", "hard-rock", "hardrock", "hardrockmusic"],
+    "hardcore punk": ["crust punk", "d-beat", "hardcore punk", "melodic hardcore", "nyhc", "powerviolence", "skate punk", "straight edge", "youth crew"],
+    "hardstyle": ["euphoric hardstyle", "gabber", "happy hardcore", "hard dance", "hardcore", "hardstyle", "jumpstyle", "rawstyle", "uptempo hardcore"],
+    "heavy metal": ["hard rock", "heavy metal", "nwobhm", "traditional heavy metal"],
+    "hip hop": ["hip hop", "hip hop's", "hip-hop", "hip-hop music", "hip-hops", "hiphop"],
+    "house": ["deep house", "house", "house music", "house's", "housemusic"],
+    "idm": ["ambient idm", "braindance", "drill and bass", "fluxwork", "glitch", "glitch hop", "idm", "intelligent dance music", "wonky"],
+    "indie": ["indie", "indie's", "indiemusic", "indies"],
+    "indie folk": ["chamber folk", "folk-pop", "freak folk", "indie anthem-folk", "indie folk", "new americana", "stomp and holler"],
+    "indie pop": ["alt pop", "bedroom pop", "indie pop", "indie poptimism", "shimmer pop", "twee pop"],
+    "indietronica": ["indie psych-pop", "indietronica", "metropopolis"],
+    "industrial": ["aggrotech", "ebm", "electro-industrial", "industrial", "industrial rock", "martial industrial", "power noise"],
+    "instrumental": ["instrumental", "instrumental's", "instrumentalmusic", "instrumentals", "no vocals"],
+    "italian pop": ["classic italian pop", "italian adult pop", "italian indie pop", "italian pop", "italian pop rock", "pop virale italiano"],
+    "j-pop": ["anime", "idol", "j-division", "j-idol", "j-pop", "j-pop boy group", "j-pop girl group", "j-rap", "japanese teen pop", "kayokyoku", "shibuya-kei", "vocaloid"],
+    "j-rock": ["j-metal", "j-poprock", "j-rock", "visual kei"],
+    "jazz": ["jazz", "jazz's", "jazzier", "jazziest", "jazzmusic", "jazzy"],
+    "jazz rap": ["abstract hip hop", "jazz hop", "jazz rap"],
+    "jungle": ["jungle", "jungle's", "junglemusic", "jungles"],
+    "k-pop": ["korean pop", "kpop"],
+    "k-rock": ["k-indie", "k-rock", "korean indie rock"],
+    "latin": ["latin", "latin's", "latina", "latinas", "latinmusic", "latino", "latinos"],
+    "latin trap": ["trap argentino", "trap boricua", "trap chileno", "trap colombiano", "trap latino", "trap mexicano", "trap venezolano"],
+    "lofi": ["chillhop", "lo fi", "lo-fi", "lo-fi beats", "lo-fi chill", "lo-fi cover", "lo-fi jazzhop", "lo-fi sleep", "lo-fi study", "lofi", "sad lo-fi"],
+    "medieval": ["early music", "gregorian chant", "medieval", "renaissance"],
+    "metal": ["metal", "metal rock", "metal's", "metalhead", "metallic", "metalmusic", "metals"],
+    "metalcore": ["chaotic hardcore", "deathcore", "electronicore", "mathcore", "melodic metalcore", "metalcore", "nu-metalcore", "progressive metalcore"],
+    "mpb": ["jovem guarda", "mpb", "nova mpb", "pop folk", "tropicalia", "velha guarda", "violao"],
+    "new age": ["new age", "new age music", "new-age", "new-age music", "newage", "newagemusic"],
+    "new wave": ["neo-synthpop", "new romantic", "new wave", "new wave pop", "sophisti-pop", "synthpop"],
+    "nu jazz": ["broken beat", "future jazz", "jazztronica", "nu jazz"],
+    "old school hip hop": ["golden age hip hop", "old school hip hop"],
+    "opera": ["arias", "libretto", "opera", "operatic"],
+    "pagode": ["pagode", "pagode baiano", "pagode novo", "partido alto", "samba de roda"],
+    "persian pop": ["farsi pop", "iranian pop", "persian pop"],
+    "persian rock": ["iranian metal", "iranian rock", "persian metal", "persian rock"],
+    "persian traditional": ["classical persian", "iranian traditional", "persian traditional", "sonati"],
+    "phonk": ["aggressive phonk", "cowbell", "drift phonk", "gym phonk", "memphis phonk", "phonk"],
+    "piano": ["piano", "piano cover", "piano music", "solo piano"],
+    "pop": ["alt pop", "folk-pop", "pop", "pop music", "pop's", "popmusic", "pops"],
+    "pop punk": ["anthem emo", "easycore", "neon pop punk", "pop punk", "socal pop punk"],
+    "pop rap": ["commercial rap", "mainstream rap", "melodic rap", "pop rap", "radio rap", "rap pop"],
+    "pop rock": ["britpop", "pop rock", "pop rock music", "pop rock's", "pop-rock", "poprock", "poprockmusic", "power pop"],
+    "post-hardcore": ["post-hardcore", "screamo", "skramz", "swancore"],
+    "post-punk": ["dance-punk", "minimal synth", "new rave", "no wave", "post-punk", "uk post-punk"],
+    "power metal": ["epic metal", "fantasy metal", "melodic power metal", "power metal"],
+    "progressive rock": ["canterbury scene", "crossover prog", "krautrock", "neo-prog", "progressive rock", "symphonic rock"],
+    "psychedelic rock": ["acid rock", "neo-psychedelic", "psychedelic pop", "psychedelic rock", "raga rock", "space rock"],
+    "punjabi pop": ["bhangra", "desi hip hop", "punjabi pop"],
+    "punk": ["punk", "punk's", "punkmusic", "punks", "punky"],
+    "r&b": ["neo soul", "r & b", "r and b", "r&b", "r&b's", "rhythm & blues", "rhythm and blues", "rnb", "rnb's", "trap soul"],
+    "rap": ["rap", "rapper", "rappers", "raps"],
+    "reggae": ["reggae", "reggae music", "reggae's", "reggaemusic"],
+    "reggaeton": ["dembow", "neoperreo", "perreo", "pop reggaeton", "reggaeton", "reggaeton chileno", "reggaeton colombiano", "reggaeton flow", "reggaeton mexicano"],
+    "regional mexican": ["banda", "banda sinaloense", "corrido", "grupera", "mariachi", "musica mexicana", "norteno", "norteno-sax", "ranchera", "regional mexican", "tejano"],
+    "rock": ["power pop", "rock", "rock & roll", "rock and roll", "rock music", "rock n roll", "rock n' roll", "rock's", "rockin", "rockin'", "rockmusic", "rocknroll", "rocks"],
+    "salsa": ["boogaloo", "modern salsa", "salsa", "salsa choke", "salsa colombiana", "salsa cubana", "salsa puertorriquena", "salsa urbana", "salsa venezolana", "timba"],
+    "samba": ["samba", "samba paulista", "samba-enredo", "samba-rock"],
+    "scandinavian pop": ["classic swedish pop", "danish pop", "dansband", "finnish pop", "iskelma", "norwegian pop", "scandipop", "swedish pop"],
+    "sertanejo": ["agronejo", "sertanejo", "sertanejo pop", "sertanejo tradicional", "sertanejo universitario"],
+    "singer-songwriter": ["acoustic pop", "cantautor", "canzone d'autore", "gen z singer-songwriter", "liedermacher", "lilith", "neo mellow", "singer-songwriter"],
+    "soul": ["neo soul", "soul", "soul music", "soul's", "soulful", "soulmusic", "souly"],
+    "soundtrack": ["film music", "film score", "game music", "game score", "movie music", "original motion picture soundtrack", "original score", "original soundtrack", "ost", "score", "soundtrack", "theme music", "tv music"],
+    "sufi music": ["ghazal", "indian instrumental", "qawwali", "sufi music"],
+    "swing": ["big band", "swing"],
+    "symphonic metal": ["gothic symphonic metal", "symphonic metal", "symphonic power metal"],
+    "synthpop": ["electropop", "synth pop", "synth-pop", "synthpop"],
+    "synthwave": ["futuresynth", "outrun", "retrowave", "synth wave", "synth-wave", "synthwave", "synthwave's"],
+    "techno": ["tech", "techno", "techno music", "techno's", "technomusic"],
+    "trance": ["psytrance", "trance", "trance music", "trance's", "trancemusic", "trancing"],
+    "trap": ["atl trap", "cloud rap", "dark trap", "desi trap", "emo trap", "melodic rap", "plugg", "pluggnb", "rage rap", "sad rap", "trap", "trap brasileiro", "trap carioca", "trap queen", "trap soul", "viral rap"],
+    "trip hop": ["trip hop", "trip hop's", "trip hops", "triphop", "triphopmusic"],
+    "turkish folk": ["turkish folk"],
+    "turkish pop": ["arabesk", "turkish pop"],
+    "turkish rock": ["anadolu rock", "turkish alternative", "turkish psych", "turkish rock"],
+    "uk garage": ["2-step", "bassline", "future garage", "speed garage", "uk garage"],
+    "vaporwave": ["broken transmission", "future funk", "mallsoft", "slushwave", "utopian virtual", "vapor trap", "vaporwave"],
+    "vgm": ["anime game", "anime score", "chiptune", "gamecore", "indie game soundtrack", "japanese vgm", "nintendocore", "otacore", "rhythm game", "scorecore", "vgm", "vgm remix", "video game music"],
+    "vocal jazz": ["crooner", "jazz singing", "lounge music", "vocal jazz"],
+    "west coast hip hop": ["g funk", "g-funk", "west coast hip hop", "west coast rap"],
+    "worship pop": ["adoracao", "anthem worship", "ccm", "christian music", "christian pop", "deep ccm", "louvor", "pop worship", "praise", "worship pop"]
+  };
+
+  const mainGenres = [
+    "acoustic",
+    "adult standards",
+    "afro r&b",
+    "afro-funk",
+    "afrobeats",
+    "alternative",
+    "alternative metal",
+    "alternative rock",
+    "amapiano",
+    "ambient",
+    "art pop",
+    "art rock",
+    "bachata",
+    "bebop",
+    "black metal",
+    "blues",
+    "blues rock",
+    "bollywood pop",
+    "bossa nova",
+    "breakbeat",
+    "c-pop",
+    "chillwave",
+    "christian hip hop",
+    "christian rock & metal",
+    "city pop",
+    "classic rock",
+    "classical",
+    "conscious hip hop",
+    "contemporary r&b",
+    "corridos tumbados",
+    "country",
+    "cumbia",
+    "dance",
+    "dark wave",
+    "death metal",
+    "dembow",
+    "disco",
+    "doom metal",
+    "dream pop",
+    "drill",
+    "drone",
+    "drum and bass",
+    "dubstep",
+    "east coast hip hop",
+    "edm",
+    "electro swing",
+    "electronic",
+    "electropop",
+    "emo",
+    "epic",
+    "epiccore",
+    "eurodance",
+    "experimental",
+    "folk",
+    "forro",
+    "french hip hop",
+    "french pop",
+    "funk",
+    "funk carioca",
+    "future bass",
+    "gangster rap",
+    "garage rock",
+    "german hip hop",
+    "german pop",
+    "glam rock",
+    "global christian",
+    "gospel",
+    "gothic metal",
+    "gothic rock",
+    "grime",
+    "grunge",
+    "hard bop",
+    "hard rock",
+    "hardcore punk",
+    "hardstyle",
+    "heavy metal",
+    "hip hop",
+    "house",
+    "idm",
+    "indie",
+    "indie folk",
+    "indie pop",
+    "indietronica",
+    "industrial",
+    "instrumental",
+    "italian pop",
+    "j-pop",
+    "j-rock",
+    "jazz",
+    "jazz rap",
+    "jungle",
+    "k-pop",
+    "k-rock",
+    "latin",
+    "latin trap",
+    "lofi",
+    "medieval",
+    "metal",
+    "metalcore",
+    "mpb",
+    "new age",
+    "new wave",
+    "nu jazz",
+    "old school hip hop",
+    "opera",
+    "pagode",
+    "persian pop",
+    "persian rock",
+    "persian traditional",
+    "phonk",
+    "piano",
+    "pop",
+    "pop punk",
+    "pop rap",
+    "pop rock",
+    "post-hardcore",
+    "post-punk",
+    "power metal",
+    "progressive rock",
+    "psychedelic rock",
+    "punjabi pop",
+    "punk",
+    "r&b",
+    "rap",
+    "reggae",
+    "reggaeton",
+    "regional mexican",
+    "rock",
+    "salsa",
+    "samba",
+    "scandinavian pop",
+    "sertanejo",
+    "singer-songwriter",
+    "soul",
+    "soundtrack",
+    "sufi music",
+    "swing",
+    "synthpop",
+    "synthwave",
+    "techno",
+    "trance",
+    "trap",
+    "trip hop",
+    "turkish folk",
+    "turkish pop",
+    "turkish rock",
+    "uk garage",
+    "urbano latino",
+    "vaporwave",
+    "vgm",
+    "vocal jazz",
+    "west coast hip hop",
+    "worship pop"
+  ];
+
   async function showGenreFilterModal(tracks, trackGenreMap) {
     const allGenres = new Set();
     trackGenreMap.forEach((genres) => {
-      genres.forEach((genre) => allGenres.add(genre));
+      genres.forEach((genre) => allGenres.add(genre.name));
+    });
+
+    const genreCounts = new Map();
+    trackGenreMap.forEach(genres => {
+        const uniqueGenreNamesOnTrack = new Set(genres.map(g => g.name));
+        uniqueGenreNamesOnTrack.forEach(name => {
+            genreCounts.set(name, (genreCounts.get(name) || 0) + 1);
+        });
     });
 
     const modalContainer = document.createElement("div");
@@ -7211,7 +7571,7 @@
       overflow-y: auto;
     }
     .genre-filter-modal .genre-button {
-      padding: 6px 16px;
+      padding: 6px 7px 6px 16px;
       margin: 4px;
       border-radius: 20px;
       border: none;
@@ -7221,20 +7581,63 @@
       font-weight: 500;
       font-size: 14px;
       transition: all 0.04s ease;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .genre-filter-modal .genre-count-badge {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #e0e0e0;
+      padding: 1px 8px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 400;
+      min-width: 20px;
+      text-align: center;
+      line-height: 1.5;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .genre-filter-modal .genre-button.selected .genre-count-badge {
+      background-color: rgba(0, 0, 0, 0.2);
+      color: #000;
     }
     .genre-filter-modal .genre-button.selected {
       background-color: #1ED760;
       color: black;
     }
     .genre-filter-modal .search-bar {
-      width: 77%;
+      width: 100%;
       padding-top: 10px;
-      padding-right: 15px;
+      padding-right: 35px;
       padding-bottom: 10px;
       padding-left: 15px;
       border-radius: 20px;
       border: 1px solid #282828;
       background: #282828;
+      color: white;
+    }
+    .genre-filter-modal .search-bar-container {
+      position: relative;
+      width: 77%;
+      display: flex;
+      align-items: center;
+    }
+    .genre-filter-modal .clear-search-button {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #b3b3b3;
+      cursor: pointer;
+      font-size: 24px;
+      padding: 0 5px;
+      line-height: 1;
+      display: none;
+    }
+    .genre-filter-modal .clear-search-button:hover {
       color: white;
     }
     .genre-filter-modal .sort-type-select {
@@ -7507,7 +7910,10 @@
     <div style="display: flex; flex-direction: column; gap: 15px;">
         <h2 class="genre-modal-title">Genres from Spotify and Last.fm:</h2> 
         <div class="genre-header">
-            <input type="text" class="search-bar" placeholder="Search genres...">
+          <div class="search-bar-container">
+                  <input type="text" class="search-bar" placeholder="Search genres...">
+                  <button class="clear-search-button">&times;</button>
+              </div>
             <button class="select-all-button">
                 <span>Select All</span>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18px" height="18px">
@@ -7543,6 +7949,7 @@
                 <div class="settings-title">Sort Type:</div>
                 <div class="setting-row">
                     <select class="sort-type-select">
+                        <option value="default">Default</option>
                         <option value="playCount">Play Count</option>
                         <option value="popularity">Popularity</option>
                         <option value="releaseDate">Release Date</option>
@@ -7593,6 +8000,7 @@
     const matchAllGenresToggle = modalContainer.querySelector("#matchAllGenresToggle");
     const genreContainer = modalContainer.querySelector(".genre-container");
     const searchBar = modalContainer.querySelector(".search-bar");
+    const clearSearchButton = modalContainer.querySelector(".clear-search-button");
     const sortTypeSelect = modalContainer.querySelector(".sort-type-select");
     const createPlaylistButton = modalContainer.querySelector(".create-playlist-button");
     const selectAllButton = modalContainer.querySelector(".select-all-button");
@@ -7600,7 +8008,7 @@
     const totalTracksStat = modalContainer.querySelector("#total-tracks-stat");
     const filteredTracksStat = modalContainer.querySelector("#filtered-tracks-stat");
 
-    const lastSelectedSort = localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SORT) || "playCount";
+    const lastSelectedSort = localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SORT) || "default";
     sortTypeSelect.value = lastSelectedSort;
 
     sortTypeSelect.addEventListener("change", () => {
@@ -7610,51 +8018,8 @@
     matchAllGenresToggle.addEventListener("change", () => {
       matchAllGenres = matchAllGenresToggle.checked;
       saveSettings();
+      updateFilteredTracksCount();
     });
-    const mainGenres = [
-      "pop",
-      "hip hop",
-      "rap",
-      "rock",
-      "synthpop",
-      "electronic",
-      "r&b",
-      "dance",
-      "classical",
-      "country",
-      "latin",
-      "alternative",
-      "indie",
-      "jazz",
-      "k-pop",
-      "metal",
-      "heavy metal",
-      "folk",
-      "reggae",
-      "blues",
-      "funk",
-      "punk",
-      "soul",
-      "pop rock",
-      "edm",
-      "house",
-      "disco",
-      "ambient",
-      "synthwave",
-      "hard rock",
-      "techno",
-      "experimental",
-      "trance",
-      "dubstep",
-      "drum and bass",
-      "lofi",
-      "contemporary r&b",
-      "new age",
-      "epic",
-      "epiccore",
-      "acoustic",
-      "funk"
-    ];
     
     let selectedGenres = [];
     let tracksWithGenresCount = 0;
@@ -7682,42 +8047,56 @@
         genre.toLowerCase().includes(searchTerm)
       );
     
-      const genreCounts = {};
-      trackGenreMap.forEach((genres) => {
-        genres.forEach((genre) => {
-          if (filteredGenres.includes(genre)) {
-            genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-          }
+      const mainGenreWords = new Set();
+      mainGenres.forEach(g => {
+          g.toLowerCase().split(/[\s-]+/).forEach(word => {
+              if (word.length > 1 && word !== 'and') mainGenreWords.add(word.replace(/&/g, ''));
+          });
+      });
+    
+      const genreDetails = new Map();
+      trackGenreMap.forEach((genresOnTrack) => {
+        const uniqueGenreNamesOnTrack = new Set(genresOnTrack.map(g => g.name));
+        
+        uniqueGenreNamesOnTrack.forEach(genreName => {
+            if (filteredGenres.includes(genreName)) {
+                const genreData = genresOnTrack.find(g => g.name === genreName);
+                if (!genreDetails.has(genreName)) {
+                    genreDetails.set(genreName, {
+                        name: genreName,
+                        isSpotify: false,
+                        count: 0
+                    });
+                }
+                const details = genreDetails.get(genreName);
+                details.count++;
+                if (genreData?.source === 'spotify') {
+                    details.isSpotify = true;
+                }
+            }
         });
       });
     
       const sortedGenres = filteredGenres.sort((a, b) => {
-        const mainGenreIndexA = getMainGenreVariantIndex(a);
-        const mainGenreIndexB = getMainGenreVariantIndex(b);
-        const countA = genreCounts[a] || 0;
-        const countB = genreCounts[b] || 0;
-    
-        const isAMain = mainGenreIndexA !== -1;
-        const isBMain = mainGenreIndexB !== -1;
-    
+        const detailsA = genreDetails.get(a) || { count: 0, isSpotify: false };
+        const detailsB = genreDetails.get(b) || { count: 0, isSpotify: false };
+
+        const lowerA = a.toLowerCase();
+        const lowerB = b.toLowerCase();
+        const isAMain = mainGenres.some(main => lowerA.includes(main.toLowerCase()));
+        const isBMain = mainGenres.some(main => lowerB.includes(main.toLowerCase()));
+
         if (isAMain && !isBMain) return -1;
         if (!isAMain && isBMain) return 1;
-    
-        if (isAMain && isBMain) {
-            if (countB !== countA) {
-                return countB - countA;
-            }
-            return mainGenreIndexA - mainGenreIndexB;
+
+        if (detailsB.count !== detailsA.count) {
+            return detailsB.count - detailsA.count;
         }
-    
-        if (!isAMain && !isBMain) {
-            if (countB !== countA) {
-                return countB - countA;
-            }
-            return a.localeCompare(b);
-        }
-        
-        return 0;
+
+        if (detailsA.isSpotify && !detailsB.isSpotify) return -1;
+        if (!detailsA.isSpotify && detailsB.isSpotify) return 1;
+
+        return a.localeCompare(b);
       });
     
       if (sortedGenres.length === 0) {
@@ -7731,7 +8110,18 @@
         sortedGenres.forEach((genre) => {
           const genreButton = document.createElement("button");
           genreButton.classList.add("genre-button");
-          genreButton.textContent = genre;
+          
+          const genreNameSpan = document.createElement("span");
+          genreNameSpan.textContent = genre;
+
+          const countBadge = document.createElement("span");
+          countBadge.classList.add("genre-count-badge");
+          const count = genreCounts.get(genre) || 0;
+          countBadge.textContent = count;
+
+          genreButton.appendChild(genreNameSpan);
+          genreButton.appendChild(countBadge);
+
           if (selectedGenres.includes(genre)) {
             genreButton.classList.add("selected");
           }
@@ -7751,18 +8141,19 @@
         });
       }
     }
-    
-    function getMainGenreVariantIndex(genre) {
-      const lowerGenre = genre.toLowerCase();
-      for (let i = 0; i < mainGenres.length; i++) {
-        const mainGenreLower = mainGenres[i].toLowerCase();
-        if (lowerGenre.includes(mainGenreLower) || mainGenreLower.includes(lowerGenre)) {
-          return i; 
-        }
-      }
-      return -1;
-    }
 
+    searchBar.addEventListener("input", () => {
+      updateGenreButtons();
+      clearSearchButton.style.display = searchBar.value.length > 0 ? 'block' : 'none';
+    });
+
+    clearSearchButton.addEventListener("click", () => {
+        searchBar.value = "";
+        const event = new Event('input', { bubbles: true });
+        searchBar.dispatchEvent(event);
+        searchBar.focus();
+    });
+    
     selectAllButton.addEventListener("click", () => {
       const searchTerm = searchBar.value.toLowerCase();
       const filteredGenres = Array.from(allGenres).filter((genre) => 
@@ -7791,34 +8182,35 @@
           Spicetify.showNotification("Please select at least one genre.");
           return;
       }
-  
+    
       const filteredTracks = filterTracksByGenres(
           tracks,
           selectedGenres,
           trackGenreMap
       );
-  
+    
       if (filteredTracks.length === 0) {
           Spicetify.showNotification("No tracks found for the selected genres.");
           return;
       }
-  
+    
       const sortType = sortTypeSelect.value;
       Spicetify.PopupModal.hide();
-  
+    
       let sortedTracks; 
-  
+    
       async function createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription) {
           try {
               const newPlaylist = await createPlaylist(playlistName, playlistDescription);
               mainButton.innerText = "Saving...";
-  
+    
               const trackUris = sortedTracks.map((track) => track.uri);
               await addTracksToPlaylist(newPlaylist.id, trackUris);
-
+    
               await addPlaylistToLibrary(newPlaylist.uri);
-  
+    
               const sortTypeInfo = {
+                  default: { fullName: "default order", shortName: "Default" },
                   playCount: { fullName: "play count", shortName: "PlayCount" },
                   popularity: { fullName: "popularity", shortName: "Popularity" },
                   releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
@@ -7833,7 +8225,7 @@
               );
               
               await navigateToPlaylist(newPlaylist);
-
+    
           } catch (error) {
               console.error("Error creating or updating playlist:", error);
               Spicetify.showNotification(
@@ -7843,8 +8235,8 @@
               resetButtons();
           }
       }
-  
-  
+    
+    
       const sourceUri = getCurrentUri();
       let sourceName;
       if (URI.isArtist(sourceUri)) {
@@ -7853,6 +8245,10 @@
           ).then((r) => r.name);
       } else if (isLikedSongsPage(sourceUri)) {
           sourceName = "Liked Songs";
+      } else if (URI.isAlbum(sourceUri)) {
+          sourceName = await Spicetify.CosmosAsync.get(
+              `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
+          ).then((r) => r.name);
       } else {
           sourceName = await Spicetify.CosmosAsync.get(
               `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
@@ -7875,25 +8271,29 @@
           "\\(Mellow Mood\\)",
           "\\(Hidden Gems\\)"
       ];
-  
+    
       let suffixPattern = new RegExp(
           `\\s*(${possibleSuffixes.join("|")})\\s*`
       );
-  
+    
       while (suffixPattern.test(sourceName)) {
           sourceName = sourceName.replace(suffixPattern, "");
       }
-  
-  
+    
+    
       let baseDescription = `Filtered using Sort-Play by genres: `;
       if (URI.isArtist(sourceUri)) {
           baseDescription = `Tracks by ${sourceName} ` + baseDescription;
+      } else if (URI.isAlbum(sourceUri)) {
+          const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
+          const artistName = albumDetails.artists[0].name;
+          baseDescription = `Tracks from ${sourceName} by ${artistName} ` + baseDescription;
       }
-  
+    
       let playlistDescription = baseDescription;
       let genreList = "";
       let addedGenres = 0;
-  
+    
       for (const genre of selectedGenres) {
           const potentialGenreList = genreList ? `${genreList}, ${genre}` : genre;
           if ((playlistDescription.length + potentialGenreList.length) <= 247) { 
@@ -7908,11 +8308,20 @@
       } else {
           playlistDescription += genreList + ".";
       }
-  
+    
       const playlistName = `${sourceName} (Genre Filter)`; 
-  
-  
-      if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
+    
+      if (sortType === "default") {
+        sortedTracks = filteredTracks;
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        mainButton.innerHTML = "100%";
+        await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
+      } else if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
           setButtonProcessing(true);
           mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
           mainButton.style.color = buttonStyles.main.disabledColor;
@@ -7920,7 +8329,7 @@
           svgElement.style.fill = buttonStyles.main.disabledColor;
           menuButtons.forEach((button) => (button.disabled = true));
           mainButton.innerHTML = "0%";
-  
+    
           const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
               filteredTracks,
               (progress) => {
@@ -7942,9 +8351,9 @@
                   mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`;
               }
           );
-  
+    
           let uniqueTracks;
-  
+    
           if (sortType === "releaseDate") {
               const tracksWithReleaseDates = await processBatchesWithDelay(
                   tracksWithPopularity,
@@ -7959,7 +8368,7 @@
           } else {
               uniqueTracks = deduplicateTracks(tracksWithPopularity).unique;
           }
-  
+    
           if (sortType === "playCount") {
             sortedTracks = uniqueTracks
               .filter((track) => track.playCount !== "N/A")
@@ -7975,7 +8384,7 @@
               const dateComparison = sortOrderState.releaseDate
                 ? (a.releaseDate || 0) - (b.releaseDate || 0)
                 : (b.releaseDate || 0) - (a.releaseDate || 0);
-
+    
               if (dateComparison !== 0) {
                 return dateComparison;
               }
@@ -7985,12 +8394,12 @@
         } else if (sortType === "shuffle") {
           sortedTracks = shuffleArray(uniqueTracks);
         }
-  
+    
           mainButton.innerText = "100%";
-  
+    
           await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
-  
-  
+    
+    
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
           try {
               setButtonProcessing(true);
@@ -8000,7 +8409,7 @@
               svgElement.style.fill = buttonStyles.main.disabledColor;
               menuButtons.forEach((button) => (button.disabled = true));
               mainButton.innerHTML = "0%";
-  
+    
               const result = await handleScrobblesSorting(
                   filteredTracks,
                   sortType,
@@ -8015,10 +8424,10 @@
                   mainButton.innerText = `${progress}%`;
               });
               mainButton.innerText = "100%";
-  
+    
               await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
-  
-  
+    
+    
           } catch (error) {
               resetButtons();
               Spicetify.showNotification(error.message);
@@ -8028,51 +8437,7 @@
     });
   }
 
-  const GENRE_MAPPINGS = {
-    "classical": ["classical", "classics", "classical music", "orchestral", "orchestral music", "symphony", "symphonic", "symphonies", "baroque", "classic", "classical's", "orchestra", "orchestras", "baroque's"],
-    "rock": ["rock", "rocks", "rock & roll", "rock and roll", "rock n roll", "rocknroll", "rock n' roll", "rockmusic", "rock's", "rockin", "rockin'", "rock music"],
-    "electronic": ["electronic", "electronica", "electro", "electronics", "electronic music", "electronico", "electronik", "electronic's", "electro's", "electronicas"],
-    "hip hop": ["hip hop", "hiphop", "hip-hop", "hip-hop music", "hip-hops", "hip hop's"],
-    "rap": ["rap", "raps", "rapper", "rappers"],
-    "jazz": ["jazz", "jazzy", "jazzmusic", "jazz's", "jazzier", "jazziest"],
-    "pop": ["pop", "pop music", "popmusic", "pop's", "pops"],
-    "r&b": ["r&b", "rnb", "r&b's", "rnb's", "r & b", "rhythm and blues", "rhythm & blues", "r and b"],
-    "metal": ["metal", "heavy metal", "metals", "metalcore", "metal rock", "metalmusic", "metal's", "metallic", "metalhead"],
-    "blues": ["blues", "bluesy", "bluesmusic", "blues'", "bluesier", "bluesiest"],
-    "folk": ["folk", "folklore", "folksy", "folkmusic", "folk's", "folkie", "folkier"],
-    "country": ["country", "country music", "countrymusic", "country & western music", "country's"],
-    "soul": ["soul", "soul music", "soulmusic", "soul's", "soulful", "souly"],
-    "funk": ["funk", "funky", "funkmusic", "funk's", "funkier", "funkiest"],
-    "reggae": ["reggae", "reggae music", "reggaemusic", "reggae's"],
-    "disco": ["disco", "disco music", "discomusic", "disco's", "discos"],
-    "alternative": ["alternative", "alt", "alternativemusic", "alternative's", "alternatives"],
-    "indie": ["indie", "indiemusic", "indie's", "indies"],
-    "dance": ["dance", "dance music", "dancemusic", "dance's", "dances", "dancey"],
-    "ambient": ["ambient", "ambient music", "atmospheric", "ambientmusic", "ambient's", "ambients"],
-    "synthwave": ["synthwave", "synth wave", "synth-wave", "retrowave", "outrun", "futuresynth", "synthwave's"],
-    "synthpop": ["synthpop", "synth pop", "synth-pop"],
-    "punk": ["punk", "punkmusic", "punk's", "punks", "punky"],
-    "Opera": ["opera", "operatic", "arias", "libretto"],
-    "house": ["house", "house music", "deep house", "housemusic", "house's"],
-    "techno": ["techno", "techno music", "tech", "technomusic", "techno's"],
-    "acoustic": ["acoustic", "acoustics", "acousticmusic", "acoustic's"],
-    "experimental": ["experimental", "experiment", "experimental electronic", "experimentalmusic", "experimental's", "experiments"],
-    "latin": ["latin", "latino", "latina", "latinmusic", "latin's", "latinos", "latinas"],
-    "trance": ["trance", "trance music", "trancemusic", "trance's", "trancing", "psytrance"],
-    "dubstep": ["dubstep", "dub step", "dubstepmusic", "dubstep's", "dub-step", "brostep"],
-    "drum and bass": ["drum and bass", "drum & bass", "dnb", "d&b", "drum n bass", "drumandbass"],
-    "edm": ["edm", "electronic dance music", "electronic dance", "edm music", "edmmusic", "edm's"],
-    "lofi": ["lofi", "lo-fi", "lo fi", "lofimusic", "lofi music", "lo-fi music"],
-    "new age": ["new age", "newage", "new-age", "new age music", "newagemusic", "new-age music"],
-    "epic": ["epic", "epic music", "epicmusic", "epic's"],
-    "epiccore": ["epiccore", "epic core", "epic-core"],
-    "hard rock": ["hard rock", "hardrock", "hard-rock", "hard rock music", "hardrockmusic", "hard rock's"],
-    "pop rock": ["pop rock", "poprock", "pop-rock", "pop rock music", "poprockmusic", "pop rock's"],
-    "contemporary r&b": ["contemporary r&b", "contemporary rnb", "modern r&b", "modern rnb", "contemporary rhythm and blues", "contemporary r and b"],
-    "soundtrack": ["soundtrack", "score", "film score", "movie music", "tv music", "game music", "ost", "original soundtrack", "ost", "game score", "film music", "original score", "original motion picture soundtrack", "theme music" ]
-  };
-
-  const GENRE_CACHE_KEY_PREFIX = 'sort-play-genre-cache-';
+  const GENRE_CACHE_KEY_PREFIX = 'sort-play-genre-cache-v2-';
   const GENRE_CACHE_MAX_SIZE_BYTES = 9 * 1024 * 1024;  
 
   function getGenreCacheKey(trackId) {
@@ -8297,11 +8662,20 @@
         
         successfulResults.forEach((result) => {
             const { track, genres } = result.value;
-            const normalizedGenres = genres.map(normalizeGenre);
-            const uniqueNormalizedGenres = [...new Set(normalizedGenres)];
-  
-            trackGenreMap.set(track.uri, uniqueNormalizedGenres);
-            uniqueNormalizedGenres.forEach((genre) => allGenres.add(genre));
+            
+            const mappedAndNormalizedGenres = mapAndNormalizeGenres(genres);
+
+            const finalUniqueGenres = [];
+            const seenGenreNames = new Set();
+            for (const genre of mappedAndNormalizedGenres) {
+                if (!seenGenreNames.has(genre.name)) {
+                    finalUniqueGenres.push(genre);
+                    seenGenreNames.add(genre.name);
+                }
+            }
+
+            trackGenreMap.set(track.uri, finalUniqueGenres);
+            finalUniqueGenres.forEach((genre) => allGenres.add(genre.name));
             tracksWithGenresCount++;
         });
   
@@ -8331,22 +8705,36 @@
     try {
       const trackParams = new URLSearchParams({
         method: 'track.getInfo',
-        api_key: CONFIG.lastfm.apiKey,
         artist: artist,
         track: track,
         format: 'json'
       });
   
-      const trackResponse = await withRetry(
-        () => fetch(`${CONFIG.lastfm.baseUrl}?${trackParams}`, {
-          headers: {
-            'Accept': 'application/json',
-            'User-Agent': 'SpicetifyGenreExtension/1.0'
+      let trackResponse;
+      while (true) {
+          const apiKey = L_F_M_Key();
+          if (!apiKey) {
+              throw new Error("All Last.fm API keys are invalid or have been revoked.");
           }
-        }),
-        CONFIG.lastfm.retryAttempts,
-        CONFIG.lastfm.retryDelay
-      );
+          trackParams.set('api_key', apiKey);
+          
+          trackResponse = await withRetry(
+            () => fetch(`${CONFIG.lastfm.baseUrl}?${trackParams}`, {
+              headers: {
+                'Accept': 'application/json',
+                'User-Agent': 'SpicetifyGenreExtension/1.0'
+              }
+            }),
+            1, 0 
+          );
+
+          if (trackResponse.status === 403) {
+              console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
+              revokedLfmKeys.add(apiKey);
+              continue;
+          }
+          break;
+      }
 
       if (!trackResponse.ok) {
         throw new Error(`Track API request failed with status ${trackResponse.status}`);
@@ -8368,21 +8756,35 @@
       if (genres.length === 0 && spotifyGenres.size === 0) { 
           const artistParams = new URLSearchParams({
             method: 'artist.getInfo',
-            api_key: CONFIG.lastfm.apiKey,
             artist: artist,
             format: 'json'
           });
     
-          const artistResponse = await withRetry(
-            () => fetch(`${CONFIG.lastfm.baseUrl}?${artistParams}`, {
-              headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'SpicetifyGenreExtension/1.0'
+          let artistResponse;
+          while (true) {
+              const apiKey = L_F_M_Key();
+              if (!apiKey) {
+                  throw new Error("All Last.fm API keys are invalid or have been revoked.");
               }
-            }),
-            CONFIG.lastfm.retryAttempts,
-            CONFIG.lastfm.retryDelay
-          );
+              artistParams.set('api_key', apiKey);
+
+              artistResponse = await withRetry(
+                () => fetch(`${CONFIG.lastfm.baseUrl}?${artistParams}`, {
+                  headers: {
+                    'Accept': 'application/json',
+                    'User-Agent': 'SpicetifyGenreExtension/1.0'
+                  }
+                }),
+                1, 0
+              );
+
+              if (artistResponse.status === 403) {
+                  console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
+                  revokedLfmKeys.add(apiKey);
+                  continue;
+              }
+              break;
+          }
 
           if (!artistResponse.ok) {
             throw new Error(`Artist API request failed with status ${artistResponse.status}`);
@@ -8489,15 +8891,28 @@
         const filteredLastfmGenres = lastfmGenres.filter(genre => {
             return !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName));
         });
-        const combinedGenres = new Set([...spotifyGenres, ...filteredLastfmGenres]);
+        
+        const combinedGenres = new Map();
 
-        if (combinedGenres.size > 0) {
-            setCachedTrackGenres(trackId, Array.from(combinedGenres));
+        spotifyGenres.forEach(genre => {
+            combinedGenres.set(genre, { name: genre, source: 'spotify' });
+        });
+
+        filteredLastfmGenres.forEach(genre => {
+            if (!combinedGenres.has(genre)) {
+                combinedGenres.set(genre, { name: genre, source: 'lastfm' });
+            }
+        });
+
+        const finalGenres = Array.from(combinedGenres.values());
+
+        if (finalGenres.length > 0) {
+            setCachedTrackGenres(trackId, finalGenres);
         } else if (!isRecent) {
             setCachedTrackGenres(trackId, []);
         }
 
-        return Array.from(combinedGenres);
+        return finalGenres;
 
     } catch (error) {
         console.error(`Error fetching details for track ID ${trackId}:`, error);
@@ -8505,17 +8920,52 @@
     }
   }
   
-  const REVERSE_GENRE_MAPPING = {};
+  function getNormalizedGenreKey(genre) {
+    return genre
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/\s?music/g, '') 
+      .replace(/[\s-]+/g, '');
+  }
+
+  const VARIANT_TO_MAIN_GENRE_MAP = {};
   Object.entries(GENRE_MAPPINGS).forEach(([mainGenre, variants]) => {
+    const canonicalMainGenre = mainGenre;
     variants.forEach(variant => {
-      REVERSE_GENRE_MAPPING[variant] = mainGenre;
+      const normalizedKey = getNormalizedGenreKey(variant);
+      if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey]) {
+        VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] = [];
+      }
+      if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].includes(canonicalMainGenre)) {
+          VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].push(canonicalMainGenre);
+      }
     });
-    REVERSE_GENRE_MAPPING[mainGenre] = mainGenre;
+    const normalizedMainKey = getNormalizedGenreKey(mainGenre);
+    if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedMainKey]) {
+        VARIANT_TO_MAIN_GENRE_MAP[normalizedMainKey] = [canonicalMainGenre];
+    }
   });
   
-  function normalizeGenre(genre) {
-    const lowerGenre = genre.toLowerCase().trim();
-    return REVERSE_GENRE_MAPPING[lowerGenre] || lowerGenre;
+  function mapAndNormalizeGenres(rawGenres) {
+    const mappedGenres = new Set();
+    if (!rawGenres) return [];
+
+    rawGenres.forEach(genreObj => {
+        const rawGenreName = typeof genreObj === 'string' ? genreObj : genreObj.name;
+        const source = typeof genreObj === 'string' ? 'unknown' : genreObj.source;
+
+        const normalizedKey = getNormalizedGenreKey(rawGenreName);
+        
+        if (VARIANT_TO_MAIN_GENRE_MAP[normalizedKey]) {
+            VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].forEach(mainGenre => {
+                mappedGenres.add(JSON.stringify({ name: mainGenre, source: source }));
+            });
+        } else {
+            mappedGenres.add(JSON.stringify({ name: rawGenreName.toLowerCase().trim(), source: source }));
+        }
+    });
+
+    return Array.from(mappedGenres).map(item => JSON.parse(item));
   }
 
   async function fetchAllTrackGenres(tracks) {
@@ -8529,19 +8979,25 @@
   }
 
   function filterTracksByGenres(tracks, selectedGenres, trackGenreMap) {
-    const normalizedSelectedGenres = selectedGenres.map(normalizeGenre);
-      if(matchAllGenres){
+    if(matchAllGenres){
+      if (selectedGenres.length === 0) {
+          return [];
+      }
       return tracks.filter((track) => {
         const trackGenres = trackGenreMap.get(track.uri);
-        return normalizedSelectedGenres.every((selectedGenre) => 
-          trackGenres?.includes(selectedGenre)
+        if (!trackGenres) return false;
+        const trackGenreNames = new Set(trackGenres.map(g => g.name));
+        return selectedGenres.every((selectedGenre) => 
+          trackGenreNames.has(selectedGenre)
         );
       });
     } else {
       return tracks.filter((track) => {
         const trackGenres = trackGenreMap.get(track.uri);
-        return normalizedSelectedGenres.some((selectedGenre) => 
-          trackGenres?.includes(selectedGenre)
+        if (!trackGenres) return false;
+        const trackGenreNames = new Set(trackGenres.map(g => g.name));
+        return selectedGenres.some((selectedGenre) => 
+          trackGenreNames.has(selectedGenre)
         );
       });
     }
@@ -8850,6 +9306,44 @@
     }
 
     return [];
+  }
+
+  async function getAlbumTracks(albumId) {
+    const { CosmosAsync } = Spicetify;
+    try {
+      const albumData = await CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+      if (!albumData || !albumData.tracks || !albumData.tracks.items) {
+        throw new Error("Failed to fetch album tracks.");
+      }
+
+      return albumData.tracks.items.map(track => ({
+        uri: track.uri,
+        uid: null,
+        name: track.name,
+        albumUri: albumData.uri,
+        albumName: albumData.name,
+        artistUris: track.artists.map(artist => artist.uri),
+        allArtists: track.artists.map(artist => artist.name).join(", "),
+        artistName: track.artists[0].name,
+        durationMilis: track.duration_ms,
+        playCount: "N/A",
+        popularity: null,
+        releaseDate: null,
+        track: {
+          album: {
+            id: albumId,
+            name: albumData.name,
+          },
+          name: track.name,
+          duration_ms: track.duration_ms,
+          id: track.id,
+        }
+      }));
+    } catch (error) {
+      console.error(`Error fetching tracks for album ${albumId}:`, error);
+      Spicetify.showNotification("Failed to fetch album tracks.", true);
+      return [];
+    }
   }
 
   async function getArtistTracks(artistUri) {
@@ -9502,9 +9996,24 @@
 
         const encodedArtist = encodeURIComponent(artistName);
         const encodedTrack = encodeURIComponent(trackName);
-        const lastFmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${L_F_M_Key()}&artist=${encodedArtist}&track=${encodedTrack}&format=json`;
+        
+        let response;
+        while (true) {
+            const apiKey = L_F_M_Key();
+            if (!apiKey) {
+                throw new Error("All Last.fm API keys are invalid or have been revoked.");
+            }
+            const lastFmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&format=json`;
+            
+            response = await fetch(lastFmUrl);
 
-        const response = await fetch(lastFmUrl);
+            if (response.status === 403) {
+                console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
+                revokedLfmKeys.add(apiKey);
+                continue;
+            }
+            break;
+        }
 
         if (!response.ok) {
           throw new Error(
@@ -9595,9 +10104,24 @@
 
         const encodedArtist = encodeURIComponent(artistName);
         const encodedTrack = encodeURIComponent(track.name);
-        const lastFmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${L_F_M_Key()}&artist=${encodedArtist}&track=${encodedTrack}&username=${username}&format=json`;
         
-        const response = await fetch(lastFmUrl);
+        let response;
+        while (true) {
+            const apiKey = L_F_M_Key();
+            if (!apiKey) {
+                throw new Error("All Last.fm API keys are invalid or have been revoked.");
+            }
+            const lastFmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&username=${username}&format=json`;
+            
+            response = await fetch(lastFmUrl);
+
+            if (response.status === 403) {
+                console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
+                revokedLfmKeys.add(apiKey);
+                continue;
+            }
+            break;
+        }
 
         if (!response.ok) {
           throw new Error(`Last.fm API request failed with status ${response.status}`);  
@@ -10986,7 +11510,13 @@
             moveRequestBody.before = "start";
         }
         
-        await CosmosAsync.post("sp://core-playlist/v1/rootlist", moveRequestBody);
+        try {
+            await CosmosAsync.post("sp://core-playlist/v1/rootlist", moveRequestBody);
+        } catch (moveError) {
+            if (moveError.status !== 400) {
+                console.error("Unexpected error while moving playlist:", moveError);
+            }
+        }
 
     } catch (error) {
         console.error("Error adding playlist to user's library:", error);
@@ -13046,9 +13576,10 @@
 
       let tracks;
       let isArtistPage = false;
+      let isAlbumPage = false;
       let currentPlaylistDetails = null;
       let sourcePlaylistCoverUrl = null;
-      let sourceNameForDialog = "Current Playlist"; 
+      let sourceNameForDialog = "Current Context"; 
 
       if (URI.isPlaylistV1OrV2(currentUriAtStart)) {
         const playlistId = currentUriAtStart.split(":")[2];
@@ -13067,8 +13598,21 @@
         isArtistPage = true;
       } else if (isLikedSongsPage(currentUriAtStart)) {
         tracks = await getLikedSongs();
+      } else if (URI.isAlbum(currentUriAtStart)) {
+        const albumId = currentUriAtStart.split(":")[2];
+        tracks = await getAlbumTracks(albumId);
+        isAlbumPage = true;
+        try {
+            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+            sourceNameForDialog = albumDetails?.name || "Current Album";
+            if (albumDetails?.images?.length > 0) {
+                sourcePlaylistCoverUrl = albumDetails.images[0].url;
+            }
+        } catch (e) {
+            console.warn("Could not fetch current album details", e);
+        }
       } else {
-        throw new Error('Invalid playlist or artist page');
+        throw new Error('Invalid page for sorting');
       }
 
       if (!tracks || tracks.length === 0) {
@@ -13083,6 +13627,7 @@
                                        isDirectSortType(sortType) &&
                                        URI.isPlaylistV1OrV2(currentUriAtStart) &&
                                        !isArtistPage &&
+                                       !isAlbumPage &&
                                        !isLikedSongsPage(currentUriAtStart) &&
                                        currentPlaylistDetails &&
                                        currentPlaylistDetails.owner &&
@@ -13412,6 +13957,9 @@
             finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUriForNaming.split(":")[2]}`).then((r) => r.name);
         } else if (isLikedSongsPage(sourceUriForNaming)) {
             finalSourceName = "Liked Songs";
+        } else if (URI.isAlbum(sourceUriForNaming)) {
+            const albumId = sourceUriForNaming.split(":")[2];
+            finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`).then((r) => r.name);
         } else {
             finalSourceName = currentPlaylistDetails?.name || "Current Playlist";
         }
@@ -13502,7 +14050,17 @@
               let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
               if (isArtistPage) {
                 playlistDescription = `Discography of ${finalSourceName} - created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
+              } else if (isAlbumPage) {
+                const albumId = currentUriAtStart.split(":")[2];
+                const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+                const artistName = albumDetails.artists[0].name;
+                playlistDescription = `Tracks from ${finalSourceName} by ${artistName} - created and sorted by ${sortTypeInfo.fullName} using Sort-Play`;
               }
+
+              if (playlistDescription.length > 300) {
+                playlistDescription = playlistDescription.substring(0, 296) + "...";
+              }
+
               mainButton.innerText = "Creating...";
               const newPlaylist = await createPlaylist(`${finalSourceName} (${sortTypeInfo.shortName})`, playlistDescription);
               
@@ -13525,7 +14083,7 @@
                   const base64Image = await toBase64(sourcePlaylistCoverUrl);
                   await setPlaylistImage(newPlaylist.id, base64Image);
                 } catch (error) {
-                  console.warn("Could not apply original playlist cover:", error);
+                  console.warn("Could not apply original playlist/album cover:", error);
                 }
               }
               const trackUris = sortedTracks.map((track) => track.uri);
@@ -14001,6 +14559,9 @@
                         tracks = await getArtistTracks(currentUri);
                     } else if (isLikedSongsPage(currentUri)) {
                         tracks = await getLikedSongs();
+                    } else if (URI.isAlbum(currentUri)) {
+                        const albumId = currentUri.split(":")[2];
+                        tracks = await getAlbumTracks(albumId);
                     } else {
                         throw new Error("Invalid URI type");
                     }
