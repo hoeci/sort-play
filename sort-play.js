@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.3.00";
+  const SORT_PLAY_VERSION = "5.3.0";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -15788,3 +15788,4 @@
     await main();
   }
 })();
+
