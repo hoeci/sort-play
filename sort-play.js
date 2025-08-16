@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.3.0";
+  const SORT_PLAY_VERSION = "5.3.01";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -9128,16 +9128,19 @@
 
     const segments = path.split('/').filter(segment => segment.length > 0);
     
-    if (segments[0] === 'album' && segments[1]) {
-        return `spotify:album:${segments[1]}`;
+    const albumIndex = segments.indexOf('album');
+    if (albumIndex > -1 && segments[albumIndex + 1]) {
+        return `spotify:album:${segments[albumIndex + 1]}`;
     }
     
-    if (segments[0] === 'artist' && segments[1]) {
-        return `spotify:artist:${segments[1]}`;
+    const artistIndex = segments.indexOf('artist');
+    if (artistIndex > -1 && segments[artistIndex + 1]) {
+        return `spotify:artist:${segments[artistIndex + 1]}`;
     }
     
-    if (segments[0] === 'playlist' && segments[1]) {
-        return `spotify:playlist:${segments[1]}`;
+    const playlistIndex = segments.indexOf('playlist');
+    if (playlistIndex > -1 && segments[playlistIndex + 1]) {
+        return `spotify:playlist:${segments[playlistIndex + 1]}`;
     }
     
     if (segments.includes('collection') && segments.includes('tracks')) {
@@ -15609,7 +15612,7 @@
   }
     
   function insertButton() {
-    const currentUri = getCurrentUri();
+    const currentUri = getCurrentUri(); 
     if (!currentUri) return;
   
     if (URI.isPlaylistV1OrV2(currentUri)) {
@@ -15788,4 +15791,3 @@
     await main();
   }
 })();
-
