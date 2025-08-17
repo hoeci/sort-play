@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.3.01";
+  const SORT_PLAY_VERSION = "5.3.2";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -2268,62 +2268,53 @@
     }
   }
 
-    const createQueueItem = (isLikedSource) => ({ uri, uid = "" }) => ({
-      contextTrack: {
-          uri,
-          uid,
-          metadata: {
-              is_queued: isLikedSource ? "true" : "false"
-          }
-      },
-      removed: [],
-      blocked: [],
-      provider: isLikedSource ? "queue" : "context"
-  });
-
   async function setQueueFromTracks(tracks, contextUri) {
     const { PlayerAPI } = Spicetify.Platform;
-    if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state) {
-        Spicetify.showNotification("Player API not available for queue manipulation.", true);
+
+    if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state || !Spicetify.Player) {
+        Spicetify.showNotification("Player API components missing for queue operation.", true);
         console.error("Player API components missing for queue operation.");
         return;
     }
 
-    if (!tracks || tracks.length === 0) {
+    if (!tracks || !tracks.length) {
         Spicetify.showNotification("No tracks to add to the queue.", true);
         return;
     }
 
+    const trackUris = tracks.map(t => t.uri);
+    trackUris.push("spotify:delimiter");
+
     const { _queue, _client } = PlayerAPI._queue;
     const { prevTracks, queueRevision } = _queue;
 
-    const isLiked = contextUri ? isLikedSongsPage(contextUri) : false;
-
-    const nextTracksFormatted = tracks.map(createQueueItem(isLiked));
+    const nextTracks = trackUris.map((uri) => ({
+        contextTrack: {
+            uri,
+            uid: "",
+            metadata: {
+                is_queued: "false",
+            },
+        },
+        removed: [],
+        blocked: [],
+        provider: "context",
+    }));
 
     try {
-        await new Promise(resolve => setTimeout(resolve, 200)); 
-
         await _client.setQueue({
-            nextTracks: nextTracksFormatted,
+            nextTracks,
             prevTracks,
-            queueRevision
+            queueRevision,
         });
-        
-        await new Promise(resolve => setTimeout(resolve, 400)); 
-        await PlayerAPI.skipToNext();
-        await new Promise(resolve => setTimeout(resolve, 750)); 
 
-        if (contextUri && !isLiked && PlayerAPI._state?.sessionId) {
-          try {
-              await PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri });
-          } catch (contextError) {
-              console.warn("Failed to update player context:", contextError);
-          }
-        } else {
+        if (contextUri && PlayerAPI._state?.sessionId) {
+            await PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri });
         }
 
-        Spicetify.showNotification("Sorted tracks added to queue.");
+        Spicetify.Player.next();
+
+        Spicetify.showNotification("Tracks added to queue.");
 
     } catch (error) {
         console.error("Error setting queue:", error);
@@ -10311,13 +10302,7 @@
     });
 
     innerButton.addEventListener("mouseleave", () => {
-        const parentMenu = svg.closest('.main-contextMenu-menu');
-        if (parentMenu) {
-            const defaultColor = window.getComputedStyle(parentMenu).getPropertyValue('color');
-            svg.style.fill = defaultColor;
-        } else {
-            svg.style.fill = '#ffffffe6';
-        }
+      svg.style.fill = 'currentColor';
     });
 
     innerButton.addEventListener("click", (event) => {
@@ -10331,6 +10316,92 @@
             : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z"
           );
         }
+    });
+
+    return innerButton;
+  }
+
+  function createInnerPlayButton(parentButton) {
+    const innerButton = document.createElement("button");
+    innerButton.title = "Shuffle and Play";
+    innerButton.innerText = "▶"; 
+
+    const buttonBgColor = "rgba(var(--spice-rgb-selected-row), 0.03)";
+    const buttonHoverBgColor = "rgba(var(--spice-rgb-selected-row), 0.2)";
+
+    innerButton.style.cssText = `
+      color: #ffffffe6;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      padding: 2px 12px;
+      font-weight: 500;
+      cursor: pointer;
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.2s ease;
+    `;
+
+    innerButton.style.backgroundColor = buttonBgColor;
+
+    innerButton.addEventListener("mouseenter", () => {
+      innerButton.style.backgroundColor = buttonHoverBgColor;
+    });
+
+    innerButton.addEventListener("mouseleave", () => {
+      innerButton.style.backgroundColor = buttonBgColor;
+    });
+
+    innerButton.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      innerButton.style.backgroundColor = buttonBgColor;
+      
+      menuButtons.forEach((btn) => {
+        if (btn.tagName.toLowerCase() === "button" && !btn.disabled) {
+            btn.style.backgroundColor = "transparent";
+        }
+      });
+
+      setButtonProcessing(true);
+      mainButton.innerHTML = '<div class="loader"></div>';
+      closeAllMenus();
+
+      try {
+        const currentUri = getCurrentUri();
+        if (!currentUri) {
+          throw new Error("Please select a playlist or artist first");
+        }
+
+        let tracks;
+        if (URI.isPlaylistV1OrV2(currentUri)) {
+            tracks = await getPlaylistTracks(currentUri.split(":")[2]);
+        } else if (URI.isArtist(currentUri)) {
+            tracks = await getArtistTracks(currentUri);
+        } else if (isLikedSongsPage(currentUri)) {
+            tracks = await getLikedSongs();
+        } else if (URI.isAlbum(currentUri)) {
+            tracks = await getAlbumTracks(currentUri.split(":")[2]);
+        } else {
+            throw new Error('Invalid page for shuffling');
+        }
+
+        if (!tracks || tracks.length === 0) {
+          throw new Error('No tracks found to shuffle');
+        }
+
+        const shuffledTracks = shuffleArray(tracks);
+        await setQueueFromTracks(shuffledTracks, currentUri);
+        
+      } catch (error) {
+        console.error("Error during shuffle and play:", error);
+        Spicetify.showNotification(error.message, true);
+      } finally {
+        resetButtons();
+      }
     });
 
     return innerButton;
@@ -10560,6 +10631,7 @@
         color: "white",
         text: "Shuffle",
         sortType: "shuffle",
+        hasInnerPlayButton: true,
       },
       {
         backgroundColor: "transparent",
@@ -10693,11 +10765,24 @@
       tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
       
       const tempButton = document.createElement('button');
+      tempButton.className = 'main-contextMenu-menuItemButton';
       tempContainer.appendChild(tempButton);
       document.body.appendChild(tempContainer);
 
+      const tempSpan = document.createElement('span');
+      tempSpan.className = "e-91000-text encore-text-body-small ellipsis-one-line m1hZc7vcFunpAF8jgPq6";
+      tempSpan.innerText = "Add to queue";
+      tempButton.appendChild(tempSpan);
+
+      let textColor = window.getComputedStyle(tempSpan).color;
+      tempButton.removeChild(tempSpan);
+
+      if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
+        return textColor;
+      }
+
       tempButton.className = primaryClass;
-      let textColor = window.getComputedStyle(tempButton).color;
+      textColor = window.getComputedStyle(tempButton).color;
 
       if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
         return textColor;
@@ -10713,6 +10798,7 @@
       return '#b3b3b3'; 
 
     } catch (error) {
+      console.warn("Sort-Play: Error detecting native menu text color.", error);
       return '#b3b3b3';
     } finally {
       if (tempContainer) {
@@ -10721,6 +10807,7 @@
     }
   }
 
+  
   function getNativeTertiaryButtonColor() {
     const targetClass = 'Button-sc-qlcn5g-0 Button-buttonTertiary-large-iconOnly-useBrowserDefaultFocusStyle-condensed';
     const tempButton = document.createElement('button');
@@ -14514,7 +14601,12 @@
     if (!buttonStyle) {
         return;
     }
-
+    
+    if (buttonStyle.hasInnerPlayButton) {
+        const innerPlayButton = createInnerPlayButton(element);
+        element.appendChild(innerPlayButton);
+    }
+    
     if (buttonStyle.isSetting) {
         element.addEventListener("click", (event) => {
             event.stopPropagation();
