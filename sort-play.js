@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.3.3";
+  const SORT_PLAY_VERSION = "5.3.4";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -10375,7 +10375,7 @@
       innerButton.style.backgroundColor = buttonBgColor;
       
       menuButtons.forEach((btn) => {
-        if (btn.tagName.toLowerCase() === "button" && !btn.disabled) {
+        if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
             btn.style.backgroundColor = "transparent";
         }
       });
@@ -10391,9 +10391,11 @@
         }
 
         let tracks;
+        const isArtistPage = URI.isArtist(currentUri);
+
         if (URI.isPlaylistV1OrV2(currentUri)) {
             tracks = await getPlaylistTracks(currentUri.split(":")[2]);
-        } else if (URI.isArtist(currentUri)) {
+        } else if (isArtistPage) {
             tracks = await getArtistTracks(currentUri);
         } else if (isLikedSongsPage(currentUri)) {
             tracks = await getLikedSongs();
@@ -10407,7 +10409,26 @@
           throw new Error('No tracks found to shuffle');
         }
 
-        const shuffledTracks = shuffleArray(tracks);
+        let tracksToShuffle;
+
+        if (isArtistPage) {
+          const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
+            tracks, () => {}
+          );
+          const tracksWithIds = await processBatchesWithDelay(
+            tracksWithPlayCounts, 200, 1000, () => {}, collectTrackIdsForPopularity
+          );
+          const tracksWithPopularity = await fetchPopularityForMultipleTracks(
+            tracksWithIds, () => {}
+          );
+
+          const { unique: uniqueTracks } = deduplicateTracks(tracksWithPopularity);
+          tracksToShuffle = uniqueTracks;
+        } else {
+          tracksToShuffle = tracks;
+        }
+
+        const shuffledTracks = shuffleArray(tracksToShuffle);
         await setQueueFromTracks(shuffledTracks, currentUri, 'shuffle');
         
       } catch (error) {
