@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.3.2";
+  const SORT_PLAY_VERSION = "5.3.3";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -2268,7 +2268,7 @@
     }
   }
 
-  async function setQueueFromTracks(tracks, contextUri) {
+  async function setQueueFromTracks(tracks, contextUri, source = 'default') {
     const { PlayerAPI } = Spicetify.Platform;
 
     if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state || !Spicetify.Player) {
@@ -2277,16 +2277,20 @@
         return;
     }
 
-    if (!tracks || !tracks.length) {
-        Spicetify.showNotification("No tracks to add to the queue.", true);
+    const currentTrackUri = PlayerAPI._state?.item?.uri;
+
+    const filteredTracks = currentTrackUri ? tracks.filter(t => t.uri !== currentTrackUri) : tracks;
+
+    if (!filteredTracks || !filteredTracks.length) {
+        Spicetify.showNotification("No tracks to add to the queue after filtering the current song.", false, 3000);
         return;
     }
 
-    const trackUris = tracks.map(t => t.uri);
+    const trackUris = filteredTracks.map(t => t.uri);
     trackUris.push("spotify:delimiter");
 
     const { _queue, _client } = PlayerAPI._queue;
-    const { prevTracks, queueRevision } = _queue;
+    const { queueRevision } = _queue; 
 
     const nextTracks = trackUris.map((uri) => ({
         contextTrack: {
@@ -2304,7 +2308,7 @@
     try {
         await _client.setQueue({
             nextTracks,
-            prevTracks,
+            prevTracks: [],
             queueRevision,
         });
 
@@ -2314,10 +2318,20 @@
 
         Spicetify.Player.next();
 
-        Spicetify.showNotification("Tracks added to queue.");
+        let message;
+        const count = filteredTracks.length;
+        const trackWord = count === 1 ? 'track' : 'tracks';
+
+        if (source === 'shuffle') {
+            message = `Shuffled ${count} ${trackWord} and added to queue.`;
+        } else {
+            message = `Sorted tracks added to queue.`;
+        }
+        
+        Spicetify.showNotification(message, false, 3000);
 
     } catch (error) {
-        console.error("Error setting queue:", error);
+        console.error("Error setting fresh queue:", error);
         Spicetify.showNotification("Failed to set the playback queue.", true);
         throw error;
     }
@@ -10394,7 +10408,7 @@
         }
 
         const shuffledTracks = shuffleArray(tracks);
-        await setQueueFromTracks(shuffledTracks, currentUri);
+        await setQueueFromTracks(shuffledTracks, currentUri, 'shuffle');
         
       } catch (error) {
         console.error("Error during shuffle and play:", error);
