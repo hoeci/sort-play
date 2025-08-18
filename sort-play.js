@@ -27,7 +27,7 @@
   let includeLyrics = false;
   let matchAllGenres  = false;
   let includeaudiofeatures = false;
-  let addToQueueEnabled = true; 
+  let addToQueueEnabled = false; 
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
   let openPlaylistAfterSortEnabled = true;
@@ -150,7 +150,7 @@
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
     const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
-    addToQueueEnabled = addToQueueStored === null ? true : addToQueueStored === "true";
+    addToQueueEnabled = addToQueueStored === null ? false : addToQueueStored === "true";
     createPlaylistAfterSort = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST) !== "false";
     const sortCurrentPlaylistStored = localStorage.getItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST);
     sortCurrentPlaylistEnabled = sortCurrentPlaylistStored === null ? false : sortCurrentPlaylistStored === "true";
