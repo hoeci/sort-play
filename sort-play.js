@@ -10338,7 +10338,7 @@
   function createInnerPlayButton(parentButton) {
     const innerButton = document.createElement("button");
     innerButton.title = "Shuffle and Play";
-    innerButton.innerText = "▶"; 
+    innerButton.innerText = "\u25B6";
 
     const buttonBgColor = "rgba(var(--spice-rgb-selected-row), 0.03)";
     const buttonHoverBgColor = "rgba(var(--spice-rgb-selected-row), 0.2)";
@@ -15918,3 +15918,4 @@
     await main();
   }
 })();
+
