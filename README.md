@@ -12,7 +12,7 @@
 + **Genre Filtering:** Filter any playlist or discography by genre, using combined data from Spotify and Last.fm.
 + **AI-Powered Playlists:** Generate playlists from prompts, using the current context as a music source with Gemini models.
 + **Last.fm Integration:** Connect your Last.fm account to sort by your personal scrobble history.
-+ **Smart Deduplication:** Remove duplicate tracks from playlists, automatically keeping the most popular or played version.
++ **Smart Deduplication:** Remove duplicate tracks from playlists, automatically keeping the most popular version.
 + **Smart Shuffle:** Randomize your playlist with an intelligent shuffle that helps prevent multiple songs by the same artist from playing back-to-back.
 + **Configurable Sorting:** Easily toggle ascending/descending order for most sort types.
 + **Flexible Output:** Save as a new playlist, modify your current playlist (if owned), or just add the sorted tracks to your queue.
