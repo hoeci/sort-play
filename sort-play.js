@@ -1425,7 +1425,7 @@
             Top Tracks Playlist Size
         </label>
         <div class="col action">
-            <select id="topTracksLimitSelect" style="max-width: 120px;">
+            <select id="topTracksLimitSelect" style="width: 65px;">
                 <option value="50">50</option>
                 <option value="100">100</option>
                 <option value="150">150</option>
@@ -1442,7 +1442,7 @@
             Discovery Playlist Size
         </label>
         <div class="col action">
-            <select id="discoveryPlaylistSizeSelect" style="max-width: 120px;">
+            <select id="discoveryPlaylistSizeSelect" style="width: 65px;">
                 <option value="25">25</option>
                 <option value="50">50</option>
                 <option value="75">75</option>
@@ -15918,4 +15918,5 @@
     await main();
   }
 })();
+
 
