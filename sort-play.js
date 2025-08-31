@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.3.4";
+  const SORT_PLAY_VERSION = "5.4.0";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -2208,6 +2208,252 @@
 
     document.getElementById("cancelFolderName").addEventListener("click", closeModal);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  }
+
+  function showCreatePlaylistModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-create-playlist-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 1000px !important;
+        background-color: #181818 !important;
+        border: 1px solid #282828;
+        display: flex;
+        flex-direction: column;
+        border-radius: 30px;
+    `;
+
+    const STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE = "sort-play-create-playlist-collapse-state";
+
+    const playlistCardsData = [
+        {
+            title: 'New Releases',
+            cards: [
+                { id: 'followedArtistPicks', name: 'Followed Artist Picks', description: 'Personalized picks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedArtistPicks },
+                { id: 'newDiscoveryPicks', name: 'New Music Picks', description: 'A personalized mix of new music from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.newDiscoveryPicks },
+                { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological },
+            ]
+        },
+        {
+            title: 'Discovery',
+            cards: [
+                { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe },
+                { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime },
+                { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery },
+            ]
+        },
+        {
+            title: 'My Top Tracks',
+            cards: [
+                { id: 'topThisMonth', name: 'Top Tracks:<br>This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth },
+                { id: 'topLast6Months', name: 'Top Tracks:<br>Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months },
+                { id: 'topAllTime', name: 'Top Tracks:<br>All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime },
+            ]
+        }
+    ];
+
+    let collapseState = JSON.parse(localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE) || '{}');
+
+    let contentHtml = '';
+    playlistCardsData.forEach(section => {
+        const isCollapsed = collapseState[section.title] || false;
+        
+        contentHtml += `
+            <div class="collapsible-section-header" data-section-title="${section.title}" role="button" tabindex="0">
+                <h2 class="create-playlist-section-title">${section.title}</h2>
+                <svg class="chevron-icon ${isCollapsed ? 'collapsed' : ''}" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
+            </div>
+        `;
+        contentHtml += `<div class="create-playlist-grid ${isCollapsed ? 'collapsed' : ''}">`;
+        section.cards.forEach(card => {
+            contentHtml += `
+                <div class="playlist-card" data-id="${card.id}" role="button" tabindex="0">
+                    <div class="card-thumbnail-container">
+                        <img src="${card.thumbnailUrl}" alt="${card.name}" class="card-thumbnail">
+                    </div>
+                    <div class="card-content">
+                        <h3 class="card-title">${card.name}</h3>
+                        <p class="card-description">${card.description}</p>
+                    </div>
+                </div>
+            `;
+        });
+        contentHtml += `</div>`;
+    });
+
+    modalContainer.innerHTML = `
+      <style>
+        .create-playlist-modal {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .collapsible-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            margin-top: 7px;
+            margin-bottom: 7px;
+        }
+        .create-playlist-section-title {
+            color: white;
+            font-weight: 700;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+        .chevron-icon {
+            color: #b3b3b3;
+            transition: transform 0.2s ease-in-out;
+        }
+        .chevron-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        .create-playlist-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            overflow: hidden;
+            max-height: 1000px;
+            transition: max-height 0.2s ease-in-out, margin-top 0.2s ease-in-out, opacity 0.2s ease-in-out;
+            margin-top: 0;
+            opacity: 1;
+        }
+        .create-playlist-grid.collapsed {
+            max-height: 0;
+            margin-top: -10px;
+            opacity: 0;
+        }
+        .playlist-card {
+            background-color: #212121;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .playlist-card:hover {
+            background-color: #282828;
+        }
+        .card-thumbnail-container {
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+            border-radius: 6px;
+            overflow: hidden;
+            background-color: #333;
+        }
+        .card-thumbnail {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .card-content {
+            flex-grow: 1;
+            min-width: 0;
+        }
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0 0 4px 0;
+        }
+        .card-description {
+            font-size: 0.875rem;
+            color: #b3b3b3;
+            margin: 0;
+            line-height: 1.4;
+        }
+        .main-trackCreditsModal-closeBtn {
+            background: transparent;
+            border: 0;
+            padding: 0;
+            color: #b3b3b3;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        .main-trackCreditsModal-closeBtn:hover {
+            color: #ffffff;
+        }
+      </style>
+      <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px; font-weight: 700;'>Dedicated Playlist Creation</span></h1>
+          <button id="closeCreatePlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <title>Close</title>
+                <path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path>
+            </svg>
+          </button>
+      </div>
+      <div class="main-trackCreditsModal-mainSection" style="padding: 24px 32px 38px !important; max-height: 75vh; flex-grow: 1; overflow-y: auto;">
+        <div class="create-playlist-modal">
+            ${contentHtml}
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    const closeModal = () => overlay.remove();
+
+    modalContainer.querySelectorAll('.playlist-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const sortType = card.getAttribute('data-id');
+            closeModal();
+            handleSortAndCreatePlaylist(sortType);
+        });
+    });
+
+    modalContainer.querySelectorAll('.collapsible-section-header').forEach(header => {
+        const handleToggle = () => {
+            const sectionTitle = header.dataset.sectionTitle;
+            const grid = header.nextElementSibling;
+            const chevron = header.querySelector('.chevron-icon');
+
+            const isNowCollapsed = !grid.classList.contains('collapsed');
+            
+            grid.classList.toggle('collapsed', isNowCollapsed);
+            chevron.classList.toggle('collapsed', isNowCollapsed);
+
+            collapseState[sectionTitle] = isNowCollapsed;
+            localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE, JSON.stringify(collapseState));
+        };
+
+        header.addEventListener('click', handleToggle);
+        header.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                handleToggle();
+            }
+        });
+    });
+
+    const closeButton = modalContainer.querySelector("#closeCreatePlaylistModal");
+    if (closeButton) {
+        closeButton.addEventListener("click", closeModal);
+    }
+
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+            closeModal();
+        }
+    });
   }
 
   function preventDragCloseModal() {
@@ -10557,77 +10803,20 @@
         ],
       },
       {
-        type: "parent",
+        backgroundColor: "transparent",
+        color: "white",
         text: "Create Playlist",
         sortType: "createNewPlaylist",
-        children: [
-          {
-            type: "title",
-            text: "New Releases",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Followed Artist Picks",
-            sortType: "followedArtistPicks",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "New Music Picks",
-            sortType: "newDiscoveryPicks",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Followed Artist (Full)",
-            sortType: "followedReleasesChronological",
-          },
-          {
-            type: "title",
-            text: "Discovery",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Recent Based",
-            sortType: "recommendRecentVibe",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "All-Time Based",
-            sortType: "recommendAllTime",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Pure Discovery",
-            sortType: "pureDiscovery",
-          },
-          {
-            type: "title",
-            text: "My Top Tracks",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Top This Month",
-            sortType: "topThisMonth",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Top Last 6 Months",
-            sortType: "topLast6Months",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Top All-Time",
-            sortType: "topAllTime",
-          },
-        ],
+        onClick: (event) => {
+          event.stopPropagation();
+          menuButtons.forEach((btn) => {
+            if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                btn.style.backgroundColor = "transparent";
+            }
+          });
+          closeAllMenus();
+          showCreatePlaylistModal();
+        },
       },
       {
         backgroundColor: "transparent",
@@ -10912,8 +11101,6 @@
       let iconSvgString;
       if (style.text === "Personalized Sort") {
         iconSvgString = personalizedSortIconSvg;
-      } else if (style.text === "Create Playlist") {
-        iconSvgString = createPlaylistIconSvg;
       } else {
         iconSvgString = sortIconSvg;
       }
@@ -10991,7 +11178,9 @@
       });
       
       let iconSvgString;
-      if (style.text === "Genre Filter") {
+      if (style.text === "Create Playlist") {
+        iconSvgString = createPlaylistIconSvg;
+      } else if (style.text === "Genre Filter") {
         iconSvgString = genreFilterIconSvg;
       } else if (style.text === "Custom Filter") {
         iconSvgString = customFilterIconSvg;
@@ -15918,5 +16107,3 @@
     await main();
   }
 })();
-
-
