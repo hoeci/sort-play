@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.4.0";
+  const SORT_PLAY_VERSION = "5.4.1";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -2456,6 +2456,66 @@
     });
   }
 
+  async function showConfirmationModal({ title, description, confirmText, cancelText }) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.id = "sort-play-confirmation-overlay";
+      overlay.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background-color: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          z-index: 2002;
+          display: flex; justify-content: center; align-items: center;
+      `;
+
+      const modalContainer = document.createElement("div");
+      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+      modalContainer.style.cssText = `
+          z-index: 2003;
+          width: 420px !important;
+          background-color: #181818 !important;
+          border: 1px solid #282828;
+          display: flex;
+          flex-direction: column;
+          border-radius: 30px;
+      `;
+
+      modalContainer.innerHTML = `
+        <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
+            <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>${title}</span></h1>
+        </div>
+        <div class="main-trackCreditsModal-mainSection" style="padding: 16px 32px 9px 32px;">
+            <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 25px; line-height: 1.5;">${description}</p>
+        </div>
+        <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button id="cancelConfirm" class="main-buttons-button" 
+                        style="width: auto; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase;">${cancelText}</button>
+                <button id="confirmAction" class="main-buttons-button main-button-primary" 
+                        style="width: auto; padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase;">${confirmText}</button>
+            </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+      overlay.appendChild(modalContainer);
+
+      const closeModal = (result) => {
+          overlay.remove();
+          resolve(result);
+      };
+
+      modalContainer.querySelector("#confirmAction").addEventListener("click", () => closeModal(true));
+      modalContainer.querySelector("#cancelConfirm").addEventListener("click", () => closeModal(false));
+      overlay.addEventListener("click", (e) => {
+          if (e.target === overlay) {
+              closeModal(false);
+          }
+      });
+    });
+  }
+  
   function preventDragCloseModal() {
     let mouseDownInsideModal = false;
     let dragStarted = false;
@@ -11454,33 +11514,23 @@
   const container = document.createElement("div");
   document.body.appendChild(container);
 
-  mainButton.addEventListener("click", (event) => {
+  mainButton.addEventListener("click", async (event) => {
     event.stopPropagation();
     if (isProcessing) {
-      Spicetify.ReactDOM.render(
-        Spicetify.React.createElement(Spicetify.ReactComponent.ConfirmDialog, {
-          isOpen: true,
-          titleText: "Stop and Reload Spotify?",
-          descriptionText: "This will stop the current Sort-Play operation and reload Spotify. Unsaved changes may be lost.",
-          confirmText: "Confirm",
-          cancelText: "Cancel",
-          onConfirm: () => {
-            closeAllMenus();
-            mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-            mainButton.innerText = "stopping...";
-            setButtonProcessing(false);
-            Spicetify.ReactDOM.unmountComponentAtNode(container);
-            location.reload();
-          },
-          onClose: () => {
-            Spicetify.ReactDOM.unmountComponentAtNode(container);
-          },
-          onOutside: () => {
-            Spicetify.ReactDOM.unmountComponentAtNode(container);
-          }
-        }),
-        container 
-      );
+      const confirmed = await showConfirmationModal({
+        title: "Stop and Reload Spotify?",
+        description: "This will stop the current Sort-Play operation and reload Spotify. Unsaved changes may be lost.",
+        confirmText: "Confirm",
+        cancelText: "Cancel",
+      });
+
+      if (confirmed) {
+        closeAllMenus();
+        mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
+        mainButton.innerText = "stopping...";
+        setButtonProcessing(false);
+        location.reload();
+      }
       return;
     }
   
@@ -13952,29 +14002,11 @@
       }
 
       if (canModifyCurrentPlaylist) {
-        const proceedWithModification = await new Promise((resolve) => {
-            Spicetify.ReactDOM.render(
-                Spicetify.React.createElement(Spicetify.ReactComponent.ConfirmDialog, {
-                    isOpen: true,
-                    titleText: "Sort Current Playlist?",
-                    descriptionText: `This will replace all tracks in "${sourceNameForDialog}" with the sorted version. This action cannot be undone. Are you sure?`,
-                    confirmText: "Confirm & Sort",
-                    cancelText: "Cancel",
-                    onConfirm: () => {
-                        Spicetify.ReactDOM.unmountComponentAtNode(container);
-                        resolve(true);
-                    },
-                    onClose: () => {
-                        Spicetify.ReactDOM.unmountComponentAtNode(container);
-                        resolve(false);
-                    },
-                    onOutside: () => {
-                        Spicetify.ReactDOM.unmountComponentAtNode(container);
-                        resolve(false);
-                    }
-                }),
-                container
-            );
+        const proceedWithModification = await showConfirmationModal({
+            title: "Sort Current Playlist?",
+            description: `This will replace all tracks in "${sourceNameForDialog}" with the sorted version. This action cannot be undone. Are you sure?`,
+            confirmText: "Confirm & Sort",
+            cancelText: "Cancel",
         });
 
         if (!proceedWithModification) {
