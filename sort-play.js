@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.4.1";
+  const SORT_PLAY_VERSION = "5.4.2";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -9866,10 +9866,20 @@
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        canvas.height = img.naturalHeight;
-        canvas.width = img.naturalWidth;
-        ctx.drawImage(img, 0, 0);
-        const dataUrl = canvas.toDataURL("image/jpeg");
+        const size = 640;
+        canvas.width = size;
+        canvas.height = size;
+
+        const sourceWidth = img.naturalWidth;
+        const sourceHeight = img.naturalHeight;
+
+        const cropSize = Math.min(sourceWidth, sourceHeight);
+        const sx = (sourceWidth - cropSize) / 2;
+        const sy = (sourceHeight - cropSize) / 2;
+
+        ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, size, size);
+
+        const dataUrl = canvas.toDataURL("image/jpeg"); 
         resolve(dataUrl);
       };
       img.onerror = (error) => reject(error);
