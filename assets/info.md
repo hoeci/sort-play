@@ -20,6 +20,7 @@
 ## 📷 Screenshots 
 <img src="https://github.com/user-attachments/assets/3a0de92c-3cba-4b5f-9227-0d5ed8db27e1" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/9eae606c-b492-4021-b003-d2d292216d27" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/14a63ac3-d466-4086-a7a0-4466b1f12c6d" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/f8e3d111-959c-441a-8519-146472216bf1" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/7da8f21f-7334-4660-80b0-9276ea5c1adb" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/2aebde0b-3d64-4fea-aeed-37fa639d76ba" alt="show" width="100%">
