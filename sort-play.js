@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.4.2";
+  const SORT_PLAY_VERSION = "5.4.3";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -11855,20 +11855,6 @@
     if (!playlistUri) return;
 
     try {
-        let addRequestBody = {
-            operation: "add",
-            uris: [playlistUri],
-            before: "start",
-        };
-
-        const folderUri = placePlaylistsInFolder ? await findOrCreatePlaylistFolder(sortPlayFolderName) : null;
-
-        if (folderUri) {
-            addRequestBody = { ...addRequestBody, after: folderUri, before: undefined };
-        }
-
-        await CosmosAsync.post("sp://core-playlist/v1/rootlist", addRequestBody);
-
         await new Promise(resolve => setTimeout(resolve, 250));
 
         let moveRequestBody = {
@@ -11876,22 +11862,23 @@
             uris: [playlistUri],
         };
 
-        if (folderUri) {
-            moveRequestBody.after = folderUri;
+        if (placePlaylistsInFolder) {
+            const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
+            if (folderUri) {
+                moveRequestBody.after = folderUri;
+            } else {
+                moveRequestBody.before = "start";
+            }
         } else {
             moveRequestBody.before = "start";
         }
         
-        try {
-            await CosmosAsync.post("sp://core-playlist/v1/rootlist", moveRequestBody);
-        } catch (moveError) {
-            if (moveError.status !== 400) {
-                console.error("Unexpected error while moving playlist:", moveError);
-            }
-        }
+        await CosmosAsync.post("sp://core-playlist/v1/rootlist", moveRequestBody);
 
     } catch (error) {
-        console.error("Error adding playlist to user's library:", error);
+        if (error.status !== 400) {
+            console.error("Unexpected error while moving playlist:", error);
+        }
     }
   }
 
@@ -11993,29 +11980,55 @@
 
     let newPlaylist;
     try {
-        const user = await Spicetify.Platform.UserAPI.getUser();
-        const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
-        newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { 
-            name, 
-            description,
-            public: false
-        });
+        const { RootlistAPI } = Platform;
+        if (!RootlistAPI) throw new Error("RootlistAPI not available for folder creation.");
 
-        if (!newPlaylist || !newPlaylist.uri) {
-            throw new Error("Playlist creation via Web API did not return a valid playlist object.");
+        let requestBody = {
+            operation: "create",
+            name: name,
+            playlist: true,
+            before: "start",
+        };
+
+        if (placePlaylistsInFolder) {
+            const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
+            if (folderUri) {
+                requestBody = { ...requestBody, after: folderUri, before: undefined };
+            } else {
+                Spicetify.showNotification("Failed to find/create folder. Creating playlist at the top.", true);
+            }
         }
 
-        try {
-            await setPlaylistVisibility(newPlaylist.uri, false);
-        } catch (visibilityError) {
-            console.warn("Could not explicitly set playlist to private, it might be public by default.", visibilityError);
+        newPlaylist = await CosmosAsync.post("sp://core-playlist/v1/rootlist", requestBody);
+
+        if (!newPlaylist || !newPlaylist.uri) {
+            throw new Error("Internal playlist creation failed, trying fallback.");
         }
 
     } catch (error) {
-        console.error("Error during playlist creation via Web API:", error);
-        Spicetify.showNotification("Failed to create playlist.", true);
-        throw error;
+        console.warn("Internal playlist creation failed, using Web API fallback:", error);
+        Spicetify.showNotification("Using fallback to create playlist.", false, 2000);
+        const user = await Spicetify.Platform.UserAPI.getUser();
+        const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
+        newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { name, description });
     }
+
+    if (!newPlaylist || !newPlaylist.uri) {
+        throw new Error("Failed to create playlist after all attempts.");
+    }
+
+    try {
+      await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${newPlaylist.uri.split(':')[2]}`, {
+          description: description,
+      });
+    } catch (descriptionError) {
+        const isExpectedJsonError = descriptionError instanceof SyntaxError && descriptionError.message.includes("Unexpected end of JSON input");
+        if (!isExpectedJsonError) {
+            console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
+        }
+    }
+    
+    await setPlaylistVisibility(newPlaylist.uri, false);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
   }
@@ -16147,3 +16160,4 @@
     await main();
   }
 })();
+
