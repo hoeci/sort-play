@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.4.3";
+  const SORT_PLAY_VERSION = "5.5.0";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -63,8 +63,12 @@
   const STORAGE_KEY_FOLLOWED_RELEASES_LIMIT = "sort-play-followed-releases-limit";
   const STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE = "sort-play-discovery-playlist-size";
   const STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS = "sort-play-set-dedicated-playlist-covers";
-
-
+  const STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS = "sort-play-dynamic-playlist-jobs";
+  const STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES = "sort-play-dynamic-playlist-custom-schedules";
+  const STORAGE_KEY_DYNAMIC_SORT_TYPE = "sort-play-dynamic-sort-type";
+  const STORAGE_KEY_DYNAMIC_SCHEDULE = "sort-play-dynamic-schedule";
+  const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
+  const runningJobIds = new Set();
 
   const L_F_M_Key_Pool = [
     "***REMOVED***",
@@ -113,6 +117,8 @@
     'recommendAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-all.png',
     'pureDiscovery': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-pure.png',
   };
+
+  const PLACEHOLDER_SVG_DATA_URI = `url("data:image/svg+xml,%3csvg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.5 8.89001V18.5M12.5 8.89001V5.57656C12.5 5.36922 12.5 5.26554 12.5347 5.17733C12.5653 5.09943 12.615 5.03047 12.6792 4.97678C12.752 4.91597 12.8503 4.88318 13.047 4.81761L17.447 3.35095C17.8025 3.23245 17.9803 3.17319 18.1218 3.20872C18.2456 3.23982 18.3529 3.31713 18.4216 3.42479C18.5 3.54779 18.5 3.73516 18.5 4.10989V7.42335C18.5 7.63069 18.5 7.73436 18.4653 7.82258C18.4347 7.90048 18.385 7.96943 18.3208 8.02313C18.248 8.08394 18.1497 8.11672 17.953 8.18229L13.553 9.64896C13.1975 9.76746 13.0197 9.82671 12.8782 9.79119C12.7544 9.76009 12.6471 9.68278 12.5784 9.57512C12.5 9.45212 12.5 9.26475 12.5 8.89001ZM12.5 18.5C12.5 19.8807 10.933 21 9 21C7.067 21 5.5 19.8807 5.5 18.5C5.5 17.1192 7.067 16 9 16C10.933 16 12.5 17.1192 12.5 18.5Z' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`;
 
   const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
   - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
@@ -1060,7 +1066,7 @@
     .tooltip-container { position: relative; display: inline-block; vertical-align: middle;}
 
     .custom-tooltip {
-        visibility: hidden; position: absolute; z-index: 1; background-color: #282828;
+        visibility: hidden; position: absolute; z-index: 1; background-color: #373737;
         color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px;
         max-width: 240px; width: max-content; bottom: 100%; left: 50%;
         transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -1068,7 +1074,7 @@
     }
     .custom-tooltip::after {
         content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
-        border-width: 5px; border-style: solid; border-color: #282828 transparent transparent transparent;
+        border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent;
     }
     .tooltip-container:hover .custom-tooltip { visibility: visible; }
     .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
@@ -1619,12 +1625,12 @@
         sortCurrentPlaylistSwitchLabel.classList.toggle("disabled", !isCreatePlaylistOn);
         sortCurrentPlaylistSettingRow.classList.toggle("dependent-disabled", !isCreatePlaylistOn);
 
-        const isModifyCurrentOn = sortCurrentPlaylistToggle.checked && !sortCurrentPlaylistToggle.disabled;
-        placePlaylistsInFolderToggle.disabled = isModifyCurrentOn;
-        document.getElementById('placePlaylistsInFolderSwitchLabel').classList.toggle("disabled", isModifyCurrentOn);
-        document.getElementById('placePlaylistsInFolderSettingRow').classList.toggle("dependent-disabled", isModifyCurrentOn);
-        folderNameSettingsBtn.disabled = isModifyCurrentOn || !placePlaylistsInFolderToggle.checked;
-
+        placePlaylistsInFolderToggle.disabled = false;
+        document.getElementById('placePlaylistsInFolderSwitchLabel').classList.remove("disabled");
+        document.getElementById('placePlaylistsInFolderSettingRow').classList.remove("dependent-disabled");
+    
+        folderNameSettingsBtn.disabled = !placePlaylistsInFolderToggle.checked;
+    
         if (!isCreatePlaylistOn) {
             sortCurrentPlaylistToggle.checked = false;
         } else {
@@ -2456,7 +2462,7 @@
     });
   }
 
-  async function showConfirmationModal({ title, description, confirmText, cancelText }) {
+  async function showConfirmationModal({ title, description, confirmText, cancelText, neutralText }) {
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.id = "sort-play-confirmation-overlay";
@@ -2478,8 +2484,40 @@
           flex-direction: column;
           border-radius: 30px;
       `;
+      
+      const neutralButtonHtml = neutralText
+        ? `<button id="neutralAction" class="sp-confirm-btn sp-confirm-btn-secondary">${neutralText}</button>`
+        : '';
 
       modalContainer.innerHTML = `
+        <style>
+            .sp-confirm-btn {
+                width: auto;
+                padding: 8px 18px;
+                border-radius: 20px;
+                border: none;
+                cursor: pointer;
+                font-weight: 550;
+                font-size: 13px;
+                text-transform: uppercase;
+                transition: background-color 0.2s ease;
+            }
+            .sp-confirm-btn-primary {
+                background-color: #1ED760;
+                color: black;
+            }
+            .sp-confirm-btn-primary:hover {
+                background-color: #3BE377;
+            }
+            .sp-confirm-btn-secondary {
+                background-color: #333333;
+                color: white;
+                 padding: 8px 16px;
+            }
+            .sp-confirm-btn-secondary:hover {
+                background-color: #444444;
+            }
+        </style>
         <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
             <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>${title}</span></h1>
         </div>
@@ -2488,10 +2526,9 @@
         </div>
         <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button id="cancelConfirm" class="main-buttons-button" 
-                        style="width: auto; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase;">${cancelText}</button>
-                <button id="confirmAction" class="main-buttons-button main-button-primary" 
-                        style="width: auto; padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase;">${confirmText}</button>
+                <button id="cancelConfirm" class="sp-confirm-btn sp-confirm-btn-secondary">${cancelText}</button>
+                ${neutralButtonHtml}
+                <button id="confirmAction" class="sp-confirm-btn sp-confirm-btn-primary">${confirmText}</button>
             </div>
         </div>
       `;
@@ -2504,11 +2541,15 @@
           resolve(result);
       };
 
-      modalContainer.querySelector("#confirmAction").addEventListener("click", () => closeModal(true));
-      modalContainer.querySelector("#cancelConfirm").addEventListener("click", () => closeModal(false));
+      modalContainer.querySelector("#confirmAction").addEventListener("click", () => closeModal('confirm'));
+      modalContainer.querySelector("#cancelConfirm").addEventListener("click", () => closeModal('cancel'));
+      if (neutralText) {
+        modalContainer.querySelector("#neutralAction").addEventListener("click", () => closeModal('neutral'));
+      }
       overlay.addEventListener("click", (e) => {
           if (e.target === overlay) {
-              closeModal(false);
+              e.preventDefault();
+              e.stopPropagation();
           }
       });
     });
@@ -3057,7 +3098,7 @@
           visibility: hidden;
           position: absolute;
           z-index: 1;
-          background-color: #282828;
+          background-color: #373737;
           color: white;
           padding: 8px 12px;
           border-radius: 4px;
@@ -3080,7 +3121,7 @@
           margin-left: -5px;
           border-width: 5px;
           border-style: solid;
-          border-color: #282828 transparent transparent transparent;
+          border-color: #373737 transparent transparent transparent;
       }
       
       .tooltip-container:hover .custom-tooltip {
@@ -3346,7 +3387,8 @@
               "\\(Personalized\\)",
               "\\(Power Hour\\)",
               "\\(Mellow Mood\\)",
-              "\\(Hidden Gems\\)"
+              "\\(Hidden Gems\\)",
+              "\\(Dynamic\\)"
           ];
           let suffixPattern = new RegExp(
             `\\s*(${possibleSuffixes.join("|")})\\s*`
@@ -7449,7 +7491,8 @@
                 "\\(Personalized\\)",
                 "\\(Power Hour\\)",
                 "\\(Mellow Mood\\)",
-                "\\(Hidden Gems\\)"
+                "\\(Hidden Gems\\)",
+                "\\(Dynamic\\)"
             ];
 
             let suffixPattern = new RegExp(
@@ -7520,6 +7563,1648 @@
     }
   }
   
+  function getJobs() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveJobs(jobs) {
+    localStorage.setItem(STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS, JSON.stringify(jobs));
+  }
+
+  function addJob(newJob) {
+    const jobs = getJobs();
+    jobs.push(newJob);
+    saveJobs(jobs);
+  }
+
+  function deleteJob(jobId) {
+    let jobs = getJobs();
+    jobs = jobs.filter(job => job.id !== jobId);
+    saveJobs(jobs);
+  }
+
+  function updateJob(updatedJob) {
+    const jobs = getJobs();
+    const index = jobs.findIndex(job => job.id === updatedJob.id);
+    if (index !== -1) {
+      jobs[index] = updatedJob;
+      saveJobs(jobs);
+    }
+  }
+
+  function getCustomSchedules() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCustomSchedules(schedules) {
+    localStorage.setItem(STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES, JSON.stringify(schedules));
+  }
+  
+  async function executeSortOperation(config) {
+    const { sortType, sources, deduplicate, isHeadless = false } = config;
+    
+    if (!sources || sources.length === 0) {
+        throw new Error('No sources provided for dynamic playlist');
+    }
+
+    const trackFetchPromises = sources.map(source => {
+        const sourceUri = source.uri;
+        if (URI.isPlaylistV1OrV2(sourceUri)) {
+            return getPlaylistTracks(sourceUri.split(":")[2]);
+        } else if (URI.isArtist(sourceUri)) {
+            return getArtistTracks(sourceUri, isHeadless);
+        } else if (isLikedSongsPage(sourceUri)) {
+            return getLikedSongs();
+        } else if (URI.isAlbum(sourceUri)) {
+            return getAlbumTracks(sourceUri.split(":")[2]);
+        } else {
+            console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
+            return Promise.resolve([]);
+        }
+    });
+
+    const trackArrays = await Promise.all(trackFetchPromises);
+    const combinedTracks = trackArrays.flat();
+
+    const tracks = Array.from(new Map(combinedTracks.map(track => [track.uri, track])).values());
+
+    if (!tracks || tracks.length === 0) {
+        throw new Error('No tracks found in source(s) to sort.');
+    }
+
+    const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks);
+    const tracksWithIds = await processBatchesWithDelay(tracksWithPlayCounts, 200, 1000, () => {}, collectTrackIdsForPopularity);
+    const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
+
+    let tracksForProcessing = tracksWithPopularity;
+    if (sortType === "releaseDate") {
+        tracksForProcessing = await processBatchesWithDelay(tracksWithPopularity, 200, 1000, () => {}, getTrackDetailsWithReleaseDate);
+    }
+
+    const { unique: uniqueTracks } = deduplicate ? deduplicateTracks(tracksForProcessing) : { unique: tracksForProcessing, removed: [] };
+
+    let sortedTracks;
+    switch (sortType) {
+        case "playCount":
+            sortedTracks = uniqueTracks.filter(t => t.playCount !== "N/A").sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+            break;
+        case "popularity":
+            sortedTracks = uniqueTracks.filter(t => t.popularity != null).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+            break;
+        case "releaseDate":
+            sortedTracks = uniqueTracks.filter(t => t.releaseDate != null).sort((a, b) => (new Date(b.releaseDate).getTime() || 0) - (new Date(a.releaseDate).getTime() || 0));
+            break;
+        case "scrobbles":
+        case "personalScrobbles":
+            const result = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
+            sortedTracks = result.sortedTracks;
+            break;
+        default:
+            sortedTracks = uniqueTracks;
+            break;
+    }
+
+    return sortedTracks.map(t => t.uri);
+  }
+  
+  async function runJob(jobConfig, isInitialRun = false) {
+    let job = { ...jobConfig };
+    let finalTrackUris;
+    let newDescription = null;
+
+    if (isInitialRun) {
+        const sortTypeInfo = buttonStyles.menuItems.flatMap(i => i.children || i).find(i => i.sortType === job.sortType);
+        const playlistName = job.targetPlaylistName || (job.sources.length > 1 ? "Combined Dynamic Playlist" : `${job.sources[0].name} (Dynamic)`);
+        const sourceNames = job.sources.length > 1 ? "multiple sources" : (job.sources[0]?.name || "Unknown Source");
+        const playlistDescription = `Dynamically sorted by ${sortTypeInfo.text}. Source${job.sources.length > 1 ? 's' : ''}: ${sourceNames}. Managed by Sort-Play.`;
+        
+        const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+        job.targetPlaylistUri = newPlaylist.uri;
+        job.targetPlaylistName = playlistName;
+
+        if (job.sources.length === 1) {
+            const firstSourceCover = job.sources[0].coverUrl;
+            if (firstSourceCover && !isDefaultMosaicCover(firstSourceCover)) {
+                try {
+                    const base64Image = await toBase64(firstSourceCover);
+                    await setPlaylistImage(newPlaylist.id, base64Image);
+                    job.coverUrl = firstSourceCover;
+                } catch (error) {
+                    console.warn(`[Sort-Play Dynamic] Could not apply original source cover for "${job.sources[0].name}":`, error);
+                    job.coverUrl = newPlaylist.images?.length ? (newPlaylist.images[newPlaylist.images.length - 1] || newPlaylist.images[0]).url : null;
+                }
+            } else {
+                job.coverUrl = newPlaylist.images?.length ? (newPlaylist.images[newPlaylist.images.length - 1] || newPlaylist.images[0]).url : null;
+            }
+        } else {
+            job.coverUrl = newPlaylist.images?.length ? (newPlaylist.images[newPlaylist.images.length - 1] || newPlaylist.images[0]).url : null;
+        }
+        
+        await addPlaylistToLibrary(newPlaylist.uri);
+        
+        finalTrackUris = await executeSortOperation({ ...job, isHeadless: true });
+    } else {
+        const playlistId = job.targetPlaylistUri.split(':')[2];
+        try {
+            const currentPlaylistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+            const currentDescription = currentPlaylistData.description;
+
+            if (currentDescription && currentDescription.includes("Managed by Sort-Play.")) {
+                const sortTypeMap = buttonStyles.menuItems.flatMap(i => i.children || i).reduce((acc, item) => {
+                    if (item.sortType) acc[item.sortType] = item.text;
+                    return acc;
+                }, {});
+
+                let oldSortTypeText = null;
+                for (const type in sortTypeMap) {
+                    const regex = new RegExp(`by ${sortTypeMap[type]}\\.`, 'i');
+                    if (regex.test(currentDescription)) {
+                        oldSortTypeText = sortTypeMap[type];
+                        break;
+                    }
+                }
+
+                const newSortTypeText = sortTypeMap[job.sortType];
+
+                if (oldSortTypeText && newSortTypeText && oldSortTypeText !== newSortTypeText) {
+                    newDescription = currentDescription.replace(`by ${oldSortTypeText}`, `by ${newSortTypeText}`);
+                }
+            }
+        } catch (e) {
+            console.warn("Sort-Play: Could not fetch current playlist details to update description.", e);
+        }
+
+        const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri }];
+        finalTrackUris = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
+    }
+    
+    if (finalTrackUris.length > 0) {
+        await replacePlaylistTracks(job.targetPlaylistUri.split(':')[2], finalTrackUris);
+    } else {
+        console.warn(`[Sort-Play Dynamic] Job for "${job.targetPlaylistName}" resulted in zero tracks. Playlist will not be updated.`);
+    }
+
+    if (newDescription) {
+        try {
+            await Spicetify.CosmosAsync.put(
+                `https://api.spotify.com/v1/playlists/${job.targetPlaylistUri.split(':')[2]}`,
+                { description: newDescription }
+            );
+        } catch (e) {
+            console.warn("Sort-Play: Failed to update playlist description.", e);
+        }
+    }
+
+    job.lastRun = Date.now();
+    return job;
+  }
+
+  async function checkAndRunJobs() {
+    const jobs = getJobs();
+    const now = Date.now();
+
+    const isJobDue = (job, currentTime) => {
+        const lastRun = job.lastRun || 0;
+        const schedule = job.schedule;
+
+        if (schedule === 'manual') {
+            return false;
+        }
+
+        if (typeof schedule === 'number') {
+            return currentTime > lastRun + schedule;
+        }
+
+        if (typeof schedule === 'string' && schedule.startsWith('release-')) {
+            const nowDate = new Date(currentTime);
+            const lastRunDate = new Date(lastRun);
+
+            if (nowDate.getDay() !== 5) {
+                return false;
+            }
+
+            if (lastRunDate.toDateString() === nowDate.toDateString()) {
+                return false;
+            }
+
+            const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
+
+            switch (schedule) {
+                case 'release-weekly':
+                    return daysSinceLastRun > 6;
+                case 'release-every-two-weeks':
+                    return daysSinceLastRun > 13;
+                case 'release-monthly':
+                    return daysSinceLastRun > 27;
+                default:
+                    return false;
+            }
+        }
+        return false;
+    };
+
+    const jobsToRun = jobs.filter(job => isJobDue(job, now));
+
+    if (jobsToRun.length > 0) {
+        for (const job of jobsToRun) {
+            try {
+                const updatedJob = await runJob(job);
+                updateJob(updatedJob);
+                Spicetify.showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
+            } catch (error) {
+                console.error(`Failed to run dynamic playlist job for "${job.targetPlaylistName}":`, error);
+                Spicetify.showNotification(`Failed to update dynamic playlist: ${job.targetPlaylistName}`, true);
+                job.lastRun = now;
+                updateJob(job);
+            }
+        }
+    }
+  }
+
+  function startScheduler() {
+    checkAndRunJobs(); 
+    setInterval(checkAndRunJobs, 15 * 60 * 1000);
+  }
+
+
+  async function fetchUserLibrary() {
+    try {
+        const rootlist = await Spicetify.Platform.RootlistAPI.getContents();
+
+        const playlistPromises = rootlist.items
+            .filter(item => item.type === 'playlist')
+            .map(async (item) => {
+                const images = item.images || [];
+                if (images.length > 0 || item.imageUrl) {
+                    return {
+                        uri: item.uri,
+                        name: item.name,
+                        info: 'Playlist',
+                        coverUrl: images.length ? (images[images.length - 1] || images[0]).url : item.imageUrl,
+                        type: 'playlist'
+                    };
+                } else {
+                    try {
+                        const playlistId = item.uri.split(':')[2];
+                        const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                        const fetchedImages = playlistData.images || [];
+                        return {
+                            uri: item.uri,
+                            name: item.name,
+                            info: 'Playlist',
+                            coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
+                            type: 'playlist'
+                        };
+                    } catch (error) {
+                        console.warn(`Sort-Play: Could not fetch full details for playlist ${item.name}`, error);
+                        return {
+                            uri: item.uri,
+                            name: item.name,
+                            info: 'Playlist',
+                            coverUrl: null,
+                            type: 'playlist'
+                        };
+                    }
+                }
+            });
+
+        const resolvedPlaylists = await Promise.all(playlistPromises);
+
+        const albumsRes = await Spicetify.CosmosAsync.get('https://api.spotify.com/v1/me/albums?limit=50');
+        const resolvedAlbums = [];
+        if (albumsRes.items) {
+            albumsRes.items.forEach(item => {
+                const images = item.album.images || [];
+                resolvedAlbums.push({
+                    uri: item.album.uri,
+                    name: item.album.name,
+                    info: `Album by ${item.album.artists.map(a => a.name).join(', ')}`,
+                    coverUrl: images.length ? (images[images.length - 1] || images[0]).url : null,
+                    type: 'album'
+                });
+            });
+        }
+        
+        return [...resolvedPlaylists, ...resolvedAlbums];
+
+    } catch (error) {
+        console.error("Failed to fetch user library:", error);
+        return [];
+    }
+  }
+
+  async function showChangeSourceModal(title, libraryItemsPromise, onSourceChanged, isMultiSelect = true) {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-change-source-modal";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        z-index: 2003; display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container";
+    modalContainer.style.cssText = `
+        width: 450px !important; display: flex; flex-direction: column;
+        border-radius: 20px; background-color: #181818 !important; border: 1px solid #282828;
+    `;
+
+    let selectedSources = new Set();
+
+    modalContainer.innerHTML = `
+        <style>
+            #user-library-container {
+                margin-top: 16px;
+                background-color: #282828;
+                border-radius: 6px;
+                padding: 8px;
+                height: 300px;
+                max-height: 300px;
+                overflow-y: auto;
+                scrollbar-width: thin;
+                scrollbar-color: #535353 #282828;
+            }
+            #user-library-container::-webkit-scrollbar { width: 8px; }
+            #user-library-container::-webkit-scrollbar-track { background: #282828; }
+            #user-library-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+            .library-item {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                padding: 8px;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background-color 0.2s ease, border 0.2s ease;
+                border: 1px solid transparent;
+            }
+            .library-item:hover { background-color: #3e3e3e; }
+            .library-item.selected {
+                background-color: #3a4f3a;
+                border: 1px solid #1ed760;
+            }
+            .library-item-cover { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; }
+            .library-item-text { display: flex; flex-direction: column; overflow: hidden; }
+            .library-item-title { color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .library-item-info { color: #b3b3b3; font-size: 12px; }
+            .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+            .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+            .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+            .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+            #search-suggestions {
+                position: fixed;
+                background-color: #282828;
+                border: 1px solid #3e3e3e;
+                border-radius: 6px;
+                z-index: 2005;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+                display: flex;
+                max-height: 450px;
+                overflow: hidden;
+            }
+            .suggestions-column {
+                flex: 1;
+                overflow-y: auto;
+                padding: 4px;
+                scrollbar-width: thin;
+                scrollbar-color: #535353 #282828;
+            }
+            .suggestions-column::-webkit-scrollbar { width: 6px; }
+            .suggestions-column::-webkit-scrollbar-track { background: #282828; }
+            .suggestions-column::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 3px; }
+            .suggestions-column:first-child {
+                border-right: 1px solid #3e3e3e;
+            }
+            .suggestion-item {
+                display: flex;
+                align-items: center;
+                padding: 8px;
+                cursor: pointer;
+                border-radius: 4px;
+            }
+            .suggestion-item:hover {
+                background-color: #3e3e3e;
+            }
+            .suggestion-cover {
+                width: 32px;
+                height: 32px;
+                margin-right: 8px;
+                border-radius: 4px;
+                object-fit: cover;
+                flex-shrink: 0;
+            }
+            .suggestion-text {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                font-size: 14px;
+                color: white;
+            }
+            .suggestion-header {
+                font-size: 12px;
+                font-weight: bold;
+                color: #b3b3b3;
+                padding: 8px 8px 4px;
+                text-transform: uppercase;
+            }
+            #source-clear-btn {
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                color: #b3b3b3;
+                cursor: pointer;
+                font-size: 20px;
+                padding: 0 5px;
+                line-height: 1;
+                display: none; /* Hidden by default */
+            }
+            #source-clear-btn:hover { color: white; }
+        </style>
+        <div class="main-trackCreditsModal-header" style="padding: 20px 24px 10px;">
+            <h1 class="main-trackCreditsModal-title" style="font-size: 20px; font-weight: 700; color: white;">${title}</h1>
+        </div>
+        <div class="main-trackCreditsModal-mainSection" style="padding: 16px 24px; scrollbar-width: none;">
+            <p style="color: #b3b3b3; font-size: 14px; margin: 0 0 12px;">Search for source, paste a link, or select from your library.</p>
+            <div style="position: relative;">
+                <input type="text" id="source-url-input" placeholder="Search or paste link..." style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 30px 8px 12px; color: white; box-sizing: border-box;">
+                <button id="source-clear-btn">&times;</button>
+            </div>
+            <div id="source-change-error" style="color: #f15e6c; font-size: 12px; margin-top: 8px; display: none;"></div>
+            <div id="user-library-container">
+                <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading Library...</div>
+            </div>
+        </div>
+        <div class="main-trackCreditsModal-originalCredits" style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="cancel-change-source" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
+            <button id="confirm-change-source" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none; color: black;">Confirm</button>
+        </div>
+    `;
+    
+    const suggestionsContainer = document.createElement('div');
+    suggestionsContainer.id = 'search-suggestions';
+    suggestionsContainer.style.display = 'none';
+    document.body.appendChild(suggestionsContainer);
+
+    const searchInput = modalContainer.querySelector('#source-url-input');
+    const clearButton = modalContainer.querySelector('#source-clear-btn');
+    const libraryContainer = modalContainer.querySelector('#user-library-container');
+
+    const positionSuggestionsPanel = () => {
+        if (suggestionsContainer.style.display === 'none') return;
+        const rect = searchInput.getBoundingClientRect();
+        suggestionsContainer.style.top = `${rect.bottom + 4}px`;
+        suggestionsContainer.style.left = `${rect.left}px`;
+        suggestionsContainer.style.width = `${rect.width}px`;
+    };
+
+    const hideSuggestions = () => {
+        suggestionsContainer.style.display = 'none';
+        suggestionsContainer.innerHTML = '';
+    };
+
+    const renderSuggestions = (playlists = [], artists = []) => {
+        if (playlists.length === 0 && artists.length === 0) {
+            hideSuggestions();
+            return;
+        }
+
+        suggestionsContainer.innerHTML = `
+            <div class="suggestions-column">
+                <div class="suggestion-header">Playlists</div>
+                ${playlists.map(item => `
+                    <div class="suggestion-item" data-uri="${item.uri}" data-url="${item.external_urls.spotify}">
+                        <img src="${item.images[0]?.url || ''}" class="suggestion-cover">
+                        <span class="suggestion-text" title="${item.name}">${item.name}</span>
+                    </div>
+                `).join('')}
+            </div>
+            <div class="suggestions-column">
+                <div class="suggestion-header">Artists</div>
+                ${artists.map(item => `
+                    <div class="suggestion-item" data-uri="${item.uri}" data-url="${item.external_urls.spotify}">
+                        <img src="${item.images[0]?.url || ''}" class="suggestion-cover">
+                        <span class="suggestion-text" title="${item.name}">${item.name}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        suggestionsContainer.style.display = 'flex';
+        positionSuggestionsPanel();
+
+        suggestionsContainer.querySelectorAll('.suggestion-item').forEach(itemEl => {
+            itemEl.addEventListener('click', () => {
+                const uri = itemEl.dataset.uri;
+                const url = itemEl.dataset.url;
+                searchInput.value = url;
+                clearButton.style.display = 'block';
+                
+                selectedSources.add(uri);
+                hideSuggestions();
+                
+                const libraryItem = libraryContainer.querySelector(`.library-item[data-uri="${uri}"]`);
+                if (libraryItem) {
+                    libraryItem.classList.add('selected');
+                }
+            });
+        });
+    };
+
+    const performSearch = async () => {
+        const query = searchInput.value.trim();
+        if (query.length < 3 || query.startsWith('http')) {
+            hideSuggestions();
+            return;
+        }
+        try {
+            const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist,artist&limit=8`);
+            renderSuggestions(res.playlists?.items, res.artists?.items);
+        } catch (e) {
+            console.error("Search failed:", e);
+            hideSuggestions();
+        }
+    };
+
+    const debouncedSearch = debounce(performSearch, 300);
+    searchInput.addEventListener('input', () => {
+        clearButton.style.display = searchInput.value.length > 0 ? 'block' : 'none';
+        debouncedSearch();
+    });
+
+    clearButton.addEventListener('click', () => {
+        searchInput.value = '';
+        clearButton.style.display = 'none';
+        hideSuggestions();
+        searchInput.focus();
+    });
+
+    const outsideClickListener = (event) => {
+        if (!modalContainer.contains(event.target) && !suggestionsContainer.contains(event.target)) {
+            hideSuggestions();
+        }
+    };
+    document.addEventListener('click', outsideClickListener, true);
+    window.addEventListener('resize', positionSuggestionsPanel);
+    window.addEventListener('scroll', positionSuggestionsPanel, true);
+
+    const closeModal = () => {
+        document.removeEventListener('click', outsideClickListener, true);
+        window.removeEventListener('resize', positionSuggestionsPanel);
+        window.removeEventListener('scroll', positionSuggestionsPanel, true);
+        suggestionsContainer.remove();
+        overlay.remove();
+    };
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+    modalContainer.querySelector('#cancel-change-source').addEventListener('click', closeModal);
+
+    const processUri = async (uri) => {
+        const uriObj = Spicetify.URI.fromString(uri);
+        const newUri = uriObj.toURI();
+        let newSourceData = { uri: newUri };
+
+        if (URI.isPlaylistV1OrV2(newUri)) {
+            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${newUri.split(":")[2]}`);
+            newSourceData.name = data.name;
+            newSourceData.info = `Playlist by ${data.owner.display_name}`;
+            newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
+            newSourceData.isStatic = false;
+        } else if (URI.isArtist(newUri)) {
+            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${newUri.split(":")[2]}`);
+            newSourceData.name = data.name;
+            newSourceData.info = `Artist Page`;
+            newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
+            newSourceData.isStatic = true;
+        } else if (URI.isAlbum(newUri)) {
+            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${newUri.split(":")[2]}`);
+            newSourceData.name = data.name;
+            newSourceData.info = `Album by ${data.artists.map(a => a.name).join(', ')}`;
+            newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
+            newSourceData.isStatic = true;
+        } else {
+            throw new Error("Unsupported link type. Please use a Playlist, Album, or Artist link.");
+        }
+        return newSourceData;
+    };
+
+    modalContainer.querySelector('#confirm-change-source').addEventListener('click', async (e) => {
+        const confirmButton = e.currentTarget;
+        const errorDiv = modalContainer.querySelector('#source-change-error');
+        errorDiv.style.display = 'none';
+        
+        const url = searchInput.value.trim();
+        
+        if (url && url.startsWith('http')) {
+            try {
+                const uriObj = Spicetify.URI.fromString(url);
+                selectedSources.add(uriObj.toURI());
+            } catch (err) {
+                errorDiv.textContent = "Invalid Spotify link pasted.";
+                errorDiv.style.display = 'block';
+                return;
+            }
+        }
+
+        if (selectedSources.size === 0) {
+            errorDiv.textContent = "Please select an item or paste a link.";
+            errorDiv.style.display = 'block';
+            return;
+        }
+
+        confirmButton.disabled = true;
+        confirmButton.textContent = 'Verifying...';
+
+        try {
+            const sourcesData = await Promise.all(Array.from(selectedSources).map(uri => processUri(uri)));
+            onSourceChanged(sourcesData);
+            closeModal();
+        } catch (error) {
+            errorDiv.textContent = error.message || "Invalid or unsupported Spotify link.";
+            errorDiv.style.display = 'block';
+            console.error("Error parsing source URL(s):", error);
+        } finally {
+            confirmButton.disabled = false;
+            confirmButton.textContent = 'Confirm';
+        }
+    });
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    const container = modalContainer.querySelector('#user-library-container');
+    try {
+        const libraryItems = await libraryItemsPromise;
+        if (libraryItems && libraryItems.length > 0) {
+            container.innerHTML = libraryItems.map(item => `
+                <div class="library-item" data-uri="${item.uri}">
+                    <img src="${item.coverUrl || ''}" class="library-item-cover">
+                    <div class="library-item-text">
+                        <span class="library-item-title" title="${item.name}">${item.name}</span>
+                        <span class="library-item-info">${item.info}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            container.querySelectorAll('.library-item').forEach(itemEl => {
+                itemEl.addEventListener('click', async () => {
+                    const uri = itemEl.dataset.uri;
+                    if (selectedSources.has(uri)) {
+                        selectedSources.delete(uri);
+                        itemEl.classList.remove('selected');
+                    } else {
+                        selectedSources.add(uri);
+                        itemEl.classList.add('selected');
+                    }
+                });
+            });
+            
+        } else {
+            container.innerHTML = '<div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Could not load library.</div>';
+        }
+    } catch (error) {
+        console.error("Failed to load library for modal:", error);
+        container.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>';
+    }
+  }
+
+  function showDynamicPlaylistsWindow() {
+    const existingModal = document.getElementById('sort-play-dynamic-playlist-modal');
+    if (existingModal) existingModal.remove();
+
+    let userLibraryPromise = null;
+
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-dynamic-playlist-modal";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        z-index: 2002; display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container";
+    modalContainer.style.cssText = `
+        width: 550px !important; display: flex; flex-direction: column;
+        border-radius: 30px; background-color: #181818 !important; border: 2px solid #282828;
+    `;
+
+    const closeModal = () => overlay.remove();
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+    const penIconSvg = `<svg width="16px" height="16px" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M2.25,12.9378906 L2.25,15.75 L5.06210943,15.75 L13.3559575,7.45615192 L10.5438481,4.64404249 L2.25,12.9378906 L2.25,12.9378906 L2.25,12.9378906 Z M15.5306555,5.28145396 C15.8231148,4.98899458 15.8231148,4.5165602 15.5306555,4.22410082 L13.7758992,2.46934454 C13.4834398,2.17688515 13.0110054,2.17688515 12.718546,2.46934454 L11.3462366,3.84165394 L14.1583461,6.65376337 L15.5306555,5.28145396 L15.5306555,5.28145396 L15.5306555,5.28145396 Z"></path></svg>`;
+
+    const formatTimeAgo = (timestamp) => {
+        if (!timestamp) return 'Never';
+        const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+        let interval = seconds / 31536000;
+        if (interval > 1) return Math.floor(interval) + " years ago";
+        interval = seconds / 2592000;
+        if (interval > 1) return Math.floor(interval) + " months ago";
+        interval = seconds / 86400;
+        if (interval > 1) return Math.floor(interval) + " days ago";
+        interval = seconds / 3600;
+        if (interval > 1) return Math.floor(interval) + " hours ago";
+        interval = seconds / 60;
+        if (interval > 1) return Math.floor(interval) + " minutes ago";
+        return "Just now";
+    };
+
+    const renderJobList = () => {
+        const jobs = getJobs();
+        const scheduleMap = {
+            10800000: 'Every 3 Hours', 21600000: 'Every 6 Hours',
+            86400000: 'Daily', 604800000: 'Weekly', 2592000000: 'Monthly',
+            'release-weekly': 'Weekly (on Friday)',
+            'release-every-two-weeks': 'Every Two Weeks (on Friday)',
+            'release-monthly': 'Monthly (on a Friday)',
+            'manual': 'Manual Only'
+        };
+        const customSchedules = getCustomSchedules();
+        customSchedules.forEach(schedule => {
+            scheduleMap[schedule.value] = schedule.text;
+        });
+
+        const sortTypeMap = buttonStyles.menuItems.flatMap(i => i.children || i).reduce((acc, item) => {
+            if (item.sortType) acc[item.sortType] = item.text;
+            return acc;
+        }, {});
+
+        let jobsHtml = jobs.map(job => `
+            <div class="job-item ${job.isDeleted ? 'deleted' : ''}" data-job-id="${job.id}">
+            <div class="job-cover-art-container">
+                <img 
+                    src="${job.coverUrl || ''}" 
+                    alt="${job.targetPlaylistName || job.sourceName}" 
+                    style="visibility: hidden;" 
+                    onerror="this.remove()"
+                >
+            </div>
+                <div class="job-details">
+                    <span class="job-source-name" title="${job.targetPlaylistName || job.sourceName}">${job.targetPlaylistName || job.sourceName}</span>
+                    <span class="job-info">${sortTypeMap[job.sortType] || 'Unknown Sort'} &bull; ${scheduleMap[job.schedule] || 'Custom'}</span>
+                    <div class="job-status-line">
+                        <span class="job-last-run">Last run: ${formatTimeAgo(job.lastRun)}</span>
+                        <span class="job-deleted-status">${job.isDeleted ? '• Playlist not in library' : ''}</span>
+                    </div>
+                </div>
+                <div class="job-actions">
+                    <button class="job-action-btn job-run-btn" data-job-id="${job.id}" title="Run Now" ${runningJobIds.has(job.id) ? 'disabled' : ''}>&#x25B6;</button>
+                    <button class="job-action-btn job-edit-btn" data-job-id="${job.id}" title="Edit Job">${penIconSvg}</button>
+                    <button class="job-action-btn job-delete-btn" data-job-id="${job.id}" title="Delete Job">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        if (jobs.length === 0) {
+            jobsHtml = `<div class="no-jobs-message">No dynamic playlists scheduled.</div>`;
+        }
+
+        modalContainer.innerHTML = `
+            <style>
+                .dynamic-playlist-modal .main-trackCreditsModal-mainSection { 
+                    padding: 24px 32px 38px !important; 
+                    max-height: 70vh; 
+                    flex-grow: 1; 
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+                .dynamic-playlist-modal .job-list-header { 
+                    display: flex; 
+                    justify-content: flex-end; 
+                    align-items: center; 
+                    margin-bottom: 20px; 
+                    flex-shrink: 0;
+                }
+                .dynamic-playlist-modal .job-list-container {
+                    flex-grow: 1;
+                    overflow-y: auto;
+                    margin-right: -16px;
+                    padding-right: 16px;
+                    scrollbar-width: thin;
+                    scrollbar-color: #535353 transparent;
+                }
+                .dynamic-playlist-modal .job-list-container::-webkit-scrollbar { width: 8px; }
+                .dynamic-playlist-modal .job-list-container::-webkit-scrollbar-track { background: transparent; }
+                .dynamic-playlist-modal .job-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+                .dynamic-playlist-modal .job-list { 
+                    display: flex; 
+                    flex-direction: column; 
+                    gap: 10px; 
+                }
+                .dynamic-playlist-modal .job-item { 
+                    display: flex; 
+                    align-items: center; 
+                    gap: 16px;
+                    background-color: #282828; 
+                    padding: 15px; 
+                    border-radius: 8px; 
+                    transition: background-color 0.2s; 
+                }
+                .dynamic-playlist-modal .job-item.deleted {
+                    background-color: #431919;
+                }
+                .dynamic-playlist-modal .job-item.deleted:hover {
+                    background-color: #5a2e2e;
+                }
+                .dynamic-playlist-modal .job-cover-art-container {
+                    width: 70px;
+                    height: 70px;
+                    border-radius: 4px;
+                    flex-shrink: 0;
+                    background-color: #353535;
+                    color: #b3b3b3;
+                    background-image: ${PLACEHOLDER_SVG_DATA_URI};
+                    background-size: 45%;
+                    background-position: center;
+                    background-repeat: no-repeat;
+                }
+                .dynamic-playlist-modal .job-cover-art-container img {
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 4px;
+                    object-fit: cover;
+                }
+                .dynamic-playlist-modal .job-item:hover { 
+                    background-color: #383838; 
+                }
+                .dynamic-playlist-modal .job-details { 
+                    flex-grow: 1; 
+                    display: flex; 
+                    flex-direction: column; 
+                    gap: 4px; 
+                    overflow: hidden; 
+                }
+                .dynamic-playlist-modal .job-source-name { 
+                    color: white; 
+                    font-weight: 500; 
+                    font-size: 1rem; 
+                    white-space: nowrap; 
+                    overflow: hidden; 
+                    text-overflow: ellipsis; 
+                    max-width: 350px; 
+                }
+                .dynamic-playlist-modal .job-info, .job-last-run { 
+                    color: #b3b3b3; 
+                    font-size: 0.875rem; 
+                }
+                .dynamic-playlist-modal .job-status-line {
+                    display: flex;
+                    align-items: center;
+                }
+                .dynamic-playlist-modal .job-deleted-status {
+                    color: #ff8a8a;
+                    font-weight: 500;
+                    font-size: 0.875rem;
+                    margin-left: 3px;
+                }
+                .dynamic-playlist-modal .job-actions {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .dynamic-playlist-modal .job-action-btn {
+                    background: none;
+                    border: none;
+                    color: #b3b3b3;
+                    cursor: pointer;
+                    padding: 4px;
+                    line-height: 1;
+                    border-radius: 50%;
+                    transition: background-color 0.2s, color 0.2s;
+                    width: 24px;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .dynamic-playlist-modal .job-action-btn:hover {
+                    background-color: rgba(255,255,255,0.1);
+                    color: white;
+                }
+                .dynamic-playlist-modal .job-action-btn:disabled {
+                    opacity: 0.5;
+                    color: #666;
+                }
+                .dynamic-playlist-modal .job-action-btn:disabled:hover {
+                    background-color: transparent;
+                    color: #666;
+                }
+                .dynamic-playlist-modal .job-run-btn {
+                    font-size: 12px;
+                }
+                .dynamic-playlist-modal .no-jobs-message { 
+                    color: #b3b3b3; 
+                    text-align: center; 
+                    padding: 20px; 
+                }
+                .dynamic-playlist-modal .main-trackCreditsModal-closeBtn { 
+                    background: transparent; 
+                    border: 0; 
+                    padding: 0; 
+                    color: #b3b3b3; 
+                    cursor: pointer; 
+                    transition: color 0.2s ease; 
+                }
+                .dynamic-playlist-modal .main-trackCreditsModal-closeBtn:hover { 
+                    color: #ffffff; 
+                }
+                .dynamic-playlist-modal .main-button-primary {
+                    background-color: #1ED760;
+                    color: black;
+                    padding: 8px 18px;
+                    border-radius: 20px;
+                    font-weight: 550;
+                    font-size: 13px;
+                    text-transform: uppercase;
+                    border: none;
+                    cursor: pointer;
+                    transition: background-color 0.1s ease;
+                }
+                .dynamic-playlist-modal .main-button-primary:hover {
+                    background-color: #3BE377;
+                }
+            </style>
+            <div class="dynamic-playlist-modal">
+                <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+                    <h1 class="main-trackCreditsModal-title" style="font-size: 24px; font-weight: 700; color: white;">Dynamic Playlists (beta)</h1>
+                    <button id="closeDynamicPlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+                        <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+                    </button>
+                </div>
+                <div class="main-trackCreditsModal-mainSection">
+                    <div class="job-list-header">
+                        <button id="create-new-job-btn" class="main-buttons-button main-button-primary">Create New</button>
+                    </div>
+                    <div class="job-list-container">
+                        <div class="job-list">${jobsHtml}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const imageElements = modalContainer.querySelectorAll('.job-cover-art-container img');
+        imageElements.forEach(img => {
+            const showImage = () => {
+                img.style.visibility = 'visible';
+            };
+
+            if (img.complete) {
+                showImage();
+            } else {
+                img.addEventListener('load', showImage);
+            }
+        });
+
+        modalContainer.querySelector('#closeDynamicPlaylistModal').addEventListener('click', closeModal);
+        modalContainer.querySelector('#create-new-job-btn').addEventListener('click', () => renderJobForm());
+        
+        modalContainer.querySelectorAll('.job-run-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const jobId = e.currentTarget.dataset.jobId;
+                const job = jobs.find(j => j.id === jobId);
+                if (!job) return;
+        
+                runningJobIds.add(job.id);
+                closeModal();
+        
+                Spicetify.showNotification(`Running job for "${job.targetPlaylistName}"...`);
+        
+                try {
+                    const updatedJob = await runJob(job);
+                    updateJob(updatedJob);
+                    Spicetify.showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
+                } catch (error) {
+                    console.error(`Failed to manually run dynamic playlist job for "${job.targetPlaylistName}":`, error);
+                    Spicetify.showNotification(`Failed to update dynamic playlist: ${job.targetPlaylistName}`, true);
+                } finally {
+                    runningJobIds.delete(job.id);
+                }
+            });
+        });
+
+        modalContainer.querySelectorAll('.job-edit-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const jobId = e.currentTarget.dataset.jobId;
+                const jobToEdit = jobs.find(j => j.id === jobId);
+                if (jobToEdit) {
+                    renderJobForm(jobToEdit);
+                }
+            });
+        });
+
+        modalContainer.querySelectorAll('.job-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const jobId = e.currentTarget.dataset.jobId;
+                const job = jobs.find(j => j.id === jobId);
+                if (!job) return;
+
+                const confirmed = await showConfirmationModal({
+                    title: "Delete Dynamic Playlist?",
+                    description: `This will stop future updates for "${job.targetPlaylistName || job.sourceName}" but will NOT delete the created playlist. Are you sure?`,
+                    confirmText: "Delete",
+                    cancelText: "Cancel",
+                });
+
+                if (confirmed === 'confirm') {
+                    deleteJob(jobId);
+                    renderJobList();
+                }
+            });
+        });
+
+        (async () => {
+            const rootlist = await Spicetify.Platform.RootlistAPI.getContents();
+            
+            function getAllPlaylistUris(items) {
+                let uris = [];
+                for (const item of items) {
+                    if (item.type === 'playlist') {
+                        uris.push(item.uri);
+                    } else if (item.type === 'folder' && Array.isArray(item.items)) {
+                        uris.push(...getAllPlaylistUris(item.items));
+                    }
+                }
+                return uris;
+            }
+        
+            const allPlaylistUris = getAllPlaylistUris(rootlist.items);
+            const userPlaylistUris = new Set(allPlaylistUris);
+
+            let jobsWereUpdated = false;
+            const mutableJobs = JSON.parse(JSON.stringify(jobs)); 
+
+            const updatePromises = mutableJobs.map(async (job) => {
+                if (!job.targetPlaylistUri) return;
+
+                const jobItemElement = modalContainer.querySelector(`.job-item[data-job-id="${job.id}"]`);
+
+                if (!userPlaylistUris.has(job.targetPlaylistUri)) {
+                    if (!job.isDeleted) {
+                        job.isDeleted = true;
+                        jobsWereUpdated = true;
+                    }
+                    if (jobItemElement && !jobItemElement.classList.contains('deleted')) {
+                        jobItemElement.classList.add('deleted');
+                        const deletedStatusElement = jobItemElement.querySelector('.job-deleted-status');
+                        if (deletedStatusElement) {
+                            deletedStatusElement.textContent = '• Playlist not in library';
+                        }
+                    }
+                    return;
+                }
+
+                try {
+                    const playlistId = job.targetPlaylistUri.split(':')[2];
+                    const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                    
+                    if (job.isDeleted) {
+                        job.isDeleted = false;
+                        jobsWereUpdated = true;
+                        if (jobItemElement) {
+                            jobItemElement.classList.remove('deleted');
+                            const deletedStatusElement = jobItemElement.querySelector('.job-deleted-status');
+                            if (deletedStatusElement) {
+                                deletedStatusElement.textContent = '';
+                            }
+                            const lastRunElement = jobItemElement.querySelector('.job-last-run');
+                            if (lastRunElement) {
+                                lastRunElement.textContent = `Last run: ${formatTimeAgo(job.lastRun)}`;
+                            }
+                        }
+                    }
+
+                    const currentCoverUrl = playlistData.images?.length ? (playlistData.images[playlistData.images.length - 1] || playlistData.images[0]).url : null;
+                    if (currentCoverUrl && (!job.coverUrl || currentCoverUrl !== job.coverUrl)) {
+                        job.coverUrl = currentCoverUrl;
+                        jobsWereUpdated = true;
+                        const imgElement = jobItemElement.querySelector('.job-cover-art-container img');
+                        if (imgElement) {
+                            imgElement.style.visibility = 'hidden'; 
+                            imgElement.src = currentCoverUrl;
+                        }
+                    }
+
+                    const currentName = playlistData.name;
+                    if (currentName && currentName !== job.targetPlaylistName) {
+                        job.targetPlaylistName = currentName;
+                        jobsWereUpdated = true;
+                        const nameElement = jobItemElement.querySelector('.job-source-name');
+                        if (nameElement) {
+                            nameElement.textContent = currentName;
+                            nameElement.title = currentName;
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`[Sort-Play Dynamic] Could not verify details for "${job.sourceName}".`, error);
+                }
+            });
+
+            await Promise.all(updatePromises);
+
+            if (jobsWereUpdated) {
+                saveJobs(mutableJobs);
+                renderJobList();
+            }
+        })();
+    };
+
+    const renderJobForm = async (jobToEdit = null) => {
+        if (!userLibraryPromise) {
+            userLibraryPromise = fetchUserLibrary();
+        }
+        
+        const isEditing = !!jobToEdit;
+        let sources = isEditing ? [...jobToEdit.sources] : [];
+
+        let currentDeduplicate = isEditing ? jobToEdit.deduplicate : playlistDeduplicate;
+        let currentUpdateFromSource = isEditing ? jobToEdit.updateFromSource : (localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === null ? true : localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === 'true');
+        
+        if (!isEditing && sources.length === 0) {
+            let sourceUri = getCurrentUri();
+            if (sourceUri) {
+                try {
+                    let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false;
+                    if (URI.isPlaylistV1OrV2(sourceUri)) {
+                        const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`);
+                        sourceName = data.name; sourceInfo = `Playlist by ${data.owner.display_name}`; sourceCoverUrl = data.images[0]?.url;
+                    } else if (URI.isArtist(sourceUri)) {
+                        const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`);
+                        sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true;
+                    } else if (isLikedSongsPage(sourceUri)) {
+                        sourceName = "Liked Songs"; sourceInfo = "Your collection"; sourceCoverUrl = 'https://misc.scdn.co/liked-songs/liked-songs-640.png';
+                    } else if (URI.isAlbum(sourceUri)) {
+                        const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
+                        sourceName = data.name; sourceInfo = `Album by ${data.artists.map(a => a.name).join(', ')}`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true;
+                    }
+                    sources.push({ uri: sourceUri, name: sourceName, info: sourceInfo, coverUrl: sourceCoverUrl, isStatic: isStaticSource });
+                } catch (e) { console.error("Could not fetch source details", e); }
+            }
+        }
+
+        const savedSortType = localStorage.getItem(STORAGE_KEY_DYNAMIC_SORT_TYPE) || 'playCount';
+        const savedSchedule = localStorage.getItem(STORAGE_KEY_DYNAMIC_SCHEDULE) || '86400000';
+        const savedDeduplicate = playlistDeduplicate;
+        const savedUpdateSource = localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === null ? true : localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === 'true';
+
+        const sortOptions = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent').children
+            .map(opt => `<option value="${opt.sortType}" ${ (isEditing ? jobToEdit.sortType : savedSortType) === opt.sortType ? 'selected' : ''}>${opt.text}</option>`).join('');
+
+        const customSchedules = getCustomSchedules();
+        const customScheduleOptions = customSchedules.map(s => `<option value="${s.value}" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === String(s.value) ? 'selected' : ''}>${s.text}</option>`).join('');
+        
+        let clearAndSeparatorHtml = '';
+        if (customSchedules.length > 0) {
+            clearAndSeparatorHtml = `
+                <option value="clear-custom" style="color: #f15e6c; font-style: italic;">Clear Custom Schedules...</option>
+            `;
+        }
+        modalContainer.innerHTML = `
+          <style>
+              .job-form-modal .main-trackCreditsModal-mainSection { 
+                  padding: 24px 32px 38px !important; display: flex; flex-direction: column; gap: 16px; scrollbar-width: none;
+              }
+              .job-form-modal .card { background-color: #282828; border-radius: 8px; padding: 16px; }
+              .job-form-modal .card-title { font-weight: 700; color: white; margin-bottom: 12px; font-size: 1rem; }
+              .job-form-modal #source-list-container { display: flex; flex-direction: column; gap: 8px; max-height: 145px; overflow-y: auto; padding-right: 5px; margin-right: -4px;scrollbar-width: thin; overflow-y: scroll;}
+              .job-form-modal .source-item { display: flex; align-items: center; gap: 8px; background-color: #3e3e3e; padding: 8px; border-radius: 6px; }
+              .job-form-modal .source-cover-art-small { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+              .job-form-modal .source-text-info { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+              .job-form-modal .source-name { color: white; font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+              .job-form-modal .source-info { color: #b3b3b3; font-size: 12px; margin-top: 2px; }
+              .job-form-modal .source-item-actions { display: flex; align-items: center; gap: 4px; }
+              .job-form-modal .remove-source-btn, .job-form-modal .edit-source-btn { 
+                  background: none; border: none; color: #b3b3b3; cursor: pointer; 
+                  padding: 4px; line-height: 1; border-radius: 50%; 
+                  height: 26px; width: 26px; display: flex; align-items: center; justify-content: center;
+              }
+              .job-form-modal .remove-source-btn { font-size: 20px; }
+              .job-form-modal .remove-source-btn:hover, .job-form-modal .edit-source-btn:hover { 
+                  color: white; background-color: rgba(255,255,255,0.1); 
+              }
+              .job-form-modal .source-actions-container { display: flex; gap: 8px; margin-top: 12px; }
+              .job-form-modal .source-actions-container button {
+                  width: auto;
+                  margin-top: 0;
+                  background-color: rgba(255,255,255,0.1);
+                  border: none;
+                  color: white;
+                  border-radius: 34px;
+                  height: 25px;
+                  border: 1px solid #666;
+              }
+              .job-form-modal .source-actions-container button:hover {
+                  background-color: rgba(255,255,255,0.2);
+                  cursor: pointer;
+                  transition: background-color 0.05s ease;
+              }
+              .job-form-modal #add-source-btn { flex-grow: 1; }
+              .job-form-modal #clear-sources-btn { flex-grow: 0; padding: 0 20px; }
+              .job-form-modal .form-select {
+                  width: 220px; background: #282828; color: white; border: 1px solid #666;
+                  border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 13px; cursor: pointer;
+                  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+                  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+                  background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
+              }
+              .job-form-modal .setting-row { display: flex; justify-content: space-between; align-items: center; }
+              .job-form-modal .card .setting-row + .setting-row { margin-top: 12px; }
+              .job-form-modal .setting-row .description { color: #c1c1c1; font-size: 1rem; }
+              .job-form-modal .setting-row.disabled { opacity: 0.5; pointer-events: none; }
+              .job-form-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+              .job-form-modal .switch input { opacity: 0; width: 0; height: 0; }
+              .job-form-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+              .job-form-modal .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+              .job-form-modal input:checked + .sliderx { background-color: #1DB954; }
+              .job-form-modal input:checked + .sliderx:before { transform: translateX(16px); }
+              .job-form-modal .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
+              .job-form-modal .main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease;}
+              .job-form-modal .main-button-secondary:hover { background-color: #444444; }
+              .job-form-modal .main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+              .job-form-modal .main-button-primary:hover { background-color: #3BE377; }
+              .job-form-modal #playlist-name-input:focus { border: 1px solid #666 !important; }
+              .custom-schedule-container { display: none; align-items: center; gap: 8px; margin-top: 16px; padding: 10px; background-color: #3e3e3e; border-radius: 8px; }
+              .custom-schedule-container.visible { display: flex; }
+              .custom-schedule-container input[type="number"] { width: 60px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center; }
+              .custom-schedule-container label { font-size: 12px; color: #b3b3b3; }
+              .custom-schedule-ok-btn { padding: 6px 12px; border-radius: 15px; border: none; background-color: #1ed760; color: black; font-weight: bold; cursor: pointer; }
+              .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
+              .custom-tooltip {
+                  visibility: hidden; position: absolute; z-index: 2005; background-color: #373737;
+                  color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px;
+                  max-width: 280px; width: max-content; bottom: 100%; left: 50%;
+                  transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                  line-height: 1.4; word-wrap: break-word; text-align: left;
+              }
+              .custom-tooltip::after {
+                  content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+                  border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent;
+              }
+              .tooltip-container:hover .custom-tooltip { visibility: visible; }
+              .job-form-modal #source-error-message {
+                  color: #f15e6c;
+                  font-size: 13px;
+                  text-align: center;
+                  margin-top: 8px;
+                  margin-bottom: 4px;
+              }
+          </style>
+            <div class="job-form-modal">
+                <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+                    <h1 class="main-trackCreditsModal-title" style="font-size: 24px; font-weight: 700; color: white;">${isEditing ? 'Edit' : 'New'} Dynamic Playlist</h1>
+                    <button id="closeDynamicPlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+                        <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+                    </button>
+                </div>
+                <div class="main-trackCreditsModal-mainSection">
+                    <div class="card">
+                        <div class="card-title">Sources</div>
+                        <div id="source-list-container"></div>
+                        <div id="source-error-message" style="display: none;"></div>
+                        <div class="source-actions-container">
+                            <button id="add-source-btn" class="main-buttons-button main-button-secondary">+ Add Source</button>
+                            <button id="clear-sources-btn" class="main-buttons-button main-button-secondary">Clear</button>
+                        </div>
+                        <div style="margin-top: 16px;">
+                            <label for="playlist-name-input" style="display: block; color: #b3b3b3; font-size: 0.875rem; margin-bottom: 8px;">New Playlist Name</label>
+                            <input type="text" id="playlist-name-input" value="" style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 12px; color: white; box-sizing: border-box;">
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Configuration</div>
+                        <div class="setting-row">
+                            <span class="description">Sort Method</span>
+                            <select id="sort-type-select" class="form-select">${sortOptions}</select>
+                        </div>
+                        <div class="setting-row" style="align-items: start;">
+                             <span class="description" style="padding-top: 8px;">Update Schedule</span>
+                            <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                                <select id="schedule-select" class="form-select">
+                                    <option value="manual" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'manual' ? 'selected' : ''}>Manual Only</option>
+                                    <option value="10800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
+                                    <option value="21600000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
+                                    <option value="86400000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
+                                    <option value="604800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
+                                    <option value="2592000000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
+                                    <option disabled>— Release Day Schedules —</option>
+                                    <option value="release-weekly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-weekly' ? 'selected' : ''}>Weekly (on Friday)</option>
+                                    <option value="release-every-two-weeks" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
+                                    <option value="release-monthly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
+                                    <option disabled>— Custom Schedules —</option>
+                                    ${customScheduleOptions}
+                                    <option value="custom">+ Custom</option>
+                                    ${clearAndSeparatorHtml}
+                                </select>
+                                <div id="custom-schedule-container" class="custom-schedule-container">
+                                    <input type="number" id="days" min="0" value="0"><label for="days">d</label>
+                                    <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
+                                    <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
+                                    <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Settings</div>
+                            <div class="setting-row">
+                            <span class="description">Deduplicate tracks</span>
+                            <label class="switch"><input type="checkbox" id="deduplicate-toggle" ${currentDeduplicate ? 'checked' : ''}><span class="sliderx"></span></label>
+                        </div>
+                        <div class="setting-row" id="update-source-row">
+                            <span class="description">
+                                Always update from original source
+                                <span class="tooltip-container">
+                                    <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                                    <span class="custom-tooltip">Enabled: Fetches fresh tracks from the source(s) for each update.<br><br>Disabled: Only re-sorts the tracks already inside this dynamic playlist.</span>
+                                </span>
+                            </span>
+                            <label class="switch"><input type="checkbox" id="update-source-toggle" ${currentUpdateFromSource ? 'checked' : ''}><span class="sliderx"></span></label>
+                        </div>
+                    </div>
+                </div>
+                <div class="main-trackCreditsModal-originalCredits" style="padding: 24px 32px !important; border-top: 1px solid #282828;">
+                    <div class="form-actions">
+                        <button id="cancel-job-btn" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
+                        <button id="save-job-btn" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">${isEditing ? 'Save Changes' : 'Save & Create'}</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const playlistNameInput = modalContainer.querySelector('#playlist-name-input');
+        const updateSourceRow = modalContainer.querySelector('#update-source-row');
+        const updateSourceToggle = modalContainer.querySelector('#update-source-toggle');
+        const deduplicateToggle = modalContainer.querySelector('#deduplicate-toggle');
+
+        deduplicateToggle.addEventListener('change', (e) => {
+            currentDeduplicate = e.target.checked;
+        });
+        updateSourceToggle.addEventListener('change', (e) => {
+            currentUpdateFromSource = e.target.checked;
+        });
+
+        const updateFormState = () => {
+            if (!isEditing) {
+                if (sources.length === 0) {
+                    playlistNameInput.value = "Dynamic Playlist";
+                } else if (sources.length === 1) {
+                    playlistNameInput.value = `${sources[0].name} (Dynamic)`;
+                } else {
+                    playlistNameInput.value = "Combined Dynamic Playlist";
+                }
+            } else {
+                playlistNameInput.value = jobToEdit.targetPlaylistName;
+            }
+        
+            updateSourceRow.classList.toggle('disabled', false);
+            updateSourceToggle.checked = currentUpdateFromSource;
+        };
+
+        const renderSources = () => {
+            const container = modalContainer.querySelector('#source-list-container');
+            const sourceErrorEl = modalContainer.querySelector('#source-error-message');
+
+            if (sourceErrorEl && sources.length > 0) {
+                sourceErrorEl.style.display = 'none';
+            }
+
+            if (!container) return;
+            container.innerHTML = sources.map((source, index) => `
+                <div class="source-item" data-uri="${source.uri}">
+                    <img src="${source.coverUrl || 'https://i.imgur.com/33q4t4k.png'}" class="source-cover-art-small">
+                    <div class="source-text-info">
+                        <div class="source-name" title="${source.name}">${source.name}</div>
+                        <div class="source-info">${source.info}</div>
+                    </div>
+                    <div class="source-item-actions">
+                        <button class="edit-source-btn" data-index="${index}" title="Change source">${penIconSvg}</button>
+                        <button class="remove-source-btn" data-index="${index}" title="Remove source">&times;</button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.querySelectorAll('.edit-source-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const indexToChange = parseInt(e.currentTarget.dataset.index, 10);
+                    showChangeSourceModal(
+                        "Change Source",
+                        userLibraryPromise,
+                        (newSourcesData) => {
+                            const existingUris = sources
+                                .filter((_, i) => i !== indexToChange)
+                                .map(s => s.uri);
+
+                            const uniqueNewSources = newSourcesData.filter(newSource => !existingUris.includes(newSource.uri));
+
+                            if (uniqueNewSources.length < newSourcesData.length) {
+                                Spicetify.showNotification("Some selected sources were already in the list and have been ignored.");
+                            }
+
+                            if (uniqueNewSources.length > 0) {
+                                sources.splice(indexToChange, 1, ...uniqueNewSources);
+                            } else {
+                                sources.splice(indexToChange, 1);
+                            }
+                            renderSources();
+                        },
+                        true 
+                    );
+                });
+            });
+
+            container.querySelectorAll('.remove-source-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const indexToRemove = parseInt(e.currentTarget.dataset.index, 10);
+                    sources.splice(indexToRemove, 1);
+                    renderSources();
+                    updateFormState();
+                });
+            });
+            updateFormState();
+        };
+
+        renderSources();
+
+        modalContainer.querySelector('#clear-sources-btn').addEventListener('click', () => {
+            sources.length = 0;
+            renderSources();
+            updateFormState();
+        });
+
+        modalContainer.querySelector('#add-source-btn').addEventListener('click', () => {
+            showChangeSourceModal(
+                "Add Source",
+                userLibraryPromise,
+                (newSourcesData) => {
+                    newSourcesData.forEach(newSource => {
+                        if (!sources.some(s => s.uri === newSource.uri)) {
+                            sources.push(newSource);
+                        } else {
+                            Spicetify.showNotification(`Source "${newSource.name}" is already in the list.`);
+                        }
+                    });
+                    renderSources();
+                },
+                true
+            );
+        });
+
+        const scheduleSelect = modalContainer.querySelector('#schedule-select');
+        const customScheduleContainer = modalContainer.querySelector('#custom-schedule-container');
+        
+        modalContainer.querySelector('#sort-type-select').addEventListener('change', (e) => localStorage.setItem(STORAGE_KEY_DYNAMIC_SORT_TYPE, e.target.value));
+        scheduleSelect.addEventListener('change', (e) => localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, e.target.value));
+        
+        let previousScheduleValue = scheduleSelect.value;
+        scheduleSelect.addEventListener('change', async (e) => {
+            const selectedValue = e.target.value;
+
+            if (selectedValue === 'clear-custom') {
+                e.target.value = previousScheduleValue;
+
+                const customSchedules = getCustomSchedules();
+                if (customSchedules.length === 0) {
+                    Spicetify.showNotification("No custom schedules to clear.");
+                    return;
+                }
+
+                const confirmed = await showConfirmationModal({
+                    title: "Clear Custom Schedules?",
+                    description: "This will permanently remove all of your saved custom schedules. This action cannot be undone. Are you sure?",
+                    confirmText: "Clear All",
+                    cancelText: "Cancel",
+                });
+
+                if (confirmed === 'confirm') {
+                    saveCustomSchedules([]);
+                    Spicetify.showNotification("All custom schedules have been cleared.");
+                    await renderJobForm(jobToEdit);
+                }
+            } else {
+                customScheduleContainer.classList.toggle('visible', selectedValue === 'custom');
+                if (selectedValue !== 'custom') {
+                    previousScheduleValue = selectedValue;
+                    localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, selectedValue);
+                }
+            }
+        });
+
+        scheduleSelect.addEventListener('change', () => {
+            customScheduleContainer.classList.toggle('visible', scheduleSelect.value === 'custom');
+        });
+
+        modalContainer.querySelector('#set-custom-schedule-btn').addEventListener('click', () => {
+            const days = parseInt(modalContainer.querySelector('#days').value) || 0;
+            const hours = parseInt(modalContainer.querySelector('#hours').value) || 0;
+            const minutes = parseInt(modalContainer.querySelector('#minutes').value) || 0;
+            
+            const totalMs = (days * 86400000) + (hours * 3600000) + (minutes * 60000);
+            if (totalMs <= 0) {
+                Spicetify.showNotification("Custom schedule must be greater than 0.", true);
+                return;
+            }
+
+            let text = 'Every ';
+            if (days > 0) text += `${days}d `;
+            if (hours > 0) text += `${hours}h `;
+            if (minutes > 0) text += `${minutes}m`;
+            text = text.trim();
+
+            const customSchedules = getCustomSchedules();
+            if (!customSchedules.some(s => s.value === totalMs)) {
+                customSchedules.push({ value: totalMs, text });
+                saveCustomSchedules(customSchedules);
+            }
+
+            const customOption = document.createElement('option');
+            customOption.value = totalMs;
+            customOption.textContent = text;
+            scheduleSelect.insertBefore(customOption, scheduleSelect.querySelector('option[value="custom"]'));
+            scheduleSelect.value = totalMs;
+            localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, totalMs);
+            customScheduleContainer.classList.remove('visible');
+            renderJobForm(jobToEdit); 
+        });
+
+        modalContainer.querySelector('#closeDynamicPlaylistModal').addEventListener('click', renderJobList);
+        modalContainer.querySelector('#cancel-job-btn').addEventListener('click', renderJobList);
+        
+        modalContainer.querySelector('#save-job-btn').addEventListener('click', (e) => {
+            const sourceErrorEl = modalContainer.querySelector('#source-error-message');
+            sourceErrorEl.style.display = 'none';
+
+            if (sources.length === 0) {
+                sourceErrorEl.textContent = "Please add at least one source.";
+                sourceErrorEl.style.display = 'block';
+                return;
+            }
+
+            const scheduleValue = document.getElementById('schedule-select').value;
+            const jobData = {
+                sources: sources,
+                targetPlaylistName: document.getElementById('playlist-name-input').value.trim(),
+                sortType: document.getElementById('sort-type-select').value,
+                deduplicate: currentDeduplicate,
+                updateFromSource: currentUpdateFromSource,
+                schedule: isNaN(parseInt(scheduleValue)) ? scheduleValue : parseInt(scheduleValue),
+            };
+            
+            if (isEditing) {
+                const updatedJob = { ...jobToEdit, ...jobData };
+                updateJob(updatedJob);
+                renderJobList();
+            } else {
+                const newJob = {
+                    ...jobData,
+                    id: crypto.randomUUID(),
+                    createdAt: Date.now(),
+                    lastRun: null,
+                };
+                closeModal();
+                runJob(newJob, true)
+                    .then(completedJob => {
+                        addJob(completedJob);
+                        Spicetify.showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" created successfully!`);
+                    })
+                    .catch(error => {
+                        Spicetify.showNotification(`Error creating dynamic playlist: ${error.message}`, true);
+                        console.error(`[Sort-Play Dynamic] Background job failed for "${newJob.targetPlaylistName}":`, error);
+                    });
+            }
+        });
+    };
+    
+    renderJobList();
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+  }
+
   const GENRE_MAPPINGS = {
     "acoustic": ["acoustic", "acoustic's", "acousticmusic", "acoustics"],
     "adult standards": ["adult standards", "crooner", "easy listening", "lounge", "standards", "traditional pop"],
@@ -8163,7 +9848,7 @@
       visibility: hidden;
       position: absolute;
       z-index: 1;
-      background-color: #282828;
+      background-color: #373737;
       color: white;
       padding: 8px 12px;
       border-radius: 4px;
@@ -8186,7 +9871,7 @@
         margin-left: -5px;
         border-width: 5px;
         border-style: solid;
-        border-color: #282828 transparent transparent transparent;
+        border-color: #373737 transparent transparent transparent;
     }
     
     .tooltip-container:hover .custom-tooltip {
@@ -8578,7 +10263,8 @@
           "\\(Personalized\\)",
           "\\(Power Hour\\)",
           "\\(Mellow Mood\\)",
-          "\\(Hidden Gems\\)"
+          "\\(Hidden Gems\\)",
+          "\\(Dynamic\\)"
       ];
     
       let suffixPattern = new RegExp(
@@ -9658,8 +11344,8 @@
     }
   }
 
-  async function getArtistTracks(artistUri) {
-    const { Locale, GraphQL } = Spicetify;
+  async function getArtistTracks(artistUri, isHeadless = false) {
+    const { Locale, GraphQL, CosmosAsync } = Spicetify;
   
     const queryArtistOverview = {
       name: "queryArtistOverview",
@@ -9667,14 +11353,10 @@
       sha256Hash: "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497",
     };
   
-    const queryArtistAppearsOn = {
-      name: "queryArtistAppearsOn",
-      operation: "query",
-      sha256Hash: "9a4bb7a20d6720fe52d7b47bc001cfa91940ddf5e7113761460b4a288d18a4c1",
-    };
-  
-    mainButton.innerHTML = '<div class="loader"></div>';
-    setButtonProcessing(true);
+    if (!isHeadless) {
+        mainButton.innerHTML = '<div class="loader"></div>';
+        setButtonProcessing(true);
+    }
   
     try {
       const artistData = await GraphQL.Request(queryArtistOverview, {
@@ -9686,20 +11368,12 @@
       if (artistData.errors) throw new Error(artistData.errors[0].message);
       const artistName = artistData.data.artistUnion.profile.name;
       const artistId = artistUri.split(":")[2];
-  
-      const appearsOnData = await GraphQL.Request(queryArtistAppearsOn, {
-        uri: artistUri,
-        offset: 0,
-        limit: 200,
-      });
-  
-      if (appearsOnData.errors) throw new Error(appearsOnData.errors[0].message);
-  
+
       const allAlbumIds = new Set();
       let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
   
       do {
-        const albumRes = await Spicetify.CosmosAsync.get(nextUrl);
+        const albumRes = await CosmosAsync.get(nextUrl);
         if (!albumRes.items) break;
   
         albumRes.items.forEach((album) => {
@@ -9707,102 +11381,49 @@
         });
   
         nextUrl = albumRes.next;
+        if (nextUrl) await new Promise(resolve => setTimeout(resolve, 100)); 
       } while (nextUrl);
   
-      const appearsOnAlbums = appearsOnData.data.artistUnion.relatedContent.appearsOn.items.flatMap(
-        ({ releases }) => releases.items
-      );
-      appearsOnAlbums.forEach((release) => {
-        if (release?.uri) {
-          const albumId = release.uri.split(":")[2];
-          allAlbumIds.add(albumId);
-        }
-      });
-  
-      async function fetchTracksFromAlbum(albumId, retries = 5, delay = 1000) {
-        const albumUri = `spotify:album:${albumId}`;
-        
-        for (let attempt = 1; attempt <= retries; attempt++) {
-          try {
-            const albumRes = await GraphQL.Request(
-              GraphQL.Definitions.getAlbum,
-              {
-                uri: albumUri,
-                locale: Locale.getLocale(),
-                offset: 0,
-                limit: 500,
-              }
-            );
-  
-            let tracks = [];
-            if (albumRes.data?.albumUnion?.tracks) {
-              tracks = albumRes.data.albumUnion.tracks.items;
-            } else if (albumRes.data?.albumUnion?.tracksV2) {
-              tracks = albumRes.data.albumUnion.tracksV2.items;
-            } else {
-              return [];
-            }
-  
-            return tracks
-              .filter((item) => {
-                if (!item?.track?.playability?.playable) return false;
-                const trackArtists = item.track.artists?.items || [];
-                return trackArtists.some(artist => 
-                  artist?.profile?.name === artistName ||
-                  artist?.uri === artistUri
-                );
-              })
-              .map((item) => {
-                const track = item.track;
-                return {
-                  uri: track.uri,
-                  uid: track.uid,
-                  name: track.name,
-                  albumUri: track.albumOfTrack?.uri || albumUri,
-                  albumName: track.albumOfTrack?.name || albumRes.data.albumUnion.name || "Unknown Album",
-                  artistUris: (track.artists?.items || []).map(
-                    (artist) => artist?.uri || "unknown"
-                  ),
-                  artistName:
-                    (track.artists?.items || [])[0]?.profile?.name ||
-                    "Unknown Artist",
-                  allArtists: (track.artists?.items || []).map(artist => artist.profile?.name || "Unknown Artist").join(", "),
-                  durationMilis: track.duration?.totalMilliseconds || 0,
-                  playcount: 0,
-                  popularity: 0,
-                  releaseDate: 0,
-                  track: {
-                    album: {
-                      id: albumId,
-                    },
-                    name: track.name,
-                    duration_ms: track.duration?.totalMilliseconds || 0,
-                    id: track.uri.split(":")[2],
-                  },
-                };
-              });
-          } catch (err) {
-            if (attempt < retries) {
-              await new Promise((resolve) => setTimeout(resolve, delay));
-              delay *= 2;
-            } else {
-              console.error(`Failed to fetch tracks for album ${albumId}:`, err);
-              return [];
-            }
-          }
-        }
-      }
-  
       const allTracks = [];
-      const batchSize = 5;
+      const batchSize = 20; 
       const allAlbumIdArray = Array.from(allAlbumIds);
+      const batchPromises = [];
       
       for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
         const batch = allAlbumIdArray.slice(i, i + batchSize);
-        const batchTracks = await Promise.all(
-          batch.map(albumId => fetchTracksFromAlbum(albumId))
-        );
-        allTracks.push(...batchTracks.flat());
+        const promise = CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`);
+        batchPromises.push(promise);
+      }
+      
+      const albumDataBatches = await Promise.all(batchPromises);
+      
+      for (const batch of albumDataBatches) {
+        if (!batch.albums) continue;
+        for (const album of batch.albums) {
+          if (!album || !album.tracks || !album.tracks.items) continue;
+          
+          const tracksFromAlbum = album.tracks.items
+            .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
+            .map(track => ({
+              uri: track.uri,
+              uid: null, 
+              name: track.name,
+              albumUri: album.uri,
+              albumName: album.name,
+              artistUris: track.artists.map(artist => artist.uri),
+              allArtists: track.artists.map(artist => artist.name).join(", "),
+              artistName: track.artists[0].name,
+              durationMilis: track.duration_ms,
+              playcount: 0, popularity: 0, releaseDate: 0,
+              track: {
+                album: { id: album.id },
+                name: track.name,
+                duration_ms: track.duration_ms,
+                id: track.id,
+              },
+            }));
+          allTracks.push(...tracksFromAlbum);
+        }
       }
   
       const uniqueTracks = allTracks.filter(
@@ -9814,9 +11435,6 @@
     } catch (error) {
       console.error("Error fetching artist tracks:", error);
       throw error;
-    } finally {
-      mainButton.innerText = "Sort Play";
-      mainButton.appendChild(svgElement);
     }
   }
   
@@ -10106,23 +11724,41 @@
     const albumPlayCountData = new Map();
     let processedAlbums = 0;
     const totalAlbums = uniqueAlbumIds.length;
+    const CONCURRENCY_LIMIT = 10;
 
-    const albumPromises = uniqueAlbumIds.map(async (albumId) => {
-        try {
-            const albumTracks = await getPlayCountsForAlbum(albumId);
-            albumPlayCountData.set(albumId, new Map(albumTracks.map(t => [t.uri, t])));
-        } catch (error) {
-            console.error(`Failed to get play counts for album ${albumId}`, error);
-            albumPlayCountData.set(albumId, new Map());
-        } finally {
-            processedAlbums++;
-            if (totalAlbums > 0) {
-                updateProgress(Math.floor((processedAlbums / totalAlbums) * 100));
+    async function processWithConcurrency(items, processorFn) {
+        const results = new Map();
+        const queue = [...items];
+        
+        async function worker() {
+            while (queue.length > 0) {
+                const albumId = queue.shift();
+                if (albumId) {
+                    try {
+                        const albumTracks = await processorFn(albumId);
+                        results.set(albumId, new Map(albumTracks.map(t => [t.uri, t])));
+                    } catch (error) {
+                        console.error(`Failed to process album ${albumId} in pool`, error);
+                        results.set(albumId, new Map());
+                    } finally {
+                        processedAlbums++;
+                        if (totalAlbums > 0) {
+                            updateProgress(Math.floor((processedAlbums / totalAlbums) * 100));
+                        }
+                    }
+                }
             }
         }
-    });
 
-    await Promise.all(albumPromises);
+        const workers = Array(CONCURRENCY_LIMIT).fill(null).map(() => worker());
+        await Promise.all(workers);
+        return results;
+    }
+
+    const processedData = await processWithConcurrency(uniqueAlbumIds, getPlayCountsForAlbum);
+    processedData.forEach((value, key) => {
+        albumPlayCountData.set(key, value);
+    });
 
     const enrichedTracks = tracks.map(track => {
         const albumId = track?.track?.album?.id || track?.album?.id;
@@ -10671,7 +12307,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: background-color 0.2s ease;
+      transition: background-color 0.1s ease;
     `;
 
     innerButton.style.backgroundColor = buttonBgColor;
@@ -10889,6 +12525,22 @@
       {
         backgroundColor: "transparent",
         color: "white",
+        text: "Dynamic Playlists",
+        sortType: "dynamicPlaylists",
+        onClick: (event) => {
+          event.stopPropagation();
+          menuButtons.forEach((btn) => {
+            if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                btn.style.backgroundColor = "transparent";
+            }
+          });
+          closeAllMenus();
+          showDynamicPlaylistsWindow();
+        },
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
         text: "Genre Filter",
         sortType: "genreFilter",
       },
@@ -10961,6 +12613,11 @@
   const createPlaylistIconSvg = `
   <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path fill="none" d="M16 5V18M16 18C16 19.1046 14.6569 20 13 20C11.3431 20 10 19.1046 10 18C10 16.8954 11.3431 16 13 16C14.6569 16 16 16.8954 16 18ZM4 5H12M4 9H12M4 13H8M16 4L20 3V7L16 8V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const dynamicPlaylistIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
   const genreFilterIconSvg = `
@@ -11248,6 +12905,8 @@
       let iconSvgString;
       if (style.text === "Create Playlist") {
         iconSvgString = createPlaylistIconSvg;
+      } else if (style.text === "Dynamic Playlists") {
+        iconSvgString = dynamicPlaylistIconSvg;
       } else if (style.text === "Genre Filter") {
         iconSvgString = genreFilterIconSvg;
       } else if (style.text === "Custom Filter") {
@@ -11532,7 +13191,7 @@
         cancelText: "Cancel",
       });
 
-      if (confirmed) {
+      if (confirmed === 'confirm') {
         closeAllMenus();
         mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
         mainButton.innerText = "stopping...";
@@ -14023,17 +15682,20 @@
       }
 
       if (canModifyCurrentPlaylist) {
-        const proceedWithModification = await showConfirmationModal({
+        const userChoice = await showConfirmationModal({
             title: "Sort Current Playlist?",
-            description: `This will replace all tracks in "${sourceNameForDialog}" with the sorted version. This action cannot be undone. Are you sure?`,
-            confirmText: "Confirm & Sort",
+            description: `This will replace all tracks in this playlist with the sorted version. Do you want to modify the current playlist, or create a new one instead?`,
+            confirmText: "Modify Current",
             cancelText: "Cancel",
+            neutralText: "Create New",
         });
 
-        if (!proceedWithModification) {
-            Spicetify.showNotification("Sorting current playlist cancelled.");
+        if (userChoice === 'cancel') {
+            Spicetify.showNotification("Sorting cancelled.");
             resetButtons();
             return;
+        } else if (userChoice === 'neutral') {
+            canModifyCurrentPlaylist = false;
         }
       }
 
@@ -14345,7 +16007,8 @@
             "\\(Personalized\\)",
             "\\(Power Hour\\)",
             "\\(Mellow Mood\\)",
-            "\\(Hidden Gems\\)"
+            "\\(Hidden Gems\\)",
+            "\\(Dynamic\\)"
         ];
         
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
@@ -16151,6 +17814,7 @@
   initializeReleaseDateCache();
   initializeScrobblesCache();
   initializePaletteAnalysisCache();
+  startScheduler();
   console.log(`Sort-Play loaded`);
   }
 
@@ -16160,4 +17824,3 @@
     await main();
   }
 })();
-
