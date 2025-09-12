@@ -1154,7 +1154,7 @@
             Modify Current Playlist
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">If 'Create Playlist' is on, this sorts your owned playlist directly instead of making a new one.</span>
+                <span class="custom-tooltip">Sorts your owned playlist directly instead of creating a new one.</span>
             </span>
         </label>
         <div class="col action">
