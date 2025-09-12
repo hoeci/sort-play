@@ -1084,7 +1084,6 @@
     .tooltip-container:hover .custom-tooltip { visibility: visible; }
     .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
     .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
-    .sort-play-settings .setting-row.forced .col.description { opacity: 0.7; }
      .sort-play-settings .github-link-container {
       display: flex;
       justify-content: center;
