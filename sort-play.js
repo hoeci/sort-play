@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.5.0";
+  const SORT_PLAY_VERSION = "5.5.1";
   
   let isProcessing = false;
   let showAdditionalColumn = false;
@@ -33,6 +33,7 @@
   let openPlaylistAfterSortEnabled = true;
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
+  let changeTitleOnModify = true;
   let myScrobblesDisplayMode = 'number';
   let selectedAlbumColumnType = 'releaseDate';
   let selectedArtistColumnType = 'releaseDate';
@@ -55,6 +56,7 @@
   const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort";
   const STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER = "sort-play-place-playlists-in-folder";
   const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
+  const STORAGE_KEY_CHANGE_TITLE_ON_MODIFY = "sort-play-change-title-on-modify";
   const STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS = "sort-play-update-behavior-settings";
   const STORAGE_KEY_DEDICATED_PLAYLIST_MAP = "sort-play-dedicated-playlist-map";
   const STORAGE_KEY_COLOR_SORT_MODE = "sort-play-color-sort-mode";
@@ -170,6 +172,8 @@
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
     placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
+    const changeTitleStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY);
+    changeTitleOnModify = changeTitleStored === null ? true : changeTitleStored === "true";
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
@@ -211,6 +215,7 @@
     localStorage.setItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, discoveryPlaylistSize);
     localStorage.setItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, placePlaylistsInFolder);
     localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
+    localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY, changeTitleOnModify);
     localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
 
@@ -1212,6 +1217,28 @@
         </div>
     </div>
 
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Playlist Names
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="changeTitleOnModifySettingRow">
+        <label class="col description">
+            Update Title When Modifying
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">When enabled, appends a sort tag like "(PlayCount)" to the playlist title after modifying it.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="changeTitleOnModifySwitchLabel">
+                <input type="checkbox" id="changeTitleOnModifyToggle" ${changeTitleOnModify ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Column Settings
     </div>
@@ -1606,6 +1633,7 @@
     const discoveryPlaylistSizeSelect = modalContainer.querySelector("#discoveryPlaylistSizeSelect");
     const placePlaylistsInFolderToggle = modalContainer.querySelector("#placePlaylistsInFolderToggle");
     const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
+    const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
     const playlistBehaviorSettingsBtn = modalContainer.querySelector("#playlistBehaviorSettingsBtn");
     const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
 
@@ -1617,6 +1645,14 @@
       openPlaylistAfterSortSwitchLabel.classList.toggle("disabled", !shouldBeEnabled);
       openPlaylistAfterSortSettingRow.classList.toggle("dependent-disabled", !shouldBeEnabled);
       openPlaylistAfterSortToggle.checked = openPlaylistAfterSortEnabled;
+    }
+
+    function updateChangeTitleToggleState() {
+        const isModifyCurrentPlaylistOn = sortCurrentPlaylistToggle.checked && !sortCurrentPlaylistToggle.disabled;
+        changeTitleOnModifyToggle.disabled = !isModifyCurrentPlaylistOn;
+        document.getElementById('changeTitleOnModifySwitchLabel').classList.toggle("disabled", !isModifyCurrentPlaylistOn);
+        document.getElementById('changeTitleOnModifySettingRow').classList.toggle("dependent-disabled", !isModifyCurrentPlaylistOn);
+        changeTitleOnModifyToggle.checked = changeTitleOnModify;
     }
 
     function updateSortCurrentPlaylistToggleState() {
@@ -1637,6 +1673,7 @@
             sortCurrentPlaylistToggle.checked = sortCurrentPlaylistEnabled;
         }
         updateOpenPlaylistAfterSortToggleState();
+        updateChangeTitleToggleState();
     }
 
     function updateCreatePlaylistToggleState() {
@@ -1747,10 +1784,17 @@
         if (!sortCurrentPlaylistToggle.disabled) {
             sortCurrentPlaylistEnabled = sortCurrentPlaylistToggle.checked;
             updateOpenPlaylistAfterSortToggleState();
+            updateChangeTitleToggleState();
             saveSettings();
         }
     });
 
+    changeTitleOnModifyToggle.addEventListener("change", () => {
+        if (!changeTitleOnModifyToggle.disabled) {
+            changeTitleOnModify = changeTitleOnModifyToggle.checked;
+            saveSettings();
+        }
+    });
     openPlaylistAfterSortToggle.addEventListener("change", () => {
         if (!openPlaylistAfterSortToggle.disabled) {
             openPlaylistAfterSortEnabled = openPlaylistAfterSortToggle.checked;
@@ -16037,16 +16081,18 @@
             modifiedPlaylistOriginalPath = initialPagePath; 
 
             try {
-                const newPlaylistName = `${finalSourceName} (${sortTypeInfo.shortName})`;
-                const newPlaylistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
+                const requestBody = {
+                    description: `Sorted by ${sortTypeInfo.fullName} using Sort-Play`
+                };
+
+                if (changeTitleOnModify) {
+                    requestBody.name = `${finalSourceName} (${sortTypeInfo.shortName})`;
+                }
 
                 try {
                     await Spicetify.CosmosAsync.put(
                         `https://api.spotify.com/v1/playlists/${playlistIdToModify}`,
-                        {
-                            name: newPlaylistName,
-                            description: newPlaylistDescription,
-                        }
+                        requestBody
                     );
                 } catch (error) {
                     const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
