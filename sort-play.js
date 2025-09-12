@@ -1647,10 +1647,9 @@
     }
 
     function updateChangeTitleToggleState() {
-        const isModifyCurrentPlaylistOn = sortCurrentPlaylistToggle.checked && !sortCurrentPlaylistToggle.disabled;
-        changeTitleOnModifyToggle.disabled = !isModifyCurrentPlaylistOn;
-        document.getElementById('changeTitleOnModifySwitchLabel').classList.toggle("disabled", !isModifyCurrentPlaylistOn);
-        document.getElementById('changeTitleOnModifySettingRow').classList.toggle("dependent-disabled", !isModifyCurrentPlaylistOn);
+        changeTitleOnModifyToggle.disabled = false;
+        document.getElementById('changeTitleOnModifySwitchLabel').classList.remove("disabled");
+        document.getElementById('changeTitleOnModifySettingRow').classList.remove("dependent-disabled");
         changeTitleOnModifyToggle.checked = changeTitleOnModify;
     }
 
