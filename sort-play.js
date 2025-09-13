@@ -12,9 +12,10 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.5.1";
+  const SORT_PLAY_VERSION = "5.5.2";
   
   let isProcessing = false;
+  let useLfmGateway = false;
   let showAdditionalColumn = false;
   let selectedColumnType = 'playCount';
   let releaseDateFormat = 'YYYY-MM-DD';
@@ -72,6 +73,8 @@
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
   const runningJobIds = new Set();
 
+  const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
+
   const L_F_M_Key_Pool = [
     "***REMOVED***",
     "***REMOVED***",
@@ -107,6 +110,68 @@
     return Ge_mini_Key_Pool[randomIndex];
   }
 
+  async function fetchLfmWithGateway(params) {
+    while (true) {
+        const apiKey = L_F_M_Key();
+        if (!apiKey) {
+            throw new Error("All Last.fm API keys are invalid or have been revoked.");
+        }
+        params.set('api_key', apiKey);
+        const directUrl = `${CONFIG.lastfm.baseUrl}?${params}`;
+        const gatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(directUrl)}`;
+
+        if (useLfmGateway) {
+            try {
+                const response = await fetch(gatewayUrl);
+                if (response.status === 403) {
+                    console.warn(`Last.fm gateway request failed with 403. Revoking key ...${apiKey.slice(-4)} and retrying.`);
+                    revokedLfmKeys.add(apiKey);
+                    continue;
+                }
+                return response;
+            } catch (gatewayError) {
+                console.warn(`Last.fm gateway request failed with network error. Revoking key ...${apiKey.slice(-4)} and retrying.`);
+                revokedLfmKeys.add(apiKey);
+                continue;
+            }
+        } else {
+            let response;
+            let needsGateway = false;
+            try {
+                response = await fetch(directUrl);
+                if (response.status === 403) {
+                    console.warn(`Last.fm direct request failed with 403. Trying gateway for key ...${apiKey.slice(-4)}.`);
+                    needsGateway = true;
+                }
+            } catch (error) {
+                console.warn(`Last.fm direct request failed with network error. Trying gateway for key ...${apiKey.slice(-4)}.`);
+                needsGateway = true;
+            }
+
+            if (!needsGateway) {
+                return response;
+            }
+
+            try {
+                response = await fetch(gatewayUrl);
+                if (response.status === 403) {
+                    console.warn(`Last.fm gateway request also failed with 403. Revoking key ...${apiKey.slice(-4)} and retrying.`);
+                    revokedLfmKeys.add(apiKey);
+                    continue;
+                }
+                if (response.ok) {
+                    console.log("Last.fm gateway successful. Using gateway for the rest of the session.");
+                    useLfmGateway = true;
+                }
+                return response;
+            } catch (gatewayError) {
+                console.warn(`Last.fm gateway request failed with network error. Revoking key ...${apiKey.slice(-4)} and retrying.`);
+                revokedLfmKeys.add(apiKey);
+                continue;
+            }
+        }
+    }
+  }
 
   const DEDICATED_PLAYLIST_COVERS = {
     'topThisMonth': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-m.png',
@@ -10747,31 +10812,7 @@
         format: 'json'
       });
   
-      let trackResponse;
-      while (true) {
-          const apiKey = L_F_M_Key();
-          if (!apiKey) {
-              throw new Error("All Last.fm API keys are invalid or have been revoked.");
-          }
-          trackParams.set('api_key', apiKey);
-          
-          trackResponse = await withRetry(
-            () => fetch(`${CONFIG.lastfm.baseUrl}?${trackParams}`, {
-              headers: {
-                'Accept': 'application/json',
-                'User-Agent': 'SpicetifyGenreExtension/1.0'
-              }
-            }),
-            1, 0 
-          );
-
-          if (trackResponse.status === 403) {
-              console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
-              revokedLfmKeys.add(apiKey);
-              continue;
-          }
-          break;
-      }
+      const trackResponse = await fetchLfmWithGateway(trackParams);
 
       if (!trackResponse.ok) {
         throw new Error(`Track API request failed with status ${trackResponse.status}`);
@@ -10797,31 +10838,7 @@
             format: 'json'
           });
     
-          let artistResponse;
-          while (true) {
-              const apiKey = L_F_M_Key();
-              if (!apiKey) {
-                  throw new Error("All Last.fm API keys are invalid or have been revoked.");
-              }
-              artistParams.set('api_key', apiKey);
-
-              artistResponse = await withRetry(
-                () => fetch(`${CONFIG.lastfm.baseUrl}?${artistParams}`, {
-                  headers: {
-                    'Accept': 'application/json',
-                    'User-Agent': 'SpicetifyGenreExtension/1.0'
-                  }
-                }),
-                1, 0
-              );
-
-              if (artistResponse.status === 403) {
-                  console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
-                  revokedLfmKeys.add(apiKey);
-                  continue;
-              }
-              break;
-          }
+          const artistResponse = await fetchLfmWithGateway(artistParams);
 
           if (!artistResponse.ok) {
             throw new Error(`Artist API request failed with status ${artistResponse.status}`);
@@ -11994,26 +12011,14 @@
           };
         }
 
-        const encodedArtist = encodeURIComponent(artistName);
-        const encodedTrack = encodeURIComponent(trackName);
+        const params = new URLSearchParams({
+            method: 'track.getInfo',
+            artist: encodeURIComponent(artistName),
+            track: encodeURIComponent(trackName),
+            format: 'json'
+        });
         
-        let response;
-        while (true) {
-            const apiKey = L_F_M_Key();
-            if (!apiKey) {
-                throw new Error("All Last.fm API keys are invalid or have been revoked.");
-            }
-            const lastFmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&format=json`;
-            
-            response = await fetch(lastFmUrl);
-
-            if (response.status === 403) {
-                console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
-                revokedLfmKeys.add(apiKey);
-                continue;
-            }
-            break;
-        }
+        const response = await fetchLfmWithGateway(params);
 
         if (!response.ok) {
           throw new Error(
@@ -12102,26 +12107,15 @@
           };
         }
 
-        const encodedArtist = encodeURIComponent(artistName);
-        const encodedTrack = encodeURIComponent(track.name);
+        const params = new URLSearchParams({
+            method: 'track.getInfo',
+            artist: encodeURIComponent(artistName),
+            track: encodeURIComponent(track.name),
+            username: username,
+            format: 'json'
+        });
         
-        let response;
-        while (true) {
-            const apiKey = L_F_M_Key();
-            if (!apiKey) {
-                throw new Error("All Last.fm API keys are invalid or have been revoked.");
-            }
-            const lastFmUrl = `https://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=${apiKey}&artist=${encodedArtist}&track=${encodedTrack}&username=${username}&format=json`;
-            
-            response = await fetch(lastFmUrl);
-
-            if (response.status === 403) {
-                console.warn(`Last.fm API key ending in ...${apiKey.slice(-4)} is forbidden. Revoking for this session and retrying.`);
-                revokedLfmKeys.add(apiKey);
-                continue;
-            }
-            break;
-        }
+        const response = await fetchLfmWithGateway(params);
 
         if (!response.ok) {
           throw new Error(`Last.fm API request failed with status ${response.status}`);  
