@@ -9019,11 +9019,11 @@
                                     <option value="86400000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
                                     <option value="604800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
                                     <option value="2592000000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
-                                    <option disabled>— Release Day Schedules —</option>
+                                    <option disabled>- Release Day Schedules -</option>
                                     <option value="release-weekly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-weekly' ? 'selected' : ''}>Weekly (on Friday)</option>
                                     <option value="release-every-two-weeks" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
                                     <option value="release-monthly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
-                                    <option disabled>— Custom Schedules —</option>
+                                    <option disabled>- Custom Schedules -</option>
                                     ${customScheduleOptions}
                                     <option value="custom">+ Custom</option>
                                     ${clearAndSeparatorHtml}
