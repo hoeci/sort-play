@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.5.2";
+  const SORT_PLAY_VERSION = "5.6.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -47,6 +47,7 @@
   let colorSortMode = 'perceptual';
   let setDedicatedPlaylistCovers = true;
   let chatPanelVisible = false;
+  let userMarketPromise = null;
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
@@ -71,6 +72,7 @@
   const STORAGE_KEY_DYNAMIC_SORT_TYPE = "sort-play-dynamic-sort-type";
   const STORAGE_KEY_DYNAMIC_SCHEDULE = "sort-play-dynamic-schedule";
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
+  const STORAGE_KEY_USER_ADDED_GENRES = "sort-play-user-added-genres";
   const runningJobIds = new Set();
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
@@ -173,6 +175,37 @@
     }
   }
 
+  async function fetchUserMarket() {
+    if (userMarketPromise) return userMarketPromise;
+
+    userMarketPromise = (async () => {
+        try {
+            const locale = Spicetify.Locale.getLocale();
+            if (locale && locale.includes('-')) {
+                const market = locale.split('-')[1].toUpperCase();
+                return market;
+            }
+        } catch (e) {
+            console.warn("[Sort-Play] Could not get market from Spicetify.Locale, trying fallback.");
+        }
+
+        try {
+            const meData = await Spicetify.CosmosAsync.get('https://api.spotify.com/v1/me');
+            if (meData && meData.country) {
+                const market = meData.country;
+                return market;
+            }
+        } catch (e) {
+            console.error("[Sort-Play] Could not get market from /v1/me endpoint either.", e);
+        }
+
+        console.error("[Sort-Play] FATAL: Could not determine user's market. Track availability checks may be inaccurate.");
+        return null; 
+    })();
+    
+    return userMarketPromise;
+  }
+  
   const DEDICATED_PLAYLIST_COVERS = {
     'topThisMonth': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-m.png',
     'topLast6Months': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-6.png',
@@ -183,7 +216,41 @@
     'recommendRecentVibe': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-recent.png',
     'recommendAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-all.png',
     'pureDiscovery': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-pure.png',
+    'genreTreeExplorer': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@c547277eb4ab981d8dd8cf510c6c698efb57b4c6/assets/base-covers/discovery-genre.png',
+    'randomGenreExplorer': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@dfa6366221b286cde0f9fe5a75bef48bebf528a9/assets/base-covers/discovery-random-genre.png',
   };
+
+  const playlistCardsData = [
+    {
+        title: 'New Releases',
+        cards: [
+            { id: 'followedArtistPicks', name: 'Followed Artist Picks', description: 'Personalized picks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedArtistPicks },
+            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological },
+            { id: 'newDiscoveryPicks', name: 'New Music Picks', description: 'A personalized mix of new music from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.newDiscoveryPicks },
+        ]
+    },
+    {
+        title: 'Discovery',
+        cards: [
+            { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer },
+            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer },
+            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe },
+            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime },
+            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery },
+        ]
+    },
+    {
+        title: 'My Top Tracks',
+        cards: [
+            { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth },
+            { id: 'topLast6Months', name: 'Top Tracks: Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months },
+            { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime },
+        ]
+    }
+  ];
+
+  const GENRE_PLAYLISTS_URL = "https://raw.githubusercontent.com/hoeci/sort-play/main/assets/genre_playlist_ids.json";
+  let genrePlaylistsCache = null;
 
   const PLACEHOLDER_SVG_DATA_URI = `url("data:image/svg+xml,%3csvg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.5 8.89001V18.5M12.5 8.89001V5.57656C12.5 5.36922 12.5 5.26554 12.5347 5.17733C12.5653 5.09943 12.615 5.03047 12.6792 4.97678C12.752 4.91597 12.8503 4.88318 13.047 4.81761L17.447 3.35095C17.8025 3.23245 17.9803 3.17319 18.1218 3.20872C18.2456 3.23982 18.3529 3.31713 18.4216 3.42479C18.5 3.54779 18.5 3.73516 18.5 4.10989V7.42335C18.5 7.63069 18.5 7.73436 18.4653 7.82258C18.4347 7.90048 18.385 7.96943 18.3208 8.02313C18.248 8.08394 18.1497 8.11672 17.953 8.18229L13.553 9.64896C13.1975 9.76746 13.0197 9.82671 12.8782 9.79119C12.7544 9.76009 12.6471 9.68278 12.5784 9.57512C12.5 9.45212 12.5 9.26475 12.5 8.89001ZM12.5 18.5C12.5 19.8807 10.933 21 9 21C7.067 21 5.5 19.8807 5.5 18.5C5.5 17.1192 7.067 16 9 16C10.933 16 12.5 17.1192 12.5 18.5Z' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`;
 
@@ -2349,33 +2416,6 @@
 
     const STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE = "sort-play-create-playlist-collapse-state";
 
-    const playlistCardsData = [
-        {
-            title: 'New Releases',
-            cards: [
-                { id: 'followedArtistPicks', name: 'Followed Artist Picks', description: 'Personalized picks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedArtistPicks },
-                { id: 'newDiscoveryPicks', name: 'New Music Picks', description: 'A personalized mix of new music from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.newDiscoveryPicks },
-                { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological },
-            ]
-        },
-        {
-            title: 'Discovery',
-            cards: [
-                { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe },
-                { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime },
-                { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery },
-            ]
-        },
-        {
-            title: 'My Top Tracks',
-            cards: [
-                { id: 'topThisMonth', name: 'Top Tracks:<br>This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth },
-                { id: 'topLast6Months', name: 'Top Tracks:<br>Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months },
-                { id: 'topAllTime', name: 'Top Tracks:<br>All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime },
-            ]
-        }
-    ];
-
     let collapseState = JSON.parse(localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE) || '{}');
 
     let contentHtml = '';
@@ -2452,7 +2492,7 @@
             background-color: #212121;
             border: 1px solid transparent;
             border-radius: 8px;
-            padding: 16px;
+            padding: 10px;
             display: flex;
             flex-direction: row;
             align-items: center;
@@ -2464,8 +2504,8 @@
             background-color: #282828;
         }
         .card-thumbnail-container {
-            width: 80px;
-            height: 80px;
+            width: 70px;
+            height: 70px;
             flex-shrink: 0;
             border-radius: 6px;
             overflow: hidden;
@@ -2513,7 +2553,7 @@
             </svg>
           </button>
       </div>
-      <div class="main-trackCreditsModal-mainSection" style="padding: 24px 32px 38px !important; max-height: 75vh; flex-grow: 1; overflow-y: auto;">
+      <div class="main-trackCreditsModal-mainSection" style="padding: 24px 32px 38px !important; max-height: 80vh; flex-grow: 1; overflow-y: auto;">
         <div class="create-playlist-modal">
             ${contentHtml}
         </div>
@@ -2529,7 +2569,13 @@
         card.addEventListener('click', () => {
             const sortType = card.getAttribute('data-id');
             closeModal();
-            handleSortAndCreatePlaylist(sortType);
+            if (sortType === 'genreTreeExplorer') {
+                showGenreTreeExplorerModal();
+            } else if (sortType === 'randomGenreExplorer') {
+                generateRandomGenrePlaylist();
+            } else {
+                handleSortAndCreatePlaylist(sortType);
+            }
         });
     });
 
@@ -9330,7 +9376,7 @@
     "black metal": ["atmospheric black metal", "black metal", "blackgaze", "cascadian black metal", "melodic black metal", "metal noir quebecois", "pagan black metal", "raw black metal", "symphonic black metal", "viking metal"],
     "blues": ["blues", "blues'", "bluesier", "bluesiest", "bluesmusic", "bluesy", "punk blues"],
     "blues rock": ["blues rock", "british blues", "electric blues"],
-    "bollywood pop": ["bollywood pop", "classic bollywood", "desi pop", "filmi", "indian fusion", "kollywood", "modern bollywood", "mollywood", "sandalwood", "tollywood"],
+    "bollywood pop": ["bollywood pop", "classic bollywood", "desi pop", "filmi", "kollywood", "modern bollywood", "mollywood", "sandalwood", "tollywood", "bollywood"],
     "bossa nova": ["bossa nova", "bossa nova cover", "bossa nova jazz", "samba-jazz"],
     "breakbeat": ["big beat", "breakbeat", "breaks", "funky breaks", "nu skool breaks"],
     "c-pop": ["c-pop", "cantopop", "chinese pop", "mandopop"],
@@ -9365,7 +9411,7 @@
     "emo": ["emo", "emo rap", "emo trap", "emocore", "midwest emo", "pop emo"],
     "epic": ["epic", "epic music", "epic's", "epicmusic"],
     "epiccore": ["epic core", "epic-core", "epiccore"],
-    "eurodance": ["bubblegum dance", "eurobeat", "eurodance", "europop", "hands up", "hi-nrg", "italo dance"],
+    "eurodance": ["bubblegum dance", "eurobeat", "eurodance", "hands up", "hi-nrg", "italo dance"],
     "experimental": ["experiment", "experimental", "experimental electronic", "experimental's", "experimentalmusic", "experiments"],
     "folk": ["folk", "folk's", "folk-pop", "folkie", "folkier", "folklore", "folkmusic", "folksy"],
     "forro": ["baiao", "forro", "forro de favela", "forro tradicional", "piseiro", "xote"],
@@ -9400,7 +9446,7 @@
     "industrial": ["aggrotech", "ebm", "electro-industrial", "industrial", "industrial rock", "martial industrial", "power noise"],
     "instrumental": ["instrumental", "instrumental's", "instrumentalmusic", "instrumentals", "no vocals"],
     "italian pop": ["classic italian pop", "italian adult pop", "italian indie pop", "italian pop", "italian pop rock", "pop virale italiano"],
-    "j-pop": ["anime", "idol", "j-division", "j-idol", "j-pop", "j-pop boy group", "j-pop girl group", "j-rap", "japanese teen pop", "kayokyoku", "shibuya-kei", "vocaloid"],
+    "j-pop": ["anime", "j-division", "j-idol", "j-pop", "j-pop boy group", "j-pop girl group", "j-rap", "japanese teen pop", "kayokyoku", "shibuya-kei", "vocaloid", "japanese electropop"],
     "j-rock": ["j-metal", "j-poprock", "j-rock", "visual kei"],
     "jazz": ["jazz", "jazz's", "jazzier", "jazziest", "jazzmusic", "jazzy"],
     "jazz rap": ["abstract hip hop", "jazz hop", "jazz rap"],
@@ -12545,22 +12591,6 @@
       {
         backgroundColor: "transparent",
         color: "white",
-        text: "Create Playlist",
-        sortType: "createNewPlaylist",
-        onClick: (event) => {
-          event.stopPropagation();
-          menuButtons.forEach((btn) => {
-            if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-                btn.style.backgroundColor = "transparent";
-            }
-          });
-          closeAllMenus();
-          showCreatePlaylistModal();
-        },
-      },
-      {
-        backgroundColor: "transparent",
-        color: "white",
         text: "Dynamic Playlists",
         sortType: "dynamicPlaylists",
         onClick: (event) => {
@@ -12572,6 +12602,22 @@
           });
           closeAllMenus();
           showDynamicPlaylistsWindow();
+        },
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
+        text: "Create Playlist",
+        sortType: "createNewPlaylist",
+        onClick: (event) => {
+          event.stopPropagation();
+          menuButtons.forEach((btn) => {
+            if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                btn.style.backgroundColor = "transparent";
+            }
+          });
+          closeAllMenus();
+          showCreatePlaylistModal();
         },
       },
       {
@@ -13585,9 +13631,14 @@
     const discoveryPlaylistColor = '#8f46d7';
     const defaultUsernameColor = '#24bf70';
 
-    const releasePlaylistTypes = ['followedReleasesChronological', 'followedArtistPicks', 'newDiscoveryPicks'];
-    const discoveryPlaylistTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery'];
+    const releasePlaylistTypes = playlistCardsData
+        .find(section => section.title === 'New Releases')?.cards
+        .map(card => card.id) || [];
 
+    const discoveryPlaylistTypes = playlistCardsData
+        .find(section => section.title === 'Discovery')?.cards
+        .map(card => card.id) || [];
+    
     let usernameColor;
     if (discoveryPlaylistTypes.includes(sortType)) {
         usernameColor = discoveryPlaylistColor;
@@ -13609,12 +13660,25 @@
                     const playlistId = playlistUri.split(':')[2];
                     const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
 
+                    const detailsToUpdate = {};
+                    if (playlistData.name !== name) {
+                        detailsToUpdate.name = name;
+                    }
+                    if (playlistData.description !== description || !playlistData.description) {
+                        detailsToUpdate.description = description;
+                    }
+
+                    if (Object.keys(detailsToUpdate).length > 0) {
+                        await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, detailsToUpdate);
+                        if (detailsToUpdate.name) playlistData.name = detailsToUpdate.name;
+                        if (detailsToUpdate.description) playlistData.description = detailsToUpdate.description;
+                    }
+
                     if (setDedicatedPlaylistCovers) {
                         try {
                             const user = await Spicetify.Platform.UserAPI.getUser();
-                            let finalUserName = user.displayName;
                             const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                            const coverBase64 = await generatePlaylistCover(finalUserName, baseImageUrl, usernameColor);
+                            const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
                             await setPlaylistImage(playlistId, coverBase64);
                         } catch (coverError) {
                             console.error("Failed to update custom playlist cover:", coverError);
@@ -13641,10 +13705,8 @@
         if (setDedicatedPlaylistCovers) {
             try {
                 const user = await Spicetify.Platform.UserAPI.getUser();
-                let finalUserName = user.displayName;
-
                 const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                const coverBase64 = await generatePlaylistCover(finalUserName, baseImageUrl, usernameColor);
+                const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
                 await setPlaylistImage(newPlaylist.id, coverBase64);
             } catch (coverError) {
                 console.error("Failed to generate or set custom playlist cover:", coverError);
@@ -15546,6 +15608,738 @@
     }
   }
 
+  async function isTrackAvailable(track) {
+    if (!track) return false;
+
+    if (track.is_playable === false) {
+        return false;
+    }
+
+    if (Array.isArray(track.available_markets) && track.available_markets.length > 0) {
+        const userMarket = await userMarketPromise;
+        if (userMarket) {
+            return track.available_markets.includes(userMarket);
+        }
+    }
+
+    return true;
+  }
+
+  async function getDirectTracksFromGenrePlaylists(playlistsToFetch, numTracksNeeded) {
+    const directTracks = [];
+    const numTracksPerPlaylist = Math.ceil(numTracksNeeded / playlistsToFetch.size);
+
+    for (const playlist of playlistsToFetch.values()) {
+        try {
+            const playlistTracks = await getPlaylistTracks(playlist.uri);
+            if (playlistTracks.length > 0) {
+                const availabilityChecks = await Promise.all(playlistTracks.map(track => isTrackAvailable(track)));
+                const availableTracks = playlistTracks.filter((_, index) => availabilityChecks[index]);
+                
+                const shuffled = shuffleArray(availableTracks);
+                const selectedTracks = shuffled.slice(0, numTracksPerPlaylist);
+
+                const flaggedTracks = selectedTracks.map(track => ({
+                    ...track,
+                    sourceInfo: {
+                        method: 'Direct Pick',
+                        sourcePlaylist: playlist.genre
+                    }
+                }));
+                directTracks.push(...flaggedTracks);
+            }
+        } catch (error) {
+            console.warn(`Could not fetch tracks for genre playlist ${playlist.genre}:`, error);
+        }
+    }
+    return directTracks;
+  }
+
+  async function discoverTracksViaGenreSearch(selectedGenres, numTracksNeeded, existingTracks = []) {
+    const allSearchedTracks = new Map();
+    const existingTrackUris = new Set(existingTracks.map(t => t.uri));
+
+    for (const genre of selectedGenres) {
+        const searchPromises = [];
+        for (let offset = 0; offset < 200; offset += 50) {
+            const params = new URLSearchParams({
+                q: `genre:"${genre}"`,
+                type: 'track',
+                limit: 50,
+                offset: offset
+            });
+            searchPromises.push(Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?${params.toString()}`));
+        }
+
+        const searchResults = await Promise.all(searchPromises);
+        for (const result of searchResults) { 
+            if (result.tracks?.items) {
+                const availabilityChecks = await Promise.all(result.tracks.items.map(track => isTrackAvailable(track)));
+                result.tracks.items.forEach((track, index) => {
+                    if (availabilityChecks[index] && !allSearchedTracks.has(track.uri)) {
+                        allSearchedTracks.set(track.uri, track);
+                    }
+                });
+            }
+        }
+    }
+
+    if (allSearchedTracks.size === 0) {
+        console.warn("Genre search returned no available tracks.");
+        return [];
+    }
+    
+    const trackPool = Array.from(allSearchedTracks.values()).filter(track => !existingTrackUris.has(track.uri));
+
+    return shuffleArray(trackPool).slice(0, numTracksNeeded).map(track => ({
+        ...track,
+        sourceInfo: {
+            method: 'Genre Search',
+            searchTerm: selectedGenres.join(', ')
+        }
+    }));
+  }
+
+  async function discoverTracksViaMultiSeedRecommendation(playlistsToFetch, numTracksNeeded, existingTracks = []) {
+    const existingTrackUris = new Set(existingTracks.map(t => t.uri));
+    const recommendationPool = new Map();
+    let seedTrackPool = [];
+
+    for (const playlist of playlistsToFetch.values()) {
+        try {
+            const playlistTracks = await getPlaylistTracks(playlist.uri);
+            const availabilityChecks = await Promise.all(playlistTracks.map(track => isTrackAvailable(track)));
+            seedTrackPool.push(...playlistTracks.filter((_, index) => availabilityChecks[index]));
+        } catch (error) {
+            console.warn(`Could not fetch seed tracks from ${playlist.genre}:`, error);
+        }
+    }
+    
+    if (seedTrackPool.length < 5) {
+        console.warn("Not enough available seed tracks for multi-seed recommendation.");
+        return [];
+    }
+
+    seedTrackPool = shuffleArray(Array.from(new Map(seedTrackPool.map(t => [t.uri, t])).values()));
+
+    const NUM_RECOMMENDATION_CALLS = 4;
+    const recommendationPromises = [];
+
+    for (let i = 0; i < NUM_RECOMMENDATION_CALLS; i++) {
+        const seedTracks = seedTrackPool.slice(i * 5, (i * 5) + 5).map(t => t.uri.split(':')[2]);
+        if (seedTracks.length === 0) continue;
+
+        const params = new URLSearchParams({
+            limit: 50,
+            seed_tracks: seedTracks.join(',')
+        });
+        recommendationPromises.push(Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`));
+    }
+
+    const recommendationResults = await Promise.all(recommendationPromises);
+    for (const result of recommendationResults) { 
+        if (result.tracks) {
+            const availabilityChecks = await Promise.all(result.tracks.map(track => isTrackAvailable(track)));
+            result.tracks.forEach((track, index) => {
+                if (availabilityChecks[index] && !recommendationPool.has(track.uri)) {
+                    recommendationPool.set(track.uri, track);
+                }
+            });
+        }
+    }
+
+    const sourceDescription = `Seeded from ${playlistsToFetch.size} playlists like: ${Array.from(playlistsToFetch.values()).slice(0,3).map(p => p.genre).join(', ')}...`;
+    const recommendedTracks = Array.from(recommendationPool.values())
+        .filter(track => !existingTrackUris.has(track.uri))
+        .map(track => ({
+            ...track,
+            sourceInfo: {
+                method: 'Recommendation',
+                details: sourceDescription
+            }
+        }));
+
+    return shuffleArray(recommendedTracks).slice(0, numTracksNeeded);
+  }
+
+  async function generateGenreTreePlaylist(selectedGenres) {
+    setButtonProcessing(true);
+    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+    mainButton.style.color = buttonStyles.main.disabledColor;
+    mainButton.style.cursor = "default";
+    svgElement.style.fill = buttonStyles.main.disabledColor;
+    menuButtons.forEach((button) => (button.disabled = true));
+    toggleMenu();
+    closeAllMenus();
+
+    try {
+        mainButton.innerText = "Finding...";
+        if (!genrePlaylistsCache) {
+            const response = await fetch(GENRE_PLAYLISTS_URL);
+            genrePlaylistsCache = await response.json();
+        }
+
+        const playlistsToFetch = new Map();
+        const numPlaylistsPerGenre = Math.max(5, Math.floor(20 / selectedGenres.length));
+
+        for (const selectedGenre of selectedGenres) {
+            const isMainGenre = !!GENRE_MAPPINGS[selectedGenre];
+            const allGenreTerms = isMainGenre 
+                ? new Set([selectedGenre, ...(GENRE_MAPPINGS[selectedGenre] || [])])
+                : new Set([selectedGenre]);
+            
+            const matchingPlaylists = genrePlaylistsCache.filter(p => 
+                [...allGenreTerms].some(term => {
+                    const escapedTerm = escapeRegExp(term);
+                    const regex = new RegExp(`\\b${escapedTerm}\\b`, 'i');
+                    return regex.test(p.genre);
+                })
+            );
+
+            const shuffled = shuffleArray(matchingPlaylists);
+            shuffled.slice(0, numPlaylistsPerGenre).forEach(p => playlistsToFetch.set(p.uri, p));
+        }
+
+        if (playlistsToFetch.size === 0) {
+            throw new Error("Could not find any genre playlists for your selection.");
+        }
+
+        const tracksPerPart = Math.ceil(discoveryPlaylistSize / 3);
+
+        mainButton.innerText = "Fetching...";
+        const directTracks = await getDirectTracksFromGenrePlaylists(playlistsToFetch, tracksPerPart);
+
+        mainButton.innerText = "Discover...";
+        const [searchedTracks, recommendedTracks] = await Promise.all([
+            discoverTracksViaGenreSearch(selectedGenres, tracksPerPart, directTracks),
+            discoverTracksViaMultiSeedRecommendation(playlistsToFetch, tracksPerPart, directTracks)
+        ]);
+
+        mainButton.innerText = "Combining...";
+        const allTracks = [...directTracks, ...searchedTracks, ...recommendedTracks];
+
+        const uniqueFinalTracks = Array.from(new Map(allTracks.map(t => [t.uri, t])).values());
+        const finalSizedTracks = shuffleArray(uniqueFinalTracks).slice(0, discoveryPlaylistSize);
+
+        mainButton.innerText = "Sorting...";
+        const { trackGenreMap } = await fetchAllTrackGenres(finalSizedTracks);
+        const sortedTracks = interleaveSortByGenre(finalSizedTracks, trackGenreMap);
+
+        const trackUris = sortedTracks.map(t => t.uri);
+        const playlistName = `Genre Explorer: ${selectedGenres.slice(0, 3).join(', ')}${selectedGenres.length > 3 ? '...' : ''}`;
+        
+        let genreListString = selectedGenres.join(', ');
+        const maxGenreListLength = 240;
+        if (genreListString.length > maxGenreListLength) {
+            genreListString = genreListString.substring(0, maxGenreListLength) + "...";
+        }
+        const playlistDescription = `A playlist exploring the genres: ${genreListString}. Created by Sort-Play.`;
+
+        mainButton.innerText = "Creating...";
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('genreTreeExplorer', playlistName, playlistDescription);
+
+        mainButton.innerText = "Saving...";
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
+
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
+        await navigateToPlaylist(newPlaylist);
+
+    } catch (error) {
+        console.error("Error in Genre Tree Explorer:", error);
+        Spicetify.showNotification(error.message, true);
+    } finally {
+        resetButtons();
+    }
+  }
+
+  async function generateRandomGenrePlaylist() {
+    setButtonProcessing(true);
+    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+    mainButton.style.color = buttonStyles.main.disabledColor;
+    mainButton.style.cursor = "default";
+    svgElement.style.fill = buttonStyles.main.disabledColor;
+    menuButtons.forEach((button) => (button.disabled = true));
+    toggleMenu();
+    closeAllMenus();
+
+    try {
+        mainButton.innerText = "Finding...";
+        if (!genrePlaylistsCache) {
+            const response = await fetch(GENRE_PLAYLISTS_URL);
+            genrePlaylistsCache = await response.json();
+        }
+
+        const allAvailableGenres = [...new Set(genrePlaylistsCache.map(p => p.genre))];
+        if (allAvailableGenres.length < 20) {
+            throw new Error("Not enough genres in the database to create a random playlist.");
+        }
+        const selectedGenres = shuffleArray(allAvailableGenres).slice(0, 20);
+
+        const playlistsToFetch = new Map();
+        for (const selectedGenre of selectedGenres) {
+            const matchingPlaylists = genrePlaylistsCache.filter(p => p.genre === selectedGenre);
+            if (matchingPlaylists.length > 0) {
+                const chosenPlaylist = matchingPlaylists[Math.floor(Math.random() * matchingPlaylists.length)];
+                playlistsToFetch.set(chosenPlaylist.uri, chosenPlaylist);
+            }
+        }
+
+        if (playlistsToFetch.size === 0) {
+            throw new Error("Could not find any genre playlists for the random selection.");
+        }
+
+        const tracksPerPart = Math.ceil(discoveryPlaylistSize / 3);
+
+        mainButton.innerText = "Fetching...";
+        const directTracks = await getDirectTracksFromGenrePlaylists(playlistsToFetch, tracksPerPart);
+
+        mainButton.innerText = "Discover...";
+        const [searchedTracks, recommendedTracks] = await Promise.all([
+            discoverTracksViaGenreSearch(selectedGenres, tracksPerPart, directTracks),
+            discoverTracksViaMultiSeedRecommendation(playlistsToFetch, tracksPerPart, directTracks)
+        ]);
+
+        mainButton.innerText = "Combining...";
+        const allTracks = [...directTracks, ...searchedTracks, ...recommendedTracks];
+        
+        const uniqueFinalTracks = Array.from(new Map(allTracks.map(t => [t.uri, t])).values());
+        const finalSizedTracks = shuffleArray(uniqueFinalTracks).slice(0, discoveryPlaylistSize);
+
+        mainButton.innerText = "Sorting...";
+        const { trackGenreMap } = await fetchAllTrackGenres(finalSizedTracks);
+        const sortedTracks = interleaveSortByGenre(finalSizedTracks, trackGenreMap);
+
+        const trackUris = sortedTracks.map(t => t.uri);
+        const playlistName = `Random Genre Explorer`;
+        
+        let genreListString = selectedGenres.slice(0, 10).join(', ');
+        const maxGenreListLength = 240;
+        if (genreListString.length > maxGenreListLength) {
+            genreListString = genreListString.substring(0, maxGenreListLength) + "...";
+        }
+        const playlistDescription = `A playlist exploring a random mix of genres including: ${genreListString}. Created by Sort-Play.`;
+
+        mainButton.innerText = "Creating...";
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('randomGenreExplorer', playlistName, playlistDescription);
+
+        mainButton.innerText = "Saving...";
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
+
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
+        await navigateToPlaylist(newPlaylist);
+
+    } catch (error) {
+        console.error("Error in Random Genre Explorer:", error);
+        Spicetify.showNotification(error.message, true);
+    } finally {
+        resetButtons();
+    }
+  }
+
+  function interleaveSortByGenre(tracks, trackGenreMap) {
+    if (!tracks || tracks.length === 0) return [];
+
+    const genreToTracksMap = new Map();
+    const trackToGenresMap = new Map();
+
+    tracks.forEach(track => {
+        const genres = trackGenreMap.get(track.uri);
+        if (genres && genres.length > 0) {
+            const genreNames = genres.map(g => g.name);
+            trackToGenresMap.set(track.uri, genreNames);
+
+            genreNames.forEach(genreName => {
+                if (!genreToTracksMap.has(genreName)) {
+                    genreToTracksMap.set(genreName, []);
+                }
+                genreToTracksMap.get(genreName).push(track);
+            });
+        } else {
+            const NO_GENRE_KEY = '__no_genre__';
+            if (!genreToTracksMap.has(NO_GENRE_KEY)) {
+                genreToTracksMap.set(NO_GENRE_KEY, []);
+            }
+            genreToTracksMap.get(NO_GENRE_KEY).push(track);
+            trackToGenresMap.set(track.uri, [NO_GENRE_KEY]);
+        }
+    });
+
+    const sortedTracks = [];
+    const remainingTracksUris = new Set(tracks.map(t => t.uri));
+    let lastGenre = null;
+
+    while (remainingTracksUris.size > 0) {
+        let availableGenres = [...genreToTracksMap.keys()].filter(g => genreToTracksMap.get(g).length > 0);
+        
+        if (availableGenres.length > 1 && lastGenre && availableGenres.includes(lastGenre)) {
+            availableGenres = availableGenres.filter(g => g !== lastGenre);
+        }
+
+        if (availableGenres.length === 0) {
+            availableGenres = [...genreToTracksMap.keys()].filter(g => genreToTracksMap.get(g).length > 0);
+            if (availableGenres.length === 0) break;
+        }
+
+        const chosenGenre = availableGenres[Math.floor(Math.random() * availableGenres.length)];
+        const tracksInGenre = genreToTracksMap.get(chosenGenre);
+        const chosenTrack = tracksInGenre.splice(Math.floor(Math.random() * tracksInGenre.length), 1)[0];
+
+        sortedTracks.push(chosenTrack);
+        remainingTracksUris.delete(chosenTrack.uri);
+        lastGenre = chosenGenre;
+
+        const allGenresOfChosenTrack = trackToGenresMap.get(chosenTrack.uri);
+        allGenresOfChosenTrack.forEach(genreName => {
+            if (genreToTracksMap.has(genreName)) {
+                const list = genreToTracksMap.get(genreName);
+                const index = list.findIndex(t => t.uri === chosenTrack.uri);
+                if (index > -1) {
+                    list.splice(index, 1);
+                }
+            }
+        });
+    }
+
+    return sortedTracks;
+  }
+
+  function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  async function showGenreTreeExplorerModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-genre-tree-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 620px !important;
+        display: flex;
+        flex-direction: column;
+        border-radius: 30px;
+    `;
+
+    if (!genrePlaylistsCache) {
+        try {
+            const response = await fetch(GENRE_PLAYLISTS_URL);
+            genrePlaylistsCache = await response.json();
+        } catch (e) {
+            console.error("Sort-Play: Failed to fetch genre database for sorting.", e);
+            Spicetify.showNotification("Could not fetch genre database.", true);
+            genrePlaylistsCache = []; 
+        }
+    }
+    
+    const genreRankMap = new Map();
+    genrePlaylistsCache.forEach((p, index) => {
+        const lowerGenre = p.genre.toLowerCase();
+        if (!genreRankMap.has(lowerGenre)) {
+            genreRankMap.set(lowerGenre, index);
+        }
+    });
+
+    const mainGenreList = Object.keys(GENRE_MAPPINGS);
+    const mainGenreRankCache = new Map();
+
+    const getMainGenreRank = (mainGenre) => {
+        if (mainGenreRankCache.has(mainGenre)) {
+            return mainGenreRankCache.get(mainGenre);
+        }
+
+        let rank = genreRankMap.get(mainGenre.toLowerCase());
+        if (rank !== undefined) {
+            mainGenreRankCache.set(mainGenre, rank);
+            return rank;
+        }
+
+        const subGenres = GENRE_MAPPINGS[mainGenre] || [];
+        let minRank = Infinity;
+        for (const subGenre of subGenres) {
+            const subGenreRank = genreRankMap.get(subGenre.toLowerCase());
+            if (subGenreRank !== undefined) {
+                minRank = Math.min(minRank, subGenreRank);
+            }
+        }
+
+        mainGenreRankCache.set(mainGenre, minRank);
+        return minRank;
+    };
+
+    const priorityGenres = ["pop", "rock", "hip hop", "rap", "jazz", "electronic", "r&b", "country", "classical", "metal", "folk", "blues", "reggae", "punk"];
+
+    mainGenreList.sort((a, b) => {
+        const aLower = a.toLowerCase();
+        const bLower = b.toLowerCase();
+        const isAPriority = priorityGenres.includes(aLower);
+        const isBPriority = priorityGenres.includes(bLower);
+
+        if (isAPriority && !isBPriority) return -1;
+        if (!isAPriority && isBPriority) return 1;
+        if (isAPriority && isBPriority) {
+            return priorityGenres.indexOf(aLower) - priorityGenres.indexOf(bLower);
+        }
+
+        const rankA = getMainGenreRank(a);
+        const rankB = getMainGenreRank(b);
+
+        if (rankA !== Infinity && rankB === Infinity) return -1;
+        if (rankA === Infinity && rankB !== Infinity) return 1;
+        
+        if (rankA !== rankB) {
+            return rankA - rankB;
+        }
+
+        return a.localeCompare(b);
+    });
+
+
+    let selectedMainGenres = [];
+    let userAddedGenres = new Set();
+    let selectedUserGenres = new Set();
+
+    const savedUserGenres = localStorage.getItem(STORAGE_KEY_USER_ADDED_GENRES);
+    if (savedUserGenres) {
+        try {
+            userAddedGenres = new Set(JSON.parse(savedUserGenres));
+        } catch (e) {
+            console.error("Sort-Play: Failed to parse user-added genres.", e);
+            userAddedGenres = new Set();
+        }
+    }
+
+    const saveUserGenres = () => {
+        localStorage.setItem(STORAGE_KEY_USER_ADDED_GENRES, JSON.stringify(Array.from(userAddedGenres)));
+    };
+
+    modalContainer.innerHTML = `
+      <style>
+        .genre-tree-modal .genre-container { max-height: 23vh; overflow-y: auto; background-color: #1e1e1e; border-radius: 20px; padding: 15px 10px; margin-top: 15px; scrollbar-width: thin; scrollbar-color: #3b3b3b transparent; }
+        .genre-tree-modal .genre-container::-webkit-scrollbar { width: 6px; }
+        .genre-tree-modal .genre-container::-webkit-scrollbar-track { background: transparent; }
+        .genre-tree-modal .genre-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 3px; }
+        .genre-tree-modal .user-added-container { margin-top: 0; max-height: 12vh; margin-bottom: 15px; margin-top: 15px; }
+        .genre-tree-modal .genre-button { display: inline-flex; align-items: center; padding: 6px 16px; margin: 4px; border-radius: 20px; border: none; cursor: pointer; background-color: #343434; color: white; font-weight: 500; font-size: 14px; transition: background-color 0.2s ease; }
+        .genre-tree-modal .genre-button.selected { background-color: #1ED760; color: black; }
+        .genre-tree-modal .user-genre-remove { margin-left: 8px; font-size: 16px; font-weight: bold; line-height: 1; opacity: 0.7; }
+        .genre-tree-modal .user-genre-remove:hover { opacity: 1; }
+        .genre-tree-modal .search-bar-wrapper { position: relative; display: flex; align-items: center; }
+        .genre-tree-modal .search-bar { width: 100%; padding: 10px 45px 10px 15px; border-radius: 20px; border: 1px solid #282828; background: #282828; color: white; }
+        .genre-tree-modal .add-genre-button { position: absolute; right: 5px; top: 5px; bottom: 5px; width: 50px; height: 30px; background-color: #1ED760; color: black; border: none; border-radius: 20px; font-size: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+        .genre-tree-modal .add-genre-button:hover { background-color: #3BE377; }
+        .genre-tree-modal #genre-add-error { color: #f15e6c; font-size: 13px; margin-top: 8px; text-align: center; display: none; }
+        .genre-tree-modal .main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+        .genre-tree-modal .main-button-primary:hover { background-color: #3BE377; }
+        .genre-tree-modal .genre-section-header { color: #b3b3b3; font-size: 14px; font-weight: bold; margin-top: 15px; margin-bottom: -5px; padding-left: 10px; }
+        .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
+        .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+        .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+      </style>
+      <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Genre Tree Explorer</span></h1>
+          <button id="closeGenreTreeModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                <title>Close</title>
+                <path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path>
+            </svg>
+          </button>
+      </div>
+      <div class="main-trackCreditsModal-mainSection genre-tree-modal" style="padding: 22px 47px 20px !important; max-height: 70vh; flex-grow: 1;">
+        <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 15px;">Select genres or add your own to start exploring.</p>
+        <div class="search-bar-wrapper">
+            <input type="text" id="genre-search-bar" class="search-bar" placeholder="Search or add a new genre...">
+            <button id="add-genre-btn" class="add-genre-button" title="Add Genre">+</button>
+        </div>
+        <div id="genre-add-error"></div>
+        <div id="user-added-section" style="display: none;">
+            <div class="genre-section-header">Your Added Genres</div>
+            <div id="user-added-genres-container" class="genre-container user-added-container"></div>
+        </div>
+        <div class="genre-section-header">Main Genres</div>
+        <div id="genre-buttons-container" class="genre-container"></div>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
+        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 15px;">
+            <div id="genre-selection-error" style="color: #f15e6c; font-size: 13px; display: none; flex-grow: 1; text-align: right;"></div>
+            <button id="createGenreTreePlaylist" class="main-buttons-button main-button-primary" 
+                    style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                Create Playlist
+            </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    const userGenreSection = modalContainer.querySelector('#user-added-section');
+    const userGenreContainer = modalContainer.querySelector('#user-added-genres-container');
+    const mainGenreContainer = modalContainer.querySelector('#genre-buttons-container');
+    const searchBar = modalContainer.querySelector('#genre-search-bar');
+    const addBtn = modalContainer.querySelector('#add-genre-btn');
+    const errorDiv = modalContainer.querySelector('#genre-add-error');
+
+    const renderGenres = (filter = '') => {
+        mainGenreContainer.innerHTML = '';
+        const filteredGenres = mainGenreList.filter(g => g.toLowerCase().includes(filter.toLowerCase()));
+        filteredGenres.forEach(genre => {
+            const btn = document.createElement('button');
+            btn.className = 'genre-button';
+            btn.textContent = genre;
+            if (selectedMainGenres.includes(genre)) {
+                btn.classList.add('selected');
+            }
+            btn.onclick = () => {
+                if (selectedMainGenres.includes(genre)) {
+                    selectedMainGenres = selectedMainGenres.filter(g => g !== genre);
+                    btn.classList.remove('selected');
+                } else {
+                    selectedMainGenres.push(genre);
+                    btn.classList.add('selected');
+                }
+            };
+            mainGenreContainer.appendChild(btn);
+        });
+    };
+
+    const renderUserGenres = (filter = '') => {
+        userGenreContainer.innerHTML = '';
+        const filteredUserGenres = [...userAddedGenres].filter(g => g.toLowerCase().includes(filter.toLowerCase()));
+        
+        if (userAddedGenres.size === 0) {
+            userGenreSection.style.display = 'none';
+            return;
+        }
+        userGenreSection.style.display = 'block';
+
+        filteredUserGenres.forEach(genre => {
+            const btn = document.createElement('button');
+            btn.className = 'genre-button';
+            
+            const textSpan = document.createElement('span');
+            textSpan.textContent = genre;
+            btn.appendChild(textSpan);
+
+            const removeSpan = document.createElement('span');
+            removeSpan.className = 'user-genre-remove';
+            removeSpan.innerHTML = '&times;';
+            removeSpan.onclick = (e) => {
+                e.stopPropagation();
+                userAddedGenres.delete(genre);
+                selectedUserGenres.delete(genre);
+                saveUserGenres();
+                fullRender(searchBar.value);
+            };
+            btn.appendChild(removeSpan);
+
+            if (selectedUserGenres.has(genre)) {
+                btn.classList.add('selected');
+            }
+            btn.onclick = () => {
+                if (selectedUserGenres.has(genre)) {
+                    selectedUserGenres.delete(genre);
+                    btn.classList.remove('selected');
+                } else {
+                    selectedUserGenres.add(genre);
+                    btn.classList.add('selected');
+                }
+            };
+            userGenreContainer.appendChild(btn);
+        });
+    };
+
+    const fullRender = (filter = '') => {
+        renderUserGenres(filter);
+        renderGenres(filter);
+    };
+
+    searchBar.addEventListener('input', () => fullRender(searchBar.value));
+    
+    addBtn.addEventListener('click', async () => {
+        const newGenre = searchBar.value.trim().toLowerCase();
+        errorDiv.style.display = 'none';
+
+        if (!newGenre) return;
+        if (mainGenreList.includes(newGenre) || userAddedGenres.has(newGenre)) {
+            errorDiv.textContent = `"${newGenre}" already exists in the list.`;
+            errorDiv.style.display = 'block';
+            setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
+            return;
+        }
+
+        if (!genrePlaylistsCache) {
+            errorDiv.textContent = "Could not verify genre; genre database is unavailable.";
+            errorDiv.style.display = 'block';
+            setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
+            return;
+        }
+
+        const escapedGenre = escapeRegExp(newGenre);
+        const regex = new RegExp(`\\b${escapedGenre}\\b`, 'i');
+        const hasMatch = genrePlaylistsCache.some(p => regex.test(p.genre));
+
+        if (hasMatch) {
+            userAddedGenres.add(newGenre);
+            selectedUserGenres.add(newGenre);
+            saveUserGenres();
+            searchBar.value = '';
+            fullRender();
+        } else {
+            errorDiv.textContent = `No genre found for "${newGenre}". Try a broader term.`;
+            errorDiv.style.display = 'block';
+            setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
+        }
+    });
+
+    fullRender();
+
+    const closeModal = () => overlay.remove();
+    
+    const createPlaylistBtn = modalContainer.querySelector('#createGenreTreePlaylist');
+    const selectionErrorDiv = modalContainer.querySelector('#genre-selection-error');
+
+    createPlaylistBtn.addEventListener('click', () => {
+        const allSelected = [...selectedMainGenres, ...selectedUserGenres];
+        if (allSelected.length === 0) {
+            selectionErrorDiv.textContent = "Please select at least one genre.";
+            selectionErrorDiv.style.display = 'block';
+            setTimeout(() => { selectionErrorDiv.style.display = 'none'; }, 4000);
+            return;
+        }
+        closeModal();
+        generateGenreTreePlaylist(allSelected);
+    });
+
+    const closeButton = modalContainer.querySelector("#closeGenreTreeModal");
+    if (closeButton) {
+        closeButton.addEventListener("click", closeModal);
+    }
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+  }
+
   async function handleSortAndCreatePlaylist(sortType) {
     if (sortType === "sortByParent" || sortType === "affinityParent" || sortType === "createNewPlaylist") {
       return;
@@ -15557,9 +16351,11 @@
         topAllTime:      { time_range: 'long_term',   name: 'All-Time',        description: 'of all time' }
     };
 
-    const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedArtistPicks', 'newDiscoveryPicks', 'followedReleasesChronological'];
+    const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedArtistPicks', 'newDiscoveryPicks', 'followedReleasesChronological', 'genreTreeExplorer'];
     if (recommendationSortTypes.includes(sortType)) {
-        if (sortType === 'followedArtistPicks') {
+        if (sortType === 'genreTreeExplorer') {
+            showGenreTreeExplorerModal();
+        } else if (sortType === 'followedArtistPicks') {
             await generateFollowedArtistPicks();
         } else if (sortType === 'newDiscoveryPicks') {
             await generateNewDiscoveryPicks();
@@ -17848,6 +18644,7 @@
   }, 100);
 
   loadSettings();
+  fetchUserMarket();
   initializePlayCountCache();
   initializeReleaseDateCache();
   initializeScrobblesCache();
