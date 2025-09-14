@@ -6,7 +6,8 @@
 + **Comprehensive Sorting:** Sort playlists and artist pages by play count, popularity, release date, album color, and Last.fm scrobbles.
 + **Full Artist Discography:** Load an artist's complete collection, including singles, albums, and compilations, for sorting.
 + **Personalized Sorting:** Sort playlists based on your unique listening habits with profiles like 'Recent Vibe', 'All-Time Favorites', 'Power Hour', 'Mellow Mood', and 'Hidden Gems'.
-+ **Playlist Creation:** Generate specialized playlists like 'New Releases from Followed Artists', 'Personalized Discovery Mixes', and your 'Top Tracks' for different time periods.
++ **Dynamic Playlists:** Create self-updating playlists from any combination of sources (playlists, artists, albums) that automatically stay updated and sorted on a custom schedule.
++ **Playlist Creation:** Generate specialized playlists like 'New Releases from Followed Artists', 'Discovery Mixes', and your 'Top Tracks' for different time periods.
 + **Extra Data Columns:** Add an extra column to playlists, albums, and artist pages (Play Count, Release Date, Scrobbles, DJ Info, Key, BPM, and more).
 + **Advanced Custom Filter:** Fine-tune playlists with keywords and range sliders for play count, release date, duration, and various audio features (BPM, energy, danceability).
 + **Genre Filtering:** Filter any playlist or discography by genre, using combined data from Spotify and Last.fm.
@@ -19,7 +20,7 @@
 
 ## 📷 Screenshots 
 <img src="https://github.com/user-attachments/assets/3a0de92c-3cba-4b5f-9227-0d5ed8db27e1" alt="show" width="100%">
-<img src="https://github.com/user-attachments/assets/9eae606c-b492-4021-b003-d2d292216d27" alt="show" width="100%">
+<img src="https://github.com/user-attachments/assets/120cd232-a3f4-429f-97d7-6682d0c07f13" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/14a63ac3-d466-4086-a7a0-4466b1f12c6d" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/f8e3d111-959c-441a-8519-146472216bf1" alt="show" width="100%">
 <img src="https://github.com/user-attachments/assets/7da8f21f-7334-4660-80b0-9276ea5c1adb" alt="show" width="100%">
