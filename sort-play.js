@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.6.0";
+  const SORT_PLAY_VERSION = "5.6.1";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -967,6 +967,13 @@
   <path d="M19.4003 18C19.7837 17.2499 20 16.4002 20 15.5C20 12.4624 17.5376 10 14.5 10C11.4624 10 9 12.4624 9 15.5C9 18.5376 11.4624 21 14.5 21L21 21C21 21 20 20 19.4143 18.0292M18.85 12C18.9484 11.5153 19 11.0137 19 10.5C19 6.35786 15.6421 3 11.5 3C7.35786 3 4 6.35786 4 10.5C4 11.3766 4.15039 12.2181 4.42676 13C5.50098 16.0117 3 18 3 18H9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
+  const coffeeIconSVG = `
+  <svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M18.5 7H19C19.4647 7 19.697 7 19.8902 7.03843C20.6836 7.19624 21.3038 7.81644 21.4616 8.60982C21.5 8.80302 21.5 9.03535 21.5 9.5C21.5 9.96465 21.5 10.197 21.4616 10.3902C21.3038 11.1836 20.6836 11.8038 19.8902 11.9616C19.697 12 19.4647 12 19 12H18.5M3 20H21M12 17C10.6055 17 9.90821 17 9.33277 16.8619C7.50453 16.4229 6.07707 14.9955 5.63815 13.1672C5.5 12.5918 5.5 11.8945 5.5 10.5L5.5 7.2C5.5 6.0799 5.5 5.51984 5.71799 5.09202C5.90973 4.7157 6.21569 4.40974 6.59202 4.21799C7.01984 4 7.57989 4 8.7 4L15.3 4C16.4201 4 16.9802 4 17.408 4.21799C17.7843 4.40973 18.0903 4.71569 18.282 5.09202C18.5 5.51984 18.5 6.07989 18.5 7.2V10.5C18.5 11.8945 18.5 12.5918 18.3619 13.1672C17.9229 14.9955 16.4955 16.4229 14.6672 16.8619C14.0918 17 13.3945 17 12 17Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const copyIconSVG = `<svg width="16px" height="16px" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v9a2 2 0 002 2h2v2a2 2 0 002 2h9a2 2 0 002-2V8a2 2 0 00-2-2h-2V4a2 2 0 00-2-2H4zm9 4V4H4v9h2V8a2 2 0 012-2h5zM8 8h9v9H8V8z"/></svg>`;
+
   function showSettingsModal() {
     const modalContainer = document.createElement("div");
     modalContainer.className = "sort-play-settings";
@@ -1032,12 +1039,20 @@
         position: absolute;
         right: 25px;
     }
+    .sort-play-settings-footer .support-me-button {
+        position: absolute;
+        left: 25px;
+    }
+    .sort-play-settings-footer .live-chat-button {
+        position: absolute;
+        right: 25px;
+    }
     .sort-play-settings-footer .github-link-container a {
         color: #1ED760;
         font-size: 14px;
         text-decoration: none;
     }
-    .live-chat-button {
+    .footer-icon-button {
         background: none;
         border: none;
         cursor: pointer;
@@ -1047,10 +1062,10 @@
         align-items: center;
         transition: color 0.1s ease-in-out;
     }
-    .live-chat-button.active {
+    .footer-icon-button.active {
         color: #1ED760;
     }
-    .live-chat-button:hover {
+    .footer-icon-button:hover {
         color: #1ED760;
     }
     #sort-play-chat-panel {
@@ -1686,16 +1701,24 @@
         const footerElement = document.createElement("div");
         footerElement.className = "sort-play-settings-footer";
         footerElement.innerHTML = `
+            <button id="supportMeBtn" class="footer-icon-button support-me-button" title="Support Sort-Play">
+                ${coffeeIconSVG}
+            </button>
             <div class="github-link-container">
                 <a href="https://github.com/hoeci/sort-play" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
             </div>
-            <button id="liveChatBtn" class="live-chat-button" title="Live Chat">
+            <button id="liveChatBtn" class="footer-icon-button live-chat-button" title="Live Chat">
                 ${liveChatIconSVG}
             </button>
         `;
         modalRootElement.appendChild(footerElement);
 
         const liveChatBtn = footerElement.querySelector("#liveChatBtn");
+        const supportMeBtn = footerElement.querySelector("#supportMeBtn");
+
+        supportMeBtn.addEventListener("click", () => {
+            showSupportModal();
+        });
 
         if (chatPanelVisible) {
             const chatPanel = createAndInitializeChatPanel();
@@ -2388,6 +2411,146 @@
 
     document.getElementById("cancelFolderName").addEventListener("click", closeModal);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  }
+
+  function showSupportModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-support-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 500px !important;
+        display: flex;
+        flex-direction: column;
+    `;
+
+    const wallets = [
+        { name: 'USDT (TRC20) / TRON', address: 'TU3tiVV3NLmFetXrsAZnuE9qu8JVSHDuAH' },
+        { name: 'TON', address: 'UQB3p1qXNXdSXIxoUvqkkTKQoim0Zy2GthZZfrAhS4cVWFbQ' },
+        { name: 'Bitcoin (BTC)', address: 'bc1q0vvhyffnk8s0g9hnf4k2c7z6ys3r2d7x6fjnvv' },
+    ];
+
+    let walletsHtml = wallets.map(wallet => `
+        <div class="wallet-entry">
+            <label class="wallet-label">${wallet.name}</label>
+            <div class="wallet-address-container">
+                <input type="text" class="wallet-address" value="${wallet.address}" readonly>
+                <button class="copy-button" data-address="${wallet.address}" title="Copy Address">
+                    ${copyIconSVG}
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    modalContainer.innerHTML = `
+      <style>
+        .support-modal-content { display: flex; flex-direction: column; gap: 16px; }
+        .wallet-entry { display: flex; flex-direction: column; gap: 6px; }
+        .wallet-label { color: #c1c1c1; font-size: 14px; font-weight: 500; }
+        .wallet-address-container { display: flex; align-items: center; gap: 8px; }
+        .wallet-address { 
+            flex-grow: 1; 
+            background-color: #121212; 
+            border: 1px solid #333; 
+            border-radius: 4px; 
+            padding: 8px 12px; 
+            color: #fff; 
+            font-family: monospace; 
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .copy-button { 
+            flex-shrink: 0;
+            background-color: #333; 
+            border: 1px solid #555;
+            color: #fff; 
+            padding: 6px 6px; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease;
+            width: 32px;
+            height: 32px;
+        }
+        .copy-button:hover { background-color: #444; }
+        .copy-button.copied {
+            background-color: #1ED760;
+            color: black;
+        }
+        .copy-button.copied:hover {
+            background-color: #1ED760;
+        }
+        .copy-button svg { width: 16px; height: 16px; }
+      </style>
+      <div class="main-trackCreditsModal-header">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Support Sort-Play</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-mainSection" style="padding: 22px 47px 20px !important; max-height: 60vh; flex-grow: 1;">
+        <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 25px;">If you enjoy using Sort-Play, please consider supporting its development. Thank you!</p>
+        <div class="support-modal-content">
+            ${walletsHtml}
+        </div>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
+        <div style="display: flex; justify-content: flex-end;">
+            <button id="closeSupportModal" class="main-buttons-button main-button-primary" 
+                    style="background-color: #1ED760; color: black; padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                Done
+            </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    modalContainer.querySelectorAll('.copy-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const address = button.dataset.address;
+            navigator.clipboard.writeText(address).then(() => {
+                Spicetify.showNotification('Address copied to clipboard!');
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                }, 1000);
+            }, (err) => {
+                Spicetify.showNotification('Failed to copy address.', true);
+                console.error('Could not copy text: ', err);
+            });
+        });
+    });
+
+    const closeModal = () => overlay.remove();
+    
+    const doneButton = modalContainer.querySelector("#closeSupportModal");
+    if (doneButton) {
+        doneButton.addEventListener("click", closeModal);
+        
+        doneButton.addEventListener("mouseenter", () => {
+            doneButton.style.backgroundColor = "#3BE377";
+        });
+        doneButton.addEventListener("mouseleave", () => {
+            doneButton.style.backgroundColor = "#1ED760";
+        });
+    }
+
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+            closeModal();
+        }
+    });
   }
 
   function showCreatePlaylistModal() {
@@ -17526,19 +17689,20 @@
   }
 
   function getTracklistTrackUri(tracklistElement) {
-      let values = Object.values(tracklistElement);
-      if (!values) {
-          console.log("Error: Could not get tracklist element");
-          return null;
-      }
-      return (
-          values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
-          values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
-          values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props
-              ?.uri ||
-          values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
-      );
-  }
+    let values = Object.values(tracklistElement);
+    if (!values || !values[0]?.pendingProps) {
+        console.log("[Sort-Play] Error: Could not find pendingProps on tracklist element.", tracklistElement);
+        return null;
+    }
+    return (
+        values[0]?.pendingProps?.children?.props?.value?.spec?._path?.[0]?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props
+            ?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+    );
+}
 
   const waitForElement = (selector) => {
     return new Promise((resolve) => {
