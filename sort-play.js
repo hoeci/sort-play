@@ -18676,14 +18676,14 @@
       }
     } 
     else if (URI.isAlbum(currentUri)) {
-        const newContainer = document.querySelector(".yLmA5f7x65en2MdKbIhX");
+        const listButton = document.querySelector(".x-sortBox-sortDropdown");
 
-        if (newContainer) {
-            const sortDropdown = newContainer.querySelector(".x-sortBox-sortDropdown");
-            if (sortDropdown && !newContainer.contains(mainButton)) {
+        if (listButton && listButton.parentElement) {
+            const container = listButton.parentElement;
+            if (!container.contains(mainButton)) {
                 mainButton.style.marginLeft = "";
-                mainButton.style.marginRight = "8px";
-                newContainer.insertBefore(mainButton, sortDropdown);
+                mainButton.style.marginRight = "1px";
+                container.insertBefore(mainButton, listButton);
             }
         } else {
             const albumActionBar = document.querySelector(".main-actionBar-ActionBarRow");
