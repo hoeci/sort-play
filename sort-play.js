@@ -12,12 +12,17 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.6.1";
+  const SORT_PLAY_VERSION = "5.7.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
   let showAdditionalColumn = false;
+  let showSecondAdditionalColumn = false;
   let selectedColumnType = 'playCount';
+  let selectedSecondColumnType = 'releaseDate';
+  let selectedAlbumColumnType = 'releaseDate';
+  let selectedArtistColumnType = 'releaseDate';
+  let myScrobblesDisplayMode = 'number';
   let releaseDateFormat = 'YYYY-MM-DD';
   let showAlbumColumn = false;
   let showArtistColumn = false; 
@@ -35,9 +40,6 @@
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
   let changeTitleOnModify = true;
-  let myScrobblesDisplayMode = 'number';
-  let selectedAlbumColumnType = 'releaseDate';
-  let selectedArtistColumnType = 'releaseDate';
   let selectedAiModel = "gemini-2.5-flash";
   let topTracksLimit = 100;
   let discoveryPlaylistSize = 50;
@@ -274,9 +276,11 @@
 
   function loadSettings() {
     showAdditionalColumn = localStorage.getItem("sort-play-show-additional-column") === "true";
+    showSecondAdditionalColumn = localStorage.getItem("sort-play-show-second-additional-column") === "true";
     showAlbumColumn = localStorage.getItem("sort-play-show-album-column") === "true";
     showArtistColumn = localStorage.getItem("sort-play-show-artist-column") === "true";
     selectedColumnType = localStorage.getItem("sort-play-selected-column-type") || "playCount";
+    selectedSecondColumnType = localStorage.getItem("sort-play-selected-second-column-type") || "releaseDate";
     selectedAlbumColumnType = localStorage.getItem("sort-play-selected-album-column-type") || "releaseDate";
     selectedArtistColumnType = localStorage.getItem("sort-play-selected-artist-column-type") || "releaseDate"; 
     releaseDateFormat = localStorage.getItem("sort-play-release-date-format") || 'YYYY-MM-DD';
@@ -320,9 +324,11 @@
   
   function saveSettings() {
     localStorage.setItem("sort-play-show-additional-column", showAdditionalColumn); 
+    localStorage.setItem("sort-play-show-second-additional-column", showSecondAdditionalColumn);
     localStorage.setItem("sort-play-show-album-column", showAlbumColumn);
     localStorage.setItem("sort-play-show-artist-column", showArtistColumn); 
     localStorage.setItem("sort-play-selected-column-type", selectedColumnType);
+    localStorage.setItem("sort-play-selected-second-column-type", selectedSecondColumnType);
     localStorage.setItem("sort-play-selected-album-column-type", selectedAlbumColumnType);
     localStorage.setItem("sort-play-selected-artist-column-type", selectedArtistColumnType);
     localStorage.setItem("sort-play-release-date-format", releaseDateFormat);
@@ -1363,28 +1369,6 @@
         </div>
     </div>
 
-
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Playlist Names
-    </div>
-    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="changeTitleOnModifySettingRow">
-        <label class="col description">
-            Update Title When Modifying
-            <span class="tooltip-container">
-                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">When enabled, appends a sort tag like "(PlayCount)" to the playlist title after modifying it.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch" id="changeTitleOnModifySwitchLabel">
-                <input type="checkbox" id="changeTitleOnModifyToggle" ${changeTitleOnModify ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
-
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Column Settings
     </div>
@@ -1436,6 +1420,52 @@
         </div>
     </div>
     
+    <div class="setting-row" id="secondAdditionalColumnSetting">
+        <label class="col description">
+          Playlist Second Extra Column
+        </label>
+        <div class="col action" style="position: relative;">
+            <button id="secondDateFormatSettingsBtn" class="column-settings-button" title="Release Date Format Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
+            <button id="secondMyScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
+            <select id="secondColumnTypeSelect" class="column-type-select" ${!showSecondAdditionalColumn ? 'disabled' : ''}>
+                <option value="playCount" ${selectedSecondColumnType === 'playCount' ? 'selected' : ''}>Play Count</option>
+                <option value="popularity" ${selectedSecondColumnType === 'popularity' ? 'selected' : ''}>Popularity</option>
+                <option value="releaseDate" ${selectedSecondColumnType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                <option value="scrobbles" ${selectedSecondColumnType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
+                <option value="personalScrobbles" ${selectedSecondColumnType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
+                <option value="djInfo" ${selectedSecondColumnType === 'djInfo' ? 'selected' : ''}>DJ Info</option>
+                <option value="key" ${selectedSecondColumnType === 'key' ? 'selected' : ''}>Key</option>
+                <option value="tempo" ${selectedSecondColumnType === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
+                <option value="energy" ${selectedSecondColumnType === 'energy' ? 'selected' : ''}>Energy</option>
+                <option value="danceability" ${selectedSecondColumnType === 'danceability' ? 'selected' : ''}>Danceability</option>
+                <option value="valence" ${selectedSecondColumnType === 'valence' ? 'selected' : ''}>Valence</option>
+            </select>
+            <label class="switch">
+                <input type="checkbox" id="showSecondAdditionalColumnToggle" ${showSecondAdditionalColumn ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+            <div id="secondDateFormatDropdownContainer" class="column-settings-dropdown">
+                <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
+                <button data-format="MM-DD-YYYY" class="${releaseDateFormat === 'MM-DD-YYYY' ? 'selected' : ''}">MM-DD-YYYY</button>
+                <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
+                <button data-format="MMM D, YYYY" class="${releaseDateFormat === 'MMM D, YYYY' ? 'selected' : ''}">Month D, YYYY</button>
+                <button data-format="D MMM, YYYY" class="${releaseDateFormat === 'D MMM, YYYY' ? 'selected' : ''}">D Month, YYYY</button>
+                <button data-format="YYYY, MMM D" class="${releaseDateFormat === 'YYYY, MMM D' ? 'selected' : ''}">YYYY, Month D</button>
+                <button data-format="YYYY-MM" class="${releaseDateFormat === 'YYYY-MM' ? 'selected' : ''}">YYYY-MM</button>
+                <button data-format="MM-YYYY" class="${releaseDateFormat === 'MM-YYYY' ? 'selected' : ''}">MM-YYYY</button>
+                <button data-format="YYYY" class="${releaseDateFormat === 'YYYY' ? 'selected' : ''}">YYYY</button>
+            </div>
+            <div id="secondMyScrobblesDropdownContainer" class="column-settings-dropdown">
+                <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
+                <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
+            </div>
+        </div>
+    </div>
+
     <div class="setting-row" id="albumColumnSetting">
         <label class="col description">
             Album Extra Column
@@ -1536,6 +1566,26 @@
         </div>
     </div>
 
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Playlist Names
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="changeTitleOnModifySettingRow">
+        <label class="col description">
+            Update Title When Modifying
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">When enabled, appends a sort tag like "(PlayCount)" to the playlist title after modifying it.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="changeTitleOnModifySwitchLabel">
+                <input type="checkbox" id="changeTitleOnModifyToggle" ${changeTitleOnModify ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
     
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Duplicate Removal
@@ -1790,6 +1840,12 @@
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
     const playlistBehaviorSettingsBtn = modalContainer.querySelector("#playlistBehaviorSettingsBtn");
     const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
+    const showSecondAdditionalColumnToggle = modalContainer.querySelector("#showSecondAdditionalColumnToggle");
+    const secondColumnTypeSelect = modalContainer.querySelector("#secondColumnTypeSelect");
+    const secondDateFormatSettingsBtn = modalContainer.querySelector("#secondDateFormatSettingsBtn");
+    const secondMyScrobblesSettingsBtn = modalContainer.querySelector("#secondMyScrobblesSettingsBtn");
+    const secondDateFormatDropdownContainer = modalContainer.querySelector("#secondDateFormatDropdownContainer");
+    const secondMyScrobblesDropdownContainer = modalContainer.querySelector("#secondMyScrobblesDropdownContainer");
 
     function updateOpenPlaylistAfterSortToggleState() {
       const isCreatePlaylistOn = createPlaylistToggle.checked;
@@ -1977,9 +2033,10 @@
         }
     });
 
-    removeDateAddedToggle.disabled = !showAdditionalColumn;
-    removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn);
+    removeDateAddedToggle.disabled = !showAdditionalColumn && !showSecondAdditionalColumn;
+    removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn && !showSecondAdditionalColumn);
     columnTypeSelect.disabled = !showAdditionalColumn;
+    secondColumnTypeSelect.disabled = !showSecondAdditionalColumn;
     albumColumnTypeSelect.disabled = !showAlbumColumn;
     artistColumnTypeSelect.disabled = !showArtistColumn;
 
@@ -1999,6 +2056,17 @@
         myScrobblesSettingsBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
         myScrobblesSettingsBtn.disabled = !showScrobbleSettings;
         if (!showScrobbleSettings) myScrobblesDropdownContainer.style.display = 'none';
+    };
+
+    const updateSecondPlaylistColumnSettingsVisibility = () => {
+        const showDateSettings = showSecondAdditionalColumn && selectedSecondColumnType === 'releaseDate';
+        secondDateFormatSettingsBtn.style.display = showDateSettings ? 'flex' : 'none';
+        secondDateFormatSettingsBtn.disabled = !showDateSettings;
+        if (!showDateSettings) secondDateFormatDropdownContainer.style.display = 'none';
+        const showScrobbleSettings = showSecondAdditionalColumn && selectedSecondColumnType === 'personalScrobbles';
+        secondMyScrobblesSettingsBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
+        secondMyScrobblesSettingsBtn.disabled = !showScrobbleSettings;
+        if (!showScrobbleSettings) secondMyScrobblesDropdownContainer.style.display = 'none';
     };
 
     const updateAlbumColumnSettingsVisibility = () => {
@@ -2024,13 +2092,15 @@
     };
 
     updatePlaylistColumnSettingsVisibility();
+    updateSecondPlaylistColumnSettingsVisibility();
     updateAlbumColumnSettingsVisibility();
     updateArtistColumnSettingsVisibility();
 
     const allDropdownsForScroll = [
         dateFormatDropdownContainer, myScrobblesDropdownContainer,
         albumDateFormatDropdownContainer, albumMyScrobblesDropdownContainer,
-        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer
+        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer,
+        secondDateFormatDropdownContainer, secondMyScrobblesDropdownContainer
     ];
     
     allDropdownsForScroll.forEach(dropdown => {
@@ -2050,13 +2120,34 @@
     showAdditionalColumnToggle.addEventListener("change", () => {
         showAdditionalColumn = showAdditionalColumnToggle.checked;
         columnTypeSelect.disabled = !showAdditionalColumn;
-        removeDateAddedToggle.disabled = !showAdditionalColumn;
-        removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn);
-        if (!showAdditionalColumn) {
+        removeDateAddedToggle.disabled = !showAdditionalColumn && !showSecondAdditionalColumn;
+        removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn && !showSecondAdditionalColumn);
+        if (!showAdditionalColumn && !showSecondAdditionalColumn) {
             removeDateAdded = false;
             removeDateAddedToggle.checked = false;
         }
         updatePlaylistColumnSettingsVisibility();
+        saveSettings();
+        updateTracklist();
+    });
+
+    showSecondAdditionalColumnToggle.addEventListener("change", () => {
+        showSecondAdditionalColumn = showSecondAdditionalColumnToggle.checked;
+        secondColumnTypeSelect.disabled = !showSecondAdditionalColumn;
+        removeDateAddedToggle.disabled = !showAdditionalColumn && !showSecondAdditionalColumn;
+        removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn && !showSecondAdditionalColumn);
+        if (!showAdditionalColumn && !showSecondAdditionalColumn) {
+            removeDateAdded = false;
+            removeDateAddedToggle.checked = false;
+        }
+        updateSecondPlaylistColumnSettingsVisibility();
+        saveSettings();
+        updateTracklist();
+    });
+
+    secondColumnTypeSelect.addEventListener("change", () => {
+        selectedSecondColumnType = secondColumnTypeSelect.value;
+        updateSecondPlaylistColumnSettingsVisibility();
         saveSettings();
         updateTracklist();
     });
@@ -2106,8 +2197,8 @@
         onPageChange();
     });
 
-    const allDateFormatContainers = [dateFormatDropdownContainer, albumDateFormatDropdownContainer, artistDateFormatDropdownContainer];
-    const allScrobbleContainers = [myScrobblesDropdownContainer, albumMyScrobblesDropdownContainer, artistMyScrobblesDropdownContainer];
+    const allDateFormatContainers = [dateFormatDropdownContainer, albumDateFormatDropdownContainer, artistDateFormatDropdownContainer, secondDateFormatDropdownContainer];
+    const allScrobbleContainers = [myScrobblesDropdownContainer, albumMyScrobblesDropdownContainer, artistMyScrobblesDropdownContainer, secondMyScrobblesDropdownContainer];
 
     const setupGlobalSettingListeners = (containers, settingKey, updateFunc) => {
         containers.forEach(container => {
@@ -2190,6 +2281,8 @@
     setupSettingsButtonToggle(albumMyScrobblesSettingsBtn, albumMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== albumMyScrobblesDropdownContainer));
     setupSettingsButtonToggle(artistDateFormatSettingsBtn, artistDateFormatDropdownContainer, allDropdowns.filter(d => d !== artistDateFormatDropdownContainer));
     setupSettingsButtonToggle(artistMyScrobblesSettingsBtn, artistMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== artistMyScrobblesDropdownContainer));
+    setupSettingsButtonToggle(secondDateFormatSettingsBtn, secondDateFormatDropdownContainer, allDropdowns.filter(d => d !== secondDateFormatDropdownContainer));
+    setupSettingsButtonToggle(secondMyScrobblesSettingsBtn, secondMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== secondMyScrobblesDropdownContainer));
 
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
@@ -8344,7 +8437,7 @@
                 font-size: 20px;
                 padding: 0 5px;
                 line-height: 1;
-                display: none; /* Hidden by default */
+                display: none;
             }
             #source-clear-btn:hover { color: white; }
         </style>
@@ -17926,46 +18019,54 @@
 
   async function loadAdditionalColumnData(tracklist_) {
     const currentUri = getCurrentUri();
-    let isColumnEnabled = false;
-    let activeColumnType = 'playCount';
+    let columnConfigs = [];
     const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo', 'popularity'];
 
     if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
-        isColumnEnabled = showAdditionalColumn;
-        activeColumnType = selectedColumnType;
+        if (showSecondAdditionalColumn) {
+            columnConfigs.push({ type: selectedSecondColumnType, dataSelector: ".sort-play-second-data" });
+        }
+        if (showAdditionalColumn) {
+            columnConfigs.push({ type: selectedColumnType, dataSelector: ".sort-play-data" });
+        }
     } else if (URI.isAlbum(currentUri)) {
-        isColumnEnabled = showAlbumColumn;
-        activeColumnType = selectedAlbumColumnType;
+        if (showAlbumColumn) columnConfigs.push({ type: selectedAlbumColumnType, dataSelector: ".sort-play-data" });
     } else if (URI.isArtist(currentUri)) {
-        isColumnEnabled = showArtistColumn;
-        activeColumnType = selectedArtistColumnType;
+        if (showArtistColumn) columnConfigs.push({ type: selectedArtistColumnType, dataSelector: ".sort-play-data" });
     }
 
-    if (!isColumnEnabled) return;
+    if (columnConfigs.length === 0) return;
 
     const tracksToProcess = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
         .filter(track => {
             if (track.classList.contains('sort-play-processing') || track.hasAttribute('data-sp-fetch-failed')) {
                 return false;
             }
-            const dataElement = track.querySelector(".sort-play-data");
             const trackUri = getTracklistTrackUri(track);
             const isTrack = trackUri && trackUri.includes("track");
-            return dataElement && (dataElement.textContent === "" || dataElement.textContent === "_") && isTrack && trackUri;
+            if (!isTrack) return false;
+
+            return columnConfigs.some(config => {
+                const dataElement = track.querySelector(config.dataSelector);
+                return dataElement && (dataElement.textContent === "" || dataElement.textContent === "_");
+            });
         });
     
     if (tracksToProcess.length === 0) return;
 
-    if (activeColumnType === 'playCount') initializePlayCountCache();
-    else if (activeColumnType === 'releaseDate') initializeReleaseDateCache();
-    else if (activeColumnType === 'scrobbles') initializeScrobblesCache();
+    const requiredDataTypes = new Set(columnConfigs.map(c => c.type));
+    if (requiredDataTypes.has('playCount')) initializePlayCountCache();
+    if (requiredDataTypes.has('releaseDate')) initializeReleaseDateCache();
+    if (requiredDataTypes.has('scrobbles')) initializeScrobblesCache();
     
     const BATCH_SIZE = 50;
     
     for (let i = 0; i < tracksToProcess.length; i += BATCH_SIZE) {
         const batch = tracksToProcess.slice(i, i + BATCH_SIZE);
         
-        if (audioFeatureTypes.includes(activeColumnType)) {
+        const needsAudioFeatures = columnConfigs.some(c => audioFeatureTypes.includes(c.type));
+        
+        if (needsAudioFeatures) {
             const trackIdsToFetch = [];
             const elementMap = new Map();
 
@@ -17973,27 +18074,38 @@
                 trackElement.classList.add('sort-play-processing');
                 const trackUri = getTracklistTrackUri(trackElement);
                 const trackId = trackUri ? trackUri.split(":")[2] : null;
-                const dataElement = trackElement.querySelector(".sort-play-data");
-                if (!trackId || !dataElement) continue;
+                if (!trackId) continue;
 
-                const statsCacheModel = "stats-column";
-                const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
-                let needsFetching = true;
-
-                if (cachedData) {
-                    if (activeColumnType === 'djInfo' && cachedData.key !== undefined) {
-                        updateDisplay(dataElement, cachedData, 'djInfo');
-                        needsFetching = false;
-                    } else if (cachedData[activeColumnType] !== undefined) {
-                        updateDisplay(dataElement, cachedData[activeColumnType], activeColumnType);
-                        needsFetching = false;
+                let needsFetching = false;
+                for (const config of columnConfigs) {
+                    if (audioFeatureTypes.includes(config.type)) {
+                        const dataElement = trackElement.querySelector(config.dataSelector);
+                        if (dataElement && (dataElement.textContent === "" || dataElement.textContent === "_")) {
+                            const statsCacheModel = "stats-column";
+                            const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
+                            if (!cachedData || cachedData[config.type] === undefined) {
+                                needsFetching = true;
+                                break;
+                            }
+                        }
                     }
                 }
 
                 if (needsFetching) {
                     trackIdsToFetch.push(trackId);
-                    elementMap.set(trackId, dataElement);
+                    elementMap.set(trackId, trackElement);
                 } else {
+                    const statsCacheModel = "stats-column";
+                    const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
+                    if (cachedData) {
+                        columnConfigs.forEach(config => {
+                            const dataElement = trackElement.querySelector(config.dataSelector);
+                            if (dataElement && audioFeatureTypes.includes(config.type)) {
+                                const value = config.type === 'djInfo' ? cachedData : cachedData[config.type];
+                                updateDisplay(dataElement, value, config.type);
+                            }
+                        });
+                    }
                     trackElement.classList.remove('sort-play-processing');
                 }
             }
@@ -18001,23 +18113,36 @@
             if (trackIdsToFetch.length > 0) {
                 const batchStats = await getBatchTrackStats(trackIdsToFetch);
                 for (const trackId of trackIdsToFetch) {
-                    const dataElement = elementMap.get(trackId);
+                    const trackElement = elementMap.get(trackId);
                     const stats = batchStats[trackId];
                     if (stats) {
-                        const value = activeColumnType === 'djInfo' ? stats : stats[activeColumnType];
-                        updateDisplay(dataElement, value, activeColumnType);
                         const statsCacheModel = "stats-column";
                         const currentCache = getTrackCache(trackId, true, false, statsCacheModel) || {};
                         const newCache = { ...currentCache, ...stats };
                         setTrackCache(trackId, newCache, true, false, statsCacheModel);
+                        
+                        columnConfigs.forEach(config => {
+                            if (audioFeatureTypes.includes(config.type)) {
+                                const dataElement = trackElement.querySelector(config.dataSelector);
+                                const value = config.type === 'djInfo' ? stats : stats[config.type];
+                                updateDisplay(dataElement, value, config.type);
+                            }
+                        });
                     } else {
-                        updateDisplay(dataElement, "_", activeColumnType);
+                        columnConfigs.forEach(config => {
+                            if (audioFeatureTypes.includes(config.type)) {
+                                const dataElement = trackElement.querySelector(config.dataSelector);
+                                updateDisplay(dataElement, "_", config.type);
+                            }
+                        });
                     }
-                    const trackElement = dataElement.closest('.main-trackList-trackListRow');
                     if (trackElement) trackElement.classList.remove('sort-play-processing');
                 }
             }
-        } else {
+        }
+        
+        const nonAudioFeatureConfigs = columnConfigs.filter(c => !audioFeatureTypes.includes(c.type));
+        if (nonAudioFeatureConfigs.length > 0) {
             const trackIdsToFetch = [];
             const elementMap = new Map();
 
@@ -18025,38 +18150,33 @@
                 trackElement.classList.add('sort-play-processing');
                 const trackUri = getTracklistTrackUri(trackElement);
                 const trackId = trackUri ? trackUri.split(":")[2] : null;
-                const dataElement = trackElement.querySelector(".sort-play-data");
-                if (!trackId || !dataElement) {
+                if (!trackId) {
                     trackElement.classList.remove('sort-play-processing');
                     continue;
                 }
 
-                let isCached = false;
-                if (activeColumnType === 'playCount') {
-                    const cachedCount = getCachedPlayCount(trackId);
-                    if (cachedCount !== null) {
-                        updateDisplay(dataElement, cachedCount, activeColumnType);
-                        isCached = true;
-                    }
-                } else if (activeColumnType === 'releaseDate') {
-                    const cachedDate = getCachedReleaseDate(trackId);
-                    if (cachedDate !== null) {
-                        updateDisplay(dataElement, cachedDate, activeColumnType);
-                        isCached = true;
-                    }
-                } else if (activeColumnType === 'scrobbles') {
-                    const cachedScrobbles = getCachedScrobbles(trackId);
-                     if (cachedScrobbles !== null) {
-                        updateDisplay(dataElement, cachedScrobbles, activeColumnType);
-                        isCached = true;
+                let isCached = true;
+                for (const config of nonAudioFeatureConfigs) {
+                    const dataElement = trackElement.querySelector(config.dataSelector);
+                    if (dataElement && (dataElement.textContent === "" || dataElement.textContent === "_")) {
+                        let cachedValue = null;
+                        if (config.type === 'playCount') cachedValue = getCachedPlayCount(trackId);
+                        else if (config.type === 'releaseDate') cachedValue = getCachedReleaseDate(trackId);
+                        else if (config.type === 'scrobbles') cachedValue = getCachedScrobbles(trackId);
+                        
+                        if (cachedValue !== null) {
+                            updateDisplay(dataElement, cachedValue, config.type);
+                        } else {
+                            isCached = false;
+                        }
                     }
                 }
 
-                if (isCached) {
-                    trackElement.classList.remove('sort-play-processing');
-                } else {
-                    elementMap.set(trackId, { trackElement, dataElement });
+                if (!isCached) {
+                    elementMap.set(trackId, trackElement);
                     trackIdsToFetch.push(trackId);
+                } else {
+                    trackElement.classList.remove('sort-play-processing');
                 }
             }
 
@@ -18070,70 +18190,66 @@
                 while (!success && retries < maxRetries) {
                     try {
                         trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdsToFetch.join(',')}`);
-                        
-                        if (trackDetailsResponse && trackDetailsResponse.tracks) {
-                            success = true;
-                        } else {
-                            throw new Error("Spotify API request for track details failed or returned invalid data.");
-                        }
+                        if (trackDetailsResponse && trackDetailsResponse.tracks) success = true;
+                        else throw new Error("Invalid data from Spotify API.");
                     } catch (error) {
                         retries++;
-                        console.warn(`Sort-Play: Error fetching track details batch (Attempt ${retries}/${maxRetries}):`, error);
-                        if (retries < maxRetries) {
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                            delay *= 2;
-                        }
+                        if (retries < maxRetries) await new Promise(resolve => setTimeout(resolve, delay *= 2));
                     }
                 }
 
                 if (success && trackDetailsResponse) {
                     const processingPromises = trackDetailsResponse.tracks.map(async (trackDetails) => {
                         if (!trackDetails) return;
+                        const trackElement = elementMap.get(trackDetails.id);
+                        if (!trackElement) return;
 
-                        const { trackElement, dataElement } = elementMap.get(trackDetails.id) || {};
-                        if (!trackElement || !dataElement) return;
+                        for (const config of nonAudioFeatureConfigs) {
+                            const dataElement = trackElement.querySelector(config.dataSelector);
+                            if (!dataElement || (dataElement.textContent !== "" && dataElement.textContent !== "_")) continue;
+                            
+                            try {
+                                if (config.type === 'playCount') {
+                                    const result = await getTrackDetailsWithPlayCount({ track: { album: { id: trackDetails.album.id }, id: trackDetails.id } });
+                                    updateDisplay(dataElement, result.playCount, config.type);
+                                    if (result.playCount !== null && result.playCount !== "N/A") setCachedPlayCount(trackDetails.id, result.playCount);
+                                } else if (config.type === 'releaseDate') {
+                                    const releaseDate = trackDetails.album.release_date;
+                                    updateDisplay(dataElement, releaseDate, config.type);
+                                    if (releaseDate) setCachedReleaseDate(trackDetails.id, releaseDate);
+                                } else if (config.type === 'scrobbles' || config.type === 'personalScrobbles') {
+                                    const trackName = trackDetails.name;
+                                    const artistName = trackDetails.artists?.[0]?.name;
+                                    if (!artistName || !trackName) throw new Error("Missing artist/track name.");
 
-                        try {
-                            if (activeColumnType === 'playCount') {
-                                const result = await getTrackDetailsWithPlayCount({ track: { album: { id: trackDetails.album.id }, id: trackDetails.id } });
-                                updateDisplay(dataElement, result.playCount, activeColumnType);
-                                if (result.playCount !== null && result.playCount !== "N/A") setCachedPlayCount(trackDetails.id, result.playCount);
-                            } else if (activeColumnType === 'releaseDate') {
-                                const releaseDate = trackDetails.album.release_date;
-                                updateDisplay(dataElement, releaseDate, activeColumnType);
-                                if (releaseDate) setCachedReleaseDate(trackDetails.id, releaseDate);
-                            } else if (activeColumnType === 'scrobbles' || activeColumnType === 'personalScrobbles') {
-                                const trackName = trackDetails.name;
-                                const artistName = trackDetails.artists?.[0]?.name;
-                                if (!artistName || !trackName) throw new Error("Missing artist/track name.");
-
-                                if (activeColumnType === 'scrobbles') {
-                                    const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                    updateDisplay(dataElement, result.scrobbles, activeColumnType);
-                                    if (result.scrobbles !== null) setCachedScrobbles(trackDetails.id, result.scrobbles);
-                                } else {
-                                    if (!loadLastFmUsername()) {
-                                        updateDisplay(dataElement, "_", activeColumnType);
+                                    if (config.type === 'scrobbles') {
+                                        const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                        updateDisplay(dataElement, result.scrobbles, config.type);
+                                        if (result.scrobbles !== null) setCachedScrobbles(trackDetails.id, result.scrobbles);
                                     } else {
-                                        const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                        updateDisplay(dataElement, result.personalScrobbles, activeColumnType);
+                                        if (!loadLastFmUsername()) updateDisplay(dataElement, "_", config.type);
+                                        else {
+                                            const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
+                                            updateDisplay(dataElement, result.personalScrobbles, config.type);
+                                        }
                                     }
                                 }
+                            } catch (e) {
+                                updateDisplay(dataElement, "_", config.type);
+                                trackElement.setAttribute('data-sp-fetch-failed', 'true');
                             }
-                        } catch (e) {
-                            updateDisplay(dataElement, "_", activeColumnType);
-                            trackElement.setAttribute('data-sp-fetch-failed', 'true');
-                        } finally {
-                            trackElement.classList.remove('sort-play-processing');
                         }
+                        trackElement.classList.remove('sort-play-processing');
                     });
                     await Promise.all(processingPromises);
                 } else {
-                    console.error(`Sort-Play: Failed to fetch batch track details after ${maxRetries} attempts.`);
                     trackIdsToFetch.forEach(trackId => {
-                        const { trackElement, dataElement } = elementMap.get(trackId) || {};
-                        if (trackElement && dataElement) {
-                            updateDisplay(dataElement, "_", activeColumnType);
+                        const trackElement = elementMap.get(trackId);
+                        if (trackElement) {
+                            columnConfigs.forEach(config => {
+                                const dataElement = trackElement.querySelector(config.dataSelector);
+                                if (dataElement) updateDisplay(dataElement, "_", config.type);
+                            });
                             trackElement.setAttribute('data-sp-fetch-failed', 'true');
                             trackElement.classList.remove('sort-play-processing');
                         }
@@ -18146,7 +18262,6 @@
         }
     }
   }
-
 
   function updateDisplay(element, value, type) {
     if (!element) return;
@@ -18246,6 +18361,8 @@
 
     const existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
     const headerTextSpan = existingHeaderColumn?.querySelector("span");
+    const existingSecondHeaderColumn = tracklistHeader.querySelector(".sort-play-second-column");
+    const secondHeaderTextSpan = existingSecondHeaderColumn?.querySelector("span");
 
     let expectedHeaderText;
     switch (selectedColumnType) {
@@ -18262,8 +18379,24 @@
         case 'valence': expectedHeaderText = "Valence"; break;
         default: expectedHeaderText = "Plays";
     }
-
     const columnTypeChanged = existingHeaderColumn && headerTextSpan?.innerText !== expectedHeaderText;
+
+    let expectedSecondHeaderText;
+    switch (selectedSecondColumnType) {
+        case 'playCount': expectedSecondHeaderText = "Plays"; break;
+        case 'popularity': expectedSecondHeaderText = "Popularity"; break;
+        case 'releaseDate': expectedSecondHeaderText = "Rel. Date"; break;
+        case 'scrobbles': expectedSecondHeaderText = "Scrobbles"; break;
+        case 'personalScrobbles': expectedSecondHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+        case 'djInfo': expectedSecondHeaderText = "DJ Info"; break;
+        case 'key': expectedSecondHeaderText = "Key"; break;
+        case 'tempo': expectedSecondHeaderText = "BPM"; break;
+        case 'energy': expectedSecondHeaderText = "Energy"; break;
+        case 'danceability': expectedSecondHeaderText = "Dance"; break;
+        case 'valence': expectedSecondHeaderText = "Valence"; break;
+        default: expectedSecondHeaderText = "Popularity";
+    }
+    const secondColumnTypeChanged = existingSecondHeaderColumn && secondHeaderTextSpan?.innerText !== expectedSecondHeaderText;
 
     if (showAdditionalColumn) {
         if (!existingHeaderColumn) {
@@ -18277,7 +18410,7 @@
                 let headerColumn = document.createElement("div");
                 headerColumn.className = "main-trackList-rowSectionVariable sort-play-column";
                 headerColumn.setAttribute("role", "columnheader");
-                headerColumn.style.display = "flex";
+                headerColumn.style.cssText = "display: flex; justify-content: center;";
                 headerColumn.setAttribute("aria-colindex", colIndexInt.toString());
                 
                 const btn = document.createElement("button");
@@ -18312,6 +18445,53 @@
         }
     }
 
+    if (showSecondAdditionalColumn) {
+        if (!existingSecondHeaderColumn) {
+            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+            if (lastColumn) {
+                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                const newGridTemplate = colIndexInt === 5 ? gridCss.sixColumnGridCss_twoExtra : colIndexInt === 6 ? gridCss.sevenColumnGridCss_twoExtra : gridCss.sevenColumnGridCss_twoExtra;
+                tracklistHeader.style.cssText = newGridTemplate;
+
+                const firstColumnHeader = tracklistHeader.querySelector(".sort-play-column");
+                const insertionPoint = firstColumnHeader || (shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn);
+                
+                let headerColumn = document.createElement("div");
+                headerColumn.className = "main-trackList-rowSectionVariable sort-play-second-column";
+                headerColumn.setAttribute("role", "columnheader");
+                headerColumn.style.cssText = "display: flex; justify-content: center;";
+                headerColumn.setAttribute("aria-colindex", (colIndexInt - (showAdditionalColumn ? 1 : 0)).toString());
+                
+                const btn = document.createElement("button");
+                btn.className = "main-trackList-column main-trackList-sortable sort-play-header";
+                const title = document.createElement("span");
+                title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
+                title.innerText = expectedSecondHeaderText;
+                btn.appendChild(title);
+                headerColumn.appendChild(btn);
+
+                if (insertionPoint) {
+                    tracklistHeader.insertBefore(headerColumn, insertionPoint);
+                    if (firstColumnHeader) firstColumnHeader.setAttribute("aria-colindex", colIndexInt.toString());
+                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+                }
+            }
+        } else if (secondColumnTypeChanged) {
+            if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
+        }
+    } else {
+        if (existingSecondHeaderColumn) {
+            existingSecondHeaderColumn.remove();
+            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+            if (lastColumn) {
+                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+                const newGridTemplate = colIndexInt - 1 === 4 ? gridCss.fiveColumnGridCss : colIndexInt - 1 === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
+                tracklistHeader.style.cssText = newGridTemplate;
+            }
+        }
+    }
+
     const dateAddedHeader = tracklistHeader.querySelector('[aria-colindex="4"]');
     if (dateAddedHeader) {
         dateAddedHeader.style.display = shouldRemoveDateAdded ? 'none' : '';
@@ -18320,6 +18500,7 @@
     const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
     for (const track of allRows) {
         const existingDataColumn = track.querySelector(".sort-play-data-column");
+        const existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
 
         if (showAdditionalColumn) {
             if (!existingDataColumn) {
@@ -18361,6 +18542,45 @@
             }
         }
 
+        if (showSecondAdditionalColumn) {
+            if (!existingSecondDataColumn) {
+                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+                if (lastColumn) {
+                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                    const newGridTemplate = colIndexInt === 5 ? gridCss.sixColumnGridCss_twoExtra : colIndexInt === 6 ? gridCss.sevenColumnGridCss_twoExtra : gridCss.sevenColumnGridCss_twoExtra;
+                    track.style.cssText = newGridTemplate;
+
+                    let dataColumn = document.createElement("div");
+                    dataColumn.className = "main-trackList-rowSectionVariable sort-play-second-data-column sort-play-second-column";
+                    dataColumn.setAttribute("aria-colindex", (colIndexInt - (showAdditionalColumn ? 1 : 0)).toString());
+                    dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
+                    dataColumn.innerHTML = `<span class="sort-play-second-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+
+                    const firstColumnCell = track.querySelector(".sort-play-data-column");
+                    const insertionPoint = firstColumnCell || (shouldRemoveDateAdded ? track.querySelector('[aria-colindex="4"]') : lastColumn);
+                    if (insertionPoint) {
+                        track.insertBefore(dataColumn, insertionPoint);
+                        if (firstColumnCell) firstColumnCell.setAttribute("aria-colindex", colIndexInt.toString());
+                        lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
+                    }
+                }
+            } else if (secondColumnTypeChanged) {
+                const dataSpan = existingSecondDataColumn.querySelector('.sort-play-second-data');
+                if (dataSpan) dataSpan.textContent = "";
+            }
+        } else {
+            if (existingSecondDataColumn) {
+                existingSecondDataColumn.remove();
+                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+                if(lastColumn) {
+                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
+                    lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+                    const newGridTemplate = colIndexInt - 1 === 4 ? gridCss.fiveColumnGridCss : colIndexInt - 1 === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
+                    track.style.cssText = newGridTemplate;
+                }
+            }
+        }
+
         const dateAddedCell = track.querySelector('[aria-colindex="4"]');
         if (dateAddedCell) {
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
@@ -18372,15 +18592,19 @@
   const getGridCss = (removeDateAdded) => {
     if (removeDateAdded) {
       return {
-        fiveColumnGridCss: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [spacer] -300px [var2] 2fr [last] minmax(120px,1fr) !important",
-        sixColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [spacer] -300px [var3] 2fr [last] minmax(120px,1fr) !important",
-        sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] minmax(120px,1fr) [spacer] -300px [var4] 2fr [last] minmax(120px,1fr) !important"
+        fiveColumnGridCss: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr) !important",
+        sixColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
+        sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr) !important",
+        sixColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
+        sevenColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr) !important",
       };
     }
     return {
       fiveColumnGridCss: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr) !important",
       sixColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
-      sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] minmax(120px,1fr) [var4] 2fr [last] minmax(120px,1fr) !important"
+      sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] minmax(120px,1fr) [var4] 2fr [last] minmax(120px,1fr) !important",
+      sixColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
+      sevenColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr) !important",
     };
   };
 
@@ -18695,7 +18919,6 @@
         }
     }
   }
-
 
   function getNativeMenuBackgroundColor() {
     const primaryClass = 'main-contextMenu-menu';
