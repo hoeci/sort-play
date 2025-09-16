@@ -20,7 +20,7 @@
   let showSecondAdditionalColumn = false;
   let selectedColumnType = 'playCount';
   let selectedSecondColumnType = 'releaseDate';
-  let selectedAlbumColumnType = 'releaseDate';
+  let selectedAlbumColumnType = 'scrobbles';
   let selectedArtistColumnType = 'releaseDate';
   let myScrobblesDisplayMode = 'number';
   let releaseDateFormat = 'YYYY-MM-DD';
@@ -17784,7 +17784,6 @@
   function getTracklistTrackUri(tracklistElement) {
     let values = Object.values(tracklistElement);
     if (!values || !values[0]?.pendingProps) {
-        console.log("[Sort-Play] Error: Could not find pendingProps on tracklist element.", tracklistElement);
         return null;
     }
     return (
