@@ -3,7 +3,7 @@
 # Sort-Play: The Ultimate Toolkit for Your Spotify Library
 
 ## ⚡️ Features
-+ **Comprehensive Sorting:** Sort playlists and artist pages by play count, popularity, release date, album color, and Last.fm scrobbles.
++ **Comprehensive Sorting:** Sort playlists and artist pages by play count, popularity, release date, album color, Last.fm scrobbles and Last Scrobbled.
 + **Full Artist Discography:** Load an artist's complete collection, including singles, albums, and compilations, for sorting.
 + **Personalized Sorting:** Sort playlists based on your unique listening habits with profiles like 'Recent Vibe', 'All-Time Favorites', 'Power Hour', 'Mellow Mood', and 'Hidden Gems'.
 + **Dynamic Playlists:** Create self-updating playlists from any combination of sources (playlists, artists, albums) that automatically stay updated and sorted on a custom schedule.
