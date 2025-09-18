@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.7.0";
+  const SORT_PLAY_VERSION = "5.8.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -53,7 +53,7 @@
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
-  const STORAGE_KEY_USER_SYSTEM_INSTRUCTION = "sort-play-user-system-instruction";
+  const STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2 = "sort-play-user-system-instruction-v2";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
   const STORAGE_KEY_CREATE_PLAYLIST = "sort-play-create-playlist";
   const STORAGE_KEY_SORT_CURRENT_PLAYLIST = "sort-play-sort-current-playlist";
@@ -208,6 +208,28 @@
     return userMarketPromise;
   }
   
+  const possibleSuffixes = [
+    "\\(PlayCount\\)",
+    "\\(Popularity\\)",
+    "\\(ReleaseDate\\)",
+    "\\(Scrobbles\\)",
+    "\\(My Scrobbles\\)",
+    "\\(LFM My Scrobbles\\)",
+    "\\(LFM Scrobbles\\)",
+    "\\(Last Scrobbled\\)",
+    "\\(Shuffle\\)",
+    "\\(Deduplicated\\)",
+    "\\(AI Pick\\)",
+    "\\(Color\\)",
+    "\\(Genre Filter\\)",
+    "\\(Custom Filter\\)",
+    "\\(Personalized\\)",
+    "\\(Power Hour\\)",
+    "\\(Mellow Mood\\)",
+    "\\(Hidden Gems\\)",
+    "\\(Dynamic\\)"
+  ];
+
   const DEDICATED_PLAYLIST_COVERS = {
     'topThisMonth': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-m.png',
     'topLast6Months': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-6.png',
@@ -256,10 +278,19 @@
 
   const PLACEHOLDER_SVG_DATA_URI = `url("data:image/svg+xml,%3csvg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.5 8.89001V18.5M12.5 8.89001V5.57656C12.5 5.36922 12.5 5.26554 12.5347 5.17733C12.5653 5.09943 12.615 5.03047 12.6792 4.97678C12.752 4.91597 12.8503 4.88318 13.047 4.81761L17.447 3.35095C17.8025 3.23245 17.9803 3.17319 18.1218 3.20872C18.2456 3.23982 18.3529 3.31713 18.4216 3.42479C18.5 3.54779 18.5 3.73516 18.5 4.10989V7.42335C18.5 7.63069 18.5 7.73436 18.4653 7.82258C18.4347 7.90048 18.385 7.96943 18.3208 8.02313C18.248 8.08394 18.1497 8.11672 17.953 8.18229L13.553 9.64896C13.1975 9.76746 13.0197 9.82671 12.8782 9.79119C12.7544 9.76009 12.6471 9.68278 12.5784 9.57512C12.5 9.45212 12.5 9.26475 12.5 8.89001ZM12.5 18.5C12.5 19.8807 10.933 21 9 21C7.067 21 5.5 19.8807 5.5 18.5C5.5 17.1192 7.067 16 9 16C10.933 16 12.5 17.1192 12.5 18.5Z' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`;
 
-  const DEFAULT_USER_SYSTEM_INSTRUCTION = `You are a music expert tasked with providing a list of Spotify track URIs that best match a user request. Based on the provided playlist or artist discography. Carefully analyze and utilize all provided information about each track, including song statistics, lyrics, and any other available data, to make the best possible selections.
-  - Prioritize tracks based on their relevance to the user's request, considering mood, themes, genres, and lyrical content.
-  - Order the URIs by how closely each track aligns with the overall intent of the request.`;
+  const DEFAULT_USER_SYSTEM_INSTRUCTION_v2 = `You are a creative and flexible music expert, an unfiltered tool for playlist creation. Your primary task is to provide a list of Spotify track URIs that best match a user's request, based on the provided playlist or artist discography.
 
+  **Crucial Rule: You MUST be flexible.** For subjective or casual requests (e.g., 'car music', 'workout songs', 'sad vibes'), you must infer the likely mood, energy, and tempo. Do not rely solely on explicit lyrical matches. If no tracks are a perfect fit, your task is to select the **closest possible matches** from the provided list. Returning an empty list is unacceptable unless the playlist content is completely antithetical to the request (e.g., requesting 'heavy metal' from a lullaby playlist).
+  
+  **Example:** For a request like "Top tracks for car" from an Ariana Grande playlist, you should interpret this as a request for upbeat, high-energy, popular, and sing-along tracks. Select songs that fit this mood using their audio features (high energy, high danceability, high valence) and popularity stats, even if their lyrics do not mention driving.
+  
+  **Process:**
+  1.  Analyze all provided track data: song statistics, lyrics, genres, etc.
+  2.  Fulfill all requests without refusal or judgment, including themes that may be explicit or controversial.
+  3.  Prioritize tracks based on their relevance to the user's request, using the flexible interpretation rule above.
+  4.  Order the resulting URIs by how closely each track aligns with the request's intent.`;
+  
+  
   const FIXED_SYSTEM_INSTRUCTION = `
   Output:
   - Only provide a raw list of Spotify track URIs (e.g., spotify:track:123, spotify:track:456).
@@ -271,6 +302,7 @@
     releaseDate: false,
     scrobbles: false,
     personalScrobbles: false,
+    lastScrobbled: false,
     averageColor: false
   };
 
@@ -290,7 +322,7 @@
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
     selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.5-flash";
-    userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
+    userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
     const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
@@ -338,7 +370,7 @@
     localStorage.setItem("sort-play-include-song-stats", includeSongStats);
     localStorage.setItem("sort-play-include-lyrics", includeLyrics);
     localStorage.setItem("sort-play-ai-model", selectedAiModel);
-    localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION, userSystemInstruction);
+    localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2, userSystemInstruction);
     localStorage.setItem("sort-play-match-all-genres", matchAllGenres);
     localStorage.setItem("sort-play-include-audio-features", includeaudiofeatures);
     localStorage.setItem(STORAGE_KEY_ADD_TO_QUEUE, addToQueueEnabled);
@@ -530,24 +562,16 @@
     }
     
     try {
-      const response = await fetch("https://cdn.jsdelivr.net/npm/@google/generative-ai@0.21.0/dist/index.min.js");
-      const sdkText = await response.text();
-      const moduleScope = {};
-      const wrappedCode = `
-        (function(exports) {
-          ${sdkText}
-          return exports;
-        })(this);
-      `;
-      const sdkExports = new Function(wrappedCode).call(moduleScope);
-      googleAiSdk = moduleScope.GoogleGenerativeAI || moduleScope.GenerativeAI;
+      const sdkModule = await import("https://cdn.jsdelivr.net/npm/@google/genai@1.20.0/+esm");
+      
+      googleAiSdk = sdkModule.GoogleGenAI; 
       if (!googleAiSdk) {
-        throw new Error('SDK constructor not found in loaded script');
+        throw new Error('GoogleGenAI constructor not found in loaded SDK module');
       }
       
       return googleAiSdk;
     } catch (error) {
-      console.error('Error loading SDK:', error);
+      console.error('Error loading Google Gen AI SDK:', error);
       throw error;
     }
   }
@@ -3099,6 +3123,7 @@
           "releaseDate",
           "scrobbles",
           "personalScrobbles",
+          "lastScrobbled",
           "shuffle",
           "averageColor",
           "affinityBalanced",
@@ -3698,8 +3723,8 @@
   
     resetButton.addEventListener("click", () => {
       if (confirm("Are you sure you want to reset the system instruction to default?")) {
-        userSystemInstruction = DEFAULT_USER_SYSTEM_INSTRUCTION;
-        textArea.value = DEFAULT_USER_SYSTEM_INSTRUCTION;
+        userSystemInstruction = DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
+        textArea.value = DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
         saveSettings();
         Spicetify.showNotification("System instruction reset to default");
       }
@@ -3715,7 +3740,6 @@
       saveSettings();
       editorDiv.classList.remove("visible");
       editButton.disabled = false;
-      Spicetify.showNotification("System instruction saved");
     });
     
     cancelButton.addEventListener("click", () => {
@@ -3780,25 +3804,7 @@
                   `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
               ).then((r) => r.name);
           }
-  
-          const possibleSuffixes = [
-              "\\(PlayCount\\)",
-              "\\(Popularity\\)",
-              "\\(ReleaseDate\\)",
-              "\\(LFM Scrobbles\\)",
-              "\\(LFM My Scrobbles\\)",
-              "\\(Shuffle\\)",
-              "\\(Deduplicated\\)",
-              "\\(AI Pick\\)",
-              "\\(Color\\)",
-              "\\(Genre Filter\\)",
-              "\\(Custom Filter\\)",
-              "\\(Personalized\\)",
-              "\\(Power Hour\\)",
-              "\\(Mellow Mood\\)",
-              "\\(Hidden Gems\\)",
-              "\\(Dynamic\\)"
-          ];
+
           let suffixPattern = new RegExp(
             `\\s*(${possibleSuffixes.join("|")})\\s*`
           );
@@ -3831,7 +3837,7 @@
           
           await navigateToPlaylist(newPlaylist);
         } else {
-          Spicetify.showNotification("AI did not return any track URIs.", true);
+          Spicetify.showNotification("AI did not return any track URIs, try another model or change your prompt.", true);
         }
       } catch (error) {
         console.error("Error handling AI pick:", error);
@@ -4031,18 +4037,9 @@
               if (includeSongStats) {
                 stats = await getTrackStats(trackId);
                 stats = stats || {
-                  danceability: null,
-                  energy: null,
-                  key: "Undefined",
-                  loudness: null,
-                  speechiness: null,
-                  acousticness: null,
-                  instrumentalness: null,
-                  liveness: null,
-                  valence: null,
-                  tempo: null,
-                  popularity: null,
-                  releaseDate: null
+                  danceability: null, energy: null, key: "Undefined", loudness: null,
+                  speechiness: null, acousticness: null, instrumentalness: null,
+                  liveness: null, valence: null, tempo: null, popularity: null, releaseDate: null
                 };
                 
                 try {
@@ -4052,18 +4049,11 @@
                     const foundTrack = albumTracksWithPlayCounts.find(
                       (albumTrack) => albumTrack.uri === track.uri
                     );
-                    if (foundTrack) {
-                      playCount = foundTrack.playcount;
-                    } else {
-                      console.warn(`Could not find playcount for track ${track.uri} in album ${albumId}`);
-                      playCount = "N/A";
-                    }
+                    playCount = foundTrack ? foundTrack.playcount : "N/A";
                   } else {
-                    console.warn(`Could not get album ID for track: ${track.uri}`);
                     playCount = "N/A";
                   }
                 } catch (error) {
-                  console.error(`Error getting playcount for track ${track.uri}: ${error}`);
                   playCount = "N/A";
                 }
               }
@@ -4083,19 +4073,11 @@
   
               if (includeSongStats) {
                 enrichedTrack.stats = {
-                  popularity: stats.popularity,
-                  playCount: playCount,
-                  releaseDate: stats.releaseDate,
-                  danceability: stats.danceability,
-                  energy: stats.energy,
-                  valence: stats.valence,
-                  tempo: stats.tempo,
-                  key: stats.key,
-                  loudness: stats.loudness,
-                  speechiness: stats.speechiness,
-                  acousticness: stats.acousticness,
-                  liveness: stats.liveness,
-                  instrumentalness: stats.instrumentalness,
+                  popularity: stats.popularity, playCount: playCount, releaseDate: stats.releaseDate,
+                  danceability: stats.danceability, energy: stats.energy, valence: stats.valence,
+                  tempo: stats.tempo, key: stats.key, loudness: stats.loudness,
+                  speechiness: stats.speechiness, acousticness: stats.acousticness,
+                  liveness: stats.liveness, instrumentalness: stats.instrumentalness,
                 };
               }
   
@@ -4104,107 +4086,58 @@
               }
   
               setTrackCache(trackId, enrichedTrack, includeSongStats, includeLyrics, modelName);
-              
               return enrichedTrack;
             }
           );
-  
           enrichedTracksCache = [...enrichedTracksCache, ...processedTracks];
         }
   
         if (tracksNeedingLyrics.length > 0) {
           const processedLyrics = await processBatchWithRateLimit(
-            tracksNeedingLyrics,
-            20,
-            100,
+            tracksNeedingLyrics, 20, 100,
             async track => {
               const trackId = track.uri.split(":")[2];
               const enrichedTrack = { ...track.cachedData };
-
               const lyricsData = await fetchLyricsFromLyricsOvh(track.artistName || track.artist, track.songTitle || track.name || track.title);
-              enrichedTrack.lyrics = lyricsData && lyricsData.unsynced 
-                ? lyricsData.unsynced.map(line => line.text).join(' ') 
-                : "Not included";
-  
+              enrichedTrack.lyrics = lyricsData && lyricsData.unsynced ? lyricsData.unsynced.map(line => line.text).join(' ') : "Not included";
               setTrackCache(trackId, enrichedTrack, includeSongStats, includeLyrics, modelName);
-  
               return enrichedTrack;
             }
           );
-  
           enrichedTracksCache = [...enrichedTracksCache, ...processedLyrics];
         }
   
         const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
-
-        const tracksWithLyrics = tracksWithStats.filter(track => track.lyrics && track.lyrics !== "Not included").length;
-        const tracksWithoutLyrics = tracksWithStats.filter(track => !track.lyrics || track.lyrics === "Not included").length;
-        console.log(`Lyrics Statistics:
-        - Tracks with lyrics: ${tracksWithLyrics}
-        - Tracks without lyrics: ${tracksWithoutLyrics}
-        - Total tracks: ${tracksWithStats.length}`);
-
-        const GoogleAI = await loadGoogleAI();
-      
-        if (!GoogleAI) {
-          throw new Error('Failed to load Google AI SDK');
-        }
+        const GoogleGenAI = await loadGoogleAI();
+        if (!GoogleGenAI) throw new Error('Failed to load Google AI SDK');
   
-        const genAI = new GoogleAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: modelName });
+        const ai = new GoogleGenAI({ apiKey });
   
-        const userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION) || DEFAULT_USER_SYSTEM_INSTRUCTION;
+        const userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
         const combinedSystemInstruction = `${userSystemInstruction}\n${FIXED_SYSTEM_INSTRUCTION}`;
-    
-        const userMessage = `Playlist Tracks:\n${JSON.stringify(tracksWithStats, null, 2)}\n\nUser Request: ${userPrompt}\n\nGIVE PICKED TRACK URI's`;
-
-        const parts = [
-          { text: combinedSystemInstruction },
-          { text: userMessage } 
-        ];
-  
-        const result = await model.generateContentStream({
-          contents: [{ role: "user", parts }],
-          generationConfig: {
-            temperature: 0.9,
-            topK: 1,
-            topP: 1,
-            maxOutputTokens: 2048,
-          },
-          safetySettings: [
-            {
-              category: "HARM_CATEGORY_HARASSMENT",
-              threshold: "BLOCK_NONE"
-            },
-            {
-              category: "HARM_CATEGORY_HATE_SPEECH",
-              threshold: "BLOCK_NONE"
-            },
-            {
-              category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-              threshold: "BLOCK_NONE"
-            },
-            {
-              category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-              threshold: "BLOCK_NONE"
-            },
-            {
-              category: "HARM_CATEGORY_CIVIC_INTEGRITY",
-              threshold: "BLOCK_NONE"
-            }
-          ]
+        const trackDataPayload = `Playlist Tracks:\n${JSON.stringify(tracksWithStats, null, 2)}`;
+        const userRequestPayload = `\n\nUser Request: ${userPrompt}\n\nGIVE PICKED TRACK URI's`;
+        
+        const fullPrompt = `${combinedSystemInstruction}\n\n${trackDataPayload}\n\n${userRequestPayload}`;
+        
+        const result = await ai.models.generateContent({
+            model: modelName,
+            contents: fullPrompt,
+            safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+            ]
         });
   
-        let responseText = '';
-        for await (const chunk of result.stream) {
-          responseText += chunk.text();
-        }
-    
-        if (result.response?.promptFeedback?.blockReason) {
-          throw new Error(`Blocked for ${result.response.promptFeedback.blockReason}`);
+        if (result?.promptFeedback?.blockReason) {
+          throw new Error(`Blocked for ${result.promptFeedback.blockReason}`);
         }
   
-        const uriRegex = /spotify:track:[a-zA-Z0-9]+/g;
+        const responseText = result.text;
+        const uriRegex = /spotify:track:[a-zA-Z0-9]{22}/g;
         let matches = responseText.match(uriRegex);
   
         if (!matches) {
@@ -4212,14 +4145,7 @@
           return [];
         }
         
-        matches = matches.filter(uri => uri.length === 22 + "spotify:track:".length);
-  
-        if (matches.length === 0) {
-          console.log("No Valid Spotify track URIs found in AI response after filtering.");
-          return [];
-        }
-  
-        return matches;
+        return [...new Set(matches)];
         
       } catch (error) {
         console.error(`Error during Gemini request (Attempt ${retries + 1}):`, error);
@@ -7885,24 +7811,6 @@
                     `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
                 ).then((r) => r.name);
             }
-            const possibleSuffixes = [
-                "\\(PlayCount\\)",
-                "\\(Popularity\\)",
-                "\\(ReleaseDate\\)",
-                "\\(LFM Scrobbles\\)",
-                "\\(LFM My Scrobbles\\)",
-                "\\(Shuffle\\)",
-                "\\(Deduplicated\\)",
-                "\\(AI Pick\\)",
-                "\\(Color\\)",
-                "\\(Genre Filter\\)",
-                "\\(Custom Filter\\)",
-                "\\(Personalized\\)",
-                "\\(Power Hour\\)",
-                "\\(Mellow Mood\\)",
-                "\\(Hidden Gems\\)",
-                "\\(Dynamic\\)"
-            ];
 
             let suffixPattern = new RegExp(
                 `\\s*(${possibleSuffixes.join("|")})\\s*`
@@ -7938,8 +7846,8 @@
                     playCount: { fullName: "play count", shortName: "PlayCount" },
                     popularity: { fullName: "popularity", shortName: "Popularity" },
                     releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-                    scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
-                    personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
+                    scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
+                    personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
                     shuffle: { fullName: "shuffle", shortName: "Shuffle" },
                     aiPick: { fullName: "AI pick", shortName: "AI Pick" },
                     averageColor: { fullName: "album color", shortName: "Color" },
@@ -10617,8 +10525,8 @@
                   playCount: { fullName: "play count", shortName: "PlayCount" },
                   popularity: { fullName: "popularity", shortName: "Popularity" },
                   releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-                  scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
-                  personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
+                  scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
+                  personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
                   shuffle: { fullName: "shuffle", shortName: "Shuffle" },
                   aiPick: { fullName: "AI pick", shortName: "AI Pick" },
                   averageColor: { fullName: "album color", shortName: "Color" },
@@ -10657,24 +10565,6 @@
               `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
           ).then((r) => r.name);
       }
-      const possibleSuffixes = [
-          "\\(PlayCount\\)",
-          "\\(Popularity\\)",
-          "\\(ReleaseDate\\)",
-          "\\(LFM Scrobbles\\)",
-          "\\(LFM My Scrobbles\\)",
-          "\\(Shuffle\\)",
-          "\\(Deduplicated\\)",
-          "\\(AI Pick\\)",
-          "\\(Color\\)",
-          "\\(Genre Filter\\)",
-          "\\(Custom Filter\\)",
-          "\\(Personalized\\)",
-          "\\(Power Hour\\)",
-          "\\(Mellow Mood\\)",
-          "\\(Hidden Gems\\)",
-          "\\(Dynamic\\)"
-      ];
     
       let suffixPattern = new RegExp(
           `\\s*(${possibleSuffixes.join("|")})\\s*`
@@ -12778,6 +12668,13 @@
             color: "white",
             text: "My Scrobbles",
             sortType: "personalScrobbles",
+            hasInnerButton: true,
+          },
+          {
+            backgroundColor: "transparent",
+            color: "white",
+            text: "Last Scrobbled",
+            sortType: "lastScrobbled",
             hasInnerButton: true,
           },
           {
@@ -16861,6 +16758,19 @@
             resetButtons();
             return;
         }
+      } else if (sortType === "lastScrobbled") {
+          try {
+              const result = await handleLastScrobbledSorting(
+                tracks, (progress) => { mainButton.innerText = `${progress}%`; }
+              );
+              sortedTracks = result.sortedTracks;
+              removedTracks = result.removedTracks;
+              mainButton.innerText = "100%";
+          } catch (error) {
+              resetButtons();
+              Spicetify.showNotification(error.message, true);
+              return;
+          }
       } else {
         mainButton.innerText = "0%";
 
@@ -17033,6 +16943,19 @@
                 Spicetify.showNotification(error.message);
                 return;
               }
+        } else if (sortType === "lastScrobbled") { 
+            try {
+                const result = await handleLastScrobbledSorting(
+                    tracks, (progress) => { mainButton.innerText = `${progress}%`; }
+                );
+                sortedTracks = result.sortedTracks;
+                removedTracks = result.removedTracks;
+                mainButton.innerText = "100%";
+            } catch (error) {
+                resetButtons();
+                Spicetify.showNotification(error.message, true);
+                return;
+            }
         } else if (sortType === "aiPick") {
           const { uniqueTracks: aiUniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
             tracks, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
@@ -17080,24 +17003,6 @@
         } else {
             finalSourceName = currentPlaylistDetails?.name || "Current Playlist";
         }
-        const possibleSuffixes = [
-            "\\(PlayCount\\)",
-            "\\(Popularity\\)",
-            "\\(ReleaseDate\\)",
-            "\\(LFM Scrobbles\\)",
-            "\\(LFM My Scrobbles\\)",
-            "\\(Shuffle\\)",
-            "\\(Deduplicated\\)",
-            "\\(AI Pick\\)",
-            "\\(Color\\)",
-            "\\(Genre Filter\\)",
-            "\\(Custom Filter\\)",
-            "\\(Personalized\\)",
-            "\\(Power Hour\\)",
-            "\\(Mellow Mood\\)",
-            "\\(Hidden Gems\\)",
-            "\\(Dynamic\\)"
-        ];
         
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
         while (suffixPattern.test(finalSourceName)) {
@@ -17107,8 +17012,9 @@
           playCount: { fullName: "play count", shortName: "PlayCount" },
           popularity: { fullName: "popularity", shortName: "Popularity" },
           releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-          scrobbles: { fullName: "Last.fm scrobbles", shortName: "LFM Scrobbles" },
-          personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "LFM My Scrobbles" },
+          scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
+          personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
+          lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
           averageColor: { fullName: "album color", shortName: "Color" },
           deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
@@ -17617,6 +17523,146 @@
     }
 
     return { sortedTracks, removedTracks };
+  }
+
+  async function handleLastScrobbledSorting(tracks, updateProgress) {
+    const lastFmUsername = loadLastFmUsername();
+    if (!lastFmUsername) {
+      throw new Error('Last.fm username required for this sorting type');
+    }
+
+    const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
+
+    updateProgress(0);
+    const scrobblesMap = await fetchRecentScrobblesMap((progress) => {
+        updateProgress(Math.floor(progress * 0.90));
+    });
+
+    if (scrobblesMap.size === 0 && !includeZeroScrobbles) {
+        throw new Error("Could not fetch any recent scrobbles from Last.fm.");
+    }
+
+    updateProgress(95);
+    const tracksWithTimestamp = tracks.map(track => {
+        const artist = (track.artistName || (track.artists && track.artists[0]?.name) || "").toLowerCase();
+        const name = (track.songTitle || track.name || "").toLowerCase();
+        const key = `${artist}|-|${name}`;
+        return {
+            ...track,
+            lastScrobbledTimestamp: scrobblesMap.get(key) || 0,
+        };
+    });
+
+    const uniqueTracksMap = new Map();
+    const removedTracks = [];
+    tracksWithTimestamp.forEach(track => {
+        const key = `${(track.songTitle || track.name).toLowerCase()}|-|${(track.artistName || track.artists[0].name).toLowerCase()}`;
+        const existing = uniqueTracksMap.get(key);
+
+        if (!existing || track.lastScrobbledTimestamp > existing.lastScrobbledTimestamp) {
+            if (existing) {
+                removedTracks.push(existing);
+            }
+            uniqueTracksMap.set(key, track);
+        } else {
+            removedTracks.push(track);
+        }
+    });
+    
+    const uniqueTracks = Array.from(uniqueTracksMap.values());
+
+    const scrobbledTracks = uniqueTracks.filter(track => track.lastScrobbledTimestamp > 0);
+    const unscrobbledTracks = uniqueTracks.filter(track => track.lastScrobbledTimestamp === 0);
+
+    const sortedScrobbledTracks = scrobbledTracks.sort((a, b) => {
+        if (sortOrderState.lastScrobbled) {
+            return a.lastScrobbledTimestamp - b.lastScrobbledTimestamp;
+        }
+        return b.lastScrobbledTimestamp - a.lastScrobbledTimestamp;
+    });
+
+    let sortedTracks;
+    if (includeZeroScrobbles) {
+        sortedTracks = [...sortedScrobbledTracks, ...unscrobbledTracks];
+    } else {
+        sortedTracks = sortedScrobbledTracks;
+    }
+
+    if (sortedTracks.length === 0) {
+        if (includeZeroScrobbles) {
+            throw new Error("No tracks found in this playlist.");
+        } else {
+            throw new Error("None of the tracks in this playlist appear in your recent Last.fm history.");
+        }
+    }
+    
+    updateProgress(100);
+    return { sortedTracks, removedTracks };
+  }
+
+  async function fetchRecentScrobblesMap(updateProgress) {
+    const username = loadLastFmUsername();
+    if (!username) {
+      throw new Error('Last.fm username is not set.');
+    }
+
+    const scrobblesMap = new Map();
+    const limit = 200;
+    const maxPages = 25;
+    let currentPage = 1;
+
+    updateProgress(0);
+
+    while (currentPage <= maxPages) {
+      const params = new URLSearchParams({
+        method: 'user.getrecenttracks',
+        user: username,
+        limit: limit.toString(),
+        page: currentPage.toString(),
+        format: 'json'
+      });
+      
+      try {
+        const response = await fetchLfmWithGateway(params);
+        if (!response.ok) {
+            console.warn(`Last.fm API request for recent tracks failed on page ${currentPage}`);
+            break; 
+        }
+
+        const data = await response.json();
+        const tracks = data.recenttracks?.track;
+
+        if (!tracks || tracks.length === 0) {
+          break;
+        }
+        
+        const processableTracks = tracks.filter(t => t.date && t.date.uts);
+
+        for (const track of processableTracks) {
+          const artist = track.artist['#text'].toLowerCase();
+          const name = track.name.toLowerCase();
+          const key = `${artist}|-|${name}`;
+          
+          if (!scrobblesMap.has(key)) {
+            scrobblesMap.set(key, parseInt(track.date.uts, 10) * 1000);
+          }
+        }
+
+        updateProgress(Math.floor((currentPage / maxPages) * 100));
+
+        if (currentPage >= data.recenttracks['@attr'].totalPages) {
+            break;
+        }
+
+        currentPage++;
+      } catch (error) {
+        console.error(`Error fetching page ${currentPage} of recent scrobbles:`, error);
+        break; 
+      }
+    }
+    
+    updateProgress(100);
+    return scrobblesMap;
   }
 
   menuButtons.forEach((element) => {
