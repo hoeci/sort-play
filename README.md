@@ -41,7 +41,11 @@
    - **Windows**: `%appdata%\spicetify\Extensions`  
    - **Linux & macOS**: `~/.config/spicetify/Extensions`
 
-3. Open a terminal and run `spicetify config extensions sort-play-loader.mjs` and `spicetify apply`
+3.  Open a terminal and run the following commands:
+    ```bash
+    spicetify config extensions sort-play-loader.mjs
+    spicetify apply
+    ```
 
 #### Using Marketplace 
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
