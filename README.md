@@ -34,6 +34,14 @@
 
 ## 🛠️ Installation  
 
+
+#### Using Marketplace 
+1.  Ensure you have [Spicetify](https://spicetify.app/) installed.
+2. Open the Spicetify Marketplace.  
+3.  Search for `Sort-Play`.
+4.  Click Install.
+
+
 #### Manual Installation  
 1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
 2. Copy the `sort-play-loader.mjs` file to the Spicetify Extensions folder:
@@ -46,9 +54,3 @@
     spicetify config extensions sort-play-loader.mjs
     spicetify apply
     ```
-
-#### Using Marketplace 
-1. Ensure that [Spicetify](https://spicetify.app/) is installed on your system.  
-2. Open the Spicetify Marketplace.  
-3. Search for **"Sort Play"**.  
-4. Click **Install**.  
