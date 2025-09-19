@@ -1300,7 +1300,7 @@
             Add Sorted Tracks to Queue
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Adds tracks to queue after direct sorts (Play Count, Popularity, Date, LFM, Shuffle). Filters & AI Pick excluded.</span>
+                <span class="custom-tooltip">Adds tracks to queue after direct sorts (Play Count, Popularity, Scrobbles, Shuffle, etc.).<br>Filters & AI Pick excluded.</span>
             </span>
         </label>
         <div class="col action">
@@ -1382,7 +1382,7 @@
             Color Sort Mode
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">"Perceptual" groups black & white albums first. "Hue Gradient" creates a pure rainbow effect.</span>
+                <span class="custom-tooltip">"Perceptual" groups black & white albums first.<br>"Hue Gradient" creates a pure rainbow effect.</span>
             </span>
         </label>
         <div class="col action">
@@ -2551,7 +2551,7 @@
 
     const wallets = [
         { name: 'USDT (TRC20) / TRON', address: 'TU3tiVV3NLmFetXrsAZnuE9qu8JVSHDuAH' },
-        { name: 'TON', address: 'UQB3p1qXNXdSXIxoUvqkkTKQoim0Zy2GthZZfrAhS4cVWFbQ' },
+        { name: 'TON', address: 'UQB3plqXNXdSXlXoUvqkkTKQoim0Zy2GthZZfrAhS4cVWFbQ' },
         { name: 'Bitcoin (BTC)', address: 'bc1q0vvhyffnk8s0g9hnf4k2c7z6ys3r2d7x6fjnvv' },
     ];
 
@@ -4645,6 +4645,7 @@
     let isLastLoad = false;
     let matchWholeWord = false;
     let activeRangeFilter = localStorage.getItem("sort-play-active-range-filter") || "releaseDate";
+    let handleTrackMove = null;
 
     if (!includeaudiofeatures && activeRangeFilter.startsWith("features.")) {
         activeRangeFilter = "releaseDate";
@@ -5685,6 +5686,7 @@
         if(!sliderxContainer         || !sliderx1 || !sliderx2 || !minInput || !maxInput || !sliderxTrack) return;
 
         let minGap = 0;
+        let isDragging = false; // Moved declaration here to be accessible by handleTrackMove
 
         function slideOne() {
             if (parseInt(sliderx2.value) - parseInt(sliderx1.value) <= minGap) {
@@ -5747,12 +5749,6 @@
             fillColor();
         }
 
-        sliderx1.addEventListener("input", slideOne);
-        sliderx2.addEventListener("input", slideTwo);
-        minInput.addEventListener("input", debouncedUpdatesliderxs);
-        maxInput.addEventListener("input", debouncedUpdatesliderxs);
-        minInput.addEventListener("blur", updatesliderxs);
-        maxInput.addEventListener("blur", updatesliderxs);
         function handleTrackClick(event) {
             const rect = sliderxTrack.getBoundingClientRect();
             const clickX = event.clientX - rect.left;
@@ -5773,12 +5769,19 @@
             }
         }
 
-        function handleTrackMove(event) {
+        handleTrackMove = function(event) {
             if (!isDragging) {
                 return;
             }
             handleTrackClick(event);
         }
+
+        sliderx1.addEventListener("input", slideOne);
+        sliderx2.addEventListener("input", slideTwo);
+        minInput.addEventListener("input", debouncedUpdatesliderxs);
+        maxInput.addEventListener("input", debouncedUpdatesliderxs);
+        minInput.addEventListener("blur", updatesliderxs);
+        maxInput.addEventListener("blur", updatesliderxs);
 
         sliderxTrack.addEventListener("mousedown", (e) => {
             isDragging = true;
