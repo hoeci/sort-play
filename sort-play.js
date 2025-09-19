@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.8.0";
+  const SORT_PLAY_VERSION = "5.9.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -227,7 +227,13 @@
     "\\(Power Hour\\)",
     "\\(Mellow Mood\\)",
     "\\(Hidden Gems\\)",
-    "\\(Dynamic\\)"
+    "\\(Dynamic\\)",
+    "\\(Tempo\\)",
+    "\\(Energy\\)",
+    "\\(Danceability\\)",
+    "\\(Valence\\)",
+    "\\(Acousticness\\)",
+    "\\(Instrumentalness\\)"
   ];
 
   const DEDICATED_PLAYLIST_COVERS = {
@@ -303,7 +309,13 @@
     scrobbles: false,
     personalScrobbles: false,
     lastScrobbled: false,
-    averageColor: false
+    averageColor: false,
+    tempo: false,
+    energy: false,
+    danceability: false,
+    valence: false,
+    acousticness: false,
+    instrumentalness: false
   };
 
   function loadSettings() {
@@ -3116,7 +3128,7 @@
   }
 
 
-  function isDirectSortType(sortType) {
+function isDirectSortType(sortType) {
       const directSortTypes = [
           "playCount",
           "popularity",
@@ -3132,7 +3144,13 @@
           "affinityPowerHour",
           "affinityMellowMood",
           "affinityHiddenGems",
-          "deduplicateOnly"
+          "deduplicateOnly",
+          "tempo",
+          "energy",
+          "danceability",
+          "valence",
+          "acousticness",
+          "instrumentalness"
       ];
       return directSortTypes.includes(sortType);
   }
@@ -5686,7 +5704,7 @@
         if(!sliderxContainer         || !sliderx1 || !sliderx2 || !minInput || !maxInput || !sliderxTrack) return;
 
         let minGap = 0;
-        let isDragging = false; // Moved declaration here to be accessible by handleTrackMove
+        let isDragging = false;
 
         function slideOne() {
             if (parseInt(sliderx2.value) - parseInt(sliderx1.value) <= minGap) {
@@ -10696,7 +10714,6 @@
     
           await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
     
-    
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
           try {
               setButtonProcessing(true);
@@ -12687,6 +12704,55 @@
             sortType: "averageColor",
             hasInnerButton: true,
           },
+          {
+            type: "parent",
+            text: "Audio Features",
+            sortType: "audioFeaturesParent",
+            children: [
+              {
+                backgroundColor: "transparent",
+                color: "white",
+                text: "Tempo (BPM)",
+                sortType: "tempo",
+                hasInnerButton: true,
+              },
+              {
+                backgroundColor: "transparent",
+                color: "white",
+                text: "Energy",
+                sortType: "energy",
+                hasInnerButton: true,
+              },
+              {
+                backgroundColor: "transparent",
+                color: "white",
+                text: "Danceability",
+                sortType: "danceability",
+                hasInnerButton: true,
+              },
+              {
+                backgroundColor: "transparent",
+                color: "white",
+                text: "Valence",
+                sortType: "valence",
+                hasInnerButton: true,
+              },
+              {
+                backgroundColor: "transparent",
+                color: "white",
+                text: "Acousticness",
+                sortType: "acousticness",
+                hasInnerButton: true,
+              },
+              {
+                backgroundColor: "transparent",
+                color: "white",
+                text: "Instrumentalness",
+                sortType: "instrumentalness",
+                hasInnerButton: true,
+              },
+            ],
+          },
         ],
       },
       {
@@ -13090,14 +13156,12 @@
       
       parentButton.addEventListener("mouseenter", () => {
         if (!parentButton.disabled) {
+          if (activeSubMenuParent && activeSubMenuParent !== parentButton) {
+            activeSubMenuParent.style.backgroundColor = "transparent";
+          }
           parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
+          activeSubMenuParent = parentButton;
           showSubMenu(parentButton);
-        }
-      });
-      
-      parentButton.addEventListener("mouseleave", (event) => {
-        if (!parentButton.disabled) {
-          parentButton.style.backgroundColor = "transparent";
         }
       });
       
@@ -13131,6 +13195,10 @@
 
       button.addEventListener("mouseenter", () => {
         button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
+        if (activeSubMenuParent) {
+          activeSubMenuParent.style.backgroundColor = "transparent";
+          activeSubMenuParent = null;
+        }
         hideAllSubMenus();
       });
     
@@ -13180,21 +13248,29 @@
   
   let isMenuOpen = false;
   let areSubMenusCreated = false;
+  let activeSubMenuParent = null;
 
   function toggleMenu() {
     isMenuOpen = !isMenuOpen;
     if (isMenuOpen) {
       if (!areSubMenusCreated) {
-        menuButtons.forEach(button => {
-          if (button.dataset.isParent === 'true') {
-            const style = buttonStyles.menuItems.find(item => item.sortType === button.dataset.sortType);
-            if (style && style.children) {
-              const subMenu = createSubMenu(style.children);
-              document.body.appendChild(subMenu);
-              button._submenu = subMenu;
-            }
-          }
-        });
+        const processMenuItems = (buttons, itemConfigs) => {
+            buttons.forEach(button => {
+                const sortType = button.dataset.sortType;
+                if (sortType) {
+                    const style = itemConfigs.find(item => item.sortType === sortType);
+                    if (style && style.type === 'parent' && style.children) {
+                        const subMenu = createSubMenu(style.children);
+                        document.body.appendChild(subMenu);
+                        button._submenu = subMenu;
+                        
+                        const subMenuParentButtons = Array.from(subMenu.querySelectorAll('button[data-is-parent]'));
+                        processMenuItems(subMenuParentButtons, style.children);
+                    }
+                }
+            });
+        };
+        processMenuItems(menuButtons, buttonStyles.menuItems);
         areSubMenusCreated = true;
       }
 
@@ -13217,8 +13293,6 @@
 
       checkAndUpdateMenuPosition();
       
-      menuContainer.addEventListener("mouseleave", handleMouseLeaveMenuArea);
-
       menuButtons.forEach((button) => {
         button.style.opacity = "1";
         button.style.transform = "translateY(0)";
@@ -13235,27 +13309,24 @@
       document.body.removeChild(menuContainer);
     }
     
+    if (activeSubMenuParent) {
+      activeSubMenuParent.style.backgroundColor = "transparent";
+      activeSubMenuParent = null;
+    }
     hideAllSubMenus();
     
-    menuContainer.removeEventListener("mouseleave", handleMouseLeaveMenuArea);
-
     isButtonClicked = false;
     mainButton.style.filter = "brightness(1)";
   }
   
   function hideAllSubMenus() {
-    document.querySelectorAll('.submenu').forEach(sm => sm.style.display = 'none');
-  }
-
-  function handleMouseLeaveMenuArea(event) {
-    const toElement = event.relatedTarget;
-    const isEnteringMainMenu = menuContainer.contains(toElement);
-    const isEnteringSubMenu = toElement && (toElement.classList.contains('submenu') || toElement.closest('.submenu'));
-
-    if (isEnteringMainMenu || isEnteringSubMenu) {
-      return;
-    }
-    hideAllSubMenus();
+    document.querySelectorAll('.submenu').forEach(sm => {
+      sm.style.display = 'none';
+      if (sm._activeSubMenuParent) {
+        sm._activeSubMenuParent.style.backgroundColor = 'transparent';
+        sm._activeSubMenuParent = null;
+      }
+    });
   }
 
   function createSubMenu(items) {
@@ -13274,7 +13345,7 @@
       backdrop-filter: blur(8px);
     `;
 
-    subMenu.addEventListener("mouseleave", handleMouseLeaveMenuArea);
+    subMenu._activeSubMenuParent = null;
 
     items.forEach((item) => {
       if (item.type === "title") {
@@ -13294,6 +13365,67 @@
         subMenu.appendChild(titleElement);
         return;
       }
+
+      if (item.type === "parent") {
+        const parentButton = document.createElement("button");
+        parentButton.style.cssText = `
+          background-color: transparent;
+          color: #ffffffe6;
+          border: none;
+          border-radius: 2px;
+          margin: 0;
+          padding: 4px 10px 4px 8px;
+          font-weight: 400;
+          font-size: 0.875rem;
+          height: 39px;
+          width: 155px;
+          text-align: left;
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        `;
+        parentButton.dataset.isParent = 'true';
+        parentButton.dataset.sortType = item.sortType;
+
+        const buttonTextSpan = document.createElement("span");
+        buttonTextSpan.innerText = item.text;
+        parentButton.appendChild(buttonTextSpan);
+       
+        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.setAttribute("viewBox", "0 0 16 16");
+        svg.setAttribute("width", "16px");
+        svg.setAttribute("height", "16px");
+        svg.style.fill = 'var(--sort-play-icon-color)';
+        svg.style.transform = "translateX(2px)";
+      
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", "M6 14l6-6-6-6v12z");
+        
+        svg.appendChild(path);
+        parentButton.appendChild(svg);
+
+        parentButton.addEventListener("mouseenter", () => {
+          if (!parentButton.disabled) {
+            if (subMenu._activeSubMenuParent && subMenu._activeSubMenuParent !== parentButton) {
+              subMenu._activeSubMenuParent.style.backgroundColor = "transparent";
+            }
+            parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
+            subMenu._activeSubMenuParent = parentButton;
+            showSubMenu(parentButton);
+          }
+        });
+        
+        parentButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          return false;
+        });
+
+        subMenu.appendChild(parentButton);
+        return;
+      }
+
       const button = document.createElement("button");
       button.style.backgroundColor = item.backgroundColor;
       button.style.color = '#ffffffe6';
@@ -13315,6 +13447,13 @@
       button.addEventListener("mouseenter", () => {
         if (!button.disabled) {
           button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
+          if (subMenu._activeSubMenuParent) {
+            subMenu._activeSubMenuParent.style.backgroundColor = "transparent";
+            if (subMenu._activeSubMenuParent._submenu) {
+              subMenu._activeSubMenuParent._submenu.style.display = 'none';
+            }
+            subMenu._activeSubMenuParent = null;
+          }
         }
       });
   
@@ -13345,7 +13484,15 @@
   }
 
   function showSubMenu(parentButton) {
-    hideAllSubMenus();
+    const parentMenu = parentButton.parentElement;
+    if (parentMenu) {
+        parentMenu.querySelectorAll('button[data-is-parent]').forEach(siblingParent => {
+            if (siblingParent !== parentButton && siblingParent._submenu) {
+                siblingParent._submenu.style.display = 'none';
+                siblingParent.style.backgroundColor = "transparent";
+            }
+        });
+    }
 
     const subMenu = parentButton._submenu;
     if (!subMenu) return;
@@ -16928,6 +17075,31 @@
           }
           mainButton.innerText = "100%";
 
+        } else if (['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
+            mainButton.innerText = "Analyzing...";
+            const tracksWithAudioFeatures = await processBatchesWithDelay(
+                tracksWithPopularity, 50, 1000,
+                (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.40)}%`; },
+                async (track) => {
+                    const trackId = track.uri.split(":")[2];
+                    const stats = await getTrackStats(trackId);
+                    return { ...track, ...stats };
+                }
+            );
+    
+            const deduplicationResult = deduplicateTracks(tracksWithAudioFeatures);
+            uniqueTracks = deduplicationResult.unique;
+            removedTracks = deduplicationResult.removed;
+    
+            sortedTracks = uniqueTracks
+                .filter(track => track[sortType] !== null && track[sortType] !== undefined)
+                .sort((a, b) => {
+                    const valA = a[sortType] || 0;
+                    const valB = b[sortType] || 0;
+                    return sortOrderState[sortType] ? valA - valB : valB - valA;
+                });
+            mainButton.innerText = "100%";
+
         } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
             try {
                 const result = await handleScrobblesSorting(
@@ -17026,7 +17198,13 @@
           affinityLongTerm: { fullName: "your all-time favorites", shortName: "Personalized" },
           affinityPowerHour: { fullName: "your power hour", shortName: "Power Hour" },
           affinityMellowMood: { fullName: "your mellow mood", shortName: "Mellow Mood" },
-          affinityHiddenGems: { fullName: "your hidden gems", shortName: "Hidden Gems" }
+          affinityHiddenGems: { fullName: "your hidden gems", shortName: "Hidden Gems" },
+          tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
+          energy: { fullName: "energy", shortName: "Energy" },
+          danceability: { fullName: "danceability", shortName: "Danceability" },
+          valence: { fullName: "valence", shortName: "Valence" },
+          acousticness: { fullName: "acousticness", shortName: "Acousticness" },
+          instrumentalness: { fullName: "instrumentalness", shortName: "Instrumentalness" }
         }[sortType];
 
         if (canModifyCurrentPlaylist) {
