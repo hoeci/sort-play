@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.10.0";
+  const SORT_PLAY_VERSION = "5.10.1";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -19520,7 +19520,7 @@ function isDirectSortType(sortType) {
                     clearTimeout(tooltipTimeoutRef.current);
                     setIsTooltipVisible(false);
                 },
-                style: { marginRight: "12px", opacity: (isLiked || hasISRCLiked) ? "1" : undefined }
+                style: { marginRight: "12px" } // The opacity property has been removed
             }, Spicetify.React.createElement("span", {
                 className: "Wrapper-sm-only Wrapper-small-only",
                 style: {
@@ -19589,32 +19589,33 @@ function isDirectSortType(sortType) {
         const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
         if (!nowPlayingView) return;
     
-        if (nowPlayingView.querySelector(".likeControl-wrapper-npv")) return;
+        let container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
     
-        const addToPlaylistButton = nowPlayingView.querySelector('button[aria-label="Add to playlist"]');
-        if (!addToPlaylistButton) return;
-        const addToPlaylistButtonWrapper = addToPlaylistButton.parentElement;
+        if (!container) {
+            const addToPlaylistButton = nowPlayingView.querySelector('button[aria-label="Add to playlist"]');
+            if (!addToPlaylistButton) return;
+            const addToPlaylistButtonWrapper = addToPlaylistButton.parentElement;
     
-        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || addToPlaylistButton;
-        if (!templateButton) return;
+            container = document.createElement("div");
+            container.className = "likeControl-wrapper-npv";
+            container.style.display = "contents";
     
-        const container = document.createElement("div");
-        container.className = "likeControl-wrapper-npv";
-        container.style.display = "contents";
+            addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
+        }
     
-        addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
+        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('button[aria-label="Add to playlist"]');
+        if (!templateButton) return; // We still need a template for class names
     
         const uri = Spicetify.Player.data?.item?.uri || "";
-        
         const dynamicSizeSelector = '.main-nowPlayingView-contextItemInfo button[aria-label="Add to playlist"] svg';
-
+    
         Spicetify.ReactDOM.render(
-            Spicetify.React.createElement(LikeButton, { 
-                uri: uri, 
-                key: uri, 
-                classList: templateButton.classList, 
+            Spicetify.React.createElement(LikeButton, {
+                uri: uri,
+                key: uri,
+                classList: templateButton.classList,
                 size: 21,
-                dynamicSizeSelector: dynamicSizeSelector 
+                dynamicSizeSelector: dynamicSizeSelector
             }),
             container
         );
