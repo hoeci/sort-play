@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.9.0";
+  const SORT_PLAY_VERSION = "5.10.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -50,6 +50,8 @@
   let setDedicatedPlaylistCovers = true;
   let chatPanelVisible = false;
   let userMarketPromise = null;
+  let showLikeButton = false;
+  let likeButton_connectObserver = () => {};
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
@@ -357,6 +359,7 @@
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
+    showLikeButton = localStorage.getItem("sort-play-show-like-button") === "true";
   
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -400,6 +403,7 @@
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY, changeTitleOnModify);
     localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
+    localStorage.setItem("sort-play-show-like-button", showLikeButton);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -1603,6 +1607,27 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        UI Enhancements
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="showLikeButtonSetting">
+        <label class="col description">
+            Show Old Like Button
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Adds a heart button to track rows, the play bar, and the Now Playing view.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="showLikeButtonToggle" ${showLikeButton ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Playlist Names
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
@@ -1882,6 +1907,42 @@
     const secondMyScrobblesSettingsBtn = modalContainer.querySelector("#secondMyScrobblesSettingsBtn");
     const secondDateFormatDropdownContainer = modalContainer.querySelector("#secondDateFormatDropdownContainer");
     const secondMyScrobblesDropdownContainer = modalContainer.querySelector("#secondMyScrobblesDropdownContainer");
+    const showLikeButtonToggle = modalContainer.querySelector("#showLikeButtonToggle");
+
+
+    showLikeButtonToggle.addEventListener("change", () => {
+        showLikeButton = showLikeButtonToggle.checked;
+        saveSettings();
+
+        const actionContainer = showLikeButtonToggle.closest('.col.action');
+        const toggleLabel = actionContainer.querySelector('.switch');
+
+        if (actionContainer && toggleLabel && !actionContainer.querySelector('.reload-button')) {
+            const reloadButton = document.createElement('button');
+            reloadButton.textContent = 'Reload';
+            reloadButton.className = 'main-buttons-button reload-button';
+            reloadButton.title = 'Reload Spotify to apply';
+            reloadButton.style.cssText = `
+                margin-right: 10px;
+                padding: 2px 12px;
+                height: 24px;
+                border-radius: 12px;
+                border: 1px solid #878787;
+                cursor: pointer;
+                background-color: transparent;
+                color: white;
+                font-weight: 500;
+                font-size: 12px;
+                transition: background-color 0.2s ease;
+            `;
+            reloadButton.addEventListener('click', () => {
+                location.reload();
+            });
+            reloadButton.addEventListener('mouseenter', () => reloadButton.style.backgroundColor = '#ffffff1a');
+            reloadButton.addEventListener('mouseleave', () => reloadButton.style.backgroundColor = 'transparent');
+            actionContainer.insertBefore(reloadButton, toggleLabel);
+        }
+    });
 
     function updateOpenPlaylistAfterSortToggleState() {
       const isCreatePlaylistOn = createPlaylistToggle.checked;
@@ -11273,44 +11334,44 @@ function isDirectSortType(sortType) {
   styleElement.innerHTML = `
     .sort-play-font-scope,
     .sort-play-font-scope * {
-      font-family: 'SpotifyMixUI', sans-serif !important;
+        font-family: 'SpotifyMixUI', sans-serif !important;
     }
     .loader {
-      position: relative;
-      width: 8px;
-      height: 8px;
-      border-radius: 5px;
-      background-color: #555;
-      color: #555;
-      animation: 0.4s linear 0.2s infinite alternate none running loader;
+        position: relative;
+        width: 8px;
+        height: 8px;
+        border-radius: 5px;
+        background-color: #555;
+        color: #555;
+        animation: 0.4s linear 0.2s infinite alternate none running loader;
     }
     
     .loader::before,
     .loader::after {
-      content: "";
-      display: inline-block;
-      position: absolute;
-      top: 0px;
+        content: "";
+        display: inline-block;
+        position: absolute;
+        top: 0px;
     }
     
     .loader::before {
-      left: -15px;
-      width: 8px;
-      height: 8px;
-      border-radius: 5px;
-      background-color: #555;
-      color: #555;
-      animation: 0.4s ease 0s infinite alternate none running loader;
+        left: -15px;
+        width: 8px;
+        height: 8px;
+        border-radius: 5px;
+        background-color: #555;
+        color: #555;
+        animation: 0.4s ease 0s infinite alternate none running loader;
     }
     
     .loader::after {
-      left: 15px;
-      width: 8px;
-      height: 8px;
-      border-radius: 5px;
-      background-color: #555;
-      color: #555;
-      animation: 0.4s ease 0.4s infinite alternate none running loader;
+        left: 15px;
+        width: 8px;
+        height: 8px;
+        border-radius: 5px;
+        background-color: #555;
+        color: #555;
+        animation: 0.4s ease 0.4s infinite alternate none running loader;
     }
     
     @keyframes loader {
@@ -11323,20 +11384,20 @@ function isDirectSortType(sortType) {
       }
     }
     .Button-sc-qlcn5g-0.Button-small-buttonTertiary-useBrowserDefaultFocusStyle {
-      cursor: default;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 5px;
+        cursor: default;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
     }
     .sort-play-column {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-      width: 90px;
-      color: var(--spice-text);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        width: 90px;
+        color: var(--spice-text);
     }
     .main-trackList-row .sort-play-playcount {
         color: var(--spice-text);
@@ -19210,6 +19271,457 @@ function isDirectSortType(sortType) {
         }
     });
   }
+  const LIKE_BUTTON_ICON_NOT_LIKED = `<path d="M1.69 2A4.582 4.582 0 018 2.023 4.583 4.583 0 0111.88.817h.002a4.618 4.618 0 013.782 3.65v.003a4.543 4.543 0 01-1.011 3.84L9.35 14.629a1.765 1.765 0 01-2.093.464 1.762 1.762 0 01-.605-.463L1.348 8.309A4.582 4.582 0 011.689 2zm3.158.252A3.082 3.082 0 002.49 7.337l.005.005L7.8 13.664a.264.264 0 00.311.069.262.262 0 00.09-.069l5.312-6.33a3.043 3.043 0 00.68-2.573 3.118 3.118 0 00-2.551-2.463 3.079 3.079 0 00-2.612.816l-.007.007a1.501 1.501 0 01-2.045 0l-.009-.008a3.082 3.082 0 00-2.121-.861z"></path>`;
+  const LIKE_BUTTON_ICON_LIKED = `<path d="M15.724 4.22A4.313 4.313 0 0012.192.814a4.269 4.269 0 00-3.622 1.13.837.837 0 01-1.14 0 4.272 4.272 0 00-6.21 5.855l5.916 7.05a1.128 1.128 0 001.727 0l5.916-7.05a4.228 4.228 0 00.945-3.577z"></path>`;
+  const LIKE_BUTTON_ICON_ISRC_LIKED = `<path d="m15.92,3.56h0c-.36-1.81-1.8-3.2-3.62-3.49-1.35-.22-2.72.21-3.71,1.16-.16.15-.37.23-.58.23s-.42-.08-.58-.23c-.85-.82-1.95-1.23-3.04-1.23S2.09.45,1.23,1.33c-1.57,1.63-1.65,4.18-.17,5.9l6.06,7.22c.23.27.56.41.89.41h0c.26,0,.53-.09.74-.27.05-.04.1-.09.14-.14l6.06-7.22c.87-1.01,1.23-2.36.97-3.66h0Zm-7.91,9.39h0L2.31,6.18h0s0-.01,0-.01c-.45-.52-.68-1.18-.66-1.86s.29-1.33.77-1.82c.52-.54,1.22-.83,1.97-.83s1.39.27,1.9.77h.01s.01.02.01.02c.46.43,1.07.67,1.7.67v9.86h0Z"></path>`;
+  
+  function initializeLikeButtonFeature() {
+    const styleId = 'sort-play-like-button-tooltip-style';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.innerHTML = `
+            .like-button-tooltip {
+                background-color: #282828;
+                color: #ffffff;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 14px;
+                font-family: 'SpotifyMixUI', 'CircularSp', 'Circular', 'Helvetica', 'Arial', sans-serif;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                z-index: 1001;
+                max-width: 300px;
+                text-align: center;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 200ms ease-in-out;
+            }
+
+            .like-button-tooltip.visible {
+                opacity: 1;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    let likeButton_likedTracksIdsISRCs = new Map(); 
+    let likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
+    var proxy_likeButton_likedTracksIdsISRCs;
+    var likeButton_likedTracksChangeEvent = new CustomEvent('likeButton_likedTracksChange');
+
+    async function likeButton_initiateLikedSongs() {
+        if (!Spicetify.CosmosAsync) {
+            setTimeout(likeButton_initiateLikedSongs, 100);
+            return;
+        }
+        let likedTracksItems = await Spicetify.CosmosAsync.get("sp://core-collection/unstable/@/list/tracks/all?responseFormat=protobufJson");
+        let likedTracksIds = likedTracksItems.item.map(item => item.trackMetadata.link.replace("spotify:track:", ""));
+
+        let newLikedTracksIdsISRCs = new Map();
+        let likedTracksIdsWithUnknownISRCs = [];
+
+        likedTracksIds.forEach(trackId => {
+            const trackIsrc = localStorage.getItem("sort-play-like-" + trackId)
+            if (trackIsrc != null) {
+                newLikedTracksIdsISRCs.set(trackId, trackIsrc)
+            } else if (!trackId.startsWith("spotify:local:")) {
+                likedTracksIdsWithUnknownISRCs.push(trackId);
+            }
+        });
+
+        let promises = [];
+        for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 50) {
+            let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
+            promises.push(
+                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`).then(response => {
+                    response.tracks.forEach(track => {
+                        if (track && track.external_ids && track.external_ids.isrc) {
+                            newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+                            localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
+                        }
+                    });
+                })
+            );
+        }
+        await Promise.all(promises);
+
+        likeButton_likedTracksIdsISRCs = newLikedTracksIdsISRCs;
+        likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
+
+        proxy_likeButton_likedTracksIdsISRCs = new Proxy(likeButton_likedTracksIdsISRCs, {
+            get: function (target, property, receiver) {
+                if (['set', 'delete'].includes(property) && typeof target[property] === 'function') {
+                    return function (...args) {
+                        const result = target[property].apply(target, args);
+                        likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
+                        document.dispatchEvent(likeButton_likedTracksChangeEvent);
+                        return result;
+                    };
+                }
+                return Reflect.get(target, property, receiver);
+            }
+        });
+
+        document.dispatchEvent(likeButton_likedTracksChangeEvent);
+        setTimeout(likeButton_initiateLikedSongs, 30000);
+    }
+
+    const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16, dynamicSizeSelector = null }) {
+        const trackId = uri.replace("spotify:track:", "");
+        const [currentSize, setCurrentSize] = Spicetify.React.useState(size);
+        const [isrc, setISRC] = Spicetify.React.useState(localStorage.getItem("sort-play-like-" + trackId));
+        const [isLiked, setIsLiked] = Spicetify.React.useState(likeButton_likedTracksIdsISRCs.has(trackId));
+        const [hasISRCLiked, setHasISRCLiked] = Spicetify.React.useState(likeButton_likedTracksISRCs.has(isrc));
+        const [isHovered, setIsHovered] = Spicetify.React.useState(false);
+        const buttonRef = Spicetify.React.useRef(null);
+    
+        const [isTooltipVisible, setIsTooltipVisible] = Spicetify.React.useState(false);
+        const tooltipTimeoutRef = Spicetify.React.useRef(null);
+        const tooltipRef = Spicetify.React.useRef(null);
+    
+        const tooltipContent = isLiked ? "Remove from Liked Songs" : hasISRCLiked ? "You've already liked another version." : "Add to Liked Songs";
+
+        Spicetify.React.useEffect(() => {
+            return () => {
+                clearTimeout(tooltipTimeoutRef.current);
+            };
+        }, []);
+
+        Spicetify.React.useEffect(() => {
+            if (!dynamicSizeSelector) return;
+
+            const referenceElement = document.querySelector(dynamicSizeSelector);
+            if (!referenceElement) return;
+
+            const resizeObserver = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    const newSize = entry.contentRect.height || entry.contentRect.width;
+                    if (newSize > 0) {
+                        setCurrentSize(newSize);
+                    }
+                }
+            });
+
+            resizeObserver.observe(referenceElement);
+
+            const initialSize = referenceElement.getBoundingClientRect().height;
+            if (initialSize > 0) {
+                setCurrentSize(initialSize);
+            }
+
+            return () => resizeObserver.disconnect();
+        }, [dynamicSizeSelector]);
+
+
+        Spicetify.React.useEffect(() => {
+            if (isTooltipVisible && buttonRef.current && tooltipRef.current) {
+                const buttonRect = buttonRef.current.getBoundingClientRect();
+                const tooltip = tooltipRef.current;
+                const tooltipRect = tooltip.getBoundingClientRect();
+                const viewportWidth = window.innerWidth;
+                const margin = 8;
+
+                tooltip.style.top = `${buttonRect.top - tooltipRect.height - 8}px`;
+
+                let idealLeft = buttonRect.left + (buttonRect.width / 2) - (tooltipRect.width / 2);
+                
+                if (idealLeft < margin) {
+                    idealLeft = margin;
+                } else if (idealLeft + tooltipRect.width > viewportWidth - margin) {
+                    idealLeft = viewportWidth - tooltipRect.width - margin;
+                }
+
+                tooltip.style.left = `${idealLeft}px`;
+
+                const timeoutId = setTimeout(() => {
+                    tooltip.classList.add('visible');
+                }, 10);
+
+                return () => clearTimeout(timeoutId);
+            } else if (tooltipRef.current) {
+                tooltipRef.current.classList.remove('visible');
+            }
+        }, [isTooltipVisible]);
+    
+        Spicetify.React.useEffect(() => {
+            async function initISRC() {
+                try {
+                    if (isrc == null && trackId) {
+                        let track = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                        if (track && track.external_ids && track.external_ids.isrc) {
+                            setISRC(track.external_ids.isrc);
+                            localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
+                            setHasISRCLiked(likeButton_likedTracksISRCs.has(track.external_ids.isrc));
+                        }
+                    } else {
+                        setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
+                    }
+                } catch (error) {
+                    console.error('[Sort-Play Like Button] Error fetching ISRC:', error);
+                }
+            };
+            initISRC();
+        }, [isLiked, hasISRCLiked, trackId]);
+    
+        const handleLikedTracksChange = () => {
+            setIsLiked(likeButton_likedTracksIdsISRCs.has(trackId));
+            setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
+        };
+    
+        Spicetify.React.useEffect(() => {
+            document.addEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
+            return () => {
+                document.removeEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
+            };
+        }, [isrc, trackId]);
+    
+        const handleClick = async function () {
+            if (!Spicetify.Platform?.LibraryAPI?.add || !Spicetify.Platform?.LibraryAPI?.remove) {
+                Spicetify.showNotification("Library API not available.", true);
+                console.error("[Sort-Play Like Button] Spicetify.Platform.LibraryAPI.add/remove is not available.");
+                return;
+            }
+            if (isLiked) {
+                try {
+                    await Spicetify.Platform.LibraryAPI.remove({ uris: [uri] });
+                    proxy_likeButton_likedTracksIdsISRCs.delete(trackId);
+                } catch (error) {
+                    console.error('[Sort-Play Like Button] Error unliking track with LibraryAPI:', error);
+                    Spicetify.showNotification("Failed to unlike song.", true);
+                }
+            } else {
+                try {
+                    await Spicetify.Platform.LibraryAPI.add({ uris: [uri] });
+                    if (isrc) {
+                        proxy_likeButton_likedTracksIdsISRCs.set(trackId, isrc);
+                    }
+                } catch (error) {
+                    console.error('[Sort-Play Like Button] Error liking track with LibraryAPI:', error);
+                    Spicetify.showNotification("Failed to like song.", true);
+                }
+            }
+        };
+    
+        return Spicetify.React.createElement(Spicetify.React.Fragment, null,
+            Spicetify.React.createElement("button", {
+                ref: buttonRef,
+                className: classList,
+                "aria-checked": isLiked || hasISRCLiked,
+                onClick: handleClick,
+                onMouseEnter: () => {
+                    setIsHovered(true);
+                    clearTimeout(tooltipTimeoutRef.current);
+                    tooltipTimeoutRef.current = setTimeout(() => {
+                        setIsTooltipVisible(true);
+                    }, 250);
+                },
+                onMouseLeave: () => {
+                    setIsHovered(false);
+                    clearTimeout(tooltipTimeoutRef.current);
+                    setIsTooltipVisible(false);
+                },
+                style: { marginRight: "12px", opacity: (isLiked || hasISRCLiked) ? "1" : undefined }
+            }, Spicetify.React.createElement("span", {
+                className: "Wrapper-sm-only Wrapper-small-only",
+                style: {
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                }
+            }, Spicetify.React.createElement("svg", {
+                role: "img", height: currentSize, width: currentSize, viewBox: "0 0 16 16",
+                className: (isLiked || hasISRCLiked) ? "Svg-sc-ytk21e-0 Svg-img-icon-small-textBrightAccent" : "Svg-sc-ytk21e-0 Svg-img-icon-small",
+                style: {
+                    fill: (isLiked || hasISRCLiked) ? "var(--text-bright-accent)" : "var(--text-subdued)",
+                    filter: isHovered ? 'brightness(1.1)' : 'none',
+                    transition: 'filter 0.1s ease-in-out'
+                },
+                dangerouslySetInnerHTML: {
+                    __html: isLiked
+                        ? LIKE_BUTTON_ICON_LIKED
+                        : (hasISRCLiked
+                            ? LIKE_BUTTON_ICON_ISRC_LIKED
+                            : LIKE_BUTTON_ICON_NOT_LIKED)
+                }
+            }))),
+            isTooltipVisible && Spicetify.ReactDOM.createPortal(
+                Spicetify.React.createElement("div", {
+                    ref: tooltipRef,
+                    className: "like-button-tooltip",
+                    style: { position: 'fixed' }
+                }, tooltipContent),
+                document.body
+            )
+        );
+    });
+
+    function mountLikeButton() {
+        const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
+        if (!nowPlayingWidget) return;
+
+        const entryPoint = nowPlayingWidget.querySelector("[data-encore-id='buttonTertiary']");
+        if (!entryPoint) {
+            setTimeout(mountLikeButton, 100);
+            return;
+        }
+
+        let container = nowPlayingWidget.querySelector(".likeControl-wrapper");
+        if (!container) {
+            container = document.createElement("div");
+            container.className = "likeControl-wrapper";
+            try {
+                entryPoint.parentNode.parentNode.insertBefore(container, entryPoint.nextSibling);
+            } catch (error) {
+                console.error("[Sort-Play Like Button] Failed to insert like button wrapper", error);
+                return;
+            }
+        }
+        
+        const uri = Spicetify.Player.data?.item?.uri || "";
+        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri: uri, key: uri, classList: entryPoint.classList }), container);
+        
+        if (container.firstChild) {
+            container.firstChild.style.marginRight = "0px";
+        }
+    }
+
+    function mountLikeButtonNowPlayingView() {
+        const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
+        if (!nowPlayingView) return;
+    
+        if (nowPlayingView.querySelector(".likeControl-wrapper-npv")) return;
+    
+        const addToPlaylistButton = nowPlayingView.querySelector('button[aria-label="Add to playlist"]');
+        if (!addToPlaylistButton) return;
+        const addToPlaylistButtonWrapper = addToPlaylistButton.parentElement;
+    
+        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || addToPlaylistButton;
+        if (!templateButton) return;
+    
+        const container = document.createElement("div");
+        container.className = "likeControl-wrapper-npv";
+        container.style.display = "contents";
+    
+        addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
+    
+        const uri = Spicetify.Player.data?.item?.uri || "";
+        
+        const dynamicSizeSelector = '.main-nowPlayingView-contextItemInfo button[aria-label="Add to playlist"] svg';
+
+        Spicetify.ReactDOM.render(
+            Spicetify.React.createElement(LikeButton, { 
+                uri: uri, 
+                key: uri, 
+                classList: templateButton.classList, 
+                size: 21,
+                dynamicSizeSelector: dynamicSizeSelector 
+            }),
+            container
+        );
+    
+        if (container.firstChild) {
+            container.firstChild.style.marginRight = "0px";
+            container.firstChild.style.marginLeft = "12px";
+        }
+    }
+    
+    (async function initialize() {
+        await likeButton_initiateLikedSongs();
+    
+        while (!Spicetify?.Player?.data?.item) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    
+        mountLikeButton();
+        mountLikeButtonNowPlayingView();
+    
+        Spicetify.Player.addEventListener("songchange", () => {
+            mountLikeButton();
+            mountLikeButtonNowPlayingView();
+        });
+    })();
+
+    function likeButton_findVal(obj, key, maxDepth = 15, visited = new Set()) {
+        if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return undefined;
+        visited.add(obj);
+        if (obj.hasOwnProperty(key)) return obj[key];
+        for (const k in obj) {
+            if (obj.hasOwnProperty(k)) {
+                const result = likeButton_findVal(obj[k], key, maxDepth - 1, visited);
+                if (result !== undefined) return result;
+            }
+        }
+        return undefined;
+    }
+
+    const likeButton_addLikeButtonToRow = (row) => {
+        if (row.classList.contains("sort-play-like-button-injected")) return;
+        const actionButtonsContainer = Array.from(row.querySelectorAll('div[role="gridcell"]')).pop();
+        if (!actionButtonsContainer) return;
+        if (actionButtonsContainer.querySelector(".likeControl-wrapper")) {
+            row.classList.add("sort-play-like-button-injected");
+            return;
+        }
+        const entryPoint = actionButtonsContainer.querySelector("button:not(:last-of-type)");
+        if (!entryPoint) return;
+        const reactPropsKey = Object.keys(row).find(key => key.startsWith("__reactProps$"));
+        if (!reactPropsKey) return;
+        const uri = likeButton_findVal(row[reactPropsKey], "uri");
+        if (!uri || !uri.startsWith("spotify:track:")) return;
+        row.classList.add("sort-play-like-button-injected");
+        const likeButtonWrapper = document.createElement("div");
+        likeButtonWrapper.className = "likeControl-wrapper";
+        likeButtonWrapper.style.display = "contents";
+        const likeButtonElement = entryPoint.parentElement.insertBefore(likeButtonWrapper, entryPoint);
+        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.classList }), likeButtonElement);
+    };
+
+    let likeButton_tracklistObserver;
+    const likeButton_processTracklist = (mainView) => {
+        const tracklist = mainView.querySelector(".main-trackList-indexable, div[data-testid='track-list'], div[aria-label='Songs search results']");
+        if (tracklist) {
+            tracklist.querySelectorAll('.main-trackList-trackListRow, div[role="row"][aria-selected]').forEach(likeButton_addLikeButtonToRow);
+        }
+    };
+
+    likeButton_connectObserver = () => {
+        if (likeButton_tracklistObserver) {
+            likeButton_tracklistObserver.disconnect();
+        }
+        const mainView = document.querySelector("main");
+        if (!mainView) {
+            setTimeout(likeButton_connectObserver, 250);
+            return;
+        }
+    
+        likeButton_processTracklist(mainView);
+        mountLikeButton();
+        mountLikeButtonNowPlayingView();
+    
+        likeButton_tracklistObserver = new MutationObserver((mutations) => {
+            if (document.querySelector(".main-nowPlayingWidget-nowPlaying") && !document.querySelector(".likeControl-wrapper")) {
+                mountLikeButton();
+            }
+            if (document.querySelector(".main-nowPlayingView-contextItemInfo") && !document.querySelector(".likeControl-wrapper-npv")) {
+                mountLikeButtonNowPlayingView();
+            }
+    
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (node.matches('.main-trackList-trackListRow, div[role="row"][aria-selected]')) {
+                            likeButton_addLikeButtonToRow(node);
+                        } else {
+                            node.querySelectorAll('.main-trackList-trackListRow, div[role="row"][aria-selected]').forEach(likeButton_addLikeButtonToRow);
+                        }
+                    }
+                }
+            }
+        });
+    
+        likeButton_tracklistObserver.observe(mainView, { childList: true, subtree: true });
+    };
+  }
 
   function onPageChange() {
     if (tracklistObserver) tracklistObserver.disconnect();
@@ -19218,14 +19730,23 @@ function isDirectSortType(sortType) {
     
     insertButton();
     const currentUri = getCurrentUri();
-    if (!currentUri) return;
-    
-    if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
-        initializeTracklistObserver();
-    } else if (URI.isAlbum(currentUri)) {
-        initializeAlbumTracklistObserver();
-    } else if (URI.isArtist(currentUri)) {
-        initializeArtistTracklistObserver();
+    const path = Spicetify.Platform.History.location?.pathname;
+    const isSearchPage = path && path.startsWith('/search');
+
+    if (!currentUri && !isSearchPage) {
+        return;
+    }
+
+    likeButton_connectObserver();
+
+    if (currentUri) {
+        if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+            initializeTracklistObserver();
+        } else if (URI.isAlbum(currentUri)) {
+            initializeAlbumTracklistObserver();
+        } else if (URI.isArtist(currentUri)) {
+            initializeArtistTracklistObserver();
+        }
     }
   }
 
@@ -19262,8 +19783,14 @@ function isDirectSortType(sortType) {
   initializeReleaseDateCache();
   initializeScrobblesCache();
   initializePaletteAnalysisCache();
+
+  if (showLikeButton) {
+    initializeLikeButtonFeature();
+  }
+  
   startScheduler();
   console.log(`Sort-Play loaded`);
+  onPageChange();
   }
 
   if (typeof module !== 'undefined' && module.exports) {
