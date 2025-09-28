@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.10.1";
+  const SORT_PLAY_VERSION = "5.10.2";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -11334,44 +11334,48 @@ function isDirectSortType(sortType) {
   styleElement.innerHTML = `
     .sort-play-font-scope,
     .sort-play-font-scope * {
-        font-family: 'SpotifyMixUI', sans-serif !important;
+      font-family: 'SpotifyMixUI', sans-serif !important;
+    }
+    .main-trackList-trackListRow .sort-play-like-button[aria-checked="true"],
+    div[role="row"][aria-selected] .sort-play-like-button[aria-checked="true"] {
+        opacity: 1 !important;
     }
     .loader {
-        position: relative;
-        width: 8px;
-        height: 8px;
-        border-radius: 5px;
-        background-color: #555;
-        color: #555;
-        animation: 0.4s linear 0.2s infinite alternate none running loader;
+      position: relative;
+      width: 8px;
+      height: 8px;
+      border-radius: 5px;
+      background-color: #555;
+      color: #555;
+      animation: 0.4s linear 0.2s infinite alternate none running loader;
     }
     
     .loader::before,
     .loader::after {
-        content: "";
-        display: inline-block;
-        position: absolute;
-        top: 0px;
+      content: "";
+      display: inline-block;
+      position: absolute;
+      top: 0px;
     }
     
     .loader::before {
-        left: -15px;
-        width: 8px;
-        height: 8px;
-        border-radius: 5px;
-        background-color: #555;
-        color: #555;
-        animation: 0.4s ease 0s infinite alternate none running loader;
+      left: -15px;
+      width: 8px;
+      height: 8px;
+      border-radius: 5px;
+      background-color: #555;
+      color: #555;
+      animation: 0.4s ease 0s infinite alternate none running loader;
     }
     
     .loader::after {
-        left: 15px;
-        width: 8px;
-        height: 8px;
-        border-radius: 5px;
-        background-color: #555;
-        color: #555;
-        animation: 0.4s ease 0.4s infinite alternate none running loader;
+      left: 15px;
+      width: 8px;
+      height: 8px;
+      border-radius: 5px;
+      background-color: #555;
+      color: #555;
+      animation: 0.4s ease 0.4s infinite alternate none running loader;
     }
     
     @keyframes loader {
@@ -11384,20 +11388,20 @@ function isDirectSortType(sortType) {
       }
     }
     .Button-sc-qlcn5g-0.Button-small-buttonTertiary-useBrowserDefaultFocusStyle {
-        cursor: default;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 5px;
+      cursor: default;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
     }
     .sort-play-column {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        white-space: nowrap;
-        text-overflow: ellipsis;
-        width: 90px;
-        color: var(--spice-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      width: 90px;
+      color: var(--spice-text);
     }
     .main-trackList-row .sort-play-playcount {
         color: var(--spice-text);
@@ -19304,6 +19308,19 @@ function isDirectSortType(sortType) {
         document.head.appendChild(style);
     }
 
+    const visibilityStyleId = 'sort-play-like-button-visibility-style';
+    if (!document.getElementById(visibilityStyleId)) {
+        const style = document.createElement('style');
+        style.id = visibilityStyleId;
+        style.innerHTML = `
+            .main-trackList-trackListRow .sort-play-like-button[aria-checked="true"],
+            div[role="row"][aria-selected] .sort-play-like-button[aria-checked="true"] {
+                opacity: 1 !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     let likeButton_likedTracksIdsISRCs = new Map(); 
     let likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
     var proxy_likeButton_likedTracksIdsISRCs;
@@ -19502,10 +19519,12 @@ function isDirectSortType(sortType) {
             }
         };
     
+        const finalClassName = `${classList} sort-play-like-button`;
+
         return Spicetify.React.createElement(Spicetify.React.Fragment, null,
             Spicetify.React.createElement("button", {
                 ref: buttonRef,
-                className: classList,
+                className: finalClassName,
                 "aria-checked": isLiked || hasISRCLiked,
                 onClick: handleClick,
                 onMouseEnter: () => {
@@ -19520,7 +19539,7 @@ function isDirectSortType(sortType) {
                     clearTimeout(tooltipTimeoutRef.current);
                     setIsTooltipVisible(false);
                 },
-                style: { marginRight: "12px" } // The opacity property has been removed
+                style: { marginRight: "12px", opacity: (isLiked || hasISRCLiked) ? "1" : undefined }
             }, Spicetify.React.createElement("span", {
                 className: "Wrapper-sm-only Wrapper-small-only",
                 style: {
@@ -19578,7 +19597,7 @@ function isDirectSortType(sortType) {
         }
         
         const uri = Spicetify.Player.data?.item?.uri || "";
-        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri: uri, key: uri, classList: entryPoint.classList }), container);
+        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri: uri, key: uri, classList: entryPoint.className }), container);
         
         if (container.firstChild) {
             container.firstChild.style.marginRight = "0px";
@@ -19604,7 +19623,7 @@ function isDirectSortType(sortType) {
         }
     
         const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('button[aria-label="Add to playlist"]');
-        if (!templateButton) return; // We still need a template for class names
+        if (!templateButton) return;
     
         const uri = Spicetify.Player.data?.item?.uri || "";
         const dynamicSizeSelector = '.main-nowPlayingView-contextItemInfo button[aria-label="Add to playlist"] svg';
@@ -19613,7 +19632,7 @@ function isDirectSortType(sortType) {
             Spicetify.React.createElement(LikeButton, {
                 uri: uri,
                 key: uri,
-                classList: templateButton.classList,
+                classList: templateButton.className,
                 size: 21,
                 dynamicSizeSelector: dynamicSizeSelector
             }),
@@ -19674,7 +19693,7 @@ function isDirectSortType(sortType) {
         likeButtonWrapper.className = "likeControl-wrapper";
         likeButtonWrapper.style.display = "contents";
         const likeButtonElement = entryPoint.parentElement.insertBefore(likeButtonWrapper, entryPoint);
-        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.classList }), likeButtonElement);
+        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.className }), likeButtonElement);
     };
 
     let likeButton_tracklistObserver;
