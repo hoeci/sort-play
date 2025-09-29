@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.10.3";
+  const SORT_PLAY_VERSION = "5.11.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -14227,39 +14227,325 @@ function isDirectSortType(sortType) {
     return allItems.slice(0, totalLimit);
   }
 
-
-  function findPeaks(profileArray) {
-      const totalWeight = profileArray.reduce((a, b) => a + b, 0);
-      if (totalWeight === 0) return [];
-
-      const PEAK_THRESHOLD = 0.02;
-
-      const peaks = [];
-      let currentPeak = null;
-
-      for (let i = 0; i < profileArray.length; i++) {
-          if (profileArray[i] > totalWeight * PEAK_THRESHOLD) {
-              if (!currentPeak) {
-                  currentPeak = { start: i, end: i, totalWeight: profileArray[i], maxBinValue: profileArray[i] };
-              } else {
-                  currentPeak.end = i;
-                  currentPeak.totalWeight += profileArray[i];
-                  currentPeak.maxBinValue = Math.max(currentPeak.maxBinValue, profileArray[i]);
-              }
-          } else {
-              if (currentPeak) {
-                  peaks.push(currentPeak);
-                  currentPeak = null;
-              }
+  class GaussianMixtureModel {
+    constructor(nComponents = 3, maxIterations = 100, tolerance = 1e-4) {
+      this.nComponents = nComponents;
+      this.maxIterations = maxIterations;
+      this.tolerance = tolerance;
+      this.means = [];
+      this.variances = [];
+      this.weights = [];
+      this.fitted = false;
+    }
+  
+    fit(data, sampleWeights = null) {
+      if (!data || data.length === 0) return;
+      
+      const n = data.length;
+      const weights = sampleWeights || Array(n).fill(1);
+      
+      this.initializeParameters(data, weights);
+      
+      let prevLogLikelihood = -Infinity;
+      
+      for (let iter = 0; iter < this.maxIterations; iter++) {
+        const responsibilities = this.expectationStep(data);
+        this.maximizationStep(data, responsibilities, weights);
+        
+        const logLikelihood = this.computeLogLikelihood(data, weights);
+        if (Math.abs(logLikelihood - prevLogLikelihood) < this.tolerance) {
+          break;
+        }
+        prevLogLikelihood = logLikelihood;
+      }
+      
+      this.fitted = true;
+    }
+  
+    initializeParameters(data, weights) {
+      const n = data.length;
+      const weightedData = [];
+      
+      for (let i = 0; i < n; i++) {
+        weightedData.push({ value: data[i], weight: weights[i] });
+      }
+      
+      weightedData.sort((a, b) => a.value - b.value);
+      
+      this.means = [];
+      const step = Math.floor(n / this.nComponents);
+      for (let i = 0; i < this.nComponents; i++) {
+        const idx = Math.min(i * step + Math.floor(step / 2), n - 1);
+        this.means.push(weightedData[idx].value);
+      }
+      
+      this.variances = Array(this.nComponents).fill(0);
+      this.weights = Array(this.nComponents).fill(1 / this.nComponents);
+      
+      for (let k = 0; k < this.nComponents; k++) {
+        let sumSquaredDiff = 0;
+        let sumWeight = 0;
+        
+        for (let i = 0; i < n; i++) {
+          const diff = data[i] - this.means[k];
+          sumSquaredDiff += weights[i] * diff * diff;
+          sumWeight += weights[i];
+        }
+        
+        this.variances[k] = Math.max(0.01, sumSquaredDiff / sumWeight);
+      }
+    }
+  
+    expectationStep(data) {
+      const n = data.length;
+      const responsibilities = Array(n).fill(null).map(() => Array(this.nComponents).fill(0));
+      
+      for (let i = 0; i < n; i++) {
+        let totalProb = 0;
+        
+        for (let k = 0; k < this.nComponents; k++) {
+          const prob = this.weights[k] * this.gaussianPDF(data[i], this.means[k], this.variances[k]);
+          responsibilities[i][k] = prob;
+          totalProb += prob;
+        }
+        
+        if (totalProb > 0) {
+          for (let k = 0; k < this.nComponents; k++) {
+            responsibilities[i][k] /= totalProb;
           }
+        }
       }
-
-      if (currentPeak) {
-          peaks.push(currentPeak);
+      
+      return responsibilities;
+    }
+  
+    maximizationStep(data, responsibilities, weights) {
+      const n = data.length;
+      
+      for (let k = 0; k < this.nComponents; k++) {
+        let sumResp = 0;
+        let sumRespData = 0;
+        let sumRespSquaredDiff = 0;
+        
+        for (let i = 0; i < n; i++) {
+          const weightedResp = responsibilities[i][k] * weights[i];
+          sumResp += weightedResp;
+          sumRespData += weightedResp * data[i];
+        }
+        
+        this.means[k] = sumResp > 0 ? sumRespData / sumResp : this.means[k];
+        
+        for (let i = 0; i < n; i++) {
+          const diff = data[i] - this.means[k];
+          sumRespSquaredDiff += responsibilities[i][k] * weights[i] * diff * diff;
+        }
+        
+        this.variances[k] = sumResp > 0 ? Math.max(0.01, sumRespSquaredDiff / sumResp) : this.variances[k];
+        
+        this.weights[k] = sumResp / weights.reduce((a, b) => a + b, 0);
       }
-
-      return peaks;
+      
+      const totalWeight = this.weights.reduce((a, b) => a + b, 0);
+      if (totalWeight > 0) {
+        for (let k = 0; k < this.nComponents; k++) {
+          this.weights[k] /= totalWeight;
+        }
+      }
+    }
+  
+    gaussianPDF(x, mean, variance) {
+      if (variance <= 0) return 0;
+      const coefficient = 1 / Math.sqrt(2 * Math.PI * variance);
+      const exponent = -Math.pow(x - mean, 2) / (2 * variance);
+      return coefficient * Math.exp(exponent);
+    }
+  
+    computeLogLikelihood(data, weights) {
+      let logLikelihood = 0;
+      for (let i = 0; i < data.length; i++) {
+        let prob = 0;
+        for (let k = 0; k < this.nComponents; k++) {
+          prob += this.weights[k] * this.gaussianPDF(data[i], this.means[k], this.variances[k]);
+        }
+        logLikelihood += weights[i] * Math.log(Math.max(1e-10, prob));
+      }
+      return logLikelihood;
+    }
+  
+    score(x) {
+      if (!this.fitted) return 0;
+      let totalProb = 0;
+      for (let k = 0; k < this.nComponents; k++) {
+        totalProb += this.weights[k] * this.gaussianPDF(x, this.means[k], this.variances[k]);
+      }
+      return totalProb;
+    }
+  
+    getMaxDensity() {
+      if (!this.fitted) return 1;
+      let maxDensity = 0;
+      for (let k = 0; k < this.nComponents; k++) {
+        const peakDensity = this.weights[k] * this.gaussianPDF(this.means[k], this.means[k], this.variances[k]);
+        if (peakDensity > maxDensity) {
+          maxDensity = peakDensity;
+        }
+      }
+      return maxDensity > 0 ? maxDensity : 1;
+    }
   }
+
+  function getGMMScore(value, gmm) {
+    if (!gmm || !gmm.fitted) return 0;
+    const rawScore = gmm.score(value);
+    const maxDensity = gmm.getMaxDensity();
+    return Math.min(1, rawScore / maxDensity);
+  }
+  
+  function buildAffinityProfile(profileData, updateProgress, timeRangeScope = 'balanced') {
+    updateProgress("Profiling...");
+    let finalTimeScope = timeRangeScope;
+    const { enhancedLikedSongs, topItems } = profileData;
+    const timeRanges = ['short_term', 'medium_term', 'long_term'];
+
+    let profileSourceSongs = enhancedLikedSongs;
+    let multipliers;
+    let recencyDecayFactor;
+
+    switch (timeRangeScope) {
+        case 'recent':
+            const sixMonthsAgo = new Date();
+            sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
+            profileSourceSongs = enhancedLikedSongs.filter(song => new Date(song.addedAt) > sixMonthsAgo);
+            multipliers = { short_term: 4.0, medium_term: 1.0, long_term: 0.5 };
+            recencyDecayFactor = 110;
+            break;
+        case 'all_time':
+            multipliers = { short_term: 0.5, medium_term: 1.5, long_term: 3.5 };
+            recencyDecayFactor = 10000;
+            break;
+        case 'energy':
+            profileSourceSongs = enhancedLikedSongs.filter(song => 
+                song.audio_features && song.audio_features.energy > 0.6 && song.audio_features.danceability > 0.5
+            );
+            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
+            recencyDecayFactor = 500;
+            break;
+        case 'mellow':
+            profileSourceSongs = enhancedLikedSongs.filter(song => 
+                song.audio_features && song.audio_features.energy < 0.4 && song.audio_features.acousticness > 0.5
+            );
+            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
+            recencyDecayFactor = 500;
+            break;
+        case 'balanced':
+        default:
+            multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
+            recencyDecayFactor = 600;
+            break;
+    }
+
+    if (profileSourceSongs.length < 25) {
+        Spicetify.showNotification(`Not enough data for ${timeRangeScope} profile, using Balanced instead.`);
+        profileSourceSongs = enhancedLikedSongs;
+        multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
+        recencyDecayFactor = 600;
+        finalTimeScope = 'balanced';
+    }
+
+    const topTrackPositions = { short_term: new Map(), medium_term: new Map(), long_term: new Map() };
+    for (const range of timeRanges) {
+        topItems[range].tracks.forEach((track, index) => {
+            topTrackPositions[range].set(track.uri, index);
+        });
+    }
+
+    const weightedSongs = profileSourceSongs.map(song => {
+        let weight = 1.0;
+        for (const range of timeRanges) {
+            const position = topTrackPositions[range].get(song.uri);
+            if (position !== undefined) { 
+                const baseMultiplier = multipliers[range];
+                if (baseMultiplier === 0) continue;
+                let positionalMultiplier = 0;
+                switch (range) {
+                    case 'long_term':
+                        if (position < 25) positionalMultiplier = 1.0;
+                        else if (position < 50) positionalMultiplier = 0.95;
+                        else if (position < 100) positionalMultiplier = 0.85;
+                        else if (position < 200) positionalMultiplier = 0.70;
+                        else if (position < 300) positionalMultiplier = 0.55;
+                        else if (position < 400) positionalMultiplier = 0.40;
+                        else positionalMultiplier = 0.25;
+                        break;
+                    case 'medium_term':
+                        if (position < 25) positionalMultiplier = 1.0;
+                        else if (position < 50) positionalMultiplier = 0.85;
+                        else if (position < 100) positionalMultiplier = 0.68;
+                        else if (position < 200) positionalMultiplier = 0.45;
+                        else positionalMultiplier = 0.20;
+                        break;
+                    case 'short_term':
+                        if (position < 25) positionalMultiplier = 1.0;
+                        else if (position < 50) positionalMultiplier = 0.85;
+                        else if (position < 100) positionalMultiplier = 0.50;
+                        else positionalMultiplier = 0.15;
+                        break;
+                }
+                weight += baseMultiplier * positionalMultiplier;
+            }
+        }
+        let days_since_added = (new Date() - new Date(song.addedAt)) / (1000 * 60 * 60 * 24);
+        if (isNaN(days_since_added)) {
+            days_since_added = 365 * 5; 
+        }
+        const date_weight = Math.exp(-days_since_added / recencyDecayFactor);
+        const final_weight = weight * date_weight;
+        return { ...song, final_weight };
+    });
+
+    const gmmSonicProfile = {};
+    const featuresToModel = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness', 'tempo'];
+    const min_tempo = 50, max_tempo = 200;
+
+    featuresToModel.forEach(feature => {
+        const values = [];
+        const weights = [];
+        weightedSongs.forEach(song => {
+            if (song.audio_features && typeof song.audio_features[feature] === 'number') {
+                let value = song.audio_features[feature];
+                if (feature === 'tempo') {
+                    value = (value - min_tempo) / (max_tempo - min_tempo);
+                }
+                values.push(Math.max(0, Math.min(1, value)));
+                weights.push(song.final_weight);
+            }
+        });
+        if (values.length > 20) {
+            const gmm = new GaussianMixtureModel(3);
+            gmm.fit(values, weights);
+            gmmSonicProfile[feature] = gmm;
+        }
+    });
+
+    const genreProfile = {};
+    const artistProfile = {};
+    weightedSongs.forEach(song => {
+        if (song.artist_genres) {
+            song.artist_genres.forEach(genre => {
+                genreProfile[genre] = (genreProfile[genre] || 0) + song.final_weight;
+            });
+        }
+        if (song.artistUris) {
+            song.artistUris.forEach(artistUri => {
+                const artistId = artistUri.split(':')[2];
+                artistProfile[artistId] = (artistProfile[artistId] || 0) + song.final_weight;
+            });
+        }
+    });
+
+    const affinityProfile = { gmmSonicProfile, genreProfile, artistProfile, weightedSongs };
+    return { affinityProfile, finalTimeScope };
+  } 
 
   const AFFINITY_PROFILE_CACHE_KEY = "sort-play-affinity-profile-cache-v1-5";
   const AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY = "sort-play-affinity-cache-timestamp-v1-5";
@@ -14298,16 +14584,77 @@ function isDirectSortType(sortType) {
     }
   }
 
+  function intelligentSampling(allSongs, targetSize) {
+    const sorted = [...allSongs].sort((a, b) => 
+        new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
+    );
+    
+    const sampled = [];
+    
+    const recentCount = Math.floor(targetSize * 0.4);
+    sampled.push(...sorted.slice(0, recentCount));
+    
+    const middleStart = recentCount;
+    const middleEnd = sorted.length - (targetSize - recentCount);
+    const middlePoolSize = middleEnd - middleStart;
+    const middleCount = Math.floor(targetSize * 0.3);
+    
+    if (middlePoolSize > middleCount) {
+        const middleStep = Math.floor(middlePoolSize / middleCount);
+        for (let i = 0; i < middleCount; i++) {
+            sampled.push(sorted[middleStart + i * middleStep]);
+        }
+    } else {
+        sampled.push(...sorted.slice(middleStart, middleEnd));
+    }
+    
+    const oldCount = targetSize - sampled.length;
+    if (oldCount > 0) {
+        sampled.push(...sorted.slice(-oldCount));
+    }
+    
+    return sampled;
+  }
+  
   async function getAffinityProfileData(updateProgress) {
     cleanupOldAffinityCaches();
 
     updateProgress("Get liked...");
-    const likedTracksData = await Spicetify.Platform.LibraryAPI.getTracks({ limit: 3000 });
+    let allLikedSongs = [];
+    let offset = 0;
+    const limit = 50;
+    let hasMore = true;
     
-    if (!likedTracksData || !likedTracksData.items || likedTracksData.items.length === 0) {
+    while (hasMore) {
+        const response = await Spicetify.Platform.LibraryAPI.getTracks({ 
+            limit, 
+            offset 
+        });
+        
+        if (response?.items?.length > 0) {
+            allLikedSongs = allLikedSongs.concat(response.items);
+            offset += limit;
+            hasMore = response.items.length === limit;
+        } else {
+            hasMore = false;
+        }
+    }
+    const likedTracksData = { items: allLikedSongs };
+
+    if (!likedTracksData.items || likedTracksData.items.length === 0) {
         throw new Error("No liked songs found to build a profile.");
     }
-    const freshLikedSongs = likedTracksData.items;
+
+    const completeLikedSongUrisSet = new Set(likedTracksData.items.map(s => s.uri));
+
+    let songsToProfile;
+    if (likedTracksData.items.length > 3000) {
+        songsToProfile = intelligentSampling(likedTracksData.items, 3000);
+    } else {
+        songsToProfile = likedTracksData.items;
+    }
+    
+    const freshLikedSongs = songsToProfile;
     updateProgress("Load cache...");
     let cachedEnhancedSongs = [];
     const cacheTimestamp = localStorage.getItem(AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY);
@@ -14336,7 +14683,7 @@ function isDirectSortType(sortType) {
 
     let newlyEnhancedSongs = [];
     if (newSongsToProcess.length > 0) {
-        updateProgress(`Get liked...`);
+        updateProgress(`Enhancing...`);
         
         const newTrackIds = newSongsToProcess.map(item => item.uri.split(':')[2]);
         const newArtistIds = [...new Set(newSongsToProcess.flatMap(item => item.artists.map(artist => artist.uri.split(':')[2])))];
@@ -14392,25 +14739,12 @@ function isDirectSortType(sortType) {
     
     let finalCacheData = allEnhancedSongs.filter(song => freshLikedSongUris.has(song.uri));
 
-    if (finalCacheData.length > 3000) {
-        finalCacheData.sort((a, b) => new Date(b.added_at).getTime() - new Date(a.added_at).getTime());
-        finalCacheData = finalCacheData.slice(0, 3000);
-    }
-    
     updateProgress("Upd-cache...");
     try {
         localStorage.setItem(AFFINITY_PROFILE_CACHE_KEY, JSON.stringify(finalCacheData));
-
-        if (!cacheTimestamp || daysPassed >= AFFINITY_CACHE_EXPIRY_DAYS) {
-            localStorage.setItem(AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY, Date.now().toString());
-        }
+        localStorage.setItem(AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY, Date.now().toString());
     } catch (e) {
-        if (e.name === 'QuotaExceededError') {
-            console.error("Cache size is still too large even after aggressive pruning. Could not save affinity profile.", e);
-            Spicetify.showNotification("Your liked songs library is too large to cache, personalized sort may be slow.", true);
-        } else {
-            console.error("An error occurred while saving the cache.", e);
-        }
+        console.error("An error occurred while saving the affinity cache.", e);
     }
 
     updateProgress("Get top...");
@@ -14425,190 +14759,232 @@ function isDirectSortType(sortType) {
         };
     }
     
-    return { enhancedLikedSongs: finalCacheData, topItems };
+    const artistTiers = buildArtistTierSystem({ enhancedLikedSongs: finalCacheData, topItems }, topItems);
+    
+    return { enhancedLikedSongs: finalCacheData, topItems, artistTiers, completeLikedSongUrisSet };
+  }
+
+  function calculateStandardDeviation(values) {
+    if (values.length === 0) return 0;
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+    return Math.sqrt(variance);
+  }
+
+  function analyzePlaylistCharacteristics(targetTracks, audioFeaturesMap, artistCache) {
+    const genres = new Set();
+    const artists = new Set();
+    const sonicFeatures = [];
+    
+    targetTracks.forEach(track => {
+        const artistGenres = artistCache.get(track.uri.split(':')[2]);
+        if (artistGenres) {
+            artistGenres.forEach(g => genres.add(g));
+        }
+        (track.artistUris || track.artists.map(a => a.uri)).forEach(uri => artists.add(uri));
+        
+        const features = audioFeaturesMap.get(track.uri.split(':')[2]);
+        if (features) {
+            sonicFeatures.push(features);
+        }
+    });
+    
+    const genreDiversity = Math.min(1, genres.size / (targetTracks.length * 0.5 || 1));
+    const artistDiversity = Math.min(1, artists.size / (targetTracks.length || 1));
+    
+    let sonicCoherence = 1.0;
+    if (sonicFeatures.length > 1) {
+        const energyStdDev = calculateStandardDeviation(sonicFeatures.map(f => f.energy));
+        const valenceStdDev = calculateStandardDeviation(sonicFeatures.map(f => f.valence));
+        sonicCoherence = 1 - ((energyStdDev + valenceStdDev) / 2);
+    }
+    
+    return {
+        genreDiversity,
+        artistDiversity,
+        sonicCoherence,
+        playlistSize: targetTracks.length
+    };
   }
   
-  function buildAffinityProfile(profileData, updateProgress, timeRangeScope = 'balanced') {
-    updateProgress("Profiling...");
-    let finalTimeScope = timeRangeScope;
-    const { enhancedLikedSongs, topItems } = profileData;
-    const timeRanges = ['short_term', 'medium_term', 'long_term'];
-
-    let profileSourceSongs = enhancedLikedSongs;
-    let multipliers;
-    let recencyDecayFactor;
-
-    switch (timeRangeScope) {
-        case 'recent':
-            const sixMonthsAgo = new Date();
-            sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
-            profileSourceSongs = enhancedLikedSongs.filter(song => new Date(song.addedAt) > sixMonthsAgo);
-            multipliers = { short_term: 4.0, medium_term: 1.0, long_term: 0.5 };
-            recencyDecayFactor = 110;
-            break;
-        case 'all_time':
-            multipliers = { short_term: 0.5, medium_term: 1.5, long_term: 3.5 };
-            recencyDecayFactor = 10000;
-            break;
-        case 'energy':
-            profileSourceSongs = enhancedLikedSongs.filter(song => 
-                song.audio_features && song.audio_features.energy > 0.6 && song.audio_features.danceability > 0.5
-            );
-            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
-            recencyDecayFactor = 500;
-            break;
-        case 'mellow':
-            profileSourceSongs = enhancedLikedSongs.filter(song => 
-                song.audio_features && song.audio_features.energy < 0.4 && song.audio_features.acousticness > 0.5
-            );
-            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
-            recencyDecayFactor = 500;
-            break;
-        case 'balanced':
-        default:
-            multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
-            recencyDecayFactor = 600;
-            break;
-    }
-
-    if (profileSourceSongs.length < 25) {
-        console.warn(`[Sort-Play] Not enough songs for a '${timeRangeScope}' profile (${profileSourceSongs.length} found). Falling back to 'Balanced'.`);
-        Spicetify.showNotification(`Not enough data for ${timeRangeScope} profile, using Balanced instead.`);
-        profileSourceSongs = enhancedLikedSongs;
-        multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
-        recencyDecayFactor = 600;
-        finalTimeScope = 'balanced';
-    }
-
-    const topTrackPositions = { short_term: new Map(), medium_term: new Map(), long_term: new Map() };
-    for (const range of timeRanges) {
-        topItems[range].tracks.forEach((track, index) => {
-            topTrackPositions[range].set(track.uri, index);
-        });
-    }
-
-    const weightedSongs = profileSourceSongs.map(song => {
-        let weight = 1.0;
-
-        for (const range of timeRanges) {
-            const position = topTrackPositions[range].get(song.uri);
-            if (position !== undefined) { 
-                const baseMultiplier = multipliers[range];
-                if (baseMultiplier === 0) continue;
-
-                let positionalMultiplier = 0;
-
-                switch (range) {
-                    case 'long_term':
-                        if (position < 25) positionalMultiplier = 1.0;
-                        else if (position < 50) positionalMultiplier = 0.95;
-                        else if (position < 100) positionalMultiplier = 0.85;
-                        else if (position < 200) positionalMultiplier = 0.70;
-                        else if (position < 300) positionalMultiplier = 0.55;
-                        else if (position < 400) positionalMultiplier = 0.40;
-                        else positionalMultiplier = 0.25;
-                        break;
-
-                    case 'medium_term':
-                        if (position < 25) positionalMultiplier = 1.0;
-                        else if (position < 50) positionalMultiplier = 0.85;
-                        else if (position < 100) positionalMultiplier = 0.68;
-                        else if (position < 200) positionalMultiplier = 0.45;
-                        else positionalMultiplier = 0.20;
-                        break;
-                        
-                    case 'short_term':
-                        if (position < 25) positionalMultiplier = 1.0;
-                        else if (position < 50) positionalMultiplier = 0.85;
-                        else if (position < 100) positionalMultiplier = 0.50;
-                        else positionalMultiplier = 0.15;
-                        break;
-                }
-
-                weight += baseMultiplier * positionalMultiplier;
-            }
-        }
-        
-        let days_since_added = (new Date() - new Date(song.addedAt)) / (1000 * 60 * 60 * 24);
-        
-        if (isNaN(days_since_added)) {
-            days_since_added = 365 * 5; 
-        }
-
-        const date_weight = Math.exp(-days_since_added / recencyDecayFactor);
-        const final_weight = weight * date_weight;
-        
-        return { ...song, final_weight };
-    });
-
-    const sonicProfile = {
-        energy: Array(10).fill(0), danceability: Array(10).fill(0), valence: Array(10).fill(0),
-        acousticness: Array(10).fill(0), instrumentalness: Array(10).fill(0), speechiness: Array(10).fill(0),
-        tempo: Array(10).fill(0)
+  function calculateAdaptiveWeights(playlistCharacteristics) {
+    const { genreDiversity, artistDiversity, playlistSize } = playlistCharacteristics;
+    
+    let weights = {
+        sonic: 0.60,
+        genre: 0.15,
+        artist: 0.20,
+        harmonic: 0.05
     };
-    const genreProfile = {};
-    const artistProfile = {};
-    const min_tempo = 50, max_tempo = 200;
+    
+    if (genreDiversity < 0.3) {
+        weights.sonic += 0.15;
+        weights.genre -= 0.10;
+    } else if (genreDiversity > 0.7) {
+        weights.genre += 0.10;
+        weights.sonic -= 0.05;
+    }
+    
+    if (artistDiversity < 0.2) {
+        weights.artist = 0.05;
+        weights.sonic += 0.10;
+    }
+    
+    if (playlistSize < 30) {
+        weights.sonic -= 0.05;
+        weights.artist += 0.05;
+    }
+    
+    const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
+    for (let key in weights) {
+        weights[key] /= totalWeight;
+    }
+    
+    return weights;
+  }
 
-    weightedSongs.forEach(song => {
-        if (song.audio_features) {
-            const features = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
-            features.forEach(feature => {
-                const value = song.audio_features[feature];
-                if (typeof value === 'number') {
-                    const bin = Math.min(9, Math.floor(value * 10));
-                    sonicProfile[feature][bin] += song.final_weight;
-                }
-            });
-            if (typeof song.audio_features.tempo === 'number') {
-                const normalized_tempo = (song.audio_features.tempo - min_tempo) / (max_tempo - min_tempo);
-                const tempo_bin = Math.min(9, Math.max(0, Math.floor(normalized_tempo * 10)));
-                sonicProfile.tempo[tempo_bin] += song.final_weight;
+  function detectAndScoreTrackVersion(track, userGenreProfile) {
+    const trackName = track.name?.toLowerCase() || '';
+    const albumName = track.album?.name?.toLowerCase() || '';
+    
+    const versionPatterns = {
+        remix: { patterns: [/remix/i, /rmx/i, /rework/i, /bootleg/i, /edit/i], penalty: 0.7, exceptions: ['electronic', 'dance', 'house', 'techno', 'edm'] },
+        live: { patterns: [/\blive\b/i, /concert/i, /acoustic/i, /unplugged/i], penalty: 0.5, exceptions: [] },
+        cover: { patterns: [/cover/i, /tribute/i], penalty: 0.6, exceptions: [] },
+        radio: { patterns: [/radio edit/i, /radio mix/i, /single version/i], penalty: 0.95, exceptions: [] },
+        instrumental: { patterns: [/instrumental/i, /karaoke/i], penalty: 0.4, exceptions: ['ambient', 'classical', 'soundtrack'] }
+    };
+    
+    let versionMultiplier = 1.0;
+    
+    for (const [versionType, config] of Object.entries(versionPatterns)) {
+        const isMatch = config.patterns.some(pattern => pattern.test(trackName) || pattern.test(albumName));
+        
+        if (isMatch) {
+            const userGenres = Object.keys(userGenreProfile || {});
+            const hasException = config.exceptions.some(exception => userGenres.some(genre => genre.includes(exception)));
+            
+            if (!hasException) {
+                versionMultiplier = config.penalty;
             }
+            break;
         }
+    }
+    return versionMultiplier;
+  }
 
-        if (song.artist_genres) {
-            song.artist_genres.forEach(genre => {
-                genreProfile[genre] = (genreProfile[genre] || 0) + song.final_weight;
-            });
-        }
-
-        if (song.artistUris) {
-            song.artistUris.forEach(artistUri => {
-                const artistId = artistUri.split(':')[2];
-                artistProfile[artistId] = (artistProfile[artistId] || 0) + song.final_weight;
-            });
-        }
+  function buildArtistTierSystem(profileData) {
+    const { enhancedLikedSongs, topItems } = profileData;
+    const artistStats = new Map();
+    
+    enhancedLikedSongs.forEach(song => {
+        (song.artistUris || []).forEach(artistUri => {
+            const artistId = artistUri.split(':')[2];
+            if (!artistStats.has(artistId)) {
+                artistStats.set(artistId, { likedSongCount: 0, topPositions: new Set(), timeRanges: new Set() });
+            }
+            const stats = artistStats.get(artistId);
+            stats.likedSongCount++;
+        });
     });
-
-    const peakSonicProfile = {};
-    for (const feature in sonicProfile) {
-        peakSonicProfile[feature] = findPeaks(sonicProfile[feature]);
-    }
-
-    const affinityProfile = { rawSonicProfile: sonicProfile, peakSonicProfile, genreProfile, artistProfile };
-    return { affinityProfile, finalTimeScope };
+    
+    ['short_term', 'medium_term', 'long_term'].forEach(range => {
+        topItems[range].artists.forEach((artist, position) => {
+            const artistId = artist.id;
+            if (!artistStats.has(artistId)) {
+                artistStats.set(artistId, { likedSongCount: 0, topPositions: new Set(), timeRanges: new Set() });
+            }
+            const stats = artistStats.get(artistId);
+            stats.topPositions.add(position);
+            stats.timeRanges.add(range);
+        });
+    });
+    
+    const artistTiers = new Map();
+    artistStats.forEach((stats, artistId) => {
+        let tierScore = 0;
+        tierScore += Math.min(30, stats.likedSongCount * 2);
+        stats.topPositions.forEach(pos => {
+            if (pos < 10) tierScore += 15;
+            else if (pos < 50) tierScore += 5;
+        });
+        tierScore += stats.timeRanges.size * 10;
+        
+        let tier;
+        if (tierScore >= 80) tier = 'S';
+        else if (tierScore >= 60) tier = 'A';
+        else if (tierScore >= 40) tier = 'B';
+        else if (tierScore >= 20) tier = 'C';
+        else tier = 'D';
+        
+        artistTiers.set(artistId, tier);
+    });
+    
+    return artistTiers;
   }
 
-  function getPeakScore(value, peaks, rawProfile) {
-    if (!peaks || peaks.length === 0) return 0;
-
-    const bin = Math.min(9, Math.floor(value * 10));
-
-    for (const peak of peaks) {
-        if (bin >= peak.start && bin <= peak.end) {
-            return rawProfile[bin] / peak.maxBinValue;
-        }
-    }
-
-    return 0;
+  function getArtistTierMultiplier(tier) {
+    const multipliers = { 'S': 2.5, 'A': 1.8, 'B': 1.3, 'C': 1.0, 'D': 0.8 };
+    return multipliers[tier] || 1.0;
   }
 
-  function getContinuousSimilarityBoost(featuresA, featuresB) {
-    if (!featuresA || !featuresB) return 0.0;
+  function aggregateScores(scores) {
+    if (scores.length === 0) return 0;
+    const rms = Math.sqrt(scores.reduce((sum, s) => sum + s * s, 0) / scores.length);
+    const consistency = 1 - calculateStandardDeviation(scores);
+    return rms * (0.9 + 0.1 * consistency);
+  }
 
-    const MIN_BOOST = 4.0;
-    const MAX_BOOST = 25.0;
+  function getFeatureImportance(feature) {
+    const importanceMap = {
+      energy: 1.0,
+      danceability: 0.9,
+      valence: 0.85,
+      acousticness: 0.7,
+      instrumentalness: 0.6,
+      speechiness: 0.5,
+      tempo: 0.8
+    };
+    return importanceMap[feature] || 0.5;
+  }
+
+  function getHarmonicResonanceScore(features) {
+    let resonanceScore = 0;
+    const harmonicPairs = [
+      ['energy', 'danceability'],
+      ['valence', 'energy'],
+      ['acousticness', 'instrumentalness']
+    ];
+    
+    for (const [feat1, feat2] of harmonicPairs) {
+      if (!(feat1 in features) || !(feat2 in features)) continue;
+      
+      const val1 = features[feat1];
+      const val2 = features[feat2];
+      const ratio = Math.max(val1, val2) / (Math.min(val1, val2) + 0.01);
+      
+      const goldenRatio = 1.618;
+      const goldenDistance = Math.abs(ratio - goldenRatio);
+      if (goldenDistance < 0.2) {
+        resonanceScore += 0.3 * (1 - goldenDistance / 0.2);
+      }
+      
+      const octaveDistance = Math.abs(ratio - Math.round(ratio));
+      if (octaveDistance < 0.1 && ratio > 1.5 && ratio < 4.5) {
+        resonanceScore += 0.2 * (1 - octaveDistance / 0.1);
+      }
+    }
+    return Math.min(1, resonanceScore);
+  }
+
+  function getContinuousSimilarityBoost(featuresA, likedSong) {
+    if (!featuresA || !likedSong || !likedSong.audio_features) return 0.0;
+
+    const featuresB = likedSong.audio_features;
+    const likedSongWeight = likedSong.final_weight || 1.0;
+
+    const MAX_BOOST = 10.0;
+    const MIN_BOOST = 2.0;
     const MAX_ALLOWED_TEMPO_DIFF = 5.0;
     const MAX_ALLOWED_OTHER_DIFF = 0.10;
 
@@ -14635,6 +15011,7 @@ function isDirectSortType(sortType) {
 
     const otherFeatures = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
     for (const feature of otherFeatures) {
+        if (featuresA[feature] === undefined || featuresB[feature] === undefined) continue;
         const diff = Math.abs(featuresA[feature] - featuresB[feature]);
         if (diff > MAX_ALLOWED_OTHER_DIFF) {
             return 0.0;
@@ -14647,53 +15024,27 @@ function isDirectSortType(sortType) {
     if (totalWeight === 0) return 0.0;
     const averageSimilarity = totalWeightedScore / totalWeight;
 
-    const boost = MIN_BOOST + (MAX_BOOST - MIN_BOOST) * averageSimilarity;
+    const baseBoost = MIN_BOOST + (MAX_BOOST - MIN_BOOST) * averageSimilarity;
     
-    return boost;
+    const weightMultiplier = Math.max(0.5, Math.min(2.0, likedSongWeight / 1.5));
+
+    return baseBoost * weightMultiplier;
   }
 
 
-  async function scoreAndSortPlaylist(targetTracks, affinityProfile, profileData, updateProgress, timeRangeScope = 'balanced', preFetchedAudioFeatures) {
+  async function scoreAndSortPlaylist(targetTracks, affinityProfile, profileData, updateProgress, timeRangeScope = 'balanced', preFetchedAudioFeatures, completeLikedSongUrisSet) {
     updateProgress("Ranking...");
-    const { rawSonicProfile, peakSonicProfile, genreProfile, artistProfile } = affinityProfile;
+    const { gmmSonicProfile, genreProfile, artistProfile, weightedSongs } = affinityProfile;
 
-    const POPULARITY_WEIGHT = 2.0; 
+    const POPULARITY_WEIGHT = 3.0;
+    const CONTEXT_BONUS_WEIGHT = 10.0;
 
     const getArtistUris = (track) => track.artistUris || (Array.isArray(track.artists) ? track.artists.map(a => a.uri) : []);
-
-    const artistCounts = new Map();
-    targetTracks.forEach(track => {
-        const artistUris = getArtistUris(track);
-        artistUris.forEach(uri => {
-            const artistId = uri.split(':')[2];
-            artistCounts.set(artistId, (artistCounts.get(artistId) || 0) + 1);
-        });
-    });
-
-    const maxArtistCount = artistCounts.size > 0 ? Math.max(...artistCounts.values()) : 0;
-    
-    let sonicWeight, genreWeight, artistWeight;
-    if (maxArtistCount > 10) {
-        console.log("Sort-Play: High artist concentration detected. Applying sonic-focused weights.");
-        sonicWeight = 0.85;
-        genreWeight = 0.0;
-        artistWeight = 0.15;
-    } else {
-        console.log("Sort-Play: Normal artist diversity. Applying balanced weights.");
-        sonicWeight = 0.70;
-        genreWeight = 0.1;
-        artistWeight = 0.20;
-    }
 
     const targetTrackIds = targetTracks.map(t => t.uri.split(':')[2]);
     const artistCache = new Map();
     const popularityMap = new Map();
-
-    for (let i = 0; i < targetTrackIds.length; i += 50) {
-        const batch = targetTrackIds.slice(i, i + 50);
-        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-        (response.tracks || []).forEach(track => track && popularityMap.set(track.id, track.popularity));
-    }
+    const releaseDateMap = new Map();
 
     const targetArtistIds = [...new Set(targetTracks.flatMap(t => getArtistUris(t).map(uri => uri.split(':')[2])))];
     for (let i = 0; i < targetArtistIds.length; i += 50) {
@@ -14701,21 +15052,51 @@ function isDirectSortType(sortType) {
         const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
         (response.artists || []).forEach(artist => artist && artistCache.set(artist.id, artist.genres));
     }
-    
-    const releaseDateMap = new Map();
+
     for (let i = 0; i < targetTrackIds.length; i += 50) {
-        const batch = targetTrackIds.slice(i, i+50);
+        const batch = targetTrackIds.slice(i, i + 50);
         const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
         (response.tracks || []).forEach(track => {
-            if (track && track.album && track.album.release_date) {
-                releaseDateMap.set(track.id, track.album.release_date);
+            if (track) {
+                popularityMap.set(track.id, track.popularity);
+                if (track.album && track.album.release_date) {
+                    releaseDateMap.set(track.id, track.album.release_date);
+                }
             }
         });
     }
 
-    const likedSongsFeatures = profileData.enhancedLikedSongs
-        .map(song => song.audio_features)
-        .filter(features => features);
+    let playlistContext = {
+        avgEnergy: 0.5,
+        avgValence: 0.5,
+        avgDanceability: 0.5,
+        avgAcousticness: 0.5,
+    };
+    let featureCount = 0;
+    let totalEnergy = 0, totalValence = 0, totalDanceability = 0, totalAcousticness = 0;
+    
+    targetTracks.forEach(track => {
+        const features = preFetchedAudioFeatures.get(track.uri.split(':')[2]);
+        if (features) {
+            totalEnergy += features.energy;
+            totalValence += features.valence;
+            totalDanceability += features.danceability;
+            totalAcousticness += features.acousticness;
+            featureCount++;
+        }
+    });
+    
+    if (featureCount > 0) {
+        playlistContext.avgEnergy = totalEnergy / featureCount;
+        playlistContext.avgValence = totalValence / featureCount;
+        playlistContext.avgDanceability = totalDanceability / featureCount;
+        playlistContext.avgAcousticness = totalAcousticness / featureCount;
+    }
+
+    const playlistCharacteristics = analyzePlaylistCharacteristics(targetTracks, preFetchedAudioFeatures, artistCache);
+    const weights = calculateAdaptiveWeights(playlistCharacteristics);
+    const { artistTiers } = profileData;
+    const likedSongsUris = completeLikedSongUrisSet;
 
     const scoredTracks = targetTracks.map(track => {
         const trackId = track.uri.split(':')[2];
@@ -14724,60 +15105,86 @@ function isDirectSortType(sortType) {
         const artist_genres = artistUris.flatMap(uri => artistCache.get(uri.split(':')[2]) || []);
         const popularity = popularityMap.get(trackId) || 0;
 
-        let sonicScoreSum = 0;
-        let genreScore = 0;
-        let artistScore = 0;
-        let featureCount = 0;
+        let rawSonicScore = 0;
+        let harmonicScore = 0;
 
         if (audio_features) {
-            const features = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
-            features.forEach(feature => {
+            const sonicScores = [];
+            const featureKeys = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
+            
+            featureKeys.forEach(feature => {
+                const gmm = gmmSonicProfile[feature];
                 const value = audio_features[feature];
-                if (typeof value === 'number' && peakSonicProfile[feature].length > 0) {
-                    sonicScoreSum += getPeakScore(value, peakSonicProfile[feature], rawSonicProfile[feature]);
-                    featureCount++;
+                if (gmm && typeof value === 'number') {
+                    const score = getGMMScore(value, gmm);
+                    sonicScores.push(score * getFeatureImportance(feature));
                 }
             });
 
             const min_tempo = 50, max_tempo = 200;
-            if (typeof audio_features.tempo === 'number' && peakSonicProfile.tempo.length > 0) {
+            const tempoGMM = gmmSonicProfile.tempo;
+            if (tempoGMM && typeof audio_features.tempo === 'number') {
                 const normalized_tempo = (audio_features.tempo - min_tempo) / (max_tempo - min_tempo);
-                sonicScoreSum += getPeakScore(normalized_tempo, peakSonicProfile.tempo, rawSonicProfile.tempo);
-                featureCount++;
+                const score = getGMMScore(Math.max(0, Math.min(1, normalized_tempo)), tempoGMM);
+                sonicScores.push(score * getFeatureImportance('tempo'));
             }
+            
+            rawSonicScore = aggregateScores(sonicScores) * 100;
+            harmonicScore = getHarmonicResonanceScore(audio_features);
         }
 
-        const rawSonicScore = featureCount > 0 ? (sonicScoreSum / featureCount) * 100 : 0;
+        let contextBonus = 0;
+        if (audio_features) {
+            const energyDiff = Math.abs(audio_features.energy - playlistContext.avgEnergy);
+            const valenceDiff = Math.abs(audio_features.valence - playlistContext.avgValence);
+            const danceabilityDiff = Math.abs(audio_features.danceability - playlistContext.avgDanceability);
+            const acousticnessDiff = Math.abs(audio_features.acousticness - playlistContext.avgAcousticness);
+            
+            const avgSimilarity = 1 - ((energyDiff + valenceDiff + danceabilityDiff + acousticnessDiff) / 4);
+            contextBonus = avgSimilarity * CONTEXT_BONUS_WEIGHT;
+        }
 
+        let genreScore = 0;
         artist_genres.forEach(genre => {
             genreScore += (genreProfile[genre] || 0);
         });
 
+        let artistScore = 0;
+        let tierMultiplier = 1.0;
         artistUris.forEach(uri => {
             const artistId = uri.split(':')[2];
             artistScore += (artistProfile[artistId] || 0);
+            const tier = artistTiers.get(artistId);
+            if (tier) {
+                tierMultiplier = Math.max(tierMultiplier, getArtistTierMultiplier(tier));
+            }
         });
-
-
+        artistScore *= tierMultiplier;
 
         let similarityBoost = 0.0;
-        const MAX_BOOST = 25.0;
-
         if (audio_features) {
-            for (const likedFeatures of likedSongsFeatures) {
-                const currentBoost = getContinuousSimilarityBoost(audio_features, likedFeatures);
-                
+            for (const likedSong of weightedSongs) {
+                const currentBoost = getContinuousSimilarityBoost(audio_features, likedSong);
                 if (currentBoost > similarityBoost) {
                     similarityBoost = currentBoost;
                 }
-
-                if (similarityBoost >= MAX_BOOST) {
+                if (similarityBoost >= 10.0) {
                     break;
                 }
             }
         }
+        
+        let affinityScore = (rawSonicScore * weights.sonic) + 
+                            (genreScore * weights.genre) + 
+                            (artistScore * weights.artist) +
+                            (harmonicScore * 100 * weights.harmonic);
 
-        let affinityScore = (rawSonicScore * sonicWeight) + (genreScore * genreWeight) + (artistScore * artistWeight);
+        const versionMultiplier = detectAndScoreTrackVersion(track, affinityProfile.genreProfile);
+        affinityScore *= versionMultiplier;
+
+        if (likedSongsUris.has(track.uri)) {
+            affinityScore += 30;
+        }
 
         let popularityBonus = 0;
         if (popularity > 40) {
@@ -14785,7 +15192,7 @@ function isDirectSortType(sortType) {
             popularityBonus = POPULARITY_WEIGHT * popularity_factor;
         }
         
-        let finalScore = affinityScore + popularityBonus + similarityBoost;
+        let finalScore = affinityScore + popularityBonus + similarityBoost + contextBonus;
 
         const releaseDateStr = releaseDateMap.get(trackId);
         if (releaseDateStr) {
@@ -14827,7 +15234,6 @@ function isDirectSortType(sortType) {
     return finalTracks;
   }
 
-
   async function getAudioFeaturesForTracks(trackIds) {
     if (!trackIds || trackIds.length === 0) return [];
     const allAudioFeatures = [];
@@ -14843,40 +15249,6 @@ function isDirectSortType(sortType) {
         }
     }
     return allAudioFeatures;
-  }
-
-  async function buildAdvancedTasteProfile(songsToProfile) {
-    if (!songsToProfile || songsToProfile.length === 0) return null;
-
-    const tasteProfileTrackIds = songsToProfile.map(t => t.uri.split(':')[2]);
-    const audioFeatures = await getAudioFeaturesForTracks(tasteProfileTrackIds);
-    if (audioFeatures.length === 0) return null;
-
-    const sonicProfile = {
-        energy: Array(10).fill(0),
-        danceability: Array(10).fill(0),
-        valence: Array(10).fill(0),
-    };
-
-    audioFeatures.forEach(features => {
-        if (!features) return;
-        const featuresToBin = ['energy', 'danceability', 'valence'];
-        featuresToBin.forEach(feature => {
-            const value = features[feature];
-            if (typeof value === 'number') {
-                const bin = Math.min(9, Math.floor(value * 10));
-                sonicProfile[feature][bin] += 1; 
-            }
-        });
-    });
-
-    const peakSonicProfile = {
-        energy: findPeaks(sonicProfile.energy),
-        danceability: findPeaks(sonicProfile.danceability),
-        valence: findPeaks(sonicProfile.valence),
-    };
-    
-    return peakSonicProfile;
   }
 
   async function getAllFollowedArtists() {
@@ -14982,14 +15354,18 @@ function isDirectSortType(sortType) {
             const seed_tracks = chosenSeedTracks.map(t => t.id);
             
             mainButton.innerText = "Profiling..."; 
-            const tasteProfile = await buildAdvancedTasteProfile(shuffleArray(profileData.enhancedLikedSongs).slice(0, 200));
-            if (tasteProfile) {
+            
+            const { affinityProfile: tasteProfile } = buildAffinityProfile(profileData, updateProgress, 'balanced');
+
+            if (tasteProfile && tasteProfile.gmmSonicProfile) {
                 const featuresToTarget = ['energy', 'danceability', 'valence'];
                 for (const feature of featuresToTarget) {
-                    if (tasteProfile[feature].length > 0) {
-                        const randomPeak = tasteProfile[feature][Math.floor(Math.random() * tasteProfile[feature].length)];
-                        const targetValue = (randomPeak.start + randomPeak.end) / 2 / 10;
-                        targetFeatures[`target_${feature}`] = targetValue;
+                    const gmm = tasteProfile.gmmSonicProfile[feature];
+                    if (gmm && gmm.fitted) {
+                        const dominantComponent = gmm.getDominantComponents()[0];
+                        if (dominantComponent) {
+                            targetFeatures[`target_${feature}`] = dominantComponent.mean;
+                        }
                     }
                 }
             }
@@ -15022,7 +15398,6 @@ function isDirectSortType(sortType) {
                 if (hasCommonArtist) {
                     return false; 
                 }
-
                 return true;
             }).filter(track => track.artists.every(artist => !knownArtistIds.has(artist.id)));
             
@@ -15054,20 +15429,17 @@ function isDirectSortType(sortType) {
         let time_range = 'medium_term';
         let contrast_time_range = 'long_term';
         let top_pool_size = 100;
-        let songsToProfile = [];
 
         if (vibeType === 'recommendRecentVibe') {
             playlistName = "Discovery: Recent Taste";
             time_range = 'short_term';
             contrast_time_range = 'long_term';
             if (profileData.enhancedLikedSongs.length < 20) throw new Error("Not enough liked songs for a recent profile.");
-            songsToProfile = profileData.enhancedLikedSongs.slice(0, 100);
         } else if (vibeType === 'recommendAllTime') {
             playlistName = "Discovery: All-Time Taste";
             time_range = 'long_term';
             contrast_time_range = 'short_term';
             if (profileData.enhancedLikedSongs.length < 50) throw new Error("Not enough liked songs for an all-time profile.");
-            songsToProfile = shuffleArray(profileData.enhancedLikedSongs).slice(0, 200);
         }
 
         mainButton.innerText = "Get top...";
@@ -15124,14 +15496,21 @@ function isDirectSortType(sortType) {
         const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
 
         mainButton.innerText = "Profiling...";
-        const tasteProfile = await buildAdvancedTasteProfile(songsToProfile);
-        if (tasteProfile) {
+        
+        let timeScope = 'balanced';
+        if (vibeType === 'recommendRecentVibe') timeScope = 'recent';
+        if (vibeType === 'recommendAllTime') timeScope = 'all_time';
+        const { affinityProfile: tasteProfile } = buildAffinityProfile(profileData, updateProgress, timeScope);
+
+        if (tasteProfile && tasteProfile.gmmSonicProfile) {
             const featuresToTarget = ['energy', 'danceability', 'valence'];
             for (const feature of featuresToTarget) {
-                if (tasteProfile[feature].length > 0) {
-                    const randomPeak = tasteProfile[feature][Math.floor(Math.random() * tasteProfile[feature].length)];
-                    const targetValue = (randomPeak.start + randomPeak.end) / 2 / 10;
-                    targetFeatures[`target_${feature}`] = targetValue;
+                const gmm = tasteProfile.gmmSonicProfile[feature];
+                if (gmm && gmm.fitted) {
+                    const dominantComponent = gmm.getDominantComponents()[0];
+                    if (dominantComponent) {
+                        targetFeatures[`target_${feature}`] = dominantComponent.mean;
+                    }
                 }
             }
         }
@@ -15225,7 +15604,6 @@ function isDirectSortType(sortType) {
             if (hasCommonArtist) {
                 return false;
             }
-
             return true;
         });
 
@@ -16952,7 +17330,7 @@ function isDirectSortType(sortType) {
             }
             const { affinityProfile, finalTimeScope } = buildAffinityProfile(profileData, updateProgress, timeScope);
             
-            sortedTracks = await scoreAndSortPlaylist(tracks, affinityProfile, profileData, updateProgress, finalTimeScope, audioFeaturesMap);
+            sortedTracks = await scoreAndSortPlaylist(tracks, affinityProfile, profileData, updateProgress, finalTimeScope, audioFeaturesMap, profileData.completeLikedSongUrisSet);
             
             if (sortType === 'affinityHiddenGems') {
                 if (sortedTracks.length > 0) {
