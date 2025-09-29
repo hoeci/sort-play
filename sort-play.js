@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.10.2";
+  const SORT_PLAY_VERSION = "5.10.3";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -19539,7 +19539,7 @@ function isDirectSortType(sortType) {
                     clearTimeout(tooltipTimeoutRef.current);
                     setIsTooltipVisible(false);
                 },
-                style: { marginRight: "12px", opacity: (isLiked || hasISRCLiked) ? "1" : undefined }
+                style: { marginRight: "12px" }
             }, Spicetify.React.createElement("span", {
                 className: "Wrapper-sm-only Wrapper-small-only",
                 style: {
