@@ -5,7 +5,6 @@
 ## ⚡️ Features
 + **Comprehensive Sorting:** Sort playlists, albums and artist pages by play count, popularity, release date, album color, Last.fm scrobbles, Last Scrobbled, tempo, energy, danceability, valence, acousticness, and instrumentalness.
 + **Full Artist Discography:** Load an artist's complete collection, including singles, albums, and compilations, for sorting.
-+ **Personalized Sorting:** Sort playlists based on your unique listening habits with profiles like 'Recent Vibe', 'All-Time Favorites', 'Power Hour', 'Mellow Mood', and 'Hidden Gems'.
 + **Dynamic Playlists:** Create self-updating playlists from any combination of sources (playlists, artists, albums) that automatically stay updated and sorted on a custom schedule.
 + **Playlist Creation:** Generate specialized playlists like 'New Releases from Followed Artists', 'Discovery Mixes', and your 'Top Tracks' for different time periods.
 + **Extra Data Columns:** Add an extra column to playlists, albums, and artist pages (Play Count, Release Date, Scrobbles, DJ Info, Key, BPM, and more).
