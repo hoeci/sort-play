@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.11.0";
+  const SORT_PLAY_VERSION = "5.12.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -32,7 +32,6 @@
   let includeSongStats = true;
   let includeLyrics = false;
   let matchAllGenres  = false;
-  let includeaudiofeatures = false;
   let addToQueueEnabled = false; 
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
@@ -225,10 +224,6 @@
     "\\(Color\\)",
     "\\(Genre Filter\\)",
     "\\(Custom Filter\\)",
-    "\\(Personalized\\)",
-    "\\(Power Hour\\)",
-    "\\(Mellow Mood\\)",
-    "\\(Hidden Gems\\)",
     "\\(Dynamic\\)",
     "\\(Tempo\\)",
     "\\(Energy\\)",
@@ -243,8 +238,6 @@
     'topLast6Months': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-6.png',
     'topAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-all.png',
     'followedReleasesChronological': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/new-followed-full.png',
-    'followedArtistPicks': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/new-followed-pick.png',
-    'newDiscoveryPicks': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/new-picks.png',
     'recommendRecentVibe': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-recent.png',
     'recommendAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-all.png',
     'pureDiscovery': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-pure.png',
@@ -256,9 +249,7 @@
     {
         title: 'New Releases',
         cards: [
-            { id: 'followedArtistPicks', name: 'Followed Artist Picks', description: 'Personalized picks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedArtistPicks },
             { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological },
-            { id: 'newDiscoveryPicks', name: 'New Music Picks', description: 'A personalized mix of new music from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.newDiscoveryPicks },
         ]
     },
     {
@@ -338,7 +329,6 @@
     selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.5-flash";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
-    includeaudiofeatures = localStorage.getItem("sort-play-include-audio-features") === "true";
     const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
     addToQueueEnabled = addToQueueStored === null ? false : addToQueueStored === "true";
     createPlaylistAfterSort = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST) !== "false";
@@ -387,7 +377,6 @@
     localStorage.setItem("sort-play-ai-model", selectedAiModel);
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2, userSystemInstruction);
     localStorage.setItem("sort-play-match-all-genres", matchAllGenres);
-    localStorage.setItem("sort-play-include-audio-features", includeaudiofeatures);
     localStorage.setItem(STORAGE_KEY_ADD_TO_QUEUE, addToQueueEnabled);
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST, createPlaylistAfterSort);
     localStorage.setItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST, sortCurrentPlaylistEnabled);
@@ -1778,22 +1767,6 @@
             </select>
         </div>
     </div>
-
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Custom Filter
-    </div>
-    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="includeAudioFeatures">
-        <label class="col description">Include Audio Features</label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" ${includeaudiofeatures ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
-    </div>
     `;
 
     Spicetify.PopupModal.display({
@@ -1878,7 +1851,6 @@
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
-    const includeAudioFeaturesToggle = modalContainer.querySelector("#includeAudioFeatures input");
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
@@ -2394,10 +2366,6 @@
         showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
         saveSettings();
     });
-    includeAudioFeaturesToggle.addEventListener("change", () => {
-        includeaudiofeatures = includeAudioFeaturesToggle.checked;
-        saveSettings();
-    });
   }
 
   function showPlaylistBehaviorModal() {
@@ -2423,8 +2391,6 @@
 
     const playlistTypes = [
         { key: 'newReleases', title: 'New Releases' },
-        { key: 'followedArtistPicks', name: 'Followed Artist Picks' },
-        { key: 'newDiscoveryPicks', name: 'New Music Picks' },
         { key: 'followedReleasesChronological', name: 'Followed Artist (Full)' },
         { key: 'discovery', title: 'Discovery' },
         { key: 'recommendRecentVibe', name: 'Recent Based' },
@@ -3129,60 +3095,70 @@
     }
 
     const currentTrackUri = PlayerAPI._state?.item?.uri;
+    let tracksToPlay = [...tracks];
 
-    const filteredTracks = currentTrackUri ? tracks.filter(t => t.uri !== currentTrackUri) : tracks;
+    if (source === 'shuffle') {
+        if (currentTrackUri && tracksToPlay.length > 1 && tracksToPlay[0].uri === currentTrackUri) {
+            const currentTrack = tracksToPlay.shift();
+            tracksToPlay.push(currentTrack);
+        }
+    } else {
+        if (currentTrackUri) {
+            tracksToPlay = tracksToPlay.filter(t => t.uri !== currentTrackUri);
+        }
+    }
 
-    if (!filteredTracks || !filteredTracks.length) {
-        Spicetify.showNotification("No tracks to add to the queue after filtering the current song.", false, 3000);
+    if (!tracksToPlay || !tracksToPlay.length) {
+        Spicetify.showNotification("No tracks to add to the queue.", false, 3000);
         return;
     }
 
-    const trackUris = filteredTracks.map(t => t.uri);
-    trackUris.push("spotify:delimiter");
-
-    const { _queue, _client } = PlayerAPI._queue;
-    const { queueRevision } = _queue; 
-
-    const nextTracks = trackUris.map((uri) => ({
-        contextTrack: {
-            uri,
-            uid: "",
-            metadata: {
-                is_queued: "false",
-            },
-        },
-        removed: [],
-        blocked: [],
-        provider: "context",
-    }));
-
     try {
-        await _client.setQueue({
-            nextTracks,
-            prevTracks: [],
-            queueRevision,
-        });
+        const expectedNextUri = tracksToPlay[0]?.uri;
+        const trackUris = tracksToPlay.map(t => t.uri);
+        trackUris.push("spotify:delimiter");
 
-        if (contextUri && PlayerAPI._state?.sessionId) {
-            await PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri });
+        const { _queue, _client } = PlayerAPI._queue;
+        const { queueRevision } = _queue;
+
+        const nextTracks = trackUris.map((uri) => ({
+            contextTrack: { uri, uid: "", metadata: { is_queued: "false" } },
+            removed: [], blocked: [], provider: "context",
+        }));
+
+        const setQueuePromise = _client.setQueue({ nextTracks, prevTracks: [], queueRevision });
+        const updateContextPromise = (contextUri && PlayerAPI._state?.sessionId)
+            ? PlayerAPI.updateContext(PlayerAPI._state.sessionId, { uri: contextUri, url: "context://" + contextUri })
+            : Promise.resolve();
+
+        await Promise.all([setQueuePromise, updateContextPromise]);
+
+        const waitForQueueUpdate = async (expectedUri, timeout = 15000) => {
+            const startTime = Date.now();
+            while (Date.now() - startTime < timeout) {
+                const currentFirstTrack = PlayerAPI._queue?._queue?.nextTracks?.[0];
+                if (currentFirstTrack?.contextTrack?.uri === expectedUri) return true;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return false;
+        };
+
+        const queueUpdated = await waitForQueueUpdate(expectedNextUri);
+        if (!queueUpdated) {
+            console.warn("[Sort-Play] Timed out waiting for queue to update. Playback may not start automatically.");
         }
 
         Spicetify.Player.next();
 
-        let message;
-        const count = filteredTracks.length;
+        const count = tracksToPlay.length;
         const trackWord = count === 1 ? 'track' : 'tracks';
-
-        if (source === 'shuffle') {
-            message = `Shuffled ${count} ${trackWord} and added to queue.`;
-        } else {
-            message = `Sorted tracks added to queue.`;
-        }
-        
+        const message = source === 'shuffle' 
+            ? `Shuffled ${count} ${trackWord} and added to queue.`
+            : `Sorted tracks added to queue.`;
         Spicetify.showNotification(message, false, 3000);
 
     } catch (error) {
-        console.error("Error setting fresh queue:", error);
+        console.error("Error setting queue with internal method:", error);
         Spicetify.showNotification("Failed to set the playback queue.", true);
         throw error;
     }
@@ -3199,12 +3175,6 @@ function isDirectSortType(sortType) {
           "lastScrobbled",
           "shuffle",
           "averageColor",
-          "affinityBalanced",
-          "affinityShortTerm",
-          "affinityLongTerm",
-          "affinityPowerHour",
-          "affinityMellowMood",
-          "affinityHiddenGems",
           "deduplicateOnly",
           "tempo",
           "energy",
@@ -3958,74 +3928,57 @@ function isDirectSortType(sortType) {
     return results;
   }
   
-  async function getTrackStats(trackId, maxRetries = 3, baseDelay = 1000) {
-    let attempt = 0;
-    
-    while (attempt < maxRetries) {
-      try {
-        const audioFeaturesResponse = await Spicetify.CosmosAsync.get(
-          `https://api.spotify.com/v1/audio-features/${trackId}`
-        );
-        
-        const trackDetailsResponse = await Spicetify.CosmosAsync.get(
-          `https://api.spotify.com/v1/tracks/${trackId}`
-        );
-  
-        if (audioFeaturesResponse?.code === 429 || trackDetailsResponse?.code === 429) {
-          attempt++;
-          const waitTime = baseDelay * Math.pow(2, attempt - 1);
-          console.warn(`Rate limit hit for track ${trackId}, retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`);
-          await delay(waitTime);
-          continue;
-        }
-  
-        if (audioFeaturesResponse?.code || trackDetailsResponse?.code) {
-          console.warn(`Error responses:`, {
-            audioFeatures: audioFeaturesResponse,
-            trackDetails: trackDetailsResponse
-          });
-          throw new Error('Failed to fetch track data');
-        }
-  
-        if (!audioFeaturesResponse || !trackDetailsResponse) {
-          console.warn(`Missing data for track ${trackId}`);
-          return null;
-        }
-  
-        const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-        const keyText = audioFeaturesResponse.key === -1 ? "Undefined" : pitchClasses[audioFeaturesResponse.key];
-  
-        return {
-          danceability: audioFeaturesResponse?.danceability ? Math.round(100 * audioFeaturesResponse.danceability) : null,
-          energy: audioFeaturesResponse?.energy ? Math.round(100 * audioFeaturesResponse.energy) : null,
-          key: keyText,
-          loudness: audioFeaturesResponse?.loudness ?? null,
-          speechiness: audioFeaturesResponse?.speechiness ? Math.round(100 * audioFeaturesResponse.speechiness) : null,
-          acousticness: audioFeaturesResponse?.acousticness ? Math.round(100 * audioFeaturesResponse.acousticness) : null,
-          instrumentalness: audioFeaturesResponse?.instrumentalness ? Math.round(100 * audioFeaturesResponse.instrumentalness) : null,
-          liveness: audioFeaturesResponse?.liveness ? Math.round(100 * audioFeaturesResponse.liveness) : null,
-          valence: audioFeaturesResponse?.valence ? Math.round(100 * audioFeaturesResponse.valence) : null,
-          tempo: audioFeaturesResponse?.tempo ? Math.round(audioFeaturesResponse.tempo) : null,
-          popularity: trackDetailsResponse?.popularity ?? null,
-          releaseDate: trackDetailsResponse?.album?.release_date ?? null
-        };
-      } catch (error) {
-        attempt++;
-        
-        if (attempt === maxRetries) {
-          console.error(`Failed to fetch stats for track ${trackId} after ${maxRetries} attempts:`, error);
-          return null;
-        }
-        
-        const waitTime = baseDelay * Math.pow(2, attempt - 1);
-        console.warn(`Attempt ${attempt}/${maxRetries} failed for track ${trackId}, retrying in ${waitTime}ms`);
-        await delay(waitTime);
-      }
+  async function getBatchTrackStats(trackIds) {
+    if (trackIds.length === 0) {
+        return {};
     }
-    
-    return null;
+
+    const results = {};
+    const BATCH_SIZE = 50;
+
+    try {
+        for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
+            const batchIds = trackIds.slice(i, i + BATCH_SIZE);
+            
+            const [audioFeaturesResponse, trackDetailsResponse] = await Promise.all([
+                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`),
+                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`)
+            ]);
+
+            if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
+                console.warn('Failed to fetch batch track data for some tracks.');
+                continue;
+            }
+
+            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+            
+            audioFeaturesResponse.audio_features.forEach((features, index) => {
+                if (features) {
+                    const trackDetails = trackDetailsResponse.tracks[index];
+                    results[features.id] = {
+                        danceability: features.danceability ? Math.round(100 * features.danceability) : null,
+                        energy: features.energy ? Math.round(100 * features.energy) : null,
+                        key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
+                        loudness: features.loudness ?? null,
+                        speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
+                        acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
+                        instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
+                        liveness: features.liveness ? Math.round(100 * features.liveness) : null,
+                        valence: features.valence ? Math.round(100 * features.valence) : null,
+                        tempo: features.tempo ? Math.round(features.tempo) : null,
+                        popularity: trackDetails?.popularity ?? null,
+                        releaseDate: trackDetails?.album?.release_date ?? null
+                    };
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching batch track stats:', error);
+    }
+    return results;
   }
 
+  
   async function fetchLyricsFromLyricsOvh(artist, track, maxRetries = 3, baseDelay = 1000) {
     let attempt = 0;
     while (attempt < maxRetries) {
@@ -4103,24 +4056,29 @@ function isDirectSortType(sortType) {
     while (retries < maxRetries) {
       try {
         if (tracksToProcess.length > 0) {
+          let allBatchStats = {};
+          if (includeSongStats) {
+              const trackIdsToFetch = tracksToProcess.map(t => t.uri.split(":")[2]);
+              allBatchStats = await getBatchTrackStats(trackIdsToFetch);
+          }
+
           const processedTracks = await processBatchWithRateLimit(
             tracksToProcess,
-            6,
+            20,
             700,
             async track => {
               const trackId = track.uri.split(":")[2];
               
-              let stats = null;
-              let playCount = null;
-  
-              if (includeSongStats) {
-                stats = await getTrackStats(trackId);
-                stats = stats || {
+              let stats = includeSongStats ? allBatchStats[trackId] : null;
+              stats = stats || {
                   danceability: null, energy: null, key: "Undefined", loudness: null,
                   speechiness: null, acousticness: null, instrumentalness: null,
                   liveness: null, valence: null, tempo: null, popularity: null, releaseDate: null
-                };
-                
+              };
+              
+              let playCount = "N/A";
+  
+              if (includeSongStats) {
                 try {
                   const albumId = track.albumId || track.track?.album?.id;
                   if (albumId) {
@@ -4129,8 +4087,6 @@ function isDirectSortType(sortType) {
                       (albumTrack) => albumTrack.uri === track.uri
                     );
                     playCount = foundTrack ? foundTrack.playcount : "N/A";
-                  } else {
-                    playCount = "N/A";
                   }
                 } catch (error) {
                   playCount = "N/A";
@@ -4624,50 +4580,23 @@ function isDirectSortType(sortType) {
             getTrackDetailsWithReleaseDateForFilter 
         );
 
+        mainButton.innerText = "Analyzing...";
+        const trackIdsToFetch = tracksWithReleaseDates
+            .map(track => track.uri.split(":")[2])
+            .filter(trackId => !getTrackCache(trackId, true, false, selectedAiModel));
 
-        let tracksWithFeatures = tracksWithReleaseDates;
-
-        if (includeaudiofeatures) {
-            const tracksNeedingFeatures = tracksWithReleaseDates.filter(track => {
-                const trackId = track.uri.split(":")[2];
-                return !getTrackCache(trackId, true, false, selectedAiModel);
-            });
-
-            const fetchedTrackFeatures = await processBatchesWithDelay(
-                tracksNeedingFeatures,
-                6,
-                700,
-                (progress) => {
-                    mainButton.innerText = `${75 + Math.floor(progress * 0.25)}%`; 
-                },
-                async (track) => {
-                    const trackId = track.uri.split(":")[2];
-                    const stats = await getTrackStats(trackId);
-                    const enrichedTrack = {
-                        ...track,
-                        features: stats || {
-                            danceability: null, energy: null, key: "Undefined", loudness: null,
-                            speechiness: null, acousticness: null, instrumentalness: null,
-                            liveness: null, valence: null, tempo: null,
-                        },
-                    };
-
-                    setTrackCache(trackId, { stats: enrichedTrack.features }, true, false, selectedAiModel);
-                    return enrichedTrack;
-                }
-            );
-
-            tracksWithFeatures = tracksWithReleaseDates.map(track => {
-                const trackId = track.uri.split(":")[2];
-                const cachedTrack = getTrackCache(trackId, true, false, selectedAiModel);
-                if (cachedTrack) {
-                    return { ...track, features: cachedTrack.stats }; 
-                }
-                const fetchedTrack = fetchedTrackFeatures.find(ft => ft.uri === track.uri);
-                return fetchedTrack ? { ...track, features: fetchedTrack.features } : track; 
+        if (trackIdsToFetch.length > 0) {
+            const batchStats = await getBatchTrackStats(trackIdsToFetch);
+            Object.entries(batchStats).forEach(([trackId, stats]) => {
+                setTrackCache(trackId, { stats }, true, false, selectedAiModel);
             });
         }
 
+        const tracksWithFeatures = tracksWithReleaseDates.map(track => {
+            const trackId = track.uri.split(":")[2];
+            const cachedData = getTrackCache(trackId, true, false, selectedAiModel);
+            return { ...track, features: cachedData ? cachedData.stats : {} };
+        });
 
         showCustomFilterModal(tracksWithFeatures);
 
@@ -4726,10 +4655,6 @@ function isDirectSortType(sortType) {
     let activeRangeFilter = localStorage.getItem("sort-play-active-range-filter") || "releaseDate";
     let handleTrackMove = null;
 
-    if (!includeaudiofeatures && activeRangeFilter.startsWith("features.")) {
-        activeRangeFilter = "releaseDate";
-        localStorage.setItem("sort-play-active-range-filter", "releaseDate");
-    }
     tracks.forEach(track => {
         track.isRemovedByRange = false;
         track.isRemovedByKeyword = false;
@@ -4745,21 +4670,17 @@ function isDirectSortType(sortType) {
         <th data-sort-key="durationMs">Duration</th>
         <th data-sort-key="playCount">Plays</th>
         <th data-sort-key="popularity">Popularity</th>
+        <th data-sort-key="features.energy">Energy</th>
+        <th data-sort-key="features.danceability">Danceability</th>
+        <th data-sort-key="features.valence">Valence</th>
+        <th data-sort-key="features.tempo">Tempo</th>
+        <th data-sort-key="features.key">Key</th>
+        <th data-sort-key="features.loudness">Loudness</th>
+        <th data-sort-key="features.acousticness">Acousticness</th>
+        <th data-sort-key="features.instrumentalness">Instrumentalness</th>
+        <th data-sort-key="features.liveness">Liveness</th>
+        <th class="sticky-col actions-col">Filter</th>
     `;
-    if (includeaudiofeatures) {
-        tableHeaders += `
-            <th data-sort-key="features.energy">Energy</th>
-            <th data-sort-key="features.danceability">Danceability</th>
-            <th data-sort-key="features.valence">Valence</th>
-            <th data-sort-key="features.tempo">Tempo</th>
-            <th data-sort-key="features.key">Key</th>
-            <th data-sort-key="features.loudness">Loudness</th>
-            <th data-sort-key="features.acousticness">Acousticness</th>
-            <th data-sort-key="features.instrumentalness">Instrumentalness</th>
-            <th data-sort-key="features.liveness">Liveness</th>
-        `;
-    }
-    tableHeaders += `<th class="sticky-col actions-col">Filter</th>`;
 
     let observer = null;
     let titleAlbumKeywords = new Set();
@@ -4928,8 +4849,7 @@ function isDirectSortType(sortType) {
               <td>${track.popularity !== null ? track.popularity : "N/A"}</td>
           `;
 
-            if (includeaudiofeatures) {
-                row += `
+            row += `
                   <td>${track.features?.energy !== null ? track.features.energy : "N/A"}</td>
                   <td>${track.features?.danceability !== null ? track.features.danceability : "N/A"}</td>
                   <td>${track.features?.valence !== null ? track.features.valence : "N/A"}</td>
@@ -4939,8 +4859,7 @@ function isDirectSortType(sortType) {
                   <td>${track.features?.acousticness !== null ? track.features.acousticness : "N/A"}</td>
                   <td>${track.features?.instrumentalness !== null ? track.features.instrumentalness : "N/A"}</td>
                   <td>${track.features?.liveness !== null ? track.features.liveness : "N/A"}</td>
-              `;
-            }
+            `;
             row += `
           <td class="sticky-col actions-col">
               <button class="remove-button" data-track-uri="${track.uri}">
@@ -5679,20 +5598,16 @@ function isDirectSortType(sortType) {
                     trackValue = track.popularity || 0;
                     track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
                 } else if (activeRangeFilter.startsWith("features.")) {
-                    if (includeaudiofeatures) {
-                        if (activeRangeFilter === 'features.energy') {
-                            trackValue = track.features?.energy ?? 0;
-                        } else if (activeRangeFilter === 'features.danceability') {
-                            trackValue = track.features?.danceability ?? 0;
-                        } else if (activeRangeFilter === 'features.valence') {
-                            trackValue = track.features?.valence ?? 0;
-                        } else if (activeRangeFilter === 'features.tempo') {
-                            trackValue = track.features?.tempo ?? 0;
-                        }
-                        track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
-                    } else {
-                        track.isRemovedByRange = false;
+                    if (activeRangeFilter === 'features.energy') {
+                        trackValue = track.features?.energy ?? 0;
+                    } else if (activeRangeFilter === 'features.danceability') {
+                        trackValue = track.features?.danceability ?? 0;
+                    } else if (activeRangeFilter === 'features.valence') {
+                        trackValue = track.features?.valence ?? 0;
+                    } else if (activeRangeFilter === 'features.tempo') {
+                        trackValue = track.features?.tempo ?? 0;
                     }
+                    track.isRemovedByRange = trackValue < minRange || trackValue > maxRange;
                 }
             } else {
                 track.isRemovedByRange = false;
@@ -5970,6 +5885,9 @@ function isDirectSortType(sortType) {
         max-width: 1200px;
         color: #fff;
     }
+    .tracklist-table .actions-col {
+        box-shadow: 2px 0 2px #000000;
+    }
     .GenericModal__overlay .GenericModal {
         border-radius: 30px;
         overflow: hidden;
@@ -6167,8 +6085,8 @@ function isDirectSortType(sortType) {
         right: 0;
         text-align: center;
         vertical-align: middle;
+        box-shadow: 2px 0 2px #000000;
     }
-
 
     .actions-col {
         right: 0;
@@ -7205,14 +7123,14 @@ function isDirectSortType(sortType) {
                       <span class="range-filter-label">Filter by:</span>
                           <div class="range-filter-title">
                               <select id="rangeFilterType">
-                                  <option value="releaseDate" ${activeRangeFilter === 'releaseDate' ? 'selected' : ''}>Release Date</option>
-                                  <option value="durationMs" ${activeRangeFilter === 'durationMs' ? 'selected' : ''}>Duration</option>
-                                  <option value="playCount" ${activeRangeFilter === 'playCount' ? 'selected' : ''}>Plays</option>
-                                  <option value="popularity" ${activeRangeFilter === 'popularity' ? 'selected' : ''}>Popularity</option>
-                                  <option value="features.energy" ${activeRangeFilter === 'features.energy' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Energy</option>
-                                  <option value="features.danceability" ${activeRangeFilter === 'features.danceability' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Danceability</option>
-                                  <option value="features.valence" ${activeRangeFilter === 'features.valence' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Valence</option>
-                                  <option value="features.tempo" ${activeRangeFilter === 'features.tempo' ? 'selected' : ''} ${!includeaudiofeatures ? 'disabled' : ''}>Tempo</option>
+                                <option value="releaseDate" ${activeRangeFilter === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                                <option value="durationMs" ${activeRangeFilter === 'durationMs' ? 'selected' : ''}>Duration</option>
+                                <option value="playCount" ${activeRangeFilter === 'playCount' ? 'selected' : ''}>Plays</option>
+                                <option value="popularity" ${activeRangeFilter === 'popularity' ? 'selected' : ''}>Popularity</option>
+                                <option value="features.energy" ${activeRangeFilter === 'features.energy' ? 'selected' : ''}>Energy</option>
+                                <option value="features.danceability" ${activeRangeFilter === 'features.danceability' ? 'selected' : ''}>Danceability</option>
+                                <option value="features.valence" ${activeRangeFilter === 'features.valence' ? 'selected' : ''}>Valence</option>
+                                <option value="features.tempo" ${activeRangeFilter === 'features.tempo' ? 'selected' : ''}>Tempo</option>
                               </select>
                           </div>
                     </div>
@@ -12598,20 +12516,23 @@ function isDirectSortType(sortType) {
     return innerButton;
   }
 
-  function createInnerPlayButton(parentButton) {
+  function createInnerPlayButton() {
+    const plusIconSvg = `<svg width="17px" height="17px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 12H18M12 6V18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
     const innerButton = document.createElement("button");
-    innerButton.title = "Shuffle and Play";
-    innerButton.innerText = "\u25B6";
+    innerButton.title = "Shuffle and Add to Queue";
+    innerButton.innerHTML = plusIconSvg;
 
     const buttonBgColor = "rgba(var(--spice-rgb-selected-row), 0.03)";
     const buttonHoverBgColor = "rgba(var(--spice-rgb-selected-row), 0.2)";
 
     innerButton.style.cssText = `
       color: #ffffffe6;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 12px;
-      padding: 2px 12px;
-      font-weight: 500;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 0;
+      width: 35px;
+      height: 25px;
       cursor: pointer;
       position: absolute;
       right: 8px;
@@ -12718,178 +12639,44 @@ function isDirectSortType(sortType) {
         type: "parent",
         text: "Sort By",
         sortType: "sortByParent", 
-        hasInnerButton: true,
         children: [
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Play Count",
-            sortType: "playCount",
-            hasInnerButton: true,
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Popularity",
-            sortType: "popularity",
-            hasInnerButton: true,
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Release Date",
-            sortType: "releaseDate",
-            hasInnerButton: true
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Scrobbles",
-            sortType: "scrobbles",
-            hasInnerButton: true,
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "My Scrobbles",
-            sortType: "personalScrobbles",
-            hasInnerButton: true,
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Last Scrobbled",
-            sortType: "lastScrobbled",
-            hasInnerButton: true,
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Album Color",
-            sortType: "averageColor",
-            hasInnerButton: true,
-          },
+          { backgroundColor: "transparent", color: "white", text: "Play Count", sortType: "playCount", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Popularity", sortType: "popularity", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Release Date", sortType: "releaseDate", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Scrobbles", sortType: "scrobbles", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "My Scrobbles", sortType: "personalScrobbles", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Last Scrobbled", sortType: "lastScrobbled", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Album Color", sortType: "averageColor", hasInnerButton: true },
           {
             type: "parent",
             text: "Audio Features",
             sortType: "audioFeaturesParent",
             children: [
-              {
-                backgroundColor: "transparent",
-                color: "white",
-                text: "Tempo (BPM)",
-                sortType: "tempo",
-                hasInnerButton: true,
-              },
-              {
-                backgroundColor: "transparent",
-                color: "white",
-                text: "Energy",
-                sortType: "energy",
-                hasInnerButton: true,
-              },
-              {
-                backgroundColor: "transparent",
-                color: "white",
-                text: "Danceability",
-                sortType: "danceability",
-                hasInnerButton: true,
-              },
-              {
-                backgroundColor: "transparent",
-                color: "white",
-                text: "Valence",
-                sortType: "valence",
-                hasInnerButton: true,
-              },
-              {
-                backgroundColor: "transparent",
-                color: "white",
-                text: "Acousticness",
-                sortType: "acousticness",
-                hasInnerButton: true,
-              },
-              {
-                backgroundColor: "transparent",
-                color: "white",
-                text: "Instrumentalness",
-                sortType: "instrumentalness",
-                hasInnerButton: true,
-              },
+              { backgroundColor: "transparent", color: "white", text: "Tempo (BPM)", sortType: "tempo", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "Energy", sortType: "energy", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "Danceability", sortType: "danceability", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "Valence", sortType: "valence", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "Acousticness", sortType: "acousticness", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "Instrumentalness", sortType: "instrumentalness", hasInnerButton: true },
             ],
-          },
-        ],
-      },
-      {
-        type: "parent",
-        text: "Personalized Sort",
-        sortType: "affinityParent",
-        children: [
-          {
-            type: "title",
-            text: "Taste Profiles",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Balanced",
-            sortType: "affinityBalanced",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "Recent Vibe",
-            sortType: "affinityShortTerm",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "All-Time Favorites",
-            sortType: "affinityLongTerm",
-          },
-          {
-            type: "title",
-            text: "Mood Mixes",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "My Power Hour",
-            sortType: "affinityPowerHour",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "My Mellow Mood",
-            sortType: "affinityMellowMood",
-          },
-          {
-            type: "title",
-            text: "Discovery",
-          },
-          {
-            backgroundColor: "transparent",
-            color: "white",
-            text: "My Hidden Gems",
-            sortType: "affinityHiddenGems",
           },
         ],
       },
       {
         backgroundColor: "transparent",
         color: "white",
-        text: "Dynamic Playlists",
-        sortType: "dynamicPlaylists",
-        onClick: (event) => {
-          event.stopPropagation();
-          menuButtons.forEach((btn) => {
-            if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-                btn.style.backgroundColor = "transparent";
-            }
-          });
-          closeAllMenus();
-          showDynamicPlaylistsWindow();
-        },
+        text: "Shuffle",
+        sortType: "shuffle",
+        hasInnerPlayButton: true,
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
+        text: "Deduplicate",
+        sortType: "deduplicateOnly",
+      },
+      {
+        type: "divider",
       },
       {
         backgroundColor: "transparent",
@@ -12942,15 +12729,18 @@ function isDirectSortType(sortType) {
       {
         backgroundColor: "transparent",
         color: "white",
-        text: "Shuffle",
-        sortType: "shuffle",
-        hasInnerPlayButton: true,
-      },
-      {
-        backgroundColor: "transparent",
-        color: "white",
-        text: "Deduplicate",
-        sortType: "deduplicateOnly",
+        text: "Dynamic Playlists",
+        sortType: "dynamicPlaylists",
+        onClick: (event) => {
+          event.stopPropagation();
+          menuButtons.forEach((btn) => {
+            if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                btn.style.backgroundColor = "transparent";
+            }
+          });
+          closeAllMenus();
+          showDynamicPlaylistsWindow();
+        },
       },
       {
         type: "divider",
@@ -12963,6 +12753,7 @@ function isDirectSortType(sortType) {
       },
     ],
   };
+  
   const settingsSvg = `<?xml version="1.0" encoding="utf-8"?>
   <!DOCTYPE svg>
   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 256 256" enable-background="new 0 0 256 256" xml:space="preserve">
@@ -12972,11 +12763,6 @@ function isDirectSortType(sortType) {
   const sortIconSvg = `
   <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  
-  const personalizedSortIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M10.5 21H4C4 17.4735 6.60771 14.5561 10 14.0709M16.4976 16.2119C15.7978 15.4328 14.6309 15.2232 13.7541 15.9367C12.8774 16.6501 12.7539 17.843 13.4425 18.6868C13.8312 19.1632 14.7548 19.9983 15.4854 20.6353C15.8319 20.9374 16.0051 21.0885 16.2147 21.1503C16.3934 21.203 16.6018 21.203 16.7805 21.1503C16.9901 21.0885 17.1633 20.9374 17.5098 20.6353C18.2404 19.9983 19.164 19.1632 19.5527 18.6868C20.2413 17.843 20.1329 16.6426 19.2411 15.9367C18.3492 15.2307 17.1974 15.4328 16.4976 16.2119ZM15 7C15 9.20914 13.2091 11 11 11C8.79086 11 7 9.20914 7 7C7 4.79086 8.79086 3 11 3C13.2091 3 15 4.79086 15 7Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
   
   const createPlaylistIconSvg = `
@@ -14227,1030 +14013,6 @@ function isDirectSortType(sortType) {
     return allItems.slice(0, totalLimit);
   }
 
-  class GaussianMixtureModel {
-    constructor(nComponents = 3, maxIterations = 100, tolerance = 1e-4) {
-      this.nComponents = nComponents;
-      this.maxIterations = maxIterations;
-      this.tolerance = tolerance;
-      this.means = [];
-      this.variances = [];
-      this.weights = [];
-      this.fitted = false;
-    }
-  
-    fit(data, sampleWeights = null) {
-      if (!data || data.length === 0) return;
-      
-      const n = data.length;
-      const weights = sampleWeights || Array(n).fill(1);
-      
-      this.initializeParameters(data, weights);
-      
-      let prevLogLikelihood = -Infinity;
-      
-      for (let iter = 0; iter < this.maxIterations; iter++) {
-        const responsibilities = this.expectationStep(data);
-        this.maximizationStep(data, responsibilities, weights);
-        
-        const logLikelihood = this.computeLogLikelihood(data, weights);
-        if (Math.abs(logLikelihood - prevLogLikelihood) < this.tolerance) {
-          break;
-        }
-        prevLogLikelihood = logLikelihood;
-      }
-      
-      this.fitted = true;
-    }
-  
-    initializeParameters(data, weights) {
-      const n = data.length;
-      const weightedData = [];
-      
-      for (let i = 0; i < n; i++) {
-        weightedData.push({ value: data[i], weight: weights[i] });
-      }
-      
-      weightedData.sort((a, b) => a.value - b.value);
-      
-      this.means = [];
-      const step = Math.floor(n / this.nComponents);
-      for (let i = 0; i < this.nComponents; i++) {
-        const idx = Math.min(i * step + Math.floor(step / 2), n - 1);
-        this.means.push(weightedData[idx].value);
-      }
-      
-      this.variances = Array(this.nComponents).fill(0);
-      this.weights = Array(this.nComponents).fill(1 / this.nComponents);
-      
-      for (let k = 0; k < this.nComponents; k++) {
-        let sumSquaredDiff = 0;
-        let sumWeight = 0;
-        
-        for (let i = 0; i < n; i++) {
-          const diff = data[i] - this.means[k];
-          sumSquaredDiff += weights[i] * diff * diff;
-          sumWeight += weights[i];
-        }
-        
-        this.variances[k] = Math.max(0.01, sumSquaredDiff / sumWeight);
-      }
-    }
-  
-    expectationStep(data) {
-      const n = data.length;
-      const responsibilities = Array(n).fill(null).map(() => Array(this.nComponents).fill(0));
-      
-      for (let i = 0; i < n; i++) {
-        let totalProb = 0;
-        
-        for (let k = 0; k < this.nComponents; k++) {
-          const prob = this.weights[k] * this.gaussianPDF(data[i], this.means[k], this.variances[k]);
-          responsibilities[i][k] = prob;
-          totalProb += prob;
-        }
-        
-        if (totalProb > 0) {
-          for (let k = 0; k < this.nComponents; k++) {
-            responsibilities[i][k] /= totalProb;
-          }
-        }
-      }
-      
-      return responsibilities;
-    }
-  
-    maximizationStep(data, responsibilities, weights) {
-      const n = data.length;
-      
-      for (let k = 0; k < this.nComponents; k++) {
-        let sumResp = 0;
-        let sumRespData = 0;
-        let sumRespSquaredDiff = 0;
-        
-        for (let i = 0; i < n; i++) {
-          const weightedResp = responsibilities[i][k] * weights[i];
-          sumResp += weightedResp;
-          sumRespData += weightedResp * data[i];
-        }
-        
-        this.means[k] = sumResp > 0 ? sumRespData / sumResp : this.means[k];
-        
-        for (let i = 0; i < n; i++) {
-          const diff = data[i] - this.means[k];
-          sumRespSquaredDiff += responsibilities[i][k] * weights[i] * diff * diff;
-        }
-        
-        this.variances[k] = sumResp > 0 ? Math.max(0.01, sumRespSquaredDiff / sumResp) : this.variances[k];
-        
-        this.weights[k] = sumResp / weights.reduce((a, b) => a + b, 0);
-      }
-      
-      const totalWeight = this.weights.reduce((a, b) => a + b, 0);
-      if (totalWeight > 0) {
-        for (let k = 0; k < this.nComponents; k++) {
-          this.weights[k] /= totalWeight;
-        }
-      }
-    }
-  
-    gaussianPDF(x, mean, variance) {
-      if (variance <= 0) return 0;
-      const coefficient = 1 / Math.sqrt(2 * Math.PI * variance);
-      const exponent = -Math.pow(x - mean, 2) / (2 * variance);
-      return coefficient * Math.exp(exponent);
-    }
-  
-    computeLogLikelihood(data, weights) {
-      let logLikelihood = 0;
-      for (let i = 0; i < data.length; i++) {
-        let prob = 0;
-        for (let k = 0; k < this.nComponents; k++) {
-          prob += this.weights[k] * this.gaussianPDF(data[i], this.means[k], this.variances[k]);
-        }
-        logLikelihood += weights[i] * Math.log(Math.max(1e-10, prob));
-      }
-      return logLikelihood;
-    }
-  
-    score(x) {
-      if (!this.fitted) return 0;
-      let totalProb = 0;
-      for (let k = 0; k < this.nComponents; k++) {
-        totalProb += this.weights[k] * this.gaussianPDF(x, this.means[k], this.variances[k]);
-      }
-      return totalProb;
-    }
-  
-    getMaxDensity() {
-      if (!this.fitted) return 1;
-      let maxDensity = 0;
-      for (let k = 0; k < this.nComponents; k++) {
-        const peakDensity = this.weights[k] * this.gaussianPDF(this.means[k], this.means[k], this.variances[k]);
-        if (peakDensity > maxDensity) {
-          maxDensity = peakDensity;
-        }
-      }
-      return maxDensity > 0 ? maxDensity : 1;
-    }
-  }
-
-  function getGMMScore(value, gmm) {
-    if (!gmm || !gmm.fitted) return 0;
-    const rawScore = gmm.score(value);
-    const maxDensity = gmm.getMaxDensity();
-    return Math.min(1, rawScore / maxDensity);
-  }
-  
-  function buildAffinityProfile(profileData, updateProgress, timeRangeScope = 'balanced') {
-    updateProgress("Profiling...");
-    let finalTimeScope = timeRangeScope;
-    const { enhancedLikedSongs, topItems } = profileData;
-    const timeRanges = ['short_term', 'medium_term', 'long_term'];
-
-    let profileSourceSongs = enhancedLikedSongs;
-    let multipliers;
-    let recencyDecayFactor;
-
-    switch (timeRangeScope) {
-        case 'recent':
-            const sixMonthsAgo = new Date();
-            sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 180);
-            profileSourceSongs = enhancedLikedSongs.filter(song => new Date(song.addedAt) > sixMonthsAgo);
-            multipliers = { short_term: 4.0, medium_term: 1.0, long_term: 0.5 };
-            recencyDecayFactor = 110;
-            break;
-        case 'all_time':
-            multipliers = { short_term: 0.5, medium_term: 1.5, long_term: 3.5 };
-            recencyDecayFactor = 10000;
-            break;
-        case 'energy':
-            profileSourceSongs = enhancedLikedSongs.filter(song => 
-                song.audio_features && song.audio_features.energy > 0.6 && song.audio_features.danceability > 0.5
-            );
-            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
-            recencyDecayFactor = 500;
-            break;
-        case 'mellow':
-            profileSourceSongs = enhancedLikedSongs.filter(song => 
-                song.audio_features && song.audio_features.energy < 0.4 && song.audio_features.acousticness > 0.5
-            );
-            multipliers = { long_term: 0.8, medium_term: 1.0, short_term: 1.8 };
-            recencyDecayFactor = 500;
-            break;
-        case 'balanced':
-        default:
-            multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
-            recencyDecayFactor = 600;
-            break;
-    }
-
-    if (profileSourceSongs.length < 25) {
-        Spicetify.showNotification(`Not enough data for ${timeRangeScope} profile, using Balanced instead.`);
-        profileSourceSongs = enhancedLikedSongs;
-        multipliers = { long_term: 0.7, medium_term: 1.2, short_term: 2.0 };
-        recencyDecayFactor = 600;
-        finalTimeScope = 'balanced';
-    }
-
-    const topTrackPositions = { short_term: new Map(), medium_term: new Map(), long_term: new Map() };
-    for (const range of timeRanges) {
-        topItems[range].tracks.forEach((track, index) => {
-            topTrackPositions[range].set(track.uri, index);
-        });
-    }
-
-    const weightedSongs = profileSourceSongs.map(song => {
-        let weight = 1.0;
-        for (const range of timeRanges) {
-            const position = topTrackPositions[range].get(song.uri);
-            if (position !== undefined) { 
-                const baseMultiplier = multipliers[range];
-                if (baseMultiplier === 0) continue;
-                let positionalMultiplier = 0;
-                switch (range) {
-                    case 'long_term':
-                        if (position < 25) positionalMultiplier = 1.0;
-                        else if (position < 50) positionalMultiplier = 0.95;
-                        else if (position < 100) positionalMultiplier = 0.85;
-                        else if (position < 200) positionalMultiplier = 0.70;
-                        else if (position < 300) positionalMultiplier = 0.55;
-                        else if (position < 400) positionalMultiplier = 0.40;
-                        else positionalMultiplier = 0.25;
-                        break;
-                    case 'medium_term':
-                        if (position < 25) positionalMultiplier = 1.0;
-                        else if (position < 50) positionalMultiplier = 0.85;
-                        else if (position < 100) positionalMultiplier = 0.68;
-                        else if (position < 200) positionalMultiplier = 0.45;
-                        else positionalMultiplier = 0.20;
-                        break;
-                    case 'short_term':
-                        if (position < 25) positionalMultiplier = 1.0;
-                        else if (position < 50) positionalMultiplier = 0.85;
-                        else if (position < 100) positionalMultiplier = 0.50;
-                        else positionalMultiplier = 0.15;
-                        break;
-                }
-                weight += baseMultiplier * positionalMultiplier;
-            }
-        }
-        let days_since_added = (new Date() - new Date(song.addedAt)) / (1000 * 60 * 60 * 24);
-        if (isNaN(days_since_added)) {
-            days_since_added = 365 * 5; 
-        }
-        const date_weight = Math.exp(-days_since_added / recencyDecayFactor);
-        const final_weight = weight * date_weight;
-        return { ...song, final_weight };
-    });
-
-    const gmmSonicProfile = {};
-    const featuresToModel = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness', 'tempo'];
-    const min_tempo = 50, max_tempo = 200;
-
-    featuresToModel.forEach(feature => {
-        const values = [];
-        const weights = [];
-        weightedSongs.forEach(song => {
-            if (song.audio_features && typeof song.audio_features[feature] === 'number') {
-                let value = song.audio_features[feature];
-                if (feature === 'tempo') {
-                    value = (value - min_tempo) / (max_tempo - min_tempo);
-                }
-                values.push(Math.max(0, Math.min(1, value)));
-                weights.push(song.final_weight);
-            }
-        });
-        if (values.length > 20) {
-            const gmm = new GaussianMixtureModel(3);
-            gmm.fit(values, weights);
-            gmmSonicProfile[feature] = gmm;
-        }
-    });
-
-    const genreProfile = {};
-    const artistProfile = {};
-    weightedSongs.forEach(song => {
-        if (song.artist_genres) {
-            song.artist_genres.forEach(genre => {
-                genreProfile[genre] = (genreProfile[genre] || 0) + song.final_weight;
-            });
-        }
-        if (song.artistUris) {
-            song.artistUris.forEach(artistUri => {
-                const artistId = artistUri.split(':')[2];
-                artistProfile[artistId] = (artistProfile[artistId] || 0) + song.final_weight;
-            });
-        }
-    });
-
-    const affinityProfile = { gmmSonicProfile, genreProfile, artistProfile, weightedSongs };
-    return { affinityProfile, finalTimeScope };
-  } 
-
-  const AFFINITY_PROFILE_CACHE_KEY = "sort-play-affinity-profile-cache-v1-5";
-  const AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY = "sort-play-affinity-cache-timestamp-v1-5";
-  const AFFINITY_CACHE_EXPIRY_DAYS = 50;
-
-  function cleanupOldAffinityCaches() {
-    const currentCacheKey = AFFINITY_PROFILE_CACHE_KEY;
-    const currentTimestampKey = AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY;
-
-    const cachePrefix = "sort-play-affinity-profile-cache-";
-    const timestampPrefix = "sort-play-affinity-cache-timestamp-";
-
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key) continue;
-
-        if (key.startsWith(cachePrefix) && key !== currentCacheKey) {
-            keysToRemove.push(key);
-        }
-
-        if (key.startsWith(timestampPrefix) && key !== currentTimestampKey) {
-            keysToRemove.push(key);
-        }
-    }
-
-    if (keysToRemove.length > 0) {
-        console.log("Sort-Play: Cleaning up old affinity cache versions:", keysToRemove);
-        keysToRemove.forEach(key => {
-            try {
-                localStorage.removeItem(key);
-            } catch (e) {
-                console.error(`Failed to remove old cache key: ${key}`, e);
-            }
-        });
-    }
-  }
-
-  function intelligentSampling(allSongs, targetSize) {
-    const sorted = [...allSongs].sort((a, b) => 
-        new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
-    );
-    
-    const sampled = [];
-    
-    const recentCount = Math.floor(targetSize * 0.4);
-    sampled.push(...sorted.slice(0, recentCount));
-    
-    const middleStart = recentCount;
-    const middleEnd = sorted.length - (targetSize - recentCount);
-    const middlePoolSize = middleEnd - middleStart;
-    const middleCount = Math.floor(targetSize * 0.3);
-    
-    if (middlePoolSize > middleCount) {
-        const middleStep = Math.floor(middlePoolSize / middleCount);
-        for (let i = 0; i < middleCount; i++) {
-            sampled.push(sorted[middleStart + i * middleStep]);
-        }
-    } else {
-        sampled.push(...sorted.slice(middleStart, middleEnd));
-    }
-    
-    const oldCount = targetSize - sampled.length;
-    if (oldCount > 0) {
-        sampled.push(...sorted.slice(-oldCount));
-    }
-    
-    return sampled;
-  }
-  
-  async function getAffinityProfileData(updateProgress) {
-    cleanupOldAffinityCaches();
-
-    updateProgress("Get liked...");
-    let allLikedSongs = [];
-    let offset = 0;
-    const limit = 50;
-    let hasMore = true;
-    
-    while (hasMore) {
-        const response = await Spicetify.Platform.LibraryAPI.getTracks({ 
-            limit, 
-            offset 
-        });
-        
-        if (response?.items?.length > 0) {
-            allLikedSongs = allLikedSongs.concat(response.items);
-            offset += limit;
-            hasMore = response.items.length === limit;
-        } else {
-            hasMore = false;
-        }
-    }
-    const likedTracksData = { items: allLikedSongs };
-
-    if (!likedTracksData.items || likedTracksData.items.length === 0) {
-        throw new Error("No liked songs found to build a profile.");
-    }
-
-    const completeLikedSongUrisSet = new Set(likedTracksData.items.map(s => s.uri));
-
-    let songsToProfile;
-    if (likedTracksData.items.length > 3000) {
-        songsToProfile = intelligentSampling(likedTracksData.items, 3000);
-    } else {
-        songsToProfile = likedTracksData.items;
-    }
-    
-    const freshLikedSongs = songsToProfile;
-    updateProgress("Load cache...");
-    let cachedEnhancedSongs = [];
-    const cacheTimestamp = localStorage.getItem(AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY);
-    const daysPassed = (Date.now() - parseInt(cacheTimestamp)) / (1000 * 60 * 60 * 24);
-
-    if (cacheTimestamp && daysPassed < AFFINITY_CACHE_EXPIRY_DAYS) {
-        try {
-            cachedEnhancedSongs = JSON.parse(localStorage.getItem(AFFINITY_PROFILE_CACHE_KEY)) || [];
-        } catch (e) {
-            console.error("Failed to parse affinity cache.", e);
-            cachedEnhancedSongs = [];
-        }
-    }
-
-    const cachedSongsMap = new Map(cachedEnhancedSongs.map(song => [song.uri, song]));
-    const newSongsToProcess = [];
-    const existingStillRelevantSongs = [];
-
-    freshLikedSongs.forEach(song => {
-        if (cachedSongsMap.has(song.uri)) {
-            existingStillRelevantSongs.push(cachedSongsMap.get(song.uri));
-        } else {
-            newSongsToProcess.push(song);
-        }
-    });
-
-    let newlyEnhancedSongs = [];
-    if (newSongsToProcess.length > 0) {
-        updateProgress(`Enhancing...`);
-        
-        const newTrackIds = newSongsToProcess.map(item => item.uri.split(':')[2]);
-        const newArtistIds = [...new Set(newSongsToProcess.flatMap(item => item.artists.map(artist => artist.uri.split(':')[2])))];
-        
-        const audioFeaturesMap = new Map();
-        const artistGenreMap = new Map();
-
-        for (let i = 0; i < newTrackIds.length; i += 100) {
-            const batch = newTrackIds.slice(i, i + 100);
-            const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batch.join(',')}`);
-            if (response && response.audio_features) {
-                response.audio_features.forEach(features => features && audioFeaturesMap.set(features.id, features));
-            }
-        }
-
-        for (let i = 0; i < newArtistIds.length; i += 50) {
-            const batch = newArtistIds.slice(i, i + 50);
-            const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
-            if (response && response.artists) {
-                response.artists.forEach(artist => artist && artistGenreMap.set(artist.id, artist.genres));
-            }
-        }
-        
-        newlyEnhancedSongs = newSongsToProcess.map(song => {
-            const full_audio_features = audioFeaturesMap.get(song.uri.split(':')[2]);
-            let lean_audio_features = null;
-
-            if (full_audio_features) {
-                lean_audio_features = {
-                    energy: full_audio_features.energy,
-                    danceability: full_audio_features.danceability,
-                    valence: full_audio_features.valence,
-                    acousticness: full_audio_features.acousticness,
-                    instrumentalness: full_audio_features.instrumentalness,
-                    speechiness: full_audio_features.speechiness,
-                    tempo: full_audio_features.tempo,
-                };
-            }
-
-            return {
-                uri: song.uri,
-                addedAt: song.addedAt,
-                artistUris: song.artists.map(artist => artist.uri),
-                audio_features: lean_audio_features,
-                artist_genres: song.artists.flatMap(artist => artistGenreMap.get(artist.uri.split(':')[2]) || [])
-            };
-        });
-    }
-
-    let allEnhancedSongs = [...existingStillRelevantSongs, ...newlyEnhancedSongs];
-    
-    const freshLikedSongUris = new Set(freshLikedSongs.map(s => s.uri));
-    
-    let finalCacheData = allEnhancedSongs.filter(song => freshLikedSongUris.has(song.uri));
-
-    updateProgress("Upd-cache...");
-    try {
-        localStorage.setItem(AFFINITY_PROFILE_CACHE_KEY, JSON.stringify(finalCacheData));
-        localStorage.setItem(AFFINITY_PROFILE_CACHE_TIMESTAMP_KEY, Date.now().toString());
-    } catch (e) {
-        console.error("An error occurred while saving the affinity cache.", e);
-    }
-
-    updateProgress("Get top...");
-    const topItemsLimits = { short_term: 200, medium_term: 300, long_term: 550 };
-    const timeRanges = ['short_term', 'medium_term', 'long_term'];
-    const topItems = {};
-    for (const range of timeRanges) {
-        const limit = topItemsLimits[range];
-        topItems[range] = {
-            tracks: await getTopItems('tracks', range, limit),
-            artists: await getTopItems('artists', range, limit)
-        };
-    }
-    
-    const artistTiers = buildArtistTierSystem({ enhancedLikedSongs: finalCacheData, topItems }, topItems);
-    
-    return { enhancedLikedSongs: finalCacheData, topItems, artistTiers, completeLikedSongUrisSet };
-  }
-
-  function calculateStandardDeviation(values) {
-    if (values.length === 0) return 0;
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
-    return Math.sqrt(variance);
-  }
-
-  function analyzePlaylistCharacteristics(targetTracks, audioFeaturesMap, artistCache) {
-    const genres = new Set();
-    const artists = new Set();
-    const sonicFeatures = [];
-    
-    targetTracks.forEach(track => {
-        const artistGenres = artistCache.get(track.uri.split(':')[2]);
-        if (artistGenres) {
-            artistGenres.forEach(g => genres.add(g));
-        }
-        (track.artistUris || track.artists.map(a => a.uri)).forEach(uri => artists.add(uri));
-        
-        const features = audioFeaturesMap.get(track.uri.split(':')[2]);
-        if (features) {
-            sonicFeatures.push(features);
-        }
-    });
-    
-    const genreDiversity = Math.min(1, genres.size / (targetTracks.length * 0.5 || 1));
-    const artistDiversity = Math.min(1, artists.size / (targetTracks.length || 1));
-    
-    let sonicCoherence = 1.0;
-    if (sonicFeatures.length > 1) {
-        const energyStdDev = calculateStandardDeviation(sonicFeatures.map(f => f.energy));
-        const valenceStdDev = calculateStandardDeviation(sonicFeatures.map(f => f.valence));
-        sonicCoherence = 1 - ((energyStdDev + valenceStdDev) / 2);
-    }
-    
-    return {
-        genreDiversity,
-        artistDiversity,
-        sonicCoherence,
-        playlistSize: targetTracks.length
-    };
-  }
-  
-  function calculateAdaptiveWeights(playlistCharacteristics) {
-    const { genreDiversity, artistDiversity, playlistSize } = playlistCharacteristics;
-    
-    let weights = {
-        sonic: 0.60,
-        genre: 0.15,
-        artist: 0.20,
-        harmonic: 0.05
-    };
-    
-    if (genreDiversity < 0.3) {
-        weights.sonic += 0.15;
-        weights.genre -= 0.10;
-    } else if (genreDiversity > 0.7) {
-        weights.genre += 0.10;
-        weights.sonic -= 0.05;
-    }
-    
-    if (artistDiversity < 0.2) {
-        weights.artist = 0.05;
-        weights.sonic += 0.10;
-    }
-    
-    if (playlistSize < 30) {
-        weights.sonic -= 0.05;
-        weights.artist += 0.05;
-    }
-    
-    const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
-    for (let key in weights) {
-        weights[key] /= totalWeight;
-    }
-    
-    return weights;
-  }
-
-  function detectAndScoreTrackVersion(track, userGenreProfile) {
-    const trackName = track.name?.toLowerCase() || '';
-    const albumName = track.album?.name?.toLowerCase() || '';
-    
-    const versionPatterns = {
-        remix: { patterns: [/remix/i, /rmx/i, /rework/i, /bootleg/i, /edit/i], penalty: 0.7, exceptions: ['electronic', 'dance', 'house', 'techno', 'edm'] },
-        live: { patterns: [/\blive\b/i, /concert/i, /acoustic/i, /unplugged/i], penalty: 0.5, exceptions: [] },
-        cover: { patterns: [/cover/i, /tribute/i], penalty: 0.6, exceptions: [] },
-        radio: { patterns: [/radio edit/i, /radio mix/i, /single version/i], penalty: 0.95, exceptions: [] },
-        instrumental: { patterns: [/instrumental/i, /karaoke/i], penalty: 0.4, exceptions: ['ambient', 'classical', 'soundtrack'] }
-    };
-    
-    let versionMultiplier = 1.0;
-    
-    for (const [versionType, config] of Object.entries(versionPatterns)) {
-        const isMatch = config.patterns.some(pattern => pattern.test(trackName) || pattern.test(albumName));
-        
-        if (isMatch) {
-            const userGenres = Object.keys(userGenreProfile || {});
-            const hasException = config.exceptions.some(exception => userGenres.some(genre => genre.includes(exception)));
-            
-            if (!hasException) {
-                versionMultiplier = config.penalty;
-            }
-            break;
-        }
-    }
-    return versionMultiplier;
-  }
-
-  function buildArtistTierSystem(profileData) {
-    const { enhancedLikedSongs, topItems } = profileData;
-    const artistStats = new Map();
-    
-    enhancedLikedSongs.forEach(song => {
-        (song.artistUris || []).forEach(artistUri => {
-            const artistId = artistUri.split(':')[2];
-            if (!artistStats.has(artistId)) {
-                artistStats.set(artistId, { likedSongCount: 0, topPositions: new Set(), timeRanges: new Set() });
-            }
-            const stats = artistStats.get(artistId);
-            stats.likedSongCount++;
-        });
-    });
-    
-    ['short_term', 'medium_term', 'long_term'].forEach(range => {
-        topItems[range].artists.forEach((artist, position) => {
-            const artistId = artist.id;
-            if (!artistStats.has(artistId)) {
-                artistStats.set(artistId, { likedSongCount: 0, topPositions: new Set(), timeRanges: new Set() });
-            }
-            const stats = artistStats.get(artistId);
-            stats.topPositions.add(position);
-            stats.timeRanges.add(range);
-        });
-    });
-    
-    const artistTiers = new Map();
-    artistStats.forEach((stats, artistId) => {
-        let tierScore = 0;
-        tierScore += Math.min(30, stats.likedSongCount * 2);
-        stats.topPositions.forEach(pos => {
-            if (pos < 10) tierScore += 15;
-            else if (pos < 50) tierScore += 5;
-        });
-        tierScore += stats.timeRanges.size * 10;
-        
-        let tier;
-        if (tierScore >= 80) tier = 'S';
-        else if (tierScore >= 60) tier = 'A';
-        else if (tierScore >= 40) tier = 'B';
-        else if (tierScore >= 20) tier = 'C';
-        else tier = 'D';
-        
-        artistTiers.set(artistId, tier);
-    });
-    
-    return artistTiers;
-  }
-
-  function getArtistTierMultiplier(tier) {
-    const multipliers = { 'S': 2.5, 'A': 1.8, 'B': 1.3, 'C': 1.0, 'D': 0.8 };
-    return multipliers[tier] || 1.0;
-  }
-
-  function aggregateScores(scores) {
-    if (scores.length === 0) return 0;
-    const rms = Math.sqrt(scores.reduce((sum, s) => sum + s * s, 0) / scores.length);
-    const consistency = 1 - calculateStandardDeviation(scores);
-    return rms * (0.9 + 0.1 * consistency);
-  }
-
-  function getFeatureImportance(feature) {
-    const importanceMap = {
-      energy: 1.0,
-      danceability: 0.9,
-      valence: 0.85,
-      acousticness: 0.7,
-      instrumentalness: 0.6,
-      speechiness: 0.5,
-      tempo: 0.8
-    };
-    return importanceMap[feature] || 0.5;
-  }
-
-  function getHarmonicResonanceScore(features) {
-    let resonanceScore = 0;
-    const harmonicPairs = [
-      ['energy', 'danceability'],
-      ['valence', 'energy'],
-      ['acousticness', 'instrumentalness']
-    ];
-    
-    for (const [feat1, feat2] of harmonicPairs) {
-      if (!(feat1 in features) || !(feat2 in features)) continue;
-      
-      const val1 = features[feat1];
-      const val2 = features[feat2];
-      const ratio = Math.max(val1, val2) / (Math.min(val1, val2) + 0.01);
-      
-      const goldenRatio = 1.618;
-      const goldenDistance = Math.abs(ratio - goldenRatio);
-      if (goldenDistance < 0.2) {
-        resonanceScore += 0.3 * (1 - goldenDistance / 0.2);
-      }
-      
-      const octaveDistance = Math.abs(ratio - Math.round(ratio));
-      if (octaveDistance < 0.1 && ratio > 1.5 && ratio < 4.5) {
-        resonanceScore += 0.2 * (1 - octaveDistance / 0.1);
-      }
-    }
-    return Math.min(1, resonanceScore);
-  }
-
-  function getContinuousSimilarityBoost(featuresA, likedSong) {
-    if (!featuresA || !likedSong || !likedSong.audio_features) return 0.0;
-
-    const featuresB = likedSong.audio_features;
-    const likedSongWeight = likedSong.final_weight || 1.0;
-
-    const MAX_BOOST = 10.0;
-    const MIN_BOOST = 2.0;
-    const MAX_ALLOWED_TEMPO_DIFF = 5.0;
-    const MAX_ALLOWED_OTHER_DIFF = 0.10;
-
-    const FEATURE_WEIGHTS = {
-        tempo: 1.5,
-        energy: 1.2,
-        danceability: 1.2,
-        valence: 1.0,
-        acousticness: 0.8,
-        instrumentalness: 0.7,
-        speechiness: 0.6,
-    };
-
-    let totalWeightedScore = 0;
-    let totalWeight = 0;
-
-    const tempoDiff = Math.abs(featuresA.tempo - featuresB.tempo);
-    if (tempoDiff > MAX_ALLOWED_TEMPO_DIFF) {
-        return 0.0;
-    }
-    const tempoSimilarity = 1 - (tempoDiff / MAX_ALLOWED_TEMPO_DIFF);
-    totalWeightedScore += tempoSimilarity * FEATURE_WEIGHTS.tempo;
-    totalWeight += FEATURE_WEIGHTS.tempo;
-
-    const otherFeatures = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
-    for (const feature of otherFeatures) {
-        if (featuresA[feature] === undefined || featuresB[feature] === undefined) continue;
-        const diff = Math.abs(featuresA[feature] - featuresB[feature]);
-        if (diff > MAX_ALLOWED_OTHER_DIFF) {
-            return 0.0;
-        }
-        const similarity = 1 - (diff / MAX_ALLOWED_OTHER_DIFF);
-        totalWeightedScore += similarity * FEATURE_WEIGHTS[feature];
-        totalWeight += FEATURE_WEIGHTS[feature];
-    }
-    
-    if (totalWeight === 0) return 0.0;
-    const averageSimilarity = totalWeightedScore / totalWeight;
-
-    const baseBoost = MIN_BOOST + (MAX_BOOST - MIN_BOOST) * averageSimilarity;
-    
-    const weightMultiplier = Math.max(0.5, Math.min(2.0, likedSongWeight / 1.5));
-
-    return baseBoost * weightMultiplier;
-  }
-
-
-  async function scoreAndSortPlaylist(targetTracks, affinityProfile, profileData, updateProgress, timeRangeScope = 'balanced', preFetchedAudioFeatures, completeLikedSongUrisSet) {
-    updateProgress("Ranking...");
-    const { gmmSonicProfile, genreProfile, artistProfile, weightedSongs } = affinityProfile;
-
-    const POPULARITY_WEIGHT = 3.0;
-    const CONTEXT_BONUS_WEIGHT = 10.0;
-
-    const getArtistUris = (track) => track.artistUris || (Array.isArray(track.artists) ? track.artists.map(a => a.uri) : []);
-
-    const targetTrackIds = targetTracks.map(t => t.uri.split(':')[2]);
-    const artistCache = new Map();
-    const popularityMap = new Map();
-    const releaseDateMap = new Map();
-
-    const targetArtistIds = [...new Set(targetTracks.flatMap(t => getArtistUris(t).map(uri => uri.split(':')[2])))];
-    for (let i = 0; i < targetArtistIds.length; i += 50) {
-        const batch = targetArtistIds.slice(i, i + 50);
-        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`);
-        (response.artists || []).forEach(artist => artist && artistCache.set(artist.id, artist.genres));
-    }
-
-    for (let i = 0; i < targetTrackIds.length; i += 50) {
-        const batch = targetTrackIds.slice(i, i + 50);
-        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-        (response.tracks || []).forEach(track => {
-            if (track) {
-                popularityMap.set(track.id, track.popularity);
-                if (track.album && track.album.release_date) {
-                    releaseDateMap.set(track.id, track.album.release_date);
-                }
-            }
-        });
-    }
-
-    let playlistContext = {
-        avgEnergy: 0.5,
-        avgValence: 0.5,
-        avgDanceability: 0.5,
-        avgAcousticness: 0.5,
-    };
-    let featureCount = 0;
-    let totalEnergy = 0, totalValence = 0, totalDanceability = 0, totalAcousticness = 0;
-    
-    targetTracks.forEach(track => {
-        const features = preFetchedAudioFeatures.get(track.uri.split(':')[2]);
-        if (features) {
-            totalEnergy += features.energy;
-            totalValence += features.valence;
-            totalDanceability += features.danceability;
-            totalAcousticness += features.acousticness;
-            featureCount++;
-        }
-    });
-    
-    if (featureCount > 0) {
-        playlistContext.avgEnergy = totalEnergy / featureCount;
-        playlistContext.avgValence = totalValence / featureCount;
-        playlistContext.avgDanceability = totalDanceability / featureCount;
-        playlistContext.avgAcousticness = totalAcousticness / featureCount;
-    }
-
-    const playlistCharacteristics = analyzePlaylistCharacteristics(targetTracks, preFetchedAudioFeatures, artistCache);
-    const weights = calculateAdaptiveWeights(playlistCharacteristics);
-    const { artistTiers } = profileData;
-    const likedSongsUris = completeLikedSongUrisSet;
-
-    const scoredTracks = targetTracks.map(track => {
-        const trackId = track.uri.split(':')[2];
-        const audio_features = preFetchedAudioFeatures.get(trackId);
-        const artistUris = getArtistUris(track);
-        const artist_genres = artistUris.flatMap(uri => artistCache.get(uri.split(':')[2]) || []);
-        const popularity = popularityMap.get(trackId) || 0;
-
-        let rawSonicScore = 0;
-        let harmonicScore = 0;
-
-        if (audio_features) {
-            const sonicScores = [];
-            const featureKeys = ['energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'speechiness'];
-            
-            featureKeys.forEach(feature => {
-                const gmm = gmmSonicProfile[feature];
-                const value = audio_features[feature];
-                if (gmm && typeof value === 'number') {
-                    const score = getGMMScore(value, gmm);
-                    sonicScores.push(score * getFeatureImportance(feature));
-                }
-            });
-
-            const min_tempo = 50, max_tempo = 200;
-            const tempoGMM = gmmSonicProfile.tempo;
-            if (tempoGMM && typeof audio_features.tempo === 'number') {
-                const normalized_tempo = (audio_features.tempo - min_tempo) / (max_tempo - min_tempo);
-                const score = getGMMScore(Math.max(0, Math.min(1, normalized_tempo)), tempoGMM);
-                sonicScores.push(score * getFeatureImportance('tempo'));
-            }
-            
-            rawSonicScore = aggregateScores(sonicScores) * 100;
-            harmonicScore = getHarmonicResonanceScore(audio_features);
-        }
-
-        let contextBonus = 0;
-        if (audio_features) {
-            const energyDiff = Math.abs(audio_features.energy - playlistContext.avgEnergy);
-            const valenceDiff = Math.abs(audio_features.valence - playlistContext.avgValence);
-            const danceabilityDiff = Math.abs(audio_features.danceability - playlistContext.avgDanceability);
-            const acousticnessDiff = Math.abs(audio_features.acousticness - playlistContext.avgAcousticness);
-            
-            const avgSimilarity = 1 - ((energyDiff + valenceDiff + danceabilityDiff + acousticnessDiff) / 4);
-            contextBonus = avgSimilarity * CONTEXT_BONUS_WEIGHT;
-        }
-
-        let genreScore = 0;
-        artist_genres.forEach(genre => {
-            genreScore += (genreProfile[genre] || 0);
-        });
-
-        let artistScore = 0;
-        let tierMultiplier = 1.0;
-        artistUris.forEach(uri => {
-            const artistId = uri.split(':')[2];
-            artistScore += (artistProfile[artistId] || 0);
-            const tier = artistTiers.get(artistId);
-            if (tier) {
-                tierMultiplier = Math.max(tierMultiplier, getArtistTierMultiplier(tier));
-            }
-        });
-        artistScore *= tierMultiplier;
-
-        let similarityBoost = 0.0;
-        if (audio_features) {
-            for (const likedSong of weightedSongs) {
-                const currentBoost = getContinuousSimilarityBoost(audio_features, likedSong);
-                if (currentBoost > similarityBoost) {
-                    similarityBoost = currentBoost;
-                }
-                if (similarityBoost >= 10.0) {
-                    break;
-                }
-            }
-        }
-        
-        let affinityScore = (rawSonicScore * weights.sonic) + 
-                            (genreScore * weights.genre) + 
-                            (artistScore * weights.artist) +
-                            (harmonicScore * 100 * weights.harmonic);
-
-        const versionMultiplier = detectAndScoreTrackVersion(track, affinityProfile.genreProfile);
-        affinityScore *= versionMultiplier;
-
-        if (likedSongsUris.has(track.uri)) {
-            affinityScore += 30;
-        }
-
-        let popularityBonus = 0;
-        if (popularity > 40) {
-            const popularity_factor = Math.min(1.0, (popularity - 40) / (90 - 40));
-            popularityBonus = POPULARITY_WEIGHT * popularity_factor;
-        }
-        
-        let finalScore = affinityScore + popularityBonus + similarityBoost + contextBonus;
-
-        const releaseDateStr = releaseDateMap.get(trackId);
-        if (releaseDateStr) {
-            const releaseYear = parseInt(releaseDateStr.substring(0, 4));
-            if (!isNaN(releaseYear)) {
-                if (timeRangeScope === 'recent' && releaseYear >= new Date().getFullYear() - 2) {
-                    finalScore *= 1.15; 
-                } else if (timeRangeScope === 'all_time' && releaseYear < 2005) {
-                    finalScore *= 1.10; 
-                }
-            }
-        }
-        
-        if (timeRangeScope === 'energy') {
-            if (!audio_features || audio_features.energy <= 0.65 || audio_features.danceability <= 0.5) {
-                finalScore *= 0.25;
-            }
-        } else if (timeRangeScope === 'mellow') {
-            if (!audio_features || audio_features.energy >= 0.4 || audio_features.acousticness <= 0.5 || audio_features.speechiness >= 0.33) {
-                finalScore *= 0.25; 
-            }
-        }
-
-        return { ...track, finalScore, popularity };
-    });
-    
-    const sortedTracks = scoredTracks.sort((a, b) => b.finalScore - a.finalScore);
-
-    let finalTracks = sortedTracks;
-    if (timeRangeScope === 'energy' || timeRangeScope === 'mellow') {
-        if (sortedTracks.length > 0) {
-            const topScore = sortedTracks[0].finalScore;
-            const scoreThreshold = topScore * 0.20;
-            
-            finalTracks = sortedTracks.filter(track => track.finalScore >= scoreThreshold);
-        }
-    }
-
-    return finalTracks;
-  }
-
-  async function getAudioFeaturesForTracks(trackIds) {
-    if (!trackIds || trackIds.length === 0) return [];
-    const allAudioFeatures = [];
-    for (let i = 0; i < trackIds.length; i += 100) {
-        const batchIds = trackIds.slice(i, i + 100);
-        try {
-            const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`);
-            if (response.audio_features) {
-                allAudioFeatures.push(...response.audio_features.filter(f => f));
-            }
-        } catch (error) {
-            console.error("Failed to fetch a batch of audio features:", error);
-        }
-    }
-    return allAudioFeatures;
-  }
-
   async function getAllFollowedArtists() {
     let allArtists = [];
     let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
@@ -15290,21 +14052,18 @@ function isDirectSortType(sortType) {
 
     return knownArtistIds;
   }
-
-  async function generatePersonalizedRecommendations(vibeType) {
+  
+  async function generateSpotifyRecommendations(vibeType) {
     let playlistName = "";
     let playlistDescription = "";
 
     try {
         mainButton.innerText = "Get library...";
-        const updateProgress = (message) => { mainButton.innerText = message; };
-        const profileData = await getAffinityProfileData(updateProgress);
         const allLikedSongs = await getLikedSongs();
-        const completeLikedSongUrisSet = new Set();
+        const completeLikedSongUrisSet = new Set(allLikedSongs.map(song => song.uri));
+        
         const likedSongsFingerprintMap = new Map();
-
         allLikedSongs.forEach(song => {
-            completeLikedSongUrisSet.add(song.uri);
             const title = song.name.toLowerCase().trim();
             if (!likedSongsFingerprintMap.has(title)) {
                 likedSongsFingerprintMap.set(title, new Set());
@@ -15313,17 +14072,15 @@ function isDirectSortType(sortType) {
             song.artistUris.forEach(uri => artistUrisForTitle.add(uri));
         });
 
-        let targetFeatures = {};
-        
         if (vibeType === 'pureDiscovery') {
             playlistName = "Pure Discovery";
-            
+            playlistDescription = "Discover new music from artists completely new to you. Created by Sort-Play.";
+
             mainButton.innerText = "Filtering...";
             const knownArtistIds = await getComprehensiveKnownArtistsSet();
             const topArtistsForSeeding = await getTopItems('artists', 'long_term', 100);
-            const topTracksForSeeding = await getTopItems('tracks', 'long_term', 50);
 
-            if (topArtistsForSeeding.length === 0 || topTracksForSeeding.length === 0) {
+            if (topArtistsForSeeding.length === 0) {
                 throw new Error("Need more listening history to build a discovery profile.");
             }
 
@@ -15332,7 +14089,7 @@ function isDirectSortType(sortType) {
             const shuffledTopArtists = shuffleArray(topArtistsForSeeding);
 
             for (const artist of shuffledTopArtists) {
-                if (relatedArtistPool.size > 500) break; 
+                if (relatedArtistPool.size > 500) break;
                 try {
                     const related = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artist.id}/related-artists`);
                     related.artists.forEach(relArtist => {
@@ -15342,64 +14099,34 @@ function isDirectSortType(sortType) {
                     });
                 } catch (e) { console.warn(`Could not get related artists for ${artist.name}`); }
             }
+            
             const unknownRelatedArtists = Array.from(relatedArtistPool.values());
             if (unknownRelatedArtists.length < 3) {
                 throw new Error("Couldn't find enough new artists related to your taste.");
             }
 
+            const topTracksForSeeding = await getTopItems('tracks', 'long_term', 50);
             const chosenUnknownArtists = shuffleArray(unknownRelatedArtists).slice(0, 3);
             const chosenSeedTracks = shuffleArray(topTracksForSeeding).slice(0, 2);
             
             const seed_artists = chosenUnknownArtists.map(a => a.id);
             const seed_tracks = chosenSeedTracks.map(t => t.id);
             
-            mainButton.innerText = "Profiling..."; 
-            
-            const { affinityProfile: tasteProfile } = buildAffinityProfile(profileData, updateProgress, 'balanced');
-
-            if (tasteProfile && tasteProfile.gmmSonicProfile) {
-                const featuresToTarget = ['energy', 'danceability', 'valence'];
-                for (const feature of featuresToTarget) {
-                    const gmm = tasteProfile.gmmSonicProfile[feature];
-                    if (gmm && gmm.fitted) {
-                        const dominantComponent = gmm.getDominantComponents()[0];
-                        if (dominantComponent) {
-                            targetFeatures[`target_${feature}`] = dominantComponent.mean;
-                        }
-                    }
-                }
-            }
-
-            playlistDescription = "Discover new music from artists related to your all-time favorites. Created by Sort-Play.";
-
             mainButton.innerText = "Get recs...";
             const params = new URLSearchParams({ limit: 100 });
             if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
             if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
-            for (const [key, value] of Object.entries(targetFeatures)) {
-                if (value !== undefined && !isNaN(value)) params.append(key, value.toFixed(3));
-            }
+            
             const recommendations = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
             
             if (!recommendations?.tracks?.length) throw new Error("Spotify didn't return any recommendations. Try again!");
             
             mainButton.innerText = "Excluding...";
-            let newRecommendedTracks = recommendations.tracks.filter(track => {
-                if (completeLikedSongUrisSet.has(track.uri)) {
-                    return false;
-                }
-                const title = track.name.toLowerCase().trim();
-                const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
-                if (!likedArtistUrisForTitle) {
-                    return true; 
-                }
-                const recommendedArtistUris = track.artists.map(a => a.uri);
-                const hasCommonArtist = recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri));
-                if (hasCommonArtist) {
-                    return false; 
-                }
-                return true;
-            }).filter(track => track.artists.every(artist => !knownArtistIds.has(artist.id)));
+            const availabilityChecks = await Promise.all(recommendations.tracks.map(track => isTrackAvailable(track)));
+            let newRecommendedTracks = recommendations.tracks
+                .filter((track, index) => availabilityChecks[index])
+                .filter(track => !completeLikedSongUrisSet.has(track.uri))
+                .filter(track => track.artists.every(artist => !knownArtistIds.has(artist.id)));
             
             if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
             
@@ -15415,16 +14142,9 @@ function isDirectSortType(sortType) {
             }
             
             Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
-
-            if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
-                const tempPath = "/library"; 
-                Spicetify.Platform.History.push(tempPath);
-                await new Promise(resolve => setTimeout(resolve, 450)); 
-                const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
-                if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
-            }
+            await navigateToPlaylist(newPlaylist);
             return;
-        } 
+        }
 
         let time_range = 'medium_term';
         let contrast_time_range = 'long_term';
@@ -15432,14 +14152,14 @@ function isDirectSortType(sortType) {
 
         if (vibeType === 'recommendRecentVibe') {
             playlistName = "Discovery: Recent Taste";
+            playlistDescription = "A diverse mix based on your recent taste. Created by Sort-Play.";
             time_range = 'short_term';
             contrast_time_range = 'long_term';
-            if (profileData.enhancedLikedSongs.length < 20) throw new Error("Not enough liked songs for a recent profile.");
         } else if (vibeType === 'recommendAllTime') {
             playlistName = "Discovery: All-Time Taste";
+            playlistDescription = "A diverse mix based on your all-time taste. Created by Sort-Play.";
             time_range = 'long_term';
             contrast_time_range = 'short_term';
-            if (profileData.enhancedLikedSongs.length < 50) throw new Error("Not enough liked songs for an all-time profile.");
         }
 
         mainButton.innerText = "Get top...";
@@ -15453,6 +14173,8 @@ function isDirectSortType(sortType) {
             throw new Error("Not enough listening history for diverse recommendations.");
         }
         
+        mainButton.innerText = "Profiling...";
+
         const allGenres = new Set(topArtists.flatMap(a => a.genres));
         const shuffledGenres = shuffleArray(Array.from(allGenres));
         let genreBridgeSeeds = [];
@@ -15470,17 +14192,14 @@ function isDirectSortType(sortType) {
 
         let likedSongSeedUris = [];
         if (vibeType === 'recommendRecentVibe') {
-            likedSongSeedUris = shuffleArray(profileData.enhancedLikedSongs.slice(0, 10)).slice(0, 5).map(t => t.uri.split(':')[2]);
+            likedSongSeedUris = shuffleArray(allLikedSongs.slice(0, 10)).slice(0, 5).map(t => t.uri.split(':')[2]);
         } else {
-            likedSongSeedUris = shuffleArray(profileData.enhancedLikedSongs.slice(-100)).slice(0, 5).map(t => t.uri.split(':')[2]);
+            likedSongSeedUris = shuffleArray(allLikedSongs.slice(-100)).slice(0, 5).map(t => t.uri.split(':')[2]);
         }
 
         const smartSongSeeds = new Set();
-        if (vibeType === 'recommendAllTime') {
-            smartSongSeeds.add(shuffleArray(topTracks.slice(0, 20))[0]);
-        } else {
-            smartSongSeeds.add(shuffleArray(topTracks.slice(0, 5))[0]);
-        }
+        if (vibeType === 'recommendAllTime') smartSongSeeds.add(shuffleArray(topTracks.slice(0, 20))[0]);
+        else smartSongSeeds.add(shuffleArray(topTracks.slice(0, 5))[0]);
         smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
         smartSongSeeds.add(deepCutPool[0]);
         if (contrastTopTracks.length > 0) smartSongSeeds.add(contrastTopTracks[0]);
@@ -15495,41 +14214,11 @@ function isDirectSortType(sortType) {
         }
         const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
 
-        mainButton.innerText = "Profiling...";
-        
-        let timeScope = 'balanced';
-        if (vibeType === 'recommendRecentVibe') timeScope = 'recent';
-        if (vibeType === 'recommendAllTime') timeScope = 'all_time';
-        const { affinityProfile: tasteProfile } = buildAffinityProfile(profileData, updateProgress, timeScope);
-
-        if (tasteProfile && tasteProfile.gmmSonicProfile) {
-            const featuresToTarget = ['energy', 'danceability', 'valence'];
-            for (const feature of featuresToTarget) {
-                const gmm = tasteProfile.gmmSonicProfile[feature];
-                if (gmm && gmm.fitted) {
-                    const dominantComponent = gmm.getDominantComponents()[0];
-                    if (dominantComponent) {
-                        targetFeatures[`target_${feature}`] = dominantComponent.mean;
-                    }
-                }
-            }
-        }
-        if (vibeType === 'recommendAllTime') {
-            if (Math.random() < 0.4) {
-                targetFeatures.target_popularity = Math.floor(Math.random() * 25) + 20;
-            }
-        }
-
-        playlistDescription = vibeType === 'recommendRecentVibe' 
-            ? "A diverse mix based on your recent taste. Created by Sort-Play." 
-            : "A diverse mix based on your all-time taste. Created by Sort-Play.";
-
         mainButton.innerText = "Get recs...";
         const recommendationBatches = [];
         const NUM_CALLS = 6;
         
         for (let i = 0; i < NUM_CALLS; i++) {
-            mainButton.innerText = "Get recs...";
             const params = new URLSearchParams({ limit: 100 });
             let seed_artists = [], seed_tracks = [];
 
@@ -15549,18 +14238,13 @@ function isDirectSortType(sortType) {
 
             if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
             if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
-            for (const [key, value] of Object.entries(targetFeatures)) {
-                if (value !== undefined && !isNaN(value)) params.append(key, value.toFixed(3));
-            }
 
             try {
                 const recsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
                 if (recsResponse?.tracks?.length > 0) {
                     recommendationBatches.push(recsResponse.tracks);
                 }
-            } catch (e) {
-                console.warn(`Recommendation call ${i+1} failed.`, e);
-            }
+            } catch (e) { console.warn(`Recommendation call ${i+1} failed.`, e); }
             await new Promise(resolve => setTimeout(resolve, 250));
         }
 
@@ -15581,30 +14265,23 @@ function isDirectSortType(sortType) {
         
         const seenUris = new Set();
         const uniqueMixedTracks = interleavedTracks.filter(track => {
-            if (seenUris.has(track.uri)) {
-                return false;
-            } else {
-                seenUris.add(track.uri);
-                return true;
-            }
+            if (seenUris.has(track.uri)) return false;
+            seenUris.add(track.uri);
+            return true;
         });
 
         mainButton.innerText = "Excluding...";
-        let newRecommendedTracks = uniqueMixedTracks.filter(track => {
-            if (completeLikedSongUrisSet.has(track.uri)) {
-                return false;
-            }
+        const availabilityChecks = await Promise.all(uniqueMixedTracks.map(track => isTrackAvailable(track)));
+        let newRecommendedTracks = uniqueMixedTracks.filter((track, index) => {
+            if (!availabilityChecks[index]) return false;
+            if (completeLikedSongUrisSet.has(track.uri)) return false;
+            
             const title = track.name.toLowerCase().trim();
             const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
-            if (!likedArtistUrisForTitle) {
-                return true; 
-            }
+            if (!likedArtistUrisForTitle) return true;
+            
             const recommendedArtistUris = track.artists.map(a => a.uri);
-            const hasCommonArtist = recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri));
-            if (hasCommonArtist) {
-                return false;
-            }
-            return true;
+            return !recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri));
         });
 
         if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
@@ -15621,17 +14298,10 @@ function isDirectSortType(sortType) {
         }
 
         Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
-
-        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
-            const tempPath = "/library"; 
-            Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 600)); 
-            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
-            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
-        }
+        await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
-        console.error(`Error in generatePersonalizedRecommendations (${vibeType}):`, error);
+        console.error(`Error in generateSpotifyRecommendations (${vibeType}):`, error);
         Spicetify.showNotification(error.message, true);
     } finally {
         resetButtons();
@@ -15809,551 +14479,6 @@ function isDirectSortType(sortType) {
     }
   }
 
-  async function generateFollowedArtistPicks() {
-    const { GraphQL, CosmosAsync } = Spicetify;
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    menuButtons.forEach((button) => (button.disabled = true));
-    toggleMenu();
-    closeAllMenus();
-
-    try {
-        const updateProgress = (message) => { mainButton.innerText = message; };
-
-        updateProgress("Get artists...");
-        
-        async function getFollowedArtists() {
-            let artists = [];
-            let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
-            while (nextUrl) {
-                const response = await Spicetify.CosmosAsync.get(nextUrl);
-                if (response.artists?.items) {
-                    artists.push(...response.artists.items);
-                    nextUrl = response.artists.next;
-                } else {
-                    nextUrl = null;
-                }
-            }
-            return artists;
-        }
-
-        const followedArtists = await getFollowedArtists();
-        if (followedArtists.length === 0) {
-            throw new Error("You are not following any artists.");
-        }
-        const dateLimit = new Date();
-        dateLimit.setUTCHours(0, 0, 0, 0);
-        const daysSinceLastFriday = (dateLimit.getUTCDay() + 2) % 7;
-        const numberOfWeeks = Math.ceil(newReleasesDaysLimit / 7);
-        const totalDaysToSubtract = daysSinceLastFriday + (numberOfWeeks - 1) * 7;
-        dateLimit.setUTCDate(dateLimit.getUTCDate() - totalDaysToSubtract);
-        const newReleasesMap = new Map();
-
-        const BATCH_SIZE = 300;
-        for (let i = 0; i < followedArtists.length; i += BATCH_SIZE) {
-            const artistBatch = followedArtists.slice(i, i + BATCH_SIZE);
-            updateProgress(`Scanning...`);
-
-            const batchPromises = artistBatch.map(artist => {
-                const variables = { uri: artist.uri, order: "DATE_DESC", offset: 0, limit: 5 };
-                return GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, variables)
-                    .catch(err => {
-                        console.warn(`Failed to fetch discography for ${artist.name}`, err);
-                        return null;
-                    });
-            });
-
-            const batchResponses = await Promise.all(batchPromises);
-
-            for (const response of batchResponses) {
-                if (!response || response.errors || !response.data?.artistUnion) continue;
-                
-                const releases = response.data.artistUnion.discography?.all?.items;
-                if (releases) {
-                    for (const release of releases) {
-                        const album = release.releases.items[0];
-                        if (album?.date?.isoString) {
-                            const releaseDate = new Date(album.date.isoString);
-                            if (releaseDate >= dateLimit) {
-                                newReleasesMap.set(album.uri, album);
-                            }
-                        }
-                    }
-                }
-            }
-            await new Promise(resolve => setTimeout(resolve, 200));
-        }
-
-        const allNewReleases = Array.from(newReleasesMap.values());
-        if (allNewReleases.length === 0) {
-            throw new Error("No new releases found in the last 14 days.");
-        }
-
-        updateProgress(`Get tracks...`);
-        let genuinelyNewTracks = [];
-        const albumUris = allNewReleases.map(album => album.uri);
-
-        for (let i = 0; i < albumUris.length; i += 20) {
-            const albumBatchUris = albumUris.slice(i, i + 20);
-            const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumBatchUris.map(uri => uri.split(':')[2]).join(',')}`);
-            
-            if (albumsData.albums) {
-                for (const album of albumsData.albums) {
-                    if (album && album.tracks && album.tracks.items) {
-                        const trackReleaseDate = new Date(album.release_date);
-                        if (trackReleaseDate < dateLimit) continue;
-                        
-                        const augmentedTracks = album.tracks.items.map(track => ({
-                            ...track,
-                            album: {
-                                release_date: album.release_date,
-                                name: album.name,
-                                uri: album.uri,
-                                id: album.id
-                            },
-                            allArtists: track.artists.map(a => a.name).join(', '),
-                            artistUris: track.artists.map(a => a.uri),
-                            durationMilis: track.duration_ms,
-                        }));
-                        genuinelyNewTracks.push(...augmentedTracks);
-                    }
-                }
-            }
-        }
-        
-        if (genuinelyNewTracks.length === 0) {
-            throw new Error("Could not fetch any tracks from the new releases.");
-        }
-
-        const MAX_TRACKS_TO_PROCESS = 1000;
-        let tracksToProcess = [...new Map(genuinelyNewTracks.map(item => [item.uri, item])).values()];
-
-        if (tracksToProcess.length > MAX_TRACKS_TO_PROCESS) {
-            tracksToProcess.sort((a, b) => new Date(b.album.release_date) - new Date(a.album.release_date));
-            tracksToProcess = tracksToProcess.slice(0, MAX_TRACKS_TO_PROCESS);
-        }
-    
-        updateProgress("Enriching...");
-        const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracksToProcess, () => {});
-    
-        const tracksWithIdsForPop = await processBatchesWithDelay(
-            tracksWithPlayCounts, 200, 1000,
-            () => {},
-            collectTrackIdsForPopularity
-        );
-        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-            tracksWithIdsForPop,
-            () => {}
-        );
-    
-        updateProgress("Deduplicating...");
-        const { unique: uniqueTracks, removed: removedDuplicates } = deduplicateTracks(tracksWithPopularity);
-
-        if (uniqueTracks.length === 0) {
-            throw new Error("No unique new tracks found after deduplication.");
-        }
-        
-        tracksToProcess = uniqueTracks;
-    
-        const profileData = await getAffinityProfileData(updateProgress);
-        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced').affinityProfile;
-        
-        const audioFeaturesForScoring = await getAudioFeaturesForTracks(tracksToProcess.map(t => t.uri.split(':')[2]));
-        const audioFeaturesMapForScoring = new Map(audioFeaturesForScoring.map(f => [f.id, f]));
-
-        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, profileData, updateProgress, 'balanced', audioFeaturesMapForScoring);
-    
-        if (scoredTracks.length === 0) {
-            throw new Error("No tracks matched your affinity profile.");
-        }
-        
-        updateProgress("Balancing...");
-        
-        const tracksByAlbum = scoredTracks.reduce((acc, track) => {
-            const albumUri = track.album.uri;
-            if (!acc[albumUri]) acc[albumUri] = [];
-            acc[albumUri].push(track);
-            return acc;
-        }, {});
-
-        let candidateTracks = [];
-        for (const albumUri in tracksByAlbum) {
-            const topTracksFromAlbum = tracksByAlbum[albumUri]
-                .sort((a, b) => b.finalScore - a.finalScore)
-                .slice(0, 2);
-            candidateTracks.push(...topTracksFromAlbum);
-        }
-        candidateTracks.sort((a, b) => b.finalScore - a.finalScore);
-
-        const FINAL_PLAYLIST_SIZE = 200;
-        const candidateTrackIds = candidateTracks.map(t => t.uri.split(':')[2]);
-        const audioFeatures = await getAudioFeaturesForTracks(candidateTrackIds);
-        const audioFeaturesMap = new Map(audioFeatures.map(f => [f.id, f]));
-        
-        const energyProfile = affinityProfile.rawSonicProfile.energy;
-        const totalWeight = energyProfile.reduce((a, b) => a + b, 0);
-        const lowEnergyWeight = energyProfile.slice(0, 4).reduce((a, b) => a + b, 0);
-        const mediumEnergyWeight = energyProfile.slice(4, 7).reduce((a, b) => a + b, 0);
-        const highEnergyWeight = energyProfile.slice(7, 10).reduce((a, b) => a + b, 0);
-
-        const lowRatio = totalWeight > 0 ? lowEnergyWeight / totalWeight : 0.33;
-        const mediumRatio = totalWeight > 0 ? mediumEnergyWeight / totalWeight : 0.34;
-        const highRatio = totalWeight > 0 ? highEnergyWeight / totalWeight : 0.33;
-
-        let targetLow = Math.round(FINAL_PLAYLIST_SIZE * lowRatio);
-        let targetMedium = Math.round(FINAL_PLAYLIST_SIZE * mediumRatio);
-        let targetHigh = Math.round(FINAL_PLAYLIST_SIZE * highRatio);
-        
-        let totalTarget = targetLow + targetMedium + targetHigh;
-        while(totalTarget !== FINAL_PLAYLIST_SIZE) {
-            if (totalTarget > FINAL_PLAYLIST_SIZE) targetMedium--;
-            else targetHigh++;
-            totalTarget = targetLow + targetMedium + targetHigh;
-        }
-
-        const lowEnergyBin = [], mediumEnergyBin = [], highEnergyBin = [];
-        for(const track of candidateTracks) {
-            const features = audioFeaturesMap.get(track.uri.split(':')[2]);
-            if (features) {
-                if (features.energy < 0.4) lowEnergyBin.push(track);
-                else if (features.energy <= 0.7) mediumEnergyBin.push(track);
-                else highEnergyBin.push(track);
-            }
-        }
-
-        const artistCountMap = new Map();
-        const albumCountMap = new Map();
-        const topTracks = [];
-        const MAX_SONGS_PER_ARTIST = 3;
-        const MAX_SONGS_PER_ALBUM = 3;
-
-        const binPointers = { low: 0, medium: 0, high: 0 };
-        const binArrays = { low: lowEnergyBin, medium: mediumEnergyBin, high: highEnergyBin };
-        const binTargets = { low: targetLow, medium: targetMedium, high: targetHigh };
-        const binCounts = { low: 0, medium: 0, high: 0 };
-
-        while (topTracks.length < FINAL_PLAYLIST_SIZE) {
-            let trackAddedInCycle = false;
-            const pickOrder = ['high', 'medium', 'low'].sort((a,b) => (binCounts[b] / binTargets[b]) - (binCounts[a] / binTargets[a]));
-
-            for (const binName of pickOrder) {
-                if (topTracks.length >= FINAL_PLAYLIST_SIZE) break;
-                while (binArrays[binName].length > binPointers[binName] && binCounts[binName] < binTargets[binName]) {
-                    const track = binArrays[binName][binPointers[binName]];
-                    binPointers[binName]++;
-
-                    const primaryArtistUri = track.artists[0].uri;
-                    const albumUri = track.album.uri;
-                    const artistCount = artistCountMap.get(primaryArtistUri) || 0;
-                    const albumCount = albumCountMap.get(albumUri) || 0;
-
-                    if (artistCount < MAX_SONGS_PER_ARTIST && albumCount < MAX_SONGS_PER_ALBUM) {
-                        topTracks.push(track);
-                        artistCountMap.set(primaryArtistUri, artistCount + 1);
-                        albumCountMap.set(albumUri, albumCount + 1);
-                        binCounts[binName]++;
-                        trackAddedInCycle = true;
-                        break;
-                    }
-                }
-            }
-             if (!trackAddedInCycle) {
-                break;
-            }
-        }
-        
-        const trackUris = topTracks.map(track => track.uri);
-        const playlistName = "Followed Artists: Fresh Picks";
-        const playlistDescription = `The latest releases from artists you follow, personalized for your taste. Created by Sort-Play.`;
-        
-        updateProgress("Creating...");
-        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('followedArtistPicks', playlistName, playlistDescription);
-        
-        updateProgress("Saving...");
-        if (wasUpdated) {
-            await replacePlaylistTracks(newPlaylist.id, trackUris);
-        } else {
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
-        }
-        
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${topTracks.length} tracks!`);
-
-        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
-            const tempPath = "/library"; 
-            Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 600)); 
-            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
-            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
-        }
-
-    } catch (error) {
-        console.error("Error generating Followed Artist Picks:", error);
-        Spicetify.showNotification(error.message, true);
-    } finally {
-        resetButtons();
-    }
-  }
-
-
-  async function generateNewDiscoveryPicks() {
-    const { GraphQL, CosmosAsync } = Spicetify;
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    menuButtons.forEach((button) => (button.disabled = true));
-    toggleMenu();
-    closeAllMenus();
-
-    try {
-        const updateProgress = (message) => { mainButton.innerText = message; };
-
-        updateProgress("Scanning...");
-
-        const formatItem = (item) => {
-            const artists = Array.isArray(item.artists) ? item.artists.map(a => a.name).join(', ') : 'N/A';
-            return { uri: item.uri, name: item.name, artists, release_date: item.release_date, id: item.id };
-        };
-
-        async function fetchBrowseNewReleases() {
-            const browseAlbums = [];
-            let nextUrl = 'https://api.spotify.com/v1/browse/new-releases?limit=50';
-            while (nextUrl) {
-                try {
-                    const res = await CosmosAsync.get(nextUrl);
-                    if (res.albums?.items) {
-                        browseAlbums.push(...res.albums.items.map(formatItem));
-                        nextUrl = res.albums.next;
-                    } else nextUrl = null;
-                } catch (e) { console.warn("Error fetching Browse releases:", e); nextUrl = null; }
-            }
-            return browseAlbums;
-        }
-
-        async function fetchSearchNewAlbums() {
-            const searchAlbums = [];
-            let nextUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(`year:${new Date().getFullYear()}`)}&type=album&limit=50`;
-            while (nextUrl && searchAlbums.length < 1000) {
-                try {
-                    const res = await CosmosAsync.get(nextUrl);
-                    if (res.albums?.items) {
-                        searchAlbums.push(...res.albums.items);
-                        nextUrl = res.albums.next;
-                    } else nextUrl = null;
-                } catch (e) { console.warn("Error fetching Search releases:", e); nextUrl = null; }
-            }
-            const twoMonthsAgo = new Date(new Date().getFullYear(), new Date().getMonth() - 2, 1);
-            return searchAlbums.filter(album => new Date(album.release_date) >= twoMonthsAgo).map(formatItem);
-        }
-
-        const [browseResults, searchResults] = await Promise.all([
-            fetchBrowseNewReleases(),
-            fetchSearchNewAlbums()
-        ]);
-
-        const combinedResults = [...browseResults, ...searchResults];
-        const uniqueAlbums = Array.from(new Map(combinedResults.map(item => [item.uri, item])).values());
-        
-        if (uniqueAlbums.length === 0) {
-            throw new Error("Could not find any new releases from Spotify's sources.");
-        }
-
-        updateProgress(`Get tracks...`);
-        let initialTracks = [];
-        const albumIds = uniqueAlbums.map(album => album.id);
-
-        for (let i = 0; i < albumIds.length; i += 20) {
-            const albumIdBatch = albumIds.slice(i, i + 20);
-            const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumIdBatch.join(',')}`);
-            if (albumsData.albums) {
-                for (const album of albumsData.albums) {
-                    if (album && album.tracks && album.tracks.items) {
-                        initialTracks.push(...album.tracks.items);
-                    }
-                }
-            }
-        }
-        
-        if (initialTracks.length === 0) {
-            throw new Error("Could not fetch any tracks from the new releases.");
-        }
-
-        updateProgress("Verifying...");
-        const dateLimit = new Date();
-        dateLimit.setUTCHours(0, 0, 0, 0);
-        dateLimit.setUTCDate(dateLimit.getUTCDate() - (newReleasesDaysLimit - 1));
-        let genuinelyNewTracks = [];
-        const initialTrackIds = initialTracks.map(t => t.id).filter(Boolean);
-
-        for (let i = 0; i < initialTrackIds.length; i += 50) {
-            const trackIdBatch = initialTrackIds.slice(i, i + 50);
-            const fullTrackData = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdBatch.join(',')}`);
-            if (fullTrackData.tracks) {
-                for (const track of fullTrackData.tracks) {
-                    if (track && track.album && track.album.release_date) {
-                        const trackReleaseDate = new Date(track.album.release_date);
-                        if (trackReleaseDate >= dateLimit) {
-                            genuinelyNewTracks.push({
-                                ...track,
-                                allArtists: track.artists.map(a => a.name).join(', '),
-                                artistUris: track.artists.map(a => a.uri),
-                                durationMilis: track.duration_ms,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        if (genuinelyNewTracks.length === 0) {
-            throw new Error("No genuinely new tracks found after filtering out old songs.");
-        }
-
-        const MAX_TRACKS_TO_PROCESS = 1000;
-        let tracksToProcess = [...new Map(genuinelyNewTracks.map(item => [item.uri, item])).values()];
-
-        if (tracksToProcess.length > MAX_TRACKS_TO_PROCESS) {
-            tracksToProcess.sort((a, b) => new Date(b.album.release_date) - new Date(a.album.release_date));
-            tracksToProcess = tracksToProcess.slice(0, MAX_TRACKS_TO_PROCESS);
-        }
-
-        const profileData = await getAffinityProfileData(updateProgress);
-        const affinityProfile = buildAffinityProfile(profileData, updateProgress, 'balanced').affinityProfile;
-        
-        const audioFeaturesForScoring = await getAudioFeaturesForTracks(tracksToProcess.map(t => t.uri.split(':')[2]));
-        const audioFeaturesMapForScoring = new Map(audioFeaturesForScoring.map(f => [f.id, f]));
-
-        const scoredTracks = await scoreAndSortPlaylist(tracksToProcess, affinityProfile, profileData, updateProgress, 'balanced', audioFeaturesMapForScoring);
-        
-        if (scoredTracks.length === 0) {
-            throw new Error("No tracks matched your affinity profile.");
-        }
-
-        updateProgress("Balancing...");
-
-        const tracksByAlbum = scoredTracks.reduce((acc, track) => {
-            const albumUri = track.album.uri;
-            if (!acc[albumUri]) acc[albumUri] = [];
-            acc[albumUri].push(track);
-            return acc;
-        }, {});
-
-        let candidateTracks = [];
-        for (const albumUri in tracksByAlbum) {
-            const bestTrackFromAlbum = tracksByAlbum[albumUri].sort((a, b) => b.finalScore - a.finalScore)[0];
-            candidateTracks.push(bestTrackFromAlbum);
-        }
-        candidateTracks.sort((a, b) => b.finalScore - a.finalScore);
-
-        const FINAL_PLAYLIST_SIZE = 100;
-        const candidateTrackIds = candidateTracks.map(t => t.uri.split(':')[2]);
-        const audioFeatures = await getAudioFeaturesForTracks(candidateTrackIds);
-        const audioFeaturesMap = new Map(audioFeatures.map(f => [f.id, f]));
-        
-        const energyProfile = affinityProfile.rawSonicProfile.energy;
-        const totalWeight = energyProfile.reduce((a, b) => a + b, 0);
-        const lowEnergyWeight = energyProfile.slice(0, 4).reduce((a, b) => a + b, 0);
-        const mediumEnergyWeight = energyProfile.slice(4, 7).reduce((a, b) => a + b, 0);
-        const highEnergyWeight = energyProfile.slice(7, 10).reduce((a, b) => a + b, 0);
-
-        const lowRatio = totalWeight > 0 ? lowEnergyWeight / totalWeight : 0.33;
-        const mediumRatio = totalWeight > 0 ? mediumEnergyWeight / totalWeight : 0.34;
-        const highRatio = totalWeight > 0 ? highEnergyWeight / totalWeight : 0.33;
-
-        let targetLow = Math.round(FINAL_PLAYLIST_SIZE * lowRatio);
-        let targetMedium = Math.round(FINAL_PLAYLIST_SIZE * mediumRatio);
-        let targetHigh = Math.round(FINAL_PLAYLIST_SIZE * highRatio);
-        
-        let totalTarget = targetLow + targetMedium + targetHigh;
-        while(totalTarget !== FINAL_PLAYLIST_SIZE) {
-            if (totalTarget > FINAL_PLAYLIST_SIZE) targetMedium--;
-            else targetHigh++;
-            totalTarget = targetLow + targetMedium + targetHigh;
-        }
-
-        const lowEnergyBin = [], mediumEnergyBin = [], highEnergyBin = [];
-        for(const track of candidateTracks) {
-            const features = audioFeaturesMap.get(track.uri.split(':')[2]);
-            if (features) {
-                if (features.energy < 0.4) lowEnergyBin.push(track);
-                else if (features.energy <= 0.7) mediumEnergyBin.push(track);
-                else highEnergyBin.push(track);
-            }
-        }
-
-        const artistCountMap = new Map();
-        const albumCountMap = new Map();
-        const topTracks = [];
-        const MAX_SONGS_PER_ARTIST = 3;
-        const MAX_SONGS_PER_ALBUM = 1;
-
-        const binPointers = { low: 0, medium: 0, high: 0 };
-        const binArrays = { low: lowEnergyBin, medium: mediumEnergyBin, high: highEnergyBin };
-        const binTargets = { low: targetLow, medium: targetMedium, high: targetHigh };
-        const binCounts = { low: 0, medium: 0, high: 0 };
-
-        while (topTracks.length < FINAL_PLAYLIST_SIZE) {
-            let trackAddedInCycle = false;
-            const pickOrder = ['high', 'medium', 'low'].sort((a,b) => (binCounts[b] / binTargets[b]) - (binCounts[a] / binTargets[a]));
-
-            for (const binName of pickOrder) {
-                if (topTracks.length >= FINAL_PLAYLIST_SIZE) break;
-                while (binArrays[binName].length > binPointers[binName] && binCounts[binName] < binTargets[binName]) {
-                    const track = binArrays[binName][binPointers[binName]];
-                    binPointers[binName]++;
-                    const primaryArtistUri = track.artists[0].uri;
-                    const albumUri = track.album.uri;
-                    const artistCount = artistCountMap.get(primaryArtistUri) || 0;
-                    const albumCount = albumCountMap.get(albumUri) || 0;
-                    if (artistCount < MAX_SONGS_PER_ARTIST && albumCount < MAX_SONGS_PER_ALBUM) {
-                        topTracks.push(track);
-                        artistCountMap.set(primaryArtistUri, artistCount + 1);
-                        albumCountMap.set(albumUri, albumCount + 1);
-                        binCounts[binName]++;
-                        trackAddedInCycle = true;
-                        break;
-                    }
-                }
-            }
-             if (!trackAddedInCycle) break;
-        }
-        
-        const trackUris = topTracks.map(track => track.uri);
-        const playlistName = "New Music Picks";
-        const playlistDescription = `A personalized mix of new music from across Spotify, tailored to your taste by Sort-Play.`;
-        
-        updateProgress("Creating...");
-        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('newDiscoveryPicks', playlistName, playlistDescription);
-        
-        updateProgress("Saving...");
-        if (wasUpdated) {
-            await replacePlaylistTracks(newPlaylist.id, trackUris);
-        } else {
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
-        }
-        
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${topTracks.length} tracks!`);
-
-        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
-            const tempPath = "/library"; 
-            Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 600)); 
-            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
-            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
-        }
-
-    } catch (error) {
-        console.error("Error generating New Discovery Picks:", error);
-        Spicetify.showNotification(error.message, true);
-    } finally {
-        resetButtons();
-    }
-  }
-
   async function isTrackAvailable(track) {
     if (!track) return false;
 
@@ -16361,7 +14486,11 @@ function isDirectSortType(sortType) {
         return false;
     }
 
-    if (Array.isArray(track.available_markets) && track.available_markets.length > 0) {
+    if (Array.isArray(track.available_markets)) {
+        if (track.available_markets.length === 0) {
+            return false;
+        }
+
         const userMarket = await userMarketPromise;
         if (userMarket) {
             return track.available_markets.includes(userMarket);
@@ -16373,32 +14502,64 @@ function isDirectSortType(sortType) {
 
   async function getDirectTracksFromGenrePlaylists(playlistsToFetch, numTracksNeeded) {
     const directTracks = [];
-    const numTracksPerPlaylist = Math.ceil(numTracksNeeded / playlistsToFetch.size);
+    const allSimplifiedTracks = [];
 
     for (const playlist of playlistsToFetch.values()) {
         try {
             const playlistTracks = await getPlaylistTracks(playlist.uri);
             if (playlistTracks.length > 0) {
-                const availabilityChecks = await Promise.all(playlistTracks.map(track => isTrackAvailable(track)));
-                const availableTracks = playlistTracks.filter((_, index) => availabilityChecks[index]);
-                
-                const shuffled = shuffleArray(availableTracks);
-                const selectedTracks = shuffled.slice(0, numTracksPerPlaylist);
-
-                const flaggedTracks = selectedTracks.map(track => ({
-                    ...track,
-                    sourceInfo: {
-                        method: 'Direct Pick',
-                        sourcePlaylist: playlist.genre
-                    }
-                }));
-                directTracks.push(...flaggedTracks);
+                allSimplifiedTracks.push(...playlistTracks);
             }
         } catch (error) {
             console.warn(`Could not fetch tracks for genre playlist ${playlist.genre}:`, error);
         }
     }
-    return directTracks;
+
+    if (allSimplifiedTracks.length === 0) {
+        return [];
+    }
+
+    const uniqueTracksMap = new Map(allSimplifiedTracks.map(t => [t.uri, t]));
+    const shuffledPool = shuffleArray(Array.from(uniqueTracksMap.values()));
+    
+    let poolIndex = 0;
+
+    while (directTracks.length < numTracksNeeded && poolIndex < shuffledPool.length) {
+        const needed = numTracksNeeded - directTracks.length;
+        const batchSize = Math.min(needed + 10, 50);
+        const batchToTest = shuffledPool.slice(poolIndex, poolIndex + batchSize);
+        poolIndex += batchSize;
+
+        if (batchToTest.length === 0) break;
+
+        const trackIds = batchToTest.map(t => t.uri.split(':')[2]);
+        
+        try {
+            const fullTrackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIds.join(',')}`);
+            if (fullTrackDetails && fullTrackDetails.tracks) {
+                for (const fullTrack of fullTrackDetails.tracks) {
+                    if (fullTrack && await isTrackAvailable(fullTrack)) {
+                        directTracks.push(fullTrack);
+                        if (directTracks.length >= numTracksNeeded) {
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.warn(`Failed to fetch a batch of full track details for availability check:`, error);
+        }
+    }
+
+    const flaggedTracks = directTracks.map(track => ({
+        ...track,
+        sourceInfo: {
+            method: 'Direct Pick',
+            sourcePlaylist: 'Various Genre Playlists'
+        }
+    }));
+    
+    return flaggedTracks;
   }
 
   async function discoverTracksViaGenreSearch(selectedGenres, numTracksNeeded, existingTracks = []) {
@@ -17087,7 +15248,7 @@ function isDirectSortType(sortType) {
   }
 
   async function handleSortAndCreatePlaylist(sortType) {
-    if (sortType === "sortByParent" || sortType === "affinityParent" || sortType === "createNewPlaylist") {
+    if (sortType === "sortByParent" || sortType === "createNewPlaylist") {
       return;
     }
 
@@ -17097,17 +15258,13 @@ function isDirectSortType(sortType) {
         topAllTime:      { time_range: 'long_term',   name: 'All-Time',        description: 'of all time' }
     };
 
-    const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedArtistPicks', 'newDiscoveryPicks', 'followedReleasesChronological', 'genreTreeExplorer'];
+    const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedReleasesChronological', 'genreTreeExplorer'];
     if (recommendationSortTypes.includes(sortType)) {
         if (sortType === 'genreTreeExplorer') {
             showGenreTreeExplorerModal();
-        } else if (sortType === 'followedArtistPicks') {
-            await generateFollowedArtistPicks();
-        } else if (sortType === 'newDiscoveryPicks') {
-            await generateNewDiscoveryPicks();
         } else if (sortType === 'followedReleasesChronological') {
             await generateFollowedReleasesChronological();
-        } else {
+        } else { 
             setButtonProcessing(true);
             mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
             mainButton.style.color = buttonStyles.main.disabledColor;
@@ -17116,7 +15273,7 @@ function isDirectSortType(sortType) {
             menuButtons.forEach((button) => (button.disabled = true));
             toggleMenu();
             closeAllMenus();
-            await generatePersonalizedRecommendations(sortType);
+            await generateSpotifyRecommendations(sortType);
         }
         return; 
     }
@@ -17255,10 +15412,6 @@ function isDirectSortType(sortType) {
                                        currentPlaylistDetails.owner &&
                                        currentPlaylistDetails.owner.id === user.username;
 
-      if (sortType === 'affinityPowerHour' || sortType === 'affinityMellowMood') {
-          canModifyCurrentPlaylist = false;
-      }
-
       if (canModifyCurrentPlaylist) {
         const userChoice = await showConfirmationModal({
             title: "Sort Current Playlist?",
@@ -17284,74 +15437,9 @@ function isDirectSortType(sortType) {
       let playlistWasModifiedOrCreated = false;
       let newPlaylistObjectForNavigation = null; 
       let modifiedPlaylistOriginalPath = null;
-      
-      const isAffinitySort = ['affinityBalanced', 'affinityShortTerm', 'affinityLongTerm', 'affinityPowerHour', 'affinityMellowMood', 'affinityHiddenGems'].includes(sortType);
 
-      if (isAffinitySort) {
-        const updateProgress = (message) => { mainButton.innerText = message; };
-        try {
-            updateProgress("Analyzing...");
-            const trackIds = tracks.map(t => t.uri.split(':')[2]);
-            const audioFeatures = await getAudioFeaturesForTracks(trackIds);
-            const audioFeaturesMap = new Map(audioFeatures.map(f => [f.id, f]));
 
-            let hasPotentialCandidates = false;
-            if (sortType === 'affinityPowerHour') {
-                hasPotentialCandidates = tracks.some(track => {
-                    const features = audioFeaturesMap.get(track.uri.split(':')[2]);
-                    return features && features.energy > 0.65 && features.danceability > 0.5;
-                });
-            } else if (sortType === 'affinityMellowMood') {
-                hasPotentialCandidates = tracks.some(track => {
-                    const features = audioFeaturesMap.get(track.uri.split(':')[2]);
-                    return features && features.energy < 0.4 && features.acousticness > 0.5 && features.speechiness < 0.33;
-                });
-            } else {
-                hasPotentialCandidates = true; 
-            }
-
-            if (!hasPotentialCandidates) {
-                Spicetify.showNotification("This playlist contains no tracks suitable for this mood mix.");
-                resetButtons();
-                return;
-            }
-
-            const profileData = await getAffinityProfileData(updateProgress);
-            
-            let timeScope;
-            switch(sortType) {
-                case 'affinityShortTerm': timeScope = 'recent'; break;
-                case 'affinityLongTerm': timeScope = 'all_time'; break;
-                case 'affinityPowerHour': timeScope = 'energy'; break;
-                case 'affinityMellowMood': timeScope = 'mellow'; break;
-                case 'affinityBalanced':
-                case 'affinityHiddenGems':
-                default: timeScope = 'balanced'; break;
-            }
-            const { affinityProfile, finalTimeScope } = buildAffinityProfile(profileData, updateProgress, timeScope);
-            
-            sortedTracks = await scoreAndSortPlaylist(tracks, affinityProfile, profileData, updateProgress, finalTimeScope, audioFeaturesMap, profileData.completeLikedSongUrisSet);
-            
-            if (sortType === 'affinityHiddenGems') {
-                if (sortedTracks.length > 0) {
-                    sortedTracks.forEach(track => {
-                        const popularityScore = track.popularity || 0;
-                        const discoveryScore = track.finalScore / Math.log10(popularityScore + 2);
-                        track.discoveryScore = discoveryScore;
-                    });
-                    sortedTracks.sort((a, b) => b.discoveryScore - a.discoveryScore);
-                }
-            }
-
-            uniqueTracks = sortedTracks; 
-            removedTracks = [];
-            mainButton.innerText = "100%";
-        } catch (error) {
-            Spicetify.showNotification(error.message, true);
-            resetButtons();
-            return;
-        }
-      } else if (sortType === "lastScrobbled") {
+      if (sortType === "lastScrobbled") {
           try {
               const result = await handleLastScrobbledSorting(
                 tracks, (progress) => { mainButton.innerText = `${progress}%`; }
@@ -17520,15 +15608,13 @@ function isDirectSortType(sortType) {
 
         } else if (['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
             mainButton.innerText = "Analyzing...";
-            const tracksWithAudioFeatures = await processBatchesWithDelay(
-                tracksWithPopularity, 50, 1000,
-                (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.40)}%`; },
-                async (track) => {
-                    const trackId = track.uri.split(":")[2];
-                    const stats = await getTrackStats(trackId);
-                    return { ...track, ...stats };
-                }
-            );
+            const trackIds = tracksWithPopularity.map(t => t.trackId);
+            const allStats = await getBatchTrackStats(trackIds);
+
+            const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
+                const stats = allStats[track.trackId] || {};
+                return { ...track, ...stats };
+            });
     
             const deduplicationResult = deduplicateTracks(tracksWithAudioFeatures);
             uniqueTracks = deduplicationResult.unique;
@@ -17597,13 +15683,9 @@ function isDirectSortType(sortType) {
       
       if (createPlaylistAfterSort && isDirectSortType(sortType)) {
         if (!sortedTracks || sortedTracks.length === 0) {
-            if (sortType === 'affinityPowerHour' || sortType === 'affinityMellowMood') {
-                Spicetify.showNotification("No tracks matched the criteria for this personalized sort.");
-            } else {
-                console.log("No tracks left after sorting/filtering to create/modify playlist.");
-                if (!addToQueueEnabled) {
-                    Spicetify.showNotification("No tracks to process for playlist.");
-                }
+            console.log("No tracks left after sorting/filtering to create/modify playlist.");
+            if (!addToQueueEnabled) {
+                Spicetify.showNotification("No tracks to process for playlist.");
             }
             resetButtons();
             return;
@@ -17636,12 +15718,6 @@ function isDirectSortType(sortType) {
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
           averageColor: { fullName: "album color", shortName: "Color" },
           deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
-          affinityBalanced: { fullName: "your taste", shortName: "Personalized" },
-          affinityShortTerm: { fullName: "your recent vibe", shortName: "Personalized" },
-          affinityLongTerm: { fullName: "your all-time favorites", shortName: "Personalized" },
-          affinityPowerHour: { fullName: "your power hour", shortName: "Power Hour" },
-          affinityMellowMood: { fullName: "your mellow mood", shortName: "Mellow Mood" },
-          affinityHiddenGems: { fullName: "your hidden gems", shortName: "Hidden Gems" },
           tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
           energy: { fullName: "energy", shortName: "Energy" },
           danceability: { fullName: "danceability", shortName: "Danceability" },
@@ -18000,13 +16076,11 @@ function isDirectSortType(sortType) {
 
               const candidateRawTitle = candidateTrack.songTitle || candidateTrack.name || "Unknown Title";
               const candidateNormalizedTitle = candidateRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
-              const candidateFirstWord = candidateNormalizedTitle.split(/\s+/)[0];
               const candidateDuration = candidateTrack.durationMs;
               const candidateArtist = candidateTrack.artistName || (candidateTrack.artists && candidateTrack.artists[0]?.name) || "";
 
               const existingRawTitle = existingUniqueTrack.songTitle || existingUniqueTrack.name || "Unknown Title";
               const existingNormalizedTitle = existingRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
-              const existingFirstWord = existingNormalizedTitle.split(/\s+/)[0];
               const existingDuration = existingUniqueTrack.durationMs; 
               const existingArtist = existingUniqueTrack.artistName || (existingUniqueTrack.artists && existingUniqueTrack.artists[0]?.name) || "";
 
@@ -18740,42 +16814,24 @@ function isDirectSortType(sortType) {
             const elementMap = new Map();
 
             for (const trackElement of batch) {
-                trackElement.classList.add('sort-play-processing');
                 const trackUri = getTracklistTrackUri(trackElement);
                 const trackId = trackUri ? trackUri.split(":")[2] : null;
                 if (!trackId) continue;
 
-                let needsFetching = false;
-                for (const config of columnConfigs) {
-                    if (audioFeatureTypes.includes(config.type)) {
+                const statsCacheModel = "stats-column";
+                const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
+                if (cachedData) {
+                    columnConfigs.forEach(config => {
                         const dataElement = trackElement.querySelector(config.dataSelector);
-                        if (dataElement && (dataElement.textContent === "" || dataElement.textContent === "_")) {
-                            const statsCacheModel = "stats-column";
-                            const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
-                            if (!cachedData || cachedData[config.type] === undefined) {
-                                needsFetching = true;
-                                break;
-                            }
+                        if (dataElement && audioFeatureTypes.includes(config.type)) {
+                            const value = config.type === 'djInfo' ? cachedData : cachedData[config.type];
+                            updateDisplay(dataElement, value, config.type);
                         }
-                    }
-                }
-
-                if (needsFetching) {
+                    });
+                } else {
+                    trackElement.classList.add('sort-play-processing');
                     trackIdsToFetch.push(trackId);
                     elementMap.set(trackId, trackElement);
-                } else {
-                    const statsCacheModel = "stats-column";
-                    const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
-                    if (cachedData) {
-                        columnConfigs.forEach(config => {
-                            const dataElement = trackElement.querySelector(config.dataSelector);
-                            if (dataElement && audioFeatureTypes.includes(config.type)) {
-                                const value = config.type === 'djInfo' ? cachedData : cachedData[config.type];
-                                updateDisplay(dataElement, value, config.type);
-                            }
-                        });
-                    }
-                    trackElement.classList.remove('sort-play-processing');
                 }
             }
 
@@ -18786,9 +16842,7 @@ function isDirectSortType(sortType) {
                     const stats = batchStats[trackId];
                     if (stats) {
                         const statsCacheModel = "stats-column";
-                        const currentCache = getTrackCache(trackId, true, false, statsCacheModel) || {};
-                        const newCache = { ...currentCache, ...stats };
-                        setTrackCache(trackId, newCache, true, false, statsCacheModel);
+                        setTrackCache(trackId, stats, true, false, statsCacheModel);
                         
                         columnConfigs.forEach(config => {
                             if (audioFeatureTypes.includes(config.type)) {
