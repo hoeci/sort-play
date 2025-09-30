@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.12.0";
+  const SORT_PLAY_VERSION = "5.13.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -221,6 +221,7 @@
     "\\(Shuffle\\)",
     "\\(Deduplicated\\)",
     "\\(AI Pick\\)",
+    "\\(Energy Wave\\)",
     "\\(Color\\)",
     "\\(Genre Filter\\)",
     "\\(Custom Filter\\)",
@@ -303,6 +304,7 @@
     personalScrobbles: false,
     lastScrobbled: false,
     averageColor: false,
+    energyWave: false,
     tempo: false,
     energy: false,
     danceability: false,
@@ -3176,6 +3178,7 @@ function isDirectSortType(sortType) {
           "shuffle",
           "averageColor",
           "deduplicateOnly",
+          "energyWave",
           "tempo",
           "energy",
           "danceability",
@@ -5886,7 +5889,7 @@ function isDirectSortType(sortType) {
         color: #fff;
     }
     .tracklist-table .actions-col {
-        box-shadow: 2px 0 2px #000000;
+        box-shadow: 2px 0 2px #121212;
     }
     .GenericModal__overlay .GenericModal {
         border-radius: 30px;
@@ -6085,7 +6088,7 @@ function isDirectSortType(sortType) {
         right: 0;
         text-align: center;
         vertical-align: middle;
-        box-shadow: 2px 0 2px #000000;
+        box-shadow: 2px 0 2px #121212;
     }
 
     .actions-col {
@@ -7836,6 +7839,7 @@ function isDirectSortType(sortType) {
 
             try {
                 const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+                await new Promise(resolve => setTimeout(resolve, 1250));
                 mainButton.innerText = "Saving...";
                 const trackUris = sortedTracksForPlaylist.map((track) => track.uri);
                 await addTracksToPlaylist(newPlaylist.id, trackUris);
@@ -10513,6 +10517,7 @@ function isDirectSortType(sortType) {
       async function createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription) {
           try {
               const newPlaylist = await createPlaylist(playlistName, playlistDescription);
+              await new Promise(resolve => setTimeout(resolve, 1250));
               mainButton.innerText = "Saving...";
     
               const trackUris = sortedTracks.map((track) => track.uri);
@@ -12646,6 +12651,7 @@ function isDirectSortType(sortType) {
           { backgroundColor: "transparent", color: "white", text: "Scrobbles", sortType: "scrobbles", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "My Scrobbles", sortType: "personalScrobbles", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Last Scrobbled", sortType: "lastScrobbled", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Energy Wave", sortType: "energyWave", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Album Color", sortType: "averageColor", hasInnerButton: true },
           {
             type: "parent",
@@ -15437,6 +15443,7 @@ function isDirectSortType(sortType) {
       let playlistWasModifiedOrCreated = false;
       let newPlaylistObjectForNavigation = null; 
       let modifiedPlaylistOriginalPath = null;
+      let missingDataCount = 0;
 
 
       if (sortType === "lastScrobbled") {
@@ -15606,6 +15613,37 @@ function isDirectSortType(sortType) {
           }
           mainButton.innerText = "100%";
 
+        } else if (sortType === "energyWave") {
+            mainButton.innerText = "Analyzing...";
+            const trackIds = tracksWithPopularity.map(t => t.trackId);
+            const allStats = await getBatchTrackStats(trackIds);
+
+            const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
+                const stats = allStats[track.trackId] || {};
+                return { ...track, ...stats, features: stats };
+            });
+    
+            const deduplicationResult = deduplicateTracks(tracksWithAudioFeatures);
+            uniqueTracks = deduplicationResult.unique;
+            removedTracks = deduplicationResult.removed;
+    
+            const tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+            const tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+            missingDataCount = tracksWithoutData.length;
+
+            const journeySortedTracks = await energyWaveSort(tracksWithData);
+
+            if (sortOrderState.energyWave) {
+                journeySortedTracks.reverse();
+            }
+
+            if (canModifyCurrentPlaylist) {
+                sortedTracks = [...journeySortedTracks, ...tracksWithoutData];
+            } else {
+                sortedTracks = journeySortedTracks;
+            }
+            mainButton.innerText = "100%";
+
         } else if (['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
             mainButton.innerText = "Analyzing...";
             const trackIds = tracksWithPopularity.map(t => t.trackId);
@@ -15620,13 +15658,21 @@ function isDirectSortType(sortType) {
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
     
-            sortedTracks = uniqueTracks
-                .filter(track => track[sortType] !== null && track[sortType] !== undefined)
-                .sort((a, b) => {
-                    const valA = a[sortType] || 0;
-                    const valB = b[sortType] || 0;
-                    return sortOrderState[sortType] ? valA - valB : valB - valA;
-                });
+            const tracksWithData = uniqueTracks.filter(track => track[sortType] !== null && track[sortType] !== undefined);
+            const tracksWithoutData = uniqueTracks.filter(track => track[sortType] === null || track[sortType] === undefined);
+            missingDataCount = tracksWithoutData.length;
+
+            const sortedTracksWithData = tracksWithData.sort((a, b) => {
+                const valA = a[sortType] || 0;
+                const valB = b[sortType] || 0;
+                return sortOrderState[sortType] ? valA - valB : valB - valA;
+            });
+
+            if (canModifyCurrentPlaylist) {
+                sortedTracks = [...sortedTracksWithData, ...tracksWithoutData];
+            } else {
+                sortedTracks = sortedTracksWithData;
+            }
             mainButton.innerText = "100%";
 
         } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
@@ -15718,6 +15764,7 @@ function isDirectSortType(sortType) {
           shuffle: { fullName: "shuffle", shortName: "Shuffle" },
           averageColor: { fullName: "album color", shortName: "Color" },
           deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
+          energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
           tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
           energy: { fullName: "energy", shortName: "Energy" },
           danceability: { fullName: "danceability", shortName: "Danceability" },
@@ -15829,6 +15876,22 @@ function isDirectSortType(sortType) {
         }
       }
 
+      if (missingDataCount > 0 && ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
+        const sortTypeInfo = {
+            tempo: { fullName: "tempo (BPM)" },
+            energy: { fullName: "energy" },
+            danceability: { fullName: "danceability" },
+            valence: { fullName: "valence" },
+            acousticness: { fullName: "acousticness" },
+            instrumentalness: { fullName: "instrumentalness" }
+        }[sortType];
+
+        const plural = missingDataCount === 1 ? "track was" : "tracks were";
+        setTimeout(() => {
+            Spicetify.showNotification(`${missingDataCount} ${plural} missing ${sortTypeInfo.fullName} data.`);
+        }, 1500);
+      }
+      
       if (addToQueueEnabled && isDirectSortType(sortType) && sortedTracks && sortedTracks.length > 0) {
         try {
           await setQueueFromTracks(sortedTracks, playlistUriForQueue);
@@ -15871,6 +15934,120 @@ function isDirectSortType(sortType) {
     } finally {
       resetButtons();
     }
+  }
+
+  const KEY_TO_CAMELOT_MAP = {
+    "B": "1B", "F♯/G♭": "2B", "C♯/D♭": "3B", "G♯/A♭": "4B", "D♯/E♭": "5B", 
+    "A♯/B♭": "6B", "F": "7B", "C": "8B", "G": "9B", "D": "10B", "A": "11B", "E": "12B",
+    "G♯/A♭m": "1A", "D♯/E♭m": "2A", "A♯/B♭m": "3A", "Fm": "4A", "Cm": "5A", 
+    "Gm": "6A", "Dm": "7A", "Am": "8A", "Em": "9A", "Bm": "10A", "F♯/G♭m": "11A", "C♯/D♭m": "12A"
+  };
+
+
+  function getHarmonicCompatibilityScore(camelotKey1, camelotKey2) {
+    if (!camelotKey1 || !camelotKey2) return 0;
+
+    const num1 = parseInt(camelotKey1.slice(0, -1));
+    const mode1 = camelotKey1.slice(-1);
+    const num2 = parseInt(camelotKey2.slice(0, -1));
+    const mode2 = camelotKey2.slice(-1);
+
+    if (num1 === num2 && mode1 === mode2) return 100;
+    if (num1 === num2) return 80;
+
+    const diff = Math.abs(num1 - num2);
+    if (diff === 1 || diff === 11) return 85;
+
+    return 0;
+  }
+
+
+  function generateJourneyMap(playlistLength, persona = 'wave') {
+    let journeyPattern;
+    switch (persona) {
+        case 'workout':
+            journeyPattern = [
+                'Medium-Energy/Positive-Valence', 'High-Energy/Positive-Valence', 'High-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence', 'Medium-Energy/Neutral-Valence', 'Low-Energy/Positive-Valence'
+            ];
+            break;
+        case 'wave':
+        default:
+            journeyPattern = [
+                'Medium-Energy/Neutral-Valence', 'Medium-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence', 'High-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence', 'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Neutral-Valence', 'Low-Energy/Positive-Valence'
+            ];
+            break;
+    }
+    return Array.from({ length: playlistLength }, (_, i) => journeyPattern[i % journeyPattern.length]);
+  }
+  
+  async function energyWaveSort(tracks) {
+    if (tracks.length < 3) {
+        return tracks;
+    }
+
+    const trackProfiles = tracks.map(track => {
+        const features = track.features || {};
+        const energy = (features.energy || 50) / 100;
+        const valence = (features.valence || 50) / 100;
+
+        const getTier = (val) => val <= 0.33 ? 'Low' : val <= 0.66 ? 'Medium' : 'High';
+        const moodBucket = `${getTier(energy)}-Energy/${getTier(valence)}-Valence`;
+
+        const keyName = features.key || "C";
+        const mode = features.mode === 0 ? 'm' : '';
+        const camelotKey = KEY_TO_CAMELOT_MAP[keyName + mode] || KEY_TO_CAMELOT_MAP[keyName];
+
+        return {
+            ...track,
+            profile: { moodBucket, camelotKey, tempo: features.tempo || 120 }
+        };
+    });
+
+    const fullJourneyMap = generateJourneyMap(tracks.length);
+
+    let remainingTracks = [...trackProfiles];
+    const sortedPlaylist = [];
+
+    let firstTrackIndex = remainingTracks.findIndex(t => t.profile.moodBucket === fullJourneyMap[0]);
+    if (firstTrackIndex === -1) firstTrackIndex = 0;
+    
+    let lastTrack = remainingTracks.splice(firstTrackIndex, 1)[0];
+    sortedPlaylist.push(lastTrack);
+
+    while (remainingTracks.length > 0) {
+        const currentJourneyStep = fullJourneyMap[sortedPlaylist.length];
+        const scoredCandidates = [];
+
+        for (const candidateTrack of remainingTracks) {
+            let score = 0;
+
+            if (candidateTrack.profile.moodBucket === currentJourneyStep) score += 100;
+
+            const harmonicScore = getHarmonicCompatibilityScore(lastTrack.profile.camelotKey, candidateTrack.profile.camelotKey);
+            score += harmonicScore * 0.8;
+
+            const tempoDiff = Math.abs(candidateTrack.profile.tempo - lastTrack.profile.tempo);
+            if (tempoDiff < 8) score += 50;
+            else if (tempoDiff < 15) score += 25;
+
+            scoredCandidates.push({ track: candidateTrack, score });
+        }
+
+        scoredCandidates.sort((a, b) => b.score - a.score);
+        
+        const selected = scoredCandidates[0];
+
+        sortedPlaylist.push(selected.track);
+        remainingTracks = remainingTracks.filter(t => t.uri !== selected.track.uri);
+        
+        lastTrack = selected.track;
+    }
+
+    return sortedPlaylist.map(profiledTrack => tracks.find(t => t.uri === profiledTrack.uri));
   }
 
   function shuffleArray(array) {
@@ -16802,7 +16979,7 @@ function isDirectSortType(sortType) {
     if (requiredDataTypes.has('releaseDate')) initializeReleaseDateCache();
     if (requiredDataTypes.has('scrobbles')) initializeScrobblesCache();
     
-    const BATCH_SIZE = 50;
+    const BATCH_SIZE = 30;
     
     for (let i = 0; i < tracksToProcess.length; i += BATCH_SIZE) {
         const batch = tracksToProcess.slice(i, i + BATCH_SIZE);
@@ -16906,8 +17083,8 @@ function isDirectSortType(sortType) {
             if (trackIdsToFetch.length > 0) {
                 let success = false;
                 let retries = 0;
-                const maxRetries = 3;
-                let delay = 500;
+                const maxRetries = 5;
+                let delay = 2000;
                 let trackDetailsResponse;
 
                 while (!success && retries < maxRetries) {
@@ -16917,7 +17094,7 @@ function isDirectSortType(sortType) {
                         else throw new Error("Invalid data from Spotify API.");
                     } catch (error) {
                         retries++;
-                        if (retries < maxRetries) await new Promise(resolve => setTimeout(resolve, delay *= 2));
+                        if (retries < maxRetries) await new Promise(resolve => setTimeout(resolve, delay *= 1.5));
                     }
                 }
 
@@ -16969,11 +17146,6 @@ function isDirectSortType(sortType) {
                     trackIdsToFetch.forEach(trackId => {
                         const trackElement = elementMap.get(trackId);
                         if (trackElement) {
-                            columnConfigs.forEach(config => {
-                                const dataElement = trackElement.querySelector(config.dataSelector);
-                                if (dataElement) updateDisplay(dataElement, "_", config.type);
-                            });
-                            trackElement.setAttribute('data-sp-fetch-failed', 'true');
                             trackElement.classList.remove('sort-play-processing');
                         }
                     });
@@ -17957,6 +18129,7 @@ function isDirectSortType(sortType) {
             Spicetify.React.createElement("button", {
                 ref: buttonRef,
                 className: finalClassName,
+                "aria-label": tooltipContent,
                 "aria-checked": isLiked || hasISRCLiked,
                 onClick: handleClick,
                 onMouseEnter: () => {
