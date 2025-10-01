@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.2";
+  const SORT_PLAY_VERSION = "5.13.3";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -18225,16 +18225,8 @@ function isDirectSortType(sortType) {
             container = document.createElement("div");
             container.className = "likeControl-wrapper-npv";
             container.style.display = "contents";
-            container.setAttribute('data-sort-play-initialized', 'true');
     
             addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
-        } else {
-            if (container.getAttribute('data-sort-play-initialized') === 'true' && container.children.length > 0) {
-                return;
-            }
-            while (container.firstChild) {
-                container.removeChild(container.firstChild);
-            }
         }
     
         const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button');
@@ -18349,10 +18341,7 @@ function isDirectSortType(sortType) {
             
             const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
             if (nowPlayingView) {
-                const container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
-                if (!container || (container.getAttribute('data-sort-play-initialized') !== 'true') || container.children.length === 0) {
-                    mountLikeButtonNowPlayingView();
-                }
+                mountLikeButtonNowPlayingView();
             }
     
             for (const mutation of mutations) {
@@ -18377,7 +18366,7 @@ function isDirectSortType(sortType) {
     
         likeButton_tracklistObserver.observe(mainView, { childList: true, subtree: true });
         likeButton_observerInitialized = true;
-    };
+      };
   }
 
   function onPageChange() {
