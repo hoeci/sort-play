@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.0";
+  const SORT_PLAY_VERSION = "5.13.1";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -18216,22 +18216,35 @@ function isDirectSortType(sortType) {
         let container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
     
         if (!container) {
-            const addToPlaylistButton = nowPlayingView.querySelector('button[aria-label="Add to playlist"]');
-            if (!addToPlaylistButton) return;
-            const addToPlaylistButtonWrapper = addToPlaylistButton.parentElement;
+            const addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1');
+            if (!addToPlaylistButtonWrapper) {
+                setTimeout(mountLikeButtonNowPlayingView, 100);
+                return;
+            }
     
             container = document.createElement("div");
             container.className = "likeControl-wrapper-npv";
             container.style.display = "contents";
+            container.setAttribute('data-sort-play-initialized', 'true');
     
             addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
+        } else {
+            if (container.getAttribute('data-sort-play-initialized') === 'true' && container.children.length > 0) {
+                return;
+            }
+            while (container.firstChild) {
+                container.removeChild(container.firstChild);
+            }
         }
     
-        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('button[aria-label="Add to playlist"]');
-        if (!templateButton) return;
+        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('button[aria-label="Add to Liked Songs"]');
+        if (!templateButton) {
+            setTimeout(mountLikeButtonNowPlayingView, 100);
+            return;
+        }
     
         const uri = Spicetify.Player.data?.item?.uri || "";
-        const dynamicSizeSelector = '.main-nowPlayingView-contextItemInfo button[aria-label="Add to playlist"] svg';
+        const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button[aria-label="Add to Liked Songs"] svg';
     
         Spicetify.ReactDOM.render(
             Spicetify.React.createElement(LikeButton, {
@@ -18309,7 +18322,13 @@ function isDirectSortType(sortType) {
         }
     };
 
+    let likeButton_observerInitialized = false;
+
     likeButton_connectObserver = () => {
+        if (likeButton_observerInitialized) {
+            return;
+        }
+                
         if (likeButton_tracklistObserver) {
             likeButton_tracklistObserver.disconnect();
         }
@@ -18327,13 +18346,25 @@ function isDirectSortType(sortType) {
             if (document.querySelector(".main-nowPlayingWidget-nowPlaying") && !document.querySelector(".likeControl-wrapper")) {
                 mountLikeButton();
             }
-            if (document.querySelector(".main-nowPlayingView-contextItemInfo") && !document.querySelector(".likeControl-wrapper-npv")) {
-                mountLikeButtonNowPlayingView();
+            
+            const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
+            if (nowPlayingView) {
+                const container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
+                if (!container || (container.getAttribute('data-sort-play-initialized') !== 'true') || container.children.length === 0) {
+                    mountLikeButtonNowPlayingView();
+                }
             }
     
             for (const mutation of mutations) {
+                if (mutation.target.closest && mutation.target.closest('.likeControl-wrapper-npv')) {
+                    continue;
+                }
+                
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (node.classList && node.classList.contains('likeControl-wrapper-npv')) {
+                            continue;
+                        }
                         if (node.matches('.main-trackList-trackListRow, div[role="row"][aria-selected]')) {
                             likeButton_addLikeButtonToRow(node);
                         } else {
@@ -18345,6 +18376,7 @@ function isDirectSortType(sortType) {
         });
     
         likeButton_tracklistObserver.observe(mainView, { childList: true, subtree: true });
+        likeButton_observerInitialized = true;
     };
   }
 
