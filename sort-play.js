@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.3";
+  const SORT_PLAY_VERSION = "5.13.4";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -76,6 +76,9 @@
   const STORAGE_KEY_DYNAMIC_SCHEDULE = "sort-play-dynamic-schedule";
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
   const STORAGE_KEY_USER_ADDED_GENRES = "sort-play-user-added-genres";
+  const STORAGE_KEY_RANDOM_GENRE_HISTORY = "sort-play-random-genre-history";
+  const RANDOM_GENRE_HISTORY_SIZE = 200;
+  const RANDOM_GENRE_SELECTION_SIZE = 20;
   const runningJobIds = new Set();
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
@@ -14787,10 +14790,25 @@ function isDirectSortType(sortType) {
         }
 
         const allAvailableGenres = [...new Set(genrePlaylistsCache.map(p => p.genre))];
-        if (allAvailableGenres.length < 20) {
+        if (allAvailableGenres.length < RANDOM_GENRE_SELECTION_SIZE) {
             throw new Error("Not enough genres in the database to create a random playlist.");
         }
-        const selectedGenres = shuffleArray(allAvailableGenres).slice(0, 20);
+
+        let genreHistory = JSON.parse(localStorage.getItem(STORAGE_KEY_RANDOM_GENRE_HISTORY) || '[]');
+        let availablePool = allAvailableGenres.filter(genre => !genreHistory.includes(genre));
+
+        if (availablePool.length < RANDOM_GENRE_SELECTION_SIZE) {
+            genreHistory = [];
+            availablePool = allAvailableGenres;
+        }
+
+        const selectedGenres = shuffleArray(availablePool).slice(0, RANDOM_GENRE_SELECTION_SIZE);
+
+        genreHistory.push(...selectedGenres);
+        if (genreHistory.length > RANDOM_GENRE_HISTORY_SIZE) {
+            genreHistory = genreHistory.slice(genreHistory.length - RANDOM_GENRE_HISTORY_SIZE);
+        }
+        localStorage.setItem(STORAGE_KEY_RANDOM_GENRE_HISTORY, JSON.stringify(genreHistory));
 
         const playlistsToFetch = new Map();
         for (const selectedGenre of selectedGenres) {
