@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.1";
+  const SORT_PLAY_VERSION = "5.13.2";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -18237,14 +18237,14 @@ function isDirectSortType(sortType) {
             }
         }
     
-        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('button[aria-label="Add to Liked Songs"]');
+        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button');
         if (!templateButton) {
             setTimeout(mountLikeButtonNowPlayingView, 100);
             return;
         }
     
         const uri = Spicetify.Player.data?.item?.uri || "";
-        const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button[aria-label="Add to Liked Songs"] svg';
+        const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button svg';
     
         Spicetify.ReactDOM.render(
             Spicetify.React.createElement(LikeButton, {
