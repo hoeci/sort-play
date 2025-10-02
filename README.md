@@ -4,8 +4,14 @@
 # Sort-Play: The Ultimate Spotify Toolkit
 ![](https://img.shields.io/badge/Spicetify-Marketplace-1ED760?logo=spotify)
 [![](https://img.shields.io/github/stars/hoeci/sort-play.svg?style=social&label=Star)](https://github.com/hoeci/sort-play)
+<br>
+<p>
+    <a href="#%EF%B8%8F-features">Features</a> •
+    <a href="#-screenshots">Screenshots</a> •
+    <a href="#%EF%B8%8F-installation">Installation</a>
+</p>
 </div>
-   
+
 ## ⚡️ Features
 + **Comprehensive Sorting:** Sort playlists, albums and artist pages by play count, popularity, release date, album color, Last.fm scrobbles, Last Scrobbled, tempo, energy, danceability, valence, acousticness, and instrumentalness.
 + **Full Artist Discography:** Load an artist's complete collection, including singles, albums, and compilations, for sorting.
