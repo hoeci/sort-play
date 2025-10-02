@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.6";
+  const SORT_PLAY_VERSION = "5.13.7";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -35,7 +35,7 @@
   let addToQueueEnabled = false; 
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
-  let openPlaylistAfterSortEnabled = true;
+  let openPlaylistAfterSortEnabled = false;
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
   let changeTitleOnModify = true;
@@ -340,7 +340,7 @@
     const sortCurrentPlaylistStored = localStorage.getItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST);
     sortCurrentPlaylistEnabled = sortCurrentPlaylistStored === null ? false : sortCurrentPlaylistStored === "true";
     const openPlaylistStored = localStorage.getItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT);
-    openPlaylistAfterSortEnabled = openPlaylistStored === null ? true : openPlaylistStored === "true";
+    openPlaylistAfterSortEnabled = openPlaylistStored === null ? false : openPlaylistStored === "true";
     myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
     colorSortMode = localStorage.getItem(STORAGE_KEY_COLOR_SORT_MODE) || 'perceptual';
     topTracksLimit = parseInt(localStorage.getItem(STORAGE_KEY_TOP_TRACKS_LIMIT), 10) || 100;
