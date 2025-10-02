@@ -58,7 +58,7 @@
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
   const STORAGE_KEY_CREATE_PLAYLIST = "sort-play-create-playlist";
   const STORAGE_KEY_SORT_CURRENT_PLAYLIST = "sort-play-sort-current-playlist";
-  const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort";
+  const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort-v2";
   const STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER = "sort-play-place-playlists-in-folder";
   const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
   const STORAGE_KEY_CHANGE_TITLE_ON_MODIFY = "sort-play-change-title-on-modify";
