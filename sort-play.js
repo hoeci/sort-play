@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.5";
+  const SORT_PLAY_VERSION = "5.13.6";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -13954,14 +13954,27 @@ function isDirectSortType(sortType) {
         throw new Error("Failed to create playlist after all attempts.");
     }
 
-    try {
-      await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${newPlaylist.uri.split(':')[2]}`, {
-          description: description,
-      });
-    } catch (descriptionError) {
-        const isExpectedJsonError = descriptionError instanceof SyntaxError && descriptionError.message.includes("Unexpected end of JSON input");
-        if (!isExpectedJsonError) {
-            console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
+    let attempt = 0;
+    const maxRetries = 3;
+    let delay = 500;
+    while (attempt < maxRetries) {
+        try {
+            await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${newPlaylist.uri.split(':')[2]}`, {
+                description: description,
+            });
+            break; 
+        } catch (descriptionError) {
+            const isExpectedJsonError = descriptionError instanceof SyntaxError && descriptionError.message.includes("Unexpected end of JSON input");
+            if (isExpectedJsonError) {
+                break; 
+            }
+            attempt++;
+            if (attempt >= maxRetries) {
+                console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
+            } else {
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+            }
         }
     }
     
@@ -16696,41 +16709,44 @@ function isDirectSortType(sortType) {
     }
 
     const results = {};
+    const BATCH_SIZE = 50;
+
     try {
-        const audioFeaturesResponse = await Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/audio-features?ids=${trackIds.join(',')}`
-        );
-        const trackDetailsResponse = await Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/tracks?ids=${trackIds.join(',')}`
-        );
+        for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
+            const batchIds = trackIds.slice(i, i + BATCH_SIZE);
+            
+            const [audioFeaturesResponse, trackDetailsResponse] = await Promise.all([
+                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`),
+                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`)
+            ]);
 
-        if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
-            console.warn('Failed to fetch batch track data');
-            return {};
-        }
-
-        const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-        
-        audioFeaturesResponse.audio_features.forEach((features, index) => {
-            if (features) {
-                const trackDetails = trackDetailsResponse.tracks[index];
-                results[features.id] = {
-                    danceability: features.danceability ? Math.round(100 * features.danceability) : null,
-                    energy: features.energy ? Math.round(100 * features.energy) : null,
-                    key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
-                    loudness: features.loudness ?? null,
-                    speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
-                    acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
-                    instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
-                    liveness: features.liveness ? Math.round(100 * features.liveness) : null,
-                    valence: features.valence ? Math.round(100 * features.valence) : null,
-                    tempo: features.tempo ? Math.round(features.tempo) : null,
-                    popularity: trackDetails?.popularity ?? null,
-                    releaseDate: trackDetails?.album?.release_date ?? null
-                };
+            if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
+                console.warn('Failed to fetch batch track data for some tracks.');
+                continue;
             }
-        });
 
+            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+            
+            audioFeaturesResponse.audio_features.forEach((features, index) => {
+                if (features) {
+                    const trackDetails = trackDetailsResponse.tracks[index];
+                    results[features.id] = {
+                        danceability: features.danceability ? Math.round(100 * features.danceability) : null,
+                        energy: features.energy ? Math.round(100 * features.energy) : null,
+                        key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
+                        loudness: features.loudness ?? null,
+                        speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
+                        acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
+                        instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
+                        liveness: features.liveness ? Math.round(100 * features.liveness) : null,
+                        valence: features.valence ? Math.round(100 * features.valence) : null,
+                        tempo: features.tempo ? Math.round(features.tempo) : null,
+                        popularity: trackDetails?.popularity ?? null,
+                        releaseDate: trackDetails?.album?.release_date ?? null
+                    };
+                }
+            });
+        }
     } catch (error) {
         console.error('Error fetching batch track stats:', error);
     }
