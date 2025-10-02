@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.4";
+  const SORT_PLAY_VERSION = "5.13.5";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -8015,10 +8015,16 @@ function isDirectSortType(sortType) {
         job.targetPlaylistName = playlistName;
 
         if (job.sources.length === 1) {
-            const firstSourceCover = job.sources[0].coverUrl;
+            const firstSource = job.sources[0];
+            const firstSourceCover = firstSource.coverUrl;
             if (firstSourceCover && !isDefaultMosaicCover(firstSourceCover)) {
                 try {
-                    const base64Image = await toBase64(firstSourceCover);
+                    let base64Image;
+                    if (URI.isArtist(firstSource.uri)) {
+                        base64Image = await toBase64(firstSourceCover);
+                    } else {
+                        base64Image = await imageUrlToBase64(firstSourceCover);
+                    }
                     await setPlaylistImage(newPlaylist.id, base64Image);
                     job.coverUrl = firstSourceCover;
                 } catch (error) {
@@ -11739,6 +11745,17 @@ function isDirectSortType(sortType) {
     }
   }
 
+  async function imageUrlToBase64(url) {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+  }
+  
   async function toBase64(imageUrl) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -15871,7 +15888,7 @@ function isDirectSortType(sortType) {
                 } catch (error) { console.error("Error setting playlist image:", error); }
               } else if (sourcePlaylistCoverUrl && !isDefaultMosaicCover(sourcePlaylistCoverUrl)) {
                 try {
-                  const base64Image = await toBase64(sourcePlaylistCoverUrl);
+                  const base64Image = await imageUrlToBase64(sourcePlaylistCoverUrl);
                   await setPlaylistImage(newPlaylist.id, base64Image);
                 } catch (error) {
                   console.warn("Could not apply original playlist/album cover:", error);
