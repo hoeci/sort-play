@@ -81,7 +81,7 @@
   const RANDOM_GENRE_SELECTION_SIZE = 20;
   const runningJobIds = new Set();
 
-  const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
+  const GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
 
   const L_F_M_Key_Pool = [
     "***REMOVED***",
@@ -126,7 +126,7 @@
         }
         params.set('api_key', apiKey);
         const directUrl = `${CONFIG.lastfm.baseUrl}?${params}`;
-        const gatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(directUrl)}`;
+        const gatewayUrl = `${GATEWAY_URL}${encodeURIComponent(directUrl)}`;
 
         if (useLfmGateway) {
             try {
@@ -3838,62 +3838,93 @@ function isDirectSortType(sortType) {
           selectedAiModel  
         );
   
-        if (aiResponse && aiResponse.length > 0) {
-          const sourceUri = getCurrentUri();
-          const isArtistPage = URI.isArtist(sourceUri); 
-          const isAlbumPage = URI.isAlbum(sourceUri);
-          let sourceName;
-          
-          if (URI.isArtist(sourceUri)) {
-              sourceName = await Spicetify.CosmosAsync.get(
-                  `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-              ).then((r) => r.name);
-          } else if (isLikedSongsPage(sourceUri)) {
-              sourceName = "Liked Songs";
-          } else if (isAlbumPage) {
-              sourceName = await Spicetify.CosmosAsync.get(
-                  `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
-              ).then((r) => r.name);
-          } else {
-              sourceName = await Spicetify.CosmosAsync.get(
-                  `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-              ).then((r) => r.name);
-          }
-
-          let suffixPattern = new RegExp(
-            `\\s*(${possibleSuffixes.join("|")})\\s*`
-          );
-          while (suffixPattern.test(sourceName)) {
-            sourceName = sourceName.replace(suffixPattern, "");
-          }
-
-          let playlistDescription;
-          if (isArtistPage) {
-            playlistDescription = `Tracks by ${sourceName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
-          } else if (isAlbumPage) {
-            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-            const artistName = albumDetails.artists[0].name;
-            playlistDescription = `Tracks from ${sourceName} by ${artistName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
-          } else {
-            playlistDescription = `Tracks picked by AI using Sort-Play for request: "${userPrompt}"`;
-          }
-  
-          const newPlaylist = await createPlaylist(
-            `${sourceName} (AI Pick)`,
-            playlistDescription 
-          );
-  
-          const trackUris = aiResponse;
-          await addTracksToPlaylist(newPlaylist.id, trackUris);
-          
-          await addPlaylistToLibrary(newPlaylist.uri);
-  
-          Spicetify.showNotification(`AI Pick playlist created!`);
-          
-          await navigateToPlaylist(newPlaylist);
-        } else {
-          Spicetify.showNotification("AI did not return any track URIs, try another model or change your prompt.", true);
+        if (!aiResponse || aiResponse.length === 0) {
+          Spicetify.showNotification("AI did not return any track URIs. Try a different prompt or model.", true);
+          resetButtons();
+          return;
         }
+
+        mainButton.innerText = "Verifying...";
+        const trackIds = aiResponse.map(uri => uri.split(':')[2]);
+        const verifiedTracks = [];
+        const batchSize = 50;
+
+        for (let i = 0; i < trackIds.length; i += batchSize) {
+            const batch = trackIds.slice(i, i + batchSize);
+            try {
+                const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
+                if (response && response.tracks) {
+                    const availableTracks = await Promise.all(response.tracks.map(async track => {
+                        if (track && await isTrackAvailable(track)) {
+                            return track.uri;
+                        }
+                        return null;
+                    }));
+                    verifiedTracks.push(...availableTracks.filter(Boolean));
+                }
+            } catch (error) {
+                console.warn("Sort-Play: Error during AI track verification batch.", error);
+            }
+        }
+
+        if (verifiedTracks.length === 0) {
+            Spicetify.showNotification("AI returned invalid or unavailable tracks. Please try again.", true);
+            resetButtons();
+            return;
+        }
+  
+        const sourceUri = getCurrentUri();
+        const isArtistPage = URI.isArtist(sourceUri); 
+        const isAlbumPage = URI.isAlbum(sourceUri);
+        let sourceName;
+        
+        if (URI.isArtist(sourceUri)) {
+            sourceName = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name);
+        } else if (isLikedSongsPage(sourceUri)) {
+            sourceName = "Liked Songs";
+        } else if (isAlbumPage) {
+            sourceName = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name);
+        } else {
+            sourceName = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
+            ).then((r) => r.name);
+        }
+
+        let suffixPattern = new RegExp(
+          `\\s*(${possibleSuffixes.join("|")})\\s*`
+        );
+        while (suffixPattern.test(sourceName)) {
+          sourceName = sourceName.replace(suffixPattern, "");
+        }
+
+        let playlistDescription;
+        if (isArtistPage) {
+          playlistDescription = `Tracks by ${sourceName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
+        } else if (isAlbumPage) {
+          const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
+          const artistName = albumDetails.artists[0].name;
+          playlistDescription = `Tracks from ${sourceName} by ${artistName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
+        } else {
+          playlistDescription = `Tracks picked by AI using Sort-Play for request: "${userPrompt}"`;
+        }
+
+        const newPlaylist = await createPlaylist(
+          `${sourceName} (AI Pick)`,
+          playlistDescription 
+        );
+
+        await addTracksToPlaylist(newPlaylist.id, verifiedTracks);
+        
+        await addPlaylistToLibrary(newPlaylist.uri);
+
+        Spicetify.showNotification(`AI Pick playlist created with ${verifiedTracks.length} tracks!`);
+        
+        await navigateToPlaylist(newPlaylist);
+
       } catch (error) {
         console.error("Error handling AI pick:", error);
         Spicetify.showNotification(
