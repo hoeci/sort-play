@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.14.0";
+  const SORT_PLAY_VERSION = "5.14.1";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -39,7 +39,7 @@
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
   let changeTitleOnModify = true;
-  let selectedAiModel = "gemini-2.5-flash";
+  let selectedAiModel = "gemini-flash-latest";
   let topTracksLimit = 100;
   let discoveryPlaylistSize = 50;
   let newReleasesDaysLimit = 14;
@@ -77,6 +77,7 @@
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
   const STORAGE_KEY_USER_ADDED_GENRES = "sort-play-user-added-genres";
   const STORAGE_KEY_RANDOM_GENRE_HISTORY = "sort-play-random-genre-history";
+  const AI_DATA_CACHE_MAX_ITEMS = 1000;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
   const runningJobIds = new Set();
@@ -331,7 +332,7 @@
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
-    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-2.5-flash";
+    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-flash-latest";
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
@@ -483,15 +484,23 @@
       timestamp: Date.now(),
       trackData: trackData
     };
+    
+    const cacheDataString = JSON.stringify(cacheData);
+    const newItemSize = cacheDataString.length;
+  
+    if (newItemSize > AI_DATA_MAX_CACHE_SIZE_BYTES) {
+      console.warn(`[Sort-Play Cache] Item for track ${trackId} is too large to cache (${newItemSize} bytes). Skipping.`);
+      return;
+    }
   
     try {
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-      manageCacheSize();
+      localStorage.setItem(cacheKey, cacheDataString);
     } catch (error) {
       if (error.name === 'QuotaExceededError') {
-        clearOldCaches();
+        console.warn('Cache quota exceeded. Running aggressive cleanup...');
+        manageCacheSize(newItemSize);
         try {
-          localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+          localStorage.setItem(cacheKey, cacheDataString);
         } catch (retryError) {
           console.error('Cache write failed after cleanup:', retryError);
         }
@@ -527,7 +536,7 @@
     });
   }
   
-  function manageCacheSize() {
+  function manageCacheSize(newItemSize = 0) {
     let cacheSize = 0;
     const cacheItems = [];
   
@@ -549,15 +558,29 @@
         }
       }
     }
+    
+    cacheItems.sort((a, b) => a.timestamp - b.timestamp);
   
-    if (cacheSize > AI_DATA_MAX_CACHE_SIZE_BYTES) {
-      cacheItems.sort((a, b) => a.timestamp - b.timestamp);
-      
+    const itemsToDeleteCount = cacheItems.length - AI_DATA_CACHE_MAX_ITEMS;
+    if (itemsToDeleteCount > 0) {
+        console.log(`[Sort-Play Cache] Exceeded item limit. Removing ${itemsToDeleteCount} oldest items.`);
+        for (let i = 0; i < itemsToDeleteCount; i++) {
+            const item = cacheItems[i];
+            localStorage.removeItem(item.key);
+            cacheSize -= item.size;
+        }
+        cacheItems.splice(0, itemsToDeleteCount);
+    }
+  
+    if (cacheSize + newItemSize > AI_DATA_MAX_CACHE_SIZE_BYTES) {
       let removedSize = 0;
+      const targetSize = AI_DATA_MAX_CACHE_SIZE_BYTES - newItemSize;
+  
       for (const item of cacheItems) {
         localStorage.removeItem(item.key);
         removedSize += item.size;
-        if (cacheSize - removedSize <= AI_DATA_MAX_CACHE_SIZE_BYTES) {
+        cacheSize -= item.size;
+        if (cacheSize <= targetSize) {
           break;
         }
       }
@@ -3192,43 +3215,6 @@ function isDirectSortType(sortType) {
       return directSortTypes.includes(sortType);
   }
 
-  async function handleAiPick(tracks) {
-    try {
-        const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks, () => {});
-
-        const tracksWithIds = await processBatchesWithDelay(
-            tracksWithPlayCounts,
-            50,
-            500,
-            () => {},
-            collectTrackIdsForPopularity
-        );
-
-        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-            tracksWithIds,
-            () => {}
-        );
-
-        let uniqueTracks;
-        let removedTracks = [];
-        const currentUri = getCurrentUri();
-
-        if (!playlistDeduplicate && URI.isPlaylistV1OrV2(currentUri)) {
-            uniqueTracks = tracksWithPopularity;
-        } else {
-            const deduplicationResult = deduplicateTracks(tracksWithPopularity);
-            uniqueTracks = deduplicationResult.unique;
-            removedTracks = deduplicationResult.removed;
-        }
-
-        return { uniqueTracks, removedTracks };
-    } catch (error) {
-        console.error("Error in handleAiPick:", error);
-        throw error;
-    }
-  }
-
-
   let userSystemInstruction;
   
   async function showAiPickModal(tracks) {
@@ -3669,10 +3655,8 @@ function isDirectSortType(sortType) {
                 <span class="custom-tooltip">Added Gemini 2.5 models</span></label>
               <select id="aiModel">
                 <option value="gemini-2.5-pro" ${selectedAiModel === "gemini-2.5-pro" ? "selected" : ""}>Gemini 2.5 Pro</option>
-                <option value="gemini-2.5-flash" ${selectedAiModel === "gemini-2.5-flash" ? "selected" : ""}>Gemini 2.5 Flash</option>
-                <option value="gemini-2.5-flash-lite-preview-06-17" ${selectedAiModel === "gemini-2.5-flash-lite-preview-06-17" ? "selected" : ""}>Gemini 2.5 Flash-Lite Preview</option>
-                <option value="gemini-2.0-flash" ${selectedAiModel === "gemini-2.0-flash" ? "selected" : ""}>Gemini 2.0 Flash</option>
-                <option value="gemini-2.0-flash-lite" ${selectedAiModel === "gemini-2.0-flash-lite" ? "selected" : ""}>Gemini 2.0 Flash-Lite</option>
+                <option value="gemini-flash-latest" ${selectedAiModel === "gemini-flash-latest" ? "selected" : ""}>Gemini 2.5 Flash</option>
+                <option value="gemini-flash-lite-latest" ${selectedAiModel === "gemini-flash-lite-latest" ? "selected" : ""}>Gemini 2.5 Flash-Lite</option>
               </select>
             </div>
             <div class="button-row">
@@ -3964,219 +3948,289 @@ function isDirectSortType(sortType) {
     
     return results;
   }
-  
-  async function fetchLyricsFromLyricsOvh(artist, track, maxRetries = 3, baseDelay = 1000) {
-    let attempt = 0;
-    while (attempt < maxRetries) {
-      try {
-        const encodedArtist = encodeURIComponent(artist);
-        const encodedTrack = encodeURIComponent(track);
-        const url = `https://api.lyrics.ovh/v1/${encodedArtist}/${encodedTrack}`;
-        
-        const response = await fetch(url);
-  
-        if (response.status === 404) {
-          return { error: "No lyrics found", uri: `spotify:track:${track}`};
-        }
-  
-        if (!response.ok) {
-          attempt++;
-          const waitTime = baseDelay * Math.pow(2, attempt - 1);
-          console.warn(`Retrying in ${waitTime}ms (attempt ${attempt}/${maxRetries})`);
-          await delay(waitTime);
-          continue;
-        }
-  
-        const data = await response.json();
-  
-        if (data && data.lyrics) {
-          return {
-            unsynced: data.lyrics.split('\n').map(line => ({ text: line })),
-            provider: "Lyrics.ovh",
-            copyright: null,
-          };
-        } else {
-          return { error: "No lyrics found in response", uri: `spotify:track:${track}`};
-        }
-        
-      } catch (error) {
-        attempt++;
-  
-        if (attempt === maxRetries) {
-          console.error(`Failed after ${maxRetries} attempts:`, error);
-          return { error: "Max retries exceeded", uri: `spotify:track:${track}` };
-        }
-  
-        const waitTime = baseDelay * Math.pow(2, attempt - 1);
-        console.warn(`Attempt ${attempt}/${maxRetries} failed, retrying in ${waitTime}ms`);
-        await delay(waitTime);
-      }
+
+  async function fetchLyricsFromLrclib(track) {
+    const trackName = track.songTitle || track.name || track.title;
+    const artistName = track.artistName || track.artist;
+    const albumName = track.albumName || track.track?.album?.name;
+    const durationMs = track.durationMs || track.track?.duration_ms;
+
+    if (!trackName || !artistName || !albumName || !durationMs) {
+        console.warn("[Sort-Play] Missing required data for LRCLIB lookup:", { trackName, artistName, albumName, durationMs });
+        return { error: "Missing track data for lyrics lookup" };
     }
-  
-    return { error: "Unknown error", uri: `spotify:track:${track}` };
+
+    const durationSec = Math.round(durationMs / 1000);
+
+    const params = new URLSearchParams({
+        track_name: trackName,
+        artist_name: artistName,
+        album_name: albumName,
+        duration: durationSec,
+    });
+    const url = `https://lrclib.net/api/get?${params.toString()}`;
+
+    try {
+        const gatewayUrl = `${GATEWAY_URL}${encodeURIComponent(url)}`;
+        const response = await fetch(gatewayUrl);
+
+        if (response.status === 404) {
+            return { error: "No lyrics found on LRCLIB" };
+        }
+
+        if (!response.ok) {
+            throw new Error(`LRCLIB API request failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data && data.plainLyrics) {
+            return {
+                unsynced: data.plainLyrics.split('\n').map(line => ({ text: line })),
+                provider: "LRCLIB",
+            };
+        } else {
+            return { error: "No lyrics found in LRCLIB response" };
+        }
+    } catch (error) {
+        console.error(`[Sort-Play] Error fetching lyrics from LRCLIB for "${trackName}":`, error);
+        return { error: "LRCLIB request failed" };
+    }
+  }
+
+  function pruneTracksForApiLimit(tracks, userSystemInstruction, userRequestPayload, maxSize) {
+    const getPromptSize = (trackData) => {
+        const payload = `Playlist Tracks:\n${JSON.stringify(trackData, null, 2)}`;
+        return new Blob([userSystemInstruction, payload, userRequestPayload]).size;
+    };
+
+    let currentSize = getPromptSize(tracks);
+    if (currentSize <= maxSize) {
+        return { prunedTracks: tracks, notification: null };
+    }
+
+    console.warn(`[Sort-Play AI] Prompt size (${currentSize} bytes) exceeds limit. Pruning data...`);
+
+    let lyricsRemovedCount = 0;
+    let statsRemovedCount = 0;
+    const prunedTracks = JSON.parse(JSON.stringify(tracks)); // Deep copy to avoid modifying original data
+
+    // Phase 1: Remove lyrics randomly
+    const tracksWithLyricsIndices = prunedTracks.map((t, i) => (t.lyrics && t.lyrics !== "Not included") ? i : -1).filter(i => i !== -1);
+    const shuffledLyricsIndices = shuffleArray(tracksWithLyricsIndices);
+
+    for (const index of shuffledLyricsIndices) {
+        delete prunedTracks[index].lyrics;
+        lyricsRemovedCount++;
+        currentSize = getPromptSize(prunedTracks);
+        if (currentSize <= maxSize) break;
+    }
+
+    if (currentSize > maxSize) {
+        const tracksWithStatsIndices = prunedTracks.map((t, i) => t.stats ? i : -1).filter(i => i !== -1);
+        const shuffledStatsIndices = shuffleArray(tracksWithStatsIndices);
+
+        for (const index of shuffledStatsIndices) {
+            delete prunedTracks[index].stats;
+            statsRemovedCount++;
+            currentSize = getPromptSize(prunedTracks);
+            if (currentSize <= maxSize) break;
+        }
+    }
+    
+    let messageParts = [];
+    if (lyricsRemovedCount > 0) messageParts.push(`lyrics from ${lyricsRemovedCount} songs`);
+    if (statsRemovedCount > 0) messageParts.push(`stats from ${statsRemovedCount} songs`);
+    
+    const notification = messageParts.length > 0 ? `Removed ${messageParts.join(' and ')} to fit API limits.` : null;
+
+    if (currentSize > maxSize) {
+        console.error("[Sort-Play AI] Could not reduce prompt size enough even after removing all lyrics and stats.");
+        throw new Error("Playlist is too large to process, even after removing extra data.");
+    }
+
+    return { prunedTracks, notification };
   }
 
   async function queryGeminiWithPlaylistTracks(tracks, userPrompt, apiKey, maxRetries = 3, initialDelay = 1000, includeSongStats = true, includeLyrics = true, modelName) {
     clearOldCaches();
-    let retries = 0;
-    let delay = initialDelay;
     let enrichedTracksCache = [];
     let tracksToProcess = [];
     let tracksNeedingLyrics = [];
-  
-    for (const track of tracks) {
-      const trackId = track.uri.split(":")[2];
-      const cachedTrack = getTrackCache(trackId, includeSongStats, includeLyrics, modelName);
-      
-      if (cachedTrack) {
-        if (includeLyrics && (!cachedTrack.lyrics || cachedTrack.lyrics === "Not included")) {
-          tracksNeedingLyrics.push({ ...track, cachedData: cachedTrack });
-        } else {
-          enrichedTracksCache.push(cachedTrack);
-        }
-      } else {
-        tracksToProcess.push(track);
-      }
-    }
-  
-    while (retries < maxRetries) {
-      try {
-        if (tracksToProcess.length > 0) {
-          let allBatchStats = {};
-          if (includeSongStats) {
-              const trackIdsToFetch = tracksToProcess.map(t => t.uri.split(":")[2]);
-              allBatchStats = await getBatchTrackStats(trackIdsToFetch);
-          }
 
-          const processedTracks = await processBatchWithRateLimit(
-            tracksToProcess,
-            20,
-            700,
-            async track => {
-              const trackId = track.uri.split(":")[2];
-              
-              let stats = includeSongStats ? allBatchStats[trackId] : null;
-              stats = stats || {
-                  danceability: null, energy: null, key: "Undefined", loudness: null,
-                  speechiness: null, acousticness: null, instrumentalness: null,
-                  liveness: null, valence: null, tempo: null, popularity: null, releaseDate: null
-              };
-              
-              let playCount = "N/A";
-  
-              if (includeSongStats) {
-                try {
-                  const albumId = track.albumId || track.track?.album?.id;
-                  if (albumId) {
-                    const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
-                    const foundTrack = albumTracksWithPlayCounts.find(
-                      (albumTrack) => albumTrack.uri === track.uri
-                    );
-                    playCount = foundTrack ? foundTrack.playcount : "N/A";
-                  }
-                } catch (error) {
-                  playCount = "N/A";
+    for (const track of tracks) {
+        const trackId = track.uri.split(":")[2];
+        const cachedTrack = getTrackCache(trackId, includeSongStats, false, modelName);
+        
+        if (cachedTrack) {
+            if (includeLyrics && (!cachedTrack.lyrics || cachedTrack.lyrics === "Not included")) {
+                tracksNeedingLyrics.push({ ...track, cachedData: cachedTrack });
+            } else {
+                enrichedTracksCache.push(cachedTrack);
+            }
+        } else {
+            tracksToProcess.push(track);
+        }
+    }
+
+    let fullPrompt;
+
+    try {
+        if (tracksToProcess.length > 0) {
+            let allBatchStats = {};
+            if (includeSongStats) {
+                const trackIdsToFetch = tracksToProcess.map(t => t.uri.split(":")[2]);
+                allBatchStats = await getBatchTrackStats(trackIdsToFetch);
+            }
+
+            const processedTracks = await processBatchWithRateLimit(
+                tracksToProcess, 20, 700,
+                async track => {
+                    const trackId = track.uri.split(":")[2];
+                    let stats = includeSongStats ? allBatchStats[trackId] : null;
+                    stats = stats || { danceability: null, energy: null, key: "Undefined", loudness: null, speechiness: null, acousticness: null, instrumentalness: null, liveness: null, valence: null, tempo: null, popularity: null, releaseDate: null };
+                    
+                    let playCount = "N/A";
+                    if (includeSongStats) {
+                        try {
+                            const albumId = track.albumId || track.track?.album?.id;
+                            if (albumId) {
+                                const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
+                                const foundTrack = albumTracksWithPlayCounts.find(t => t.uri === track.uri);
+                                playCount = foundTrack ? foundTrack.playcount : "N/A";
+                            }
+                        } catch (error) { playCount = "N/A"; }
+                    }
+                    
+                    let lyrics = "Not included";
+                    if (includeLyrics) {
+                        const lyricsData = await fetchLyricsFromLrclib(track);
+                        lyrics = lyricsData?.unsynced ? lyricsData.unsynced.map(line => line.text).join('\n') : "Not included";
+                    }
+                    
+                    const enrichedTrack = {
+                        song_title: track.songTitle || track.name || track.title,
+                        artist: track.artistName || track.artist,
+                        album: track.albumName,
+                        uri: track.uri
+                    };
+        
+                    if (includeSongStats) {
+                        enrichedTrack.stats = { popularity: stats.popularity, playCount: playCount, releaseDate: stats.releaseDate, danceability: stats.danceability, energy: stats.energy, valence: stats.valence, tempo: stats.tempo, key: stats.key, loudness: stats.loudness, speechiness: stats.speechiness, acousticness: stats.acousticness, liveness: stats.liveness, instrumentalness: stats.instrumentalness };
+                    }
+        
+                    const trackDataForCache = { ...enrichedTrack };
+                    if (includeLyrics) {
+                        enrichedTrack.lyrics = lyrics;
+                    }
+                    
+                    setTrackCache(trackId, trackDataForCache, includeSongStats, false, modelName);
+                    return enrichedTrack;
                 }
-              }
-              
-              let lyrics = "Not included";
-              if (includeLyrics) {
-                const lyricsData = await fetchLyricsFromLyricsOvh(track.artistName || track.artist, track.songTitle || track.name || track.title);
-                lyrics = lyricsData && lyricsData.unsynced ? lyricsData.unsynced.map(line => line.text).join(' ') : "Not included";
-              }
-              
-              const enrichedTrack = {
-                song_title: track.songTitle || track.name || track.title,
-                artist: track.artistName || track.artist,
-                album: track.albumName,
-                uri: track.uri
-              };
-  
-              if (includeSongStats) {
-                enrichedTrack.stats = {
-                  popularity: stats.popularity, playCount: playCount, releaseDate: stats.releaseDate,
-                  danceability: stats.danceability, energy: stats.energy, valence: stats.valence,
-                  tempo: stats.tempo, key: stats.key, loudness: stats.loudness,
-                  speechiness: stats.speechiness, acousticness: stats.acousticness,
-                  liveness: stats.liveness, instrumentalness: stats.instrumentalness,
-                };
-              }
-  
-              if (includeLyrics) {
-                enrichedTrack.lyrics = lyrics;
-              }
-  
-              setTrackCache(trackId, enrichedTrack, includeSongStats, includeLyrics, modelName);
-              return enrichedTrack;
-            }
-          );
-          enrichedTracksCache = [...enrichedTracksCache, ...processedTracks];
+            );
+            enrichedTracksCache.push(...processedTracks);
         }
-  
+
         if (tracksNeedingLyrics.length > 0) {
-          const processedLyrics = await processBatchWithRateLimit(
-            tracksNeedingLyrics, 20, 100,
-            async track => {
-              const trackId = track.uri.split(":")[2];
-              const enrichedTrack = { ...track.cachedData };
-              const lyricsData = await fetchLyricsFromLyricsOvh(track.artistName || track.artist, track.songTitle || track.name || track.title);
-              enrichedTrack.lyrics = lyricsData && lyricsData.unsynced ? lyricsData.unsynced.map(line => line.text).join(' ') : "Not included";
-              setTrackCache(trackId, enrichedTrack, includeSongStats, includeLyrics, modelName);
-              return enrichedTrack;
-            }
-          );
-          enrichedTracksCache = [...enrichedTracksCache, ...processedLyrics];
+            const processedLyrics = await processBatchWithRateLimit(
+                tracksNeedingLyrics, 20, 100,
+                async track => {
+                    const enrichedTrack = { ...track.cachedData };
+                    const lyricsData = await fetchLyricsFromLrclib(track);
+                    enrichedTrack.lyrics = lyricsData?.unsynced ? lyricsData.unsynced.map(line => line.text).join('\n') : "Not included";
+                    return enrichedTrack;
+                }
+            );
+            enrichedTracksCache.push(...processedLyrics);
         }
-  
+
+        manageCacheSize();
+        
         const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
-        const GoogleGenAI = await loadGoogleAI();
-        if (!GoogleGenAI) throw new Error('Failed to load Google AI SDK');
-  
-        const ai = new GoogleGenAI({ apiKey });
-  
         const userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
         const combinedSystemInstruction = `${userSystemInstruction}\n${FIXED_SYSTEM_INSTRUCTION}`;
-        const trackDataPayload = `Playlist Tracks:\n${JSON.stringify(tracksWithStats, null, 2)}`;
         const userRequestPayload = `\n\nUser Request: ${userPrompt}\n\nGIVE PICKED TRACK URI's`;
-        
-        const fullPrompt = `${combinedSystemInstruction}\n\n${trackDataPayload}\n\n${userRequestPayload}`;
-        
-        const result = await ai.models.generateContent({
-            model: modelName,
-            contents: fullPrompt,
-            safetySettings: [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-            ]
-        });
-  
-        if (result?.promptFeedback?.blockReason) {
-          throw new Error(`Blocked for ${result.promptFeedback.blockReason}`);
-        }
-  
-        const responseText = result.text;
-        const uriRegex = /spotify:track:[a-zA-Z0-9]{22}/g;
-        let matches = responseText.match(uriRegex);
-  
-        if (!matches) {
-          console.log("No Spotify track URIs found in AI response.");
-          return [];
+
+        const maxPromptSizeBytes = modelName.includes('pro')
+            ? 285 * 1024
+            : 585 * 1024;
+
+        const { prunedTracks, notification } = pruneTracksForApiLimit(tracksWithStats, combinedSystemInstruction, userRequestPayload, maxPromptSizeBytes);
+        if (notification) {
+            Spicetify.showNotification(notification);
         }
         
-        return [...new Set(matches)];
-        
-      } catch (error) {
-        console.error(`Error during Gemini request (Attempt ${retries + 1}):`, error);
-        if (retries === maxRetries - 1) {
-          throw new Error(`Failed to get a valid response from Gemini after ${maxRetries} retries.`);
+        const trackDataPayload = `Playlist Tracks:\n${JSON.stringify(prunedTracks, null, 2)}`;
+        fullPrompt = `${combinedSystemInstruction}\n\n${trackDataPayload}\n\n${userRequestPayload}`;
+        console.log({ message: "[Sort-Play AI Prompt]", prompt: fullPrompt });
+
+    } catch (dataPrepError) {
+        console.error("A critical error occurred during the data preparation phase:", dataPrepError);
+        throw dataPrepError;
+    }
+
+    let retries = 0;
+    let delay = initialDelay;
+    let currentApiKey = apiKey;
+    const usedKeys = new Set([currentApiKey]);
+
+    while (retries < maxRetries) {
+        try {
+            const GoogleGenAI = await loadGoogleAI();
+            if (!GoogleGenAI) throw new Error('Failed to load Google AI SDK');
+            const ai = new GoogleGenAI({ apiKey: currentApiKey });
+
+            const result = await ai.models.generateContent({
+                model: modelName,
+                contents: fullPrompt,
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+                ]
+            });
+
+            if (result?.promptFeedback?.blockReason) {
+                throw new Error(`Blocked for ${result.promptFeedback.blockReason}`);
+            }
+
+            const responseText = result.text;
+            const uriRegex = /spotify:track:[a-zA-Z0-9]{22}/g;
+            let matches = responseText.match(uriRegex);
+
+            if (!matches) {
+                console.log("No Spotify track URIs found in AI response.");
+                return [];
+            }
+            
+            return [...new Set(matches)];
+
+        } catch (error) {
+            console.error(`Error during Gemini request (Attempt ${retries + 1}):`, error);
+
+            if (error.toString().includes('429')) {
+                console.log('[Sort-Play AI] Quota exceeded. Rotating to a new API key...');
+                let newKey;
+                if (usedKeys.size < Ge_mini_Key_Pool.length) {
+                    do { newKey = Ge_mini_Key(); } while (usedKeys.has(newKey));
+                } else {
+                    console.warn('[Sort-Play AI] All keys in the pool have been tried. Re-using a random key.');
+                    newKey = Ge_mini_Key(); 
+                }
+                currentApiKey = newKey;
+                usedKeys.add(currentApiKey);
+                console.log(`[Sort-Play AI] Retrying with new key: ...${currentApiKey.slice(-4)}`);
+            }
+
+            if (retries === maxRetries - 1) {
+                throw new Error(`Failed to get a valid response from Gemini after ${maxRetries} retries.`);
+            }
+            retries++;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2;
         }
-        retries++;
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2;
-      }
     }
   }
 
@@ -11968,7 +12022,6 @@ function isDirectSortType(sortType) {
   }
 
   async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}) {
-    console.log("enrichTracksWithPlayCounts called!");
     const albumGroups = new Map();
     tracks.forEach(track => {
         const albumId = track?.track?.album?.id || track?.album?.id;
@@ -15381,6 +15434,47 @@ function isDirectSortType(sortType) {
         }
         return; 
     }
+
+    if (sortType === "aiPick") {
+        setButtonProcessing(true);
+        mainButton.innerHTML = '<div class="loader"></div>';
+        mainButton.innerText = "Preparing...";
+        toggleMenu();
+        closeAllMenus();
+    
+        try {
+            const currentUri = getCurrentUri();
+            if (!currentUri) {
+                throw new Error("Please select a playlist or artist first");
+            }
+    
+            let tracks;
+            if (URI.isPlaylistV1OrV2(currentUri)) {
+                tracks = await getPlaylistTracks(currentUri.split(":")[2]);
+            } else if (URI.isArtist(currentUri)) {
+                tracks = await getArtistTracks(currentUri);
+            } else if (isLikedSongsPage(currentUri)) {
+                tracks = await getLikedSongs();
+            } else if (URI.isAlbum(currentUri)) {
+                tracks = await getAlbumTracks(currentUri.split(":")[2]);
+            } else {
+                throw new Error('Invalid page for AI Pick');
+            }
+    
+            if (!tracks || tracks.length === 0) {
+                throw new Error('No tracks found to analyze');
+            }
+            
+            await showAiPickModal(tracks);
+            resetButtons(); 
+    
+        } catch (error) {
+            console.error("Error preparing AI Pick:", error);
+            Spicetify.showNotification(error.message, true);
+            resetButtons();
+        }
+        return;
+    }
     
     if (topTrackSortTypes[sortType]) {
         setButtonProcessing(true);
@@ -15844,24 +15938,6 @@ function isDirectSortType(sortType) {
                 Spicetify.showNotification(error.message, true);
                 return;
             }
-        } else if (sortType === "aiPick") {
-          const { uniqueTracks: aiUniqueTracks, removedTracks: removedTracksFromAi } = await handleAiPick(
-            tracks, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
-          );
-          removedTracks = removedTracksFromAi;
-          if (aiUniqueTracks.length === 0) {
-            resetButtons();
-            Spicetify.showNotification("No tracks available for AI to pick from.");
-            return;
-          }
-          let artistImageUrl = null;
-          if (isArtistPage) {
-            try {
-              artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
-            } catch (error) { console.error("Error fetching artist image URL:", error); }
-          }
-          await showAiPickModal(aiUniqueTracks, artistImageUrl);
-          return;
         }
       }
       
