@@ -68,7 +68,7 @@
   <tr>
     <td align="center">
       <img src="https://github.com/user-attachments/assets/01ab45ee-6a3f-4b30-9f27-e4c8606f6f18" width="500px">
-      <br><b>Dedicated Playlist Creation</b>
+      <br><b>Dedicated Playlists</b>
     </td>
     <td align="center">
       <img src="https://github.com/user-attachments/assets/868a2bd6-252e-41f3-a3ee-854c26a20c10" width="500px">
