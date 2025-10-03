@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.13.7";
+  const SORT_PLAY_VERSION = "5.14.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -27,7 +27,7 @@
   let showAlbumColumn = false;
   let showArtistColumn = false; 
   let removeDateAdded = false;
-  let playlistDeduplicate = true;
+  let playlistDeduplicate = false;
   let showRemovedDuplicates = false;
   let includeSongStats = true;
   let includeLyrics = false;
@@ -327,7 +327,7 @@
     selectedArtistColumnType = localStorage.getItem("sort-play-selected-artist-column-type") || "releaseDate"; 
     releaseDateFormat = localStorage.getItem("sort-play-release-date-format") || 'YYYY-MM-DD';
     removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
-    playlistDeduplicate = localStorage.getItem("sort-play-playlist-deduplicate") !== "false";
+    playlistDeduplicate = localStorage.getItem("sort-play-playlist-deduplicate-v2") === "true";
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
@@ -375,7 +375,7 @@
     localStorage.setItem("sort-play-selected-artist-column-type", selectedArtistColumnType);
     localStorage.setItem("sort-play-release-date-format", releaseDateFormat);
     localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
-    localStorage.setItem("sort-play-playlist-deduplicate", playlistDeduplicate);
+    localStorage.setItem("sort-play-playlist-deduplicate-v2", playlistDeduplicate);
     localStorage.setItem("sort-play-show-removed-duplicates", showRemovedDuplicates);
     localStorage.setItem("sort-play-include-song-stats", includeSongStats);
     localStorage.setItem("sort-play-include-lyrics", includeLyrics);
@@ -3198,8 +3198,8 @@ function isDirectSortType(sortType) {
 
         const tracksWithIds = await processBatchesWithDelay(
             tracksWithPlayCounts,
-            200,
-            1000,
+            50,
+            500,
             () => {},
             collectTrackIdsForPopularity
         );
@@ -3965,57 +3965,6 @@ function isDirectSortType(sortType) {
     return results;
   }
   
-  async function getBatchTrackStats(trackIds) {
-    if (trackIds.length === 0) {
-        return {};
-    }
-
-    const results = {};
-    const BATCH_SIZE = 50;
-
-    try {
-        for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
-            const batchIds = trackIds.slice(i, i + BATCH_SIZE);
-            
-            const [audioFeaturesResponse, trackDetailsResponse] = await Promise.all([
-                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`),
-                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`)
-            ]);
-
-            if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
-                console.warn('Failed to fetch batch track data for some tracks.');
-                continue;
-            }
-
-            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-            
-            audioFeaturesResponse.audio_features.forEach((features, index) => {
-                if (features) {
-                    const trackDetails = trackDetailsResponse.tracks[index];
-                    results[features.id] = {
-                        danceability: features.danceability ? Math.round(100 * features.danceability) : null,
-                        energy: features.energy ? Math.round(100 * features.energy) : null,
-                        key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
-                        loudness: features.loudness ?? null,
-                        speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
-                        acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
-                        instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
-                        liveness: features.liveness ? Math.round(100 * features.liveness) : null,
-                        valence: features.valence ? Math.round(100 * features.valence) : null,
-                        tempo: features.tempo ? Math.round(features.tempo) : null,
-                        popularity: trackDetails?.popularity ?? null,
-                        releaseDate: trackDetails?.album?.release_date ?? null
-                    };
-                }
-            });
-        }
-    } catch (error) {
-        console.error('Error fetching batch track stats:', error);
-    }
-    return results;
-  }
-
-  
   async function fetchLyricsFromLyricsOvh(artist, track, maxRetries = 3, baseDelay = 1000) {
     let attempt = 0;
     while (attempt < maxRetries) {
@@ -4594,8 +4543,8 @@ function isDirectSortType(sortType) {
 
         const tracksWithIds = await processBatchesWithDelay(
           tracksWithPlayCounts,
-          200,
-          1000,
+          50,
+          500,
           (progress) => {
             mainButton.innerText = `${25 + Math.floor(progress * 0.25)}%`; 
           },
@@ -4609,10 +4558,10 @@ function isDirectSortType(sortType) {
         );
         const tracksWithReleaseDates = await processBatchesWithDelay(
             tracksWithPopularity,
-            200,
-            1000,
+            50,
+            500,
             (progress) => {
-                mainButton.innerText = `${75 + Math.floor(progress * 0.25)}%`; //75%
+                mainButton.innerText = `${75 + Math.floor(progress * 0.25)}%`;
             },
             getTrackDetailsWithReleaseDateForFilter 
         );
@@ -7996,12 +7945,12 @@ function isDirectSortType(sortType) {
     }
 
     const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks);
-    const tracksWithIds = await processBatchesWithDelay(tracksWithPlayCounts, 200, 1000, () => {}, collectTrackIdsForPopularity);
+    const tracksWithIds = await processBatchesWithDelay(tracksWithPlayCounts, 50, 500, () => {}, collectTrackIdsForPopularity);
     const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
 
     let tracksForProcessing = tracksWithPopularity;
     if (sortType === "releaseDate") {
-        tracksForProcessing = await processBatchesWithDelay(tracksWithPopularity, 200, 1000, () => {}, getTrackDetailsWithReleaseDate);
+        tracksForProcessing = await processBatchesWithDelay(tracksWithPopularity, 50, 500, () => {}, getTrackDetailsWithReleaseDate);
     }
 
     const { unique: uniqueTracks } = deduplicate ? deduplicateTracks(tracksForProcessing) : { unique: tracksForProcessing, removed: [] };
@@ -10677,8 +10626,8 @@ function isDirectSortType(sortType) {
           );
           const tracksWithIds = await processBatchesWithDelay(
               tracksWithPlayCounts,
-              200,
-              1000,
+              50,
+              500,
               (progress) => {
                   mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`;
               },
@@ -10696,8 +10645,8 @@ function isDirectSortType(sortType) {
           if (sortType === "releaseDate") {
               const tracksWithReleaseDates = await processBatchesWithDelay(
                   tracksWithPopularity,
-                  200,
-                  1000,
+                  50,
+                  500,
                   (progress) => {
                       mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
                   },
@@ -12019,6 +11968,7 @@ function isDirectSortType(sortType) {
   }
 
   async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}) {
+    console.log("enrichTracksWithPlayCounts called!");
     const albumGroups = new Map();
     tracks.forEach(track => {
         const albumId = track?.track?.album?.id || track?.album?.id;
@@ -12090,6 +12040,8 @@ function isDirectSortType(sortType) {
         const albumData = albumPlayCountData.get(albumId);
         const foundTrack = albumData ? albumData.get(trackUri) : null;
 
+        const correctPlayCount = foundTrack ? foundTrack.playcount : "N/A";
+
         const enrichedData = {
             trackNumber: foundTrack ? foundTrack.trackNumber : 0,
             songTitle: track.name,
@@ -12097,17 +12049,74 @@ function isDirectSortType(sortType) {
             trackId: trackId,
             albumId: albumId,
             durationMs: track.durationMs || track.duration_ms || track?.track?.duration_ms,
-            playCount: foundTrack ? foundTrack.playcount : "N/A",
+            playcount: correctPlayCount,
+            playCount: correctPlayCount,
             uri: trackUri,
             artistName: track.artistName || track?.artists?.[0]?.name,
             allArtists: track.allArtists || track?.artists?.map(a => a.name).join(", "),
         };
+        
         return { ...track, ...enrichedData };
     });
 
     return enrichedTracks;
   }
 
+  async function refreshTrackAlbumInfo(tracks, updateProgress = () => {}) {
+    const BATCH_SIZE = 50;
+    const refreshedTracks = [];
+    const trackIds = tracks.map(t => t.id || t.track?.id).filter(Boolean);
+
+    for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
+        const batchIds = trackIds.slice(i, i + BATCH_SIZE);
+
+        if (batchIds.length === 0) continue;
+
+        try {
+            const trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
+            if (trackDetailsResponse && trackDetailsResponse.tracks) {
+                trackDetailsResponse.tracks.forEach(detailedTrack => {
+                    if (!detailedTrack) return;
+
+                    const newTrack = {
+                        uri: detailedTrack.uri,
+                        name: detailedTrack.name,
+                        albumName: detailedTrack.album.name,
+                        artistName: detailedTrack.artists[0]?.name,
+                        allArtists: detailedTrack.artists.map(a => a.name).join(", "),
+                        durationMs: detailedTrack.duration_ms,
+                        popularity: detailedTrack.popularity,
+                        trackId: detailedTrack.id,
+                        albumId: detailedTrack.album.id,
+                        track: {
+                            id: detailedTrack.id,
+                            name: detailedTrack.name,
+                            uri: detailedTrack.uri,
+                            duration_ms: detailedTrack.duration_ms,
+                            album: {
+                                id: detailedTrack.album.id,
+                                name: detailedTrack.album.name,
+                                uri: detailedTrack.album.uri,
+                            },
+                            artists: detailedTrack.artists.map(a => ({
+                                id: a.id,
+                                name: a.name,
+                                uri: a.uri,
+                            })),
+                        }
+                    };
+                    refreshedTracks.push(newTrack);
+                });
+            }
+        } catch (error) {
+            console.warn(`[Sort-Play] Failed to refresh a batch of track album info:`, error);
+        }
+        const progress = Math.min(100, Math.floor(((i + BATCH_SIZE) / trackIds.length) * 100));
+        updateProgress(progress);
+    }
+    return refreshedTracks;
+  }
+  
   async function collectTrackIdsForPopularity(track) {
     const trackId = track.uri.split(":")[2];
     return {
@@ -12656,7 +12665,7 @@ function isDirectSortType(sortType) {
             tracks, () => {}
           );
           const tracksWithIds = await processBatchesWithDelay(
-            tracksWithPlayCounts, 200, 1000, () => {}, collectTrackIdsForPopularity
+            tracksWithPlayCounts, 50, 500, () => {}, collectTrackIdsForPopularity
           );
           const tracksWithPopularity = await fetchPopularityForMultipleTracks(
             tracksWithIds, () => {}
@@ -12688,7 +12697,7 @@ function isDirectSortType(sortType) {
       color: "#FFFFFFB3",
       clickBackgroundColor: "transparent",
       disabledBackgroundColor: "#FFFFFFB3",
-      disabledColor: "#666",
+      disabledColor: "#474747",
     },
     menuItems: [
       {
@@ -12878,7 +12887,7 @@ function isDirectSortType(sortType) {
   mainButton.style.padding = "4px 10px";
   mainButton.style.fontWeight = "400";
   mainButton.style.fontSize = "14px";
-  mainButton.style.height = "32px";  
+  mainButton.style.height = "30px";  
   mainButton.style.overflow = "hidden";
   mainButton.style.width = "100px";
   mainButton.style.display = "flex";
@@ -13986,24 +13995,34 @@ function isDirectSortType(sortType) {
     }
 
     let attempt = 0;
-    const maxRetries = 3;
-    let delay = 500;
+    const maxRetries = 5;
+    let delay = 1000;
     while (attempt < maxRetries) {
         try {
             await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${newPlaylist.uri.split(':')[2]}`, {
                 description: description,
             });
-            break; 
+            break;
         } catch (descriptionError) {
             const isExpectedJsonError = descriptionError instanceof SyntaxError && descriptionError.message.includes("Unexpected end of JSON input");
             if (isExpectedJsonError) {
                 break; 
             }
+            
+            const is404Error = descriptionError?.status === 404 || 
+                              descriptionError?.message?.includes('404') ||
+                              (typeof descriptionError === 'string' && descriptionError.includes('404'));
+            
             attempt++;
             if (attempt >= maxRetries) {
-                console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
+                if (is404Error) {
+                    console.warn(`Playlist "${name}" was created but may take time to propagate. Description will be empty.`);
+                } else {
+                    console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
+                }
             } else {
-                await new Promise(resolve => setTimeout(resolve, delay));
+                const retryDelay = is404Error ? delay * 1.5 : delay;
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
                 delay *= 2;
             }
         }
@@ -15541,15 +15560,42 @@ function isDirectSortType(sortType) {
       } else {
         mainButton.innerText = "0%";
 
-        const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
-          tracks, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.20)}%`; }
-        );
-        const tracksWithIds = await processBatchesWithDelay(
-          tracksWithPlayCounts, 200, 1000, (progress) => { mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`; }, collectTrackIdsForPopularity
-        );
-        const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-          tracksWithIds, (progress) => { mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`; }
-        );
+        let tracksWithPopularity;
+
+        if (playlistDeduplicate || sortType === 'playCount' || sortType === 'popularity' || sortType === 'deduplicateOnly' || isArtistPage) {
+            
+            let refreshedTracks = tracks;
+            if (isArtistPage) {
+                mainButton.innerText = "Correcting Data...";
+                refreshedTracks = await refreshTrackAlbumInfo(
+                    tracks, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.15)}%`; }
+                );
+            }
+
+            const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
+              refreshedTracks, (progress) => { mainButton.innerText = `${15 + Math.floor(progress * 0.30)}%`; }
+            );
+            const tracksWithIds = await processBatchesWithDelay(
+              tracksWithPlayCounts, 50, 500, (progress) => { mainButton.innerText = `${45 + Math.floor(progress * 0.20)}%`; },
+              collectTrackIdsForPopularity
+            );
+            tracksWithPopularity = await fetchPopularityForMultipleTracks(
+              tracksWithIds, (progress) => { mainButton.innerText = `${65 + Math.floor(progress * 0.15)}%`; }
+            );
+        } else {
+            tracksWithPopularity = tracks.map(track => ({
+                ...track,
+                trackId: track.uri.split(":")[2],
+                songTitle: track.name,
+                artistName: track.artistName || (track.artists && track.artists[0]?.name),
+                allArtists: track.allArtists || (track.artists?.map(a => a.name).join(", ")),
+                albumName: track.albumName || track.album?.name,
+                playCount: "N/A",
+                popularity: null,
+            }));
+            mainButton.innerText = "60%";
+        }
+
 
         if (
           sortType === "playCount" ||
@@ -15562,7 +15608,7 @@ function isDirectSortType(sortType) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
             const tracksWithReleaseDates = await processBatchesWithDelay(
-              tracksWithPopularity, 200, 1000, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithReleaseDate
+              tracksWithPopularity, 50, 500, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithReleaseDate
             );
             tracksForDeduplication = tracksWithReleaseDates;
           } else if (sortType === "averageColor") {
@@ -15610,7 +15656,8 @@ function isDirectSortType(sortType) {
             tracksForDeduplication = tracksWithPopularity;
           }
           
-          const deduplicationResult = deduplicateTracks(tracksForDeduplication);
+
+          const deduplicationResult = deduplicateTracks(tracksForDeduplication, sortType === "deduplicateOnly");
           uniqueTracks = deduplicationResult.unique;
           removedTracks = deduplicationResult.removed;
 
@@ -15724,9 +15771,11 @@ function isDirectSortType(sortType) {
             mainButton.innerText = "100%";
 
         } else if (['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
-            mainButton.innerText = "Analyzing...";
             const trackIds = tracksWithPopularity.map(t => t.trackId);
-            const allStats = await getBatchTrackStats(trackIds);
+            const allStats = await getBatchTrackStats(trackIds, (progress) => {
+                const overallProgress = 60 + Math.floor(progress * 0.40);
+                mainButton.innerText = `${overallProgress}%`;
+            });
 
             const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
                 const stats = allStats[track.trackId] || {};
@@ -15752,21 +15801,31 @@ function isDirectSortType(sortType) {
             } else {
                 sortedTracks = sortedTracksWithData;
             }
-            mainButton.innerText = "100%";
 
         } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
             try {
-                const result = await handleScrobblesSorting(
-                  tracks, sortType, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.30)}%`; }
+                const tracksWithScrobbles = await handleScrobblesSorting(
+                  tracksWithPopularity,
+                  sortType,
+                  (progress) => { mainButton.innerText = `${80 + Math.floor(progress * 0.20)}%`; }
                 );
-                sortedTracks = result.sortedTracks;
-                removedTracks = result.removedTracks;
-                const totalTracksProgress = sortedTracks.length;
-                sortedTracks.forEach((_, index) => {
-                  const progress = 90 + Math.floor(((index + 1) / totalTracksProgress) * 10);
-                  mainButton.innerText = `${progress}%`;
-                });
+
+                const deduplicationResult = deduplicateTracks(tracksWithScrobbles, sortType === "deduplicateOnly");
+                uniqueTracks = deduplicationResult.unique;
+                removedTracks = deduplicationResult.removed;
+
+                if (sortType === 'personalScrobbles') {
+                    const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
+                    sortedTracks = uniqueTracks
+                        .filter((track) => includeZeroScrobbles || track.personalScrobbles > 0)
+                        .sort((a, b) => sortOrderState.personalScrobbles ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
+                } else {
+                    sortedTracks = uniqueTracks
+                        .filter((track) => track.scrobbles !== null)
+                        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles);
+                }
                 mainButton.innerText = "100%";
+
               } catch (error) {
                 resetButtons();
                 Spicetify.showNotification(error.message);
@@ -16278,9 +16337,9 @@ function isDirectSortType(sortType) {
   }
   
 
-  function deduplicateTracks(tracks) {
+function deduplicateTracks(tracks, force = false) {
       const currentUri = getCurrentUri();
-      if (!playlistDeduplicate && URI.isPlaylistV1OrV2(currentUri)) {
+      if (!force && !playlistDeduplicate && !URI.isArtist(currentUri)) {
           return { unique: tracks, removed: [] };
       }
 
@@ -16404,47 +16463,11 @@ function isDirectSortType(sortType) {
       }
     }
 
-    const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
-      tracks,
-      (progress) => {
-        updateProgress(Math.floor(progress * 0.25));
-      }
-    );
-
-    const tracksWithIds = await processBatchesWithDelay(
-      tracksWithPlayCounts,
-      200,
-      1000,
-      (progress) => {
-        updateProgress(Math.floor(25 + progress * 0.25));
-      },
-      collectTrackIdsForPopularity
-    );
-
-    const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-      tracksWithIds,
-      (progress) => {
-        updateProgress(Math.floor(50 + progress * 0.1));
-      }
-    );
-
-    let uniqueTracks;
-    let removedTracks = [];
-    const currentUri = getCurrentUri();
-
-    if (!playlistDeduplicate && URI.isPlaylistV1OrV2(currentUri)) {
-      uniqueTracks = tracksWithPopularity;
-    } else {
-      const deduplicationResult = deduplicateTracks(tracksWithPopularity);
-      uniqueTracks = deduplicationResult.unique;
-      removedTracks = deduplicationResult.removed;
-    }
-
     const fetchFunction = sortType === 'personalScrobbles'
       ? getTrackDetailsWithPersonalScrobbles
       : getTrackDetailsWithScrobbles;
 
-    const tracksForScrobbleFetching = uniqueTracks.map(track => ({
+    const tracksForScrobbleFetching = tracks.map(track => ({
       ...track,
       name: track.songTitle || track.name,
       artistName: track.artistName || (track.artists && track.artists[0]?.name),
@@ -16456,27 +16479,16 @@ function isDirectSortType(sortType) {
       50,
       1000,
       (progress) => {
-        updateProgress(Math.floor(75 + progress * 0.25));
+        updateProgress(progress);
       },
       fetchFunction
     );
-    let sortedTracks;
-    if (sortType === 'personalScrobbles') {
-      const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
-      sortedTracks = tracksWithScrobbles
-        .filter((track) => includeZeroScrobbles || track.personalScrobbles > 0)
-        .sort((a, b) => sortOrderState.personalScrobbles ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
-    } else {
-      sortedTracks = tracksWithScrobbles
-        .filter((track) => track.scrobbles !== null)
-        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles);
-    }
 
-    if (sortedTracks.length === 0) {
+    if (tracksWithScrobbles.length === 0) {
       throw new Error(`No tracks found with ${sortType === 'personalScrobbles' ? 'personal ' : ''}Last.fm data to sort.`);
     }
 
-    return { sortedTracks, removedTracks };
+    return tracksWithScrobbles;
   }
 
   async function handleLastScrobbledSorting(tracks, updateProgress) {
@@ -16734,52 +16746,67 @@ function isDirectSortType(sortType) {
     });
   }
 
-  async function getBatchTrackStats(trackIds) {
+  async function getBatchTrackStats(trackIds, updateProgress = () => {}) {
     if (trackIds.length === 0) {
         return {};
     }
 
     const results = {};
     const BATCH_SIZE = 50;
+    const MAX_RETRIES = 3;
+    const INITIAL_DELAY = 1000;
 
-    try {
-        for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
-            const batchIds = trackIds.slice(i, i + BATCH_SIZE);
-            
-            const [audioFeaturesResponse, trackDetailsResponse] = await Promise.all([
-                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`),
-                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`)
-            ]);
+    for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
+        const batchIds = trackIds.slice(i, i + BATCH_SIZE);
+        let success = false;
+        let retries = 0;
+        let delay = INITIAL_DELAY;
 
-            if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
-                console.warn('Failed to fetch batch track data for some tracks.');
-                continue;
-            }
+        while (!success && retries < MAX_RETRIES) {
+            try {
+                const [audioFeaturesResponse, trackDetailsResponse] = await Promise.all([
+                    Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`),
+                    Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`)
+                ]);
 
-            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-            
-            audioFeaturesResponse.audio_features.forEach((features, index) => {
-                if (features) {
-                    const trackDetails = trackDetailsResponse.tracks[index];
-                    results[features.id] = {
-                        danceability: features.danceability ? Math.round(100 * features.danceability) : null,
-                        energy: features.energy ? Math.round(100 * features.energy) : null,
-                        key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
-                        loudness: features.loudness ?? null,
-                        speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
-                        acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
-                        instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
-                        liveness: features.liveness ? Math.round(100 * features.liveness) : null,
-                        valence: features.valence ? Math.round(100 * features.valence) : null,
-                        tempo: features.tempo ? Math.round(features.tempo) : null,
-                        popularity: trackDetails?.popularity ?? null,
-                        releaseDate: trackDetails?.album?.release_date ?? null
-                    };
+                if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
+                    throw new Error('Incomplete data received from Spotify API for a batch.');
                 }
-            });
+
+                const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+                
+                audioFeaturesResponse.audio_features.forEach((features, index) => {
+                    if (features) {
+                        const trackDetails = trackDetailsResponse.tracks[index];
+                        results[features.id] = {
+                            danceability: features.danceability ? Math.round(100 * features.danceability) : null,
+                            energy: features.energy ? Math.round(100 * features.energy) : null,
+                            key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
+                            loudness: features.loudness ?? null,
+                            speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
+                            acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
+                            instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
+                            liveness: features.liveness ? Math.round(100 * features.liveness) : null,
+                            valence: features.valence ? Math.round(100 * features.valence) : null,
+                            tempo: features.tempo ? Math.round(features.tempo) : null,
+                            popularity: trackDetails?.popularity ?? null,
+                            releaseDate: trackDetails?.album?.release_date ?? null
+                        };
+                    }
+                });
+                success = true;
+            } catch (error) {
+                retries++;
+                if (retries < MAX_RETRIES) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                } else {
+                    console.error(`[Sort-Play] Failed to fetch batch track stats after ${MAX_RETRIES} attempts for batch starting at index ${i}.`);
+                }
+            }
         }
-    } catch (error) {
-        console.error('Error fetching batch track stats:', error);
+        const progress = Math.min(100, Math.floor(((i + BATCH_SIZE) / trackIds.length) * 100));
+        updateProgress(progress);
     }
     return results;
   }
