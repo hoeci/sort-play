@@ -81,7 +81,7 @@
 
 #### Using Marketplace 
 1.  Ensure you have [Spicetify](https://spicetify.app/) installed.
-2. Open the Spicetify Marketplace.  
+2. Open the [Spicetify Marketplace](https://github.com/hoeci/sort-play/blob/main/assets/SM.jpg?raw=true).  
 3.  Search for `Sort-Play`.
 4.  Click Install.
 
