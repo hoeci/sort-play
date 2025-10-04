@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.14.1";
+  const SORT_PLAY_VERSION = "5.14.2";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -38,6 +38,7 @@
   let openPlaylistAfterSortEnabled = false;
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
+  let changeTitleOnCreate = true;
   let changeTitleOnModify = true;
   let selectedAiModel = "gemini-flash-latest";
   let topTracksLimit = 100;
@@ -61,6 +62,7 @@
   const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort-v2";
   const STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER = "sort-play-place-playlists-in-folder";
   const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
+  const STORAGE_KEY_CHANGE_TITLE_ON_CREATE = "sort-play-change-title-on-create";
   const STORAGE_KEY_CHANGE_TITLE_ON_MODIFY = "sort-play-change-title-on-modify";
   const STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS = "sort-play-update-behavior-settings";
   const STORAGE_KEY_DEDICATED_PLAYLIST_MAP = "sort-play-dedicated-playlist-map";
@@ -77,7 +79,7 @@
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
   const STORAGE_KEY_USER_ADDED_GENRES = "sort-play-user-added-genres";
   const STORAGE_KEY_RANDOM_GENRE_HISTORY = "sort-play-random-genre-history";
-  const AI_DATA_CACHE_MAX_ITEMS = 1000;
+  const AI_DATA_CACHE_MAX_ITEMS = 1500;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
   const runningJobIds = new Set();
@@ -350,6 +352,8 @@
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
     placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
+    const changeTitleOnCreateStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE);
+    changeTitleOnCreate = changeTitleOnCreateStored === null ? true : changeTitleOnCreateStored === "true";
     const changeTitleStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY);
     changeTitleOnModify = changeTitleStored === null ? true : changeTitleStored === "true";
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
@@ -395,6 +399,7 @@
     localStorage.setItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, discoveryPlaylistSize);
     localStorage.setItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, placePlaylistsInFolder);
     localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
+    localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE, changeTitleOnCreate);
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY, changeTitleOnModify);
     localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
@@ -1649,12 +1654,28 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
+    <div class="setting-row" id="changeTitleOnCreateSettingRow">
+        <label class="col description">
+            Update Title When Creating
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Appends a sort tag like "(PlayCount)" to new playlists created via direct sorting.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="changeTitleOnCreateSwitchLabel">
+                <input type="checkbox" id="changeTitleOnCreateToggle" ${changeTitleOnCreate ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div class="setting-row" id="changeTitleOnModifySettingRow">
         <label class="col description">
             Update Title When Modifying
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">When enabled, appends a sort tag like "(PlayCount)" to the playlist title after modifying it.</span>
+                <span class="custom-tooltip">Appends a sort tag like "(PlayCount)" to the playlist title after modifying it.</span>
             </span>
         </label>
         <div class="col action">
@@ -1898,6 +1919,7 @@
     const discoveryPlaylistSizeSelect = modalContainer.querySelector("#discoveryPlaylistSizeSelect");
     const placePlaylistsInFolderToggle = modalContainer.querySelector("#placePlaylistsInFolderToggle");
     const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
+    const changeTitleOnCreateToggle = modalContainer.querySelector("#changeTitleOnCreateToggle");
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
     const playlistBehaviorSettingsBtn = modalContainer.querySelector("#playlistBehaviorSettingsBtn");
     const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
@@ -2095,6 +2117,13 @@
         }
     });
 
+    changeTitleOnCreateToggle.addEventListener("change", () => {
+        if (!changeTitleOnCreateToggle.disabled) {
+            changeTitleOnCreate = changeTitleOnCreateToggle.checked;
+            saveSettings();
+        }
+    });
+    
     changeTitleOnModifyToggle.addEventListener("change", () => {
         if (!changeTitleOnModifyToggle.disabled) {
             changeTitleOnModify = changeTitleOnModifyToggle.checked;
@@ -2618,7 +2647,7 @@
 
     const wallets = [
         { name: 'USDT (TRC20) / TRON', address: 'TU3tiVV3NLmFetXrsAZnuE9qu8JVSHDuAH' },
-        { name: 'TON', address: 'UQB3plqXNXdSXlXoUvqkkTKQoim0Zy2GthZZfrAhS4cVWFbQ' },
+        { name: 'TON', address: 'UQAFHn9aGKqTn1Vku5xSuPCkkvVbnfnN20B1RwijthZ8a2OE' },
         { name: 'Bitcoin (BTC)', address: 'bc1q0vvhyffnk8s0g9hnf4k2c7z6ys3r2d7x6fjnvv' },
     ];
 
@@ -4013,9 +4042,8 @@ function isDirectSortType(sortType) {
 
     let lyricsRemovedCount = 0;
     let statsRemovedCount = 0;
-    const prunedTracks = JSON.parse(JSON.stringify(tracks)); // Deep copy to avoid modifying original data
+    const prunedTracks = JSON.parse(JSON.stringify(tracks));
 
-    // Phase 1: Remove lyrics randomly
     const tracksWithLyricsIndices = prunedTracks.map((t, i) => (t.lyrics && t.lyrics !== "Not included") ? i : -1).filter(i => i !== -1);
     const shuffledLyricsIndices = shuffleArray(tracksWithLyricsIndices);
 
@@ -10559,6 +10587,7 @@ function isDirectSortType(sortType) {
     
       async function createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription) {
           try {
+              mainButton.innerText = "Creating...";
               const newPlaylist = await createPlaylist(playlistName, playlistDescription);
               await new Promise(resolve => setTimeout(resolve, 1250));
               mainButton.innerText = "Saving...";
@@ -11747,36 +11776,51 @@ function isDirectSortType(sortType) {
     return artistData.images[0]?.url;
   }
   
-  async function setPlaylistImage(playlistId, base64Image, maxRetries = 3, initialDelay = 500) {
-    let attempt = 0;
-    let delay = initialDelay;
+  function setPlaylistImage(playlistId, base64Image, maxRetries = 8, initialDelay = 1500) {
+    (async () => {
+        let attempt = 0;
+        let delay = initialDelay;
 
-    while (attempt < maxRetries) {
-        try {
-            await Spicetify.CosmosAsync.put(
-                `https://api.spotify.com/v1/playlists/${playlistId}/images`,
-                base64Image.split("base64,")[1]
-            );
-            return; 
-        } catch (error) {
-            attempt++;
-            const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
-            
-            if (isExpectedJsonError) {
-                return;
+        while (attempt < maxRetries) {
+            try {
+                let putResponse;
+                try {
+                    putResponse = await Spicetify.CosmosAsync.put(
+                        `https://api.spotify.com/v1/playlists/${playlistId}/images`,
+                        base64Image.split("base64,")[1]
+                    );
+                } catch (putError) {
+                    const isExpectedJsonError = putError instanceof SyntaxError && putError.message.includes("Unexpected end of JSON input");
+                    if (!isExpectedJsonError) {
+                        throw putError;
+                    }
+                }
+
+                if (putResponse && putResponse.error) {
+                    throw new Error(`Spotify API Error: ${putResponse.error.status} ${putResponse.error.message}`);
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                const updatedPlaylist = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                
+                if (updatedPlaylist?.images?.length > 0 && !isDefaultMosaicCover(updatedPlaylist.images[0].url)) {
+                    return;
+                } else {
+                    throw new Error("Playlist image not yet updated after PUT request.");
+                }
+
+            } catch (error) {
+                console.warn(`[Sort-Play] Set playlist image attempt ${attempt + 1} failed. Full error:`, error);
+                attempt++;
+                if (attempt >= maxRetries) {
+                    console.error(`[Sort-Play] Failed to set and verify playlist image after ${maxRetries} attempts.`);
+                    return;
+                }
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 1.5;
             }
-
-            console.warn(`Sort-Play: Error setting playlist image (Attempt ${attempt}/${maxRetries}):`, error);
-
-            if (attempt >= maxRetries) {
-                console.error("Sort-Play: Failed to set playlist image after all retries.");
-                return;
-            }
-
-            await new Promise(resolve => setTimeout(resolve, delay));
-            delay *= 2;
         }
-    }
+    })();
   }
 
   async function imageUrlToBase64(url) {
@@ -13948,14 +13992,16 @@ function isDirectSortType(sortType) {
                     }
 
                     if (setDedicatedPlaylistCovers) {
-                        try {
-                            const user = await Spicetify.Platform.UserAPI.getUser();
-                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                            const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
-                            await setPlaylistImage(playlistId, coverBase64);
-                        } catch (coverError) {
-                            console.error("Failed to update custom playlist cover:", coverError);
-                        }
+                        (async () => {
+                            try {
+                                const user = await Spicetify.Platform.UserAPI.getUser();
+                                const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                                const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
+                                setPlaylistImage(playlistId, coverBase64);
+                            } catch (coverError) {
+                                console.error("Failed to update custom playlist cover:", coverError);
+                            }
+                        })();
                     }
 
                     await movePlaylistToTop(playlistUri);
@@ -13973,17 +14019,19 @@ function isDirectSortType(sortType) {
     const newPlaylist = await createPlaylist(name, description, maxRetries, initialDelay);
 
     if (newPlaylist) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 250));
 
         if (setDedicatedPlaylistCovers) {
-            try {
-                const user = await Spicetify.Platform.UserAPI.getUser();
-                const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
-                await setPlaylistImage(newPlaylist.id, coverBase64);
-            } catch (coverError) {
-                console.error("Failed to generate or set custom playlist cover:", coverError);
-            }
+            (async () => {
+                try {
+                    const user = await Spicetify.Platform.UserAPI.getUser();
+                    const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                    const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
+                    setPlaylistImage(newPlaylist.id, coverBase64);
+                } catch (coverError) {
+                    console.error("Failed to generate or set custom playlist cover:", coverError);
+                }
+            })();
         }
         
         await addPlaylistToLibrary(newPlaylist.uri);
@@ -14046,46 +14094,54 @@ function isDirectSortType(sortType) {
     if (!newPlaylist || !newPlaylist.uri) {
         throw new Error("Failed to create playlist after all attempts.");
     }
-
-    let attempt = 0;
-    const maxRetries = 5;
-    let delay = 1000;
-    while (attempt < maxRetries) {
-        try {
-            await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${newPlaylist.uri.split(':')[2]}`, {
-                description: description,
-            });
-            break;
-        } catch (descriptionError) {
-            const isExpectedJsonError = descriptionError instanceof SyntaxError && descriptionError.message.includes("Unexpected end of JSON input");
-            if (isExpectedJsonError) {
-                break; 
-            }
-            
-            const is404Error = descriptionError?.status === 404 || 
-                              descriptionError?.message?.includes('404') ||
-                              (typeof descriptionError === 'string' && descriptionError.includes('404'));
-            
-            attempt++;
-            if (attempt >= maxRetries) {
-                if (is404Error) {
-                    console.warn(`Playlist "${name}" was created but may take time to propagate. Description will be empty.`);
-                } else {
-                    console.warn(`An unexpected error occurred while setting the playlist description for "${name}". The playlist was still created. Error:`, descriptionError);
-                }
-            } else {
-                const retryDelay = is404Error ? delay * 1.5 : delay;
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                delay *= 2;
-            }
-        }
-    }
+    
+    updatePlaylistDescription(newPlaylist.uri.split(':')[2], description);
     
     await setPlaylistVisibility(newPlaylist.uri, false);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
   }
 
+  async function updatePlaylistDescription(playlistId, description) {
+    try {
+        await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+            description: description,
+        });
+    } catch (e) {
+        const isExpectedJsonError = e instanceof SyntaxError && e.message.includes("Unexpected end of JSON input");
+        if (!isExpectedJsonError) {
+            console.error(`[Sort-Play] Failed to send playlist description update for playlist ${playlistId}:`, e);
+            return;
+        }
+    }
+
+    (async () => {
+        let attempt = 0;
+        const maxRetries = 8;
+        let delay = 1500;
+
+        while (attempt < maxRetries) {
+            try {
+                await new Promise(resolve => setTimeout(resolve, delay));
+
+                const updatedPlaylist = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                
+                if (updatedPlaylist && updatedPlaylist.description === description) {
+                    return;
+                }
+
+            } catch (verificationError) {
+                console.error(`[Sort-Play] Error during description verification for playlist ${playlistId}:`, verificationError);
+            }
+
+            attempt++;
+            delay *= 1.5; 
+        }
+
+        console.warn(`[Sort-Play] Could not verify playlist description update for ${playlistId} after ${maxRetries} attempts. The description may still have been set.`);
+    })();
+  }
+  
   async function navigateToPlaylist(playlistObject) {
     if (openPlaylistAfterSortEnabled && playlistObject && playlistObject.uri) { 
         const tempPath = "/library"; 
@@ -15656,16 +15712,16 @@ function isDirectSortType(sortType) {
 
         let tracksWithPopularity;
 
-        if (playlistDeduplicate || sortType === 'playCount' || sortType === 'popularity' || sortType === 'deduplicateOnly' || isArtistPage) {
-            
+        if (playlistDeduplicate || sortType === 'deduplicateOnly' || isArtistPage) {
+          
             let refreshedTracks = tracks;
             if (isArtistPage) {
-                mainButton.innerText = "Correcting Data...";
+                mainButton.innerText = "Correcting...";
                 refreshedTracks = await refreshTrackAlbumInfo(
                     tracks, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.15)}%`; }
                 );
             }
-
+  
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
               refreshedTracks, (progress) => { mainButton.innerText = `${15 + Math.floor(progress * 0.30)}%`; }
             );
@@ -15676,6 +15732,25 @@ function isDirectSortType(sortType) {
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
               tracksWithIds, (progress) => { mainButton.innerText = `${65 + Math.floor(progress * 0.15)}%`; }
             );
+        
+        } else if (sortType === 'playCount') {
+            mainButton.innerText = "0%";
+            tracksWithPopularity = await enrichTracksWithPlayCounts(
+                tracks, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }
+            );
+
+        } else if (sortType === 'popularity') {
+            mainButton.innerText = "0%";
+            const tracksWithIds = await processBatchesWithDelay(
+              tracks, 50, 500, 
+              (progress) => { mainButton.innerText = `${Math.floor(progress * 0.10)}%`; },
+              collectTrackIdsForPopularity
+            );
+            tracksWithPopularity = await fetchPopularityForMultipleTracks(
+              tracksWithIds, 
+              (progress) => { mainButton.innerText = `${10 + Math.floor(progress * 0.90)}%`; }
+            );
+
         } else {
             tracksWithPopularity = tracks.map(track => ({
                 ...track,
@@ -15687,7 +15762,6 @@ function isDirectSortType(sortType) {
                 playCount: "N/A",
                 popularity: null,
             }));
-            mainButton.innerText = "60%";
         }
 
 
@@ -15702,7 +15776,7 @@ function isDirectSortType(sortType) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
             const tracksWithReleaseDates = await processBatchesWithDelay(
-              tracksWithPopularity, 50, 500, (progress) => { mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`; }, getTrackDetailsWithReleaseDate
+              tracksWithPopularity, 50, 500, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }, getTrackDetailsWithReleaseDate
             );
             tracksForDeduplication = tracksWithReleaseDates;
           } else if (sortType === "averageColor") {
@@ -16049,7 +16123,13 @@ function isDirectSortType(sortType) {
               }
 
               mainButton.innerText = "Creating...";
-              const newPlaylist = await createPlaylist(`${finalSourceName} (${sortTypeInfo.shortName})`, playlistDescription);
+
+              let playlistName = finalSourceName;
+              if (changeTitleOnCreate) {
+                  playlistName = `${finalSourceName} (${sortTypeInfo.shortName})`;
+              }
+
+              const newPlaylist = await createPlaylist(playlistName, playlistDescription);
               
               await new Promise(resolve => setTimeout(resolve, 1250));
               
