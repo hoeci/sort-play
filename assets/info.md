@@ -10,12 +10,6 @@
   <img src="https://img.shields.io/badge/Made%20with-%E2%9D%A4-F472B6?style=for-the-badge" alt="Made with Love">
 </p>
 
-<p>
-  <a href="#%EF%B8%8F-features"><b>⚡️ Features</b></a> •
-  <a href="#-screenshots"><b>📷 Screenshots</b></a> •
-  <a href="#%EF%B8%8F-installation"><b>🛠️ Installation</b></a>
-</p>
-
 </div>
 
 ## ⚡️ Features
