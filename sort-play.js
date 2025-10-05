@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.15.0";
+  const SORT_PLAY_VERSION = "5.15.1";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -14302,7 +14302,7 @@ function isDirectSortType(sortType) {
     }
     
     updatePlaylistDescription(newPlaylist.uri.split(':')[2], description);
-    
+    await new Promise(resolve => setTimeout(resolve, 250));
     await setPlaylistVisibility(newPlaylist.uri, false);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
