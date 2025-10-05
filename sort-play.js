@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.15.1";
+  const SORT_PLAY_VERSION = "5.15.2";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -35,6 +35,7 @@
   let addToQueueEnabled = false; 
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
+  let createPlaylistPrivate = true;
   let openPlaylistAfterSortEnabled = false;
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
@@ -60,6 +61,7 @@
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
   const STORAGE_KEY_CREATE_PLAYLIST = "sort-play-create-playlist";
   const STORAGE_KEY_SORT_CURRENT_PLAYLIST = "sort-play-sort-current-playlist";
+  const STORAGE_KEY_CREATE_PLAYLIST_PRIVATE = "sort-play-create-playlist-private";
   const STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT = "sort-play-open-playlist-after-sort-v2";
   const STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER = "sort-play-place-playlists-in-folder";
   const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
@@ -344,6 +346,8 @@
     createPlaylistAfterSort = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST) !== "false";
     const sortCurrentPlaylistStored = localStorage.getItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST);
     sortCurrentPlaylistEnabled = sortCurrentPlaylistStored === null ? false : sortCurrentPlaylistStored === "true";
+    const createPlaylistPrivateStored = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST_PRIVATE);
+    createPlaylistPrivate = createPlaylistPrivateStored === null ? true : createPlaylistPrivateStored === "true";
     const openPlaylistStored = localStorage.getItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT);
     openPlaylistAfterSortEnabled = openPlaylistStored === null ? false : openPlaylistStored === "true";
     myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
@@ -393,6 +397,7 @@
     localStorage.setItem(STORAGE_KEY_ADD_TO_QUEUE, addToQueueEnabled);
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST, createPlaylistAfterSort);
     localStorage.setItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST, sortCurrentPlaylistEnabled);
+    localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, createPlaylistPrivate);
     localStorage.setItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, openPlaylistAfterSortEnabled);
     localStorage.setItem("sort-play-my-scrobbles-display-mode", myScrobblesDisplayMode);
     localStorage.setItem(STORAGE_KEY_COLOR_SORT_MODE, colorSortMode);
@@ -1383,7 +1388,7 @@
             </label>
         </div>
     </div>
-
+    
     <div class="setting-row" id="openPlaylistAfterSortSettingRow">
         <label class="col description">
             Open Playlist After Creation
@@ -1670,10 +1675,23 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Playlist Names
+        Playlist Attributes
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
+    
+    <div class="setting-row" id="createPlaylistPrivateSettingRow">
+        <label class="col description">
+            Make Created Playlists Private
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="createPlaylistPrivateToggle" ${createPlaylistPrivate ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+    
     <div class="setting-row" id="changeTitleOnCreateSettingRow">
         <label class="col description">
             Update Title When Creating
@@ -1930,6 +1948,7 @@
     const sortCurrentPlaylistSwitchLabel = modalContainer.querySelector("#sortCurrentPlaylistSwitchLabel");
     const sortCurrentPlaylistSettingRow = modalContainer.querySelector("#sortCurrentPlaylistSettingRow");
     const openPlaylistAfterSortToggle = modalContainer.querySelector("#openPlaylistAfterSortToggle");
+    const createPlaylistPrivateToggle = modalContainer.querySelector("#createPlaylistPrivateToggle");
     const openPlaylistAfterSortSwitchLabel = modalContainer.querySelector("#openPlaylistAfterSortSwitchLabel");
     const openPlaylistAfterSortSettingRow = modalContainer.querySelector("#openPlaylistAfterSortSettingRow");
     const colorSortModeSelect = modalContainer.querySelector("#colorSortModeSelect");
@@ -2155,11 +2174,17 @@
             saveSettings();
         }
     });
+
     openPlaylistAfterSortToggle.addEventListener("change", () => {
         if (!openPlaylistAfterSortToggle.disabled) {
             openPlaylistAfterSortEnabled = openPlaylistAfterSortToggle.checked;
             saveSettings();
         }
+    });
+
+    createPlaylistPrivateToggle.addEventListener("change", () => {
+        createPlaylistPrivate = createPlaylistPrivateToggle.checked;
+        saveSettings();
     });
 
     updateCreatePlaylistToggleState();
@@ -13961,7 +13986,7 @@ function isDirectSortType(sortType) {
 
   function isDefaultMosaicCover(url) {
     if (!url) return false;
-    return url.includes("mosaic.scdn.co");
+    return url.includes("mosaic.scdn.co") || url.includes("i.scdn.co/image/");
   }
   
   async function generatePlaylistCover(userName, baseImageUrl, usernameColor) {
@@ -14294,7 +14319,7 @@ function isDirectSortType(sortType) {
         Spicetify.showNotification("Using fallback to create playlist.", false, 2000);
         const user = await Spicetify.Platform.UserAPI.getUser();
         const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
-        newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { name, description });
+        newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { name, description, public: !createPlaylistPrivate });
     }
 
     if (!newPlaylist || !newPlaylist.uri) {
@@ -14302,8 +14327,8 @@ function isDirectSortType(sortType) {
     }
     
     updatePlaylistDescription(newPlaylist.uri.split(':')[2], description);
-    await new Promise(resolve => setTimeout(resolve, 250));
-    await setPlaylistVisibility(newPlaylist.uri, false);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await setPlaylistVisibility(newPlaylist.uri, !createPlaylistPrivate);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
   }
