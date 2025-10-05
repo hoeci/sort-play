@@ -10,11 +10,17 @@
   <img src="https://img.shields.io/badge/Made%20with-%E2%9D%A4-F472B6?style=for-the-badge" alt="Made with Love">
 </p>
 
+<p>
+  <a href="#%EF%B8%8F-features"><b>⚡️ Features</b></a> •
+  <a href="#-screenshots"><b>📷 Screenshots</b></a> •
+  <a href="#%EF%B8%8F-installation"><b>🛠️ Installation</b></a>
+</p>
+
 </div>
 
 ## ⚡️ Features
 + **Comprehensive Sorting:** Sort playlists, albums and artist pages by play count, popularity, release date, album color, Last.fm scrobbles, Last Scrobbled, tempo, energy, danceability, valence, acousticness, and instrumentalness.
-+ **Full Artist Discography:** Load an artist's complete collection, including singles, albums, and compilations, for sorting.
++ **Full Artist Discography:** Load an artist's complete collection, including singles, albums, and compilations, for sorting, with all duplicate tracks removed.
 + **Dynamic Playlists:** Create self-updating playlists from any combination of sources (playlists, artists, albums) that automatically stay updated and sorted on a custom schedule.
 + **Playlist Creation:** Generate specialized playlists like 'New Releases from Followed Artists', 'Discovery Mixes', and your 'Top Tracks' for different time periods.
 + **Extra Data Columns:** Add an extra column to playlists, albums, and artist pages (Play Count, Release Date, Scrobbles, DJ Info, Key, BPM, and more).
