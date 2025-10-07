@@ -8,6 +8,27 @@
     "authors": [
         { "name": "hoeci", "url": "https://github.com/hoeci" }
     ],
-    "tags": ["sort", "play count", "last.fm", "duplicate", "discography", "sort-play", "genre", "AI", "playlist", "column"]
+    "tags": [
+      "play count",
+      "column",
+      "shuffle",
+      "genre",
+      "last.fm",
+      "filter",
+      "duplicate", 
+      "discography", 
+      "sort", 
+      "sort-play", 
+      "AI", 
+      "playlist", 
+      "tempo",
+      "energy",
+      "scrobbles",
+      "queue",
+      "automation",
+      "release date",
+      "color",
+      "like button"
+    ]
   }
 ]
