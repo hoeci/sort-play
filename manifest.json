@@ -9,10 +9,10 @@
         { "name": "hoeci", "url": "https://github.com/hoeci" }
     ],
     "tags": [
-      "play count",
+      "sort",
       "column",
       "genre",
-      "sort",
+      "play count",
       "last.fm",
       "shuffle",
       "filter",
