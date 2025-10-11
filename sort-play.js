@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.15.2";
+  const SORT_PLAY_VERSION = "5.15.3";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -11958,16 +11958,12 @@ function isDirectSortType(sortType) {
     return artistData.images[0]?.url;
   }
   
-  function setPlaylistImage(playlistId, base64Image, maxRetries = 8, initialDelay = 1500) {
+  function setPlaylistImage(playlistId, base64Image, maxRetries = 10, retryInterval = 4000) {
     (async () => {
-        let attempt = 0;
-        let delay = initialDelay;
-
-        while (attempt < maxRetries) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                let putResponse;
                 try {
-                    putResponse = await Spicetify.CosmosAsync.put(
+                    await Spicetify.CosmosAsync.put(
                         `https://api.spotify.com/v1/playlists/${playlistId}/images`,
                         base64Image.split("base64,")[1]
                     );
@@ -11978,32 +11974,26 @@ function isDirectSortType(sortType) {
                     }
                 }
 
-                if (putResponse && putResponse.error) {
-                    throw new Error(`Spotify API Error: ${putResponse.error.status} ${putResponse.error.message}`);
-                }
-
                 await new Promise(resolve => setTimeout(resolve, 1000));
+
                 const updatedPlaylist = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
                 
                 if (updatedPlaylist?.images?.length > 0 && !isDefaultMosaicCover(updatedPlaylist.images[0].url)) {
                     return;
                 } else {
-                    throw new Error("Playlist image not yet updated after PUT request.");
+                    throw new Error("Verification failed: Image not updated on Spotify's side yet.");
                 }
 
-            } catch (error) {
-                console.warn(`[Sort-Play] Set playlist image attempt ${attempt + 1} failed. Full error:`, error);
-                attempt++;
-                if (attempt >= maxRetries) {
-                    console.error(`[Sort-Play] Failed to set and verify playlist image after ${maxRetries} attempts.`);
-                    return;
+            } catch (error) {                
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, retryInterval));
+                } else {
+                    console.error(`[Sort-Play] Failed to set and verify playlist image for ${playlistId} after ${maxRetries} attempts.`);
                 }
-                await new Promise(resolve => setTimeout(resolve, delay));
-                delay *= 1.5;
             }
         }
     })();
-  }
+}
 
   async function imageUrlToBase64(url) {
     const response = await fetch(url);
@@ -14326,50 +14316,51 @@ function isDirectSortType(sortType) {
         throw new Error("Failed to create playlist after all attempts.");
     }
     
-    updatePlaylistDescription(newPlaylist.uri.split(':')[2], description);
+    const playlistId = newPlaylist.uri.split(':')[2];
+
     await new Promise(resolve => setTimeout(resolve, 500));
-    await setPlaylistVisibility(newPlaylist.uri, !createPlaylistPrivate);
+
+    await Promise.all([
+        setPlaylistVisibility(newPlaylist.uri, !createPlaylistPrivate),
+        updatePlaylistDescription(playlistId, description)
+    ]);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
   }
 
-  async function updatePlaylistDescription(playlistId, description) {
-    try {
-        await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, {
-            description: description,
-        });
-    } catch (e) {
-        const isExpectedJsonError = e instanceof SyntaxError && e.message.includes("Unexpected end of JSON input");
-        if (!isExpectedJsonError) {
-            console.error(`[Sort-Play] Failed to send playlist description update for playlist ${playlistId}:`, e);
-            return;
-        }
-    }
-
+  function updatePlaylistDescription(playlistId, description, maxRetries = 12, retryInterval = 5000) {
     (async () => {
-        let attempt = 0;
-        const maxRetries = 8;
-        let delay = 1500;
-
-        while (attempt < maxRetries) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                await new Promise(resolve => setTimeout(resolve, delay));
+                try {
+                    await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+                        description: description,
+                    });
+                } catch (putError) {
+                    const isExpectedJsonError = putError instanceof SyntaxError && putError.message.includes("Unexpected end of JSON input");
+                    if (!isExpectedJsonError) {
+                        throw putError;
+                    }
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 1000));
 
                 const updatedPlaylist = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
                 
                 if (updatedPlaylist && updatedPlaylist.description === description) {
                     return;
+                } else {
+                    throw new Error("Verification failed: Description not updated on Spotify's side yet.");
                 }
 
-            } catch (verificationError) {
-                console.error(`[Sort-Play] Error during description verification for playlist ${playlistId}:`, verificationError);
+            } catch (error) {                
+                if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, retryInterval));
+                } else {
+                    console.error(`[Sort-Play] Failed to set and verify playlist description for ${playlistId} after ${maxRetries} attempts.`);
+                }
             }
-
-            attempt++;
-            delay *= 1.5; 
         }
-
-        console.warn(`[Sort-Play] Could not verify playlist description update for ${playlistId} after ${maxRetries} attempts. The description may still have been set.`);
     })();
   }
   
@@ -14787,7 +14778,7 @@ function isDirectSortType(sortType) {
             updateProgress(`Scanning...`);
 
             const batchPromises = artistBatch.map(artist => {
-                const variables = { uri: artist.uri, order: "DATE_DESC", offset: 0, limit: 10 };
+                const variables = { uri: artist.uri, order: "DATE_DESC", offset: 0, limit: 20 };
                 return GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, variables)
                     .catch(err => {
                         console.warn(`Failed to fetch discography for ${artist.name}`, err);
@@ -14822,7 +14813,7 @@ function isDirectSortType(sortType) {
         }
 
         updateProgress(`Get tracks...`);
-        let genuinelyNewTracks = [];
+        let initialTrackPool = [];
         const albumUris = allNewReleases.map(album => album.uri);
 
         for (let i = 0; i < albumUris.length; i += 20) {
@@ -14831,31 +14822,103 @@ function isDirectSortType(sortType) {
             if (albumsData.albums) {
                 for (const album of albumsData.albums) {
                     if (album && album.tracks && album.tracks.items) {
-                        const trackReleaseDate = new Date(album.release_date);
-                        if (trackReleaseDate < dateLimit) continue;
-
-                        const augmentedTracks = album.tracks.items.map(track => ({
-                            ...track,
-                            album: {
-                                release_date: album.release_date,
-                                name: album.name,
-                                uri: album.uri,
-                                id: album.id
-                            }
-                        }));
-
-                        let tracksFromAlbum = augmentedTracks;
+                        let tracksFromAlbum = album.tracks.items;
                         if (followedReleasesAlbumLimit !== 'all') {
                             tracksFromAlbum = tracksFromAlbum.slice(0, parseInt(followedReleasesAlbumLimit, 10));
                         }
-                        genuinelyNewTracks.push(...tracksFromAlbum);
+                        initialTrackPool.push(...tracksFromAlbum);
                     }
                 }
             }
         }
         
-        if (genuinelyNewTracks.length === 0) {
+        if (initialTrackPool.length === 0) {
             throw new Error("Could not fetch any tracks from the new releases.");
+        }
+
+        updateProgress("Verifying...");
+        const verifiedNewTracks = [];
+        const trackIdsToVerify = initialTrackPool.map(t => t.id);
+
+        for (let i = 0; i < trackIdsToVerify.length; i += 50) {
+            const batchIds = trackIdsToVerify.slice(i, i + 50);
+            const trackDetailsResponse = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
+
+            if (trackDetailsResponse && trackDetailsResponse.tracks) {
+                for (const detailedTrack of trackDetailsResponse.tracks) {
+                    if (detailedTrack && detailedTrack.album && detailedTrack.album.release_date) {
+                        const trackReleaseDate = new Date(detailedTrack.album.release_date);
+                        if (trackReleaseDate >= dateLimit) {
+                            verifiedNewTracks.push(detailedTrack);
+                        }
+                    }
+                }
+            }
+        }
+        
+        updateProgress("Deduplicating...");
+        const trackGroups = new Map();
+
+        const getFirstWord = (title) => {
+            if (!title) return "";
+            const clean = title.replace(/^[^a-zA-Z0-9]+/, '').split(/\s+/)[0].replace(/[^a-zA-Z0-9]+$/, '').toLowerCase();
+            return clean;
+        };
+
+        for (const track of verifiedNewTracks) {
+            const duration = track.duration_ms;
+            const artistIds = track.artists.map(a => a.id).sort().join(',');
+            const firstWord = getFirstWord(track.name);
+
+            const key = `${duration}|${artistIds}|${firstWord}`;
+
+            if (!trackGroups.has(key)) {
+                trackGroups.set(key, []);
+            }
+            trackGroups.get(key).push(track);
+        }
+
+        const finalDeduplicatedTracks = [];
+
+        const getTypeScore = (type) => {
+            if (type === 'album') return 3;
+            if (type === 'compilation') return 2;
+            if (type === 'single') return 1;
+            return 0;
+        };
+
+        for (const group of trackGroups.values()) {
+            if (group.length === 1) {
+                finalDeduplicatedTracks.push(group[0]);
+                continue;
+            }
+
+            group.sort((a, b) => {
+                const scoreA = getTypeScore(a.album.album_type);
+                const scoreB = getTypeScore(b.album.album_type);
+                if (scoreA !== scoreB) {
+                    return scoreB - scoreA;
+                }
+
+                const dateA = new Date(a.album.release_date).getTime();
+                const dateB = new Date(b.album.release_date).getTime();
+                if (dateA !== dateB) {
+                    return dateB - dateA;
+                }
+
+                const tracksA = a.album.total_tracks || 0;
+                const tracksB = b.album.total_tracks || 0;
+                return tracksB - tracksA;
+            });
+
+            finalDeduplicatedTracks.push(group[0]);
+        }
+
+        let genuinelyNewTracks = finalDeduplicatedTracks;
+        console.log(`Followed Releases: Verified ${verifiedNewTracks.length} tracks, deduplicated to ${genuinelyNewTracks.length} tracks.`);
+
+        if (genuinelyNewTracks.length === 0) {
+            throw new Error("No genuinely new tracks found after verification and deduplication.");
         }
         
         updateProgress("Sorting...");
@@ -14863,7 +14926,7 @@ function isDirectSortType(sortType) {
             const dateA = new Date(a.album.release_date).getTime();
             const dateB = new Date(b.album.release_date).getTime();
             if (dateB !== dateA) {
-                return dateB - dateA; 
+                return dateB - dateA;
             }
         
             const albumNameA = a.album.name || '';
@@ -14876,9 +14939,11 @@ function isDirectSortType(sortType) {
             return a.track_number - b.track_number;
         });
 
+        console.log("Full details of final sorted tracks:", genuinelyNewTracks);
+
         const trackUris = genuinelyNewTracks.map(track => track.uri);
         const playlistName = "Followed Artists: Full Releases";
-        const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Created by Sort-Play.`;
+        const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Deduplicated. Created by Sort-Play.`;
         
         updateProgress("Creating...");
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('followedReleasesChronological', playlistName, playlistDescription);
