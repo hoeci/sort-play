@@ -14939,11 +14939,9 @@ function isDirectSortType(sortType) {
             return a.track_number - b.track_number;
         });
 
-        console.log("Full details of final sorted tracks:", genuinelyNewTracks);
-
         const trackUris = genuinelyNewTracks.map(track => track.uri);
         const playlistName = "Followed Artists: Full Releases";
-        const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Deduplicated. Created by Sort-Play.`;
+        const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Created by Sort-Play.`;
         
         updateProgress("Creating...");
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('followedReleasesChronological', playlistName, playlistDescription);
