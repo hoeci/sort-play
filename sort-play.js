@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.15.4";
+  const SORT_PLAY_VERSION = "5.16.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -8091,6 +8091,16 @@ function isDirectSortType(sortType) {
         tracksForProcessing = await processBatchesWithDelay(tracksWithPopularity, 50, 500, () => {}, getTrackDetailsWithReleaseDate);
     }
 
+    const audioFeatureSortTypes = ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'];
+    if (audioFeatureSortTypes.includes(sortType)) {
+        const trackIds = tracksWithPopularity.map(t => t.trackId || t.uri.split(":")[2]);
+        const allStats = await getBatchTrackStats(trackIds);
+        tracksForProcessing = tracksWithPopularity.map(track => {
+            const stats = allStats[track.trackId || track.uri.split(":")[2]] || {};
+            return { ...track, ...stats };
+        });
+    }
+
     const { unique: uniqueTracks } = deduplicate ? deduplicateTracks(tracksForProcessing, false, sources.some(s => URI.isArtist(s.uri))) : { unique: tracksForProcessing, removed: [] };
 
     let sortedTracks;
@@ -8109,6 +8119,20 @@ function isDirectSortType(sortType) {
             const result = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
             sortedTracks = result.sortedTracks;
             break;
+        case 'tempo':
+        case 'energy':
+        case 'danceability':
+        case 'valence':
+        case 'acousticness':
+        case 'instrumentalness':
+            sortedTracks = uniqueTracks
+                .filter(track => track[sortType] !== null && track[sortType] !== undefined)
+                .sort((a, b) => {
+                    const valA = a[sortType] || 0;
+                    const valB = b[sortType] || 0;
+                    return valB - valA;
+                });
+            break;
         default:
             sortedTracks = uniqueTracks;
             break;
@@ -8124,7 +8148,9 @@ function isDirectSortType(sortType) {
     const updateMode = job.updateMode || 'replace';
 
     if (isInitialRun) {
-        const sortTypeInfo = buttonStyles.menuItems.flatMap(i => i.children || i).find(i => i.sortType === job.sortType);
+        const sortByParent = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent');
+        const allSortOptions = sortByParent.children.flatMap(opt => (opt.type === 'parent' && opt.children) ? opt.children : opt);
+        const sortTypeInfo = allSortOptions.find(i => i.sortType === job.sortType);
         const playlistName = job.targetPlaylistName || (job.sources.length > 1 ? "Combined Dynamic Playlist" : `${job.sources[0].name} (Dynamic)`);
         const sourceNames = job.sources.length > 1 ? "multiple sources" : (job.sources[0]?.name || "Unknown Source");
         const playlistDescription = `Dynamically sorted by ${sortTypeInfo.text}. Source${job.sources.length > 1 ? 's' : ''}: ${sourceNames}. Managed by Sort-Play.`;
@@ -8819,8 +8845,12 @@ function isDirectSortType(sortType) {
             scheduleMap[schedule.value] = schedule.text;
         });
 
-        const sortTypeMap = buttonStyles.menuItems.flatMap(i => i.children || i).reduce((acc, item) => {
-            if (item.sortType) acc[item.sortType] = item.text;
+        const sortByParent = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent');
+        const allSortOptions = sortByParent.children.flatMap(opt => (opt.type === 'parent' && opt.children) ? opt.children : opt);
+        const sortTypeMap = allSortOptions.reduce((acc, item) => {
+            if (item.sortType) {
+                acc[item.sortType] = item.text;
+            }
             return acc;
         }, {});
 
@@ -9243,11 +9273,18 @@ function isDirectSortType(sortType) {
 
         const savedSortType = localStorage.getItem(STORAGE_KEY_DYNAMIC_SORT_TYPE) || 'playCount';
         const savedSchedule = localStorage.getItem(STORAGE_KEY_DYNAMIC_SCHEDULE) || '86400000';
-        const savedDeduplicate = playlistDeduplicate;
-        const savedUpdateSource = localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === null ? true : localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === 'true';
 
         const sortOptions = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent').children
-            .map(opt => `<option value="${opt.sortType}" ${ (isEditing ? jobToEdit.sortType : savedSortType) === opt.sortType ? 'selected' : ''}>${opt.text}</option>`).join('');
+        .flatMap(opt => {
+            if (opt.type === 'parent' && opt.children) {
+                return opt.children.map(childOpt => 
+                    `<option value="${childOpt.sortType}" ${ (isEditing ? jobToEdit.sortType : savedSortType) === childOpt.sortType ? 'selected' : ''}>${childOpt.text}</option>`
+                );
+            } else if (opt.sortType) {
+                return [`<option value="${opt.sortType}" ${ (isEditing ? jobToEdit.sortType : savedSortType) === opt.sortType ? 'selected' : ''}>${opt.text}</option>`];
+            }
+            return [];
+        }).join('');
 
         const customSchedules = getCustomSchedules();
         const customScheduleOptions = customSchedules.map(s => `<option value="${s.value}" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === String(s.value) ? 'selected' : ''}>${s.text}</option>`).join('');
