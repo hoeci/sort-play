@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.15.3";
+  const SORT_PLAY_VERSION = "5.15.4";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -1697,7 +1697,7 @@
             Update Title When Creating
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Appends a sort tag like "(PlayCount)" to new playlists created via direct sorting.</span>
+                <span class="custom-tooltip">Appends a sort tag like (PlayCount) to new playlists created via direct sorting.</span>
             </span>
         </label>
         <div class="col action">
@@ -1713,7 +1713,7 @@
             Update Title When Modifying
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Appends a sort tag like "(PlayCount)" to the playlist title after modifying it.</span>
+                <span class="custom-tooltip">Appends a sort tag like (PlayCount) to the playlist title after modifying it.</span>
             </span>
         </label>
         <div class="col action">
@@ -8045,30 +8045,36 @@ function isDirectSortType(sortType) {
   }
   
   async function executeSortOperation(config) {
-    const { sortType, sources, deduplicate, isHeadless = false } = config;
-    
-    if (!sources || sources.length === 0) {
-        throw new Error('No sources provided for dynamic playlist');
-    }
+    const { sortType, sources, deduplicate, isHeadless = false, preFetchedTracks = null } = config;
 
-    const trackFetchPromises = sources.map(source => {
-        const sourceUri = source.uri;
-        if (URI.isPlaylistV1OrV2(sourceUri)) {
-            return getPlaylistTracks(sourceUri.split(":")[2]);
-        } else if (URI.isArtist(sourceUri)) {
-            return getArtistTracks(sourceUri, isHeadless);
-        } else if (isLikedSongsPage(sourceUri)) {
-            return getLikedSongs();
-        } else if (URI.isAlbum(sourceUri)) {
-            return getAlbumTracks(sourceUri.split(":")[2]);
-        } else {
-            console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
-            return Promise.resolve([]);
+    let combinedTracks;
+
+    if (preFetchedTracks) {
+        combinedTracks = preFetchedTracks;
+    } else {
+        if (!sources || sources.length === 0) {
+            throw new Error('No sources provided for dynamic playlist');
         }
-    });
 
-    const trackArrays = await Promise.all(trackFetchPromises);
-    const combinedTracks = trackArrays.flat();
+        const trackFetchPromises = sources.map(source => {
+            const sourceUri = source.uri;
+            if (URI.isPlaylistV1OrV2(sourceUri)) {
+                return getPlaylistTracks(sourceUri.split(":")[2]);
+            } else if (URI.isArtist(sourceUri)) {
+                return getArtistTracks(sourceUri, isHeadless);
+            } else if (isLikedSongsPage(sourceUri)) {
+                return getLikedSongs();
+            } else if (URI.isAlbum(sourceUri)) {
+                return getAlbumTracks(sourceUri.split(":")[2]);
+            } else {
+                console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
+                return Promise.resolve([]);
+            }
+        });
+
+        const trackArrays = await Promise.all(trackFetchPromises);
+        combinedTracks = trackArrays.flat();
+    }
 
     const tracks = Array.from(new Map(combinedTracks.map(track => [track.uri, track])).values());
 
@@ -8115,6 +8121,7 @@ function isDirectSortType(sortType) {
     let job = { ...jobConfig };
     let finalTrackUris;
     let newDescription = null;
+    const updateMode = job.updateMode || 'replace';
 
     if (isInitialRun) {
         const sortTypeInfo = buttonStyles.menuItems.flatMap(i => i.children || i).find(i => i.sortType === job.sortType);
@@ -8152,7 +8159,12 @@ function isDirectSortType(sortType) {
         
         await addPlaylistToLibrary(newPlaylist.uri);
         
-        finalTrackUris = await executeSortOperation({ ...job, isHeadless: true });
+        if (updateMode === 'append') {
+            const trackArrays = await Promise.all(job.sources.map(source => getPlaylistTracks(source.uri.split(":")[2])));
+            finalTrackUris = trackArrays.flat().map(t => t.uri);
+        } else {
+            finalTrackUris = await executeSortOperation({ ...job, isHeadless: true });
+        }
     } else {
         const playlistId = job.targetPlaylistUri.split(':')[2];
         try {
@@ -8184,11 +8196,30 @@ function isDirectSortType(sortType) {
             console.warn("Sort-Play: Could not fetch current playlist details to update description.", e);
         }
 
-        const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri }];
-        finalTrackUris = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
+        if (updateMode === 'append') {
+            const sourceTrackArrays = await Promise.all(job.sources.map(source => getPlaylistTracks(source.uri.split(":")[2])));
+            const sourceTracks = sourceTrackArrays.flat();
+            const targetTracks = await getPlaylistTracks(playlistId);
+            const targetTrackUris = new Set(targetTracks.map(t => t.uri));
+            const newTrackUris = sourceTracks.map(t => t.uri).filter(uri => !targetTrackUris.has(uri));
+
+            if (newTrackUris.length > 0) {
+                await Spicetify.Platform.PlaylistAPI.add(job.targetPlaylistUri, newTrackUris, { before: 0 });
+            }
+            job.lastRun = Date.now();
+            return job;
+        } else if (updateMode === 'merge') {
+            const sourceTrackArrays = await Promise.all(job.sources.map(source => getPlaylistTracks(source.uri.split(":")[2])));
+            const sourceTracks = sourceTrackArrays.flat();
+            const targetTracks = await getPlaylistTracks(playlistId);
+            finalTrackUris = await executeSortOperation({ ...job, isHeadless: true, preFetchedTracks: [...sourceTracks, ...targetTracks] });
+        } else {
+            const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri }];
+            finalTrackUris = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
+        }
     }
     
-    if (finalTrackUris.length > 0) {
+    if (finalTrackUris && finalTrackUris.length > 0) {
         await replacePlaylistTracks(job.targetPlaylistUri.split(':')[2], finalTrackUris);
     } else {
         console.warn(`[Sort-Play Dynamic] Job for "${job.targetPlaylistName}" resulted in zero tracks. Playlist will not be updated.`);
@@ -9341,6 +9372,14 @@ function isDirectSortType(sortType) {
                     <div class="card">
                         <div class="card-title">Configuration</div>
                         <div class="setting-row">
+                            <span class="description">Update Behavior</span>
+                            <select id="update-mode-select" class="form-select">
+                                <option value="replace">Replace All Tracks</option>
+                                <option value="merge">Add New Tracks & Re-sort All</option>
+                                <option value="append">Add New Tracks to Top</option>
+                            </select>
+                        </div>
+                        <div class="setting-row" id="sort-type-row">
                             <span class="description">Sort Method</span>
                             <select id="sort-type-select" class="form-select">${sortOptions}</select>
                         </div>
@@ -9351,6 +9390,7 @@ function isDirectSortType(sortType) {
                                     <option value="manual" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'manual' ? 'selected' : ''}>Manual Only</option>
                                     <option value="10800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
                                     <option value="21600000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
+                                    <option value="43200000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '43200000' ? 'selected' : ''}>Every 12 Hours</option>
                                     <option value="86400000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
                                     <option value="604800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
                                     <option value="2592000000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
@@ -9400,6 +9440,9 @@ function isDirectSortType(sortType) {
         `;
         
         const playlistNameInput = modalContainer.querySelector('#playlist-name-input');
+        const updateModeSelect = modalContainer.querySelector('#update-mode-select');
+        const sortTypeRow = modalContainer.querySelector('#sort-type-row');
+        const sortTypeSelectUI = modalContainer.querySelector('#sort-type-select');
         const updateSourceRow = modalContainer.querySelector('#update-source-row');
         const updateSourceToggle = modalContainer.querySelector('#update-source-toggle');
         const deduplicateToggle = modalContainer.querySelector('#deduplicate-toggle');
@@ -9428,6 +9471,33 @@ function isDirectSortType(sortType) {
             updateSourceToggle.checked = currentUpdateFromSource;
         };
 
+        if (isEditing) {
+            updateModeSelect.value = jobToEdit.updateMode || 'replace';
+        }
+
+        const handleUpdateModeChange = () => {
+            if (updateModeSelect.value === 'append') {
+                sortTypeRow.classList.add('disabled');
+                sortTypeSelectUI.disabled = true;
+            } else {
+                sortTypeRow.classList.remove('disabled');
+                sortTypeSelectUI.disabled = false;
+            }
+    
+            if (updateModeSelect.value === 'replace') {
+                updateSourceRow.classList.remove('disabled');
+                updateSourceToggle.disabled = false;
+                updateSourceToggle.checked = currentUpdateFromSource; 
+            } else {
+                updateSourceRow.classList.add('disabled');
+                updateSourceToggle.disabled = true;
+                updateSourceToggle.checked = true;
+            }
+        };
+
+        updateModeSelect.addEventListener('change', handleUpdateModeChange);
+        handleUpdateModeChange();
+        
         const renderSources = () => {
             const container = modalContainer.querySelector('#source-list-container');
             const sourceErrorEl = modalContainer.querySelector('#source-error-message');
@@ -9611,6 +9681,7 @@ function isDirectSortType(sortType) {
             const jobData = {
                 sources: sources,
                 targetPlaylistName: document.getElementById('playlist-name-input').value.trim(),
+                updateMode: document.getElementById('update-mode-select').value,
                 sortType: document.getElementById('sort-type-select').value,
                 deduplicate: currentDeduplicate,
                 updateFromSource: currentUpdateFromSource,
@@ -12238,7 +12309,6 @@ function isDirectSortType(sortType) {
   }
 
   async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}) {
-    console.log("enrichTracksWithPlayCounts called!");
     const albumGroups = new Map();
     tracks.forEach(track => {
         const albumId = track?.track?.album?.id || track?.album?.id;
