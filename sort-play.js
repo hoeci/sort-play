@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.16.0";
+  const SORT_PLAY_VERSION = "5.17.0";
   
   let isProcessing = false;
   let useLfmGateway = false;
@@ -8045,9 +8045,10 @@ function isDirectSortType(sortType) {
   }
   
   async function executeSortOperation(config) {
-    const { sortType, sources, deduplicate, isHeadless = false, preFetchedTracks = null } = config;
+    const { sortType, sources, deduplicate, isHeadless = false, preFetchedTracks = null, limitEnabled = false, additionalTracksToInclude = [] } = config;
 
     let combinedTracks;
+    let newUsedUrisBySource = {};
 
     if (preFetchedTracks) {
         combinedTracks = preFetchedTracks;
@@ -8056,30 +8057,53 @@ function isDirectSortType(sortType) {
             throw new Error('No sources provided for dynamic playlist');
         }
 
-        const trackFetchPromises = sources.map(source => {
+        const trackFetchPromises = sources.map(async source => {
             const sourceUri = source.uri;
+            let sourceTracks;
+
             if (URI.isPlaylistV1OrV2(sourceUri)) {
-                return getPlaylistTracks(sourceUri.split(":")[2]);
+                sourceTracks = await getPlaylistTracks(sourceUri.split(":")[2]);
             } else if (URI.isArtist(sourceUri)) {
-                return getArtistTracks(sourceUri, isHeadless);
+                sourceTracks = await getArtistTracks(sourceUri, isHeadless);
             } else if (isLikedSongsPage(sourceUri)) {
-                return getLikedSongs();
+                sourceTracks = await getLikedSongs();
             } else if (URI.isAlbum(sourceUri)) {
-                return getAlbumTracks(sourceUri.split(":")[2]);
+                sourceTracks = await getAlbumTracks(sourceUri.split(":")[2]);
             } else {
                 console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
-                return Promise.resolve([]);
+                return [];
             }
+
+            if (limitEnabled && source.limit > 0) {
+                let usedUris = new Set(source.usedTrackURIs || []);
+                let availableTracks = sourceTracks.filter(t => !usedUris.has(t.uri));
+                let selectedTracks;
+
+                if (availableTracks.length < source.limit && sourceTracks.length > 0) {
+                    const shuffledAll = shuffleArray(sourceTracks);
+                    selectedTracks = shuffledAll.slice(0, source.limit);
+                    newUsedUrisBySource[source.uri] = selectedTracks.map(t => t.uri);
+                } else {
+                    const shuffledAvailable = shuffleArray(availableTracks);
+                    selectedTracks = shuffledAvailable.slice(0, source.limit);
+                    const newUris = selectedTracks.map(t => t.uri);
+                    newUris.forEach(uri => usedUris.add(uri));
+                    newUsedUrisBySource[source.uri] = Array.from(usedUris);
+                }
+                return selectedTracks;
+            }
+            return sourceTracks;
         });
 
         const trackArrays = await Promise.all(trackFetchPromises);
         combinedTracks = trackArrays.flat();
+        combinedTracks.push(...additionalTracksToInclude);
     }
 
     const tracks = Array.from(new Map(combinedTracks.map(track => [track.uri, track])).values());
 
     if (!tracks || tracks.length === 0) {
-        throw new Error('No tracks found in source(s) to sort.');
+        return { trackUris: [], newUsedUrisBySource: {} };
     }
 
     const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks);
@@ -8138,7 +8162,10 @@ function isDirectSortType(sortType) {
             break;
     }
 
-    return sortedTracks.map(t => t.uri);
+    return {
+        trackUris: sortedTracks.map(t => t.uri),
+        newUsedUrisBySource: newUsedUrisBySource
+    };
   }
   
   async function runJob(jobConfig, isInitialRun = false) {
@@ -8185,12 +8212,14 @@ function isDirectSortType(sortType) {
         
         await addPlaylistToLibrary(newPlaylist.uri);
         
-        if (updateMode === 'append') {
-            const trackArrays = await Promise.all(job.sources.map(source => getPlaylistTracks(source.uri.split(":")[2])));
-            finalTrackUris = trackArrays.flat().map(t => t.uri);
-        } else {
-            finalTrackUris = await executeSortOperation({ ...job, isHeadless: true });
-        }
+        const result = await executeSortOperation({ ...job, isHeadless: true });
+        finalTrackUris = result.trackUris;
+        job.sources.forEach(source => {
+            const newHistory = result.newUsedUrisBySource[source.uri];
+            if (newHistory) {
+                source.usedTrackURIs = newHistory;
+            }
+        });
     } else {
         const playlistId = job.targetPlaylistUri.split(':')[2];
         try {
@@ -8223,25 +8252,48 @@ function isDirectSortType(sortType) {
         }
 
         if (updateMode === 'append') {
-            const sourceTrackArrays = await Promise.all(job.sources.map(source => getPlaylistTracks(source.uri.split(":")[2])));
-            const sourceTracks = sourceTrackArrays.flat();
+            const result = await executeSortOperation({ ...job, isHeadless: true });
+            const sampledTrackUris = result.trackUris;
+
+            if (!sampledTrackUris || sampledTrackUris.length === 0) {
+                job.lastRun = Date.now();
+                return job;
+            }
             const targetTracks = await getPlaylistTracks(playlistId);
             const targetTrackUris = new Set(targetTracks.map(t => t.uri));
-            const newTrackUris = sourceTracks.map(t => t.uri).filter(uri => !targetTrackUris.has(uri));
+            const newTrackUris = sampledTrackUris.filter(uri => !targetTrackUris.has(uri));
 
             if (newTrackUris.length > 0) {
                 await Spicetify.Platform.PlaylistAPI.add(job.targetPlaylistUri, newTrackUris, { before: 0 });
             }
+            job.sources.forEach(source => {
+                const newHistory = result.newUsedUrisBySource[source.uri];
+                if (newHistory) {
+                    source.usedTrackUris = newHistory;
+                }
+            });
             job.lastRun = Date.now();
             return job;
         } else if (updateMode === 'merge') {
-            const sourceTrackArrays = await Promise.all(job.sources.map(source => getPlaylistTracks(source.uri.split(":")[2])));
-            const sourceTracks = sourceTrackArrays.flat();
             const targetTracks = await getPlaylistTracks(playlistId);
-            finalTrackUris = await executeSortOperation({ ...job, isHeadless: true, preFetchedTracks: [...sourceTracks, ...targetTracks] });
+            const mergeResult = await executeSortOperation({ ...job, isHeadless: true, additionalTracksToInclude: targetTracks });
+            finalTrackUris = mergeResult.trackUris;
+            job.sources.forEach(source => {
+                const newHistory = mergeResult.newUsedUrisBySource[source.uri];
+                if (newHistory) {
+                    source.usedTrackURIs = newHistory;
+                }
+            });
         } else {
-            const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri }];
-            finalTrackUris = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
+            const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri, totalTracks: 0 }];
+            const updateResult = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
+            finalTrackUris = updateResult.trackUris;
+            job.sources.forEach(source => {
+                const newHistory = updateResult.newUsedUrisBySource[source.uri];
+                if (newHistory) {
+                    source.usedTrackURIs = newHistory;
+                }
+            });
         }
     }
     
@@ -8683,6 +8735,8 @@ function isDirectSortType(sortType) {
             newSourceData.info = `Playlist by ${data.owner.display_name}`;
             newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
             newSourceData.isStatic = false;
+            newSourceData.totalTracks = 'N/A';
+            newSourceData.totalTracks = data.tracks.total;
         } else if (URI.isArtist(newUri)) {
             const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${newUri.split(":")[2]}`);
             newSourceData.name = data.name;
@@ -8695,6 +8749,8 @@ function isDirectSortType(sortType) {
             newSourceData.info = `Album by ${data.artists.map(a => a.name).join(', ')}`;
             newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
             newSourceData.isStatic = true;
+            newSourceData.totalTracks = 'N/A';
+            newSourceData.totalTracks = data.tracks.total;
         } else {
             throw new Error("Unsupported link type. Please use a Playlist, Album, or Artist link.");
         }
@@ -8800,7 +8856,7 @@ function isDirectSortType(sortType) {
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container";
     modalContainer.style.cssText = `
-        width: 550px !important; display: flex; flex-direction: column;
+        width: 900px !important; display: flex; flex-direction: column;
         border-radius: 30px; background-color: #181818 !important; border: 2px solid #282828;
     `;
 
@@ -9253,20 +9309,22 @@ function isDirectSortType(sortType) {
             let sourceUri = getCurrentUri();
             if (sourceUri) {
                 try {
-                    let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false;
+                    let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false, totalTracks = 'N/A';
                     if (URI.isPlaylistV1OrV2(sourceUri)) {
                         const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`);
-                        sourceName = data.name; sourceInfo = `Playlist by ${data.owner.display_name}`; sourceCoverUrl = data.images[0]?.url;
+                        sourceName = data.name; sourceInfo = `Playlist by ${data.owner.display_name}`; sourceCoverUrl = data.images[0]?.url; totalTracks = data.tracks.total;
                     } else if (URI.isArtist(sourceUri)) {
                         const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`);
-                        sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true;
+                        sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = 'N/A';
                     } else if (isLikedSongsPage(sourceUri)) {
                         sourceName = "Liked Songs"; sourceInfo = "Your collection"; sourceCoverUrl = 'https://misc.scdn.co/liked-songs/liked-songs-640.png';
+                        const likedSongs = await getLikedSongs();
+                        totalTracks = likedSongs.length;
                     } else if (URI.isAlbum(sourceUri)) {
                         const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-                        sourceName = data.name; sourceInfo = `Album by ${data.artists.map(a => a.name).join(', ')}`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true;
+                        sourceName = data.name; sourceInfo = `Album by ${data.artists.map(a => a.name).join(', ')}`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = data.tracks.total;
                     }
-                    sources.push({ uri: sourceUri, name: sourceName, info: sourceInfo, coverUrl: sourceCoverUrl, isStatic: isStaticSource });
+                    sources.push({ uri: sourceUri, name: sourceName, info: sourceInfo, coverUrl: sourceCoverUrl, isStatic: isStaticSource, totalTracks: totalTracks });
                 } catch (e) { console.error("Could not fetch source details", e); }
             }
         }
@@ -9296,13 +9354,28 @@ function isDirectSortType(sortType) {
             `;
         }
         modalContainer.innerHTML = `
-          <style>
-              .job-form-modal .main-trackCreditsModal-mainSection { 
-                  padding: 24px 32px 38px !important; display: flex; flex-direction: column; gap: 16px; scrollbar-width: none;
-              }
+            <style>
+                .job-form-modal .main-trackCreditsModal-mainSection { 
+                    padding: 24px 32px 38px !important; display: flex; flex-direction: column; scrollbar-width: none;
+                }
+                .job-form-layout-container {
+                    display: flex;
+                    gap: 16px;
+                }
+                .job-form-left-column {
+                    flex: 1;
+                    min-width: 0;
+                }
+                .job-form-right-column {
+                    flex: 1;
+                    min-width: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 16px;
+                }
               .job-form-modal .card { background-color: #282828; border-radius: 8px; padding: 16px; }
               .job-form-modal .card-title { font-weight: 700; color: white; margin-bottom: 12px; font-size: 1rem; }
-              .job-form-modal #source-list-container { display: flex; flex-direction: column; gap: 8px; max-height: 145px; overflow-y: auto; padding-right: 5px; margin-right: -4px;scrollbar-width: thin; overflow-y: scroll;}
+              .job-form-modal #source-list-container { display: flex; flex-direction: column; gap: 8px; max-height: 335px; overflow-y: auto; padding-right: 5px; margin-right: -4px;scrollbar-width: thin; overflow-y: scroll;}
               .job-form-modal .source-item { display: flex; align-items: center; gap: 8px; background-color: #3e3e3e; padding: 8px; border-radius: 6px; }
               .job-form-modal .source-cover-art-small { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
               .job-form-modal .source-text-info { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
@@ -9393,77 +9466,95 @@ function isDirectSortType(sortType) {
                     </button>
                 </div>
                 <div class="main-trackCreditsModal-mainSection">
-                    <div class="card">
-                        <div class="card-title">Sources</div>
-                        <div id="source-list-container"></div>
-                        <div id="source-error-message" style="display: none;"></div>
-                        <div class="source-actions-container">
-                            <button id="add-source-btn" class="main-buttons-button main-button-secondary">+ Add Source</button>
-                            <button id="clear-sources-btn" class="main-buttons-button main-button-secondary">Clear</button>
-                        </div>
-                        <div style="margin-top: 16px;">
-                            <label for="playlist-name-input" style="display: block; color: #b3b3b3; font-size: 0.875rem; margin-bottom: 8px;">New Playlist Name</label>
-                            <input type="text" id="playlist-name-input" value="" style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 12px; color: white; box-sizing: border-box;">
-                        </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Configuration</div>
-                        <div class="setting-row">
-                            <span class="description">Update Behavior</span>
-                            <select id="update-mode-select" class="form-select">
-                                <option value="replace">Replace All Tracks</option>
-                                <option value="merge">Add New Tracks & Re-sort All</option>
-                                <option value="append">Add New Tracks to Top</option>
-                            </select>
-                        </div>
-                        <div class="setting-row" id="sort-type-row">
-                            <span class="description">Sort Method</span>
-                            <select id="sort-type-select" class="form-select">${sortOptions}</select>
-                        </div>
-                        <div class="setting-row" style="align-items: start;">
-                             <span class="description" style="padding-top: 8px;">Update Schedule</span>
-                            <div style="display: flex; flex-direction: column; align-items: flex-end;">
-                                <select id="schedule-select" class="form-select">
-                                    <option value="manual" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'manual' ? 'selected' : ''}>Manual Only</option>
-                                    <option value="10800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
-                                    <option value="21600000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
-                                    <option value="43200000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '43200000' ? 'selected' : ''}>Every 12 Hours</option>
-                                    <option value="86400000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
-                                    <option value="604800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
-                                    <option value="2592000000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
-                                    <option disabled>- Release Day Schedules -</option>
-                                    <option value="release-weekly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-weekly' ? 'selected' : ''}>Weekly (on Friday)</option>
-                                    <option value="release-every-two-weeks" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
-                                    <option value="release-monthly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
-                                    <option disabled>- Custom Schedules -</option>
-                                    ${customScheduleOptions}
-                                    <option value="custom">+ Custom</option>
-                                    ${clearAndSeparatorHtml}
-                                </select>
-                                <div id="custom-schedule-container" class="custom-schedule-container">
-                                    <input type="number" id="days" min="0" value="0"><label for="days">d</label>
-                                    <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
-                                    <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
-                                    <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
+                    <div class="job-form-layout-container">
+                        <div class="job-form-left-column">
+                            <div class="card">
+                                <div class="card-title">Sources</div>
+                                <div id="source-list-container"></div>
+                                <div id="source-error-message" style="display: none;"></div>
+                                <div class="source-actions-container">
+                                    <button id="add-source-btn" class="main-buttons-button main-button-secondary">+ Add Source</button>
+                                    <button id="clear-sources-btn" class="main-buttons-button main-button-secondary">Clear</button>
+                                </div>
+                                <div style="border-top: 1px solid #3e3e3e; margin: 20px 0 4px;"></div>
+                                <div class="setting-row" style="margin-top: 15px;">
+                                    <span class="description">
+                                        Limit tracks per source
+                                        <span class="tooltip-container">
+                                            <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                                            <span class="custom-tooltip">Set a limit of random tracks to pull from each source, ensuring fresh content on every update.</span>
+                                        </span>
+                                    </span>
+                                    <label class="switch"><input type="checkbox" id="limit-tracks-toggle" ${isEditing && jobToEdit.limitEnabled ? 'checked' : ''}><span class="sliderx"></span></label>
+                                </div>
+                                <div style="margin-top: 16px;">
+                                    <label for="playlist-name-input" style="display: block; color: #b3b3b3; font-size: 0.875rem; margin-bottom: 8px;">New Playlist Name</label>
+                                    <input type="text" id="playlist-name-input" value="" style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 12px; color: white; box-sizing: border-box;">
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="card">
-                        <div class="card-title">Settings</div>
-                            <div class="setting-row">
-                            <span class="description">Deduplicate tracks</span>
-                            <label class="switch"><input type="checkbox" id="deduplicate-toggle" ${currentDeduplicate ? 'checked' : ''}><span class="sliderx"></span></label>
-                        </div>
-                        <div class="setting-row" id="update-source-row">
-                            <span class="description">
-                                Always update from original source
-                                <span class="tooltip-container">
-                                    <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                                    <span class="custom-tooltip">Enabled: Fetches fresh tracks from the source(s) for each update.<br><br>Disabled: Only re-sorts the tracks already inside this dynamic playlist.</span>
-                                </span>
-                            </span>
-                            <label class="switch"><input type="checkbox" id="update-source-toggle" ${currentUpdateFromSource ? 'checked' : ''}><span class="sliderx"></span></label>
+                        <div class="job-form-right-column">
+                            <div class="card">
+                                <div class="card-title">Configuration</div>
+                                <div class="setting-row">
+                                    <span class="description">Update Behavior</span>
+                                    <select id="update-mode-select" class="form-select">
+                                        <option value="replace">Replace All Tracks</option>
+                                        <option value="merge">Add New Tracks & Re-sort All</option>
+                                        <option value="append">Add New Tracks to Top</option>
+                                    </select>
+                                </div>
+                                <div class="setting-row" id="sort-type-row">
+                                    <span class="description">Sort Method</span>
+                                    <select id="sort-type-select" class="form-select">${sortOptions}</select>
+                                </div>
+                                <div class="setting-row" style="align-items: start;">
+                                    <span class="description" style="padding-top: 8px;">Update Schedule</span>
+                                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                                        <select id="schedule-select" class="form-select">
+                                            <option value="manual" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'manual' ? 'selected' : ''}>Manual Only</option>
+                                            <option value="10800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
+                                            <option value="21600000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
+                                            <option value="43200000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '43200000' ? 'selected' : ''}>Every 12 Hours</option>
+                                            <option value="86400000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
+                                            <option value="172800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '172800000' ? 'selected' : ''}>Every 2d</option>
+                                            <option value="604800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
+                                            <option value="2592000000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
+                                            <option disabled>- Release Day Schedules -</option>
+                                            <option value="release-weekly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-weekly' ? 'selected' : ''}>Weekly (on Friday)</option>
+                                            <option value="release-every-two-weeks" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
+                                            <option value="release-monthly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
+                                            <option disabled>- Custom Schedules -</option>
+                                            ${customScheduleOptions}
+                                            <option value="custom">+ Custom</option>
+                                            ${clearAndSeparatorHtml}
+                                        </select>
+                                        <div id="custom-schedule-container" class="custom-schedule-container">
+                                            <input type="number" id="days" min="0" value="0"><label for="days">d</label>
+                                            <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
+                                            <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
+                                            <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-title">Settings</div>
+                                    <div class="setting-row">
+                                    <span class="description">Deduplicate tracks</span>
+                                    <label class="switch"><input type="checkbox" id="deduplicate-toggle" ${currentDeduplicate ? 'checked' : ''}><span class="sliderx"></span></label>
+                                </div>
+                                <div class="setting-row" id="update-source-row">
+                                    <span class="description">
+                                        Always update from original source
+                                        <span class="tooltip-container">
+                                            <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                                            <span class="custom-tooltip">Enabled: Fetches fresh tracks from the source(s) for each update.<br><br>Disabled: Only re-sorts the tracks already inside this dynamic playlist.</span>
+                                        </span>
+                                    </span>
+                                    <label class="switch"><input type="checkbox" id="update-source-toggle" ${currentUpdateFromSource ? 'checked' : ''}><span class="sliderx"></span></label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -9483,6 +9574,8 @@ function isDirectSortType(sortType) {
         const updateSourceRow = modalContainer.querySelector('#update-source-row');
         const updateSourceToggle = modalContainer.querySelector('#update-source-toggle');
         const deduplicateToggle = modalContainer.querySelector('#deduplicate-toggle');
+        const limitTracksToggle = modalContainer.querySelector('#limit-tracks-toggle');
+        const sourceListContainer = modalContainer.querySelector('#source-list-container');
 
         deduplicateToggle.addEventListener('change', (e) => {
             currentDeduplicate = e.target.checked;
@@ -9549,7 +9642,11 @@ function isDirectSortType(sortType) {
                     <img src="${source.coverUrl || 'https://i.imgur.com/33q4t4k.png'}" class="source-cover-art-small">
                     <div class="source-text-info">
                         <div class="source-name" title="${source.name}">${source.name}</div>
-                        <div class="source-info">${source.info}</div>
+                        <div class="source-info">${source.info} • ${source.totalTracks ?? 'N/A'} tracks</div>
+                        <div class="source-limit-wrapper" style="display: none; margin-top: 4px; align-items: center; gap: 8px;">
+                            <label style="font-size: 12px; color: #b3b3b3;">Limit:</label>
+                            <input type="number" class="source-limit-input" data-index="${index}" value="${source.limit || 10}" min="1" max="${source.totalTracks || ''}" style="width: 60px; background-color: #3e3e3e; border: 1px solid #666; border-radius: 4px; color: white; padding: 2px 6px;">
+                        </div>
                     </div>
                     <div class="source-item-actions">
                         <button class="edit-source-btn" data-index="${index}" title="Change source">${penIconSvg}</button>
@@ -9600,9 +9697,42 @@ function isDirectSortType(sortType) {
 
         renderSources();
 
+        const toggleLimitInputs = (show) => {
+            const wrappers = modalContainer.querySelectorAll('.source-limit-wrapper');
+            wrappers.forEach(wrapper => {
+                wrapper.style.display = show ? 'flex' : 'none';
+            });
+        };
+
+        if (limitTracksToggle.checked) {
+            toggleLimitInputs(true);
+        }
+
+        limitTracksToggle.addEventListener('change', (e) => {
+            toggleLimitInputs(e.target.checked);
+        });
+
+        sourceListContainer.addEventListener('change', (e) => {
+            if (e.target.classList.contains('source-limit-input')) {
+                const index = parseInt(e.target.dataset.index, 10);
+                let value = parseInt(e.target.value, 10);
+                const max = parseInt(e.target.max, 10);
+
+                if (!isNaN(max) && value > max) {
+                    value = max;
+                    e.target.value = max;
+                }
+
+                if (sources[index] && value > 0) {
+                    sources[index].limit = value;
+                }
+            }
+        });
+
         modalContainer.querySelector('#clear-sources-btn').addEventListener('click', () => {
             sources.length = 0;
             renderSources();
+            toggleLimitInputs(limitTracksToggle.checked);
             updateFormState();
         });
 
@@ -9619,6 +9749,7 @@ function isDirectSortType(sortType) {
                         }
                     });
                     renderSources();
+                    toggleLimitInputs(limitTracksToggle.checked);
                 },
                 true
             );
@@ -9714,9 +9845,21 @@ function isDirectSortType(sortType) {
                 return;
             }
 
+            const limitEnabled = document.getElementById('limit-tracks-toggle').checked;
+            if (limitEnabled) {
+                modalContainer.querySelectorAll('.source-limit-input').forEach(input => {
+                    const index = parseInt(input.dataset.index, 10);
+                    const value = parseInt(input.value, 10);
+                    if (sources[index] && value > 0) {
+                        sources[index].limit = value;
+                    }
+                });
+            }
+
             const scheduleValue = document.getElementById('schedule-select').value;
             const jobData = {
                 sources: sources,
+                limitEnabled: limitEnabled,
                 targetPlaylistName: document.getElementById('playlist-name-input').value.trim(),
                 updateMode: document.getElementById('update-mode-select').value,
                 sortType: document.getElementById('sort-type-select').value,
