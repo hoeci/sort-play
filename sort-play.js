@@ -12,8 +12,9 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.17.0";
-  
+  const SORT_PLAY_VERSION = "5.18.0";
+
+  const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
   let useLfmGateway = false;
   let showAdditionalColumn = false;
@@ -67,7 +68,7 @@
   const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
   const STORAGE_KEY_CHANGE_TITLE_ON_CREATE = "sort-play-change-title-on-create";
   const STORAGE_KEY_CHANGE_TITLE_ON_MODIFY = "sort-play-change-title-on-modify";
-  const STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS = "sort-play-update-behavior-settings";
+  const STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR = "sort-play-dedicated-playlist-behavior";
   const STORAGE_KEY_DEDICATED_PLAYLIST_MAP = "sort-play-dedicated-playlist-map";
   const STORAGE_KEY_COLOR_SORT_MODE = "sort-play-color-sort-mode";
   const STORAGE_KEY_TOP_TRACKS_LIMIT = "sort-play-top-tracks-limit";
@@ -77,6 +78,7 @@
   const STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS = "sort-play-set-dedicated-playlist-covers";
   const STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS = "sort-play-dynamic-playlist-jobs";
   const STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES = "sort-play-dynamic-playlist-custom-schedules";
+  const STORAGE_KEY_DEDICATED_PLAYLIST_JOBS = "sort-play-dedicated-playlist-jobs";
   const STORAGE_KEY_DYNAMIC_SORT_TYPE = "sort-play-dynamic-sort-type";
   const STORAGE_KEY_DYNAMIC_SCHEDULE = "sort-play-dynamic-schedule";
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
@@ -255,6 +257,89 @@
     'genreTreeExplorer': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@c547277eb4ab981d8dd8cf510c6c698efb57b4c6/assets/base-covers/discovery-genre.png',
     'randomGenreExplorer': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@dfa6366221b286cde0f9fe5a75bef48bebf528a9/assets/base-covers/discovery-random-genre.png',
   };
+
+  const dedicatedJobRunners = {
+    'topThisMonth': (isHeadless = false) => handleSortAndCreatePlaylist('topThisMonth', { isHeadless }),
+    'topLast6Months': (isHeadless = false) => handleSortAndCreatePlaylist('topLast6Months', { isHeadless }),
+    'topAllTime': (isHeadless = false) => handleSortAndCreatePlaylist('topAllTime', { isHeadless }),
+    'followedReleasesChronological': (isHeadless = false) => generateFollowedReleasesChronological({ isHeadless }),
+    'recommendRecentVibe': (isHeadless = false) => generateSpotifyRecommendations('recommendRecentVibe', { isHeadless }),
+    'recommendAllTime': (isHeadless = false) => generateSpotifyRecommendations('recommendAllTime', { isHeadless }),
+    'pureDiscovery': (isHeadless = false) => generateSpotifyRecommendations('pureDiscovery', { isHeadless }),
+    'randomGenreExplorer': (isHeadless = false) => generateRandomGenrePlaylist({ isHeadless }),
+  };
+
+  async function runDedicatedJob(jobConfig) {
+    const runner = dedicatedJobRunners[jobConfig.dedicatedType];
+    if (runner) {
+        await runner(true);
+    } else {
+        throw new Error(`No runner found for dedicated job type: ${jobConfig.dedicatedType}`);
+    }
+    return { ...jobConfig, lastRun: Date.now() };
+  }
+
+  async function checkAndRunDedicatedJobs() {
+    const jobs = getDedicatedJobs();
+    const now = Date.now();
+
+    const isJobDue = (job, currentTime) => {
+        const lastRun = job.lastRun || 0;
+        const schedule = job.schedule;
+
+        if (schedule === 'manual') {
+            return false;
+        }
+
+        if (typeof schedule === 'number') {
+            return currentTime > lastRun + schedule;
+        }
+
+        if (typeof schedule === 'string' && schedule.startsWith('release-')) {
+            const nowDate = new Date(currentTime);
+            const lastRunDate = new Date(lastRun);
+
+            if (nowDate.getDay() !== 5) {
+                return false;
+            }
+
+            if (lastRunDate.toDateString() === nowDate.toDateString()) {
+                return false;
+            }
+
+            const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
+
+            switch (schedule) {
+                case 'release-weekly':
+                    return daysSinceLastRun > 6;
+                case 'release-every-two-weeks':
+                    return daysSinceLastRun > 13;
+                case 'release-monthly':
+                    return daysSinceLastRun > 27;
+                default:
+                    return false;
+            }
+        }
+        return false;
+    };
+
+    const jobsToRun = jobs.filter(job => isJobDue(job, now));
+
+    if (jobsToRun.length > 0) {
+        for (const job of jobsToRun) {
+            try {
+                const updatedJob = await runDedicatedJob(job);
+                updateDedicatedJob(updatedJob);
+                Spicetify.showNotification(`Dedicated playlist "${job.targetPlaylistName}" was updated.`);
+            } catch (error) {
+                console.error(`Failed to run dedicated playlist job for "${job.targetPlaylistName}":`, error);
+                Spicetify.showNotification(`Failed to update dedicated playlist: ${job.targetPlaylistName}`, true);
+                job.lastRun = now;
+                updateDedicatedJob(job);
+            }
+        }
+    }
+  }
 
   const playlistCardsData = [
     {
@@ -1759,21 +1844,6 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
-    <div class="setting-row" id="playlistBehaviorSettingRow">
-        <label class="col description">
-            Update Existing Playlists
-            <span class="tooltip-container">
-                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Instead of creating new playlists each time, update a single, persistent playlist for each type.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <button id="playlistBehaviorSettingsBtn" class="column-settings-button" title="Configure Playlist Update Behavior">
-                ${settingsSvg}
-            </button>
-        </div>
-    </div>
-
     <div class="setting-row" id="setDedicatedCoversSettingRow">
         <label class="col description">
             Set Custom Playlist Covers
@@ -1960,7 +2030,6 @@
     const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
     const changeTitleOnCreateToggle = modalContainer.querySelector("#changeTitleOnCreateToggle");
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
-    const playlistBehaviorSettingsBtn = modalContainer.querySelector("#playlistBehaviorSettingsBtn");
     const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
     const showSecondAdditionalColumnToggle = modalContainer.querySelector("#showSecondAdditionalColumnToggle");
     const secondColumnTypeSelect = modalContainer.querySelector("#secondColumnTypeSelect");
@@ -2062,10 +2131,6 @@
       }
       updateSortCurrentPlaylistToggleState();
     }
-
-    playlistBehaviorSettingsBtn.addEventListener("click", () => {
-        showPlaylistBehaviorModal();
-    });
 
     setDedicatedCoversToggle.addEventListener("change", () => {
         setDedicatedPlaylistCovers = setDedicatedCoversToggle.checked;
@@ -2475,153 +2540,6 @@
     });
   }
 
-  function showPlaylistBehaviorModal() {
-    const overlay = document.createElement("div");
-    overlay.id = "sort-play-behavior-overlay";
-    overlay.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        z-index: 2002;
-        display: flex; justify-content: center; align-items: center;
-    `;
-
-    const modalContainer = document.createElement("div");
-    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
-    modalContainer.style.cssText = `
-        z-index: 2003;
-        width: 500px !important;
-        display: flex;
-        flex-direction: column;
-    `;
-    
-    let updateBehaviorSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS) || '{}');
-
-    const playlistTypes = [
-        { key: 'newReleases', title: 'New Releases' },
-        { key: 'followedReleasesChronological', name: 'Followed Artist (Full)' },
-        { key: 'discovery', title: 'Discovery' },
-        { key: 'recommendRecentVibe', name: 'Recent Based' },
-        { key: 'recommendAllTime', name: 'All-Time Based' },
-        { key: 'pureDiscovery', name: 'Pure Discovery' },
-        { key: 'topTracks', title: 'My Top Tracks' },
-        { key: 'topThisMonth', name: 'Top This Month' },
-        { key: 'topLast6Months', name: 'Top Last 6 Months' },
-        { key: 'topAllTime', name: 'Top All-Time' }
-    ];
-
-    let settingsHtml = '';
-    playlistTypes.forEach(playlist => {
-        if (playlist.title) {
-            settingsHtml += `<div style="color: white; font-weight: bold; font-size: 18px; margin-top: 15px; margin-bottom: 5px; border-bottom: 1px solid #555; padding-bottom: 5px;">${playlist.title}</div>`;
-        } else {
-            const isChecked = updateBehaviorSettings[playlist.key] || false;
-            settingsHtml += `
-                <div class="setting-row">
-                    <label class="col description">${playlist.name}</label>
-                    <div class="col action">
-                        <label class="switch">
-                            <input type="checkbox" id="update-toggle-${playlist.key}" ${isChecked ? 'checked' : ''}>
-                            <span class="sliderx"></span>
-                        </label>
-                    </div>
-                </div>
-            `;
-        }
-    });
-
-    modalContainer.innerHTML = `
-      <style>
-        .sort-play-behavior-modal .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
-        .sort-play-behavior-modal .col.description { color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
-        .sort-play-behavior-modal .col.action { display: flex; align-items: center; }
-        .sort-play-behavior-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
-        .sort-play-behavior-modal .switch input { opacity: 0; width: 0; height: 0; }
-        .sort-play-behavior-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
-        .sort-play-behavior-modal .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
-        .sort-play-behavior-modal input:checked + .sliderx { background-color: #1DB954; }
-        .sort-play-behavior-modal input:checked + .sliderx:before { transform: translateX(16px); }
-      </style>
-      <div class="main-trackCreditsModal-header">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Playlist Update Behavior</span></h1>
-      </div>
-      <div class="main-trackCreditsModal-mainSection sort-play-behavior-modal" style="padding: 22px 47px 20px !important; max-height: 60vh; flex-grow: 1;">
-        <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 25px;">Update one playlist instead of creating new ones for:</p>
-        <div style="display: flex; justify-content: flex-end; margin-bottom: -40px;">
-            <button id="selectAllTogglesBtn" class="main-buttons-button" style="background-color: #333333; color: white; padding: 2px 16px; border-radius: 20px; font-weight: 500; font-size: 13px; border: none; cursor: pointer;">
-                Select All
-            </button>
-        </div>
-        ${settingsHtml}
-      </div>
-      <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
-        <div style="display: flex; justify-content: flex-end;">
-            <button id="closeBehaviorModal" class="main-buttons-button main-button-primary" 
-                    style="background-color: #1ED760; color: black; padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
-                Done
-            </button>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    overlay.appendChild(modalContainer);
-
-    playlistTypes.forEach(playlist => {
-        if (!playlist.title) {
-            const toggle = modalContainer.querySelector(`#update-toggle-${playlist.key}`);
-            if(toggle) {
-                toggle.addEventListener('change', () => {
-                    updateBehaviorSettings[playlist.key] = toggle.checked;
-                    localStorage.setItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS, JSON.stringify(updateBehaviorSettings));
-                });
-            }
-        }
-    });
-
-    const selectAllButton = modalContainer.querySelector("#selectAllTogglesBtn");
-    if (selectAllButton) {
-        selectAllButton.addEventListener("click", () => {
-            const allToggles = modalContainer.querySelectorAll('.setting-row input[type="checkbox"]');
-            const allAreChecked = Array.from(allToggles).every(toggle => toggle.checked);
-            const newState = !allAreChecked;
-
-            allToggles.forEach(toggle => {
-                toggle.checked = newState;
-                const key = toggle.id.replace('update-toggle-', '');
-                updateBehaviorSettings[key] = newState;
-            });
-            localStorage.setItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS, JSON.stringify(updateBehaviorSettings));
-        });
-        
-        selectAllButton.addEventListener("mouseenter", () => {
-            selectAllButton.style.backgroundColor = "#444444";
-        });
-        selectAllButton.addEventListener("mouseleave", () => {
-            selectAllButton.style.backgroundColor = "#333333";
-        });
-    }
-
-    const closeModal = () => overlay.remove();
-    
-    const doneButton = modalContainer.querySelector("#closeBehaviorModal");
-    if (doneButton) {
-        doneButton.addEventListener("click", closeModal);
-        
-        doneButton.addEventListener("mouseenter", () => {
-            doneButton.style.backgroundColor = "#3BE377";
-        });
-        doneButton.addEventListener("mouseleave", () => {
-            doneButton.style.backgroundColor = "#1ED760";
-        });
-    }
-
-    overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) {
-            closeModal();
-        }
-    });
-  }
-
   function showFolderNameModal() {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-folder-name-overlay";
@@ -2828,11 +2746,12 @@
         display: flex; justify-content: center; align-items: center;
     `;
 
+    
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
     modalContainer.style.cssText = `
         z-index: 2003;
-        width: 1000px !important;
+        width: 1050px !important;
         background-color: #181818 !important;
         border: 1px solid #282828;
         display: flex;
@@ -2841,8 +2760,37 @@
     `;
 
     const STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE = "sort-play-create-playlist-collapse-state";
-
     let collapseState = JSON.parse(localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE) || '{}');
+    let dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
+    const jobs = getDedicatedJobs();
+    const customSchedules = getCustomSchedules();
+
+    jobs.forEach(job => {
+        if (job.dedicatedType && dedicatedJobRunners[job.dedicatedType]) {
+            dedicatedPlaylistBehavior[job.dedicatedType] = 'autoUpdate';
+        }
+    });
+    Object.keys(dedicatedPlaylistBehavior).forEach(cardId => {
+        if (dedicatedPlaylistBehavior[cardId] === 'autoUpdate' && !jobs.some(job => job.dedicatedType === cardId)) {
+            delete dedicatedPlaylistBehavior[cardId];
+        }
+    });
+    localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
+
+    const scheduleToTextMap = {
+        10800000: 'Every 3 Hours', 21600000: 'Every 6 Hours', 43200000: 'Every 12 Hours',
+        86400000: 'Daily', 172800000: 'Every 2 Days', 604800000: 'Weekly', 2592000000: 'Monthly',
+        'release-weekly': 'Weekly (on Friday)',
+        'release-every-two-weeks': 'Every Two Weeks (Fri)',
+        'release-monthly': 'Monthly (on a Friday)'
+    };
+    
+    const scheduleToShortTextMap = {
+        'release-every-two-weeks': 'Every 2 Weeks (Fri)',
+        'release-monthly': 'Monthly (Fri)'
+    };
+    
+    customSchedules.forEach(s => { scheduleToTextMap[s.value] = s.text; });
 
     let contentHtml = '';
     playlistCardsData.forEach(section => {
@@ -2856,15 +2804,55 @@
         `;
         contentHtml += `<div class="create-playlist-grid ${isCollapsed ? 'collapsed' : ''}">`;
         section.cards.forEach(card => {
+            const behavior = dedicatedPlaylistBehavior[card.id] || 'createOnce';
+            let autoUpdateOptionText = "Create & Auto-Update";
+
+            if (behavior === 'autoUpdate') {
+                const job = jobs.find(j => j.dedicatedType === card.id);
+                if (job && job.schedule) {
+                    const shortText = scheduleToShortTextMap[job.schedule];
+                    const fullText = scheduleToTextMap[job.schedule];
+                    if (shortText) {
+                        autoUpdateOptionText = `Update ${shortText}`;
+                    } else if (fullText) {
+                        autoUpdateOptionText = `Update ${fullText}`;
+                    }
+                }
+            }
+
+            let settingsHtml = '';
+            if (card.id !== 'genreTreeExplorer') {
+                settingsHtml = `
+                    <div class="card-settings">
+                        <span class="card-settings-title">Create Mode:</span>
+                        <div class="card-settings-controls">
+                            <button class="card-settings-btn" data-id="${card.id}" data-name="${card.name}" title="Configure Auto-Update" style="display: ${behavior === 'autoUpdate' ? 'flex' : 'none'};">
+                            ${settingsSvg.replace('<svg', '<svg fill="#ffffff"')}
+                            </button>
+                            <select class="card-behavior-select" data-id="${card.id}">
+                                <option value="createOnce" ${behavior === 'createOnce' ? 'selected' : ''}>Create Once</option>
+                                <option value="replace" ${behavior === 'replace' ? 'selected' : ''}>Create & Replace</option>
+                                <option value="autoUpdate" ${behavior === 'autoUpdate' ? 'selected' : ''}>${autoUpdateOptionText}</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            } else {
+                 settingsHtml = `<div class="card-settings" style="height: 41px;"></div>`;
+            }
+
             contentHtml += `
-                <div class="playlist-card" data-id="${card.id}" role="button" tabindex="0">
-                    <div class="card-thumbnail-container">
-                        <img src="${card.thumbnailUrl}" alt="${card.name}" class="card-thumbnail">
+                <div class="playlist-card-wrapper">
+                    <div class="playlist-card" data-id="${card.id}" role="button" tabindex="0">
+                        <div class="card-thumbnail-container">
+                            <img src="${card.thumbnailUrl}" alt="${card.name}" class="card-thumbnail">
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">${card.name}</h3>
+                            <p class="card-description">${card.description}</p>
+                        </div>
                     </div>
-                    <div class="card-content">
-                        <h3 class="card-title">${card.name}</h3>
-                        <p class="card-description">${card.description}</p>
-                    </div>
+                    ${settingsHtml}
                 </div>
             `;
         });
@@ -2873,116 +2861,39 @@
 
     modalContainer.innerHTML = `
       <style>
-        .create-playlist-modal {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .collapsible-section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            margin-top: 7px;
-            margin-bottom: 7px;
-        }
-        .create-playlist-section-title {
-            color: white;
-            font-weight: 700;
-            font-size: 1.4rem;
-            margin: 0;
-        }
-        .chevron-icon {
-            color: #b3b3b3;
-            transition: transform 0.2s ease-in-out;
-        }
-        .chevron-icon.collapsed {
-            transform: rotate(-90deg);
-        }
-        .create-playlist-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            overflow: hidden;
-            max-height: 1000px;
-            transition: max-height 0.2s ease-in-out, margin-top 0.2s ease-in-out, opacity 0.2s ease-in-out;
-            margin-top: 0;
-            opacity: 1;
-        }
-        .create-playlist-grid.collapsed {
-            max-height: 0;
-            margin-top: -10px;
-            opacity: 0;
-        }
-        .playlist-card {
-            background-color: #212121;
-            border: 1px solid transparent;
-            border-radius: 8px;
-            padding: 10px;
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            gap: 16px;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
-        .playlist-card:hover {
-            background-color: #282828;
-        }
-        .card-thumbnail-container {
-            width: 70px;
-            height: 70px;
-            flex-shrink: 0;
-            border-radius: 6px;
-            overflow: hidden;
-            background-color: #333;
-        }
-        .card-thumbnail {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        .card-content {
-            flex-grow: 1;
-            min-width: 0;
-        }
-        .card-title {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #fff;
-            margin: 0 0 4px 0;
-        }
-        .card-description {
-            font-size: 0.875rem;
-            color: #b3b3b3;
-            margin: 0;
-            line-height: 1.4;
-        }
-        .main-trackCreditsModal-closeBtn {
-            background: transparent;
-            border: 0;
-            padding: 0;
-            color: #b3b3b3;
-            cursor: pointer;
-            transition: color 0.2s ease;
-        }
-        .main-trackCreditsModal-closeBtn:hover {
-            color: #ffffff;
-        }
+        .create-playlist-modal { display: flex; flex-direction: column; gap: 10px; }
+        .collapsible-section-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin: 7px 0; }
+        .create-playlist-section-title { color: white; font-weight: 700; font-size: 1.4rem; margin: 0; }
+        .chevron-icon { color: #b3b3b3; transition: transform 0.2s ease-in-out; }
+        .chevron-icon.collapsed { transform: rotate(-90deg); }
+        .create-playlist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; overflow: hidden; max-height: 1000px; transition: all 0.2s ease-in-out; margin-top: 0; opacity: 1; }
+        .create-playlist-grid.collapsed { max-height: 0; margin-top: -10px; opacity: 0; }
+        .playlist-card-wrapper { background-color: #212121; border: 1px solid transparent; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
+        .playlist-card:hover { background-color: #282828; }
+        .playlist-card { padding: 10px; display: flex; flex-direction: row; align-items: center; gap: 16px; cursor: pointer; flex-grow: 1; transition: background-color 0.2s ease; }
+        .card-thumbnail-container { width: 60px; height: 60px; flex-shrink: 0; border-radius: 6px; overflow: hidden; background-color: #333; }
+        .card-thumbnail { width: 100%; height: 100%; object-fit: cover; }
+        .card-content { flex-grow: 1; min-width: 0; }
+        .card-title { font-size: 0.9rem; font-weight: 700; color: #fff; margin: 0 0 2px 0; }
+        .card-description { font-size: 0.85rem; color: #b3b3b3; margin: 0; line-height: 1.4; }
+        .card-settings { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-top: 1px solid #333;}
+        .card-settings-title { font-size: 0.8rem; font-weight: 500; color: #b3b3b3; }
+        .card-settings-controls { display: flex; align-items: center; gap: 8px; }
+        .card-settings-btn { background: none; border: none; cursor: pointer; padding: 4px; color: #b3b3b3; display: flex; align-items: center; justify-content: center; }
+        .card-settings-btn:hover { color: white; }
+        .card-settings-btn svg { width: 16px; height: 16px; }
+        .card-behavior-select { background: #212121; color: white; border: 1px solid #444; border-radius: 4px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+        .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
+        .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
       </style>
       <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px; font-weight: 700;'>Dedicated Playlist Creation</span></h1>
           <button id="closeCreatePlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                <title>Close</title>
-                <path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path>
-            </svg>
+            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
           </button>
       </div>
       <div class="main-trackCreditsModal-mainSection" style="padding: 24px 32px 38px !important; max-height: 80vh; flex-grow: 1; overflow-y: auto;">
-        <div class="create-playlist-modal">
-            ${contentHtml}
-        </div>
+        <div class="create-playlist-modal">${contentHtml}</div>
       </div>
     `;
     
@@ -2994,6 +2905,17 @@
     modalContainer.querySelectorAll('.playlist-card').forEach(card => {
         card.addEventListener('click', () => {
             const sortType = card.getAttribute('data-id');
+            const behavior = dedicatedPlaylistBehavior[sortType] || 'createOnce';
+            
+            if (behavior === 'autoUpdate') {
+                const jobs = getDedicatedJobs();
+                const job = jobs.find(j => j.dedicatedType === sortType);
+                if (job) {
+                    job.lastRun = Date.now();
+                    updateDedicatedJob(job);
+                }
+            }
+
             closeModal();
             if (sortType === 'genreTreeExplorer') {
                 showGenreTreeExplorerModal();
@@ -3005,39 +2927,306 @@
         });
     });
 
-    modalContainer.querySelectorAll('.collapsible-section-header').forEach(header => {
-        const handleToggle = () => {
-            const sectionTitle = header.dataset.sectionTitle;
-            const grid = header.nextElementSibling;
-            const chevron = header.querySelector('.chevron-icon');
+    modalContainer.querySelectorAll('.card-behavior-select').forEach(select => {
+        select.addEventListener('change', async (e) => {
+            const cardId = e.target.dataset.id;
+            const newBehavior = e.target.value;
+            const oldBehavior = dedicatedPlaylistBehavior[cardId] || 'createOnce';
+            dedicatedPlaylistBehavior[cardId] = newBehavior;
+            localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
 
-            const isNowCollapsed = !grid.classList.contains('collapsed');
-            
-            grid.classList.toggle('collapsed', isNowCollapsed);
-            chevron.classList.toggle('collapsed', isNowCollapsed);
+            const settingsBtn = modalContainer.querySelector(`.card-settings-btn[data-id="${cardId}"]`);
+            if (settingsBtn) {
+                settingsBtn.style.display = newBehavior === 'autoUpdate' ? 'flex' : 'none';
+            }
 
-            collapseState[sectionTitle] = isNowCollapsed;
-            localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE, JSON.stringify(collapseState));
-        };
+            if (newBehavior === 'autoUpdate' && oldBehavior !== 'autoUpdate') {
+                const cardName = modalContainer.querySelector(`.playlist-card[data-id="${cardId}"] .card-title`).textContent;
+                
+                const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
 
-        header.addEventListener('click', handleToggle);
-        header.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                handleToggle();
+                if (newScheduleText) {
+                    const autoUpdateOption = select.querySelector('option[value="autoUpdate"]');
+                    if (autoUpdateOption) {
+                        autoUpdateOption.textContent = newScheduleText;
+                        select.value = 'autoUpdate';
+                    }
+                } else {
+                    select.value = oldBehavior;
+                    dedicatedPlaylistBehavior[cardId] = oldBehavior;
+                    localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
+                    if (settingsBtn) {
+                        settingsBtn.style.display = oldBehavior === 'autoUpdate' ? 'flex' : 'none';
+                    }
+                }
+            } else if (newBehavior !== 'autoUpdate' && oldBehavior === 'autoUpdate') {
+                const jobs = getDedicatedJobs();
+                const job = jobs.find(j => j.dedicatedType === cardId);
+                if (job) {
+                    deleteDedicatedJob(job.id);
+                    Spicetify.showNotification(`Auto-update disabled for "${job.targetPlaylistName || cardId}".`);
+                }
+                const autoUpdateOption = select.querySelector('option[value="autoUpdate"]');
+                if (autoUpdateOption) {
+                    autoUpdateOption.textContent = "Create & Auto-Update";
+                }
             }
         });
     });
 
-    const closeButton = modalContainer.querySelector("#closeCreatePlaylistModal");
-    if (closeButton) {
-        closeButton.addEventListener("click", closeModal);
-    }
+    modalContainer.querySelectorAll('.card-settings-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            const cardId = e.currentTarget.dataset.id;
+            const cardName = e.currentTarget.dataset.name;
+            const selectElement = e.currentTarget.closest('.card-settings-controls').querySelector('.card-behavior-select');
 
-    overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) {
-            closeModal();
+            const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
+
+            if (newScheduleText) {
+                const autoUpdateOption = selectElement.querySelector('option[value="autoUpdate"]');
+                if (autoUpdateOption) {
+                    autoUpdateOption.textContent = newScheduleText;
+                    selectElement.value = 'autoUpdate';
+                }
+            }
+        });
+    });
+
+    modalContainer.querySelectorAll('.collapsible-section-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const sectionTitle = header.dataset.sectionTitle;
+            const grid = header.nextElementSibling;
+            const chevron = header.querySelector('.chevron-icon');
+            const isNowCollapsed = !grid.classList.contains('collapsed');
+            grid.classList.toggle('collapsed', isNowCollapsed);
+            chevron.classList.toggle('collapsed', isNowCollapsed);
+            collapseState[sectionTitle] = isNowCollapsed;
+            localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE, JSON.stringify(collapseState));
+        });
+    });
+
+    modalContainer.querySelector("#closeCreatePlaylistModal").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  }
+
+  function showDedicatedScheduleModal(cardId, cardName) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement("div");
+        overlay.id = "sort-play-dedicated-schedule-overlay";
+        overlay.className = "sort-play-font-scope";
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); z-index: 2004;
+            display: flex; justify-content: center; align-items: center;
+        `;
+
+        const modalContainer = document.createElement("div");
+        modalContainer.className = "main-embedWidgetGenerator-container";
+        modalContainer.style.zIndex = "2005";
+        
+        const scheduleToShortTextMap = {
+            'release-every-two-weeks': 'Every 2 Weeks (Fri)',
+            'release-monthly': 'Monthly (Fri)'
+        };
+        
+        const jobs = getDedicatedJobs();
+        const job = jobs.find(j => j.dedicatedType === cardId);
+        const currentSchedule = job ? job.schedule : '86400000';
+
+        const customSchedules = getCustomSchedules();
+        const customScheduleOptions = customSchedules.map(s => `<option value="${s.value}" ${String(currentSchedule) === String(s.value) ? 'selected' : ''}>${s.text}</option>`).join('');
+
+        let clearAndSeparatorHtml = '';
+        if (customSchedules.length > 0) {
+            clearAndSeparatorHtml = `
+                <option value="clear-custom" style="color: #f15e6c; font-style: italic;">Clear Custom Schedules...</option>
+            `;
         }
+
+        modalContainer.innerHTML = `
+          <style>
+            .form-select {
+                width: 100%; background: #282828; color: white; border: 1px solid #666;
+                border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 13px; cursor: pointer;
+                -webkit-appearance: none; -moz-appearance: none; appearance: none;
+                background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+                background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
+            }
+            .custom-schedule-container { display: none; align-items: center; gap: 8px; margin-top: 16px; padding: 10px; background-color: #3e3e3e; border-radius: 8px; }
+            .custom-schedule-container.visible { display: flex; }
+            .custom-schedule-container input[type="number"] { width: 60px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center; }
+            .custom-schedule-container label { font-size: 12px; color: #b3b3b3; }
+            .custom-schedule-ok-btn { padding: 6px 12px; border-radius: 15px; border: none; background-color: #1ed760; color: black; font-weight: bold; cursor: pointer; }
+            .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+            .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+            .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+            .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+          </style>
+          <div class="main-trackCreditsModal-header">
+              <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Auto-Update Schedule</span></h1>
+          </div>
+          <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px !important;">
+              <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 20px;">Set the update frequency for "${cardName}":</p>
+              <select id="dedicated-schedule-select" class="form-select" style="width: 100%; margin-bottom: 10px;">
+                  <option value="10800000" ${String(currentSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
+                  <option value="21600000" ${String(currentSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
+                  <option value="43200000" ${String(currentSchedule) === '43200000' ? 'selected' : ''}>Every 12 Hours</option>
+                  <option value="86400000" ${String(currentSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
+                  <option value="172800000" ${String(currentSchedule) === '172800000' ? 'selected' : ''}>Every 2 Days</option>
+                  <option value="604800000" ${String(currentSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
+                  <option value="2592000000" ${String(currentSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
+                  <option disabled>- Release Day Schedules -</option>
+                  <option value="release-weekly" ${currentSchedule === 'release-weekly' ? 'selected' : ''}>Weekly (on Friday)</option>
+                  <option value="release-every-two-weeks" ${currentSchedule === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
+                  <option value="release-monthly" ${currentSchedule === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
+                  <option disabled>- Custom Schedules -</option>
+                  ${customScheduleOptions}
+                  <option value="custom">+ Custom</option>
+                  ${clearAndSeparatorHtml}
+              </select>
+              <div id="custom-schedule-container" class="custom-schedule-container">
+                  <input type="number" id="days" min="0" value="0"><label for="days">d</label>
+                  <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
+                  <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
+                  <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
+              </div>
+              <div id="custom-schedule-error" style="color: #f15e6c; font-size: 12px; text-align: right; margin-top: 4px; display: none;"></div>
+              <label id="custom-schedule-min-label" style="font-size: 12px; color: #b3b3b3; text-align: right; display: none; margin-top: 4px;">Minimum: ${SCHEDULER_INTERVAL_MINUTES} minutes</label>
+              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                  <button id="cancel-schedule" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
+                  <button id="save-schedule" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Save</button>
+              </div>
+          </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        overlay.appendChild(modalContainer);
+
+        const closeModal = () => overlay.remove();
+
+        const scheduleSelect = modalContainer.querySelector('#dedicated-schedule-select');
+        const customScheduleContainer = modalContainer.querySelector('#custom-schedule-container');
+        const minLabel = modalContainer.querySelector('#custom-schedule-min-label');
+        let previousScheduleValue = scheduleSelect.value;
+
+        scheduleSelect.addEventListener('change', async (e) => {
+            const selectedValue = e.target.value;
+
+            if (selectedValue === 'clear-custom') {
+                e.target.value = previousScheduleValue;
+                const confirmed = await showConfirmationModal({
+                    title: "Clear Custom Schedules?",
+                    description: "This will permanently remove all of your saved custom schedules. This action cannot be undone.",
+                    confirmText: "Clear All",
+                    cancelText: "Cancel",
+                });
+                if (confirmed === 'confirm') {
+                    saveCustomSchedules([]);
+                    Spicetify.showNotification("All custom schedules have been cleared.");
+                    closeModal();
+                    resolve(await showDedicatedScheduleModal(cardId, cardName));
+                }
+            } else {
+                const isCustom = selectedValue === 'custom';
+                customScheduleContainer.classList.toggle('visible', isCustom);
+                minLabel.style.display = isCustom ? 'block' : 'none';
+                if (!isCustom) {
+                    previousScheduleValue = selectedValue;
+                }
+            }
+        });
+
+        modalContainer.querySelector('#set-custom-schedule-btn').addEventListener('click', () => {
+            const errorDiv = modalContainer.querySelector('#custom-schedule-error');
+            errorDiv.style.display = 'none';
+
+            const days = parseInt(modalContainer.querySelector('#days').value) || 0;
+            const hours = parseInt(modalContainer.querySelector('#hours').value) || 0;
+            const minutes = parseInt(modalContainer.querySelector('#minutes').value) || 0;
+            
+            const totalMs = (days * 86400000) + (hours * 3600000) + (minutes * 60000);
+            const minMs = SCHEDULER_INTERVAL_MINUTES * 60 * 1000;
+
+            if (totalMs < minMs) {
+                errorDiv.textContent = `Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`;
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            let text = 'Every ';
+            if (days > 0) text += `${days}d `;
+            if (hours > 0) text += `${hours}h `;
+            if (minutes > 0) text += `${minutes}m`;
+            text = text.trim();
+
+            const customSchedules = getCustomSchedules();
+            if (!customSchedules.some(s => s.value === totalMs)) {
+                customSchedules.push({ value: totalMs, text });
+                saveCustomSchedules(customSchedules);
+            }
+
+            const customOption = document.createElement('option');
+            customOption.value = totalMs;
+            customOption.textContent = text;
+            scheduleSelect.insertBefore(customOption, scheduleSelect.querySelector('option[value="custom"]'));
+            scheduleSelect.value = totalMs;
+            previousScheduleValue = totalMs;
+            customScheduleContainer.classList.remove('visible');
+            minLabel.style.display = 'none';
+        });
+
+        document.getElementById("save-schedule").addEventListener("click", () => {
+            const errorDiv = modalContainer.querySelector('#custom-schedule-error');
+            errorDiv.style.display = 'none';
+
+            if (scheduleSelect.value === 'custom') {
+                errorDiv.textContent = "Please 'Set' your custom schedule or choose another option before saving.";
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const newSchedule = scheduleSelect.value;
+            const newScheduleValue = isNaN(parseInt(newSchedule)) ? newSchedule : parseInt(newSchedule);
+
+            const jobs = getDedicatedJobs();
+            let job = jobs.find(j => j.dedicatedType === cardId);
+
+            if (job) {
+                job.schedule = newScheduleValue;
+                updateDedicatedJob(job);
+            } else {
+                const newJob = {
+                    id: crypto.randomUUID(),
+                    dedicatedType: cardId,
+                    targetPlaylistName: cardName,
+                    schedule: newScheduleValue,
+                    createdAt: Date.now(),
+                    lastRun: null,
+                };
+                addDedicatedJob(newJob);
+            }
+            
+            Spicetify.showNotification("Auto-update schedule saved!");
+            
+            const fullScheduleText = scheduleSelect.options[scheduleSelect.selectedIndex].text;
+            const shortScheduleText = scheduleToShortTextMap[newScheduleValue];
+            const finalScheduleText = shortScheduleText || fullScheduleText;
+
+            closeModal();
+            resolve(`Update ${finalScheduleText}`);
+        });
+
+        document.getElementById("cancel-schedule").addEventListener("click", () => {
+            closeModal();
+            resolve(null);
+        });
+
+        overlay.addEventListener("click", (e) => { 
+            if (e.target === overlay) {
+                closeModal();
+                resolve(null);
+            }
+        });
     });
   }
 
@@ -8032,6 +8221,39 @@ function isDirectSortType(sortType) {
     }
   }
 
+  function getDedicatedJobs() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_JOBS) || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveDedicatedJobs(jobs) {
+    localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_JOBS, JSON.stringify(jobs));
+  }
+
+  function addDedicatedJob(newJob) {
+    const jobs = getDedicatedJobs();
+    jobs.push(newJob);
+    saveDedicatedJobs(jobs);
+  }
+
+  function deleteDedicatedJob(jobId) {
+    let jobs = getDedicatedJobs();
+    jobs = jobs.filter(job => job.id !== jobId);
+    saveDedicatedJobs(jobs);
+  }
+
+  function updateDedicatedJob(updatedJob) {
+    const jobs = getDedicatedJobs();
+    const index = jobs.findIndex(job => job.id === updatedJob.id);
+    if (index !== -1) {
+      jobs[index] = updatedJob;
+      saveDedicatedJobs(jobs);
+    }
+  }
+
   function getCustomSchedules() {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES) || '[]');
@@ -8157,6 +8379,9 @@ function isDirectSortType(sortType) {
                     return valB - valA;
                 });
             break;
+        case "shuffle":
+            sortedTracks = shuffleArray(uniqueTracks);
+            break;
         default:
             sortedTracks = uniqueTracks;
             break;
@@ -8175,9 +8400,22 @@ function isDirectSortType(sortType) {
     const updateMode = job.updateMode || 'replace';
 
     if (isInitialRun) {
-        const sortByParent = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent');
-        const allSortOptions = sortByParent.children.flatMap(opt => (opt.type === 'parent' && opt.children) ? opt.children : opt);
-        const sortTypeInfo = allSortOptions.find(i => i.sortType === job.sortType);
+        const allSortableItems = buttonStyles.menuItems.flatMap(item => {
+            if (item.sortType && item.text) {
+                return item;
+            }
+            if (item.children) {
+                return item.children.flatMap(child => {
+                    if (child.children) {
+                        return child.children;
+                    }
+                    return child.sortType ? child : [];
+                });
+            }
+            return [];
+        }).filter(item => item && item.sortType);
+        
+        const sortTypeInfo = allSortableItems.find(i => i.sortType === job.sortType);
         const playlistName = job.targetPlaylistName || (job.sources.length > 1 ? "Combined Dynamic Playlist" : `${job.sources[0].name} (Dynamic)`);
         const sourceNames = job.sources.length > 1 ? "multiple sources" : (job.sources[0]?.name || "Unknown Source");
         const playlistDescription = `Dynamically sorted by ${sortTypeInfo.text}. Source${job.sources.length > 1 ? 's' : ''}: ${sourceNames}. Managed by Sort-Play.`;
@@ -8382,7 +8620,11 @@ function isDirectSortType(sortType) {
 
   function startScheduler() {
     checkAndRunJobs(); 
-    setInterval(checkAndRunJobs, 15 * 60 * 1000);
+    checkAndRunDedicatedJobs();
+    setInterval(() => {
+        checkAndRunJobs();
+        checkAndRunDedicatedJobs();
+    }, SCHEDULER_INTERVAL_MINUTES * 60 * 1000);
   }
 
 
@@ -9332,8 +9574,19 @@ function isDirectSortType(sortType) {
         const savedSortType = localStorage.getItem(STORAGE_KEY_DYNAMIC_SORT_TYPE) || 'playCount';
         const savedSchedule = localStorage.getItem(STORAGE_KEY_DYNAMIC_SCHEDULE) || '86400000';
 
-        const sortOptions = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent').children
-        .flatMap(opt => {
+        const sortByParent = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent');
+        const shuffleItem = buttonStyles.menuItems.find(i => i.sortType === 'shuffle');
+        
+        const sortChildren = [...sortByParent.children];
+        const releaseDateIndex = sortChildren.findIndex(item => item.sortType === 'releaseDate');
+        
+        if (releaseDateIndex !== -1) {
+            sortChildren.splice(releaseDateIndex + 1, 0, shuffleItem);
+        } else {
+            sortChildren.push(shuffleItem);
+        }
+
+        const sortOptions = sortChildren.flatMap(opt => {
             if (opt.type === 'parent' && opt.children) {
                 return opt.children.map(childOpt => 
                     `<option value="${childOpt.sortType}" ${ (isEditing ? jobToEdit.sortType : savedSortType) === childOpt.sortType ? 'selected' : ''}>${childOpt.text}</option>`
@@ -9535,6 +9788,8 @@ function isDirectSortType(sortType) {
                                             <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
                                             <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
                                         </div>
+                                        <div id="custom-schedule-error" style="color: #f15e6c; font-size: 12px; text-align: right; margin-top: 4px; display: none;"></div>
+                                        <label id="custom-schedule-min-label" style="font-size: 12px; color: #b3b3b3; text-align: right; display: none; margin-top: 4px;">Minimum: ${SCHEDULER_INTERVAL_MINUTES} minutes</label>
                                     </div>
                                 </div>
                             </div>
@@ -9762,6 +10017,9 @@ function isDirectSortType(sortType) {
         scheduleSelect.addEventListener('change', (e) => localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, e.target.value));
         
         let previousScheduleValue = scheduleSelect.value;
+        
+        const minLabel = modalContainer.querySelector('#custom-schedule-min-label');
+
         scheduleSelect.addEventListener('change', async (e) => {
             const selectedValue = e.target.value;
 
@@ -9787,8 +10045,10 @@ function isDirectSortType(sortType) {
                     await renderJobForm(jobToEdit);
                 }
             } else {
-                customScheduleContainer.classList.toggle('visible', selectedValue === 'custom');
-                if (selectedValue !== 'custom') {
+                const isCustom = selectedValue === 'custom';
+                customScheduleContainer.classList.toggle('visible', isCustom);
+                minLabel.style.display = isCustom ? 'block' : 'none';
+                if (!isCustom) {
                     previousScheduleValue = selectedValue;
                     localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, selectedValue);
                 }
@@ -9800,13 +10060,19 @@ function isDirectSortType(sortType) {
         });
 
         modalContainer.querySelector('#set-custom-schedule-btn').addEventListener('click', () => {
+            const errorDiv = modalContainer.querySelector('#custom-schedule-error');
+            errorDiv.style.display = 'none';
+
             const days = parseInt(modalContainer.querySelector('#days').value) || 0;
             const hours = parseInt(modalContainer.querySelector('#hours').value) || 0;
             const minutes = parseInt(modalContainer.querySelector('#minutes').value) || 0;
             
             const totalMs = (days * 86400000) + (hours * 3600000) + (minutes * 60000);
-            if (totalMs <= 0) {
-                Spicetify.showNotification("Custom schedule must be greater than 0.", true);
+            const minMs = SCHEDULER_INTERVAL_MINUTES * 60 * 1000;
+
+            if (totalMs < minMs) {
+                errorDiv.textContent = `Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`;
+                errorDiv.style.display = 'block';
                 return;
             }
 
@@ -9829,6 +10095,7 @@ function isDirectSortType(sortType) {
             scheduleSelect.value = totalMs;
             localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, totalMs);
             customScheduleContainer.classList.remove('visible');
+            minLabel.style.display = 'none';
             renderJobForm(jobToEdit); 
         });
 
@@ -13940,7 +14207,7 @@ function isDirectSortType(sortType) {
 
   window.addEventListener('scroll', closeAllMenus);
 
-  const setButtonProcessing = (processing) => {
+  let setButtonProcessing = (processing) => {
     isProcessing = processing;
     mainButton.style.cursor = "pointer"; 
     
@@ -14200,27 +14467,34 @@ function isDirectSortType(sortType) {
     }
   }
 
+  
   async function getActiveUserPlaylistUris() {
     try {
-        const allPlaylists = [];
-        let nextUrl = 'https://api.spotify.com/v1/me/playlists?limit=50';
+        const rootlist = await Spicetify.Platform.RootlistAPI.getContents();
+        const playlistUris = new Set();
 
-        while (nextUrl) {
-            const response = await Spicetify.CosmosAsync.get(nextUrl);
-            if (response && response.items) {
-                allPlaylists.push(...response.items);
-                nextUrl = response.next;
-            } else {
-                nextUrl = null;
+        function traverseItems(items) {
+            for (const item of items) {
+                if (item.type === 'playlist') {
+                    playlistUris.add(item.uri);
+                } else if (item.type === 'folder' && Array.isArray(item.items)) {
+                    traverseItems(item.items);
+                }
             }
         }
-        
-        const playlistUris = new Set(allPlaylists.map(p => p.uri));
+
+        traverseItems(rootlist.items);
         return playlistUris;
 
     } catch (error) {
-        console.error("An error occurred while fetching user playlists for verification:", error);
-        return new Set();
+        console.error("An error occurred while fetching user playlists from RootlistAPI:", error);
+        try {
+            const response = await Spicetify.CosmosAsync.get('https://api.spotify.com/v1/me/playlists?limit=50');
+            return new Set(response.items.map(p => p.uri));
+        } catch (fallbackError) {
+            console.error("Fallback playlist fetch also failed:", fallbackError);
+            return new Set();
+        }
     }
   }
 
@@ -14412,8 +14686,9 @@ function isDirectSortType(sortType) {
   ).register();
 
   async function getOrCreateDedicatedPlaylist(sortType, name, description, maxRetries = 5, initialDelay = 1000) {
-    const updateBehaviorSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_UPDATE_BEHAVIOR_SETTINGS) || '{}');
-    const isUpdateEnabled = updateBehaviorSettings[sortType] || false;
+    const dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
+    const behavior = dedicatedPlaylistBehavior[sortType] || 'createOnce';
+    const isUpdateEnabled = behavior === 'replace' || behavior === 'autoUpdate';
 
     const releasePlaylistColor = '#3798a5';
     const discoveryPlaylistColor = '#8f46d7';
@@ -14444,43 +14719,36 @@ function isDirectSortType(sortType) {
             const activePlaylistsSet = await getActiveUserPlaylistUris();
 
             if (activePlaylistsSet.has(playlistUri)) {
+                const playlistId = playlistUri.split(':')[2];
+
                 try {
-                    const playlistId = playlistUri.split(':')[2];
-                    const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-
-                    const detailsToUpdate = {};
-                    if (playlistData.name !== name) {
-                        detailsToUpdate.name = name;
-                    }
-                    if (playlistData.description !== description || !playlistData.description) {
-                        detailsToUpdate.description = description;
-                    }
-
-                    if (Object.keys(detailsToUpdate).length > 0) {
-                        await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, detailsToUpdate);
-                        if (detailsToUpdate.name) playlistData.name = detailsToUpdate.name;
-                        if (detailsToUpdate.description) playlistData.description = detailsToUpdate.description;
-                    }
-
-                    if (setDedicatedPlaylistCovers) {
-                        (async () => {
-                            try {
-                                const user = await Spicetify.Platform.UserAPI.getUser();
-                                const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                                const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
-                                setPlaylistImage(playlistId, coverBase64);
-                            } catch (coverError) {
-                                console.error("Failed to update custom playlist cover:", coverError);
-                            }
-                        })();
-                    }
-
-                    await movePlaylistToTop(playlistUri);
-                    return { playlist: playlistData, wasUpdated: true };
-                } catch (e) {
-                    console.warn(`Error verifying linked playlist ${playlistUri}, creating a new one.`, e);
+                    await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, {
+                        name: name,
+                        description: description
+                    });
+                } catch (updateError) {
                 }
+
+                if (setDedicatedPlaylistCovers) {
+                    (async () => {
+                        try {
+                            const user = await Spicetify.Platform.UserAPI.getUser();
+                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                            const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
+                            setPlaylistImage(playlistId, coverBase64);
+                        } catch (coverError) {
+                            console.error("Failed to update custom playlist cover:", coverError);
+                        }
+                    })();
+                }
+
+                await movePlaylistToTop(playlistUri);
+
+                const minimalPlaylistData = { id: playlistId, uri: playlistUri, name: name };
+                return { playlist: minimalPlaylistData, wasUpdated: true };
+
             } else {
+                console.log(`[Sort-Play] Linked playlist ${playlistUri} is no longer in the user's library. A new one will be created.`);
                 delete dedicatedPlaylistMap[sortType];
                 localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
             }
@@ -14703,8 +14971,11 @@ function isDirectSortType(sortType) {
     return allArtists;
   }
 
-  async function getComprehensiveKnownArtistsSet() {
-    mainButton.innerText = "Filtering...";
+  async function getComprehensiveKnownArtistsSet(options = {}) {
+    const { isHeadless = false } = options;
+    if (!isHeadless) {
+        mainButton.innerText = "Filtering...";
+    }
     
     const [longTerm, mediumTerm, shortTerm, followedArtists] = await Promise.all([
         getTopItems('artists', 'long_term', 300),
@@ -14723,12 +14994,24 @@ function isDirectSortType(sortType) {
     return knownArtistIds;
   }
   
-  async function generateSpotifyRecommendations(vibeType) {
+  async function generateSpotifyRecommendations(vibeType, options = {}) {
+    const { isHeadless = false } = options;
     let playlistName = "";
     let playlistDescription = "";
 
+    if (!isHeadless) {
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        toggleMenu();
+        closeAllMenus();
+    }
+
     try {
-        mainButton.innerText = "Get library...";
+        if (!isHeadless) mainButton.innerText = "Get library...";
         const allLikedSongs = await getLikedSongs();
         const completeLikedSongUrisSet = new Set(allLikedSongs.map(song => song.uri));
         
@@ -14754,7 +15037,7 @@ function isDirectSortType(sortType) {
                 throw new Error("Need more listening history to build a discovery profile.");
             }
 
-            mainButton.innerText = "Related...";
+            if (!isHeadless) mainButton.innerText = "Related...";
             let relatedArtistPool = new Map();
             const shuffledTopArtists = shuffleArray(topArtistsForSeeding);
 
@@ -14782,7 +15065,7 @@ function isDirectSortType(sortType) {
             const seed_artists = chosenUnknownArtists.map(a => a.id);
             const seed_tracks = chosenSeedTracks.map(t => t.id);
             
-            mainButton.innerText = "Get recs...";
+            if (!isHeadless) mainButton.innerText = "Get recs...";
             const params = new URLSearchParams({ limit: 100 });
             if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
             if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
@@ -14791,7 +15074,7 @@ function isDirectSortType(sortType) {
             
             if (!recommendations?.tracks?.length) throw new Error("Spotify didn't return any recommendations. Try again!");
             
-            mainButton.innerText = "Excluding...";
+            if (!isHeadless) mainButton.innerText = "Excluding...";
             const availabilityChecks = await Promise.all(recommendations.tracks.map(track => isTrackAvailable(track)));
             let newRecommendedTracks = recommendations.tracks
                 .filter((track, index) => availabilityChecks[index])
@@ -14802,7 +15085,7 @@ function isDirectSortType(sortType) {
             
             const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
             
-            mainButton.innerText = "Creating...";
+            if (!isHeadless) mainButton.innerText = "Creating...";
             const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
             
             if (wasUpdated) {
@@ -14832,7 +15115,7 @@ function isDirectSortType(sortType) {
             contrast_time_range = 'short_term';
         }
 
-        mainButton.innerText = "Get top...";
+        if (!isHeadless) mainButton.innerText = "Get top...";
         const [topArtists, topTracks, contrastTopTracks] = await Promise.all([
             getTopItems('artists', time_range, top_pool_size),
             getTopItems('tracks', time_range, top_pool_size),
@@ -14843,7 +15126,7 @@ function isDirectSortType(sortType) {
             throw new Error("Not enough listening history for diverse recommendations.");
         }
         
-        mainButton.innerText = "Profiling...";
+        if (!isHeadless) mainButton.innerText = "Profiling...";
 
         const allGenres = new Set(topArtists.flatMap(a => a.genres));
         const shuffledGenres = shuffleArray(Array.from(allGenres));
@@ -14884,7 +15167,7 @@ function isDirectSortType(sortType) {
         }
         const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
 
-        mainButton.innerText = "Get recs...";
+        if (!isHeadless) mainButton.innerText = "Get recs...";
         const recommendationBatches = [];
         const NUM_CALLS = 6;
         
@@ -14922,7 +15205,7 @@ function isDirectSortType(sortType) {
             throw new Error("Spotify didn't return any recommendations. Try again!");
         }
 
-        mainButton.innerText = "Mixing...";
+        if (!isHeadless) mainButton.innerText = "Mixing...";
         let interleavedTracks = [];
         const maxBatchLength = Math.max(...recommendationBatches.map(batch => batch.length));
         for (let i = 0; i < maxBatchLength; i++) {
@@ -14940,7 +15223,7 @@ function isDirectSortType(sortType) {
             return true;
         });
 
-        mainButton.innerText = "Excluding...";
+        if (!isHeadless) mainButton.innerText = "Excluding...";
         const availabilityChecks = await Promise.all(uniqueMixedTracks.map(track => isTrackAvailable(track)));
         let newRecommendedTracks = uniqueMixedTracks.filter((track, index) => {
             if (!availabilityChecks[index]) return false;
@@ -14958,7 +15241,7 @@ function isDirectSortType(sortType) {
         
         const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
         
-        mainButton.innerText = "Creating...";
+        if (!isHeadless) mainButton.innerText = "Creating...";
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
         
         if (wasUpdated) {
@@ -14974,23 +15257,28 @@ function isDirectSortType(sortType) {
         console.error(`Error in generateSpotifyRecommendations (${vibeType}):`, error);
         Spicetify.showNotification(error.message, true);
     } finally {
-        resetButtons();
+        if (!isHeadless) {
+            resetButtons();
+        }
     }
   }
 
-  async function generateFollowedReleasesChronological() {
+  async function generateFollowedReleasesChronological(options = {}) {
+    const { isHeadless = false } = options;
     const { GraphQL, CosmosAsync } = Spicetify;
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    menuButtons.forEach((button) => (button.disabled = true));
-    toggleMenu();
-    closeAllMenus();
+    if (!isHeadless) {
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        toggleMenu();
+        closeAllMenus();
+    }
 
     try {
-        const updateProgress = (message) => { mainButton.innerText = message; };
+        const updateProgress = isHeadless ? () => {} : (message) => { mainButton.innerText = message; };
 
         updateProgress("Get artists...");
         
@@ -15217,7 +15505,9 @@ function isDirectSortType(sortType) {
         console.error("Error generating Chronological Followed Releases:", error);
         Spicetify.showNotification(error.message, true);
     } finally {
-        resetButtons();
+        if (!isHeadless) {
+            resetButtons();
+        }
     }
   }
 
@@ -15505,18 +15795,21 @@ function isDirectSortType(sortType) {
     }
   }
 
-  async function generateRandomGenrePlaylist() {
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    menuButtons.forEach((button) => (button.disabled = true));
-    toggleMenu();
-    closeAllMenus();
+  async function generateRandomGenrePlaylist(options = {}) {
+    const { isHeadless = false } = options;
+    if (!isHeadless) {
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        toggleMenu();
+        closeAllMenus();
+    }
 
     try {
-        mainButton.innerText = "Finding...";
+        if (!isHeadless) mainButton.innerText = "Finding...";
         if (!genrePlaylistsCache) {
             const response = await fetch(GENRE_PLAYLISTS_URL);
             genrePlaylistsCache = await response.json();
@@ -15558,22 +15851,22 @@ function isDirectSortType(sortType) {
 
         const tracksPerPart = Math.ceil(discoveryPlaylistSize / 3);
 
-        mainButton.innerText = "Fetching...";
+        if (!isHeadless) mainButton.innerText = "Fetching...";
         const directTracks = await getDirectTracksFromGenrePlaylists(playlistsToFetch, tracksPerPart);
 
-        mainButton.innerText = "Discover...";
+        if (!isHeadless) mainButton.innerText = "Discover...";
         const [searchedTracks, recommendedTracks] = await Promise.all([
             discoverTracksViaGenreSearch(selectedGenres, tracksPerPart, directTracks),
             discoverTracksViaMultiSeedRecommendation(playlistsToFetch, tracksPerPart, directTracks)
         ]);
 
-        mainButton.innerText = "Combining...";
+        if (!isHeadless) mainButton.innerText = "Combining...";
         const allTracks = [...directTracks, ...searchedTracks, ...recommendedTracks];
         
         const uniqueFinalTracks = Array.from(new Map(allTracks.map(t => [t.uri, t])).values());
         const finalSizedTracks = shuffleArray(uniqueFinalTracks).slice(0, discoveryPlaylistSize);
 
-        mainButton.innerText = "Sorting...";
+        if (!isHeadless) mainButton.innerText = "Sorting...";
         const { trackGenreMap } = await fetchAllTrackGenres(finalSizedTracks);
         const sortedTracks = interleaveSortByGenre(finalSizedTracks, trackGenreMap);
 
@@ -15587,10 +15880,10 @@ function isDirectSortType(sortType) {
         }
         const playlistDescription = `A playlist exploring a random mix of genres including: ${genreListString}. Created by Sort-Play.`;
 
-        mainButton.innerText = "Creating...";
+        if (!isHeadless) mainButton.innerText = "Creating...";
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('randomGenreExplorer', playlistName, playlistDescription);
 
-        mainButton.innerText = "Saving...";
+        if (!isHeadless) mainButton.innerText = "Saving...";
         if (wasUpdated) {
             await replacePlaylistTracks(newPlaylist.id, trackUris);
         } else {
@@ -15604,7 +15897,9 @@ function isDirectSortType(sortType) {
         console.error("Error in Random Genre Explorer:", error);
         Spicetify.showNotification(error.message, true);
     } finally {
-        resetButtons();
+        if (!isHeadless) {
+            resetButtons();
+        }
     }
   }
 
@@ -16004,7 +16299,9 @@ function isDirectSortType(sortType) {
     });
   }
 
-  async function handleSortAndCreatePlaylist(sortType) {
+  async function handleSortAndCreatePlaylist(sortType, options = {}) {
+    const { isHeadless = false } = options;
+
     if (sortType === "sortByParent" || sortType === "createNewPlaylist") {
       return;
     }
@@ -16020,17 +16317,9 @@ function isDirectSortType(sortType) {
         if (sortType === 'genreTreeExplorer') {
             showGenreTreeExplorerModal();
         } else if (sortType === 'followedReleasesChronological') {
-            await generateFollowedReleasesChronological();
+            await generateFollowedReleasesChronological(options);
         } else { 
-            setButtonProcessing(true);
-            mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-            mainButton.style.color = buttonStyles.main.disabledColor;
-            mainButton.style.cursor = "default";
-            svgElement.style.fill = buttonStyles.main.disabledColor;
-            menuButtons.forEach((button) => (button.disabled = true));
-            toggleMenu();
-            closeAllMenus();
-            await generateSpotifyRecommendations(sortType);
+            await generateSpotifyRecommendations(sortType, options);
         }
         return; 
     }
@@ -16077,22 +16366,24 @@ function isDirectSortType(sortType) {
     }
     
     if (topTrackSortTypes[sortType]) {
-        setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-        toggleMenu();
-        closeAllMenus();
+        if (!isHeadless) {
+            setButtonProcessing(true);
+            mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+            mainButton.style.color = buttonStyles.main.disabledColor;
+            mainButton.style.cursor = "default";
+            svgElement.style.fill = buttonStyles.main.disabledColor;
+            menuButtons.forEach((button) => (button.disabled = true));
+            toggleMenu();
+            closeAllMenus();
+        }
         
         try {
-            mainButton.innerText = "Fetching...";
+            if (!isHeadless) mainButton.innerText = "Fetching...";
             const topTracksData = await getTopItems('tracks', topTrackSortTypes[sortType].time_range, topTracksLimit);
             
             if (!topTracksData || topTracksData.length === 0) {
                 Spicetify.showNotification(`No top tracks found for "${topTrackSortTypes[sortType].name}".`, true);
-                resetButtons();
+                if (!isHeadless) resetButtons();
                 return;
             }
 
@@ -16100,10 +16391,10 @@ function isDirectSortType(sortType) {
             const playlistName = `My Top Tracks: ${topTrackSortTypes[sortType].name}`;
             const playlistDescription = `Your top tracks ${topTrackSortTypes[sortType].description}, created by Sort-Play.`;
             
-            mainButton.innerText = "Creating...";
+            if (!isHeadless) mainButton.innerText = "Creating...";
             const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(sortType, playlistName, playlistDescription);
             
-            mainButton.innerText = "Saving...";
+            if (!isHeadless) mainButton.innerText = "Saving...";
             if (wasUpdated) {
                 await replacePlaylistTracks(newPlaylist.id, trackUris);
             } else {
@@ -16127,26 +16418,30 @@ function isDirectSortType(sortType) {
             console.error("Error creating top tracks playlist:", error);
             Spicetify.showNotification("Failed to create top tracks playlist.", true);
         } finally {
-            resetButtons();
+            if (!isHeadless) {
+                resetButtons();
+            }
         }
         return; 
     }
 
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    menuButtons.forEach((button) => (button.disabled = true));
-    toggleMenu();
-    closeAllMenus();
+    if (!isHeadless) {
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        toggleMenu();
+        closeAllMenus();
+    }
 
     const initialPagePath = Spicetify.Platform.History.location.pathname; 
 
     try {
       const currentUriAtStart = getCurrentUri(); 
       if (!currentUriAtStart) {
-        resetButtons();
+        if (!isHeadless) resetButtons();
         Spicetify.showNotification("Please select a playlist or artist first");
         return;
       }
@@ -16194,7 +16489,7 @@ function isDirectSortType(sortType) {
 
       if (!tracks || tracks.length === 0) {
           Spicetify.showNotification('No tracks found to sort');
-          resetButtons();
+          if (!isHeadless) resetButtons();
           return;
       }
 
@@ -16210,7 +16505,7 @@ function isDirectSortType(sortType) {
                                        currentPlaylistDetails.owner &&
                                        currentPlaylistDetails.owner.id === user.username;
 
-      if (canModifyCurrentPlaylist) {
+      if (canModifyCurrentPlaylist && !isHeadless) {
         const userChoice = await showConfirmationModal({
             title: "Sort Current Playlist?",
             description: `This will replace all tracks in this playlist with the sorted version. Do you want to modify the current playlist, or create a new one instead?`,
@@ -16221,7 +16516,7 @@ function isDirectSortType(sortType) {
 
         if (userChoice === 'cancel') {
             Spicetify.showNotification("Sorting cancelled.");
-            resetButtons();
+            if (!isHeadless) resetButtons();
             return;
         } else if (userChoice === 'neutral') {
             canModifyCurrentPlaylist = false;
@@ -16241,18 +16536,18 @@ function isDirectSortType(sortType) {
       if (sortType === "lastScrobbled") {
           try {
               const result = await handleLastScrobbledSorting(
-                tracks, (progress) => { mainButton.innerText = `${progress}%`; }
+                tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${progress}%`; }
               );
               sortedTracks = result.sortedTracks;
               removedTracks = result.removedTracks;
-              mainButton.innerText = "100%";
+              if (!isHeadless) mainButton.innerText = "100%";
           } catch (error) {
-              resetButtons();
+              if (!isHeadless) resetButtons();
               Spicetify.showNotification(error.message, true);
               return;
           }
       } else {
-        mainButton.innerText = "0%";
+        if (!isHeadless) mainButton.innerText = "0%";
 
         let tracksWithPopularity;
 
@@ -16260,39 +16555,39 @@ function isDirectSortType(sortType) {
           
             let refreshedTracks = tracks;
             if (isArtistPage) {
-                mainButton.innerText = "Correcting...";
+                if (!isHeadless) mainButton.innerText = "Correcting...";
                 refreshedTracks = await refreshTrackAlbumInfo(
-                    tracks, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.15)}%`; }
+                    tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.15)}%`; }
                 );
             }
   
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
-              refreshedTracks, (progress) => { mainButton.innerText = `${15 + Math.floor(progress * 0.30)}%`; }
+              refreshedTracks, (progress) => { if (!isHeadless) mainButton.innerText = `${15 + Math.floor(progress * 0.30)}%`; }
             );
             const tracksWithIds = await processBatchesWithDelay(
-              tracksWithPlayCounts, 50, 500, (progress) => { mainButton.innerText = `${45 + Math.floor(progress * 0.20)}%`; },
+              tracksWithPlayCounts, 50, 500, (progress) => { if (!isHeadless) mainButton.innerText = `${45 + Math.floor(progress * 0.20)}%`; },
               collectTrackIdsForPopularity
             );
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
-              tracksWithIds, (progress) => { mainButton.innerText = `${65 + Math.floor(progress * 0.15)}%`; }
+              tracksWithIds, (progress) => { if (!isHeadless) mainButton.innerText = `${65 + Math.floor(progress * 0.15)}%`; }
             );
         
         } else if (sortType === 'playCount') {
-            mainButton.innerText = "0%";
+            if (!isHeadless) mainButton.innerText = "0%";
             tracksWithPopularity = await enrichTracksWithPlayCounts(
-                tracks, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }
+                tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }
             );
 
         } else if (sortType === 'popularity') {
-            mainButton.innerText = "0%";
+            if (!isHeadless) mainButton.innerText = "0%";
             const tracksWithIds = await processBatchesWithDelay(
               tracks, 50, 500, 
-              (progress) => { mainButton.innerText = `${Math.floor(progress * 0.10)}%`; },
+              (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.10)}%`; },
               collectTrackIdsForPopularity
             );
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
               tracksWithIds, 
-              (progress) => { mainButton.innerText = `${10 + Math.floor(progress * 0.90)}%`; }
+              (progress) => { if (!isHeadless) mainButton.innerText = `${10 + Math.floor(progress * 0.90)}%`; }
             );
 
         } else {
@@ -16320,7 +16615,7 @@ function isDirectSortType(sortType) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
             const tracksWithReleaseDates = await processBatchesWithDelay(
-              tracksWithPopularity, 50, 500, (progress) => { mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }, getTrackDetailsWithReleaseDate
+              tracksWithPopularity, 50, 500, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }, getTrackDetailsWithReleaseDate
             );
             tracksForDeduplication = tracksWithReleaseDates;
           } else if (sortType === "averageColor") {
@@ -16343,7 +16638,7 @@ function isDirectSortType(sortType) {
                       cachedTracks, 50, 500,
                       (progress) => {
                           const overallProgress = (cachedTracks.length / totalColorTracks) * progress;
-                          mainButton.innerText = `${60 + Math.floor(overallProgress * 0.40)}%`;
+                          if (!isHeadless) mainButton.innerText = `${60 + Math.floor(overallProgress * 0.40)}%`;
                       },
                       getTrackDetailsWithPaletteAnalysis
                   );
@@ -16356,7 +16651,7 @@ function isDirectSortType(sortType) {
                       (progress) => {
                           const cachedPortion = (cachedTracks.length / totalColorTracks) * 40;
                           const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress * 0.40;
-                          mainButton.innerText = `${60 + Math.floor(cachedPortion + uncachedPortion)}%`;
+                          if (!isHeadless) mainButton.innerText = `${60 + Math.floor(cachedPortion + uncachedPortion)}%`;
                       },
                       getTrackDetailsWithPaletteAnalysis
                   );
@@ -16431,7 +16726,7 @@ function isDirectSortType(sortType) {
                   });
           } else if (sortType === "shuffle") {
             if (useEnergyWaveShuffle) {
-                mainButton.innerText = "Analyzing...";
+                if (!isHeadless) mainButton.innerText = "Analyzing...";
                 const trackIds = uniqueTracks.map(t => t.trackId);
                 const allStats = await getBatchTrackStats(trackIds);
 
@@ -16454,7 +16749,7 @@ function isDirectSortType(sortType) {
           } else if (sortType === "deduplicateOnly") {
             if (removedTracks.length === 0) {
                 Spicetify.showNotification("No duplicate tracks found.");
-                resetButtons();
+                if (!isHeadless) resetButtons();
                 return;
             }
             const originalOrderMap = new Map();
@@ -16469,10 +16764,10 @@ function isDirectSortType(sortType) {
                 return orderA - orderB;
             });
           }
-          mainButton.innerText = "100%";
+          if (!isHeadless) mainButton.innerText = "100%";
 
         } else if (sortType === "energyWave") {
-            mainButton.innerText = "Analyzing...";
+            if (!isHeadless) mainButton.innerText = "Analyzing...";
             const trackIds = tracksWithPopularity.map(t => t.trackId);
             const allStats = await getBatchTrackStats(trackIds);
 
@@ -16500,13 +16795,13 @@ function isDirectSortType(sortType) {
             } else {
                 sortedTracks = journeySortedTracks;
             }
-            mainButton.innerText = "100%";
+            if (!isHeadless) mainButton.innerText = "100%";
 
         } else if (['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
             const trackIds = tracksWithPopularity.map(t => t.trackId);
             const allStats = await getBatchTrackStats(trackIds, (progress) => {
                 const overallProgress = 60 + Math.floor(progress * 0.40);
-                mainButton.innerText = `${overallProgress}%`;
+                if (!isHeadless) mainButton.innerText = `${overallProgress}%`;
             });
 
             const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
@@ -16539,7 +16834,7 @@ function isDirectSortType(sortType) {
                 const tracksWithScrobbles = await handleScrobblesSorting(
                   tracksWithPopularity,
                   sortType,
-                  (progress) => { mainButton.innerText = `${80 + Math.floor(progress * 0.20)}%`; }
+                  (progress) => { if (!isHeadless) mainButton.innerText = `${80 + Math.floor(progress * 0.20)}%`; }
                 );
 
                 const deduplicationResult = deduplicateTracks(tracksWithScrobbles, sortType === "deduplicateOnly", isArtistPage);
@@ -16556,23 +16851,23 @@ function isDirectSortType(sortType) {
                         .filter((track) => track.scrobbles !== null)
                         .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles);
                 }
-                mainButton.innerText = "100%";
+                if (!isHeadless) mainButton.innerText = "100%";
 
               } catch (error) {
-                resetButtons();
+                if (!isHeadless) resetButtons();
                 Spicetify.showNotification(error.message);
                 return;
               }
         } else if (sortType === "lastScrobbled") { 
             try {
                 const result = await handleLastScrobbledSorting(
-                    tracks, (progress) => { mainButton.innerText = `${progress}%`; }
+                    tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${progress}%`; }
                 );
                 sortedTracks = result.sortedTracks;
                 removedTracks = result.removedTracks;
-                mainButton.innerText = "100%";
+                if (!isHeadless) mainButton.innerText = "100%";
             } catch (error) {
-                resetButtons();
+                if (!isHeadless) resetButtons();
                 Spicetify.showNotification(error.message, true);
                 return;
             }
@@ -16585,7 +16880,7 @@ function isDirectSortType(sortType) {
             if (!addToQueueEnabled) {
                 Spicetify.showNotification("No tracks to process for playlist.");
             }
-            resetButtons();
+            if (!isHeadless) resetButtons();
             return;
         }
         
@@ -16650,7 +16945,7 @@ function isDirectSortType(sortType) {
                     }
                 }
 
-                mainButton.innerText = "Saving...";
+                if (!isHeadless) mainButton.innerText = "Saving...";
                 const trackUris = sortedTracks.map((track) => track.uri);
                 await replacePlaylistTracks(playlistIdToModify, trackUris);
                 
@@ -16686,7 +16981,7 @@ function isDirectSortType(sortType) {
                 playlistDescription = playlistDescription.substring(0, 296) + "...";
               }
 
-              mainButton.innerText = "Creating...";
+              if (!isHeadless) mainButton.innerText = "Creating...";
 
               let playlistName = finalSourceName;
               if (changeTitleOnCreate) {
@@ -16700,7 +16995,7 @@ function isDirectSortType(sortType) {
               playlistUriForQueue = newPlaylist.uri;
               newPlaylistObjectForNavigation = newPlaylist; 
               playlistWasModifiedOrCreated = true;
-              mainButton.innerText = "Saving...";
+              if (!isHeadless) mainButton.innerText = "Saving...";
               if (isArtistPage) {
                 try {
                   const artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
@@ -16790,7 +17085,9 @@ function isDirectSortType(sortType) {
       console.error("Error during sorting process:", error);
       Spicetify.showNotification(`An error occurred during the sorting process: ${error.message}`);
     } finally {
-      resetButtons();
+      if (!isHeadless) {
+        resetButtons();
+      }
     }
   }
 
@@ -19080,19 +19377,19 @@ function isDirectSortType(sortType) {
     function mountLikeButton() {
         const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
         if (!nowPlayingWidget) return;
-
+    
         const entryPoint = nowPlayingWidget.querySelector("[data-encore-id='buttonTertiary']");
         if (!entryPoint) {
             setTimeout(mountLikeButton, 100);
             return;
         }
-
+    
         let container = nowPlayingWidget.querySelector(".likeControl-wrapper");
         if (!container) {
             container = document.createElement("div");
             container.className = "likeControl-wrapper";
             try {
-                entryPoint.parentNode.parentNode.insertBefore(container, entryPoint.nextSibling);
+                entryPoint.parentNode.insertBefore(container, entryPoint.nextSibling);
             } catch (error) {
                 console.error("[Sort-Play Like Button] Failed to insert like button wrapper", error);
                 return;
