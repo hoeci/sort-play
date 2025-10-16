@@ -3023,6 +3023,7 @@
         const modalContainer = document.createElement("div");
         modalContainer.className = "main-embedWidgetGenerator-container";
         modalContainer.style.zIndex = "2005";
+        modalContainer.style.width = "500px";
         
         const scheduleToShortTextMap = {
             'release-every-two-weeks': 'Every 2 Weeks (Fri)',
