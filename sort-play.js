@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.18.2";
+  const SORT_PLAY_VERSION = "5.18.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -19171,12 +19171,28 @@ function isDirectSortType(sortType) {
     var likeButton_likedTracksChangeEvent = new CustomEvent('likeButton_likedTracksChange');
 
     async function likeButton_initiateLikedSongs() {
-        if (!Spicetify.CosmosAsync) {
+        if (!Spicetify.Platform?.LibraryAPI?.getTracks) {
             setTimeout(likeButton_initiateLikedSongs, 100);
             return;
         }
-        let likedTracksItems = await Spicetify.CosmosAsync.get("sp://core-collection/unstable/@/list/tracks/all?responseFormat=protobufJson");
-        let likedTracksIds = likedTracksItems.item.map(item => item.trackMetadata.link.replace("spotify:track:", ""));
+
+        let likedTracksData;
+        try {
+            likedTracksData = await Spicetify.Platform.LibraryAPI.getTracks({
+                limit: Number.MAX_SAFE_INTEGER,
+            });
+        } catch (error) {
+            console.error("[Sort-Play Like Button] Error fetching liked songs via LibraryAPI:", error);
+            setTimeout(likeButton_initiateLikedSongs, 30000);
+            return;
+        }
+
+        if (!likedTracksData || !likedTracksData.items || likedTracksData.items.length === 0) {
+            setTimeout(likeButton_initiateLikedSongs, 5000);
+            return;
+        }
+
+        let likedTracksIds = likedTracksData.items.map(item => item.uri.replace("spotify:track:", ""));
 
         let newLikedTracksIdsISRCs = new Map();
         let likedTracksIdsWithUnknownISRCs = [];
@@ -19195,12 +19211,16 @@ function isDirectSortType(sortType) {
             let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
             promises.push(
                 Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`).then(response => {
-                    response.tracks.forEach(track => {
-                        if (track && track.external_ids && track.external_ids.isrc) {
-                            newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
-                            localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
-                        }
-                    });
+                    if (response && response.tracks) {
+                        response.tracks.forEach(track => {
+                            if (track && track.external_ids && track.external_ids.isrc) {
+                                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+                                localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
+                            }
+                        });
+                    }
+                }).catch(error => {
+                    console.error("[Sort-Play Like Button] Error fetching track details for ISRC:", error);
                 })
             );
         }
