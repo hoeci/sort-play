@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.18.0";
+  const SORT_PLAY_VERSION = "5.18.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -17431,7 +17431,6 @@ function isDirectSortType(sortType) {
       }
 
       const DURATION_THRESHOLD = 2000; 
-      const DURATION_THRESHOLD_SAME_TITLE = 6000;
       const finalUniqueTracks = [];
       const finalRemovedTracks = [];
 
@@ -17450,6 +17449,16 @@ function isDirectSortType(sortType) {
               .replace(versionRegex, '')
               .replace(/['’ʼ]/g, "'")
               .replace(/[^a-z0-9\s]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+      };
+      
+      const getNormalizedTitle = (rawTitle) => {
+          return rawTitle
+              .trim()
+              .toLowerCase()
+              .replace(/['’ʼ]/g, "'")
+              .replace(/[()\[\],.:-]/g, ' ')
               .replace(/\s+/g, ' ')
               .trim();
       };
@@ -17477,49 +17486,61 @@ function isDirectSortType(sortType) {
                                                 existingUniqueTrack.playCount !== undefined;
 
               const candidateRawTitle = candidateTrack.songTitle || candidateTrack.name || "Unknown Title";
-              const candidateNormalizedTitle = candidateRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
               const candidateDuration = candidateTrack.durationMs;
-              const candidateArtist = candidateTrack.artistName || (candidateTrack.artists && candidateTrack.artists[0]?.name) || "";
+              const candidateArtist = candidateTrack.allArtists || candidateTrack.artistName || "";
 
               const existingRawTitle = existingUniqueTrack.songTitle || existingUniqueTrack.name || "Unknown Title";
-              const existingNormalizedTitle = existingRawTitle.trim().toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, "");
               const existingDuration = existingUniqueTrack.durationMs; 
-              const existingArtist = existingUniqueTrack.artistName || (existingUniqueTrack.artists && existingUniqueTrack.artists[0]?.name) || "";
+              const existingArtist = existingUniqueTrack.allArtists || existingUniqueTrack.artistName || "";
 
               let areDuplicatesByNewRules = false;
+
+              const normalizeAndSplitArtists = (artistStr) => {
+                  const clean = (name) => name.toLowerCase().replace(/[.&]/g, '').replace(/\s+/g, ' ').trim();
+                  return artistStr.split(',').map(a => clean(a.trim()));
+              };
+              
+              const candidateArtistSet = new Set(normalizeAndSplitArtists(candidateArtist));
+              const existingArtistSet = new Set(normalizeAndSplitArtists(existingArtist));
+              
+              const artistsOverlap = candidateArtist && existingArtist && 
+                  ([...candidateArtistSet].some(artist => existingArtistSet.has(artist)));
 
               if (candidateHasValidPlayCount && existingHasValidPlayCount) {
                   if (Number(candidateTrack.playCount) === Number(existingUniqueTrack.playCount)) {
                       
-                      const hasVersionKeyword = versionRegex.test(candidateRawTitle) || versionRegex.test(existingRawTitle);
-                      if (hasVersionKeyword && candidateArtist === existingArtist) {
-                          const cleanCandidateTitle = getCleanTitle(candidateRawTitle);
-                          const cleanExistingTitle = getCleanTitle(existingRawTitle);
-                          if (cleanCandidateTitle === cleanExistingTitle) {
-                              areDuplicatesByNewRules = true;
-                          }
-                      }
-                      
                       if (!areDuplicatesByNewRules && 
                           candidateRawTitle.trim().toLowerCase() === existingRawTitle.trim().toLowerCase() &&
-                          candidateArtist === existingArtist) {
-                          
-                          const durationDiff = Math.abs(candidateDuration - existingDuration);
-                          if (durationDiff <= DURATION_THRESHOLD_SAME_TITLE) {
-                              areDuplicatesByNewRules = true;
+                          artistsOverlap) {
+                          areDuplicatesByNewRules = true;
+                      }
+
+                      if (!areDuplicatesByNewRules && artistsOverlap) {
+                          const hasVersionKeyword = versionRegex.test(candidateRawTitle) || versionRegex.test(existingRawTitle);
+                          if (hasVersionKeyword) {
+                              const cleanCandidateTitle = getCleanTitle(candidateRawTitle);
+                              const cleanExistingTitle = getCleanTitle(existingRawTitle);
+                              if (cleanCandidateTitle === cleanExistingTitle) {
+                                  areDuplicatesByNewRules = true;
+                              }
                           }
                       }
 
-                      if (!areDuplicatesByNewRules) {
+                      if (!areDuplicatesByNewRules && artistsOverlap) {
                           const durationDiff = Math.abs(candidateDuration - existingDuration);
                           if (durationDiff <= DURATION_THRESHOLD) {
                               areDuplicatesByNewRules = true;
                           }
                       }
                   }
-              } else if (!candidateHasValidPlayCount && !existingHasValidPlayCount) {
-                  if (candidateNormalizedTitle === existingNormalizedTitle && candidateDuration === existingDuration) {
-                      areDuplicatesByNewRules = true;
+              } else {
+                  const normalizedCandidateTitle = getNormalizedTitle(candidateRawTitle);
+                  const normalizedExistingTitle = getNormalizedTitle(existingRawTitle);
+
+                  if (normalizedCandidateTitle === normalizedExistingTitle && artistsOverlap) {
+                      if (candidateDuration === existingDuration) {
+                          areDuplicatesByNewRules = true;
+                      }
                   }
               }
 
