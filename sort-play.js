@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.18.1";
+  const SORT_PLAY_VERSION = "5.18.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -14359,79 +14359,102 @@ function isDirectSortType(sortType) {
   }
 
   async function replacePlaylistTracks(playlistId, trackUris) {
-    const BATCH_SIZE = 100;
-    const validUris = trackUris.filter(uri => typeof uri === 'string' && uri.startsWith("spotify:track:"));
-    
-    const firstBatch = validUris.slice(0, BATCH_SIZE);
-    try {
-        await Spicetify.CosmosAsync.put(
-            `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-            { uris: firstBatch }
-        );
-    } catch (error) {
-        console.error(`Error replacing tracks in playlist ${playlistId} (first batch):`, error);
-        throw error;
-    }
+    (async (maxRetries = 10, initialDelay = 2000) => {
+        const BATCH_SIZE = 100;
+        const validUris = trackUris.filter(uri => typeof uri === 'string' && uri.startsWith("spotify:track:"));
+        
+        const firstBatch = validUris.slice(0, BATCH_SIZE);
+        const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+        
+        let retries = 0;
+        let currentDelay = initialDelay;
+        let success = false;
 
-    if (validUris.length > BATCH_SIZE) {
-        const remainingUris = validUris.slice(BATCH_SIZE);
-        await addTracksToPlaylist(playlistId, remainingUris);
-    }
+        while (retries <= maxRetries && !success) {
+            try {
+                await Spicetify.CosmosAsync.put(playlistUrl, { uris: firstBatch });
+                success = true;
+            } catch (error) {
+                console.error(
+                    `[Sort-Play] Error replacing tracks in playlist ${playlistId} (Attempt ${retries + 1}):`,
+                    error
+                );
+                retries++;
+                if (retries <= maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, currentDelay));
+                    currentDelay *= 2;
+                } else {
+                    console.error(
+                        `[Sort-Play] Failed to replace tracks in playlist ${playlistId} after ${maxRetries + 1} attempts. Aborting operation for this playlist.`
+                    );
+                    return;
+                }
+            }
+        }
+
+        if (success && validUris.length > BATCH_SIZE) {
+            const remainingUris = validUris.slice(BATCH_SIZE);
+            addTracksToPlaylist(playlistId, remainingUris);
+        }
+    })(); 
   }
 
-  async function addTracksToPlaylist(playlistId, trackUris, maxRetries = 5, initialDelay = 1000) {
-    const BATCH_SIZE = 100;
-    const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-    const validAndUniqueUris = [
-      ...new Set(
-        trackUris.filter(
-          (uri) =>
-            typeof uri === "string" &&
-            uri.startsWith("spotify:track:") &&
-            uri.length > "spotify:track:".length
-        )
-      ),
-    ];
+  async function addTracksToPlaylist(playlistId, trackUris) {
+    (async (maxRetries = 10, initialDelay = 2000) => {
+        const BATCH_SIZE = 100;
+        const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+        const validAndUniqueUris = [
+          ...new Set(
+            trackUris.filter(
+              (uri) =>
+                typeof uri === "string" &&
+                uri.startsWith("spotify:track:") &&
+                uri.length > "spotify:track:".length
+            )
+          ),
+        ];
 
-    if (validAndUniqueUris.length < trackUris.length) {
-      console.warn(
-        "Some track URIs were invalid or duplicates and have been removed."
-      );
-    }
-
-    for (let i = 0; i < validAndUniqueUris.length; i += BATCH_SIZE) {
-      const batch = validAndUniqueUris.slice(i, i + BATCH_SIZE);
-      let retries = 0;
-      let currentDelay = initialDelay;
-
-      while (retries <= maxRetries) {
-        try {
-          await Spicetify.CosmosAsync.post(playlistUrl, {
-            uris: batch,
-          });
-          break; 
-        } catch (error) {
-          console.error(
-            `Error adding batch ${
-              i / BATCH_SIZE + 1
-            } to playlist (Attempt ${retries + 1}):`,
-            error
+        if (validAndUniqueUris.length < trackUris.length) {
+          console.warn(
+            "[Sort-Play] Some track URIs were invalid or duplicates and have been removed."
           );
-          if (retries === maxRetries) {
-            throw new Error(
-              `Failed to add batch ${
-                i / BATCH_SIZE + 1
-              } after ${maxRetries} retries.`,
-              error
-            );
-          }
-
-          retries++;
-          await new Promise((resolve) => setTimeout(resolve, currentDelay));
-          currentDelay *= 2;  
         }
-      }
-    }
+
+        for (let i = 0; i < validAndUniqueUris.length; i += BATCH_SIZE) {
+          const batch = validAndUniqueUris.slice(i, i + BATCH_SIZE);
+          let retries = 0;
+          let currentDelay = initialDelay;
+
+          while (retries <= maxRetries) {
+            try {
+              await Spicetify.CosmosAsync.post(playlistUrl, {
+                uris: batch,
+              });
+              break; 
+            } catch (error) {
+              console.error(
+                `[Sort-Play] Error adding batch ${
+                  i / BATCH_SIZE + 1
+                } to playlist (Attempt ${retries + 1}):`,
+                error
+              );
+              
+              if (retries === maxRetries) {
+                console.error(
+                  `[Sort-Play] Failed to add batch ${
+                    i / BATCH_SIZE + 1
+                  } after ${maxRetries + 1} attempts. Giving up on this batch.`
+                );
+                break;
+              }
+
+              retries++;
+              await new Promise((resolve) => setTimeout(resolve, currentDelay));
+              currentDelay *= 2;
+            }
+          }
+        }
+    })();
   }
 
   async function setPlaylistVisibility(playlist, visibleForAll) {
