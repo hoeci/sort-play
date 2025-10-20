@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.18.3";
+  const SORT_PLAY_VERSION = "5.19.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -55,6 +55,18 @@
   let useEnergyWaveShuffle = false;
   let showLikeButton = false;
   let likeButton_connectObserver = () => {};
+  let showNowPlayingData = false;
+  let selectedNowPlayingDataType = 'releaseDate';
+  let selectedNowPlayingDataPosition = '.main-trackInfo-name';
+  let selectedNowPlayingDateFormat = 'YYYY';
+  let selectedNowPlayingPlayCountFormat = 'raw';
+  let selectedNowPlayingTempoFormat = 'with_unit';
+  let selectedNowPlayingEnergyFormat = 'percentage';
+  let selectedNowPlayingDanceabilityFormat = 'percentage';
+  let selectedNowPlayingValenceFormat = 'percentage';
+  let selectedNowPlayingKeyFormat = 'standard';
+  let selectedNowPlayingPopularityFormat = 'raw';
+  let selectedNowPlayingSeparator = '•';
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
@@ -85,6 +97,18 @@
   const STORAGE_KEY_USER_ADDED_GENRES = "sort-play-user-added-genres";
   const STORAGE_KEY_RANDOM_GENRE_HISTORY = "sort-play-random-genre-history";
   const STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE = "sort-play-use-energy-wave-shuffle";
+  const STORAGE_KEY_SHOW_NOW_PLAYING_DATA = "sort-play-show-now-playing-data";
+  const STORAGE_KEY_NOW_PLAYING_DATA_TYPE = "sort-play-now-playing-data-type";
+  const STORAGE_KEY_NOW_PLAYING_DATA_POSITION = "sort-play-now-playing-data-position";
+  const STORAGE_KEY_NOW_PLAYING_DATA_FORMAT = "sort-play-now-playing-data-format";
+  const STORAGE_KEY_NOW_PLAYING_PLAY_COUNT_FORMAT = "sort-play-now-playing-play-count-format";
+  const STORAGE_KEY_NOW_PLAYING_TEMPO_FORMAT = "sort-play-now-playing-tempo-format";
+  const STORAGE_KEY_NOW_PLAYING_ENERGY_FORMAT = "sort-play-now-playing-energy-format";
+  const STORAGE_KEY_NOW_PLAYING_DANCEABILITY_FORMAT = "sort-play-now-playing-danceability-format";
+  const STORAGE_KEY_NOW_PLAYING_VALENCE_FORMAT = "sort-play-now-playing-valence-format";
+  const STORAGE_KEY_NOW_PLAYING_KEY_FORMAT = "sort-play-now-playing-key-format";
+  const STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT = "sort-play-now-playing-popularity-format";
+  const STORAGE_KEY_NOW_PLAYING_SEPARATOR = "sort-play-now-playing-separator";
   const AI_DATA_CACHE_MAX_ITEMS = 1500;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
@@ -452,7 +476,19 @@
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
     showLikeButton = localStorage.getItem("sort-play-show-like-button") === "true";
     useEnergyWaveShuffle = localStorage.getItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE) === "true";
-  
+    showNowPlayingData = localStorage.getItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA) === "true";
+    selectedNowPlayingDataType = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DATA_TYPE) || 'releaseDate';
+    selectedNowPlayingDataPosition = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DATA_POSITION) || '.main-trackInfo-name';
+    selectedNowPlayingDateFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DATA_FORMAT) || 'YYYY';
+    selectedNowPlayingPlayCountFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_PLAY_COUNT_FORMAT) || 'raw';
+    selectedNowPlayingTempoFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_TEMPO_FORMAT) || 'with_unit';
+    selectedNowPlayingEnergyFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_ENERGY_FORMAT) || 'percentage';
+    selectedNowPlayingDanceabilityFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DANCEABILITY_FORMAT) || 'percentage';
+    selectedNowPlayingValenceFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_VALENCE_FORMAT) || 'percentage';
+    selectedNowPlayingKeyFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_KEY_FORMAT) || 'standard';
+    selectedNowPlayingPopularityFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT) || 'raw';
+    selectedNowPlayingSeparator = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR) || '•';
+
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
         if (storedValue !== null) {
@@ -498,6 +534,18 @@
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
     localStorage.setItem("sort-play-show-like-button", showLikeButton);
     localStorage.setItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE, useEnergyWaveShuffle);
+    localStorage.setItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA, showNowPlayingData);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_DATA_TYPE, selectedNowPlayingDataType);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_DATA_POSITION, selectedNowPlayingDataPosition);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_DATA_FORMAT, selectedNowPlayingDateFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_PLAY_COUNT_FORMAT, selectedNowPlayingPlayCountFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_TEMPO_FORMAT, selectedNowPlayingTempoFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_ENERGY_FORMAT, selectedNowPlayingEnergyFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_DANCEABILITY_FORMAT, selectedNowPlayingDanceabilityFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_VALENCE_FORMAT, selectedNowPlayingValenceFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_KEY_FORMAT, selectedNowPlayingKeyFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT, selectedNowPlayingPopularityFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR, selectedNowPlayingSeparator);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -1312,6 +1360,7 @@
     .sort-play-settings select.column-type-select {
         flex-grow: 1;
         margin-right: 10px;
+        width: 120px;
     }
     .sort-play-settings select:disabled {
         opacity: 0.5;
@@ -1331,7 +1380,6 @@
         display: none; position: absolute; background-color: #282828; min-width: 140px;
         box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px;
         padding: 4px 0; left: -55px;
-        max-height: 225px;
         overflow-y: auto;
         scrollbar-width: thin; 
         scrollbar-color: #555 #282828;
@@ -1759,6 +1807,30 @@
         </div>
     </div>
 
+    <div class="setting-row" id="showNowPlayingDataSetting">
+        <label class="col description">
+            Now Playing Extra Data
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">Shows extra data like Release Date or Popularity in the Now Playing bar.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <button id="nowPlayingSettingsBtn" class="column-settings-button" title="Now Playing Data Settings">
+                ${settingsSvg}
+            </button>
+            <select id="nowPlayingDataTypeSelect" class="column-type-select" ${!showNowPlayingData ? 'disabled' : ''}>
+                <option value="releaseDate" ${selectedNowPlayingDataType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                <option value="playCount" ${selectedNowPlayingDataType === 'playCount' ? 'selected' : ''}>Play Count</option>
+                <option value="popularity" ${selectedNowPlayingDataType === 'popularity' ? 'selected' : ''}>Popularity</option>
+            </select>
+            <label class="switch">
+                <input type="checkbox" id="showNowPlayingDataToggle" ${showNowPlayingData ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Playlist Attributes
     </div>
@@ -2039,6 +2111,9 @@
     const secondMyScrobblesDropdownContainer = modalContainer.querySelector("#secondMyScrobblesDropdownContainer");
     const showLikeButtonToggle = modalContainer.querySelector("#showLikeButtonToggle");
     const useEnergyWaveShuffleToggle = modalContainer.querySelector("#useEnergyWaveShuffleToggle");
+    const showNowPlayingDataToggle = modalContainer.querySelector("#showNowPlayingDataToggle");
+    const nowPlayingDataTypeSelect = modalContainer.querySelector("#nowPlayingDataTypeSelect");
+    const nowPlayingSettingsBtn = modalContainer.querySelector("#nowPlayingSettingsBtn");
 
     showLikeButtonToggle.addEventListener("change", () => {
         showLikeButton = showLikeButtonToggle.checked;
@@ -2071,6 +2146,28 @@
             reloadButton.addEventListener('mouseenter', () => reloadButton.style.backgroundColor = '#ffffff1a');
             reloadButton.addEventListener('mouseleave', () => reloadButton.style.backgroundColor = 'transparent');
             actionContainer.insertBefore(reloadButton, toggleLabel);
+        }
+    });
+
+    nowPlayingSettingsBtn.disabled = !showNowPlayingDataToggle.checked;
+
+    showNowPlayingDataToggle.addEventListener("change", () => {
+        showNowPlayingData = showNowPlayingDataToggle.checked;
+        nowPlayingDataTypeSelect.disabled = !showNowPlayingData;
+        nowPlayingSettingsBtn.disabled = !showNowPlayingData;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    nowPlayingDataTypeSelect.addEventListener("change", () => {
+        selectedNowPlayingDataType = nowPlayingDataTypeSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    nowPlayingSettingsBtn.addEventListener("click", () => {
+        if (!nowPlayingSettingsBtn.disabled) {
+            showNowPlayingSettingsModal(true);
         }
     });
 
@@ -2480,6 +2577,13 @@
                 return;
             }
 
+            dropdown.style.top = 'auto';
+            dropdown.style.bottom = 'auto';
+            dropdown.style.marginTop = 'auto';
+            dropdown.style.marginBottom = 'auto';
+            dropdown.style.maxHeight = '';
+            dropdown.style.overflowY = '';
+
             dropdown.style.visibility = 'hidden';
             dropdown.style.display = 'block';
             const dropdownRect = dropdown.getBoundingClientRect();
@@ -2487,28 +2591,35 @@
             dropdown.style.visibility = 'visible';
 
             const buttonRect = button.getBoundingClientRect();
-            const modal = document.querySelector(".main-embedWidgetGenerator-container");
-            const modalRect = modal.getBoundingClientRect();
+            const modal = button.closest(".main-embedWidgetGenerator-container");
+            const scrollContainer = modal.querySelector(".main-trackCreditsModal-mainSection");
+            const scrollContainerRect = scrollContainer.getBoundingClientRect();
 
-            const spaceAbove = buttonRect.top - modalRect.top;
-            const spaceBelow = modalRect.bottom - buttonRect.bottom;
             const dropdownHeight = dropdownRect.height;
             const margin = 9;
+            const boundaryMargin = 20;
 
-            dropdown.style.top = 'auto';
-            dropdown.style.bottom = 'auto';
-            dropdown.style.marginTop = 'auto';
-            dropdown.style.marginBottom = 'auto';
+            const spaceBelow = scrollContainerRect.bottom - buttonRect.bottom;
+            const spaceAbove = buttonRect.top - scrollContainerRect.top;
 
-            if (spaceAbove >= dropdownHeight + margin) {
-                dropdown.style.bottom = '100%';
-                dropdown.style.marginBottom = `${margin}px`;
-            } else if (spaceBelow >= dropdownHeight + margin) {
+            if (spaceBelow >= dropdownHeight + margin + boundaryMargin) {
                 dropdown.style.top = '100%';
                 dropdown.style.marginTop = `${margin}px`;
-            } else {
+            } else if (spaceAbove >= dropdownHeight + margin + boundaryMargin) {
                 dropdown.style.bottom = '100%';
                 dropdown.style.marginBottom = `${margin}px`;
+            } else {
+                if (spaceAbove > spaceBelow) {
+                    dropdown.style.bottom = '100%';
+                    dropdown.style.marginBottom = `${margin}px`;
+                    dropdown.style.maxHeight = `${spaceAbove - margin - boundaryMargin}px`;
+                    dropdown.style.overflowY = 'auto';
+                } else {
+                    dropdown.style.top = '100%';
+                    dropdown.style.marginTop = `${margin}px`;
+                    dropdown.style.maxHeight = `${spaceBelow - margin - boundaryMargin}px`;
+                    dropdown.style.overflowY = 'auto';
+                }
             }
 
             dropdown.style.display = 'block';
@@ -2592,6 +2703,308 @@
 
     document.getElementById("cancelFolderName").addEventListener("click", closeModal);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  }
+
+  function showNowPlayingSettingsModal(fromSettings = false) {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-np-settings-overlay";
+    const overlayBackgroundColor = fromSettings ? 'rgba(0, 0, 0, 0.7)' : 'transparent';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: ${overlayBackgroundColor}; z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 600px !important;
+    `;
+    modalContainer.innerHTML = `
+      <style>
+        .np-settings-layout { display: flex; gap: 16px; }
+        .np-settings-card { flex: 1; background-color: #282828; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+        .np-setting-row { display: flex; flex-direction: column; gap: 8px; }
+        .np-setting-row label { color: #c1c1c1; font-weight: 500; }
+        .np-setting-row select {
+            padding: 6px 12px; border-radius: 4px; border: 1px solid #434343;
+            background: #3e3e3e; color: white; cursor: pointer; font-size: 14px;
+            width: 100%; text-align: left;
+        }
+        #np-dynamic-settings { margin-top: 8px; }
+        #np-release-date-settings, #np-play-count-settings, #np-tempo-settings, #np-energy-settings, #np-danceability-settings, #np-valence-settings, #np-key-settings, #np-popularity-settings { display: none; }
+      </style>
+      <div class="main-trackCreditsModal-header">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Now Playing Data Settings</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px !important;">
+          <div class="np-settings-layout">
+              <div class="np-settings-card">
+                  <div class="np-setting-row">
+                      <label for="npDataType">Data to Display</label>
+                      <select id="npDataType">
+                          <option value="releaseDate" ${selectedNowPlayingDataType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                          <option value="playCount" ${selectedNowPlayingDataType === 'playCount' ? 'selected' : ''}>Play Count</option>
+                          <option value="popularity" ${selectedNowPlayingDataType === 'popularity' ? 'selected' : ''}>Popularity</option>
+                          <option value="tempo" ${selectedNowPlayingDataType === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
+                          <option value="energy" ${selectedNowPlayingDataType === 'energy' ? 'selected' : ''}>Energy</option>
+                          <option value="danceability" ${selectedNowPlayingDataType === 'danceability' ? 'selected' : ''}>Danceability</option>
+                          <option value="valence" ${selectedNowPlayingDataType === 'valence' ? 'selected' : ''}>Valence</option>
+                          <option value="key" ${selectedNowPlayingDataType === 'key' ? 'selected' : ''}>Key</option>
+                      </select>
+                  </div>
+                  <div id="np-dynamic-settings">
+                      <div id="np-release-date-settings">
+                          <div class="np-setting-row">
+                              <label for="npDateFormatSelect">Release Date Style</label>
+                              <select id="npDateFormatSelect">
+                                  <option value="YYYY">YYYY</option>
+                                  <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                  <option value="MM-DD-YYYY">MM-DD-YYYY</option>
+                                  <option value="DD-MM-YYYY">DD-MM-YYYY</option>
+                                  <option value="MMM D, YYYY">Month D, YYYY</option>
+                                  <option value="D MMM, YYYY">D Month, YYYY</option>
+                                  <option value="YYYY, MMM D">YYYY, Month D</option>
+                                  <option value="YYYY-MM">YYYY-MM</option>
+                                  <option value="MM-YYYY">MM-YYYY</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div id="np-play-count-settings">
+                          <div class="np-setting-row">
+                              <label for="npPlayCountFormatSelect">Play Count Style</label>
+                              <select id="npPlayCountFormatSelect">
+                                  <option value="raw">Full (1,234,567)</option>
+                                  <option value="abbreviated">Short (1.2M)</option>
+                                  <option value="rounded_abbreviated">Simple (1M)</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div id="np-popularity-settings">
+                          <div class="np-setting-row">
+                              <label for="npPopularityFormatSelect">Popularity Style</label>
+                              <select id="npPopularityFormatSelect">
+                                  <option value="raw">Raw Number (e.g., 75)</option>
+                                  <option value="with_label">With Label (e.g., Pop: 75)</option>
+                                  <option value="percentage">Percentage (e.g., 75%)</option>
+                                  <option value="tier">Tier (e.g., Popular)</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div id="np-tempo-settings">
+                          <div class="np-setting-row">
+                              <label for="npTempoFormatSelect">Tempo Style</label>
+                              <select id="npTempoFormatSelect">
+                                  <option value="with_unit">With Unit (120 BPM)</option>
+                                  <option value="raw">Raw Number (120)</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div id="np-energy-settings">
+                          <div class="np-setting-row">
+                              <label for="npEnergyFormatSelect">Energy Style</label>
+                              <select id="npEnergyFormatSelect">
+                                  <option value="percentage">Percentage (50%)</option>
+                                  <option value="with_unit">With Unit (50 Energy)</option>
+                                  <option value="raw">Raw (50)</option>
+                                  <option value="decimal">Decimal (0.50)</option>
+                                  <option value="tier">Tier (Medium)</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div id="np-danceability-settings">
+                          <div class="np-setting-row">
+                              <label for="npDanceabilityFormatSelect">Danceability Style</label>
+                              <select id="npDanceabilityFormatSelect">
+                                  <option value="percentage">Percentage (50%)</option>
+                                  <option value="with_unit">With Unit (50 Dance)</option>
+                                  <option value="raw">Raw (50)</option>
+                                  <option value="decimal">Decimal (0.50)</option>
+                                  <option value="tier">Tier (Medium)</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div id="np-valence-settings">
+                          <div class="np-setting-row">
+                              <label for="npValenceFormatSelect">Valence Style</label>
+                              <select id="npValenceFormatSelect">
+                                  <option value="percentage">Percentage (50%)</option>
+                                  <option value="with_unit">With Unit (50 Valence)</option>
+                                  <option value="raw">Raw (50)</option>
+                                  <option value="decimal">Decimal (0.50)</option>
+                                  <option value="tier">Tier (Medium)</option>
+                              </select>
+                          </div>
+                      </div>
+                      <div id="np-key-settings">
+                          <div class="np-setting-row">
+                              <label for="npKeyFormatSelect">Key Style</label>
+                              <select id="npKeyFormatSelect">
+                                  <option value="standard">Standard (e.g., C\u266F/D\u266D)</option>
+                                  <option value="full_name">Full Name (e.g., C\u266F Minor)</option>
+                                  <option value="camelot">Camelot (e.g., 12A)</option>
+                                  <option value="openkey">Open Key (e.g., 5m)</option>
+                              </select>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              <div class="np-settings-card">
+                  <div class="np-setting-row">
+                      <label for="npDataPosition">Display Position</label>
+                      <select id="npDataPosition">
+                          <option value=".main-trackInfo-name" ${selectedNowPlayingDataPosition === '.main-trackInfo-name' ? 'selected' : ''}>Next to Title</option>
+                          <option value=".main-trackInfo-artists" ${selectedNowPlayingDataPosition === '.main-trackInfo-artists' ? 'selected' : ''}>Next to Artist</option>
+                      </select>
+                  </div>
+                  <div style="margin-top: 8px;">
+                      <div class="np-setting-row">
+                          <label for="npSeparatorSelect">Separator Style</label>
+                          <select id="npSeparatorSelect">
+                            <option value="•" ${selectedNowPlayingSeparator === '•' ? 'selected' : ''}>Bullet (•)</option>
+                            <option value="|" ${selectedNowPlayingSeparator === '|' ? 'selected' : ''}>Pipe (|)</option>
+                            <option value="-" ${selectedNowPlayingSeparator === '-' ? 'selected' : ''}>Dash (-)</option>
+                            <option value="–" ${selectedNowPlayingSeparator === '–' ? 'selected' : ''}>En Dash (–)</option>
+                            <option value="—" ${selectedNowPlayingSeparator === '—' ? 'selected' : ''}>Em Dash (—)</option>
+                            <option value="//" ${selectedNowPlayingSeparator === '//' ? 'selected' : ''}>Double Slash (//)</option>
+                            <option value="::" ${selectedNowPlayingSeparator === '::' ? 'selected' : ''}>Double Colon (::)</option>
+                            <option value="◆" ${selectedNowPlayingSeparator === '◆' ? 'selected' : ''}>Diamond (◆)</option>
+                            <option value="★" ${selectedNowPlayingSeparator === '★' ? 'selected' : ''}>Star (★)</option>
+                            <option value="▸" ${selectedNowPlayingSeparator === '▸' ? 'selected' : ''}>Arrow (▸)</option>
+                            <option value=" " ${selectedNowPlayingSeparator === ' ' ? 'selected' : ''}>Space</option>
+                          </select>
+                      </div>
+                  </div>
+              </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
+              <button id="doneNowPlayingSettings" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase;">Done</button>
+          </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    const closeModal = () => overlay.remove();
+
+    const dataTypeSelect = modalContainer.querySelector("#npDataType");
+    const dataPositionSelect = modalContainer.querySelector("#npDataPosition");
+    const doneButton = modalContainer.querySelector("#doneNowPlayingSettings");
+    
+    const releaseDateSettings = modalContainer.querySelector("#np-release-date-settings");
+    const dateFormatSelect = modalContainer.querySelector("#npDateFormatSelect");
+    const playCountSettings = modalContainer.querySelector("#np-play-count-settings");
+    const playCountFormatSelect = modalContainer.querySelector("#npPlayCountFormatSelect");
+    const popularitySettings = modalContainer.querySelector("#np-popularity-settings");
+    const popularityFormatSelect = modalContainer.querySelector("#npPopularityFormatSelect");
+    const tempoSettings = modalContainer.querySelector("#np-tempo-settings");
+    const tempoFormatSelect = modalContainer.querySelector("#npTempoFormatSelect");
+    const energySettings = modalContainer.querySelector("#np-energy-settings");
+    const energyFormatSelect = modalContainer.querySelector("#npEnergyFormatSelect");
+    const danceabilitySettings = modalContainer.querySelector("#np-danceability-settings");
+    const danceabilityFormatSelect = modalContainer.querySelector("#npDanceabilityFormatSelect");
+    const valenceSettings = modalContainer.querySelector("#np-valence-settings");
+    const valenceFormatSelect = modalContainer.querySelector("#npValenceFormatSelect");
+    const keySettings = modalContainer.querySelector("#np-key-settings");
+    const keyFormatSelect = modalContainer.querySelector("#npKeyFormatSelect");
+    const separatorSelect = modalContainer.querySelector("#npSeparatorSelect");
+
+    function updateDynamicSettingsVisibility() {
+        const selectedType = dataTypeSelect.value;
+        releaseDateSettings.style.display = selectedType === 'releaseDate' ? 'block' : 'none';
+        playCountSettings.style.display = selectedType === 'playCount' ? 'block' : 'none';
+        popularitySettings.style.display = selectedType === 'popularity' ? 'block' : 'none';
+        tempoSettings.style.display = selectedType === 'tempo' ? 'block' : 'none';
+        energySettings.style.display = selectedType === 'energy' ? 'block' : 'none';
+        danceabilitySettings.style.display = selectedType === 'danceability' ? 'block' : 'none';
+        valenceSettings.style.display = selectedType === 'valence' ? 'block' : 'none';
+        keySettings.style.display = selectedType === 'key' ? 'block' : 'none';
+    }
+
+    dataTypeSelect.addEventListener("change", () => {
+        selectedNowPlayingDataType = dataTypeSelect.value;
+        const mainSettingsSelect = document.querySelector("#nowPlayingDataTypeSelect");
+        if (mainSettingsSelect) mainSettingsSelect.value = selectedNowPlayingDataType;
+        saveSettings();
+        displayNowPlayingData();
+        updateDynamicSettingsVisibility();
+    });
+
+    dataPositionSelect.addEventListener("change", () => {
+        selectedNowPlayingDataPosition = dataPositionSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    dateFormatSelect.value = selectedNowPlayingDateFormat;
+    dateFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingDateFormat = dateFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    playCountFormatSelect.value = selectedNowPlayingPlayCountFormat;
+    playCountFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingPlayCountFormat = playCountFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    popularityFormatSelect.value = selectedNowPlayingPopularityFormat;
+    popularityFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingPopularityFormat = popularityFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    tempoFormatSelect.value = selectedNowPlayingTempoFormat;
+    tempoFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingTempoFormat = tempoFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    energyFormatSelect.value = selectedNowPlayingEnergyFormat;
+    energyFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingEnergyFormat = energyFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    danceabilityFormatSelect.value = selectedNowPlayingDanceabilityFormat;
+    danceabilityFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingDanceabilityFormat = danceabilityFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    valenceFormatSelect.value = selectedNowPlayingValenceFormat;
+    valenceFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingValenceFormat = valenceFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    keyFormatSelect.value = selectedNowPlayingKeyFormat;
+    keyFormatSelect.addEventListener("change", () => {
+        selectedNowPlayingKeyFormat = keyFormatSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    separatorSelect.value = selectedNowPlayingSeparator;
+    separatorSelect.addEventListener("change", () => {
+        selectedNowPlayingSeparator = separatorSelect.value;
+        saveSettings();
+        displayNowPlayingData();
+    });
+
+    doneButton.addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+    updateDynamicSettingsVisibility();
   }
 
   function showSupportModal() {
@@ -3324,6 +3737,308 @@
     });
   }
   
+  function formatPlayCount(count, format) {
+    if (count === null || count === undefined || isNaN(count) || count === "N/A") {
+        return '_';
+    }
+
+    const num = Number(count);
+
+    if (format === 'abbreviated') {
+        if (num >= 1_000_000_000) {
+            return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+        }
+        if (num >= 1_000_000) {
+            return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+        }
+        if (num >= 1_000) {
+            return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+        }
+        return num.toString();
+    } else if (format === 'rounded_abbreviated') {
+        if (num >= 1_000_000_000) {
+            return Math.round(num / 1_000_000_000) + 'B';
+        }
+        if (num >= 1_000_000) {
+            return Math.round(num / 1_000_000) + 'M';
+        }
+        if (num >= 1_000) {
+            return Math.round(num / 1_000) + 'K';
+        }
+        return num.toString();
+    }
+
+    return new Intl.NumberFormat('en-US').format(num);
+  }
+
+  function formatTempo(value, format) {
+    if (value === null || isNaN(value)) return '_';
+    const rounded = Math.round(value);
+    if (format === 'raw') {
+        return rounded.toString();
+    }
+    return `${rounded} BPM`;
+  }
+
+  function formatAudioFeature(value, format, unitName = '') {
+    if (value === null || isNaN(value)) return '_';
+    
+    const roundedValue = Math.round(value);
+
+    if (format === 'raw') {
+        return roundedValue.toString();
+    } else if (format === 'decimal') {
+        return (value / 100).toFixed(2);
+    } else if (format === 'tier') {
+        if (value <= 20) return 'Very Low';
+        if (value <= 40) return 'Low';
+        if (value <= 60) return 'Medium';
+        if (value <= 80) return 'High';
+        return 'Very High';
+    } else if (format === 'with_unit') {
+        return `${roundedValue} ${unitName}`;
+    }
+    return `${roundedValue}%`;
+  }
+
+  function formatKey(key, mode, format) {
+    if (key === null || key === -1 || isNaN(key) || mode === null || isNaN(mode)) return '_';
+
+    const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+    
+    const camelotMap = [
+        { major: '8B', minor: '5A' }, { major: '3B', minor: '12A' }, { major: '10B', minor: '7A' },
+        { major: '5B', minor: '2A' }, { major: '12B', minor: '9A' }, { major: '7B', minor: '4A' },
+        { major: '2B', minor: '11A' }, { major: '9B', minor: '6A' }, { major: '4B', minor: '1A' },
+        { major: '11B', minor: '8A' }, { major: '6B', minor: '3A' }, { major: '1B', minor: '10A' }
+    ];
+
+    const openKeyMap = [
+        { major: '1d', minor: '10m' }, { major: '8d', minor: '5m' }, { major: '3d', minor: '12m' },
+        { major: '10d', minor: '7m' }, { major: '5d', minor: '2m' }, { major: '12d', minor: '9m' },
+        { major: '7d', minor: '4m' }, { major: '2d', minor: '11m' }, { major: '9d', minor: '6m' },
+        { major: '4d', minor: '1m' }, { major: '11d', minor: '8m' }, { major: '6d', minor: '3m' }
+    ];
+
+    switch (format) {
+        case 'camelot':
+            return mode === 1 ? camelotMap[key].major : camelotMap[key].minor;
+        case 'openkey':
+            return mode === 1 ? openKeyMap[key].major : openKeyMap[key].minor;
+        case 'full_name':
+            return `${pitchClasses[key]} ${mode === 1 ? 'Major' : 'Minor'}`;
+        case 'standard':
+        default:
+            return pitchClasses[key];
+    }
+  }
+
+  function formatPopularity(value, format) {
+    if (value === null || isNaN(value)) return '_';
+    const num = Math.round(value);
+
+    switch (format) {
+        case 'with_label':
+            return `Pop: ${num}`;
+        case 'percentage':
+            return `${num}%`;
+        case 'tier':
+            if (num >= 90) return 'Global Hit';
+            if (num >= 75) return 'Major Hit';
+            if (num >= 55) return 'Popular';
+            if (num >= 30) return 'Niche';
+            return 'Underground';
+        case 'raw':
+        default:
+            return num.toString();
+    }
+  }
+  
+  async function displayNowPlayingData() {
+    const MAX_RETRIES = 10;
+    let retryDelay = 250;
+
+    const existingElement = document.getElementById('sort-play-now-playing-data');
+    if (existingElement) {
+        const parent = existingElement.parentElement;
+        if (parent) {
+            parent.style.display = '';
+            parent.style.alignItems = '';
+        }
+        existingElement.remove();
+    }
+
+    if (!showNowPlayingData) {
+        return;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    for (let i = 0; i < MAX_RETRIES; i++) {
+        const track = Spicetify.Player.data?.item;
+        if (!track?.uri) {
+            return;
+        }
+
+        const targetContainer = document.querySelector(selectedNowPlayingDataPosition);
+        if (!targetContainer) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retryDelay = Math.min(retryDelay * 2, 3000);
+            continue;
+        }
+
+        try {
+            const trackId = track.uri.split(":")[2];
+            let dataValue;
+
+            if (selectedNowPlayingDataType === 'releaseDate') {
+                const releaseDateData = await getTrackDetailsWithReleaseDate({
+                    uri: track.uri,
+                    albumUri: track.album.uri,
+                    name: track.name
+                });
+                dataValue = releaseDateData ? formatReleaseDate(releaseDateData.releaseDate, selectedNowPlayingDateFormat) : '_';
+            } else if (selectedNowPlayingDataType === 'popularity') {
+                const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                const rawPopularity = trackDetails.popularity !== null ? trackDetails.popularity : null;
+                dataValue = formatPopularity(rawPopularity, selectedNowPlayingPopularityFormat);
+            } else if (selectedNowPlayingDataType === 'playCount') {
+                const playCountData = await getTrackDetailsWithPlayCount({
+                    track: {
+                        id: trackId,
+                        album: { id: track.album.uri.split(":")[2] }
+                    },
+                    name: track.name
+                });
+                const rawPlayCount = (playCountData && playCountData.playCount !== "N/A") ? playCountData.playCount : '_';
+                dataValue = formatPlayCount(rawPlayCount, selectedNowPlayingPlayCountFormat);
+            } else {
+                const audioFeatureTypes = ['tempo', 'energy', 'danceability', 'valence', 'key'];
+                if (audioFeatureTypes.includes(selectedNowPlayingDataType)) {
+                    const allStats = await getBatchTrackStats([trackId]);
+                    const stats = allStats[trackId];
+                    let value = stats ? stats[selectedNowPlayingDataType] : null;
+
+                    if (value !== null && value !== "Undefined") {
+                        switch (selectedNowPlayingDataType) {
+                            case 'tempo':
+                                dataValue = formatTempo(value, selectedNowPlayingTempoFormat);
+                                break;
+                            case 'energy':
+                                dataValue = formatAudioFeature(value, selectedNowPlayingEnergyFormat, 'Energy');
+                                break;
+                            case 'danceability':
+                                dataValue = formatAudioFeature(value, selectedNowPlayingDanceabilityFormat, 'Dance');
+                                break;
+                            case 'valence':
+                                dataValue = formatAudioFeature(value, selectedNowPlayingValenceFormat, 'Valence');
+                                break;
+                            case 'key':
+                                dataValue = formatKey(stats.key_raw, stats.mode, selectedNowPlayingKeyFormat);
+                                break;
+                            default:
+                                dataValue = String(value);
+                        }
+                    } else {
+                        dataValue = '_';
+                    }
+                }
+            }
+
+            if (dataValue === '_') return;
+
+            const duplicateCheck = document.getElementById('sort-play-now-playing-data');
+            if (duplicateCheck) {
+                duplicateCheck.remove();
+            }
+
+            let overlayElement = null;
+            let checkAttempts = 0;
+            const maxCheckAttempts = 20;
+            
+            while (checkAttempts < maxCheckAttempts) {
+                overlayElement = targetContainer.querySelector('.main-trackInfo-overlay');
+                
+                if (overlayElement) {
+                    const textElement = overlayElement.querySelector('[data-encore-id="text"]');
+                    const linkElement = overlayElement.querySelector('a');
+                    
+                    if (textElement && linkElement && linkElement.textContent.trim() !== '') {
+                        break;
+                    }
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 50));
+                checkAttempts++;
+            }
+            
+            if (!overlayElement || checkAttempts >= maxCheckAttempts) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+
+            targetContainer.style.display = 'flex';
+            targetContainer.style.alignItems = 'center';
+
+            const dataElement = document.createElement("div");
+            dataElement.id = 'sort-play-now-playing-data';
+            dataElement.style.display = 'flex';
+            dataElement.style.alignItems = 'center';
+            dataElement.dataset.renderedForUri = track.uri;
+            dataElement.dataset.renderedValue = dataValue;
+
+            dataElement.addEventListener('click', (event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                showNowPlayingSettingsModal(false);
+            });
+
+            const separatorElement = document.createElement("p");
+            separatorElement.textContent = selectedNowPlayingSeparator;
+            separatorElement.style.color = "var(--text-subdued)";
+            separatorElement.style.margin = selectedNowPlayingSeparator === ' ' ? "0" : "0 4px";
+
+            const valueElement = document.createElement("p");
+            valueElement.className = 'sort-play-np-value';
+            valueElement.textContent = dataValue;
+            valueElement.style.color = "var(--text-subdued)";
+            valueElement.style.margin = "0";
+
+            const nativeTextElement = targetContainer.querySelector('[data-encore-id="text"]');
+            if (nativeTextElement) {
+                const styles = window.getComputedStyle(nativeTextElement);
+                const fontStyles = {
+                    fontSize: styles.fontSize,
+                    fontWeight: styles.fontWeight,
+                    lineHeight: styles.lineHeight,
+                    letterSpacing: styles.letterSpacing,
+                    textTransform: styles.textTransform,
+                };
+                Object.assign(valueElement.style, fontStyles);
+                Object.assign(separatorElement.style, fontStyles);
+            }
+
+            dataElement.appendChild(separatorElement);
+            dataElement.appendChild(valueElement);
+
+            if (overlayElement.nextSibling) {
+                targetContainer.insertBefore(dataElement, overlayElement.nextSibling);
+            } else {
+                targetContainer.appendChild(dataElement);
+            }
+            
+            return;
+
+        } catch (error) {
+            console.error('[Sort-Play] Error displaying Now Playing data:', error);
+            return;
+        }
+    }
+
+    console.error(`[Sort-Play] Failed to mount Now Playing data after ${MAX_RETRIES} retries.`);
+}
+
   function preventDragCloseModal() {
     let mouseDownInsideModal = false;
     let dragStarted = false;
@@ -11989,6 +12704,12 @@ function isDirectSortType(sortType) {
     div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3) {
         justify-content: center;
     }
+    #sort-play-now-playing-data {
+        cursor: pointer;
+    }
+    #sort-play-now-playing-data:hover .sort-play-np-value {
+        text-decoration: underline;
+    }
   `;
   document.head.appendChild(styleElement);
 
@@ -17912,6 +18633,8 @@ function isDirectSortType(sortType) {
                         results[features.id] = {
                             danceability: features.danceability ? Math.round(100 * features.danceability) : null,
                             energy: features.energy ? Math.round(100 * features.energy) : null,
+                            key_raw: features.key,
+                            mode: features.mode,
                             key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
                             loudness: features.loudness ?? null,
                             speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
@@ -19439,80 +20162,117 @@ function isDirectSortType(sortType) {
         );
     });
 
-    function mountLikeButton() {
-        const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
-        if (!nowPlayingWidget) return;
+    async function mountLikeButton() {
+        const MAX_RETRIES = 10;
+        let retryDelay = 250;
+
+        for (let i = 0; i < MAX_RETRIES; i++) {
+            const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
+            if (!nowPlayingWidget) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
     
-        const entryPoint = nowPlayingWidget.querySelector("[data-encore-id='buttonTertiary']");
-        if (!entryPoint) {
-            setTimeout(mountLikeButton, 100);
-            return;
-        }
-    
-        let container = nowPlayingWidget.querySelector(".likeControl-wrapper");
-        if (!container) {
-            container = document.createElement("div");
-            container.className = "likeControl-wrapper";
-            try {
-                entryPoint.parentNode.insertBefore(container, entryPoint.nextSibling);
-            } catch (error) {
-                console.error("[Sort-Play Like Button] Failed to insert like button wrapper", error);
+            const entryPoint = nowPlayingWidget.querySelector("[data-encore-id='buttonTertiary']");
+            if (!entryPoint || !entryPoint.parentNode) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+
+            let container = nowPlayingWidget.querySelector(".likeControl-wrapper");
+            if (!container) {
+                container = document.createElement("div");
+                container.className = "likeControl-wrapper";
+                try {
+                    entryPoint.parentNode.insertBefore(container, entryPoint.nextSibling);
+                } catch (error) {
+                    console.error("[Sort-Play Like Button] Failed to insert like button wrapper, retrying...", error);
+                    continue;
+                }
+            }
+            
+            const uri = Spicetify.Player.data?.item?.uri || "";
+            if (container.dataset.renderedUri === uri) {
                 return;
             }
+            
+            Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri: uri, key: uri, classList: entryPoint.className }), container);
+            container.dataset.renderedUri = uri;
+    
+            if (container.firstChild) {
+                container.firstChild.style.marginRight = "0px";
+            }
+            
+            return;
         }
-        
-        const uri = Spicetify.Player.data?.item?.uri || "";
-        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri: uri, key: uri, classList: entryPoint.className }), container);
-        
-        if (container.firstChild) {
-            container.firstChild.style.marginRight = "0px";
-        }
+
+        console.error(`[Sort-Play Like Button] Failed to mount like button in Now Playing bar after ${MAX_RETRIES} retries.`);
     }
 
-    function mountLikeButtonNowPlayingView() {
-        const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
-        if (!nowPlayingView) return;
-    
-        let container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
-    
-        if (!container) {
-            const addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1');
-            if (!addToPlaylistButtonWrapper) {
-                setTimeout(mountLikeButtonNowPlayingView, 100);
-                return;
+    async function mountLikeButtonNowPlayingView() {
+        const MAX_RETRIES = 10;
+        let retryDelay = 250;
+
+        for (let i = 0; i < MAX_RETRIES; i++) {
+            const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
+            if (!nowPlayingView) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
             }
     
-            container = document.createElement("div");
-            container.className = "likeControl-wrapper-npv";
-            container.style.display = "contents";
+            const addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1');
+            if (!addToPlaylistButtonWrapper || !addToPlaylistButtonWrapper.parentElement) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+
+            const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button');
+            if (!templateButton) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+
+            let container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
+            if (!container) {
+                container = document.createElement("div");
+                container.className = "likeControl-wrapper-npv";
+                container.style.display = "contents";
+                addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
+            }
     
-            addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
-        }
+            const uri = Spicetify.Player.data?.item?.uri || "";
+            if (container.dataset.renderedUri === uri) {
+                return;
+            }
+
+            const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button svg';
     
-        const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button');
-        if (!templateButton) {
-            setTimeout(mountLikeButtonNowPlayingView, 100);
+            Spicetify.ReactDOM.render(
+                Spicetify.React.createElement(LikeButton, {
+                    uri: uri,
+                    key: uri,
+                    classList: templateButton.className,
+                    size: 21,
+                    dynamicSizeSelector: dynamicSizeSelector
+                }),
+                container
+            );
+            container.dataset.renderedUri = uri;
+    
+            if (container.firstChild) {
+                container.firstChild.style.marginRight = "0px";
+                container.firstChild.style.marginLeft = "12px";
+            }
+            
             return;
         }
-    
-        const uri = Spicetify.Player.data?.item?.uri || "";
-        const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button svg';
-    
-        Spicetify.ReactDOM.render(
-            Spicetify.React.createElement(LikeButton, {
-                uri: uri,
-                key: uri,
-                classList: templateButton.className,
-                size: 21,
-                dynamicSizeSelector: dynamicSizeSelector
-            }),
-            container
-        );
-    
-        if (container.firstChild) {
-            container.firstChild.style.marginRight = "0px";
-            container.firstChild.style.marginLeft = "12px";
-        }
+
+        console.error(`[Sort-Play Like Button] Failed to mount like button in Now Playing View after ${MAX_RETRIES} retries.`);
     }
     
     (async function initialize() {
@@ -19522,8 +20282,8 @@ function isDirectSortType(sortType) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
     
-        mountLikeButton();
-        mountLikeButtonNowPlayingView();
+        await mountLikeButton();
+        await mountLikeButtonNowPlayingView();
     
         Spicetify.Player.addEventListener("songchange", () => {
             mountLikeButton();
@@ -19695,6 +20455,8 @@ function isDirectSortType(sortType) {
   }
   
   startScheduler();
+  Spicetify.Player.addEventListener("songchange", displayNowPlayingData);
+  displayNowPlayingData();
   console.log(`Sort-Play loaded`);
   onPageChange();
   }
