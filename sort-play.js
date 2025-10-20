@@ -3997,13 +3997,14 @@
             const separatorElement = document.createElement("p");
             separatorElement.textContent = selectedNowPlayingSeparator;
             separatorElement.style.color = "var(--text-subdued)";
-            separatorElement.style.margin = selectedNowPlayingSeparator === ' ' ? "0" : "0 4px";
+            separatorElement.style.margin = selectedNowPlayingSeparator === ' ' ? "0" : "0 0 0 1px";
 
             const valueElement = document.createElement("p");
             valueElement.className = 'sort-play-np-value';
             valueElement.textContent = dataValue;
             valueElement.style.color = "var(--text-subdued)";
             valueElement.style.margin = "0";
+            valueElement.style.marginLeft = "6px";
 
             const nativeTextElement = targetContainer.querySelector('[data-encore-id="text"]');
             if (nativeTextElement) {
