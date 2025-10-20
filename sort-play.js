@@ -9244,7 +9244,7 @@ function isDirectSortType(sortType) {
             if (item.children) {
                 return item.children.flatMap(child => {
                     if (child.children) {
-                        return child.children;
+                        return child.children.filter(c => c && c.sortType);
                     }
                     return child.sortType ? child : [];
                 });
@@ -9253,10 +9253,10 @@ function isDirectSortType(sortType) {
                 return item;
             }
             return [];
-        }).filter(item => item && item.sortType);
-
+        }).filter(item => item && item.sortType && item.text);
+        
         const sortTypeInfo = allSortableItems.find(i => i.sortType === job.sortType);
-        const sortTypeText = sortTypeInfo?.text ?? job.sortType.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        const sortTypeText = sortTypeInfo?.text || job.sortType.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
         const playlistName = job.targetPlaylistName || (job.sources.length > 1 ? "Combined Dynamic Playlist" : `${job.sources[0].name} (Dynamic)`);
         const sourceNames = job.sources.length > 1 ? "multiple sources" : (job.sources[0]?.name || "Unknown Source");
@@ -9311,7 +9311,7 @@ function isDirectSortType(sortType) {
                     if (item.children) {
                         return item.children.flatMap(child => {
                             if (child.children) {
-                                return child.children;
+                                return child.children.filter(c => c && c.sortType);
                             }
                             return child.sortType ? child : [];
                         });
@@ -9320,7 +9320,7 @@ function isDirectSortType(sortType) {
                         return item;
                     }
                     return [];
-                }).filter(item => item && item.sortType);
+                }).filter(item => item && item.sortType && item.text);
 
                 const sortTypeMap = allSortableItems.reduce((acc, item) => {
                     acc[item.sortType] = item.text;
