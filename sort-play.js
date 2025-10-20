@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.3";
+  const SORT_PLAY_VERSION = "5.19.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -20119,15 +20119,56 @@ function isDirectSortType(sortType) {
         const [isTooltipVisible, setIsTooltipVisible] = Spicetify.React.useState(false);
         const tooltipTimeoutRef = Spicetify.React.useRef(null);
         const tooltipRef = Spicetify.React.useRef(null);
+        const tooltipCheckIntervalRef = Spicetify.React.useRef(null);
     
         const tooltipContent = isLiked ? "Remove from Liked Songs" : hasISRCLiked ? "You've already liked another version." : "Add to Liked Songs";
 
         Spicetify.React.useEffect(() => {
             return () => {
                 clearTimeout(tooltipTimeoutRef.current);
+                clearInterval(tooltipCheckIntervalRef.current);
+                const tooltipNode = tooltipRef.current;
+                if (tooltipNode && tooltipNode.parentNode) {
+                    tooltipNode.parentNode.removeChild(tooltipNode);
+                }
             };
         }, []);
 
+        Spicetify.React.useEffect(() => {
+            if (isTooltipVisible) {
+                if (buttonRef.current && tooltipRef.current) {
+                    const buttonRect = buttonRef.current.getBoundingClientRect();
+                    const tooltip = tooltipRef.current;
+                    const tooltipRect = tooltip.getBoundingClientRect();
+                    const viewportWidth = window.innerWidth;
+                    const margin = 8;
+
+                    tooltip.style.top = `${buttonRect.top - tooltipRect.height - 8}px`;
+                    let idealLeft = buttonRect.left + (buttonRect.width / 2) - (tooltipRect.width / 2);
+                    
+                    if (idealLeft < margin) idealLeft = margin;
+                    else if (idealLeft + tooltipRect.width > viewportWidth - margin) idealLeft = viewportWidth - tooltipRect.width - margin;
+
+                    tooltip.style.left = `${idealLeft}px`;
+                    
+                    const timeoutId = setTimeout(() => tooltip.classList.add('visible'), 10);
+                    
+                    tooltipCheckIntervalRef.current = setInterval(() => {
+                        if (!buttonRef.current || !document.body.contains(buttonRef.current)) {
+                            setIsTooltipVisible(false);
+                        }
+                    }, 150);
+
+                    return () => clearTimeout(timeoutId);
+                }
+            } else {
+                clearInterval(tooltipCheckIntervalRef.current);
+                if (tooltipRef.current) {
+                    tooltipRef.current.classList.remove('visible');
+                }
+            }
+        }, [isTooltipVisible]);
+    
         Spicetify.React.useEffect(() => {
             if (!dynamicSizeSelector) return;
 
@@ -20154,36 +20195,6 @@ function isDirectSortType(sortType) {
         }, [dynamicSizeSelector]);
 
 
-        Spicetify.React.useEffect(() => {
-            if (isTooltipVisible && buttonRef.current && tooltipRef.current) {
-                const buttonRect = buttonRef.current.getBoundingClientRect();
-                const tooltip = tooltipRef.current;
-                const tooltipRect = tooltip.getBoundingClientRect();
-                const viewportWidth = window.innerWidth;
-                const margin = 8;
-
-                tooltip.style.top = `${buttonRect.top - tooltipRect.height - 8}px`;
-
-                let idealLeft = buttonRect.left + (buttonRect.width / 2) - (tooltipRect.width / 2);
-                
-                if (idealLeft < margin) {
-                    idealLeft = margin;
-                } else if (idealLeft + tooltipRect.width > viewportWidth - margin) {
-                    idealLeft = viewportWidth - tooltipRect.width - margin;
-                }
-
-                tooltip.style.left = `${idealLeft}px`;
-
-                const timeoutId = setTimeout(() => {
-                    tooltip.classList.add('visible');
-                }, 10);
-
-                return () => clearTimeout(timeoutId);
-            } else if (tooltipRef.current) {
-                tooltipRef.current.classList.remove('visible');
-            }
-        }, [isTooltipVisible]);
-    
         Spicetify.React.useEffect(() => {
             async function initISRC() {
                 try {
