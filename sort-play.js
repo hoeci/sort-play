@@ -4107,6 +4107,7 @@
             dataElement.id = 'sort-play-now-playing-data';
             dataElement.style.display = 'flex';
             dataElement.style.alignItems = 'center';
+            dataElement.style.flexShrink = '0';
             dataElement.dataset.renderedForUri = track.uri;
             dataElement.dataset.renderedValue = dataValue;
 
