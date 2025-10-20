@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.2";
+  const SORT_PLAY_VERSION = "5.19.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -4108,6 +4108,7 @@
             dataElement.style.display = 'flex';
             dataElement.style.alignItems = 'center';
             dataElement.style.flexShrink = '0';
+            dataElement.style.whiteSpace = 'nowrap';
             dataElement.dataset.renderedForUri = track.uri;
             dataElement.dataset.renderedValue = dataValue;
 
@@ -9240,9 +9241,6 @@ function isDirectSortType(sortType) {
 
     if (isInitialRun) {
         const allSortableItems = buttonStyles.menuItems.flatMap(item => {
-            if (item.sortType && item.text) {
-                return item;
-            }
             if (item.children) {
                 return item.children.flatMap(child => {
                     if (child.children) {
@@ -9251,13 +9249,18 @@ function isDirectSortType(sortType) {
                     return child.sortType ? child : [];
                 });
             }
+            if (item.sortType && item.text) {
+                return item;
+            }
             return [];
         }).filter(item => item && item.sortType);
-        
+
         const sortTypeInfo = allSortableItems.find(i => i.sortType === job.sortType);
+        const sortTypeText = sortTypeInfo?.text ?? job.sortType.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+
         const playlistName = job.targetPlaylistName || (job.sources.length > 1 ? "Combined Dynamic Playlist" : `${job.sources[0].name} (Dynamic)`);
         const sourceNames = job.sources.length > 1 ? "multiple sources" : (job.sources[0]?.name || "Unknown Source");
-        const playlistDescription = `Dynamically sorted by ${sortTypeInfo.text}. Source${job.sources.length > 1 ? 's' : ''}: ${sourceNames}. Managed by Sort-Play.`;
+        const playlistDescription = `Dynamically sorted by ${sortTypeText}. Source${job.sources.length > 1 ? 's' : ''}: ${sourceNames}. Managed by Sort-Play.`;
         
         const newPlaylist = await createPlaylist(playlistName, playlistDescription);
         job.targetPlaylistUri = newPlaylist.uri;
@@ -9304,8 +9307,23 @@ function isDirectSortType(sortType) {
             const currentDescription = currentPlaylistData.description;
 
             if (currentDescription && currentDescription.includes("Managed by Sort-Play.")) {
-                const sortTypeMap = buttonStyles.menuItems.flatMap(i => i.children || i).reduce((acc, item) => {
-                    if (item.sortType) acc[item.sortType] = item.text;
+                const allSortableItems = buttonStyles.menuItems.flatMap(item => {
+                    if (item.children) {
+                        return item.children.flatMap(child => {
+                            if (child.children) {
+                                return child.children;
+                            }
+                            return child.sortType ? child : [];
+                        });
+                    }
+                    if (item.sortType && item.text) {
+                        return item;
+                    }
+                    return [];
+                }).filter(item => item && item.sortType);
+
+                const sortTypeMap = allSortableItems.reduce((acc, item) => {
+                    acc[item.sortType] = item.text;
                     return acc;
                 }, {});
 
