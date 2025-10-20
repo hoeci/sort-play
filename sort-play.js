@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.1";
+  const SORT_PLAY_VERSION = "5.19.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -1812,7 +1812,7 @@
             Now Playing Extra Data
             <span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Shows extra data like Release Date or Popularity in the Now Playing bar.</span>
+                <span class="custom-tooltip">Shows extra data like Release Date next to the title or artist in the Now Playing bar.</span>
             </span>
         </label>
         <div class="col action">
@@ -1823,6 +1823,11 @@
                 <option value="releaseDate" ${selectedNowPlayingDataType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
                 <option value="playCount" ${selectedNowPlayingDataType === 'playCount' ? 'selected' : ''}>Play Count</option>
                 <option value="popularity" ${selectedNowPlayingDataType === 'popularity' ? 'selected' : ''}>Popularity</option>
+                <option value="tempo" ${selectedNowPlayingDataType === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
+                <option value="energy" ${selectedNowPlayingDataType === 'energy' ? 'selected' : ''}>Energy</option>
+                <option value="danceability" ${selectedNowPlayingDataType === 'danceability' ? 'selected' : ''}>Danceability</option>
+                <option value="valence" ${selectedNowPlayingDataType === 'valence' ? 'selected' : ''}>Valence</option>
+                <option value="key" ${selectedNowPlayingDataType === 'key' ? 'selected' : ''}>Key</option>
             </select>
             <label class="switch">
                 <input type="checkbox" id="showNowPlayingDataToggle" ${showNowPlayingData ? 'checked' : ''}>
@@ -2731,9 +2736,80 @@
             padding: 6px 12px; border-radius: 4px; border: 1px solid #434343;
             background: #3e3e3e; color: white; cursor: pointer; font-size: 14px;
             width: 100%; text-align: left;
+            height: 35px;
+            box-sizing: border-box;
         }
         #np-dynamic-settings { margin-top: 8px; }
         #np-release-date-settings, #np-play-count-settings, #np-tempo-settings, #np-energy-settings, #np-danceability-settings, #np-valence-settings, #np-key-settings, #np-popularity-settings { display: none; }
+        
+        .custom-select-wrapper { position: relative; width: 100%; }
+        .custom-select-trigger {
+            width: 100%;
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #434343;
+            background: #3e3e3e;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: left;
+            height: 35px;
+            box-sizing: border-box;
+        }
+        #npSeparatorDisplay {
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+        .custom-select-trigger svg {
+            width: 16px;
+            height: 16px;
+            transition: transform 0.2s ease;
+        }
+        .custom-select-trigger.open svg {
+            transform: rotate(180deg);
+        }
+        #npSeparatorDropdown {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 4px);
+            left: 0;
+            width: 100%;
+            background-color: #282828;
+            border: 1px solid #434343;
+            border-radius: 4px;
+            z-index: 10;
+            padding: 8px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .separator-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .separator-option {
+            background-color: #3e3e3e;
+            border: 1px solid #434343;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            text-align: center;
+            transition: background-color 0.2s ease;
+        }
+        .separator-option:hover {
+            background-color: #555;
+        }
+        .separator-option.selected {
+            background-color: #1ED760;
+            color: black;
+            border-color: #1ED760;
+        }
       </style>
       <div class="main-trackCreditsModal-header">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Now Playing Data Settings</span></h1>
@@ -2860,20 +2936,17 @@
                   </div>
                   <div style="margin-top: 8px;">
                       <div class="np-setting-row">
-                          <label for="npSeparatorSelect">Separator Style</label>
-                          <select id="npSeparatorSelect">
-                            <option value="•" ${selectedNowPlayingSeparator === '•' ? 'selected' : ''}>Bullet (•)</option>
-                            <option value="|" ${selectedNowPlayingSeparator === '|' ? 'selected' : ''}>Pipe (|)</option>
-                            <option value="-" ${selectedNowPlayingSeparator === '-' ? 'selected' : ''}>Dash (-)</option>
-                            <option value="–" ${selectedNowPlayingSeparator === '–' ? 'selected' : ''}>En Dash (–)</option>
-                            <option value="—" ${selectedNowPlayingSeparator === '—' ? 'selected' : ''}>Em Dash (—)</option>
-                            <option value="//" ${selectedNowPlayingSeparator === '//' ? 'selected' : ''}>Double Slash (//)</option>
-                            <option value="::" ${selectedNowPlayingSeparator === '::' ? 'selected' : ''}>Double Colon (::)</option>
-                            <option value="◆" ${selectedNowPlayingSeparator === '◆' ? 'selected' : ''}>Diamond (◆)</option>
-                            <option value="★" ${selectedNowPlayingSeparator === '★' ? 'selected' : ''}>Star (★)</option>
-                            <option value="▸" ${selectedNowPlayingSeparator === '▸' ? 'selected' : ''}>Arrow (▸)</option>
-                            <option value=" " ${selectedNowPlayingSeparator === ' ' ? 'selected' : ''}>Space</option>
-                          </select>
+                          <label>Separator Style</label>
+                          <div class="custom-select-wrapper">
+                              <button id="npSeparatorTrigger" class="custom-select-trigger">
+                                  <span id="npSeparatorDisplay"></span>
+                                  <svg fill="currentColor" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg>
+                              </button>
+                              <div id="npSeparatorDropdown">
+                                  <div class="separator-grid">
+                                  </div>
+                              </div>
+                          </div>
                       </div>
                   </div>
               </div>
@@ -2886,8 +2959,6 @@
     
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
-
-    const closeModal = () => overlay.remove();
 
     const dataTypeSelect = modalContainer.querySelector("#npDataType");
     const dataPositionSelect = modalContainer.querySelector("#npDataPosition");
@@ -2909,7 +2980,65 @@
     const valenceFormatSelect = modalContainer.querySelector("#npValenceFormatSelect");
     const keySettings = modalContainer.querySelector("#np-key-settings");
     const keyFormatSelect = modalContainer.querySelector("#npKeyFormatSelect");
-    const separatorSelect = modalContainer.querySelector("#npSeparatorSelect");
+    const separatorTrigger = modalContainer.querySelector("#npSeparatorTrigger");
+    const separatorDisplay = modalContainer.querySelector("#npSeparatorDisplay");
+    const separatorDropdown = modalContainer.querySelector("#npSeparatorDropdown");
+    const separatorGrid = modalContainer.querySelector(".separator-grid");
+
+    const separatorOptions = [
+        { value: '•', text: '•' }, { value: '●', text: '●' }, { value: '▪', text: '▪' }, { value: '■', text: '■' },
+        { value: '▢', text: '▢' }, { value: '|', text: '|' }, { value: '❚', text: '❚' }, { value: '-', text: '-' },
+        { value: '–', text: '–' }, { value: '—', text: '—' }, { value: '/', text: '/' }, { value: '//', text: '//' },
+        { value: '〢', text: '〢' }, { value: '::', text: '::' }, { value: '≡', text: '≡' }, { value: '►', text: '►' },
+        { value: '▸', text: '▸' }, { value: '➔', text: '➔' }, { value: '◆', text: '◆' }, { value: '✦', text: '✦' },
+        { value: '★', text: '★' }, { value: '✶', text: '✶' }, { value: '✵', text: '✵' }, { value: '✳', text: '✳' },
+        { value: '♪', text: '♪' }, { value: '✕', text: '✕' }, { value: '╳', text: '╳' }, { value: ' ', text: 'ㅤ' }
+    ];
+
+    const initialOption = separatorOptions.find(opt => opt.value === selectedNowPlayingSeparator);
+    separatorDisplay.textContent = initialOption ? initialOption.text : selectedNowPlayingSeparator;
+
+    separatorOptions.forEach(option => {
+        const optionButton = document.createElement('button');
+        optionButton.className = 'separator-option';
+        optionButton.textContent = option.text;
+        optionButton.dataset.value = option.value;
+        if (option.value === selectedNowPlayingSeparator) {
+            optionButton.classList.add('selected');
+        }
+        optionButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectedNowPlayingSeparator = option.value;
+            separatorDisplay.textContent = option.text;
+            
+            separatorGrid.querySelectorAll('.separator-option').forEach(btn => btn.classList.remove('selected'));
+            optionButton.classList.add('selected');
+            
+            saveSettings();
+            displayNowPlayingData();
+        });
+        separatorGrid.appendChild(optionButton);
+    });
+
+    separatorTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = separatorDropdown.style.display === 'block';
+        separatorDropdown.style.display = isOpen ? 'none' : 'block';
+        separatorTrigger.classList.toggle('open', !isOpen);
+    });
+
+    const closeDropdownHandler = (e) => {
+        if (!separatorDropdown.contains(e.target) && e.target !== separatorTrigger && !separatorTrigger.contains(e.target)) {
+            separatorDropdown.style.display = 'none';
+            separatorTrigger.classList.remove('open');
+        }
+    };
+    document.addEventListener('click', closeDropdownHandler, true);
+
+    const closeModal = () => {
+        document.removeEventListener('click', closeDropdownHandler, true);
+        overlay.remove();
+    };
 
     function updateDynamicSettingsVisibility() {
         const selectedType = dataTypeSelect.value;
@@ -2990,13 +3119,6 @@
     keyFormatSelect.value = selectedNowPlayingKeyFormat;
     keyFormatSelect.addEventListener("change", () => {
         selectedNowPlayingKeyFormat = keyFormatSelect.value;
-        saveSettings();
-        displayNowPlayingData();
-    });
-
-    separatorSelect.value = selectedNowPlayingSeparator;
-    separatorSelect.addEventListener("change", () => {
-        selectedNowPlayingSeparator = separatorSelect.value;
         saveSettings();
         displayNowPlayingData();
     });
@@ -3997,14 +4119,14 @@
             const separatorElement = document.createElement("p");
             separatorElement.textContent = selectedNowPlayingSeparator;
             separatorElement.style.color = "var(--text-subdued)";
-            separatorElement.style.margin = selectedNowPlayingSeparator === ' ' ? "0" : "0 0 0 1px";
+            separatorElement.style.margin = selectedNowPlayingSeparator === ' ' ? "0" : "0 4px";
 
             const valueElement = document.createElement("p");
             valueElement.className = 'sort-play-np-value';
             valueElement.textContent = dataValue;
             valueElement.style.color = "var(--text-subdued)";
             valueElement.style.margin = "0";
-            valueElement.style.marginLeft = "6px";
+            valueElement.style.marginLeft = "5px";
 
             const nativeTextElement = targetContainer.querySelector('[data-encore-id="text"]');
             if (nativeTextElement) {
@@ -7997,7 +8119,6 @@ function isDirectSortType(sortType) {
         <div class="playlist-title-container">
           <span class="playlist-title" style="color: #fff; font-size: 15px; font-weight: bold;">Playlist Name</span>
           <div class="playlist-stats-container">
-              <! -- Stats will go here -->
           </div>
       </div>
       <div class="playlist-wrapper">
