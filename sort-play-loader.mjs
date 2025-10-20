@@ -1,6 +1,5 @@
-fetch("https://api.github.com/repos/hoeci/sort-play/contents/sort-play.js")
-    .then(res => res.json())
-    .then(json => atob(json.content))
+fetch("https://raw.githubusercontent.com/hoeci/sort-play/main/sort-play.js")
+    .then(res => res.text())
     .then(content => new Blob([content], { type: "application/javascript" }))
     .then(URL.createObjectURL)
     .then(url => import(url))
