@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.4";
+  const SORT_PLAY_VERSION = "5.19.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -9241,20 +9241,23 @@ function isDirectSortType(sortType) {
 
     if (isInitialRun) {
         const allSortableItems = buttonStyles.menuItems.flatMap(item => {
-            if (item.children) {
+            if (item.type === 'parent' && item.children) {
                 return item.children.flatMap(child => {
-                    if (child.children) {
-                        return child.children.filter(c => c && c.sortType);
+                    if (child.type === 'parent' && child.children) {
+                        return child.children.filter(c => c && c.sortType && c.text);
                     }
-                    return child.sortType ? child : [];
+                    if (child.sortType && child.text) {
+                        return [child];
+                    }
+                    return [];
                 });
             }
             if (item.sortType && item.text) {
-                return item;
+                return [item];
             }
             return [];
-        }).filter(item => item && item.sortType && item.text);
-        
+        });
+
         const sortTypeInfo = allSortableItems.find(i => i.sortType === job.sortType);
         const sortTypeText = sortTypeInfo?.text ?? job.sortType.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
 
@@ -9308,19 +9311,22 @@ function isDirectSortType(sortType) {
 
             if (currentDescription && currentDescription.includes("Managed by Sort-Play.")) {
                 const allSortableItems = buttonStyles.menuItems.flatMap(item => {
-                    if (item.children) {
+                    if (item.type === 'parent' && item.children) {
                         return item.children.flatMap(child => {
-                            if (child.children) {
-                                return child.children.filter(c => c && c.sortType);
+                            if (child.type === 'parent' && child.children) {
+                                return child.children.filter(c => c && c.sortType && c.text);
                             }
-                            return child.sortType ? child : [];
+                            if (child.sortType && child.text) {
+                                return [child];
+                            }
+                            return [];
                         });
                     }
                     if (item.sortType && item.text) {
-                        return item;
+                        return [item];
                     }
                     return [];
-                }).filter(item => item && item.sortType && item.text);
+                });
 
                 const sortTypeMap = allSortableItems.reduce((acc, item) => {
                     acc[item.sortType] = item.text;
