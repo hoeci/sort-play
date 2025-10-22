@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.6";
+  const SORT_PLAY_VERSION = "5.19.7";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13088,11 +13088,24 @@ function isDirectSortType(sortType) {
     const { CosmosAsync } = Spicetify;
     try {
       const albumData = await CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
-      if (!albumData || !albumData.tracks || !albumData.tracks.items) {
-        throw new Error("Failed to fetch album tracks.");
+      if (!albumData || !albumData.tracks) {
+        throw new Error("Failed to fetch initial album data.");
+      }
+  
+      let allTracks = albumData.tracks.items;
+      let nextUrl = albumData.tracks.next;
+  
+      while (nextUrl) {
+        const nextPageData = await CosmosAsync.get(nextUrl);
+        if (nextPageData && nextPageData.items) {
+          allTracks.push(...nextPageData.items);
+          nextUrl = nextPageData.next;
+        } else {
+          nextUrl = null; 
+        }
       }
 
-      return albumData.tracks.items.map(track => ({
+      return allTracks.map(track => ({
         uri: track.uri,
         uid: null,
         name: track.name,
@@ -13100,7 +13113,7 @@ function isDirectSortType(sortType) {
         albumName: albumData.name,
         artistUris: track.artists.map(artist => artist.uri),
         allArtists: track.artists.map(artist => artist.name).join(", "),
-        artistName: track.artists[0].name,
+        artistName: track.artists?.[0]?.name,
         durationMilis: track.duration_ms,
         playCount: "N/A",
         popularity: null,
@@ -13117,7 +13130,7 @@ function isDirectSortType(sortType) {
       }));
     } catch (error) {
       console.error(`Error fetching tracks for album ${albumId}:`, error);
-      Spicetify.showNotification("Failed to fetch album tracks.", true);
+      Spicetify.showNotification("Failed to fetch all album tracks.", true);
       return [];
     }
   }
