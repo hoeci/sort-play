@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.5";
+  const SORT_PLAY_VERSION = "5.19.6";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -9201,10 +9201,20 @@ function isDirectSortType(sortType) {
             sortedTracks = uniqueTracks.filter(t => t.releaseDate != null).sort((a, b) => (new Date(b.releaseDate).getTime() || 0) - (new Date(a.releaseDate).getTime() || 0));
             break;
         case "scrobbles":
-        case "personalScrobbles":
-            const result = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
-            sortedTracks = result.sortedTracks;
+        case "personalScrobbles": {
+            const tracksWithScrobbles = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
+            if (sortType === 'personalScrobbles') {
+                const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
+                sortedTracks = tracksWithScrobbles
+                    .filter(track => includeZeroScrobbles || (track.personalScrobbles != null && track.personalScrobbles > 0))
+                    .sort((a, b) => (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
+            } else {
+                sortedTracks = tracksWithScrobbles
+                    .filter(track => track.scrobbles != null)
+                    .sort((a, b) => (b.scrobbles ?? 0) - (a.scrobbles ?? 0));
+            }
             break;
+        }
         case 'tempo':
         case 'energy':
         case 'danceability':
