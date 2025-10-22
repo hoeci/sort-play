@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.7";
+  const SORT_PLAY_VERSION = "5.19.8";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -3859,6 +3859,19 @@
     });
   }
   
+  function showDetailedError(error, context) {
+    let location = "unknown location";
+    if (error.stack) {
+        const stackLines = error.stack.split('\n');
+        if (stackLines.length > 1) {
+            location = stackLines[1].trim();
+        }
+    }
+    const errorMessage = `${context}: ${error.message}\n${location}`;
+    Spicetify.showNotification(errorMessage, true, 8000);
+    console.error(`[Sort-Play] ${context}:`, error);
+  }
+
   function formatPlayCount(count, format) {
     if (count === null || count === undefined || isNaN(count) || count === "N/A") {
         return '_';
@@ -9482,8 +9495,7 @@ function isDirectSortType(sortType) {
                 updateJob(updatedJob);
                 Spicetify.showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
             } catch (error) {
-                console.error(`Failed to run dynamic playlist job for "${job.targetPlaylistName}":`, error);
-                Spicetify.showNotification(`Failed to update dynamic playlist: ${job.targetPlaylistName}`, true);
+                showDetailedError(error, `Failed to run dynamic playlist job for "${job.targetPlaylistName}"`);
                 job.lastRun = now;
                 updateJob(job);
             }
@@ -10275,8 +10287,7 @@ function isDirectSortType(sortType) {
                     updateJob(updatedJob);
                     Spicetify.showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
                 } catch (error) {
-                    console.error(`Failed to manually run dynamic playlist job for "${job.targetPlaylistName}":`, error);
-                    Spicetify.showNotification(`Failed to update dynamic playlist: ${job.targetPlaylistName}`, true);
+                    showDetailedError(error, `Failed to manually run dynamic playlist job for "${job.targetPlaylistName}"`);
                 } finally {
                     runningJobIds.delete(job.id);
                 }
@@ -11021,14 +11032,13 @@ function isDirectSortType(sortType) {
                 };
                 closeModal();
                 runJob(newJob, true)
-                    .then(completedJob => {
-                        addJob(completedJob);
-                        Spicetify.showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" created successfully!`);
-                    })
-                    .catch(error => {
-                        Spicetify.showNotification(`Error creating dynamic playlist: ${error.message}`, true);
-                        console.error(`[Sort-Play Dynamic] Background job failed for "${newJob.targetPlaylistName}":`, error);
-                    });
+                .then(completedJob => {
+                    addJob(completedJob);
+                    Spicetify.showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" created successfully!`);
+                })
+                .catch(error => {
+                    showDetailedError(error, `Error creating dynamic playlist "${newJob.targetPlaylistName}"`);
+                });
             }
         });
     };
@@ -13113,7 +13123,7 @@ function isDirectSortType(sortType) {
         albumName: albumData.name,
         artistUris: track.artists.map(artist => artist.uri),
         allArtists: track.artists.map(artist => artist.name).join(", "),
-        artistName: track.artists?.[0]?.name,
+        artistName: track.artists[0].name,
         durationMilis: track.duration_ms,
         playCount: "N/A",
         popularity: null,
