@@ -10122,8 +10122,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   <div class="setting-row">
                       <span class="description">
                           Max Play Count
+                          <span class="tooltip-container">
+                              <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                              <span class="custom-tooltip">Only include tracks with a play count less than or equal to this value. Leave blank to disable.</span>
+                          </span>
                       </span>
-                      <input type="number" id="filter-max-playcount" placeholder="e.g., 10" style="width: 150px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center;">
+                      <input type="number" id="filter-max-playcount" placeholder="e.g., 10000" min="1000" step="1000" style="width: 150px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center;">
                   </div>
               </div>
 
