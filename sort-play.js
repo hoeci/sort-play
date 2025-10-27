@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.19.8";
+  const SORT_PLAY_VERSION = "5.20.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -3559,6 +3559,8 @@
         modalContainer.className = "main-embedWidgetGenerator-container";
         modalContainer.style.zIndex = "2005";
         modalContainer.style.width = "500px";
+        modalContainer.style.borderRadius = "20px";
+        
         
         const scheduleToShortTextMap = {
             'release-every-two-weeks': 'Every 2 Weeks (Fri)',
@@ -5802,6 +5804,370 @@ function isDirectSortType(sortType) {
     <path fill="#ffffff" fill-opacity="1" stroke-width="0.2" stroke-linejoin="round" d="M 18.0147,41.5355C 16.0621,39.5829 16.0621,36.4171 18.0147,34.4645L 26.9646,25.5149C 28.0683,24.4113 29,24 31,24L 52,24C 54.7614,24 57,26.2386 57,29L 57,47C 57,49.7614 54.7614,52 52,52L 31,52C 29,52 28.0683,51.589 26.9646,50.4854L 18.0147,41.5355 Z M 47.5281,42.9497L 42.5784,37.9999L 47.5281,33.0502L 44.9497,30.4717L 40,35.4215L 35.0502,30.4717L 32.4718,33.0502L 37.4215,37.9999L 32.4718,42.9497L 35.0502,45.5281L 40,40.5783L 44.9497,45.5281L 47.5281,42.9497 Z "/>
   </svg>`;
 
+function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () => {}) {
+        const tag = document.createElement("span");
+        tag.className = "keyword-tag";
+        tag.innerHTML = `
+            ${keyword}
+            <span class="keyword-tag-remove">×</span>
+        `;
+
+        tag.querySelector(".keyword-tag-remove").addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            tag.remove();
+            keywordSet.delete(keyword);
+            onUpdateCallback();
+        });
+
+        tag.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        const tagsContainer = container.querySelector(".keyword-tags-container");
+        tagsContainer.appendChild(tag);
+        tagsContainer.scrollTop = tagsContainer.scrollHeight;
+    }
+
+    function setupKeywordInput(container, keywordSet, onUpdateCallback = () => {}) {
+      if(!container) return;
+      const input = container.querySelector(".keyword-input");
+      const clearButton = container.querySelector(".keyword-remove-all-button");
+      const saveButton = container.querySelector(".keyword-save-button");
+      const loadButton = container.querySelector(".keyword-load-button");
+      
+      if(!input) return;
+
+      input.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+      });
+
+      input.addEventListener("keydown", (e) => {
+          e.stopPropagation();
+          if (e.key === "Enter" || e.key === ",") {
+              e.preventDefault();
+              const keyword = input.value.trim().toLowerCase();
+              if (keyword && !keywordSet.has(keyword)) {
+                  keywordSet.add(keyword);
+                  createKeywordTag(keyword, container, keywordSet, onUpdateCallback);
+                  input.value = "";
+                  onUpdateCallback();
+              }
+          }
+      });
+
+      if (clearButton) {
+        clearButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const tagsContainer = container.querySelector(".keyword-tags-container");
+            tagsContainer.innerHTML = "";
+            keywordSet.clear();
+            onUpdateCallback();
+        });
+      }
+
+      input.addEventListener("blur", () => {
+          const keyword = input.value.trim().toLowerCase();
+          if (keyword && !keywordSet.has(keyword)) {
+              keywordSet.add(keyword);
+              createKeywordTag(keyword, container, keywordSet, onUpdateCallback);
+              input.value = "";
+          }
+          if (keyword) {
+              onUpdateCallback();
+          }
+      });
+
+      if (saveButton) {
+        saveButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (keywordSet.size === 0) {
+                Spicetify.showNotification("No keywords to save.");
+                return;
+            }
+
+            const saveModal = document.createElement("div");
+            saveModal.className = "save-keywords-modal";
+            saveModal.innerHTML = `
+                <style>
+                .save-keywords-modal {
+                    background-color: #282828;
+                    border-radius: 8px;
+                    padding: 16px;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    z-index: 1001;
+                    width: 300px;
+                }
+                .save-keywords-title {
+                    color: #fff;
+                    font-size: 14px;
+                    font-weight: bold;
+                    margin-bottom: 12px;
+                }
+                .save-keywords-input {
+                    width: 100%;
+                    padding: 8px;
+                    border-radius: 4px;
+                    border: 1px solid #434343;
+                    background: #121212;
+                    color: white;
+                    margin-bottom: 12px;
+                    box-sizing: border-box;
+                }
+                .save-keywords-button {
+                    background-color: #1db954;
+                    border: none;
+                    color: black;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    display: block;
+                    width: auto;
+                    margin: 0 auto;
+                }
+
+                .save-keywords-button:hover {
+                    background-color: #1ed760;
+                }
+
+                .save-keywords-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background-color: rgba(0, 0, 0, 0.5);
+                    z-index: 1000;
+                }
+                </style>
+                <div class="save-keywords-title">Enter Keywords Group Name</div>
+                <input type="text" class="save-keywords-input" placeholder="Group Name">
+                <button class="save-keywords-button">Save</button>
+            `;
+            const overlay = document.createElement("div");
+            overlay.className = "save-keywords-overlay";
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(saveModal);
+
+            const saveInput = saveModal.querySelector(".save-keywords-input");
+            const saveBtn = saveModal.querySelector(".save-keywords-button");
+
+            const closeModal = () => {
+                saveModal.remove();
+                overlay.remove();
+            };
+
+            saveBtn.addEventListener("click", () => {
+                const groupName = saveInput.value.trim();
+                if (groupName) {
+                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                    savedKeywordGroups[groupName] = [...keywordSet];
+                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+                    Spicetify.showNotification(`Keywords saved as "${groupName}"`);
+                    closeModal();
+                } else {
+                    Spicetify.showNotification("Please enter a group name.");
+                }
+            });
+            overlay.addEventListener("click", closeModal);
+        });
+      }
+
+      if (loadButton) {
+        loadButton.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+            const groupNames = Object.keys(savedKeywordGroups).reverse();
+
+            if (groupNames.length === 0) {
+                Spicetify.showNotification("No saved keyword groups.");
+                return;
+            }
+
+            const dropdown = document.createElement("div");
+            dropdown.className = "load-keywords-dropdown";
+            dropdown.innerHTML = `
+                <style>
+                .load-keywords-dropdown {
+                    background-color: #282828;
+                    border-radius: 4px;
+                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+                    position: absolute;
+                    right: 0;
+                    z-index: 1002;
+                    min-width: 180px;
+                    max-width: 250px;
+                    max-height: 200px;
+                    overflow-y: auto;
+                }
+                .load-keywords-option {
+                    color: #fff;
+                    padding-top: 8px;
+                    padding-right: 5px;
+                    padding-bottom: 8px;
+                    padding-left: 12px;
+                    cursor: pointer;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .load-keywords-option:hover {
+                    background-color: #383838;
+                }
+                .load-keywords-option:active, .load-keywords-option.selected {
+                    background-color: #1db954;
+                    color: black;
+                }
+                .load-keywords-option .remove-button {
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                    cursor: pointer;
+                    padding: 4px;
+                    display: flex;
+                    align-items: center;
+                    max-width: 30px;
+                }
+                .load-keywords-option:hover .remove-button {
+                    opacity: 1;
+                }
+                .remove-icon {
+                    width: 12px;
+                    height: 12px;
+                    fill: currentColor;
+                }
+                .load-keywords-option-text {
+                    flex-grow: 1;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    font-size: 14px;
+                }
+                .load-keywords-dropdown::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .load-keywords-dropdown::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .load-keywords-dropdown::-webkit-scrollbar-thumb {
+                    background-color: #4d4d4d;
+                    border-radius: 4px;
+                }
+                </style>
+            `;
+
+            let selectedOption = null;
+
+            groupNames.forEach(groupName => {
+                const option = document.createElement("div");
+                option.className = "load-keywords-option";
+
+                const optionContent = document.createElement("span");
+                optionContent.className = "load-keywords-option-text";
+                optionContent.textContent = groupName.length > 30 ? groupName.substring(0, 30) + "..." : groupName;
+                optionContent.dataset.fullName = groupName;
+
+                const removeButton = document.createElement("div");
+                removeButton.className = "remove-button";
+                removeButton.innerHTML = removeIconSVG;
+
+                option.appendChild(optionContent);
+                option.appendChild(removeButton);
+
+                optionContent.addEventListener("click", (e) => {
+                    const tagsContainer = container.querySelector(".keyword-tags-container");
+                    tagsContainer.innerHTML = "";
+                    keywordSet.clear();
+
+                    savedKeywordGroups[groupName].forEach(keyword => {
+                        keywordSet.add(keyword);
+                        createKeywordTag(keyword, container, keywordSet, onUpdateCallback);
+                    });
+
+                    onUpdateCallback();
+                    Spicetify.showNotification(`Keywords loaded from "${groupName}"`);
+
+                    if (selectedOption) {
+                        selectedOption.classList.remove("selected");
+                    }
+                    option.classList.add("selected");
+                    selectedOption = option;
+
+                    dropdown.remove();
+                });
+
+                removeButton.addEventListener("click", (e) => {
+                    e.stopPropagation();
+
+                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                    delete savedKeywordGroups[groupName];
+                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+
+                    option.remove();
+                    Spicetify.showNotification(`Removed keyword group "${groupName}"`);
+
+                    if (Object.keys(savedKeywordGroups).length === 0) {
+                        dropdown.remove();
+                        Spicetify.showNotification("No more saved keyword groups.");
+                    }
+                });
+
+                dropdown.appendChild(option);
+            });
+
+            loadButton.parentNode.appendChild(dropdown);
+
+            const buttonRect = loadButton.getBoundingClientRect();
+            dropdown.style.bottom = `${buttonRect.height + 4}px`;
+            dropdown.style.right = `-50px`;
+
+            const removeDropdown = (event) => {
+                if (!dropdown.contains(event.target)) {
+                    dropdown.remove();
+                    document.removeEventListener('click', removeDropdown);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', removeDropdown);
+            }, 0);
+        });
+      }
+
+      container.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+      });
+  }
+
+    function saveKeywords(titleAlbumKeywords, artistKeywords) {
+        localStorage.setItem("sort-play-title-album-keywords", JSON.stringify([...titleAlbumKeywords]));
+        localStorage.setItem("sort-play-artist-keywords", JSON.stringify([...artistKeywords]));
+    }
+
+     function loadKeywords() {
+      const savedTitleAlbumKeywords = localStorage.getItem("sort-play-title-album-keywords");
+      const savedArtistKeywords = localStorage.getItem("sort-play-artist-keywords");
+
+      const titleAlbumKeywords = savedTitleAlbumKeywords ? new Set(JSON.parse(savedTitleAlbumKeywords)) : new Set();
+      const artistKeywords = savedArtistKeywords ? new Set(JSON.parse(savedArtistKeywords)) : new Set();
+    
+      return { titleAlbumKeywords, artistKeywords };
+    }
+
   async function showCustomFilterModal(tracks) {
     const modalContainer = document.createElement("div");
     modalContainer.className = "custom-filter-modal";
@@ -6315,390 +6681,9 @@ function isDirectSortType(sortType) {
                 return numberPart;
         }
     }
-    function createKeywordTag(keyword, container, keywordSet) {
-        const tag = document.createElement("span");
-        tag.className = "keyword-tag";
-        tag.innerHTML = `
-            ${keyword}
-            <span class="keyword-tag-remove">×</span>
-        `;
-
-        tag.querySelector(".keyword-tag-remove").addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            tag.remove();
-            keywordSet.delete(keyword);
-            updateTrackFilters();
-            saveKeywords();
-
-        });
-
-        tag.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-
-        const tagsContainer = container.querySelector(".keyword-tags-container");
-        tagsContainer.appendChild(tag);
-        tagsContainer.scrollTop = tagsContainer.scrollHeight;
-    }
-
-    function setupKeywordInput(container, keywordSet) {
-      if(!container) return;
-      const input = container.querySelector(".keyword-input");
-      const clearButton = container.querySelector(".keyword-remove-all-button");
-      const saveButton = container.querySelector(".keyword-save-button");
-      const loadButton = container.querySelector(".keyword-load-button");
-      
-      if(!input) return;
-
-      input.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-      });
-
-      input.addEventListener("keydown", (e) => {
-          e.stopPropagation();
-          if (e.key === "Enter" || e.key === ",") {
-              e.preventDefault();
-              const keyword = input.value.trim().toLowerCase();
-              if (keyword && !keywordSet.has(keyword)) {
-                  keywordSet.add(keyword);
-                  createKeywordTag(keyword, container, keywordSet);
-                  input.value = "";
-                  updateTrackFilters();
-                  saveKeywords();
-              }
-          }
-      });
-
-      if (clearButton) {
-        clearButton.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            const tagsContainer = container.querySelector(".keyword-tags-container");
-            tagsContainer.innerHTML = "";
-            keywordSet.clear();
-            updateTrackFilters();
-            saveKeywords();
-        });
-      }
-
-      input.addEventListener("blur", () => {
-          const keyword = input.value.trim().toLowerCase();
-          if (keyword && !keywordSet.has(keyword)) {
-              keywordSet.add(keyword);
-              createKeywordTag(keyword, container, keywordSet);
-              input.value = "";
-          }
-          if (keyword) {
-              updateTrackFilters();
-          }
-          saveKeywords();
-      });
-
-      if (saveButton) {
-        saveButton.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            if (keywordSet.size === 0) {
-                Spicetify.showNotification("No keywords to save.");
-                return;
-            }
-
-            const saveModal = document.createElement("div");
-            saveModal.className = "save-keywords-modal";
-            saveModal.innerHTML = `
-                <style>
-                .save-keywords-modal {
-                    background-color: #282828;
-                    border-radius: 8px;
-                    padding: 16px;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    z-index: 1001;
-                    width: 300px;
-                }
-                .save-keywords-title {
-                    color: #fff;
-                    font-size: 14px;
-                    font-weight: bold;
-                    margin-bottom: 12px;
-                }
-                .save-keywords-input {
-                    width: 100%;
-                    padding: 8px;
-                    border-radius: 4px;
-                    border: 1px solid #434343;
-                    background: #121212;
-                    color: white;
-                    margin-bottom: 12px;
-                    box-sizing: border-box;
-                }
-                .save-keywords-button {
-                    background-color: #1db954;
-                    border: none;
-                    color: black;
-                    padding: 8px 16px;
-                    border-radius: 20px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    display: block;
-                    width: auto;
-                    margin: 0 auto;
-                }
-
-                .save-keywords-button:hover {
-                    background-color: #1ed760;
-                }
-
-                .save-keywords-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: rgba(0, 0, 0, 0.5);
-                    z-index: 1000;
-                }
-                </style>
-                <div class="save-keywords-title">Enter Keywords Group Name</div>
-                <input type="text" class="save-keywords-input" placeholder="Group Name">
-                <button class="save-keywords-button">Save</button>
-            `;
-            const overlay = document.createElement("div");
-            overlay.className = "save-keywords-overlay";
-
-            document.body.appendChild(overlay);
-            document.body.appendChild(saveModal);
-
-            const saveInput = saveModal.querySelector(".save-keywords-input");
-            const saveBtn = saveModal.querySelector(".save-keywords-button");
-
-            const closeModal = () => {
-                saveModal.remove();
-                overlay.remove();
-            };
-
-            saveBtn.addEventListener("click", () => {
-                const groupName = saveInput.value.trim();
-                if (groupName) {
-                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
-                    savedKeywordGroups[groupName] = [...keywordSet];
-                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
-                    Spicetify.showNotification(`Keywords saved as "${groupName}"`);
-                    closeModal();
-                } else {
-                    Spicetify.showNotification("Please enter a group name.");
-                }
-            });
-            overlay.addEventListener("click", closeModal);
-        });
-      }
-
-      if (loadButton) {
-        loadButton.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-
-            let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
-            const groupNames = Object.keys(savedKeywordGroups).reverse();
-
-            if (groupNames.length === 0) {
-                Spicetify.showNotification("No saved keyword groups.");
-                return;
-            }
-
-            const dropdown = document.createElement("div");
-            dropdown.className = "load-keywords-dropdown";
-            dropdown.innerHTML = `
-                <style>
-                .load-keywords-dropdown {
-                    background-color: #282828;
-                    border-radius: 4px;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-                    position: absolute;
-                    right: 0;
-                    z-index: 1002;
-                    min-width: 180px;
-                    max-width: 250px;
-                    max-height: 200px;
-                    overflow-y: auto;
-                }
-                .load-keywords-option {
-                    color: #fff;
-                    padding-top: 8px;
-                    padding-right: 5px;
-                    padding-bottom: 8px;
-                    padding-left: 12px;
-                    cursor: pointer;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .load-keywords-option:hover {
-                    background-color: #383838;
-                }
-                .load-keywords-option:active, .load-keywords-option.selected {
-                    background-color: #1db954;
-                    color: black;
-                }
-                .load-keywords-option .remove-button {
-                    opacity: 0;
-                    transition: opacity 0.2s;
-                    cursor: pointer;
-                    padding: 4px;
-                    display: flex;
-                    align-items: center;
-                    max-width: 30px;
-                }
-                .load-keywords-option:hover .remove-button {
-                    opacity: 1;
-                }
-                .remove-icon {
-                    width: 12px;
-                    height: 12px;
-                    fill: currentColor;
-                }
-                .load-keywords-option-text {
-                    flex-grow: 1;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    font-size: 14px;
-                }
-                .load-keywords-dropdown::-webkit-scrollbar {
-                    width: 8px;
-                }
-                .load-keywords-dropdown::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .load-keywords-dropdown::-webkit-scrollbar-thumb {
-                    background-color: #4d4d4d;
-                    border-radius: 4px;
-                }
-                </style>
-            `;
-
-            let selectedOption = null;
-
-            groupNames.forEach(groupName => {
-                const option = document.createElement("div");
-                option.className = "load-keywords-option";
-
-                const optionContent = document.createElement("span");
-                optionContent.className = "load-keywords-option-text";
-                optionContent.textContent = groupName.length > 30 ? groupName.substring(0, 30) + "..." : groupName;
-                optionContent.dataset.fullName = groupName;
-
-                const removeButton = document.createElement("div");
-                removeButton.className = "remove-button";
-                removeButton.innerHTML = removeIconSVG;
-
-                option.appendChild(optionContent);
-                option.appendChild(removeButton);
-
-                optionContent.addEventListener("click", (e) => {
-                    const tagsContainer = container.querySelector(".keyword-tags-container");
-                    tagsContainer.innerHTML = "";
-                    keywordSet.clear();
-
-                    savedKeywordGroups[groupName].forEach(keyword => {
-                        keywordSet.add(keyword);
-                        createKeywordTag(keyword, container, keywordSet);
-                    });
-
-                    updateTrackFilters();
-                    saveKeywords();
-                    Spicetify.showNotification(`Keywords loaded from "${groupName}"`);
-
-                    if (selectedOption) {
-                        selectedOption.classList.remove("selected");
-                    }
-                    option.classList.add("selected");
-                    selectedOption = option;
-
-                    dropdown.remove();
-                });
-
-                removeButton.addEventListener("click", (e) => {
-                    e.stopPropagation();
-
-                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
-                    delete savedKeywordGroups[groupName];
-                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
-
-                    option.remove();
-                    Spicetify.showNotification(`Removed keyword group "${groupName}"`);
-
-                    if (Object.keys(savedKeywordGroups).length === 0) {
-                        dropdown.remove();
-                        Spicetify.showNotification("No more saved keyword groups.");
-                    }
-                });
-
-                dropdown.appendChild(option);
-            });
-
-            loadButton.parentNode.appendChild(dropdown);
-
-            const buttonRect = loadButton.getBoundingClientRect();
-            dropdown.style.bottom = `${buttonRect.height + 4}px`;
-            dropdown.style.right = `-50px`;
-
-            const removeDropdown = (event) => {
-                if (!dropdown.contains(event.target)) {
-                    dropdown.remove();
-                    document.removeEventListener('click', removeDropdown);
-                }
-            };
-            setTimeout(() => {
-                document.addEventListener('click', removeDropdown);
-            }, 0);
-        });
-      }
-
-      container.addEventListener("click", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-      });
-  }
-
-    function saveKeywords() {
-        localStorage.setItem("sort-play-title-album-keywords", JSON.stringify([...titleAlbumKeywords]));
-        localStorage.setItem("sort-play-artist-keywords", JSON.stringify([...artistKeywords]));
-    }
-
-     function loadKeywords() {
-      const savedTitleAlbumKeywords = localStorage.getItem("sort-play-title-album-keywords");
-      const savedArtistKeywords = localStorage.getItem("sort-play-artist-keywords");
-
-      if (savedTitleAlbumKeywords) {
-        titleAlbumKeywords = new Set(JSON.parse(savedTitleAlbumKeywords));
-        const titleAlbumContainer = modalContainer.querySelector("#titleAlbumKeywords");
-
-        if(titleAlbumContainer) {
-            titleAlbumKeywords.forEach(keyword => createKeywordTag(keyword, titleAlbumContainer, titleAlbumKeywords));
-        }
-      }
-
-      if (savedArtistKeywords) {
-        artistKeywords = new Set(JSON.parse(savedArtistKeywords));
-        const artistContainer = modalContainer.querySelector("#artistKeywords");
-
-        if(artistContainer){
-            artistKeywords.forEach(keyword => createKeywordTag(keyword, artistContainer, artistKeywords));
-        }
-      }
-    }
 
     function updateTrackFilters() {
+        saveKeywords(titleAlbumKeywords, artistKeywords);
         const keywordFilterEnabled = keywordFilterToggle.checked;
         const keepMatching = keepMatchingMode;
         const filterTitle = titleToggle.checked;
@@ -6709,7 +6694,6 @@ function isDirectSortType(sortType) {
         const minRange = parseFormattedNumber(modalContainer.querySelector("#rangeMin").value) || minRangeValue;
         const maxRange = parseFormattedNumber(modalContainer.querySelector("#rangeMax").value) || maxRangeValue;
     
-        localStorage.setItem("sort-play-keep-matching-mode", keepMatching);
         localStorage.setItem("sort-play-filter-title", filterTitle);
         localStorage.setItem("sort-play-filter-album", filterAlbum);
         localStorage.setItem("sort-play-filter-artist", filterArtist);
@@ -8397,7 +8381,7 @@ function isDirectSortType(sortType) {
     artistToggle = modalContainer.querySelector("#artistToggle");
     maxRowsSelect = modalContainer.querySelector(".max-rows-select");
 
-    keepMatchingMode = localStorage.getItem("sort-play-keep-matching-mode") === "true";
+    keepMatchingMode = false;
     titleToggle.checked = localStorage.getItem("sort-play-filter-title") !== "false";
     albumToggle.checked = localStorage.getItem("sort-play-filter-album") !== "false";
     artistToggle.checked = localStorage.getItem("sort-play-filter-artist") !== "false";
@@ -8439,9 +8423,15 @@ function isDirectSortType(sortType) {
 
     displayedTracks = tracks.slice(startIndex, isLastLoad ? tracks.length : pageSize);
     updateTable(displayedTracks);
-    loadKeywords();
-    setupKeywordInput(titleAlbumContainer, titleAlbumKeywords);
-    setupKeywordInput(artistContainer, artistKeywords);
+    const loadedKeywords = loadKeywords();
+    titleAlbumKeywords = loadedKeywords.titleAlbumKeywords;
+    artistKeywords = loadedKeywords.artistKeywords;
+    
+    titleAlbumKeywords.forEach(keyword => createKeywordTag(keyword, titleAlbumContainer, titleAlbumKeywords, updateTrackFilters));
+    artistKeywords.forEach(keyword => createKeywordTag(keyword, artistContainer, artistKeywords, updateTrackFilters));
+
+    setupKeywordInput(titleAlbumContainer, titleAlbumKeywords, updateTrackFilters);
+    setupKeywordInput(artistContainer, artistKeywords, updateTrackFilters);
 
     tableBody.addEventListener("click", (event) => {
         const row = event.target.closest("tr");
@@ -9120,7 +9110,7 @@ function isDirectSortType(sortType) {
   }
   
   async function executeSortOperation(config) {
-    const { sortType, sources, deduplicate, isHeadless = false, preFetchedTracks = null, limitEnabled = false, additionalTracksToInclude = [] } = config;
+    const { sortType, sources, deduplicate, isHeadless = false, preFetchedTracks = null, limitEnabled = false, additionalTracksToInclude = [], filters = {} } = config;
 
     let combinedTracks;
     let newUsedUrisBySource = {};
@@ -9175,7 +9165,75 @@ function isDirectSortType(sortType) {
         combinedTracks.push(...additionalTracksToInclude);
     }
 
-    const tracks = Array.from(new Map(combinedTracks.map(track => [track.uri, track])).values());
+    let filteredTracks = combinedTracks;
+
+    if (filters.excludeLiked) {
+        if (!isHeadless) mainButton.innerText = "Filtering Liked...";
+        const likedSongs = await getLikedSongs();
+        const likedSongUris = new Set(likedSongs.map(s => s.uri));
+        filteredTracks = filteredTracks.filter(t => !likedSongUris.has(t.uri));
+    }
+
+    if (filters.excludeListened) {
+        if (!isHeadless) mainButton.innerText = "Filtering Listened...";
+        const lastFmUsername = loadLastFmUsername();
+        if (lastFmUsername) {
+            const tracksWithScrobbles = await processBatchesWithDelay(
+                filteredTracks, 50, 1000, () => {}, getTrackDetailsWithPersonalScrobbles
+            );
+            filteredTracks = tracksWithScrobbles.filter(t => (t.personalScrobbles || 0) === 0);
+        } else {
+            console.warn("[Sort-Play Dynamic Filter] Cannot exclude listened tracks. Last.fm username not set.");
+            if (!isHeadless) Spicetify.showNotification("Last.fm username not set, cannot exclude listened tracks.", true);
+        }
+    }
+
+    if (filters.maxPlayCount !== undefined && filters.maxPlayCount !== null && filters.maxPlayCount !== '') {
+        if (!isHeadless) mainButton.innerText = "Filtering Plays...";
+        const maxPlays = parseInt(filters.maxPlayCount, 10);
+        if (!isNaN(maxPlays)) {
+            const tracksWithPlaycounts = await enrichTracksWithPlayCounts(filteredTracks);
+            filteredTracks = tracksWithPlaycounts.filter(t => {
+                const playCount = parseInt(t.playCount, 10);
+                return isNaN(playCount) || playCount <= maxPlays;
+            });
+        }
+    }
+
+    if (filters.keywordFilterEnabled && (filters.titleAlbumKeywords?.length > 0 || filters.artistKeywords?.length > 0)) {
+        if (!isHeadless) mainButton.innerText = "Filtering Keywords...";
+    
+        const { keepMatchingMode, filterTitle, filterAlbum, filterArtist, matchWholeWord, titleAlbumKeywords = [], artistKeywords = [] } = filters;
+        
+        filteredTracks = filteredTracks.filter(track => {
+            const trackTitle = track.songTitle || track.name || "";
+            const trackAlbum = track.albumName || "";
+            const trackArtists = track.allArtists || "";
+    
+            const hasTitleAlbumKeywords = titleAlbumKeywords.length > 0;
+            const hasArtistKeywords = artistKeywords.length > 0;
+    
+            const titleAlbumMatch = hasTitleAlbumKeywords && titleAlbumKeywords.some(keyword => {
+                const regex = matchWholeWord ? new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'i') : new RegExp(escapeRegExp(keyword), 'i');
+                return (filterTitle && regex.test(trackTitle)) || (filterAlbum && regex.test(trackAlbum));
+            });
+    
+            const artistMatch = hasArtistKeywords && filterArtist && artistKeywords.some(keyword => {
+                const regex = matchWholeWord ? new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'i') : new RegExp(escapeRegExp(keyword), 'i');
+                return regex.test(trackArtists);
+            });
+    
+            if (keepMatchingMode) {
+                const titleAlbumCondition = hasTitleAlbumKeywords ? titleAlbumMatch : true;
+                const artistCondition = hasArtistKeywords ? artistMatch : true;
+                return titleAlbumCondition && artistCondition;
+            } else {
+                return !(titleAlbumMatch || artistMatch);
+            }
+        });
+    }
+
+    const tracks = Array.from(new Map(filteredTracks.map(track => [track.uri, track])).values());
 
     if (!tracks || tracks.length === 0) {
         return { trackUris: [], newUsedUrisBySource: {} };
@@ -9964,6 +10022,261 @@ function isDirectSortType(sortType) {
     }
   }
 
+  async function showDynamicFilterModal(currentFilters) {
+    return new Promise((resolve) => {
+        const lastFmUsername = loadLastFmUsername();
+        const isExcludeListenedDisabled = !lastFmUsername;
+        let titleAlbumKeywords = new Set();
+        let artistKeywords = new Set();
+        let keepMatchingMode, filterTitle, filterAlbum, filterArtist, matchWholeWord;
+
+        const overlay = document.createElement("div");
+        overlay.id = "filter-overlay";
+        overlay.className = "sort-play-font-scope";
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); z-index: 2006;
+            display: flex; justify-content: center; align-items: center;
+        `;
+
+        const modalContainer = document.createElement("div");
+        modalContainer.className = "main-embedWidgetGenerator-container";
+        modalContainer.style.zIndex = "2007";
+        modalContainer.style.width = "650px";
+        modalContainer.style.backgroundColor = "#181818";
+        modalContainer.style.borderRadius = "25px";
+        modalContainer.style.border = "2px solid #282828";
+
+        modalContainer.innerHTML = `
+          <style>
+            .main-trackCreditsModal-mainSection { padding: 20px 32px !important; overflow: hidden; }
+            #filter-overlay .settings-left-wrapper { background-color: #1c1c1c; border-radius: 20px; padding: 20px; position: relative; margin-top: 20px; }
+            #filter-overlay .settings-left-wrapper.disabled > *:not(.settings-title-wrapper) { opacity: 0.5; pointer-events: none; }
+            #filter-overlay .settings-left-wrapper.disabled .settings-title-wrapper { opacity: 1; pointer-events: all; }
+            #filter-overlay .settings-left-wrapper.disabled #keywordFilterToggle { pointer-events: all; }
+            #filter-overlay .settings-title { color: white; font-weight: bold; font-size: 15px; margin-bottom: 5px; }
+            #filter-overlay .settings-title-wrapper { display: flex; justify-content: space-between; width: 100%; margin-bottom: 8px; }
+            #filter-overlay .filter-mode-radio-group { display: flex; align-items: center; gap: 16px; margin: 10px 0; }
+            #filter-overlay .radio-button-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+            #filter-overlay .radio-button { width: 16px; height: 16px; border: 2px solid #b3b3b3; border-radius: 50%; display: flex; padding: 2px; }
+            #filter-overlay .radio-button input { display: none; }
+            #filter-overlay .radio-button-inner { width: 8px; height: 8px; background-color: #1DB954; border-radius: 50%; display: none; }
+            #filter-overlay .radio-button input:checked + .radio-button-inner { display: block; }
+            #filter-overlay .radio-label { color: #b3b3b3; font-size: 13px; }
+            #filter-overlay .radio-button-container:hover .radio-button, #filter-overlay .radio-button-container:hover .radio-label { color: #ffffff; border-color: #ffffff; }
+            #filter-overlay .keyword-filter-container { display: flex; gap: 15px; width: 100%; }
+            #filter-overlay .filter-group { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+            #filter-overlay .filter-group-header { display: flex; align-items: center; gap: 8px; height: 20px; justify-content: space-between; }
+            #filter-overlay .filter-group-title { color: #fff; font-size: 13px; font-weight: 500; }
+            #filter-overlay .toggle-group { display: flex; gap: 5px; align-items: center; }
+            #filter-overlay .filter-mode-toggle-label { color: #b3b3b3; font-size: 13px; }
+            #filter-overlay .keyword-input-container { position: relative; display: flex; flex-direction: column; background: #282828; border-radius: 6px; min-height: 96px; max-height: 96px; width: 100%; }
+            #filter-overlay .keyword-tags-container { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; overflow-y: auto; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #ffffff40 transparent; }
+            #filter-overlay .keyword-input-wrapper { position: relative; padding: 3px; border-top: 1px solid #444; background: #313131; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; display: flex; align-items: center; }
+            #filter-overlay .keyword-input { background: none; border: none; color: white; padding: 4px; width: 100%; height: 24px; margin: 0; flex: 1; min-width: 0; }
+            #filter-overlay .keyword-input:focus { outline: none; }
+            #filter-overlay .keyword-actions-container { display: flex; margin-left: auto; flex-shrink: 0; }
+            #filter-overlay .keyword-action-button { background-color: transparent; border: none; color: white; padding: 2px 7px; border-radius: 12px; font-size: 12px; cursor: pointer; transition: background-color: 0.2s ease; height: 24px; white-space: nowrap; }
+            #filter-overlay .keyword-action-button:hover { background-color: #484848; }
+            #filter-overlay .keyword-action-button svg { width: 14px; height: 14px; fill: #fff; display: block; margin: 0 auto; }
+            #filter-overlay .keyword-tag { display: inline-flex; align-items: center; background: #383838; border-radius: 12px; padding: 2px 8px; color: white; font-size: 12px; white-space: nowrap; flex-shrink: 0; height: 24px; }
+            #filter-overlay .keyword-tag-remove { margin-left: 4px; cursor: pointer; color: #ccc; font-size: 14px; }
+            #filter-overlay .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+            #filter-overlay .setting-row .description { color: #c1c1c1; }
+            #filter-overlay .setting-row.disabled .description { opacity: 0.5; }
+            #filter-overlay .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
+            #filter-overlay .custom-tooltip { visibility: hidden; position: absolute; z-index: 2008; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 280px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
+            #filter-overlay .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+            #filter-overlay .tooltip-container:hover .custom-tooltip { visibility: visible; }
+            #filter-overlay .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+            #filter-overlay .switch input { opacity: 0; width: 0; height: 0; }
+            #filter-overlay .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+            #filter-overlay .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+            #filter-overlay input:checked + .sliderx { background-color: #1DB954; }
+            #filter-overlay input:checked + .sliderx:before { transform: translateX(16px); }
+            #filter-overlay .switch.disabled .sliderx, #filter-overlay input:disabled + .sliderx { opacity: 0.5; cursor: not-allowed; }
+            #filter-overlay .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+            #filter-overlay .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+            #filter-overlay .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+            #filter-overlay .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+          </style>
+          <div class="main-trackCreditsModal-header">
+              <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Track Filtering Options</span></h1>
+          </div>
+          <div class="main-trackCreditsModal-mainSection">
+              <div style="display: flex; flex-direction: column; gap: 16px;">
+                  <div class="setting-row">
+                      <span class="description">Exclude Liked Tracks</span>
+                      <label class="switch"><input type="checkbox" id="filter-exclude-liked"><span class="sliderx"></span></label>
+                  </div>
+                  <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
+                      <span class="description">
+                          Exclude My Scrobbled Tracks
+                          <span class="tooltip-container">
+                              <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                              <span class="custom-tooltip">Requires Last.fm. Removes tracks you have scrobbled at least once. ${isExcludeListenedDisabled ? '(Set Last.fm username in settings)' : ''}</span>
+                          </span>
+                      </span>
+                      <label class="switch"><input type="checkbox" id="filter-exclude-listened" ${isExcludeListenedDisabled ? 'disabled' : ''}><span class="sliderx"></span></label>
+                  </div>
+                  <div class="setting-row">
+                      <span class="description">
+                          Max Play Count
+                          <span class="tooltip-container">
+                              <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                              <span class="custom-tooltip">Only include tracks with a play count less than or equal to this value. Leave blank to disable.</span>
+                          </span>
+                      </span>
+                      <input type="number" id="filter-max-playcount" placeholder="e.g., 10" style="width: 150px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center;">
+                  </div>
+              </div>
+
+              <div class="settings-left-wrapper">
+                  <div class="settings-title-wrapper">
+                      <div class="settings-title">Keyword Filters</div>
+                      <label class="switch"><input type="checkbox" id="keywordFilterToggle"><span class="sliderx"></span></label>
+                  </div>
+                  <div class="filter-mode-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
+                      <div class="filter-mode-radio-group">
+                          <div class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-right: 8px;">Filter Mode:</div>
+                          <label class="radio-button-container"><span class="radio-button"><input type="radio" name="filterMode" value="exclude"><span class="radio-button-inner"></span></span><span class="radio-label">Exclude</span></label>
+                          <label class="radio-button-container"><span class="radio-button"><input type="radio" name="filterMode" value="keep"><span class="radio-button-inner"></span></span><span class="radio-label">Keep</span></label>
+                          <span class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-left: 14px;">Match Whole Word:</span>
+                      </div>
+                      <label class="switch"><input type="checkbox" id="matchWholeWordToggle"><span class="sliderx"></span></label>
+                  </div>
+                  <div class="keyword-filter-container">
+                      <div class="filter-group">
+                          <div class="filter-group-header">
+                              <span class="filter-group-title">Titles/Albums</span>
+                              <div class="toggle-group">
+                                  <span class="filter-mode-toggle-label">Title</span>
+                                  <label class="switch"><input type="checkbox" id="titleToggle" checked><span class="sliderx"></span></label>
+                                  <span class="filter-mode-toggle-label">Album</span>
+                                  <label class="switch"><input type="checkbox" id="albumToggle" checked><span class="sliderx"></span></label>
+                              </div>
+                          </div>
+                          <div class="keyword-input-container" id="titleAlbumKeywords">
+                              <div class="keyword-tags-container"></div>
+                              <div class="keyword-input-wrapper">
+                                  <input type="text" class="keyword-input" placeholder="Add keywords...">
+                                  <div class="keyword-actions-container">
+                                      <button class="keyword-action-button keyword-save-button" title="Save Keywords">${saveIconSVG}</button>
+                                      <button class="keyword-action-button keyword-load-button" title="Load Keywords">${loadIconSVG}</button>
+                                      <button class="keyword-action-button keyword-remove-all-button" title="Clear Keywords">${clearIconSVG}</button>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                      <div class="filter-group">
+                          <div class="filter-group-header">
+                              <span class="filter-group-title">Artists</span>
+                              <div class="toggle-group">
+                                  <label class="switch"><input type="checkbox" id="artistToggle" checked><span class="sliderx"></span></label>
+                              </div>
+                          </div>
+                          <div class="keyword-input-container" id="artistKeywords">
+                              <div class="keyword-tags-container"></div>
+                              <div class="keyword-input-wrapper"><input type="text" class="keyword-input" placeholder="Add keywords..."></div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px;">
+                  <button id="cancel-filters" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
+                  <button id="save-filters" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Save</button>
+              </div>
+          </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        overlay.appendChild(modalContainer);
+
+        const closeModal = (data) => {
+            overlay.remove();
+            resolve(data);
+        };
+
+        const keywordFilterWrapper = modalContainer.querySelector('.settings-left-wrapper');
+        const keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
+        const filterModeRadios = modalContainer.querySelectorAll('input[name="filterMode"]');
+        const titleToggle = modalContainer.querySelector("#titleToggle");
+        const albumToggle = modalContainer.querySelector("#albumToggle");
+        const artistToggle = modalContainer.querySelector("#artistToggle");
+        const matchWholeWordToggle = modalContainer.querySelector("#matchWholeWordToggle");
+        const titleAlbumContainer = modalContainer.querySelector("#titleAlbumKeywords");
+        const artistContainer = modalContainer.querySelector("#artistKeywords");
+
+        document.getElementById('filter-exclude-liked').checked = currentFilters.excludeLiked || false;
+        document.getElementById('filter-exclude-listened').checked = currentFilters.excludeListened || false;
+        document.getElementById('filter-max-playcount').value = currentFilters.maxPlayCount || '';
+        keywordFilterToggle.checked = currentFilters.keywordFilterEnabled || false;
+        keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
+
+        keepMatchingMode = currentFilters.keepMatchingMode ?? false;
+        filterTitle = currentFilters.filterTitle ?? (localStorage.getItem("sort-play-filter-title") !== "false");
+        filterAlbum = currentFilters.filterAlbum ?? (localStorage.getItem("sort-play-filter-album") !== "false");
+        filterArtist = currentFilters.filterArtist ?? (localStorage.getItem("sort-play-filter-artist") !== "false");
+        matchWholeWord = currentFilters.matchWholeWord ?? (localStorage.getItem("sort-play-match-whole-word") === "true");
+        
+        filterModeRadios.forEach(radio => radio.checked = (keepMatchingMode && radio.value === "keep") || (!keepMatchingMode && radio.value === "exclude"));
+        titleToggle.checked = filterTitle;
+        albumToggle.checked = filterAlbum;
+        artistToggle.checked = filterArtist;
+        matchWholeWordToggle.checked = matchWholeWord;
+
+        const loadedKeywords = loadKeywords();
+        titleAlbumKeywords = currentFilters.titleAlbumKeywords ? new Set(currentFilters.titleAlbumKeywords) : loadedKeywords.titleAlbumKeywords;
+        artistKeywords = currentFilters.artistKeywords ? new Set(currentFilters.artistKeywords) : loadedKeywords.artistKeywords;
+        
+        if(titleAlbumContainer) titleAlbumContainer.querySelector(".keyword-tags-container").innerHTML = "";
+        if(artistContainer) artistContainer.querySelector(".keyword-tags-container").innerHTML = "";
+
+        titleAlbumKeywords.forEach(keyword => createKeywordTag(keyword, titleAlbumContainer, titleAlbumKeywords));
+        artistKeywords.forEach(keyword => createKeywordTag(keyword, artistContainer, artistKeywords));
+
+        setupKeywordInput(titleAlbumContainer, titleAlbumKeywords);
+        setupKeywordInput(artistContainer, artistKeywords);
+
+        keywordFilterToggle.addEventListener('change', (e) => keywordFilterWrapper.classList.toggle('disabled', !e.target.checked));
+        filterModeRadios.forEach(radio => radio.addEventListener("change", (e) => keepMatchingMode = e.target.value === "keep"));
+        titleToggle.addEventListener('change', e => filterTitle = e.target.checked);
+        albumToggle.addEventListener('change', e => filterAlbum = e.target.checked);
+        artistToggle.addEventListener('change', e => filterArtist = e.target.checked);
+        matchWholeWordToggle.addEventListener('change', e => matchWholeWord = e.target.checked);
+        
+        modalContainer.querySelector('#save-filters').addEventListener('click', () => {
+            saveKeywords(titleAlbumKeywords, artistKeywords);
+            localStorage.setItem("sort-play-filter-title", filterTitle);
+            localStorage.setItem("sort-play-filter-album", filterAlbum);
+            localStorage.setItem("sort-play-filter-artist", filterArtist);
+            localStorage.setItem("sort-play-match-whole-word", matchWholeWord);
+
+            const newFilters = {
+                excludeLiked: modalContainer.querySelector('#filter-exclude-liked').checked,
+                excludeListened: modalContainer.querySelector('#filter-exclude-listened').checked,
+                maxPlayCount: modalContainer.querySelector('#filter-max-playcount').value,
+                keywordFilterEnabled: modalContainer.querySelector('#keywordFilterToggle').checked,
+                keepMatchingMode,
+                filterTitle,
+                filterAlbum,
+                filterArtist,
+                matchWholeWord,
+                titleAlbumKeywords: Array.from(titleAlbumKeywords),
+                artistKeywords: Array.from(artistKeywords),
+            };
+            closeModal(newFilters);
+        });
+
+        modalContainer.querySelector('#cancel-filters').addEventListener('click', () => closeModal(null));
+        overlay.addEventListener("click", (e) => { 
+            if (e.target === overlay) {
+                closeModal(null);
+            }
+        });
+    });
+  }
+  
   function showDynamicPlaylistsWindow() {
     const existingModal = document.getElementById('sort-play-dynamic-playlist-modal');
     if (existingModal) existingModal.remove();
@@ -10426,6 +10739,7 @@ function isDirectSortType(sortType) {
         }
         
         const isEditing = !!jobToEdit;
+        let jobFilters = isEditing ? (jobToEdit.filters || {}) : {};
         let sources = isEditing ? [...jobToEdit.sources] : [];
 
         let currentDeduplicate = isEditing ? jobToEdit.deduplicate : playlistDeduplicate;
@@ -10594,6 +10908,13 @@ function isDirectSortType(sortType) {
                   margin-top: 8px;
                   margin-bottom: 4px;
               }
+              #configure-filters-btn {
+                  background-color: #282828;
+              }
+              #configure-filters-btn:hover {
+                  background-color: #3e3e3e;
+                  border-color: #878787;
+              }
           </style>
             <div class="job-form-modal">
                 <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
@@ -10631,52 +10952,65 @@ function isDirectSortType(sortType) {
                             </div>
                         </div>
                         <div class="job-form-right-column">
-                            <div class="card">
-                                <div class="card-title">Configuration</div>
-                                <div class="setting-row">
-                                    <span class="description">Update Behavior</span>
-                                    <select id="update-mode-select" class="form-select">
-                                        <option value="replace">Replace All Tracks</option>
-                                        <option value="merge">Add New Tracks & Re-sort All</option>
-                                        <option value="append">Add New Tracks to Top</option>
+                        <div class="card">
+                            <div class="card-title">Configuration</div>
+                            <div class="setting-row">
+                                <span class="description">Update Behavior</span>
+                                <select id="update-mode-select" class="form-select">
+                                    <option value="replace">Replace All Tracks</option>
+                                    <option value="merge">Add New Tracks & Re-sort All</option>
+                                    <option value="append">Add New Tracks to Top</option>
+                                </select>
+                            </div>
+                            <div class="setting-row" id="sort-type-row">
+                                <span class="description">Sort Method</span>
+                                <select id="sort-type-select" class="form-select">${sortOptions}</select>
+                            </div>
+                            <div class="setting-row" style="align-items: start;">
+                                <span class="description" style="padding-top: 8px;">Update Schedule</span>
+                                <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                                    <select id="schedule-select" class="form-select">
+                                        <option value="manual" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'manual' ? 'selected' : ''}>Manual Only</option>
+                                        <option value="10800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
+                                        <option value="21600000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
+                                        <option value="43200000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '43200000' ? 'selected' : ''}>Every 12 Hours</option>
+                                        <option value="86400000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
+                                        <option value="172800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '172800000' ? 'selected' : ''}>Every 2d</option>
+                                        <option value="604800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
+                                        <option value="2592000000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
+                                        <option disabled>- Release Day Schedules -</option>
+                                        <option value="release-weekly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-weekly' ? 'selected' : ''}>Weekly (on Friday)</option>
+                                        <option value="release-every-two-weeks" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
+                                        <option value="release-monthly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
+                                        <option disabled>- Custom Schedules -</option>
+                                        ${customScheduleOptions}
+                                        <option value="custom">+ Custom</option>
+                                        ${clearAndSeparatorHtml}
                                     </select>
-                                </div>
-                                <div class="setting-row" id="sort-type-row">
-                                    <span class="description">Sort Method</span>
-                                    <select id="sort-type-select" class="form-select">${sortOptions}</select>
-                                </div>
-                                <div class="setting-row" style="align-items: start;">
-                                    <span class="description" style="padding-top: 8px;">Update Schedule</span>
-                                    <div style="display: flex; flex-direction: column; align-items: flex-end;">
-                                        <select id="schedule-select" class="form-select">
-                                            <option value="manual" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'manual' ? 'selected' : ''}>Manual Only</option>
-                                            <option value="10800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
-                                            <option value="21600000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
-                                            <option value="43200000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '43200000' ? 'selected' : ''}>Every 12 Hours</option>
-                                            <option value="86400000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '86400000' ? 'selected' : ''}>Daily</option>
-                                            <option value="172800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '172800000' ? 'selected' : ''}>Every 2d</option>
-                                            <option value="604800000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '604800000' ? 'selected' : ''}>Weekly</option>
-                                            <option value="2592000000" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === '2592000000' ? 'selected' : ''}>Monthly</option>
-                                            <option disabled>- Release Day Schedules -</option>
-                                            <option value="release-weekly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-weekly' ? 'selected' : ''}>Weekly (on Friday)</option>
-                                            <option value="release-every-two-weeks" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
-                                            <option value="release-monthly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
-                                            <option disabled>- Custom Schedules -</option>
-                                            ${customScheduleOptions}
-                                            <option value="custom">+ Custom</option>
-                                            ${clearAndSeparatorHtml}
-                                        </select>
-                                        <div id="custom-schedule-container" class="custom-schedule-container">
-                                            <input type="number" id="days" min="0" value="0"><label for="days">d</label>
-                                            <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
-                                            <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
-                                            <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
-                                        </div>
-                                        <div id="custom-schedule-error" style="color: #f15e6c; font-size: 12px; text-align: right; margin-top: 4px; display: none;"></div>
-                                        <label id="custom-schedule-min-label" style="font-size: 12px; color: #b3b3b3; text-align: right; display: none; margin-top: 4px;">Minimum: ${SCHEDULER_INTERVAL_MINUTES} minutes</label>
+                                    <div id="custom-schedule-container" class="custom-schedule-container">
+                                        <input type="number" id="days" min="0" value="0"><label for="days">d</label>
+                                        <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
+                                        <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
+                                        <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
                                     </div>
+                                    <div id="custom-schedule-error" style="color: #f15e6c; font-size: 12px; text-align: right; margin-top: 4px; display: none;"></div>
+                                    <label id="custom-schedule-min-label" style="font-size: 12px; color: #b3b3b3; text-align: right; display: none; margin-top: 4px;">Minimum: ${SCHEDULER_INTERVAL_MINUTES} minutes</label>
                                 </div>
                             </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-title">Track Filtering</div>
+                            <div class="setting-row">
+                                <span class="description">
+                                    Apply filters to source tracks
+                                    <span class="tooltip-container">
+                                        <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                                        <span class="custom-tooltip">Configure advanced filters for tracks from your sources.</span>
+                                    </span>
+                                </span>
+                                <button id="configure-filters-btn" class="main-buttons-button main-button-secondary" style="padding: 6px 25px; border-radius: 20px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; transition: background-color 0.1s ease, border-color 0.1s ease;">Configure</button>
+                            </div>
+                        </div>
                             <div class="card">
                                 <div class="card-title">Settings</div>
                                     <div class="setting-row">
@@ -10715,6 +11049,16 @@ function isDirectSortType(sortType) {
         const deduplicateToggle = modalContainer.querySelector('#deduplicate-toggle');
         const limitTracksToggle = modalContainer.querySelector('#limit-tracks-toggle');
         const sourceListContainer = modalContainer.querySelector('#source-list-container');
+        const configureFiltersBtn = modalContainer.querySelector('#configure-filters-btn');
+        
+        if (configureFiltersBtn) {
+            configureFiltersBtn.addEventListener('click', async () => {
+                const newFilters = await showDynamicFilterModal(jobFilters);
+                if (newFilters) {
+                    jobFilters = newFilters;
+                }
+            });
+        }
 
         deduplicateToggle.addEventListener('change', (e) => {
             currentDeduplicate = e.target.checked;
@@ -11017,6 +11361,7 @@ function isDirectSortType(sortType) {
                 deduplicate: currentDeduplicate,
                 updateFromSource: currentUpdateFromSource,
                 schedule: isNaN(parseInt(scheduleValue)) ? scheduleValue : parseInt(scheduleValue),
+                filters: jobFilters,
             };
             
             if (isEditing) {
