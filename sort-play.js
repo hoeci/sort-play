@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.20.0";
+  const SORT_PLAY_VERSION = "5.20.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -56,6 +56,7 @@
   let showLikeButton = false;
   let likeButton_connectObserver = () => {};
   let showNowPlayingData = false;
+  let currentTrackUriForScrobbleCache = null;
   let selectedNowPlayingDataType = 'releaseDate';
   let selectedNowPlayingDataPosition = '.main-trackInfo-name';
   let selectedNowPlayingDateFormat = 'YYYY';
@@ -109,6 +110,9 @@
   const STORAGE_KEY_NOW_PLAYING_KEY_FORMAT = "sort-play-now-playing-key-format";
   const STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT = "sort-play-now-playing-popularity-format";
   const STORAGE_KEY_NOW_PLAYING_SEPARATOR = "sort-play-now-playing-separator";
+  const CACHE_KEY_PERSONAL_SCROBBLES = 'sort-play-personal-scrobbles-cache';
+  const CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES = 'sort-play-personal-scrobbles-cache-timestamp';
+  const CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES = 48;
   const AI_DATA_CACHE_MAX_ITEMS = 1500;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
@@ -13127,6 +13131,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     .sort-play-font-scope * {
       font-family: 'SpotifyMixUI', sans-serif !important;
     }
+    .sort-play-failed-cell {
+      position: relative;
+      cursor: help;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: var(--spice-subtext);
+      text-underline-offset: 2px;
+    }
+    .sort-play-tooltip {
+      visibility: hidden;
+      width: max-content;
+      max-width: 250px;
+      background-color: #282828;
+      color: #fff;
+      text-align: center;
+      border-radius: 4px;
+      padding: 6px 10px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      opacity: 0;
+      transition: opacity 0.2s;
+      font-size: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      pointer-events: none;
+      text-decoration: none;
+    }
+    .sort-play-failed-cell:hover .sort-play-tooltip {
+      visibility: visible;
+      opacity: 1;
+    }
     .main-trackList-trackListRow .sort-play-like-button[aria-checked="true"],
     div[role="row"][aria-selected] .sort-play-like-button[aria-checked="true"] {
         opacity: 1 !important;
@@ -14374,12 +14411,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getTrackDetailsWithPersonalScrobbles(track) {
+    const trackId = track.uri ? track.uri.split(":")[2] : (track.track ? track.track.id : null);
+    if (!trackId) {
+        return { ...track, personalScrobbles: null, error: "Invalid track ID." };
+    }
+
+    const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
+    const cachedData = getCachedPersonalScrobbles(trackId);
+
+    if (cachedData && !cachedData.pendingUpdate && !isCurrentTrack) {
+        return { ...track, personalScrobbles: cachedData.count };
+    }
+
     const username = loadLastFmUsername();
     if (!username) {
-      return {
-        ...track,
-        personalScrobbles: null,
-      };
+      return { ...track, personalScrobbles: null, error: "Last.fm username not set." };
     }
 
     const maxRetries = 5;
@@ -14389,16 +14435,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     while (retries < maxRetries) {
       try {
-        const artistName = track.artists
-          ? track.artists[0]?.name || track.artistName
-          : track.artistName;
-
+        const artistName = track.artists ? track.artists[0]?.name || track.artistName : track.artistName;
         if (!artistName || !track.name) {
-          console.warn("Missing artist name or track name:", track);
-          return {
-            ...track,
-            personalScrobbles: null,
-          };
+          return { ...track, personalScrobbles: null, error: "Missing track metadata." };
         }
 
         const params = new URLSearchParams({
@@ -14410,67 +14449,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
         
         const response = await fetchLfmWithGateway(params);
-
-        if (!response.ok) {
-          throw new Error(`Last.fm API request failed with status ${response.status}`);  
-        }
-
+        if (!response.ok) throw new Error(`Last.fm API request failed with status ${response.status}`);  
+        
         const data = await response.json();
 
         if (data.error) {
           if (data.error === 6) {
-            if (
-              localStorage.getItem("sort-play-include-zero-scrobbles") === "true"
-            ) {
-              console.warn(
-                `User ${username} has no scrobbles for artist ${artistName} (track ${track.name}). Treating as 0 scrobbles.`
-              );
-              return {
-                ...track,
-                personalScrobbles: 0,
-              };
-            } else {
-              console.warn(
-                `User ${username} not found or has no scrobbles for artist ${artistName}.`
-              );
-              return {
-                ...track,
-                personalScrobbles: null,
-              };
-            }
+            return { ...track, personalScrobbles: 0 };
           } else {
             throw new Error(`Last.fm API error: ${data.message}`); 
           }
-        } else {
-            const personalScrobbles = data.track && data.track.userplaycount
-            ? parseInt(data.track.userplaycount)
-            : 0;
-
-            return {
-            ...track,
-            personalScrobbles: personalScrobbles,
-            };
         }
-      } catch (error) {
-        console.error(
-          `Error fetching personal scrobbles for track ${track.name} (Attempt ${
-            retries + 1
-          }):`,
-          error
-        );
+        
+        const newScrobbleCount = data.track?.userplaycount ? parseInt(data.track.userplaycount) : 0;
+        const oldScrobbleCount = cachedData ? cachedData.count : -1;
 
+        if (newScrobbleCount > oldScrobbleCount) {
+            setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
+        } else if (cachedData) {
+            setCachedPersonalScrobbles(trackId, oldScrobbleCount, true);
+        } else {
+            setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
+        }
+
+        return { ...track, personalScrobbles: newScrobbleCount };
+
+      } catch (error) {
+        console.error(`Error fetching personal scrobbles for track ${track.name} (Attempt ${retries + 1}):`, error);
         retries++;
         if (retries < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;
         } else {
-          console.error(
-            `Failed to fetch personal scrobbles for track ${track.name} after ${maxRetries} attempts.`
-          );
-          return {
-            ...track,
-            personalScrobbles: null,
-          };
+          return { ...track, personalScrobbles: null, error: `Failed to fetch after ${maxRetries} attempts.` };
         }
       }
     }
@@ -19258,7 +19269,78 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
+  function initializePersonalScrobblesCache() {
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES);
+    if (!timestamp) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
+      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
+      return;
+    }
 
+    const hoursPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60); 
+    if (hoursPassed >= CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES) {
+      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
+      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
+    }
+  }
+
+  function getCachedPersonalScrobbles(trackId) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
+      return cache[trackId] || null;
+    } catch (error) {
+      console.error('Error reading from personal scrobbles cache:', error);
+      return null;
+    }
+  }
+
+  function setCachedPersonalScrobbles(trackId, scrobbleCount, isPending) {
+    try {
+        const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
+        cache[trackId] = { count: scrobbleCount, pendingUpdate: isPending };
+        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify(cache));
+    } catch (error) {
+        console.error('Error writing to personal scrobbles cache:', error);
+    }
+  }
+
+  function flagCachedPersonalScrobbleForUpdate(trackId) {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
+      if (cache[trackId]) {
+        cache[trackId].pendingUpdate = true;
+        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify(cache));
+      }
+    } catch (error) {
+      console.error('Error flagging personal scrobble cache:', error);
+    }
+  }
+  
+  function initializeSongChangeWatcher() {
+    if (!Spicetify || !Spicetify.Player) {
+        setTimeout(initializeSongChangeWatcher, 100);
+        return;
+    }
+
+    const handleSongChange = (uri) => {
+        if (!uri) return;
+        currentTrackUriForScrobbleCache = uri;
+        const trackId = uri.split(":")[2];
+        flagCachedPersonalScrobbleForUpdate(trackId);
+    };
+
+    const currentTrack = Spicetify.Player.data?.item;
+    if (currentTrack) {
+        handleSongChange(currentTrack.uri);
+    }
+
+    Spicetify.Player.addEventListener("songchange", (event) => {
+        const newTrack = event?.data?.item;
+        if (newTrack) {
+            handleSongChange(newTrack.uri);
+        }
+    });
+  }
 
   const RELEASE_DATE_CACHE_KEY = 'spotify-release-date-cache2';
   const RELEASE_DATE_CACHE_TIMESTAMP_KEY = 'spotify-release-date-cache-timestamp2';
@@ -19544,9 +19626,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const dataElement = trackElement.querySelector(config.dataSelector);
                     if (dataElement && (dataElement.textContent === "" || dataElement.textContent === "_")) {
                         let cachedValue = null;
-                        if (config.type === 'playCount') cachedValue = getCachedPlayCount(trackId);
-                        else if (config.type === 'releaseDate') cachedValue = getCachedReleaseDate(trackId);
-                        else if (config.type === 'scrobbles') cachedValue = getCachedScrobbles(trackId);
+                        if (config.type === 'playCount') {
+                            cachedValue = getCachedPlayCount(trackId);
+                        } else if (config.type === 'releaseDate') {
+                            cachedValue = getCachedReleaseDate(trackId);
+                        } else if (config.type === 'scrobbles') {
+                            cachedValue = getCachedScrobbles(trackId);
+                        } else if (config.type === 'personalScrobbles') {
+                            const cachedData = getCachedPersonalScrobbles(trackId);
+                            if (cachedData && !cachedData.pendingUpdate) {
+                                cachedValue = cachedData.count;
+                            }
+                        }
                         
                         if (cachedValue !== null) {
                             updateDisplay(dataElement, cachedValue, config.type);
@@ -19613,8 +19704,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                     } else {
                                         if (!loadLastFmUsername()) updateDisplay(dataElement, "_", config.type);
                                         else {
-                                            const result = await getTrackDetailsWithPersonalScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                            updateDisplay(dataElement, result.personalScrobbles, config.type);
+                                            const result = await getTrackDetailsWithPersonalScrobbles(trackDetails);
+                                            const valueToDisplay = result.error ? { error: result.error } : result.personalScrobbles;
+                                            updateDisplay(dataElement, valueToDisplay, config.type);
                                         }
                                     }
                                 }
@@ -19652,12 +19744,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             displayValue = new Intl.NumberFormat('en-US').format(value);
         }
     } else if (type === 'personalScrobbles') {
-        if (value > 0 && !isNaN(value)) {
+        if (value && typeof value === 'object' && value.error) {
+            element.innerHTML = `
+                <span class="sort-play-failed-cell">
+                    Failed
+                    <span class="sort-play-tooltip">${value.error}</span>
+                </span>
+            `;
+            return; 
+        } else if (value === 0) {
+            displayValue = "_";
+        } else if (value > 0 && !isNaN(value)) {
             if (myScrobblesDisplayMode === 'sign') {
                 displayValue = '\u2705';
             } else { 
                 displayValue = new Intl.NumberFormat('en-US').format(value);
             }
+        } else {
+            displayValue = "Failed";
         }
     } else if (type === 'scrobbles') {
         if (value !== "_" && !isNaN(value) && value !== null && value !== undefined) {
@@ -20980,6 +21084,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   initializePlayCountCache();
   initializeReleaseDateCache();
   initializeScrobblesCache();
+  initializePersonalScrobblesCache();
   initializePaletteAnalysisCache();
 
   if (showLikeButton) {
@@ -20987,6 +21092,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
   
   startScheduler();
+  initializeSongChangeWatcher();
   Spicetify.Player.addEventListener("songchange", displayNowPlayingData);
   displayNowPlayingData();
   console.log(`Sort-Play loaded`);
