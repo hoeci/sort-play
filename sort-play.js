@@ -10119,6 +10119,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                       </span>
                       <label class="switch"><input type="checkbox" id="filter-exclude-listened" ${isExcludeListenedDisabled ? 'disabled' : ''}><span class="sliderx"></span></label>
                   </div>
+                  <div class="setting-row">
+                      <span class="description">
+                          Max Play Count
+                      </span>
+                      <input type="number" id="filter-max-playcount" placeholder="e.g., 10" style="width: 150px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center;">
+                  </div>
               </div>
 
               <div class="settings-left-wrapper">
