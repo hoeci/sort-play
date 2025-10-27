@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.20.1";
+  const SORT_PLAY_VERSION = "5.20.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -5029,6 +5029,7 @@ function isDirectSortType(sortType) {
           playlistDescription 
         );
 
+        await new Promise(resolve => setTimeout(resolve, 1250));
         await addTracksToPlaylist(newPlaylist.id, verifiedTracks);
         
         await addPlaylistToLibrary(newPlaylist.uri);
