@@ -20748,6 +20748,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             Spicetify.React.createElement("button", {
                 ref: buttonRef,
                 className: finalClassName,
+                title: "",
                 "aria-label": tooltipContent,
                 "aria-checked": isLiked || hasISRCLiked,
                 onClick: handleClick,
@@ -20798,59 +20799,145 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         );
     });
 
-    async function mountLikeButton() {
+    let mountLikeButton_debounceTimer = null;
+    let mountLikeButton_isRunning = false;
+    let mountLikeButton_failedAttempts = 0;
+    
+    async function mountLikeButton(isDebounced = false) {
+        if (!isDebounced) {
+            clearTimeout(mountLikeButton_debounceTimer);
+            mountLikeButton_debounceTimer = setTimeout(() => {
+                mountLikeButton(true);
+            }, 300);
+            return;
+        }
+    
+        if (mountLikeButton_isRunning) {
+            return;
+        }
+        mountLikeButton_isRunning = true;
+    
         const MAX_RETRIES = 10;
         let retryDelay = 250;
-
-        for (let i = 0; i < MAX_RETRIES; i++) {
-            const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
-            if (!nowPlayingWidget) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 2, 3000);
-                continue;
-            }
     
-            const entryPoint = nowPlayingWidget.querySelector("[data-encore-id='buttonTertiary']");
-            if (!entryPoint || !entryPoint.parentNode) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 2, 3000);
-                continue;
-            }
-
-            let container = nowPlayingWidget.querySelector(".likeControl-wrapper");
-            if (!container) {
-                container = document.createElement("div");
-                container.className = "likeControl-wrapper";
+        try {
+            for (let i = 0; i < MAX_RETRIES; i++) {
+                const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
+                if (!nowPlayingWidget) {
+                    console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Now playing widget not found`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    continue;
+                }
+    
+                const nativeLikeButton = nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]');
+                if (!nativeLikeButton || !nativeLikeButton.parentNode) {
+                    console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native like button not found or has no parent`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    continue;
+                }
+    
+                const uri = Spicetify.Player.data?.item?.uri || "";
+                
+                if (!uri || !uri.startsWith("spotify:track:")) {
+                    console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Invalid or empty URI: "${uri}"`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    continue;
+                }
+    
+                let container = nowPlayingWidget.querySelector(".likeControl-wrapper");
+                
+                if (container && container.dataset.renderedUri === uri && container.firstChild) {
+                    mountLikeButton_failedAttempts = 0;
+                    mountLikeButton_isRunning = false;
+                    return;
+                }
+                
+                if (container && container.dataset.renderedUri !== uri) {
+                }
+                
+                if (!container) {
+                    container = document.createElement("div");
+                    container.className = "likeControl-wrapper";
+                    
+                    const currentNativeLikeButton = nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]');
+                    if (!currentNativeLikeButton || !currentNativeLikeButton.parentNode) {
+                        console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native button parent disappeared before insertion`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        retryDelay = Math.min(retryDelay * 2, 3000);
+                        continue;
+                    }
+                    
+                    try {
+                        currentNativeLikeButton.parentNode.insertBefore(container, currentNativeLikeButton.nextSibling);
+                    } catch (error) {
+                        console.error(`[Sort-Play Like Button] Retry ${i + 1}: Failed to insert like button wrapper`, error);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        retryDelay = Math.min(retryDelay * 2, 3000);
+                        continue;
+                    }
+                }
+                
                 try {
-                    entryPoint.parentNode.insertBefore(container, entryPoint.nextSibling);
+                    const currentNativeLikeButton = nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]');
+                    if (!currentNativeLikeButton) {
+                        console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native button disappeared before render`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        retryDelay = Math.min(retryDelay * 2, 3000);
+                        continue;
+                    }
+                    
+                    Spicetify.ReactDOM.render(
+                        Spicetify.React.createElement(LikeButton, { 
+                            uri: uri, 
+                            key: uri, 
+                            classList: currentNativeLikeButton.className 
+                        }), 
+                        container
+                    );
+                    
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                    
+                    if (!container.firstChild) {
+                        console.error(`[Sort-Play Like Button] Retry ${i + 1}: React render completed but no child element found`);
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        retryDelay = Math.min(retryDelay * 2, 3000);
+                        continue;
+                    }
+                    
+                    container.dataset.renderedUri = uri;
+                    container.firstChild.style.marginRight = "0px";
+                    
+                    mountLikeButton_failedAttempts = 0;
+                    mountLikeButton_isRunning = false;
+                    return;
+                    
                 } catch (error) {
-                    console.error("[Sort-Play Like Button] Failed to insert like button wrapper, retrying...", error);
+                    console.error(`[Sort-Play Like Button] Retry ${i + 1}: React render error`, error);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
                     continue;
                 }
             }
-            
-            const uri = Spicetify.Player.data?.item?.uri || "";
-            if (container.dataset.renderedUri === uri) {
-                return;
-            }
-            
-            Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri: uri, key: uri, classList: entryPoint.className }), container);
-            container.dataset.renderedUri = uri;
     
-            if (container.firstChild) {
-                container.firstChild.style.marginRight = "0px";
-            }
+            mountLikeButton_failedAttempts++;
+            console.error(`[Sort-Play Like Button] Failed to mount like button after ${MAX_RETRIES} retries. Failed attempts: ${mountLikeButton_failedAttempts}`);
             
-            return;
+            if (mountLikeButton_failedAttempts < 3) {
+                console.log(`[Sort-Play Like Button] Scheduling retry in 2 seconds...`);
+                setTimeout(() => mountLikeButton(true), 2000);
+            }
+        } finally {
+            mountLikeButton_isRunning = false;
         }
-
-        console.error(`[Sort-Play Like Button] Failed to mount like button in Now Playing bar after ${MAX_RETRIES} retries.`);
     }
 
     async function mountLikeButtonNowPlayingView() {
-        const MAX_RETRIES = 10;
+        const MAX_RETRIES = 15;
         let retryDelay = 250;
-
+    
         for (let i = 0; i < MAX_RETRIES; i++) {
             const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
             if (!nowPlayingView) {
@@ -20861,62 +20948,96 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
             const addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1');
             if (!addToPlaylistButtonWrapper || !addToPlaylistButtonWrapper.parentElement) {
+                console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Add to playlist button wrapper not found or has no parent`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retryDelay = Math.min(retryDelay * 2, 3000);
                 continue;
             }
-
+    
             const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button');
             if (!templateButton) {
+                console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Template button not found`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retryDelay = Math.min(retryDelay * 2, 3000);
                 continue;
             }
-
+    
+            const uri = Spicetify.Player.data?.item?.uri || "";
+            
+            if (!uri || !uri.startsWith("spotify:track:")) {
+                console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Invalid or empty URI: "${uri}"`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+    
             let container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
             if (!container) {
                 container = document.createElement("div");
                 container.className = "likeControl-wrapper-npv";
                 container.style.display = "contents";
-                addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
+                try {
+                    addToPlaylistButtonWrapper.parentElement.insertBefore(container, addToPlaylistButtonWrapper);
+                } catch (error) {
+                    console.error(`[Sort-Play Like Button NPV] Retry ${i + 1}: Failed to insert like button wrapper`, error);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    continue;
+                }
             }
     
-            const uri = Spicetify.Player.data?.item?.uri || "";
-            if (container.dataset.renderedUri === uri) {
+            if (container.dataset.renderedUri === uri && container.firstChild) {
                 return;
             }
-
+    
             const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button svg';
     
-            Spicetify.ReactDOM.render(
-                Spicetify.React.createElement(LikeButton, {
-                    uri: uri,
-                    key: uri,
-                    classList: templateButton.className,
-                    size: 21,
-                    dynamicSizeSelector: dynamicSizeSelector
-                }),
-                container
-            );
-            container.dataset.renderedUri = uri;
-    
-            if (container.firstChild) {
+            try {
+                Spicetify.ReactDOM.render(
+                    Spicetify.React.createElement(LikeButton, {
+                        uri: uri,
+                        key: uri,
+                        classList: templateButton.className,
+                        size: 21,
+                        dynamicSizeSelector: dynamicSizeSelector
+                    }),
+                    container
+                );
+                
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                if (!container.firstChild) {
+                    console.error(`[Sort-Play Like Button NPV] Retry ${i + 1}: React render completed but no child element found`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    continue;
+                }
+                
+                container.dataset.renderedUri = uri;
                 container.firstChild.style.marginRight = "0px";
                 container.firstChild.style.marginLeft = "12px";
+                
+                return;
+                
+            } catch (error) {
+                console.error(`[Sort-Play Like Button NPV] Retry ${i + 1}: React render error`, error);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
             }
-            
-            return;
         }
-
-        console.error(`[Sort-Play Like Button] Failed to mount like button in Now Playing View after ${MAX_RETRIES} retries.`);
+    
+        console.error(`[Sort-Play Like Button NPV] Failed to mount like button in Now Playing View after ${MAX_RETRIES} retries.`);
     }
     
     (async function initialize() {
         await likeButton_initiateLikedSongs();
     
-        while (!Spicetify?.Player?.data?.item) {
+        while (!Spicetify?.Player?.data?.item || !document.querySelector(".main-nowPlayingWidget-nowPlaying")) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
     
         await mountLikeButton();
         await mountLikeButtonNowPlayingView();
