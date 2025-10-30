@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.21.0";
+  const SORT_PLAY_VERSION = "5.21.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -14482,11 +14482,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return { ...track, personalScrobbles: null, error: "Invalid track ID." };
     }
 
+    const isLocal = Spicetify.URI.isLocal(track.uri);
+
     const trackName = track.name;
     const artistName = track.artists ? track.artists[0]?.name || track.artistName : track.artistName;
 
     const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
-    const cachedData = getCachedPersonalScrobbles(trackId);
+    const cachedData = isLocal ? null : getCachedPersonalScrobbles(trackId);
 
     if (cachedData && !cachedData.pendingUpdate && !isCurrentTrack) {
         return { ...track, personalScrobbles: cachedData.count };
@@ -14522,23 +14524,28 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const data = await response.json();
 
         if (data.error) {
-          if (data.error === 6) {
-            setCachedPersonalScrobbles(trackId, 0, false);
+          if (data.error === 6) { 
+            if (!isLocal) {
+                setCachedPersonalScrobbles(trackId, 0, false);
+            }
             return { ...track, personalScrobbles: 0 };
           } else {
-            throw new Error(`Last.fm API error: ${data.message}`); 
+            throw new Error(`Last.fm API error: ${data.message}`);
           }
         }
         
         const newScrobbleCount = data.track?.userplaycount ? parseInt(data.track.userplaycount) : 0;
-        const oldScrobbleCount = cachedData ? cachedData.count : -1;
+        
+        if (!isLocal) {
+            const oldScrobbleCount = cachedData ? cachedData.count : -1;
 
-        if (newScrobbleCount > oldScrobbleCount) {
-            setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
-        } else if (cachedData) {
-            setCachedPersonalScrobbles(trackId, oldScrobbleCount, true);
-        } else {
-            setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
+            if (newScrobbleCount > oldScrobbleCount) {
+                setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
+            } else if (cachedData) {
+                setCachedPersonalScrobbles(trackId, oldScrobbleCount, true);
+            } else {
+                setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
+            }
         }
 
         return { ...track, personalScrobbles: newScrobbleCount };
@@ -15959,6 +15966,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     let tracks;
     const isArtistPage = URI.isArtist(uri);
+    let contextUri = uri; 
 
     if (URI.isPlaylistV1OrV2(uri)) {
         tracks = await getPlaylistTracks(uri.split(":")[2]);
@@ -15966,6 +15974,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         tracks = await getArtistTracksForShuffle(uri);
     } else if (isLikedSongsPage(uri)) {
         tracks = await getLikedSongs();
+        contextUri = null; 
+    } else if (isLocalFilesPage(uri)) {
+        tracks = await getLocalFilesTracks();
+        contextUri = null; 
     } else if (URI.isAlbum(uri)) {
         tracks = await getAlbumTracks(uri.split(":")[2]);
     } else {
@@ -15975,6 +15987,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (!tracks || tracks.length === 0) {
       throw new Error('No tracks found to shuffle');
     }
+
+    const containsLocalFiles = tracks.some(track => Spicetify.URI.isLocal(track.uri));
 
     let tracksToProcess;
 
@@ -15991,7 +16005,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     let finalSortedTracks;
 
-    if (useEnergyWaveShuffle) {
+    if (useEnergyWaveShuffle && !containsLocalFiles) {
         Spicetify.showNotification("Performing Randomized Energy Wave Shuffle...");
         
         const trackIds = tracksToProcess.map(t => t.trackId || t.uri.split(":")[2]);
@@ -16003,10 +16017,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         finalSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
     } else {
+        if (useEnergyWaveShuffle && containsLocalFiles) {
+            Spicetify.showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
+        }
         finalSortedTracks = shuffleArray(tracksToProcess);
     }
 
-    await setQueueFromTracks(finalSortedTracks, uri, 'shuffle');
+    await setQueueFromTracks(finalSortedTracks, contextUri, 'shuffle');
   }
 
   function shouldShowShufflePlayOption(uris) {
@@ -18105,7 +18122,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                       }
                   });
           } else if (sortType === "shuffle") {
-            if (useEnergyWaveShuffle && !isLocalFilesPage(currentUriAtStart)) {
+            const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
+
+            if (useEnergyWaveShuffle && !containsLocalFiles) {
                 if (!isHeadless) mainButton.innerText = "Analyzing...";
                 const trackIds = uniqueTracks.map(t => t.trackId);
                 const allStats = await getBatchTrackStats(trackIds);
@@ -18122,8 +18141,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const waveSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
 
                 sortedTracks = [...waveSortedTracks, ...shuffleArray(tracksWithoutData)];
-                
             } else {
+                if (useEnergyWaveShuffle && containsLocalFiles && !isHeadless) {
+                    Spicetify.showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
+                }
                 sortedTracks = shuffleArray(uniqueTracks);
             }
           } else if (sortType === "deduplicateOnly") {
@@ -19241,12 +19262,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     const results = {};
-    const BATCH_SIZE = 50;
+    const BATCH_SIZE = 100;
     const MAX_RETRIES = 3;
     const INITIAL_DELAY = 1000;
+    const CONCURRENCY_LIMIT = 10;
 
+    const batches = [];
     for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
-        const batchIds = trackIds.slice(i, i + BATCH_SIZE);
+        batches.push(trackIds.slice(i, i + BATCH_SIZE));
+    }
+
+    let tracksProcessed = 0;
+
+    const processBatch = async (batchIds) => {
         let success = false;
         let retries = 0;
         let delay = INITIAL_DELAY;
@@ -19292,13 +19320,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     await new Promise(resolve => setTimeout(resolve, delay));
                     delay *= 2;
                 } else {
-                    console.error(`[Sort-Play] Failed to fetch batch track stats after ${MAX_RETRIES} attempts for batch starting at index ${i}.`);
+                    console.error(`[Sort-Play] Failed to fetch batch track stats after ${MAX_RETRIES} attempts for a batch.`);
                 }
             }
         }
-        const progress = Math.min(100, Math.floor(((i + BATCH_SIZE) / trackIds.length) * 100));
+        tracksProcessed += batchIds.length;
+        const progress = Math.min(100, Math.floor((tracksProcessed / trackIds.length) * 100));
         updateProgress(progress);
+    };
+
+    for (let i = 0; i < batches.length; i += CONCURRENCY_LIMIT) {
+        const concurrentBatch = batches.slice(i, i + CONCURRENCY_LIMIT);
+        await Promise.all(concurrentBatch.map(batch => processBatch(batch)));
     }
+
     return results;
   }
 
@@ -21152,17 +21187,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let retryDelay = 250;
     
         const uri = Spicetify.Player.data?.item?.uri || "";
-        const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
-        let container = nowPlayingView ? nowPlayingView.querySelector(".likeControl-wrapper-npv") : null;
-
+        
         if (!uri || !uri.startsWith("spotify:track:")) {
+            const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
+            const container = nowPlayingView ? nowPlayingView.querySelector(".likeControl-wrapper-npv") : null;
             if (container) {
                 Spicetify.ReactDOM.unmountComponentAtNode(container);
             }
             return;
         }
-
+    
         for (let i = 0; i < MAX_RETRIES; i++) {
+            const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
+            
             if (!nowPlayingView) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retryDelay = Math.min(retryDelay * 2, 3000);
@@ -21185,7 +21222,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 continue;
             }
     
-            container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
+            let container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
             if (!container) {
                 container = document.createElement("div");
                 container.className = "likeControl-wrapper-npv";
