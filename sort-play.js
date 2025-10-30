@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.20.3";
+  const SORT_PLAY_VERSION = "5.21.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -590,6 +590,19 @@
       console.error("Failed to load Color Thief library, color sorting will not be available.", error);
   }
 
+  function normalizeArtistNames(artists) {
+    if (!artists || artists.length === 0) return "Unknown Artist";
+    
+    const firstArtistName = artists[0].name || "";
+    
+    if (firstArtistName.includes(';')) {
+        const uniqueArtists = [...new Set(firstArtistName.split(';').map(a => a.trim()))];
+        return uniqueArtists.join(', ');
+    }
+
+    return artists.map(artist => artist.name).join(", ");
+  }
+
   const AI_DATA_CACHE_VERSION = '1';
   const AI_DATA_CACHE_KEY_PREFIX = `sort-play-playlist-cache-v${AI_DATA_CACHE_VERSION}-`;
   const AI_DATA_MAX_CACHE_SIZE_BYTES = 9 * 1024 * 1024;
@@ -766,6 +779,7 @@
     console.error("Failed to load Google AI SDK:", error);
   }
 
+  
   function saveLastFmUsername(username) {
     localStorage.setItem(STORAGE_KEY_LASTFM_USERNAME, username);
   }
@@ -4021,6 +4035,10 @@
             return;
         }
 
+        if (Spicetify.URI.isLocalTrack(track.uri)) {
+            return;
+        }
+
         const targetContainer = document.querySelector(selectedNowPlayingDataPosition);
         if (!targetContainer) {
             await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -4181,7 +4199,7 @@
     }
 
     console.error(`[Sort-Play] Failed to mount Now Playing data after ${MAX_RETRIES} retries.`);
-}
+  }
 
   function preventDragCloseModal() {
     let mouseDownInsideModal = false;
@@ -13289,6 +13307,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
+  function isLocalFilesPage(uri) {
+    if (!uri || typeof uri !== 'string') return false;
+    return uri === "spotify:collection:local-files";
+  }
+
   function getCurrentUri() {
     const path = Spicetify.Platform.History.location?.pathname;
     if (!path) return null;
@@ -13312,6 +13335,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     if (segments.includes('collection') && segments.includes('tracks')) {
         return "spotify:collection:tracks";
+    }
+    
+    if (segments.includes('collection') && segments.includes('local-files')) {
+        return "spotify:collection:local-files";
     }
     
     return null;
@@ -13360,6 +13387,43 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
     
+  async function getLocalFilesTracks() {
+    try {
+        const localTracksData = await Spicetify.Platform.LocalFilesAPI.getTracks();
+        if (!localTracksData) {
+            throw new Error("Failed to fetch local files data.");
+        }
+
+        return localTracksData.map((item) => ({
+            uri: item.uri,
+            uid: item.uid,
+            name: item.name,
+            albumUri: item.album.uri,
+            albumName: item.album.name,
+            artistUris: item.artists.map((artist) => artist.uri),
+            artistName: item.artists[0].name,
+            allArtists: normalizeArtistNames(item.artists),
+            durationMilis: item.duration.milliseconds,
+            playCount: "N/A",
+            popularity: null,
+            releaseDate: null,
+            track: {
+                album: {
+                    id: item.album.uri.split(":")[2],
+                    name: item.album.name,
+                },
+                name: item.name,
+                duration_ms: item.duration.milliseconds,
+                id: item.uri.split(":")[2]
+            }
+        }));
+    } catch (error) {
+        console.error("Error fetching local files:", error);
+        Spicetify.showNotification("Failed to fetch local files.", true);
+        return [];
+    }
+  }
+
   const fetchPlaylistContents = async (uri) => (await PlaylistAPI.getContents(uri)).items;
 
   const parsePlaylistAPITrack = (track) => ({
@@ -13411,7 +13475,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     if (!track || !track.uri) {
                         return false;
                     }
-                    return !URI.isLocalTrack(track.uri);
+                    return track.uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(track.uri);
                 })
                 .map(track => {
                     try {
@@ -14418,6 +14482,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return { ...track, personalScrobbles: null, error: "Invalid track ID." };
     }
 
+    const trackName = track.name;
+    const artistName = track.artists ? track.artists[0]?.name || track.artistName : track.artistName;
+
     const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
     const cachedData = getCachedPersonalScrobbles(trackId);
 
@@ -14437,15 +14504,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     while (retries < maxRetries) {
       try {
-        const artistName = track.artists ? track.artists[0]?.name || track.artistName : track.artistName;
-        if (!artistName || !track.name) {
+        if (!artistName || !trackName) {
           return { ...track, personalScrobbles: null, error: "Missing track metadata." };
         }
 
         const params = new URLSearchParams({
             method: 'track.getInfo',
             artist: encodeURIComponent(artistName),
-            track: encodeURIComponent(track.name),
+            track: encodeURIComponent(trackName),
             username: username,
             format: 'json'
         });
@@ -14457,6 +14523,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         if (data.error) {
           if (data.error === 6) {
+            setCachedPersonalScrobbles(trackId, 0, false);
             return { ...track, personalScrobbles: 0 };
           } else {
             throw new Error(`Last.fm API error: ${data.message}`); 
@@ -14477,7 +14544,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return { ...track, personalScrobbles: newScrobbleCount };
 
       } catch (error) {
-        console.error(`Error fetching personal scrobbles for track ${track.name} (Attempt ${retries + 1}):`, error);
+        console.error(`Error fetching personal scrobbles for track ${trackName} (Attempt ${retries + 1}):`, error);
         retries++;
         if (retries < maxRetries) {
           await new Promise((resolve) => setTimeout(resolve, delay));
@@ -15618,98 +15685,112 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function replacePlaylistTracks(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
-    const BATCH_SIZE = 100;
-    const validUris = trackUris.filter(uri => typeof uri === 'string' && uri.startsWith("spotify:track:"));
-    
-    const firstBatch = validUris.slice(0, BATCH_SIZE);
-    const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-    
-    let retries = 0;
-    let currentDelay = initialDelay;
-    let success = false;
+    const validUris = trackUris.filter(uri => typeof uri === 'string' && (uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(uri)));
+    const hasLocalTracks = validUris.some(uri => Spicetify.URI.isLocal(uri));
 
-    while (retries <= maxRetries && !success) {
-        try {
-            await Spicetify.CosmosAsync.put(playlistUrl, { uris: firstBatch });
-            success = true;
-        } catch (error) {
-            console.error(
-                `[Sort-Play] Error replacing tracks in playlist ${playlistId} (Attempt ${retries + 1}):`,
-                error
-            );
-            retries++;
-            if (retries <= maxRetries) {
-                await new Promise(resolve => setTimeout(resolve, currentDelay));
-                currentDelay *= 2;
-            } else {
-                console.error(
-                    `[Sort-Play] Failed to replace tracks in playlist ${playlistId} after ${maxRetries + 1} attempts. Aborting.`
-                );
-                throw new Error(`Failed to replace tracks in playlist ${playlistId}.`);
+    if (!hasLocalTracks) {
+        const BATCH_SIZE = 100;
+        const firstBatch = validUris.slice(0, BATCH_SIZE);
+        const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+        
+        let retries = 0;
+        let currentDelay = initialDelay;
+        let success = false;
+
+        while (retries <= maxRetries && !success) {
+            try {
+                await Spicetify.CosmosAsync.put(playlistUrl, { uris: firstBatch });
+                success = true;
+            } catch (error) {
+                console.error(`[Sort-Play] Error replacing tracks in playlist ${playlistId} (Attempt ${retries + 1}):`, error);
+                retries++;
+                if (retries <= maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, currentDelay));
+                    currentDelay *= 2;
+                } else {
+                    throw new Error(`Failed to replace tracks in playlist ${playlistId}.`);
+                }
             }
         }
-    }
 
-    if (success && validUris.length > BATCH_SIZE) {
-        const remainingUris = validUris.slice(BATCH_SIZE);
-        await addTracksToPlaylist(playlistId, remainingUris);
+        if (success && validUris.length > BATCH_SIZE) {
+            const remainingUris = validUris.slice(BATCH_SIZE);
+            await addTracksToPlaylist(playlistId, remainingUris);
+        }
+    } else {
+        const playlistUri = `spotify:playlist:${playlistId}`;
+        try {
+            const { items } = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri);
+            if (items.length > 0) {
+                const tracksToRemove = items.map(track => ({ uri: track.uri, uid: track.uid }));
+                await Spicetify.Platform.PlaylistAPI.remove(playlistUri, tracksToRemove);
+            }
+            await addTracksToPlaylist(playlistId, validUris);
+        } catch (error) {
+            console.error(`[Sort-Play] Error updating playlist with local files using Platform API:`, error);
+            Spicetify.showNotification("Failed to update playlist with local files.", true);
+        }
     }
   }
 
   async function addTracksToPlaylist(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
-    const BATCH_SIZE = 100;
-    const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-    const validAndUniqueUris = [
-      ...new Set(
-        trackUris.filter(
-          (uri) =>
-            typeof uri === "string" &&
-            uri.startsWith("spotify:track:") &&
-            uri.length > "spotify:track:".length
-        )
-      ),
-    ];
+    const playlistUri = `spotify:playlist:${playlistId}`;
+    const spotifyUris = [];
+    const localUris = [];
 
-    if (validAndUniqueUris.length < trackUris.length) {
-      console.warn(
-        "[Sort-Play] Some track URIs were invalid or duplicates and have been removed."
-      );
-    }
-
-    for (let i = 0; i < validAndUniqueUris.length; i += BATCH_SIZE) {
-      const batch = validAndUniqueUris.slice(i, i + BATCH_SIZE);
-      let retries = 0;
-      let currentDelay = initialDelay;
-
-      while (retries <= maxRetries) {
-        try {
-          await Spicetify.CosmosAsync.post(playlistUrl, {
-            uris: batch,
-          });
-          break;
-        } catch (error) {
-          console.error(
-            `[Sort-Play] Error adding batch ${
-              i / BATCH_SIZE + 1
-            } to playlist (Attempt ${retries + 1}):`,
-            error
-          );
-          
-          if (retries === maxRetries) {
-            console.error(
-              `[Sort-Play] Failed to add batch ${
-                i / BATCH_SIZE + 1
-              } after ${maxRetries + 1} attempts. Giving up on this batch and continuing.`
-            );
-            break;
-          }
-
-          retries++;
-          await new Promise((resolve) => setTimeout(resolve, currentDelay));
-          currentDelay *= 2;
+    trackUris.forEach(uri => {
+        if (typeof uri === "string") {
+            if (Spicetify.URI.isLocal(uri)) {
+                localUris.push(uri);
+            } else if (uri.startsWith("spotify:track:")) {
+                spotifyUris.push(uri);
+            }
         }
-      }
+    });
+
+    const promises = [];
+
+    if (localUris.length > 0) {
+        promises.push(
+            Spicetify.Platform.PlaylistAPI.add(playlistUri, localUris, {}).catch(error => {
+                console.error("[Sort-Play] Error adding local tracks via Platform API:", error);
+                Spicetify.showNotification("Failed to add local tracks to the playlist.", true);
+            })
+        );
     }
+
+    if (spotifyUris.length > 0) {
+        const spotifyAddPromise = (async () => {
+            const BATCH_SIZE = 100;
+            const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+
+            for (let i = 0; i < spotifyUris.length; i += BATCH_SIZE) {
+                const batch = spotifyUris.slice(i, i + BATCH_SIZE);
+                let retries = 0;
+                let currentDelay = initialDelay;
+
+                while (retries <= maxRetries) {
+                    try {
+                        await Spicetify.CosmosAsync.post(playlistUrl, { uris: batch });
+                        break;
+                    } catch (error) {
+                        console.error(`[Sort-Play] Error adding Spotify track batch (Attempt ${retries + 1}):`, error);
+                        if (retries === maxRetries) {
+                            console.error(`[Sort-Play] Failed to add Spotify track batch after ${maxRetries + 1} attempts. Giving up.`);
+                            Spicetify.showNotification("Failed to add some Spotify tracks.", true);
+                            break;
+                        }
+                        retries++;
+                        await new Promise((resolve) => setTimeout(resolve, currentDelay));
+                        currentDelay *= 2;
+                    }
+                }
+            }
+        })();
+        promises.push(spotifyAddPromise);
+    }
+
+    await Promise.all(promises);
   }
 
   async function setPlaylistVisibility(playlist, visibleForAll) {
@@ -17581,6 +17662,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function handleSortAndCreatePlaylist(sortType, options = {}) {
     const { isHeadless = false } = options;
 
+    const currentUriAtStartForCheck = getCurrentUri();
+    if (isLocalFilesPage(currentUriAtStartForCheck)) {
+        const unsupportedSortsForLocalFiles = [
+            'playCount', 'popularity', 'releaseDate', 'averageColor', 
+            'energyWave', 'tempo', 'energy', 'danceability', 'valence', 
+            'acousticness', 'instrumentalness', 'deduplicateOnly', 
+            'aiPick', 'customFilter', 'genreFilter'
+        ];
+
+        if (unsupportedSortsForLocalFiles.includes(sortType)) {
+            Spicetify.showNotification("This sort type is not available for Local Files. Only Scrobble and Shuffle sorts are supported.", true);
+            if (!isHeadless) {
+                resetButtons();
+            }
+            return;
+        }
+    }
+
     if (sortType === "sortByParent" || sortType === "createNewPlaylist") {
       return;
     }
@@ -17749,6 +17848,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         isArtistPage = true;
       } else if (isLikedSongsPage(currentUriAtStart)) {
         tracks = await getLikedSongs();
+      } else if (isLocalFilesPage(currentUriAtStart)) {
+        tracks = await getLocalFilesTracks();
       } else if (URI.isAlbum(currentUriAtStart)) {
         const albumId = currentUriAtStart.split(":")[2];
         tracks = await getAlbumTracks(albumId);
@@ -18004,7 +18105,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                       }
                   });
           } else if (sortType === "shuffle") {
-            if (useEnergyWaveShuffle) {
+            if (useEnergyWaveShuffle && !isLocalFilesPage(currentUriAtStart)) {
                 if (!isHeadless) mainButton.innerText = "Analyzing...";
                 const trackIds = uniqueTracks.map(t => t.trackId);
                 const allStats = await getBatchTrackStats(trackIds);
@@ -18169,6 +18270,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUriForNaming.split(":")[2]}`).then((r) => r.name);
         } else if (isLikedSongsPage(sourceUriForNaming)) {
             finalSourceName = "Liked Songs";
+        } else if (isLocalFilesPage(sourceUriForNaming)) {
+            finalSourceName = "Local Files";
         } else if (URI.isAlbum(sourceUriForNaming)) {
             const albumId = sourceUriForNaming.split(":")[2];
             finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`).then((r) => r.name);
@@ -19506,12 +19609,37 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
+  function getTrackDataObject(trackElement) {
+    const reactPropsKey = Object.keys(trackElement).find(key => key.startsWith("__reactProps$"));
+    if (!reactPropsKey) return null;
+
+    const props = trackElement[reactPropsKey];
+    if (!props) return null;
+
+    const potentialPaths = [
+        () => props.children?.props?.item,
+        () => props.children?.[0]?.props?.item,
+        () => props.children?.props?.value?.item,
+        () => props.children?.[0]?.props?.children?.props?.item,
+        () => props.children?.[0]?.props?.children?.[0]?.props?.item,
+    ];
+
+    for (const getPath of potentialPaths) {
+        const trackData = getPath();
+        if (trackData && trackData.uri && trackData.name && trackData.artists) {
+            return trackData;
+        }
+    }
+    
+    return null;
+  }
+
   async function loadAdditionalColumnData(tracklist_) {
     const currentUri = getCurrentUri();
     let columnConfigs = [];
     const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo', 'popularity'];
 
-    if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+    if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)) {
         if (showSecondAdditionalColumn) {
             columnConfigs.push({ type: selectedSecondColumnType, dataSelector: ".sort-play-second-data" });
         }
@@ -19526,32 +19654,81 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (columnConfigs.length === 0) return;
 
-    const tracksToProcess = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"))
-        .filter(track => {
-            if (track.classList.contains('sort-play-processing') || track.hasAttribute('data-sp-fetch-failed')) {
-                return false;
-            }
-            const trackUri = getTracklistTrackUri(track);
-            const isTrack = trackUri && trackUri.includes("track");
-            if (!isTrack) return false;
+    const allTrackRows = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"));
+    const spotifyTracksToProcess = [];
 
-            return columnConfigs.some(config => {
-                const dataElement = track.querySelector(config.dataSelector);
+    for (const trackElement of allTrackRows) {
+        if (trackElement.classList.contains('sort-play-processing') || trackElement.hasAttribute('data-sp-fetch-failed')) {
+            continue;
+        }
+        const trackUri = getTracklistTrackUri(trackElement);
+        if (!trackUri) continue;
+
+        if (Spicetify.URI.isLocal(trackUri)) {
+            trackElement.classList.add('sort-play-processing');
+            const trackData = getTrackDataObject(trackElement);
+
+            if (trackData) {
+                const rawArtistName = trackData.artists[0]?.name || "";
+                let cleanedArtistName = rawArtistName;
+                if (rawArtistName.includes(';')) {
+                    cleanedArtistName = rawArtistName.split(';')[0].trim();
+                }
+
+                const localTrackInfo = {
+                    name: trackData.name,
+                    artistName: cleanedArtistName,
+                    artists: [{ name: cleanedArtistName }],
+                    uri: trackData.uri
+                };
+
+                for (const config of columnConfigs) {
+                    const dataElement = trackElement.querySelector(config.dataSelector);
+                    if (!dataElement || dataElement.dataset.spProcessed) continue;
+
+                    try {
+                        if (config.type === 'scrobbles') {
+                            const result = await getTrackDetailsWithScrobbles(localTrackInfo);
+                            updateDisplay(dataElement, result.scrobbles, config.type);
+                        } else if (config.type === 'personalScrobbles') {
+                            if (!loadLastFmUsername()) {
+                                updateDisplay(dataElement, { error: "Set Last.fm username" }, config.type);
+                            } else {
+                                const result = await getTrackDetailsWithPersonalScrobbles(localTrackInfo);
+                                const valueToDisplay = result.error ? { error: result.error } : result.personalScrobbles;
+                                updateDisplay(dataElement, valueToDisplay, config.type);
+                            }
+                        } else {
+                            updateDisplay(dataElement, "_", config.type);
+                        }
+                    } catch (e) {
+                        updateDisplay(dataElement, "_", config.type);
+                        trackElement.setAttribute('data-sp-fetch-failed', 'true');
+                    }
+                }
+            }
+            trackElement.classList.remove('sort-play-processing');
+        } else if (trackUri.includes("track")) {
+            const needsProcessing = columnConfigs.some(config => {
+                const dataElement = trackElement.querySelector(config.dataSelector);
                 return dataElement && !dataElement.dataset.spProcessed;
             });
-        });
-    
-    if (tracksToProcess.length === 0) return;
+            if (needsProcessing) {
+                spotifyTracksToProcess.push(trackElement);
+            }
+        }
+    }
 
-    const requiredDataTypes = new Set(columnConfigs.map(c => c.type));
-    if (requiredDataTypes.has('playCount')) initializePlayCountCache();
-    if (requiredDataTypes.has('releaseDate')) initializeReleaseDateCache();
-    if (requiredDataTypes.has('scrobbles')) initializeScrobblesCache();
+    if (spotifyTracksToProcess.length === 0) return;
+
+    if (columnConfigs.some(c => c.type === 'playCount')) initializePlayCountCache();
+    if (columnConfigs.some(c => c.type === 'releaseDate')) initializeReleaseDateCache();
+    if (columnConfigs.some(c => c.type === 'scrobbles')) initializeScrobblesCache();
     
     const BATCH_SIZE = 30;
     
-    for (let i = 0; i < tracksToProcess.length; i += BATCH_SIZE) {
-        const batch = tracksToProcess.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < spotifyTracksToProcess.length; i += BATCH_SIZE) {
+        const batch = spotifyTracksToProcess.slice(i, i + BATCH_SIZE);
         
         const needsAudioFeatures = columnConfigs.some(c => audioFeatureTypes.includes(c.type));
         
@@ -19731,7 +19908,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
             }
         }
-        if (i < tracksToProcess.length - 1) {
+        if (i < spotifyTracksToProcess.length - 1) {
             await new Promise(resolve => setTimeout(resolve, 200));
         }
     }
@@ -20401,6 +20578,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           likedSongsContainer.appendChild(mainButton);
         }
       }
+      } else if (isLocalFilesPage(currentUri)) {
+        const localFilesActionBar = document.querySelector(".main-actionBar-ActionBarRow");
+        if (localFilesActionBar) {
+            const controlsContainer = localFilesActionBar.querySelector("div:last-child");
+            if (controlsContainer && !controlsContainer.contains(mainButton)) {
+                mainButton.style.marginLeft = ""; 
+                mainButton.style.marginRight = "8px";
+                if (controlsContainer.firstChild) {
+                    controlsContainer.insertBefore(mainButton, controlsContainer.firstChild);
+                } else {
+                    controlsContainer.appendChild(mainButton);
+                }
+            }
+        }
     } 
     else if (URI.isAlbum(currentUri)) {
         const listButton = document.querySelector(".x-sortBox-sortDropdown");
@@ -20841,8 +21032,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let retryDelay = 250;
     
         try {
+            const uri = Spicetify.Player.data?.item?.uri || "";
+            const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
+            let container = nowPlayingWidget ? nowPlayingWidget.querySelector(".likeControl-wrapper") : null;
+
+            if (!uri || !uri.startsWith("spotify:track:")) {
+                if (container) {
+                    Spicetify.ReactDOM.unmountComponentAtNode(container);
+                }
+                mountLikeButton_isRunning = false;
+                return;
+            }
+
             for (let i = 0; i < MAX_RETRIES; i++) {
-                const nowPlayingWidget = document.querySelector(".main-nowPlayingWidget-nowPlaying");
                 if (!nowPlayingWidget) {
                     console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Now playing widget not found`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -20857,17 +21059,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     retryDelay = Math.min(retryDelay * 2, 3000);
                     continue;
                 }
-    
-                const uri = Spicetify.Player.data?.item?.uri || "";
                 
-                if (!uri || !uri.startsWith("spotify:track:")) {
-                    console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Invalid or empty URI: "${uri}"`);
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    retryDelay = Math.min(retryDelay * 2, 3000);
-                    continue;
-                }
-    
-                let container = nowPlayingWidget.querySelector(".likeControl-wrapper");
+                container = nowPlayingWidget.querySelector(".likeControl-wrapper");
                 
                 if (container && container.dataset.renderedUri === uri && container.firstChild) {
                     mountLikeButton_failedAttempts = 0;
@@ -20958,8 +21151,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const MAX_RETRIES = 15;
         let retryDelay = 250;
     
+        const uri = Spicetify.Player.data?.item?.uri || "";
+        const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
+        let container = nowPlayingView ? nowPlayingView.querySelector(".likeControl-wrapper-npv") : null;
+
+        if (!uri || !uri.startsWith("spotify:track:")) {
+            if (container) {
+                Spicetify.ReactDOM.unmountComponentAtNode(container);
+            }
+            return;
+        }
+
         for (let i = 0; i < MAX_RETRIES; i++) {
-            const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
             if (!nowPlayingView) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
                 retryDelay = Math.min(retryDelay * 2, 3000);
@@ -20982,16 +21185,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 continue;
             }
     
-            const uri = Spicetify.Player.data?.item?.uri || "";
-            
-            if (!uri || !uri.startsWith("spotify:track:")) {
-                console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Invalid or empty URI: "${uri}"`);
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 2, 3000);
-                continue;
-            }
-    
-            let container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
+            container = nowPlayingView.querySelector(".likeControl-wrapper-npv");
             if (!container) {
                 container = document.createElement("div");
                 container.className = "likeControl-wrapper-npv";
