@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.20.2";
+  const SORT_PLAY_VERSION = "5.20.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -112,7 +112,7 @@
   const STORAGE_KEY_NOW_PLAYING_SEPARATOR = "sort-play-now-playing-separator";
   const CACHE_KEY_PERSONAL_SCROBBLES = 'sort-play-personal-scrobbles-cache';
   const CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES = 'sort-play-personal-scrobbles-cache-timestamp';
-  const CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES = 48;
+  const CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES = 4;
   const AI_DATA_CACHE_MAX_ITEMS = 1500;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
@@ -9572,6 +9572,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     setInterval(() => {
         checkAndRunJobs();
         checkAndRunDedicatedJobs();
+        checkAndClearExpiredPersonalScrobblesCache();
     }, SCHEDULER_INTERVAL_MINUTES * 60 * 1000);
   }
 
@@ -19271,20 +19272,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   function initializePersonalScrobblesCache() {
-    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES);
-    if (!timestamp) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
-      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
-      return;
-    }
-
-    const hoursPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60); 
-    if (hoursPassed >= CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
-      localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
-    }
+    localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
+    localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
   }
 
+  function checkAndClearExpiredPersonalScrobblesCache() {
+    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES);
+    if (timestamp) {
+      const hoursPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
+      if (hoursPassed >= CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES) {
+        localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
+        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
+      }
+    }
+  }
+  
   function getCachedPersonalScrobbles(trackId) {
     try {
       const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
@@ -19535,7 +19537,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             return columnConfigs.some(config => {
                 const dataElement = track.querySelector(config.dataSelector);
-                return dataElement && (dataElement.textContent === "" || dataElement.textContent === "_");
+                return dataElement && !dataElement.dataset.spProcessed;
             });
         });
     
@@ -19737,6 +19739,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function updateDisplay(element, value, type) {
     if (!element) return;
+    element.dataset.spProcessed = "true";
 
     let displayValue = "_"; 
 
@@ -19912,6 +19915,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         } else if (columnTypeChanged) {
             if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
+            const allCells = tracklist_.querySelectorAll('.sort-play-data');
+            allCells.forEach(cell => {
+                cell.textContent = "";
+                delete cell.dataset.spProcessed;
+            });
         }
     } else { 
         if (existingHeaderColumn) {
@@ -19962,6 +19970,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         } else if (secondColumnTypeChanged) {
             if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
+            const allCells = tracklist_.querySelectorAll('.sort-play-second-data');
+            allCells.forEach(cell => {
+                cell.textContent = "";
+                delete cell.dataset.spProcessed;
+            });
         }
     } else {
         if (existingSecondHeaderColumn) {
@@ -20159,7 +20172,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
             headerTextSpan.innerText = expectedHeaderText;
             const allCells = tracklistContainer.querySelectorAll('.sort-play-album-col .sort-play-data');
-            allCells.forEach(cell => cell.textContent = "");
+            allCells.forEach(cell => {
+                cell.textContent = "";
+                delete cell.dataset.spProcessed;
+            });
         }
     }
     
@@ -20251,7 +20267,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
             headerTextSpan.innerText = expectedHeaderText;
             const allCells = tracklistContainer.querySelectorAll('.sort-play-artist-col .sort-play-data');
-            allCells.forEach(cell => cell.textContent = "");
+            allCells.forEach(cell => {
+                cell.textContent = "";
+                delete cell.dataset.spProcessed;
+            });
         }
     }
 
