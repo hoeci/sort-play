@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.21.1";
+  const SORT_PLAY_VERSION = "5.21.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -791,7 +791,7 @@
   function showLastFmUsernameModal() {
     const modalContainer = document.createElement("div");
     const savedUsername = loadLastFmUsername();
-    let includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true"; 
+    let includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false"; 
 
     modalContainer.innerHTML = `
       <style>
@@ -933,7 +933,7 @@
       enableButton(saveButton);
       saveButton.textContent = "Save";
 
-      localStorage.setItem("sort-play-include-zero-scrobbles", includeZeroScrobbles);
+      localStorage.setItem("sort-play-include-no-scrobbles", includeZeroScrobbles);
     });
 
     cancelButton.addEventListener("click", () => {
@@ -9298,13 +9298,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         case "personalScrobbles": {
             const tracksWithScrobbles = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
             if (sortType === 'personalScrobbles') {
-                const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
+                const includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
                 sortedTracks = tracksWithScrobbles
                     .filter(track => includeZeroScrobbles || (track.personalScrobbles != null && track.personalScrobbles > 0))
                     .sort((a, b) => (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
             } else {
+                const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") !== "false";
                 sortedTracks = tracksWithScrobbles
-                    .filter(track => track.scrobbles != null)
+                    .filter(track => includeZeroScrobbles || (track.scrobbles != null && track.scrobbles > 0))
                     .sort((a, b) => (b.scrobbles ?? 0) - (a.scrobbles ?? 0));
             }
             break;
@@ -13361,8 +13362,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         albumUri: item.album.uri,
         albumName: item.album.name,
         artistUris: item.artists.map((artist) => artist.uri),
-        artistName: item.artists[0].name,
-        allArtists: item.artists.map(artist => artist.name).join(", "),
+        artistName: item.artists[0]?.name,
+        allArtists: normalizeArtistNames(item.artists),
         durationMilis: item.duration.milliseconds,
         addedAt: item.addedAt,
         playCount: "N/A",
@@ -13401,7 +13402,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             albumUri: item.album.uri,
             albumName: item.album.name,
             artistUris: item.artists.map((artist) => artist.uri),
-            artistName: item.artists[0].name,
+            artistName: item.artists[0]?.name,
             allArtists: normalizeArtistNames(item.artists),
             durationMilis: item.duration.milliseconds,
             playCount: "N/A",
@@ -13433,8 +13434,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     albumUri: track.album.uri,
     albumName: track.album.name,
     artistUris: track.artists.map((artist) => artist.uri),
-    allArtists: track.artists.map((artist) => artist.name).join(", "),
-    artistName: track.artists[0].name,
+    allArtists: normalizeArtistNames(track.artists),
+    artistName: track.artists[0]?.name,
     durationMilis: track.duration.milliseconds,
     playcount: 0,
     popularity: 0,
@@ -14392,16 +14393,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       try {
         let artistName, trackName;
 
-        if (track.artists) {
-          artistName = track.artists[0]?.name || track.artistName;
-          trackName = track.name;
-        } else {
-          artistName = track.artistName;
-          trackName = track.name;
+        artistName = track.artistName;
+        if (!artistName && track.artists && track.artists.length > 0) {
+            artistName = track.artists[0]?.name;
+        }
+        if (!artistName && track.allArtists) {
+            artistName = track.allArtists.split(',')[0].trim();
+        }
+        if (artistName && artistName.includes(';')) {
+            artistName = artistName.split(';')[0].trim();
         }
 
+        trackName = track.name;
+
         if (!artistName || !trackName) {
-          console.warn("Missing artist name or track name:", track);
           return {
             ...track,
             scrobbles: null,
@@ -14432,7 +14437,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             );
             return {
               ...track,
-              scrobbles: 0,  
+              scrobbles: null,  
             };
           } else {
             throw new Error(`Last.fm API error: ${data.message}`);
@@ -14478,14 +14483,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   async function getTrackDetailsWithPersonalScrobbles(track) {
     const trackId = track.uri ? track.uri.split(":")[2] : (track.track ? track.track.id : null);
-    if (!trackId) {
+    const isLocal = Spicetify.URI.isLocal(track.uri);
+    
+    if (isLocal && (!track.name || !track.artistName)) {
+        return { ...track, personalScrobbles: null, error: "Local file missing metadata." };
+    }
+    
+    if (!trackId && !isLocal) {
         return { ...track, personalScrobbles: null, error: "Invalid track ID." };
     }
 
-    const isLocal = Spicetify.URI.isLocal(track.uri);
-
     const trackName = track.name;
-    const artistName = track.artists ? track.artists[0]?.name || track.artistName : track.artistName;
+    let artistName = track.artistName;
+    if (!artistName && track.artists && track.artists.length > 0) {
+        artistName = track.artists[0]?.name;
+    }
+    if (!artistName && track.allArtists) {
+        artistName = track.allArtists.split(',')[0].trim();
+    }
+    if (artistName && artistName.includes(';')) {
+        artistName = artistName.split(';')[0].trim();
+    }
 
     const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
     const cachedData = isLocal ? null : getCachedPersonalScrobbles(trackId);
@@ -14512,8 +14530,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const params = new URLSearchParams({
             method: 'track.getInfo',
-            artist: encodeURIComponent(artistName),
-            track: encodeURIComponent(trackName),
+            artist: artistName,
+            track: trackName,
             username: username,
             format: 'json'
         });
@@ -15742,62 +15760,59 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   async function addTracksToPlaylist(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const playlistUri = `spotify:playlist:${playlistId}`;
-    const spotifyUris = [];
-    const localUris = [];
+    const validUris = trackUris.filter(uri => typeof uri === "string" && (Spicetify.URI.isLocal(uri) || uri.startsWith("spotify:track:")));
+    const hasLocalTracks = validUris.some(uri => Spicetify.URI.isLocal(uri));
+    const BATCH_SIZE = 100;
 
-    trackUris.forEach(uri => {
-        if (typeof uri === "string") {
-            if (Spicetify.URI.isLocal(uri)) {
-                localUris.push(uri);
-            } else if (uri.startsWith("spotify:track:")) {
-                spotifyUris.push(uri);
-            }
-        }
-    });
+    if (hasLocalTracks) {
+        for (let i = validUris.length; i > 0; i -= BATCH_SIZE) {
+            const start = Math.max(0, i - BATCH_SIZE);
+            const batch = validUris.slice(start, i);
+            
+            let retries = 0;
+            let success = false;
+            let currentDelay = initialDelay;
 
-    const promises = [];
-
-    if (localUris.length > 0) {
-        promises.push(
-            Spicetify.Platform.PlaylistAPI.add(playlistUri, localUris, {}).catch(error => {
-                console.error("[Sort-Play] Error adding local tracks via Platform API:", error);
-                Spicetify.showNotification("Failed to add local tracks to the playlist.", true);
-            })
-        );
-    }
-
-    if (spotifyUris.length > 0) {
-        const spotifyAddPromise = (async () => {
-            const BATCH_SIZE = 100;
-            const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-
-            for (let i = 0; i < spotifyUris.length; i += BATCH_SIZE) {
-                const batch = spotifyUris.slice(i, i + BATCH_SIZE);
-                let retries = 0;
-                let currentDelay = initialDelay;
-
-                while (retries <= maxRetries) {
-                    try {
-                        await Spicetify.CosmosAsync.post(playlistUrl, { uris: batch });
+            while (!success && retries <= maxRetries) {
+                try {
+                    await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { before: 0 });
+                    success = true;
+                } catch (error) {
+                    console.error(`[Sort-Play] Platform API Error adding batch to start (Attempt ${retries + 1}):`, error);
+                    if (retries === maxRetries) {
+                        Spicetify.showNotification("Failed to add some tracks.", true);
                         break;
-                    } catch (error) {
-                        console.error(`[Sort-Play] Error adding Spotify track batch (Attempt ${retries + 1}):`, error);
-                        if (retries === maxRetries) {
-                            console.error(`[Sort-Play] Failed to add Spotify track batch after ${maxRetries + 1} attempts. Giving up.`);
-                            Spicetify.showNotification("Failed to add some Spotify tracks.", true);
-                            break;
-                        }
-                        retries++;
-                        await new Promise((resolve) => setTimeout(resolve, currentDelay));
-                        currentDelay *= 2;
                     }
+                    retries++;
+                    await new Promise(resolve => setTimeout(resolve, currentDelay));
+                    currentDelay *= 2;
                 }
             }
-        })();
-        promises.push(spotifyAddPromise);
-    }
+        }
+    } else {
+        const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+        for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
+            const batch = validUris.slice(i, i + BATCH_SIZE);
+            let retries = 0;
+            let currentDelay = initialDelay;
 
-    await Promise.all(promises);
+            while (retries <= maxRetries) {
+                try {
+                    await Spicetify.CosmosAsync.post(playlistUrl, { uris: batch });
+                    break;
+                } catch (error) {
+                    console.error(`[Sort-Play] CosmosAsync Error adding batch (Attempt ${retries + 1}):`, error);
+                    if (retries === maxRetries) {
+                        Spicetify.showNotification("Failed to add some Spotify tracks.", true);
+                        break;
+                    }
+                    retries++;
+                    await new Promise((resolve) => setTimeout(resolve, currentDelay));
+                    currentDelay *= 2;
+                }
+            }
+        }
+    }
   }
 
   async function setPlaylistVisibility(playlist, visibleForAll) {
@@ -18243,14 +18258,61 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 removedTracks = deduplicationResult.removed;
 
                 if (sortType === 'personalScrobbles') {
-                    const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
-                    sortedTracks = uniqueTracks
-                        .filter((track) => includeZeroScrobbles || track.personalScrobbles > 0)
-                        .sort((a, b) => sortOrderState.personalScrobbles ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
-                } else {
-                    sortedTracks = uniqueTracks
-                        .filter((track) => track.scrobbles !== null)
-                        .sort((a, b) => sortOrderState.scrobbles ? a.scrobbles - b.scrobbles : b.scrobbles - a.scrobbles);
+                    const includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
+
+                    let tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
+
+                    if (!includeZeroScrobbles) {
+                        tracksToSort = tracksToSort.filter(t => t.personalScrobbles > 0);
+                    }
+
+                    sortedTracks = tracksToSort.sort((a, b) => {
+                        const getSortValue = (scrobbles) => {
+                            if (typeof scrobbles === 'number' && scrobbles > 0) return 2;
+                            if (scrobbles === 0) return 1;
+                            return 0;
+                        };
+
+                        const valA = getSortValue(a.personalScrobbles);
+                        const valB = getSortValue(b.personalScrobbles);
+
+                        if (valA !== valB) {
+                            return valB - valA;
+                        }
+
+                        if (valA === 2) {
+                            return sortOrderState.personalScrobbles 
+                                ? a.personalScrobbles - b.personalScrobbles 
+                                : b.personalScrobbles - a.personalScrobbles;
+                        }
+
+                        return a.originalIndex - b.originalIndex;
+                    });
+                } else { 
+                    const tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
+
+                    sortedTracks = tracksToSort.sort((a, b) => {
+                        const getSortValue = (scrobbles) => {
+                            if (typeof scrobbles === 'number' && scrobbles > 0) return 2;
+                            if (scrobbles === 0) return 1;
+                            return 0;
+                        };
+
+                        const valA = getSortValue(a.scrobbles);
+                        const valB = getSortValue(b.scrobbles);
+
+                        if (valA !== valB) {
+                            return valB - valA;
+                        }
+
+                        if (valA === 2) {
+                            return sortOrderState.scrobbles 
+                                ? (a.scrobbles ?? 0) - (b.scrobbles ?? 0) 
+                                : (b.scrobbles ?? 0) - (a.scrobbles ?? 0);
+                        }
+
+                        return a.originalIndex - b.originalIndex;
+                    });
                 }
                 if (!isHeadless) mainButton.innerText = "100%";
 
@@ -19007,7 +19069,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       throw new Error('Last.fm username required for this sorting type');
     }
 
-    const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") === "true";
+    const includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
 
     updateProgress(0);
     const scrobblesMap = await fetchRecentScrobblesMap((progress) => {
