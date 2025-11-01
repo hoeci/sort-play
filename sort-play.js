@@ -17775,8 +17775,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 throw new Error('No tracks found to analyze');
             }
             
-            await showAiPickModal(tracks);
-            resetButtons(); 
+            const originalAiPickCount = tracks.length;
+            tracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
+            const removedAiPickCount = originalAiPickCount - tracks.length;
+
+            const openModal = async () => {
+                await showAiPickModal(tracks);
+                resetButtons(); 
+            };
+
+            if (removedAiPickCount > 0) {
+                Spicetify.showNotification(`${removedAiPickCount} local track(s) skipped for AI Pick.`);
+                await new Promise(resolve => setTimeout(resolve, 2500));
+                await openModal();
+            } else {
+                await openModal();
+            }
+
+            return;
     
         } catch (error) {
             console.error("Error preparing AI Pick:", error);
