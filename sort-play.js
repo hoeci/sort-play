@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.21.2";
+  const SORT_PLAY_VERSION = "5.21.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -5730,7 +5730,13 @@ function isDirectSortType(sortType) {
         if (!tracks || tracks.length === 0) {
             throw new Error('No tracks found');
         }
-
+        const originalCount = tracks.length;
+        tracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
+        const removedCount = originalCount - tracks.length;
+        if (removedCount > 0) {
+            Spicetify.showNotification(`${removedCount} local track(s) skipped for Custom Filter.`);
+        }
+        
         mainButton.innerText = "0%";
 
 
@@ -9161,6 +9167,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
                 return [];
             }
+            
+            if (sourceTracks) {
+                sourceTracks = sourceTracks.filter(track => !Spicetify.URI.isLocal(track.uri));
+            }
 
             if (limitEnabled && source.limit > 0) {
                 let usedUris = new Set(source.usedTrackURIs || []);
@@ -9185,7 +9195,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const trackArrays = await Promise.all(trackFetchPromises);
         combinedTracks = trackArrays.flat();
-        combinedTracks.push(...additionalTracksToInclude);
+        const filteredAdditionalTracks = additionalTracksToInclude.filter(track => !Spicetify.URI.isLocal(track.uri));
+        combinedTracks.push(...filteredAdditionalTracks);
     }
 
     let filteredTracks = combinedTracks;
@@ -10772,7 +10783,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         if (!isEditing && sources.length === 0) {
             let sourceUri = getCurrentUri();
-            if (sourceUri) {
+            if (sourceUri && !isLocalFilesPage(sourceUri)) {
                 try {
                     let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false, totalTracks = 'N/A';
                     if (URI.isPlaylistV1OrV2(sourceUri)) {
@@ -17905,6 +17916,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           return;
       }
 
+      let removedCount = 0;
+      const directSortsToFilterLocalTracks = [
+        'playCount', 'popularity', 'releaseDate', 'averageColor', 
+        'energyWave', 'tempo', 'energy', 'danceability', 'valence', 
+        'acousticness', 'instrumentalness', 'deduplicateOnly'
+      ];
+
+      if (directSortsToFilterLocalTracks.includes(sortType)) {
+          const originalCount = tracks.length;
+          tracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
+          removedCount = originalCount - tracks.length;
+      }
+
       const user = await Spicetify.Platform.UserAPI.getUser();
       let canModifyCurrentPlaylist = sortCurrentPlaylistEnabled &&
                                        createPlaylistAfterSort && 
@@ -17933,6 +17957,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         } else if (userChoice === 'neutral') {
             canModifyCurrentPlaylist = false;
         }
+      }
+
+      if (removedCount > 0 && !isHeadless) {
+          Spicetify.showNotification(`${removedCount} local track(s) skipped for this sort type.`);
       }
 
       let sortedTracks;
@@ -19279,10 +19307,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         throw new Error("No tracks found");
                     }
 
-                    const { allGenres, trackGenreMap, tracksWithGenresCount } = await fetchAllTrackGenres(
-                        tracks
-                    );
-                    await showGenreFilterModal(tracks, trackGenreMap, tracksWithGenresCount);
+                    const originalGenreFilterCount = tracks.length;
+                    tracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
+                    const removedGenreFilterCount = originalGenreFilterCount - tracks.length;
+
+                    const openModal = async () => {
+                        const { allGenres, trackGenreMap, tracksWithGenresCount } = await fetchAllTrackGenres(
+                            tracks
+                        );
+                        await showGenreFilterModal(tracks, trackGenreMap, tracksWithGenresCount);
+                    };
+
+                    if (removedGenreFilterCount > 0) {
+                        Spicetify.showNotification(`${removedGenreFilterCount} local track(s) skipped for Genre Filter.`);
+                        await new Promise(resolve => setTimeout(resolve, 2500));
+                        await openModal();
+                    } else {
+                        await openModal();
+                    }
                 } catch (error) {
                     console.error("Error during genre filtering:", error);
                     Spicetify.showNotification(
