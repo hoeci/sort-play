@@ -73,7 +73,7 @@ A powerful modal to meticulously filter any playlist or discography.
 
 ### ➕ Genre Filtering
 Filter any playlist or discography by genre with a powerful, interactive modal.
-*   **Comprehensive Genre Data:** Utilizes a rich combination of genres sourced from both Spotify and Last.fm for maximum accuracy.
+*   **Combined Genre Data:** Combines genre information from both Spotify and Last.fm for a more detailed and accurate profile for each track.
 *   **Intelligent Mapping:** Automatically groups hundreds of specific sub-genres into broader, easy-to-understand main genres.
 *   **Intuitive Interface:** Easily browse, search, and select genres, complete with track counts for each genre and a "select all" option.
 *   **Match All Option:** An advanced setting to only include tracks that match *all* of your selected genres instead of just any.
