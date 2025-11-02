@@ -97,7 +97,7 @@ Build powerful, self-updating playlists that manage themselves.
 Generate a variety of curated playlists with a single click.
 *   **Available Playlist Types:**
     *   **My Top Tracks:** Create playlists of your most-played tracks from the "Last Month," "Last 6 Months," or "All Time."
-    *   **New Releases from Followed Artists:** A full chronological playlist of all new singles and album tracks from every artist you follow.
+    *   **New Releases from Followed Artists:** A full playlist in order of release of all new singles and album tracks from every artist you follow.
     *   **Genre Exploration:**
         *   **Genre Tree Explorer:** Generate a tailored playlist by selecting from a comprehensive list of main genres.
         *   **Random Genre Explorer:** Get a mix from a random selection of 20 genres from across Spotify.
