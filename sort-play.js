@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.21.3";
+  const SORT_PLAY_VERSION = "5.22.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -1201,6 +1201,8 @@
   </svg>`;
 
   const copyIconSVG = `<svg width="16px" height="16px" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v9a2 2 0 002 2h2v2a2 2 0 002 2h9a2 2 0 002-2V8a2 2 0 00-2-2h-2V4a2 2 0 00-2-2H4zm9 4V4H4v9h2V8a2 2 0 012-2h5zM8 8h9v9H8V8z"/></svg>`;
+
+  const arrowRightIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.2328 16.4569C12.9328 16.7426 12.9212 17.2173 13.2069 17.5172C13.4926 17.8172 13.9673 17.8288 14.2672 17.5431L13.2328 16.4569ZM19.5172 12.5431C19.8172 12.2574 19.8288 11.7827 19.5431 11.4828C19.2574 11.1828 18.7827 11.1712 18.4828 11.4569L19.5172 12.5431ZM18.4828 12.5431C18.7827 12.8288 19.2574 12.8172 19.5431 12.5172C19.8288 12.2173 19.8172 11.7426 19.5172 11.4569L18.4828 12.5431ZM14.2672 6.4569C13.9673 6.17123 13.4926 6.18281 13.2069 6.48276C12.9212 6.78271 12.9328 7.25744 13.2328 7.5431L14.2672 6.4569ZM19 12.75C19.4142 12.75 19.75 12.4142 19.75 12C19.75 11.5858 19.4142 11.25 19 11.25V12.75ZM5 11.25C4.58579 11.25 4.25 11.5858 4.25 12C4.25 12.4142 4.58579 12.75 5 12.75V11.25ZM14.2672 17.5431L19.5172 12.5431L18.4828 11.4569L13.2328 16.4569L14.2672 17.5431ZM19.5172 11.4569L14.2672 6.4569L13.2328 7.5431L18.4828 12.5431L19.5172 11.4569ZM19 11.25L5 11.25V12.75L19 12.75V11.25Z" fill="currentColor"/></svg>`;
 
   function showSettingsModal() {
     const modalContainer = document.createElement("div");
@@ -14843,6 +14845,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       {
         backgroundColor: "transparent",
         color: "white",
+        text: "Convert to Spotify",
+        sortType: "convertToSpotify",
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
         text: "Deduplicate",
         sortType: "deduplicateOnly",
       },
@@ -14969,6 +14977,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   const deduplicateIconSvg = `
   <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path fill="none" d="M8 8H7.2C6.0799 8 5.51984 8 5.09202 8.21799C4.71569 8.40973 4.40973 8.71569 4.21799 9.09202C4 9.51984 4 10.0799 4 11.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.0799 20 7.2 20H12.8C13.9201 20 14.4802 20 14.908 19.782C15.2843 19.5903 15.5903 19.2843 15.782 18.908C16 18.4802 16 17.9201 16 16.8V16M11.2 16H16.8C17.9201 16 18.4802 16 18.908 15.782C19.2843 15.5903 19.5903 15.2843 19.782 14.908C20 14.4802 20 13.9201 20 12.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H11.2C10.0799 4 9.51984 4 9.09202 4.21799C8.71569 4.40973 8.40973 4.71569 8.21799 5.09202C8 5.51984 8 6.07989 8 7.2V12.8C8 13.9201 8 14.4802 8.21799 14.908C8.40973 15.2843 8.71569 15.5903 9.09202 15.782C9.51984 16 10.0799 16 11.2 16Z M17.186 6.814L10.814 13.186 M10.814 6.814L17.186 13.186" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const convertToSpotifyIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M12 9.5V15.5M9 12.5H15M8.4 19C5.41766 19 3 16.6044 3 13.6493C3 11.2001 4.8 8.9375 7.5 8.5C8.34694 6.48637 10.3514 5 12.6893 5C15.684 5 18.1317 7.32251 18.3 10.25C19.8893 10.9449 21 12.6503 21 14.4969C21 16.9839 18.9853 19 16.5 19L8.4 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
   const settingsIconSvg = `
@@ -15245,6 +15258,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         iconSvgString = shuffleIconSvg;
       } else if (style.text === "Deduplicate") {
         iconSvgString = deduplicateIconSvg;
+      } else if (style.text === "Convert to Spotify") {
+        iconSvgString = convertToSpotifyIconSvg;
       } else if (style.isSetting) {
         iconSvgString = settingsIconSvg;
       } else {
@@ -15297,6 +15312,51 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
 
       menuContainer.style.backgroundColor = getNativeMenuBackgroundColor();
+
+      const isLocalPage = isLocalFilesPage(getCurrentUri());
+
+      menuButtons.forEach((button, index) => {
+          const style = buttonStyles.menuItems[index];
+          let shouldShow;
+
+          if (isLocalPage) {
+              const allowedSortTypes = ['sortByParent', 'shuffle', 'convertToSpotify'];
+              if (style.sortType) {
+                  shouldShow = allowedSortTypes.includes(style.sortType);
+              } else if (style.isSetting) {
+                  shouldShow = true;
+              } else if (style.type === 'divider') {
+                  const settingsIndex = buttonStyles.menuItems.findIndex(item => item.isSetting);
+                  shouldShow = (index === settingsIndex - 1);
+              } else {
+                  shouldShow = false;
+              }
+          } else {
+              shouldShow = style.sortType !== 'convertToSpotify';
+          }
+
+          button.style.display = shouldShow ? (style.type === 'divider' ? 'block' : 'flex') : 'none';
+
+          if (style.type === 'parent' && button._submenu) {
+              const subMenuItems = Array.from(button._submenu.children);
+              const subItemConfigs = style.children;
+
+              subMenuItems.forEach((subItem, subIndex) => {
+                  const subStyle = subItemConfigs[subIndex];
+                  let shouldShowSub = !isLocalPage;
+
+                  if (isLocalPage) {
+                      if (subStyle && subStyle.sortType) {
+                          shouldShowSub = ['scrobbles', 'personalScrobbles'].includes(subStyle.sortType);
+                      } else {
+                          shouldShowSub = false;
+                      }
+                  }
+                  
+                  subItem.style.display = shouldShowSub ? (subStyle && subStyle.type === 'divider' ? 'block' : 'flex') : 'none';
+              });
+          }
+      });
 
       applyCurrentThemeColors();
       const buttonRect = mainButton.getBoundingClientRect();
@@ -16044,7 +16104,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         finalSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
     } else {
         if (useEnergyWaveShuffle && containsLocalFiles) {
-            Spicetify.showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
+            Spicetify.showNotification("Local files detected. Reverting to standard shuffle.");
         }
         finalSortedTracks = shuffleArray(tracksToProcess);
     }
@@ -16087,6 +16147,467 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     shouldShowShufflePlayOption,
     "shuffle"
   ).register();
+
+  async function convertLocalPlaylistToSpotify() {
+    const BATCH_SIZE = 25; 
+    const DELAY_BETWEEN_BATCHES = 2000;
+    const MAX_RETRIES = 3;
+    const RETRY_DELAYS = [1000, 3000, 5000];
+
+    setButtonProcessing(true);
+    mainButton.innerHTML = '<div class="loader"></div>';
+    closeAllMenus();
+
+    const logData = {
+        summary: {},
+        foundTracks: [],
+        notFoundTracks: [],
+        tracksWithMissingData: [],
+        retryStats: {
+            totalRetries: 0,
+            rateLimitHits: 0,
+            networkErrors: 0,
+        },
+    };
+
+    async function retryOperation(operation, context = "", maxRetries = MAX_RETRIES) {
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await operation();
+            } catch (error) {
+                const isLastAttempt = attempt === maxRetries;
+                const isRateLimit = error.status === 429 || error.message?.includes('429');
+                const isNetworkError = !error.status || error.message?.includes('network') || error.message?.includes('fetch');
+                
+                if (isRateLimit) {
+                    logData.retryStats.rateLimitHits++;
+                } else if (isNetworkError) {
+                    logData.retryStats.networkErrors++;
+                }
+
+                if (isLastAttempt) {
+                    throw error;
+                }
+
+                logData.retryStats.totalRetries++;
+                
+                let delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+                if (isRateLimit && error.headers?.['retry-after']) {
+                    delay = parseInt(error.headers['retry-after']) * 1000;
+                }
+
+                console.log(`[Sort-Play] Retry ${attempt + 1}/${maxRetries} for ${context} after ${delay}ms. Error:`, error.message);
+                
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+
+    let newPlaylist = null;
+
+    try {
+        mainButton.innerText = "Reading...";
+        const allLocalTracks = await getLocalFilesTracks();
+        if (!allLocalTracks || allLocalTracks.length === 0) {
+            throw new Error("No local tracks found to convert.");
+        }
+
+        const localTracksToSearch = allLocalTracks.filter(track => {
+            if (!track.name || !track.artistName) {
+                logData.tracksWithMissingData.push({
+                    reason: "Missing track name or artist name",
+                    track: track,
+                });
+                return false;
+            }
+            return true;
+        });
+
+        for (let i = 0; i < localTracksToSearch.length; i += BATCH_SIZE) {
+            const batch = localTracksToSearch.slice(i, i + BATCH_SIZE);
+            mainButton.innerText = `${i}/${localTracksToSearch.length}`;
+
+            const searchPromises = batch.map(async (track, idx) => {
+                const artistQuery = track.artistName || "";
+                const uniqueArtists = [...new Set(artistQuery.split(/[;,]/).map(a => a.trim()).filter(Boolean))];
+                const artistSearchTerm = uniqueArtists.join(' ');
+                const query = `track:"${track.name}" artist:"${artistSearchTerm}"`;
+                
+                try {
+                    const result = await retryOperation(
+                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`),
+                        `track ${i + idx + 1}`
+                    );
+                    return { success: true, result, originalTrack: track };
+                } catch (err) {
+                    return { success: false, error: err, originalTrack: track };
+                }
+            });
+
+            const searchResults = await Promise.all(searchPromises);
+
+            searchResults.forEach(res => {
+                if (res.success && res.result.tracks && res.result.tracks.items.length > 0) {
+                    logData.foundTracks.push({
+                        localTrack: res.originalTrack,
+                        spotifyTrack: res.result.tracks.items[0],
+                    });
+                } else {
+                    logData.notFoundTracks.push({
+                        reason: res.success ? "No items in search result" : `API Error: ${res.error.message}`,
+                        track: res.originalTrack,
+                    });
+                }
+            });
+            
+            if (i + BATCH_SIZE < localTracksToSearch.length) {
+                await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
+            }
+        }
+
+        logData.summary = {
+            totalLocalTracks: allLocalTracks.length,
+            tracksWithMissingData: logData.tracksWithMissingData.length,
+            tracksSearched: localTracksToSearch.length,
+            tracksFound: logData.foundTracks.length,
+            tracksNotFound: logData.notFoundTracks.length,
+            totalRetries: logData.retryStats.totalRetries,
+            rateLimitHits: logData.retryStats.rateLimitHits,
+            networkErrors: logData.retryStats.networkErrors,
+        };
+
+        if (logData.foundTracks.length > 0) {
+            mainButton.innerText = "Creating...";
+            newPlaylist = await retryOperation(
+                () => createPlaylist(
+                    "Local Files (Spotify Version)",
+                    `Converted ${logData.foundTracks.length} of ${allLocalTracks.length} local tracks to Spotify tracks. Created by Sort-Play.`
+                ),
+                "playlist creation"
+            );
+
+            mainButton.innerText = "Saving...";
+            const trackUris = logData.foundTracks.map(item => item.spotifyTrack.uri);
+            await retryOperation(
+                () => addTracksToPlaylist(newPlaylist.id, trackUris),
+                "adding tracks"
+            );
+            await retryOperation(
+                () => addPlaylistToLibrary(newPlaylist.uri),
+                "adding to library"
+            );
+        } else {
+             Spicetify.showNotification("Could not find any matching tracks on Spotify.");
+        }
+
+    } catch (error) {
+        console.error("Error converting local playlist:", error);
+        Spicetify.showNotification(error.message, true);
+    } finally {
+        resetButtons();
+        showConversionReportModal(logData, newPlaylist);
+    }
+  }
+
+  function showConversionReportModal(logData, playlistToNavigate) {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-conversion-report-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 1100px !important;
+        display: flex;
+        flex-direction: column;
+        border-radius: 30px;
+    `;
+
+    const allProcessedTracks = [];
+    logData.notFoundTracks.forEach(item => {
+        allProcessedTracks.push({
+            status: 'not-found',
+            localTrack: item.track,
+            reason: item.reason
+        });
+    });
+    logData.tracksWithMissingData.forEach(item => {
+        allProcessedTracks.push({
+            status: 'missing-data',
+            localTrack: item.track,
+            reason: item.reason
+        });
+    });
+    logData.foundTracks.forEach(item => {
+        allProcessedTracks.push({
+            status: 'found',
+            localTrack: item.localTrack,
+            spotifyTrack: item.spotifyTrack
+        });
+    });
+
+    const conversionListHTML = allProcessedTracks.map(item => {
+        const localTitle = item.localTrack.name || 'N/A';
+        const localArtist = item.localTrack.artistName || 'N/A';
+
+        let spotifySideHTML = '';
+        let statusClass = `status-${item.status}`;
+
+        switch (item.status) {
+            case 'found':
+                const spotifyTitle = item.spotifyTrack.name || 'N/A';
+                const spotifyArtist = item.spotifyTrack.artists.map(a => a.name).join(', ') || 'N/A';
+                spotifySideHTML = `
+                    <div class="track-text-wrapper">
+                        <span class="track-item-title" title="${spotifyTitle}">${spotifyTitle}</span>
+                        <span class="track-item-artist" title="${spotifyArtist}">${spotifyArtist}</span>
+                    </div>
+                    <button class="copy-track-button" data-title="${spotifyTitle}" data-artist="${spotifyArtist}" title="Copy 'Track - Artist'">
+                        ${copyIconSVG}
+                    </button>
+                `;
+                break;
+            case 'not-found':
+                spotifySideHTML = `<span class="status-text">Not Found</span>`;
+                break;
+            case 'missing-data':
+                spotifySideHTML = `<span class="status-text">Missing Data</span>`;
+                break;
+        }
+
+        return `
+            <div class="conversion-row">
+                <div class="track-item local-track">
+                    <div class="track-text-wrapper">
+                        <span class="track-item-title" title="${localTitle}">${localTitle}</span>
+                        <span class="track-item-artist" title="${localArtist}">${localArtist}</span>
+                    </div>
+                    <button class="copy-track-button" data-title="${localTitle}" data-artist="${localArtist}" title="Copy 'Track - Artist'">
+                        ${copyIconSVG}
+                    </button>
+                </div>
+                <div class="arrow-separator">
+                    ${arrowRightIconSVG}
+                </div>
+                <div class="track-item spotify-track ${statusClass}">
+                    ${spotifySideHTML}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    modalContainer.innerHTML = `
+      <style>
+        .report-layout { display: flex; gap: 24px; }
+        .report-left-column { flex: 2; display: flex; flex-direction: column; min-width: 0; }
+        .report-right-column { flex: 1; }
+        .summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; background-color: #282828; border-radius: 8px; padding: 16px; }
+        .summary-item { text-align: center; }
+        .summary-value { font-size: 24px; font-weight: bold; color: white; }
+        .summary-label { font-size: 12px; color: #b3b3b3; text-transform: uppercase; margin-top: 4px; }
+        .conversion-list-header { display: flex; justify-content: space-between; padding: 0 10px 8px; border-bottom: 1px solid #3e3e3e; margin-bottom: 8px; }
+        .column-title { color: white; font-size: 14px; font-weight: 500; flex-basis: 45%; text-align: center; }
+        .conversion-list-container { max-height: 400px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+        .conversion-list-container::-webkit-scrollbar { width: 8px; }
+        .conversion-list-container::-webkit-scrollbar-track { background: #282828; }
+        .conversion-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+        .conversion-row { display: flex; align-items: center; gap: 8px; }
+        .conversion-row:not(:last-child) { margin-bottom: 4px; }
+        .track-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 4px; flex: 1; min-width: 0; }
+        .track-item.local-track { border: 1px solid #ffffff24; }
+        .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+        .track-item-title { color: #e0e0e0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .track-item-artist { color: #b3b3b3; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .arrow-separator { flex-shrink: 0; color: #b3b3b3; }
+        .arrow-separator svg { width: 16px; height: 16px; }
+        .spotify-track { justify-content: space-between; }
+        .status-found { background-color: rgba(30, 215, 96, 0.15); }
+        .status-not-found { background-color: rgba(241, 94, 108, 0.15); }
+        .status-missing-data { background-color: rgba(232, 160, 57, 0.15); }
+        .status-text { color: #e0e0e0; font-size: 14px; font-style: italic; }
+        .copy-track-button { background: none; border: none; cursor: pointer; color: #b3b3b3; padding: 4px; display: flex; align-items: center; flex-shrink: 0; }
+        .copy-track-button:hover { color: white; }
+        .copy-track-button svg { width: 14px; height: 14px; }
+        .copy-track-button.copied { color: #1ED760; }
+        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+        .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+        .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+        .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+      </style>
+      <div class="main-trackCreditsModal-header">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Conversion Report</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-mainSection" style="padding: 22px 32px !important; overflow:auto">
+        <div class="report-layout">
+            <div class="report-left-column">
+                <div class="conversion-list-header">
+                    <div class="column-title">Original Local Track</div>
+                    <div class="column-title">Found Spotify Track</div>
+                </div>
+                <div class="conversion-list-container">
+                    ${conversionListHTML}
+                </div>
+            </div>
+            <div class="report-right-column">
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-value">${logData.summary.totalLocalTracks || 0}</div>
+                        <div class="summary-label">Total Tracks</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: #1ED760;">${logData.summary.tracksFound || 0}</div>
+                        <div class="summary-label">Found</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: #f15e6c;">${logData.summary.tracksNotFound || 0}</div>
+                        <div class="summary-label">Not Found</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: #e8a039;">${logData.summary.tracksWithMissingData || 0}</div>
+                        <div class="summary-label">Missing Data</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="exportReportData" class="main-buttons-button main-button-secondary" 
+                    style="padding: 8px 24px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                Export Data
+            </button>
+            <button id="closeReportModal" class="main-buttons-button main-button-primary" 
+                    style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                ${playlistToNavigate ? 'Go to Playlist' : 'Done'}
+            </button>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    modalContainer.querySelectorAll('.copy-track-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const title = button.dataset.title || '';
+            const artist = button.dataset.artist || '';
+            let textToCopy;
+
+            if (title && artist) {
+                textToCopy = `${title} - ${artist}`;
+            } else if (title) {
+                textToCopy = title;
+            } else if (artist) {
+                textToCopy = artist;
+            } else {
+                return;
+            }
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                button.classList.add('copied');
+                setTimeout(() => button.classList.remove('copied'), 1000);
+            });
+        });
+    });
+
+    modalContainer.querySelector("#exportReportData").addEventListener("click", async () => {
+        const exportData = {
+            summary: logData.summary,
+            results: []
+        };
+
+        logData.notFoundTracks.forEach(item => {
+            exportData.results.push({
+                status: 'not-found',
+                local: {
+                    title: item.track.name || 'N/A',
+                    artist: item.track.artistName || 'N/A'
+                },
+                reason: item.reason
+            });
+        });
+
+        logData.tracksWithMissingData.forEach(item => {
+            exportData.results.push({
+                status: 'missing-data',
+                local: {
+                    title: item.track.name || 'N/A',
+                    artist: item.track.artistName || 'N/A'
+                },
+                reason: item.reason
+            });
+        });
+
+        logData.foundTracks.forEach(item => {
+            exportData.results.push({
+                status: 'found',
+                local: {
+                    title: item.localTrack.name || 'N/A',
+                    artist: item.localTrack.artistName || 'N/A'
+                },
+                spotify: {
+                    title: item.spotifyTrack.name || 'N/A',
+                    artist: item.spotifyTrack.artists.map(a => a.name).join(', ') || 'N/A',
+                    link: item.spotifyTrack.uri.replace('spotify:track:', 'https://open.spotify.com/track/')
+                }
+            });
+        });
+
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: 'sort-play_conversion_report.json',
+                    types: [{
+                        description: 'JSON Files',
+                        accept: { 'application/json': ['.json'] },
+                    }],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Error saving file:', err);
+                    Spicetify.showNotification("Failed to export data.", true);
+                }
+            }
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sort-play_conversion_report.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    });
+
+    const closeModal = () => {
+        overlay.remove();
+        if (playlistToNavigate) {
+            navigateToPlaylist(playlistToNavigate, true);
+        }
+    };
+    
+    modalContainer.querySelector("#closeReportModal").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { 
+        if (e.target === overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+  }
 
   async function getOrCreateDedicatedPlaylist(sortType, name, description, maxRetries = 5, initialDelay = 1000) {
     const dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
@@ -16285,8 +16806,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     })();
   }
   
-  async function navigateToPlaylist(playlistObject) {
-    if (openPlaylistAfterSortEnabled && playlistObject && playlistObject.uri) { 
+  async function navigateToPlaylist(playlistObject, force = false) {
+    if ((openPlaylistAfterSortEnabled || force) && playlistObject && playlistObject.uri) { 
         const tempPath = "/library"; 
         Spicetify.Platform.History.push(tempPath);
         await new Promise(resolve => setTimeout(resolve, 500)); 
@@ -19275,6 +19796,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             event.stopPropagation();
             handleCustomFilter();
         });
+    } else if (buttonStyle.sortType === "convertToSpotify") {
+        element.addEventListener("click", (event) => {
+            event.stopPropagation();
+            convertLocalPlaylistToSpotify();
+        });
     } else {
         const sortType = buttonStyle.sortType;
         element.addEventListener("click", async (event) => {
@@ -21397,8 +21923,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 continue;
             }
         }
-    
-        console.error(`[Sort-Play Like Button NPV] Failed to mount like button in Now Playing View after ${MAX_RETRIES} retries.`);
     }
     
     (async function initialize() {
