@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.22.0";
+  const SORT_PLAY_VERSION = "5.22.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -21593,19 +21593,28 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
             };
             initISRC();
-        }, [isLiked, hasISRCLiked, trackId]);
-    
-        const handleLikedTracksChange = () => {
-            setIsLiked(likeButton_likedTracksIdsISRCs.has(trackId));
-            setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
-        };
-    
+        }, [trackId]);
+
         Spicetify.React.useEffect(() => {
+            if (isrc) {
+                setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
+            }
+        }, [isrc]);
+
+        Spicetify.React.useEffect(() => {
+            const handleLikedTracksChange = () => {
+                setIsLiked(likeButton_likedTracksIdsISRCs.has(trackId));
+                const currentISRC = localStorage.getItem("sort-play-like-" + trackId);
+                if (currentISRC) {
+                    setHasISRCLiked(likeButton_likedTracksISRCs.has(currentISRC));
+                }
+            };
+            
             document.addEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
             return () => {
                 document.removeEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
             };
-        }, [isrc, trackId]);
+        }, [trackId]);
     
         const handleClick = async function () {
             if (!Spicetify.Platform?.LibraryAPI?.add || !Spicetify.Platform?.LibraryAPI?.remove) {
