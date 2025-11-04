@@ -17254,7 +17254,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             getTopItems('tracks', contrast_time_range, 1)
         ]);
 
-        if (topArtists.length < 10 || topTracks.length < 10) {
+        if (topArtists.length < 5 || topTracks.length < 5) {
             throw new Error("Not enough listening history for diverse recommendations.");
         }
         
