@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.22.1";
+  const SORT_PLAY_VERSION = "5.22.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -15025,6 +15025,41 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   let isButtonClicked = false;
 
+  const originalFontSize = "14px";
+  const originalLineHeight = "normal";
+  mainButton.style.lineHeight = originalLineHeight;
+
+  let isAdjustingStyle = false;
+  const buttonTextObserver = new MutationObserver(() => {
+      if (isAdjustingStyle) return;
+      isAdjustingStyle = true;
+
+      if (mainButton.querySelector('.loader')) {
+          mainButton.style.fontSize = originalFontSize;
+          mainButton.style.lineHeight = originalLineHeight;
+          requestAnimationFrame(() => { isAdjustingStyle = false; });
+          return;
+      }
+
+      mainButton.style.fontSize = originalFontSize;
+      mainButton.style.lineHeight = originalLineHeight;
+
+      requestAnimationFrame(() => {
+          if (mainButton.scrollHeight > mainButton.clientHeight) {
+              mainButton.style.fontSize = "13px";
+              mainButton.style.lineHeight = "1.0";
+          }
+
+          isAdjustingStyle = false;
+      });
+  });
+
+  buttonTextObserver.observe(mainButton, {
+      childList: true,
+      characterData: true,
+      subtree: true
+  });
+
   mainButton.addEventListener("mouseenter", () => {
     mainButton.style.cursor = "pointer";
     if (!isProcessing) { 
@@ -16149,7 +16184,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   ).register();
 
   async function convertLocalPlaylistToSpotify() {
-    const BATCH_SIZE = 25; 
+    const BATCH_SIZE = 20; 
     const DELAY_BETWEEN_BATCHES = 2000;
     const MAX_RETRIES = 3;
     const RETRY_DELAYS = [1000, 3000, 5000];
@@ -16231,13 +16266,51 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const artistQuery = track.artistName || "";
                 const uniqueArtists = [...new Set(artistQuery.split(/[;,]/).map(a => a.trim()).filter(Boolean))];
                 const artistSearchTerm = uniqueArtists.join(' ');
-                const query = `track:"${track.name}" artist:"${artistSearchTerm}"`;
                 
+                const lenientQuery = `${track.name} ${artistSearchTerm}`;
+                const strictQuery = `track:"${track.name}" artist:"${artistSearchTerm}"`;
+
                 try {
-                    const result = await retryOperation(
-                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=1`),
-                        `track ${i + idx + 1}`
+                    let result = { tracks: { items: [] } };
+
+                    const getFirstWord = (title) => {
+                        if (!title) return "";
+                        return title.toLowerCase().replace(/^[^a-z0-9]+/, '').split(/\s+/)[0];
+                    };
+                    const localFirstWord = getFirstWord(track.name);
+                    const localArtistWords = (track.artistName || "").toLowerCase().split(/\s+/).filter(w => w.length > 1);
+
+                    const verifyTrack = (spotifyTrack) => {
+                        if (!spotifyTrack || !spotifyTrack.name) return false;
+                        if (localFirstWord !== getFirstWord(spotifyTrack.name)) return false;
+                        const spotifyArtistString = spotifyTrack.artists.map(a => a.name).join(' ').toLowerCase();
+                        return localArtistWords.some(word => spotifyArtistString.includes(word));
+                    };
+
+                    const lenientResult = await retryOperation(
+                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(lenientQuery)}&type=track&limit=5`),
+                        `track ${i + idx + 1} (lenient)`
                     );
+
+                    let verifiedTrack = null;
+                    if (lenientResult.tracks && lenientResult.tracks.items.length > 0) {
+                        verifiedTrack = lenientResult.tracks.items.find(verifyTrack);
+                    }
+
+                    if (!verifiedTrack) {
+                        const strictResult = await retryOperation(
+                            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(strictQuery)}&type=track&limit=5`),
+                            `track ${i + idx + 1} (strict)`
+                        );
+                        if (strictResult.tracks && strictResult.tracks.items.length > 0) {
+                            verifiedTrack = strictResult.tracks.items.find(verifyTrack);
+                        }
+                    }
+
+                    if (verifiedTrack) {
+                        result = { tracks: { items: [verifiedTrack] } };
+                    }
+                    
                     return { success: true, result, originalTrack: track };
                 } catch (err) {
                     return { success: false, error: err, originalTrack: track };
@@ -18453,18 +18526,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           return;
       }
 
-      let removedCount = 0;
-      const directSortsToFilterLocalTracks = [
+      let unconvertedLocalCount = 0;
+      const directSortsToConvertLocalTracks = [
         'playCount', 'popularity', 'releaseDate', 'averageColor', 
         'energyWave', 'tempo', 'energy', 'danceability', 'valence', 
         'acousticness', 'instrumentalness', 'deduplicateOnly'
       ];
-
-      if (directSortsToFilterLocalTracks.includes(sortType)) {
-          const originalCount = tracks.length;
-          tracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
-          removedCount = originalCount - tracks.length;
-      }
 
       const user = await Spicetify.Platform.UserAPI.getUser();
       let canModifyCurrentPlaylist = sortCurrentPlaylistEnabled &&
@@ -18496,8 +18563,126 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
       }
 
-      if (removedCount > 0 && !isHeadless) {
-          Spicetify.showNotification(`${removedCount} local track(s) skipped for this sort type.`);
+      if (directSortsToConvertLocalTracks.includes(sortType)) {
+          const localTracks = tracks.filter(track => Spicetify.URI.isLocal(track.uri));
+          const spotifyTracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
+
+          if (localTracks.length > 0) {
+              if (!isHeadless) mainButton.innerText = "Converting...";
+
+              const BATCH_SIZE = 20;
+              const DELAY_BETWEEN_BATCHES = 2000;
+              const MAX_RETRIES = 3;
+              const RETRY_DELAYS = [1000, 2000, 4000];
+              
+              const foundSpotifyTracks = [];
+
+              async function retryOperation(operation, context = "", maxRetries = MAX_RETRIES) {
+                  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                      try {
+                          return await operation();
+                      } catch (error) {
+                          if (attempt === maxRetries) throw error;
+                          let delay = RETRY_DELAYS[attempt] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
+                          console.warn(`[Sort-Play] Retry ${attempt + 1}/${maxRetries} for ${context} after ${delay}ms. Error:`, error.message);
+                          await new Promise(resolve => setTimeout(resolve, delay));
+                      }
+                  }
+              }
+
+              for (let i = 0; i < localTracks.length; i += BATCH_SIZE) {
+                  const batch = localTracks.slice(i, i + BATCH_SIZE);
+                  if (!isHeadless) mainButton.innerText = `Find-Local ${Math.min(i + BATCH_SIZE, localTracks.length)}/${localTracks.length}`;
+
+                  const searchPromises = batch.map(async (track, idx) => {
+                      const artistQuery = track.artistName || "";
+                      const uniqueArtists = [...new Set(artistQuery.split(/[;,]/).map(a => a.trim()).filter(Boolean))];
+                      const artistSearchTerm = uniqueArtists.join(' ');
+                      
+                      const lenientQuery = `${track.name} ${artistSearchTerm}`;
+                      const strictQuery = `track:"${track.name}" artist:"${artistSearchTerm}"`;
+
+                      try {
+                          let result = { tracks: { items: [] } };
+
+                          const getFirstWord = (title) => {
+                              if (!title) return "";
+                              return title.toLowerCase().replace(/^[^a-z0-9]+/, '').split(/\s+/)[0];
+                          };
+                          const localFirstWord = getFirstWord(track.name);
+                          const localArtistWords = (track.artistName || "").toLowerCase().split(/\s+/).filter(w => w.length > 1);
+
+                          const verifyTrack = (spotifyTrack) => {
+                              if (!spotifyTrack || !spotifyTrack.name) return false;
+                              if (localFirstWord !== getFirstWord(spotifyTrack.name)) return false;
+                              const spotifyArtistString = spotifyTrack.artists.map(a => a.name).join(' ').toLowerCase();
+                              return localArtistWords.some(word => spotifyArtistString.includes(word));
+                          };
+
+                          const lenientResult = await retryOperation(
+                              () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(lenientQuery)}&type=track&limit=5`),
+                              `track ${i + idx + 1} (lenient)`
+                          );
+
+                          let verifiedTrack = null;
+                          if (lenientResult.tracks && lenientResult.tracks.items.length > 0) {
+                              verifiedTrack = lenientResult.tracks.items.find(verifyTrack);
+                          }
+
+                          if (!verifiedTrack) {
+                              const strictResult = await retryOperation(
+                                  () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(strictQuery)}&type=track&limit=5`),
+                                  `track ${i + idx + 1} (strict)`
+                              );
+                              if (strictResult.tracks && strictResult.tracks.items.length > 0) {
+                                  verifiedTrack = strictResult.tracks.items.find(verifyTrack);
+                              }
+                          }
+
+                          if (verifiedTrack) {
+                              result = { tracks: { items: [verifiedTrack] } };
+                          }
+                          
+                          return { success: true, result, originalTrack: track };
+                      } catch (err) {
+                          return { success: false, error: err, originalTrack: track };
+                      }
+                  });
+
+                  const searchResults = await Promise.all(searchPromises);
+
+                  searchResults.forEach(res => {
+                      if (res.success && res.result.tracks && res.result.tracks.items.length > 0) {
+                          const spotifyTrack = res.result.tracks.items[0];
+                          foundSpotifyTracks.push({
+                              uri: spotifyTrack.uri, uid: null, name: spotifyTrack.name,
+                              albumUri: spotifyTrack.album.uri, albumName: spotifyTrack.album.name,
+                              artistUris: spotifyTrack.artists.map(a => a.uri),
+                              allArtists: spotifyTrack.artists.map(a => a.name).join(", "),
+                              artistName: spotifyTrack.artists[0].name,
+                              durationMilis: spotifyTrack.duration_ms,
+                              playCount: "N/A", popularity: null, releaseDate: null,
+                              track: {
+                                  album: { id: spotifyTrack.album.id, name: spotifyTrack.album.name },
+                                  name: spotifyTrack.name, duration_ms: spotifyTrack.duration_ms, id: spotifyTrack.id,
+                              }
+                          });
+                      } else {
+                          unconvertedLocalCount++;
+                      }
+                  });
+
+                  if (i + BATCH_SIZE < localTracks.length) {
+                      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
+                  }
+              }
+              tracks = [...spotifyTracks, ...foundSpotifyTracks];
+          }
+      }
+
+      if (unconvertedLocalCount > 0 && !isHeadless) {
+          const plural = unconvertedLocalCount === 1 ? "track" : "tracks";
+          Spicetify.showNotification(`${unconvertedLocalCount} local ${plural} not found on Spotify and were skipped.`);
       }
 
       let sortedTracks;
