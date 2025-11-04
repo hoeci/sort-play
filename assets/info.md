@@ -118,11 +118,10 @@ Generate playlists from natural language prompts.
     *   **Data Toggles:** Decide whether to include song statistics and lyrics in the AI's analysis for more nuanced results.
 *   **Use Your Own Key:** Provide your own free Google Gemini API key for extended, personal usage.
   
-### ➕ Local File Conversion (✨new)
-Convert your 'Local Files' library into a streamable Spotify playlist.
-*   **Spotify Matching:** Searches Spotify to find streamable versions of your local tracks.
-*   **New Playlist Creation:** Creates a new, streamable Spotify playlist from the successfully matched tracks.
-*   **Detailed Report:** Provides a comprehensive report listing which tracks were found and which could not be matched.
+### ➕ Local File Integration
+*   **Automatic Sorting Integration:** Converts local tracks in playlists to their Spotify versions on-the-fly when sorting or filtering.
+*   **Dedicated Conversion Tool:** Convert your entire 'Local Files' library into a new, streamable Spotify playlist.
+*   **Detailed Report:** After converting your Local Files, view a report of which tracks were found and which couldn't be matched.
 *   **Export Report:** Download the detailed conversion report as a JSON file for your records.
 
 ### ➕ UI & Enhancements
