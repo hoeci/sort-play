@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.22.3";
+  const SORT_PLAY_VERSION = "5.22.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -18433,24 +18433,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   async function handleSortAndCreatePlaylist(sortType, options = {}) {
     const { isHeadless = false } = options;
-
-    const currentUriAtStartForCheck = getCurrentUri();
-    if (isLocalFilesPage(currentUriAtStartForCheck)) {
-        const unsupportedSortsForLocalFiles = [
-            'playCount', 'popularity', 'releaseDate', 'averageColor', 
-            'energyWave', 'tempo', 'energy', 'danceability', 'valence', 
-            'acousticness', 'instrumentalness', 'deduplicateOnly', 
-            'aiPick', 'customFilter', 'genreFilter'
-        ];
-
-        if (unsupportedSortsForLocalFiles.includes(sortType)) {
-            Spicetify.showNotification("This sort type is not available for Local Files. Only Scrobble and Shuffle sorts are supported.", true);
-            if (!isHeadless) {
-                resetButtons();
-            }
-            return;
-        }
-    }
 
     if (sortType === "sortByParent" || sortType === "createNewPlaylist") {
       return;
