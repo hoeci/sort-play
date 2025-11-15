@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.22.5";
+  const SORT_PLAY_VERSION = "5.22.6";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -19773,21 +19773,44 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       artists: track.artists || [{ name: track.artistName }]
     }));
 
-    const tracksWithScrobbles = await processBatchesWithDelay(
-      tracksForScrobbleFetching,
-      50,
-      1000,
-      (progress) => {
-        updateProgress(progress);
-      },
-      fetchFunction
-    );
+    const results = [];
+    const totalTracks = tracksForScrobbleFetching.length;
+    
+    const safeConcurrencyPerKey = 5;
+    const validKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
+    const totalConcurrency = Math.min(50, Math.max(5, validKeys * safeConcurrencyPerKey));
 
-    if (tracksWithScrobbles.length === 0) {
+    const queue = [...tracksForScrobbleFetching];
+    let processedCount = 0;
+
+    const worker = async () => {
+        while (queue.length > 0) {
+            const track = queue.shift();
+            if (!track) continue;
+
+            try {
+                const result = await fetchFunction(track);
+                if (result) {
+                    results.push(result);
+                }
+            } catch (error) {
+                console.error(`Error fetching scrobbles for track ${track.name}:`, error);
+            } finally {
+                processedCount++;
+                const progress = Math.round((processedCount / totalTracks) * 100);
+                updateProgress(progress);
+            }
+        }
+    };
+
+    const workers = Array(totalConcurrency).fill(null).map(() => worker());
+    await Promise.all(workers);
+
+    if (results.length === 0) {
       throw new Error(`No tracks found with ${sortType === 'personalScrobbles' ? 'personal ' : ''}Last.fm data to sort.`);
     }
 
-    return tracksWithScrobbles;
+    return results;
   }
 
   async function handleLastScrobbledSorting(tracks, updateProgress) {
