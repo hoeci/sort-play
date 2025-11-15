@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.22.4";
+  const SORT_PLAY_VERSION = "5.22.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -133,14 +133,17 @@
     "***REMOVED***"
   ];
   const revokedLfmKeys = new Set();
+  let lfmKeyIndex = 0;
 
-  function L_F_M_Key() {
+  function getNextLfmKey() {
     const validKeys = L_F_M_Key_Pool.filter(key => !revokedLfmKeys.has(key));
     if (validKeys.length === 0) {
       return null;
     }
-    const randomIndex = Math.floor(Math.random() * validKeys.length);
-    return validKeys[randomIndex];
+    const keyIndex = lfmKeyIndex % validKeys.length;
+    const key = validKeys[keyIndex];
+    lfmKeyIndex++;
+    return key;
   }
 
   const Ge_mini_Key_Pool = [
@@ -157,7 +160,7 @@
 
   async function fetchLfmWithGateway(params) {
     while (true) {
-        const apiKey = L_F_M_Key();
+        const apiKey = getNextLfmKey();
         if (!apiKey) {
             throw new Error("All Last.fm API keys are invalid or have been revoked.");
         }
@@ -12903,7 +12906,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   const lastfmCache = new Map();
   
   const CONFIG = {
-    batchSize: 5,
+    concurrencyLimit: 20,
     batchDelay: 200,
     lastfm: {
       apiKey: '***REMOVED***',
@@ -12984,72 +12987,47 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function processGenreBatches(tracks, updateProgress = () => {}) {
     const allGenres = new Set();
     const trackGenreMap = new Map();
-    let tracksWithGenresCount = 0;
     const totalTracks = tracks.length;
-    const batches = [];
-  
-    for (let i = 0; i < tracks.length; i += CONFIG.batchSize) {
-        batches.push(tracks.slice(i, i + CONFIG.batchSize));
-    }
-  
-    for (let i = 0; i < batches.length; i++) {
-        const batch = batches[i];
-        const startTime = Date.now();
-        
-        const batchIsAllCached = batch.every(track => {
-            const trackId = track.uri.split(":")[2];
-            return getCachedTrackGenres(trackId) !== null;
-        });
-  
-        const batchResults = await Promise.allSettled(
-            batch.map(async (track) => {  
-                try {
-                    const genres = await getTrackGenres(track.uri);
-                    return { track, genres };
-                } catch (error) {
-                    console.error(`Error processing track ${track.name}:`, error);
-                    return { track, genres: [] };
-                }
-            })
-        );
-  
-        const successfulResults = batchResults.filter(result => 
-            result.status === 'fulfilled' && result.value.genres.length > 0
-        );
-        
-        successfulResults.forEach((result) => {
-            const { track, genres } = result.value;
-            
-            const mappedAndNormalizedGenres = mapAndNormalizeGenres(genres);
 
-            const finalUniqueGenres = [];
-            const seenGenreNames = new Set();
-            for (const genre of mappedAndNormalizedGenres) {
-                if (!seenGenreNames.has(genre.name)) {
-                    finalUniqueGenres.push(genre);
-                    seenGenreNames.add(genre.name);
-                }
-            }
+    const safeConcurrencyPerKey = 5;
+    const validKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
+    const totalConcurrency = Math.min(50, Math.max(5, validKeys * safeConcurrencyPerKey));
 
-            trackGenreMap.set(track.uri, finalUniqueGenres);
-            finalUniqueGenres.forEach((genre) => allGenres.add(genre.name));
-            tracksWithGenresCount++;
-        });
-  
-        const endTime = Date.now(); 
-        const elapsedTime = endTime - startTime;
-        const delayMs = batchIsAllCached ? 0 : Math.max(CONFIG.batchDelay - elapsedTime, 0);
-  
-        const progress = Math.round(((i + 1) * CONFIG.batchSize / totalTracks) * 100);
-        updateProgress(progress);
-  
-        if (i < batches.length - 1) {
-            if (!batchIsAllCached) {
-                await new Promise((resolve) => setTimeout(resolve, delayMs));
+    const queue = [...tracks];
+    let processedCount = 0;
+
+    const worker = async () => {
+        while (queue.length > 0) {
+            const track = queue.shift();
+            if (!track) continue;
+
+            try {
+                const genres = await getTrackGenres(track.uri);
+                if (genres.length > 0) {
+                    const mappedAndNormalizedGenres = mapAndNormalizeGenres(genres);
+                    const finalUniqueGenres = Array.from(new Set(mappedAndNormalizedGenres.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
+                    
+                    trackGenreMap.set(track.uri, finalUniqueGenres);
+                    finalUniqueGenres.forEach((genre) => allGenres.add(genre.name));
+                } else {
+                    trackGenreMap.set(track.uri, []);
+                }
+            } catch (error) {
+                console.error(`Error processing track ${track.name}:`, error);
+                trackGenreMap.set(track.uri, []);
+            } finally {
+                processedCount++;
+                const progress = Math.round((processedCount / totalTracks) * 100);
+                updateProgress(progress);
             }
         }
-    }
-  
+    };
+
+    const workers = Array(totalConcurrency).fill(null).map(() => worker());
+    await Promise.all(workers);
+
+    const tracksWithGenresCount = Array.from(trackGenreMap.values()).filter(g => g.length > 0).length;
+
     return { allGenres, trackGenreMap, tracksWithGenresCount };
   }
 
