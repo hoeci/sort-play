@@ -12991,7 +12991,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const safeConcurrencyPerKey = 5;
     const validKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
-    const totalConcurrency = Math.min(50, Math.max(5, validKeys * safeConcurrencyPerKey));
+    const totalConcurrency = Math.min(40, Math.max(5, validKeys * safeConcurrencyPerKey));
 
     const queue = [...tracks];
     let processedCount = 0;
