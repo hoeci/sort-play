@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.22.6";
+  const SORT_PLAY_VERSION = "5.23.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -11680,6 +11680,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     "jazz": ["jazz", "jazz's", "jazzier", "jazziest", "jazzmusic", "jazzy"],
     "jazz rap": ["abstract hip hop", "jazz hop", "jazz rap"],
     "jungle": ["jungle", "jungle's", "junglemusic", "jungles"],
+    "k-ballad": ["k-ballad", "k-pop ballad"],
     "k-pop": ["korean pop", "kpop"],
     "k-rock": ["k-indie", "k-rock", "korean indie rock"],
     "latin": ["latin", "latin's", "latina", "latinas", "latinmusic", "latino", "latinos"],
@@ -11836,6 +11837,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     "jazz",
     "jazz rap",
     "jungle",
+    "k-ballad",
     "k-pop",
     "k-rock",
     "latin",
@@ -11961,6 +11963,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       justify-content: space-between;
       align-items: center;
       gap: 8px;
+    }
+    .genre-filter-modal .genre-button.related {
+    background-color: #283f2d; 
+      color: white;
+    }
+    .genre-filter-modal .genre-button.selected {
+      background-color: #1ED760;
+      color: black;
+    }
+    .genre-filter-modal .genre-button.excluded {
+      background-color: #a92121;
+      color: white;
+    }
+    .genre-filter-modal .genre-button.excluded .genre-count-badge {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: #fff;
     }
     .genre-filter-modal .genre-count-badge {
       background-color: rgba(255, 255, 255, 0.1);
@@ -12284,7 +12302,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
     </style>
     <div style="display: flex; flex-direction: column; gap: 15px;">
-        <h2 class="genre-modal-title">Genres from Spotify and Last.fm:</h2> 
+    <h2 class="genre-modal-title">
+    Genres from Spotify and Last.fm 
+    <span style="font-size: 0.85em; font-weight: normal; opacity: 0.5; margin-left: 8px;">
+    💡 Left-click to include • Right-click to exclude
+    </span>
+    </h2>
         <div class="genre-header">
           <div class="search-bar-container">
                   <input type="text" class="search-bar" placeholder="Search genres...">
@@ -12336,6 +12359,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 </div>
             </div>
         </div>
+        <div id="genre-selection-error" style="color: #f15e6c; font-size: 13px; text-align: center; display: none;"></div>
         <button class="create-playlist-button">Create Playlist</button>
     </div>
   `;
@@ -12380,6 +12404,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const sortTypeSelect = modalContainer.querySelector(".sort-type-select");
     const createPlaylistButton = modalContainer.querySelector(".create-playlist-button");
     const selectAllButton = modalContainer.querySelector(".select-all-button");
+    const selectionErrorDiv = modalContainer.querySelector("#genre-selection-error");
 
     const totalTracksStat = modalContainer.querySelector("#total-tracks-stat");
     const filteredTracksStat = modalContainer.querySelector("#filtered-tracks-stat");
@@ -12398,6 +12423,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
     
     let selectedGenres = [];
+    let excludedGenres = [];
     let tracksWithGenresCount = 0;
     trackGenreMap.forEach(genres => {
       if (genres.length > 0) {
@@ -12411,9 +12437,41 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const filteredTracks = filterTracksByGenres(
         tracks,
         selectedGenres,
+        excludedGenres,
         trackGenreMap  
       );
       filteredTracksStat.textContent = `Filtered tracks: ${filteredTracks.length}`;
+
+      const relatedGenres = new Set();
+      if (selectedGenres.length > 0) {
+          filteredTracks.forEach(track => {
+              const genresOnTrack = trackGenreMap.get(track.uri);
+              if (genresOnTrack) {
+                  genresOnTrack.forEach(genre => {
+                      relatedGenres.add(genre.name);
+                  });
+              }
+          });
+
+          selectedGenres.forEach(genre => {
+              relatedGenres.delete(genre);
+          });
+      }
+
+      const genreButtons = genreContainer.querySelectorAll('.genre-button');
+      genreButtons.forEach(button => {
+          const genreName = button.querySelector('span:first-child').textContent;
+
+          button.classList.remove('selected', 'excluded', 'related');
+
+          if (selectedGenres.includes(genreName)) {
+              button.classList.add('selected');
+          } else if (excludedGenres.includes(genreName)) {
+              button.classList.add('excluded');
+          } else if (relatedGenres.has(genreName)) {
+              button.classList.add('related');
+          }
+      });
     }
 
     function updateGenreButtons() {
@@ -12453,17 +12511,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
       });
     
+      const totalPlaylistSize = tracks.length;
+      const countThreshold = totalPlaylistSize * 0.05;
+
       const sortedGenres = filteredGenres.sort((a, b) => {
         const detailsA = genreDetails.get(a) || { count: 0, isSpotify: false };
         const detailsB = genreDetails.get(b) || { count: 0, isSpotify: false };
 
-        const lowerA = a.toLowerCase();
-        const lowerB = b.toLowerCase();
-        const isAMain = mainGenres.some(main => lowerA.includes(main.toLowerCase()));
-        const isBMain = mainGenres.some(main => lowerB.includes(main.toLowerCase()));
+        const getTier = (genreName, genreCount) => {
+            const isMain = mainGenres.some(main => genreName.toLowerCase().includes(main.toLowerCase()));
+            if (isMain || genreCount > countThreshold) {
+                return 1;
+            }
+            return 2;
+        };
 
-        if (isAMain && !isBMain) return -1;
-        if (!isAMain && isBMain) return 1;
+        const tierA = getTier(a, detailsA.count);
+        const tierB = getTier(b, detailsB.count);
+
+        if (tierA !== tierB) {
+            return tierA - tierB;
+        }
 
         if (detailsB.count !== detailsA.count) {
             return detailsB.count - detailsA.count;
@@ -12500,15 +12568,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
           if (selectedGenres.includes(genre)) {
             genreButton.classList.add("selected");
+          } else if (excludedGenres.includes(genre)) {
+            genreButton.classList.add("excluded");
           }
     
           genreButton.addEventListener("click", () => {
+            if (excludedGenres.includes(genre)) {
+              excludedGenres = excludedGenres.filter((g) => g !== genre);
+            }
             if (selectedGenres.includes(genre)) {
               selectedGenres = selectedGenres.filter((g) => g !== genre);
-              genreButton.classList.remove("selected");
             } else {
               selectedGenres.push(genre);
-              genreButton.classList.add("selected");
+            }
+            updateFilteredTracksCount();
+          });
+
+          genreButton.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            if (selectedGenres.includes(genre)) {
+              selectedGenres = selectedGenres.filter((g) => g !== genre);
+            }
+            if (excludedGenres.includes(genre)) {
+              excludedGenres = excludedGenres.filter((g) => g !== genre);
+            } else {
+              excludedGenres.push(genre);
             }
             updateFilteredTracksCount();
           });
@@ -12516,6 +12600,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           genreContainer.appendChild(genreButton);
         });
       }
+    updateFilteredTracksCount();
     }
 
     searchBar.addEventListener("input", () => {
@@ -12535,17 +12620,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const filteredGenres = Array.from(allGenres).filter((genre) => 
         genre.toLowerCase().includes(searchTerm)
       );
+      
       const allSelected = filteredGenres.every((genre) => selectedGenres.includes(genre));
-    
-      if (allSelected) {
-        selectedGenres = selectedGenres.filter((genre) => !filteredGenres.includes(genre));
-      } else {
+
+      selectedGenres = selectedGenres.filter((genre) => !filteredGenres.includes(genre));
+      excludedGenres = excludedGenres.filter((genre) => !filteredGenres.includes(genre));
+
+      if (!allSelected) {
         filteredGenres.forEach((genre) => {
           if (!selectedGenres.includes(genre)) {
             selectedGenres.push(genre);
           }
         });
       }
+      
       updateGenreButtons();
       updateFilteredTracksCount();
     });
@@ -12554,14 +12642,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     updateGenreButtons();
 
     createPlaylistButton.addEventListener("click", async () => {
-      if (selectedGenres.length === 0) {
-          Spicetify.showNotification("Please select at least one genre.");
+      selectionErrorDiv.style.display = 'none';
+      if (selectedGenres.length === 0 && excludedGenres.length === 0) {
+          selectionErrorDiv.textContent = "Please select at least one genre to include or exclude.";
+          selectionErrorDiv.style.display = 'block';
           return;
       }
     
       const filteredTracks = filterTracksByGenres(
           tracks,
           selectedGenres,
+          excludedGenres,
           trackGenreMap
       );
     
@@ -13265,29 +13356,40 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     );
   }
 
-  function filterTracksByGenres(tracks, selectedGenres, trackGenreMap) {
-    if(matchAllGenres){
-      if (selectedGenres.length === 0) {
-          return [];
-      }
-      return tracks.filter((track) => {
-        const trackGenres = trackGenreMap.get(track.uri);
-        if (!trackGenres) return false;
-        const trackGenreNames = new Set(trackGenres.map(g => g.name));
-        return selectedGenres.every((selectedGenre) => 
-          trackGenreNames.has(selectedGenre)
-        );
-      });
-    } else {
-      return tracks.filter((track) => {
-        const trackGenres = trackGenreMap.get(track.uri);
-        if (!trackGenres) return false;
-        const trackGenreNames = new Set(trackGenres.map(g => g.name));
-        return selectedGenres.some((selectedGenre) => 
-          trackGenreNames.has(selectedGenre)
-        );
-      });
+  function filterTracksByGenres(tracks, selectedGenres, excludedGenres, trackGenreMap) {
+    if (selectedGenres.length === 0 && excludedGenres.length === 0) {
+        return [];
     }
+    let includedTracks;
+
+    if (selectedGenres.length === 0) {
+        includedTracks = tracks;
+    } else if (matchAllGenres) {
+        includedTracks = tracks.filter((track) => {
+            const trackGenres = trackGenreMap.get(track.uri);
+            if (!trackGenres) return false;
+            const trackGenreNames = new Set(trackGenres.map(g => g.name));
+            return selectedGenres.every((selectedGenre) => trackGenreNames.has(selectedGenre));
+        });
+    } else {
+        includedTracks = tracks.filter((track) => {
+            const trackGenres = trackGenreMap.get(track.uri);
+            if (!trackGenres) return false;
+            const trackGenreNames = new Set(trackGenres.map(g => g.name));
+            return selectedGenres.some((selectedGenre) => trackGenreNames.has(selectedGenre));
+        });
+    }
+
+    if (excludedGenres.length === 0) {
+        return includedTracks;
+    }
+
+    return includedTracks.filter(track => {
+        const trackGenres = trackGenreMap.get(track.uri);
+        if (!trackGenres) return true;
+        const trackGenreNames = new Set(trackGenres.map(g => g.name));
+        return !excludedGenres.some(excludedGenre => trackGenreNames.has(excludedGenre));
+    });
   }
 
   const styleElement = document.createElement("style");
