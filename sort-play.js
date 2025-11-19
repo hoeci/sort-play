@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.23.0";
+  const SORT_PLAY_VERSION = "5.23.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -10111,7 +10111,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (URI.isPlaylistV1OrV2(newUri)) {
             const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${newUri.split(":")[2]}`);
             newSourceData.name = data.name;
-            newSourceData.info = `Playlist by ${data.owner.display_name}`;
+            const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
+            newSourceData.info = `Playlist by ${ownerName}`;
             newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
             newSourceData.isStatic = false;
             newSourceData.totalTracks = 'N/A';
@@ -10946,7 +10947,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false, totalTracks = 'N/A';
                     if (URI.isPlaylistV1OrV2(sourceUri)) {
                         const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`);
-                        sourceName = data.name; sourceInfo = `Playlist by ${data.owner.display_name}`; sourceCoverUrl = data.images[0]?.url; totalTracks = data.tracks.total;
+                        sourceName = data.name; 
+                        const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
+                        sourceInfo = `Playlist by ${ownerName}`; 
+                        sourceCoverUrl = data.images[0]?.url; 
+                        totalTracks = data.tracks.total;
                     } else if (URI.isArtist(sourceUri)) {
                         const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`);
                         sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = 'N/A';
@@ -17048,7 +17053,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     const playlistId = newPlaylist.uri.split(':')[2];
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     await Promise.all([
         setPlaylistVisibility(newPlaylist.uri, !createPlaylistPrivate),
@@ -17243,7 +17248,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             mainButton.innerText = "Filtering...";
             const knownArtistIds = await getComprehensiveKnownArtistsSet();
-            const topArtistsForSeeding = await getTopItems('artists', 'long_term', 100);
+            
+            let topArtistsForSeeding = await getTopItems('artists', 'long_term', 100);
+            if (topArtistsForSeeding.length < 5) {
+                 topArtistsForSeeding = await getTopItems('artists', 'short_term', 100);
+            }
 
             if (topArtistsForSeeding.length === 0) {
                 throw new Error("Need more listening history to build a discovery profile.");
@@ -17328,13 +17337,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
 
         if (!isHeadless) mainButton.innerText = "Get top...";
-        const [topArtists, topTracks, contrastTopTracks] = await Promise.all([
+        let [topArtists, topTracks, contrastTopTracks] = await Promise.all([
             getTopItems('artists', time_range, top_pool_size),
             getTopItems('tracks', time_range, top_pool_size),
             getTopItems('tracks', contrast_time_range, 1)
         ]);
 
-        if (topArtists.length < 5 || topTracks.length < 5) {
+        if (topArtists.length < 2 || topTracks.length < 2) {
+             [topArtists, topTracks] = await Promise.all([
+                getTopItems('artists', 'short_term', top_pool_size),
+                getTopItems('tracks', 'short_term', top_pool_size)
+            ]);
+        }
+
+        if (topArtists.length < 1 || topTracks.length < 1) {
             throw new Error("Not enough listening history for diverse recommendations.");
         }
         
@@ -17365,13 +17381,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const smartSongSeeds = new Set();
         if (vibeType === 'recommendAllTime') smartSongSeeds.add(shuffleArray(topTracks.slice(0, 20))[0]);
         else smartSongSeeds.add(shuffleArray(topTracks.slice(0, 5))[0]);
-        smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
-        smartSongSeeds.add(deepCutPool[0]);
+        
+        if (topTracks.length > 0) {
+             smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
+        }
+        if (deepCutPool.length > 0) {
+            smartSongSeeds.add(deepCutPool[0]);
+        }
         if (contrastTopTracks.length > 0) smartSongSeeds.add(contrastTopTracks[0]);
         const randomLikedTopTrackPool = topTracks.filter(t => completeLikedSongUrisSet.has(t.uri));
         if(randomLikedTopTrackPool.length > 0) smartSongSeeds.add(shuffleArray(randomLikedTopTrackPool)[0]);
         
-        const finalSmartSeeds = Array.from(smartSongSeeds);
+        const finalSmartSeeds = Array.from(smartSongSeeds).filter(Boolean);
         let seedIdx = 0;
         while (finalSmartSeeds.length < 5 && seedIdx < topTracks.length) {
             if (!finalSmartSeeds.some(s => s.uri === topTracks[seedIdx].uri)) finalSmartSeeds.push(topTracks[seedIdx]);
@@ -17405,9 +17426,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
 
             try {
-                const recsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
-                if (recsResponse?.tracks?.length > 0) {
-                    recommendationBatches.push(recsResponse.tracks);
+                if (seed_artists.length > 0 || seed_tracks.length > 0) {
+                    const recsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
+                    if (recsResponse?.tracks?.length > 0) {
+                        recommendationBatches.push(recsResponse.tracks);
+                    }
                 }
             } catch (e) { console.warn(`Recommendation call ${i+1} failed.`, e); }
             await new Promise(resolve => setTimeout(resolve, 250));
@@ -19284,7 +19307,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
               const newPlaylist = await createPlaylist(playlistName, playlistDescription);
               
-              await new Promise(resolve => setTimeout(resolve, 1250));
+              await new Promise(resolve => setTimeout(resolve, 1500));
               
               playlistUriForQueue = newPlaylist.uri;
               newPlaylistObjectForNavigation = newPlaylist; 
