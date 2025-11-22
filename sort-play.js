@@ -13290,7 +13290,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function saveGenresToTurso(newGenresData) {
     if (newGenresData.length === 0) return;
 
-    const BATCH_SIZE = 200;
+    const BATCH_SIZE = 100;
     const MAX_RETRIES = 5;
     const RETRY_DELAY_BASE = 2000;
 
