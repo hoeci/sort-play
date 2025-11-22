@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.4";
+  const SORT_PLAY_VERSION = "5.24.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -121,6 +121,8 @@
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
   const DEEZER_GATEWAY_URL = "https://deezer-proxy.niko2nio2.workers.dev/?url=";
+  const DEEZER_GATEWAY_URL_2 = "https://deezer-proxy-2.hoeci.workers.dev/?url=";
+  const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
 
   const L_F_M_Key_Pool = [
     "***REMOVED***",
@@ -13170,33 +13172,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function getDeezerGenres(isrc, useSpecificGateway = false) {
-    const MAX_RETRIES = 5;
-    let retryDelay = 2000;
+  async function getDeezerGenres(isrc, gatewayUrl = null) {
+    const MAX_RETRIES = 3;
+    let retryDelay = 1500;
 
     const fetchDeezerData = async (url) => {
-        const response = await fetch(url);
-
-        if (response.status === 404) return { isNotFound: true };
-
-        if (!response.ok) throw new Error(`Deezer HTTP status ${response.status}`);
-
-        const data = await response.json();
-
-        if (data.error) {
-            if (data.error.code === 800) return { isNotFound: true };
+        try {
+            const response = await fetch(url);
+            if (response.status === 404) return { isNotFound: true };
+            if (!response.ok) throw new Error(`Gateway HTTP status ${response.status}`);
             
-            if (data.error.message && data.error.message.includes("Quota")) {
-                throw new Error("Quota limit exceeded");
+            const data = await response.json();
+            if (data.error) {
+                if (data.error.code === 800) return { isNotFound: true };
+                if (data.error.message && data.error.message.includes("Quota")) {
+                    throw new Error("Quota limit exceeded");
+                }
+                throw new Error(`Deezer API Error: ${data.error.message}`);
             }
-
-            throw new Error(`Deezer API Error: ${data.error.message}`);
+            return { data };
+        } catch (networkError) {
+            throw new Error(`Network/Gateway Error: ${networkError.message}`);
         }
-
-        return { data };
     };
 
-    const activeGateway = useSpecificGateway ? DEEZER_GATEWAY_URL : LFM_GATEWAY_URL;
+    const activeGateway = gatewayUrl || DEEZER_GATEWAY_URL;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
@@ -13226,17 +13226,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return [];
 
         } catch (error) {
-            const isQuota = error.message.includes("Quota");
-            
-            if (attempt === MAX_RETRIES) {
+            if (error.message.includes("Gateway") || error.message.includes("Network")) {
                 throw error;
             }
+            
+            const isQuota = error.message.includes("Quota");
+            if (attempt === MAX_RETRIES) throw error;
 
             const waitTime = isQuota ? retryDelay * 2 : retryDelay;
-            console.warn(`[Sort-Play] Deezer retry ${attempt}/${MAX_RETRIES} for ISRC ${isrc}: ${error.message}. Waiting ${waitTime}ms.`);
-            
             await new Promise(resolve => setTimeout(resolve, waitTime));
-            
             retryDelay *= 1.5;
         }
     }
@@ -13358,7 +13356,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     mainButton.innerText = "0%";
   
-    async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null, useDeezerGateway = false) {
+    async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null, deezerGatewayUrl = null) {
         const trackId = trackUri.split(":")[2];
         let isCompleteSuccess = true; 
 
@@ -13370,10 +13368,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             );
     
             if (trackDetails?.code || trackDetails?.error) throw new Error(trackDetails.message);
-            if (!trackDetails?.artists?.length) return { isrc: null, canSave: false, data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], release_date: null } };
+            if (!trackDetails?.artists?.length) return { success: true, isrc: null, canSave: false, data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], release_date: null } };
             
             const isrc = trackDetails.external_ids?.isrc || null;
-            if (!isrc) console.warn(`No ISRC found for ${trackUri}`);
 
             const artistIds = [...new Set(trackDetails.artists.map(artist => artist.uri.split(":")[2]))];
             const spotifyGenres = new Set();
@@ -13416,7 +13413,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
     
             const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name);
-            
             let lfmTrackGenres = [];
             let lfmArtistGenres = [];
             
@@ -13430,19 +13426,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
     
             let deezer_genres = [];
-            if (isrc) {
+            if (isrc && deezerGatewayUrl) {
                 try {
-                    deezer_genres = await getDeezerGenres(isrc, useDeezerGateway);
+                    deezer_genres = await getDeezerGenres(isrc, deezerGatewayUrl);
                 } catch (e) {
-                    console.warn(`Deezer fetch failed for ISRC ${isrc}: ${e.message}`);
+                    if (e.message.includes("Gateway") || e.message.includes("Network") || e.message.includes("status 5")) {
+                        throw e; 
+                    }
+                    console.warn(`Deezer fetch failed for ISRC ${isrc} (Non-Gateway Error): ${e.message}`);
                     isCompleteSuccess = false; 
                 }
+            } else if (isrc && !deezerGatewayUrl) {
+                isCompleteSuccess = false;
             }
     
             const releaseDate = trackDetails.album?.release_date;
             const releaseDateInDays = releaseDate ? Math.floor(new Date(releaseDate).getTime() / 86400000) : null;
     
             return { 
+                success: true,
                 isrc: isrc,
                 canSave: isCompleteSuccess,
                 data: {
@@ -13455,13 +13457,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             };
     
         } catch (error) {
-            console.error(`Error fetching details for track ID ${trackId}:`, error);
-            return { isrc: null, canSave: false, data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], release_date: null } };
+            throw error; 
         }
     }
   
     const trackUris = tracks.map(t => t.uri);
-    
     mainButton.innerText = "Checking...";
     
     const finalGenresMap = new Map();
@@ -13582,65 +13582,102 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     tracksWithIsrcs.forEach(item => {
         const { uri, isrc } = item;
-        
         if (isrc && cachedGenresByIsrc.has(isrc)) {
             const cached = cachedGenresByIsrc.get(isrc);
             if (!isDataStale(cached)) {
                 finalGenresMap.set(uri, cached);
                 sessionGenreCache.set(uri, cached);
-                dataToSave.push({
-                    track_uri: uri,
-                    isrc: isrc,
-                    ...cached
-                });
+                dataToSave.push({ track_uri: uri, isrc: isrc, ...cached });
                 return;
             }
         }
-        
         tracksNeedingExternalFetch.push(item);
     });
-
+    
     if (tracksNeedingExternalFetch.length > 0) {
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
-        const SPLIT_CONCURRENCY = 6; 
-        const queue = [...tracksNeedingExternalFetch];
         
-        const worker = async (useDeezerGateway) => {
-            while (queue.length > 0) {
-                const item = queue.shift();
-                if (!item) break;
+        const sharedQueue = [...tracksNeedingExternalFetch];
+        
+        const gateways = [
+            { url: DEEZER_GATEWAY_URL, active: true, failures: 0 },
+            { url: DEEZER_GATEWAY_URL_2, active: true, failures: 0 },
+            { url: DEEZER_GATEWAY_URL_3, active: true, failures: 0 }
+        ];
+        
+        const MAX_GATEWAY_FAILURES = 3;
+        const WORKERS_PER_GATEWAY = 5;
 
+        const startGatewayWorkers = (gateway) => {
+            const workers = [];
+            for (let i = 0; i < WORKERS_PER_GATEWAY; i++) {
+                workers.push(async () => {
+                    while (sharedQueue.length > 0 && gateway.active) {
+                        const item = sharedQueue.shift(); 
+                        if (!item) break; 
+
+                        try {
+                            const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, gateway.url);
+                            
+                            finalGenresMap.set(item.uri, result.data);
+                            sessionGenreCache.set(item.uri, result.data);
+                            if (result.isrc) sessionGenreCache.set(result.isrc, result.data);
+                            
+                            if (result.isrc && result.canSave) {
+                                dataToSave.push({
+                                    track_uri: item.uri,
+                                    isrc: result.isrc,
+                                    ...result.data
+                                });
+                            }
+                            fetchedCount++;
+                            mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
+
+                        } catch (error) {
+                            if (error.message.includes("Gateway") || error.message.includes("Network")) {
+                                console.warn(`Gateway ${gateway.url} failed for ${item.uri}. Fail count: ${gateway.failures + 1}`);
+                                gateway.failures++;
+                                
+                                sharedQueue.push(item); 
+
+                                if (gateway.failures >= MAX_GATEWAY_FAILURES) {
+                                    gateway.active = false;
+                                    console.error(`Gateway ${gateway.url} marked inactive due to too many failures.`);
+                                    break; 
+                                }
+                            } else {
+                                console.error(`Non-gateway error for ${item.uri}:`, error);
+                                fetchedCount++;
+                            }
+                        }
+                    }
+                });
+            }
+            return Promise.all(workers.map(w => w()));
+        };
+
+        const allPools = gateways.map(gw => startGatewayWorkers(gw));
+        await Promise.all(allPools);
+
+        if (sharedQueue.length > 0) {
+            console.warn(`[Sort-Play] All Deezer gateways failed. Processing ${sharedQueue.length} remaining tracks without Deezer.`);
+            
+            for (const item of sharedQueue) {
                 try {
-                    const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, useDeezerGateway);
+                    const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null);
                     
                     finalGenresMap.set(item.uri, result.data);
-                    
                     sessionGenreCache.set(item.uri, result.data);
-                    if (result.isrc) {
-                        sessionGenreCache.set(result.isrc, result.data);
-                    }
-                    
-                    if (result.isrc && result.canSave) {
-                        dataToSave.push({
-                            track_uri: item.uri,
-                            isrc: result.isrc,
-                            ...result.data
-                        });
-                    }
-                } catch (error) {
-                    console.error(`Error fetching external genres for ${item.uri}:`, error);
+                                        
+                } catch (e) {
+                    console.error("Error in fallback processing:", e);
                 } finally {
                     fetchedCount++;
                     mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
                 }
             }
-        };
-      
-        const normalWorkers = Array(SPLIT_CONCURRENCY).fill(null).map(() => worker(false));
-        const gatewayWorkers = Array(SPLIT_CONCURRENCY).fill(null).map(() => worker(true));
-        
-        await Promise.all([...normalWorkers, ...gatewayWorkers]);
+        }
     }
   
     if (dataToSave.length > 0) {
