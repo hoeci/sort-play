@@ -33,7 +33,7 @@ Load complete collections from all releases with intelligent deduplication that 
 Filter by keywords (track, album, artist) and range sliders (Release Date, Duration, Play Count, Popularity, Tempo, Energy, Danceability, Valence). View results in an interactive table with integrated mini-player. Save and load keyword sets.
 
 ### ➕ Genre Filtering
-Filter by genre using combined Spotify and Last.fm data with intelligent sub-genre mapping. Browse with track counts, search, and "match all" option.
+Filter by genre using combined Spotify, Deezer and Last.fm data with intelligent mapping. Browse with track counts, search, and "match all" option.
 
 ### ➕ Dynamic Playlists
 Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
