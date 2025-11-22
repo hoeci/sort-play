@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.6";
+  const SORT_PLAY_VERSION = "5.24.8";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -120,7 +120,7 @@
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
-  const DEEZER_GATEWAY_URL = "https://deezer-proxy.niko2nio2.workers.dev/?url=";
+  const DEEZER_GATEWAY_URL = "https://deezer-proxy.hunqo.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_2 = "https://deezer-proxy-2.hoeci.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
 
@@ -13173,57 +13173,35 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getDeezerGenres(isrc, gatewayUrl = null) {
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 3; 
     let retryDelay = 1500;
 
-    const fetchDeezerData = async (url) => {
-        try {
-            const response = await fetch(url);
-            
-            if (response.status === 429) throw new Error("Gateway Rate Limit");
-            if (response.status === 404) return { isNotFound: true };
-            if (!response.ok) throw new Error(`Gateway Error: HTTP ${response.status}`);
-            
-            const data = await response.json();
-            if (data.error) {
-                if (data.error.code === 800) return { isNotFound: true };
-                if (data.error.message && data.error.message.includes("Quota")) {
-                    throw new Error("Deezer API Quota");
-                }
-                throw new Error(`Deezer API Error: ${data.error.message}`);
-            }
-            return { data };
-        } catch (networkError) {
-            if (networkError.message.includes("Rate Limit") || networkError.message.includes("Quota")) {
-                throw networkError;
-            }
-            throw new Error(`Network/Gateway Error: ${networkError.message}`);
-        }
-    };
-
-    const activeGateway = gatewayUrl || DEEZER_GATEWAY_URL;
+    let rawGatewayUrl = gatewayUrl || DEEZER_GATEWAY_URL;
+    let baseUrl = rawGatewayUrl.split('?')[0]; 
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const trackUrl = `https://api.deezer.com/track/isrc:${isrc}`;
-            const trackGatewayUrl = `${activeGateway}${encodeURIComponent(trackUrl)}`;
+            const requestUrl = `${baseUrl}?isrc=${isrc}`;
+            
+            const response = await fetch(requestUrl);
+            
+            if (response.status === 429) throw new Error("Gateway Rate Limit");
+            if (!response.ok) throw new Error(`Gateway Error: HTTP ${response.status}`);
+            
+            const result = await response.json();
 
-            const trackResult = await fetchDeezerData(trackGatewayUrl);
-            if (trackResult.isNotFound) return []; 
+            if (result.isNotFound) return [];
 
-            const trackData = trackResult.data;
-            if (!trackData.album || !trackData.album.id) return [];
+            if (result.error) {
+                const msg = result.error.message || "";
+                if (result.error.code === 800) return [];
+                if (msg.includes("Quota")) throw new Error("Deezer API Quota");
+                throw new Error(`Deezer API Error: ${msg}`);
+            }
 
-            const albumId = trackData.album.id;
-            const albumUrl = `https://api.deezer.com/album/${albumId}`;
-            const albumGatewayUrl = `${activeGateway}${encodeURIComponent(albumUrl)}`;
-
-            const albumResult = await fetchDeezerData(albumGatewayUrl);
-            if (albumResult.isNotFound) return [];
-
-            const albumData = albumResult.data;
-            if (albumData.genres && albumData.genres.data) {
-                return albumData.genres.data.flatMap(genre => 
+            const genreData = result.data?.genres?.data;
+            if (genreData && Array.isArray(genreData)) {
+                return genreData.flatMap(genre => 
                     genre.name.toLowerCase().split('/').map(g => g.trim()).filter(g => g.length > 0)
                 );
             }
@@ -13292,11 +13270,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function saveGenresToTurso(newGenresData) {
     if (newGenresData.length === 0) return;
 
-    const BATCH_SIZE = 100;
-    const MAX_RETRIES = 5;
+    const BATCH_SIZE = 50; 
+    const MAX_RETRIES = 3;
     const RETRY_DELAY_BASE = 2000;
-
-    const promises = [];
 
     for (let i = 0; i < newGenresData.length; i += BATCH_SIZE) {
       const batch = newGenresData.slice(i, i + BATCH_SIZE).map(data => ({
@@ -13310,44 +13286,44 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         updated_at: Math.floor(Date.now() / 86400000),
       }));
 
-      const processBatch = async () => {
-        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-          try {
-            const response = await fetch(`${TURSO_GATEWAY_URL}/genres`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(batch),
-            });
+      let success = false;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          const response = await fetch(`${TURSO_GATEWAY_URL}/genres`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(batch),
+          });
 
-            if (!response.ok) {
-              if (response.status >= 500 || response.status === 429) {
-                const errorText = await response.text();
-                throw new Error(`Server responded ${response.status}: ${errorText}`);
-              } else {
-                const errorText = await response.text();
-                console.error(`[Sort-Play] Client error saving genres (no retry): ${response.status}`, errorText);
-                return; 
-              }
-            }
-            
-            return; 
-
-          } catch (error) {
-            if (attempt === MAX_RETRIES) {
-              console.error(`[Sort-Play] Error saving a batch of genres to Turso gateway after ${MAX_RETRIES} attempts:`, error);
+          if (!response.ok) {
+            const errorText = await response.text();
+            if (response.status >= 500 || response.status === 429) {
+              throw new Error(`Server responded ${response.status}: ${errorText}`);
             } else {
-              const delay = RETRY_DELAY_BASE * attempt;
-              console.warn(`[Sort-Play] Failed to save genres (Attempt ${attempt}). Retrying in ${delay}ms. Error:`, error.message);
-              await new Promise(resolve => setTimeout(resolve, delay));
+              console.error(`[Sort-Play] Client error saving genres (no retry): ${response.status}`, errorText);
+              success = true;
+              break; 
             }
           }
+          
+          success = true;
+          break; 
+
+        } catch (error) {
+          if (attempt === MAX_RETRIES) {
+            console.error(`[Sort-Play] Error saving batch ${i/BATCH_SIZE + 1} to Turso after ${MAX_RETRIES} attempts:`, error);
+          } else {
+            const delay = RETRY_DELAY_BASE * attempt;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
         }
-      };
-
-      promises.push(processBatch());
+      }
+      
+      if (success && (i + BATCH_SIZE < newGenresData.length)) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+      }
     }
-
-    await Promise.all(promises);
+    console.log(`[Sort-Play] Finished saving ${newGenresData.length} items to Turso.`);
   }
 
   async function fetchAllTrackGenres(tracks) {
