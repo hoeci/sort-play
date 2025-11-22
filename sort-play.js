@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.2";
+  const SORT_PLAY_VERSION = "5.24.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13170,7 +13170,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function getDeezerGenres(isrc) {
+  async function getDeezerGenres(isrc, useSpecificGateway = false) {
     const MAX_RETRIES = 5;
     let retryDelay = 2000;
 
@@ -13196,8 +13196,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return { data };
     };
 
-    const useSecondaryGateway = Math.random() < 0.5;
-    const activeGateway = useSecondaryGateway ? DEEZER_GATEWAY_URL : LFM_GATEWAY_URL;
+    const activeGateway = useSpecificGateway ? DEEZER_GATEWAY_URL : LFM_GATEWAY_URL;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
@@ -13357,7 +13356,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     mainButton.innerText = "0%";
   
-    async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null) {
+    async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null, useDeezerGateway = false) {
         const trackId = trackUri.split(":")[2];
         let isCompleteSuccess = true; 
 
@@ -13431,7 +13430,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             let deezer_genres = [];
             if (isrc) {
                 try {
-                    deezer_genres = await getDeezerGenres(isrc);
+                    deezer_genres = await getDeezerGenres(isrc, useDeezerGateway);
                 } catch (e) {
                     console.warn(`Deezer fetch failed for ISRC ${isrc}: ${e.message}`);
                     isCompleteSuccess = false; 
@@ -13602,14 +13601,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (tracksNeedingExternalFetch.length > 0) {
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
-        const CONCURRENCY_LIMIT = 12;
+        const SPLIT_CONCURRENCY = 6;
         const queue = [...tracksNeedingExternalFetch];
         
-        const worker = async () => {
+        const worker = async (useDeezerGateway) => {
             while (queue.length > 0) {
                 const item = queue.shift();
+                if (!item) break;
+
                 try {
-                    const result = await fetchSingleTrackGenresFromApis(item.uri, item.details);
+                    const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, useDeezerGateway);
                     
                     finalGenresMap.set(item.uri, result.data);
                     
@@ -13634,8 +13635,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         };
       
-        const workers = Array(CONCURRENCY_LIMIT).fill(null).map(() => worker());
-        await Promise.all(workers);
+        const normalWorkers = Array(SPLIT_CONCURRENCY).fill(null).map(() => worker(false));
+        const deezerWorkers = Array(SPLIT_CONCURRENCY).fill(null).map(() => worker(true));
+        
+        await Promise.all([...normalWorkers, ...deezerWorkers]);
     }
   
     if (dataToSave.length > 0) {
