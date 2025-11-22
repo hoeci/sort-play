@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.5";
+  const SORT_PLAY_VERSION = "5.24.6";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13179,19 +13179,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const fetchDeezerData = async (url) => {
         try {
             const response = await fetch(url);
+            
+            if (response.status === 429) throw new Error("Gateway Rate Limit");
             if (response.status === 404) return { isNotFound: true };
-            if (!response.ok) throw new Error(`Gateway HTTP status ${response.status}`);
+            if (!response.ok) throw new Error(`Gateway Error: HTTP ${response.status}`);
             
             const data = await response.json();
             if (data.error) {
                 if (data.error.code === 800) return { isNotFound: true };
                 if (data.error.message && data.error.message.includes("Quota")) {
-                    throw new Error("Quota limit exceeded");
+                    throw new Error("Deezer API Quota");
                 }
                 throw new Error(`Deezer API Error: ${data.error.message}`);
             }
             return { data };
         } catch (networkError) {
+            if (networkError.message.includes("Rate Limit") || networkError.message.includes("Quota")) {
+                throw networkError;
+            }
             throw new Error(`Network/Gateway Error: ${networkError.message}`);
         }
     };
@@ -13226,15 +13231,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return [];
 
         } catch (error) {
-            if (error.message.includes("Gateway") || error.message.includes("Network")) {
+            if (error.message.includes("Gateway") || error.message.includes("Network") || error.message.includes("Quota")) {
                 throw error;
             }
             
-            const isQuota = error.message.includes("Quota");
             if (attempt === MAX_RETRIES) throw error;
-
-            const waitTime = isQuota ? retryDelay * 2 : retryDelay;
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
             retryDelay *= 1.5;
         }
     }
@@ -13430,11 +13432,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 try {
                     deezer_genres = await getDeezerGenres(isrc, deezerGatewayUrl);
                 } catch (e) {
-                    if (e.message.includes("Gateway") || e.message.includes("Network") || e.message.includes("status 5")) {
-                        throw e; 
-                    }
-                    console.warn(`Deezer fetch failed for ISRC ${isrc} (Non-Gateway Error): ${e.message}`);
-                    isCompleteSuccess = false; 
+                    throw e;
                 }
             } else if (isrc && !deezerGatewayUrl) {
                 isCompleteSuccess = false;
@@ -13446,7 +13444,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return { 
                 success: true,
                 isrc: isrc,
-                canSave: isCompleteSuccess,
+                canSave: isCompleteSuccess, 
                 data: {
                     spotify_artist_genres: Array.from(spotifyGenres), 
                     lastfm_track_genres: lfmTrackGenres,
@@ -13593,7 +13591,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
         tracksNeedingExternalFetch.push(item);
     });
-    
+
     if (tracksNeedingExternalFetch.length > 0) {
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
@@ -13606,7 +13604,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             { url: DEEZER_GATEWAY_URL_3, active: true, failures: 0 }
         ];
         
-        const MAX_GATEWAY_FAILURES = 3;
+        const MAX_GATEWAY_FAILURES = 10; 
         const WORKERS_PER_GATEWAY = 5;
 
         const startGatewayWorkers = (gateway) => {
@@ -13635,10 +13633,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
 
                         } catch (error) {
-                            if (error.message.includes("Gateway") || error.message.includes("Network")) {
-                                console.warn(`Gateway ${gateway.url} failed for ${item.uri}. Fail count: ${gateway.failures + 1}`);
+                            const errorMsg = error.message || "";
+                            const isRateLimit = errorMsg.includes("Rate Limit") || errorMsg.includes("Quota");
+                            
+                            if (isRateLimit) {
+                                sharedQueue.push(item); 
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                            }
+                            else if (errorMsg.includes("Gateway") || errorMsg.includes("Network")) {
+                                console.warn(`Gateway ${gateway.url} hard failed for ${item.uri}: ${errorMsg}. Fail count: ${gateway.failures + 1}`);
                                 gateway.failures++;
-                                
                                 sharedQueue.push(item); 
 
                                 if (gateway.failures >= MAX_GATEWAY_FAILURES) {
@@ -13647,7 +13651,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                     break; 
                                 }
                             } else {
-                                console.error(`Non-gateway error for ${item.uri}:`, error);
+                                console.error(`Non-gateway error for ${item.uri}: ${errorMsg}`);
                                 fetchedCount++;
                             }
                         }
@@ -13661,15 +13665,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         await Promise.all(allPools);
 
         if (sharedQueue.length > 0) {
-            console.warn(`[Sort-Play] All Deezer gateways failed. Processing ${sharedQueue.length} remaining tracks without Deezer.`);
-            
+            console.warn(`[Sort-Play] All Deezer gateways failed or timed out. Processing ${sharedQueue.length} remaining tracks without Deezer.`);
             for (const item of sharedQueue) {
                 try {
                     const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null);
-                    
                     finalGenresMap.set(item.uri, result.data);
                     sessionGenreCache.set(item.uri, result.data);
-                                        
                 } catch (e) {
                     console.error("Error in fallback processing:", e);
                 } finally {
