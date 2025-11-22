@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.8";
+  const SORT_PLAY_VERSION = "5.24.9";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13270,7 +13270,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function saveGenresToTurso(newGenresData) {
     if (newGenresData.length === 0) return;
 
-    const BATCH_SIZE = 50; 
+    const BATCH_SIZE = 70; 
     const MAX_RETRIES = 3;
     const RETRY_DELAY_BASE = 2000;
 
@@ -13581,7 +13581,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         ];
         
         const MAX_GATEWAY_FAILURES = 10; 
-        const WORKERS_PER_GATEWAY = 5;
+        const WORKERS_PER_GATEWAY = 3;
 
         const startGatewayWorkers = (gateway) => {
             const workers = [];
@@ -13608,13 +13608,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             fetchedCount++;
                             mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
 
+                            await new Promise(resolve => setTimeout(resolve, 500));
+
                         } catch (error) {
                             const errorMsg = error.message || "";
-                            const isRateLimit = errorMsg.includes("Rate Limit") || errorMsg.includes("Quota");
+
+                            const isRateLimit = 
+                                errorMsg.includes("Rate Limit") || 
+                                errorMsg.includes("Quota") || 
+                                errorMsg.includes("429") || 
+                                errorMsg.includes("HTTP 5"); 
                             
                             if (isRateLimit) {
+                                console.warn(`Gateway ${gateway.url} server issue/limit (${errorMsg}). Pausing worker briefly.`);
                                 sharedQueue.push(item); 
-                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                await new Promise(resolve => setTimeout(resolve, 3000)); 
                             }
                             else if (errorMsg.includes("Gateway") || errorMsg.includes("Network")) {
                                 console.warn(`Gateway ${gateway.url} hard failed for ${item.uri}: ${errorMsg}. Fail count: ${gateway.failures + 1}`);
