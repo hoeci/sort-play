@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.0";
+  const SORT_PLAY_VERSION = "5.24.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13126,90 +13126,114 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         };
   
+        if (!trackResponse.ok && trackResponse.status !== 404) {
+             throw new Error(`Last.fm track network error: ${trackResponse.status}`);
+        }
+
         if (trackResponse.ok) {
             const trackData = await safeJson(trackResponse);
-            if (trackData?.track?.toptags?.tag) {
+            if (trackData && trackData.error) {
+                if (trackData.error !== 6) {
+                    throw new Error(`Last.fm API error: ${trackData.message}`);
+                }
+            } else if (trackData?.track?.toptags?.tag) {
                 result.track_genres = trackData.track.toptags.tag
                     .map(tag => tag.name.toLowerCase())
                     .filter(g => !/^\d+$/.test(g));
             }
-        } else {
-            console.warn(`Last.fm track.getInfo failed for ${artist} - ${track} with status ${trackResponse.status}`);
         }
   
+        if (!artistResponse.ok && artistResponse.status !== 404) {
+             throw new Error(`Last.fm artist network error: ${artistResponse.status}`);
+        }
+
         if (artistResponse.ok) {
             const artistData = await safeJson(artistResponse);
-            if (artistData?.artist?.tags?.tag) {
+            if (artistData && artistData.error) {
+                if (artistData.error !== 6) {
+                    throw new Error(`Last.fm API error: ${artistData.message}`);
+                }
+            } else if (artistData?.artist?.tags?.tag) {
                 result.artist_genres = artistData.artist.tags.tag
                     .map(tag => tag.name.toLowerCase())
                     .filter(g => !/^\d+$/.test(g));
             }
-        } else {
-            console.warn(`Last.fm artist.getInfo failed for ${artist} with status ${artistResponse.status}`);
         }
   
         lastfmCache.set(cacheKey, result);
-        return result;
+        return result; 
   
     } catch (error) {
-        console.warn(`Last.fm fetch failed for ${artist} - ${track}:`, {
-            error: error.message,
-            type: error.constructor.name
-        });
-        return result;
+        console.warn(`Last.fm fetch failed for ${artist} - ${track}:`, error.message);
+        return null;
     }
   }
 
   async function getDeezerGenres(isrc) {
-    const fetchWithRetry = async (url, retries = 3, delay = 1000) => {
-        for (let i = 0; i < retries; i++) {
-            try {
-                const response = await fetch(url);
-                if (response.status >= 500 && response.status < 600) {
-                     if (i === retries - 1) return response;
-                     await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
-                     continue;
-                }
-                return response;
-            } catch (error) {
-                if (i === retries - 1) throw error;
-                await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+    const MAX_RETRIES = 5;
+    let retryDelay = 2000;
+
+    const fetchDeezerData = async (url) => {
+        const response = await fetch(url);
+
+        if (response.status === 404) return { isNotFound: true };
+
+        if (!response.ok) throw new Error(`Deezer HTTP status ${response.status}`);
+
+        const data = await response.json();
+
+        if (data.error) {
+            if (data.error.code === 800) return { isNotFound: true };
+            
+            if (data.error.message && data.error.message.includes("Quota")) {
+                throw new Error("Quota limit exceeded");
             }
+
+            throw new Error(`Deezer API Error: ${data.error.message}`);
         }
+
+        return { data };
     };
 
-    try {
-        const trackUrl = `https://api.deezer.com/track/isrc:${isrc}`;
-        const trackGatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(trackUrl)}`;
-        const trackResponse = await fetchWithRetry(trackGatewayUrl);
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+            const trackUrl = `https://api.deezer.com/track/isrc:${isrc}`;
+            const trackGatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(trackUrl)}`;
 
-        if (!trackResponse || !trackResponse.ok) {
+            const trackResult = await fetchDeezerData(trackGatewayUrl);
+            if (trackResult.isNotFound) return []; 
+
+            const trackData = trackResult.data;
+            if (!trackData.album || !trackData.album.id) return [];
+
+            const albumId = trackData.album.id;
+            const albumUrl = `https://api.deezer.com/album/${albumId}`;
+            const albumGatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(albumUrl)}`;
+
+            const albumResult = await fetchDeezerData(albumGatewayUrl);
+            if (albumResult.isNotFound) return [];
+
+            const albumData = albumResult.data;
+            if (albumData.genres && albumData.genres.data) {
+                return albumData.genres.data.map(genre => genre.name.toLowerCase());
+            }
+
             return [];
+
+        } catch (error) {
+            const isQuota = error.message.includes("Quota");
+            
+            if (attempt === MAX_RETRIES) {
+                throw error;
+            }
+
+            const waitTime = isQuota ? retryDelay * 2 : retryDelay;
+            console.warn(`[Sort-Play] Deezer retry ${attempt}/${MAX_RETRIES} for ISRC ${isrc}: ${error.message}. Waiting ${waitTime}ms.`);
+            
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            
+            retryDelay *= 1.5;
         }
-
-        const trackData = await trackResponse.json();
-        if (trackData.error || !trackData.album || !trackData.album.id) {
-            return [];
-        }
-
-        const albumId = trackData.album.id;
-        const albumUrl = `https://api.deezer.com/album/${albumId}`;
-        const albumGatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(albumUrl)}`;
-        const albumResponse = await fetchWithRetry(albumGatewayUrl);
-
-        if (!albumResponse || !albumResponse.ok) {
-            return [];
-        }
-
-        const albumData = await albumResponse.json();
-        if (albumData.genres && albumData.genres.data) {
-            return albumData.genres.data.map(genre => genre.name.toLowerCase());
-        }
-
-        return [];
-    } catch (error) {
-        console.error(`Error fetching Deezer genres for ISRC ${isrc}:`, error);
-        return [];
     }
   }
   
@@ -13264,35 +13288,60 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (newGenresData.length === 0) return;
 
     const BATCH_SIZE = 200;
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY_BASE = 2000;
+
     const promises = [];
-  
+
     for (let i = 0; i < newGenresData.length; i += BATCH_SIZE) {
       const batch = newGenresData.slice(i, i + BATCH_SIZE).map(data => ({
-          isrc: data.isrc,
-          track_id: data.track_uri.split(':').pop(),
-          spotify_artist_genres: JSON.stringify(data.spotify_artist_genres || []),
-          lastfm_track_genres: JSON.stringify(data.lastfm_track_genres || []),
-          lastfm_artist_genres: JSON.stringify(data.lastfm_artist_genres || []),
-          deezer_genres: JSON.stringify(data.deezer_genres || []),
-          release_date: data.release_date,
-          updated_at: Math.floor(Date.now() / 86400000),
+        isrc: data.isrc,
+        track_id: data.track_uri.split(':').pop(),
+        spotify_artist_genres: JSON.stringify(data.spotify_artist_genres || []),
+        lastfm_track_genres: JSON.stringify(data.lastfm_track_genres || []),
+        lastfm_artist_genres: JSON.stringify(data.lastfm_artist_genres || []),
+        deezer_genres: JSON.stringify(data.deezer_genres || []),
+        release_date: data.release_date,
+        updated_at: Math.floor(Date.now() / 86400000),
       }));
-  
-      const promise = fetch(`${TURSO_GATEWAY_URL}/genres`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batch),
-      }).then(async response => {
-          if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`Server responded ${response.status}: ${errorText}`);
+
+      const processBatch = async () => {
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const response = await fetch(`${TURSO_GATEWAY_URL}/genres`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(batch),
+            });
+
+            if (!response.ok) {
+              if (response.status >= 500 || response.status === 429) {
+                const errorText = await response.text();
+                throw new Error(`Server responded ${response.status}: ${errorText}`);
+              } else {
+                const errorText = await response.text();
+                console.error(`[Sort-Play] Client error saving genres (no retry): ${response.status}`, errorText);
+                return; 
+              }
+            }
+            
+            return; 
+
+          } catch (error) {
+            if (attempt === MAX_RETRIES) {
+              console.error(`[Sort-Play] Error saving a batch of genres to Turso gateway after ${MAX_RETRIES} attempts:`, error);
+            } else {
+              const delay = RETRY_DELAY_BASE * attempt;
+              console.warn(`[Sort-Play] Failed to save genres (Attempt ${attempt}). Retrying in ${delay}ms. Error:`, error.message);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
           }
-      }).catch(error => {
-        console.error("Error saving a batch of genres to Turso gateway:", error);
-      });
-      promises.push(promise);
+        }
+      };
+
+      promises.push(processBatch());
     }
-    
+
     await Promise.all(promises);
   }
 
@@ -13306,6 +13355,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
     async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null) {
         const trackId = trackUri.split(":")[2];
+        let isCompleteSuccess = true; 
+
         try {
             const trackDetails = preFetchedTrackDetails || await withRetry(
                 () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`),
@@ -13314,7 +13365,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             );
     
             if (trackDetails?.code || trackDetails?.error) throw new Error(trackDetails.message);
-            if (!trackDetails?.artists?.length) return { isrc: null, genres: [] };
+            if (!trackDetails?.artists?.length) return { isrc: null, canSave: false, data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], release_date: null } };
             
             const isrc = trackDetails.external_ids?.isrc || null;
             if (!isrc) console.warn(`No ISRC found for ${trackUri}`);
@@ -13354,17 +13405,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         }
                     } catch (error) {
                         console.warn(`Error fetching Spotify genres:`, error);
+                        isCompleteSuccess = false;
                     }
                 }));
             }
     
             const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name);
-            const artistNames = trackDetails.artists.map(artist => artist.name.toLowerCase());
-            const filterGenres = (genres) => genres.filter(genre => !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName)));
+            
+            let lfmTrackGenres = [];
+            let lfmArtistGenres = [];
+            
+            if (lastfmGenresData === null) {
+                isCompleteSuccess = false; 
+            } else {
+                const artistNames = trackDetails.artists.map(artist => artist.name.toLowerCase());
+                const filterGenres = (genres) => genres.filter(genre => !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName)));
+                lfmTrackGenres = filterGenres(lastfmGenresData.track_genres);
+                lfmArtistGenres = filterGenres(lastfmGenresData.artist_genres);
+            }
     
             let deezer_genres = [];
             if (isrc) {
-                deezer_genres = await getDeezerGenres(isrc);
+                try {
+                    deezer_genres = await getDeezerGenres(isrc);
+                } catch (e) {
+                    console.warn(`Deezer fetch failed for ISRC ${isrc}: ${e.message}`);
+                    isCompleteSuccess = false; 
+                }
             }
     
             const releaseDate = trackDetails.album?.release_date;
@@ -13372,10 +13439,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
             return { 
                 isrc: isrc,
+                canSave: isCompleteSuccess,
                 data: {
                     spotify_artist_genres: Array.from(spotifyGenres), 
-                    lastfm_track_genres: filterGenres(lastfmGenresData.track_genres),
-                    lastfm_artist_genres: filterGenres(lastfmGenresData.artist_genres),
+                    lastfm_track_genres: lfmTrackGenres,
+                    lastfm_artist_genres: lfmArtistGenres,
                     deezer_genres: deezer_genres,
                     release_date: releaseDateInDays
                 }
@@ -13383,7 +13451,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
         } catch (error) {
             console.error(`Error fetching details for track ID ${trackId}:`, error);
-            return { isrc: null, data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], release_date: null } };
+            return { isrc: null, canSave: false, data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], release_date: null } };
         }
     }
   
@@ -13530,7 +13598,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (tracksNeedingExternalFetch.length > 0) {
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
-        const CONCURRENCY_LIMIT = 15;
+        const CONCURRENCY_LIMIT = 8;
         const queue = [...tracksNeedingExternalFetch];
         
         const worker = async () => {
@@ -13546,7 +13614,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         sessionGenreCache.set(result.isrc, result.data);
                     }
                     
-                    if (result.isrc) {
+                    if (result.isrc && result.canSave) {
                         dataToSave.push({
                             track_uri: item.uri,
                             isrc: result.isrc,
