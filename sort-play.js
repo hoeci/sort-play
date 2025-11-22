@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.1";
+  const SORT_PLAY_VERSION = "5.24.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -120,6 +120,7 @@
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
+  const DEEZER_GATEWAY_URL = "https://deezer-proxy.niko2nio2.workers.dev/?url=";
 
   const L_F_M_Key_Pool = [
     "***REMOVED***",
@@ -13195,10 +13196,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return { data };
     };
 
+    const useSecondaryGateway = Math.random() < 0.5;
+    const activeGateway = useSecondaryGateway ? DEEZER_GATEWAY_URL : LFM_GATEWAY_URL;
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
             const trackUrl = `https://api.deezer.com/track/isrc:${isrc}`;
-            const trackGatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(trackUrl)}`;
+            const trackGatewayUrl = `${activeGateway}${encodeURIComponent(trackUrl)}`;
 
             const trackResult = await fetchDeezerData(trackGatewayUrl);
             if (trackResult.isNotFound) return []; 
@@ -13208,7 +13212,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             const albumId = trackData.album.id;
             const albumUrl = `https://api.deezer.com/album/${albumId}`;
-            const albumGatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(albumUrl)}`;
+            const albumGatewayUrl = `${activeGateway}${encodeURIComponent(albumUrl)}`;
 
             const albumResult = await fetchDeezerData(albumGatewayUrl);
             if (albumResult.isNotFound) return [];
@@ -13598,7 +13602,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (tracksNeedingExternalFetch.length > 0) {
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
-        const CONCURRENCY_LIMIT = 8;
+        const CONCURRENCY_LIMIT = 12;
         const queue = [...tracksNeedingExternalFetch];
         
         const worker = async () => {
