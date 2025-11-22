@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.3";
+  const SORT_PLAY_VERSION = "5.24.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13218,7 +13218,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             const albumData = albumResult.data;
             if (albumData.genres && albumData.genres.data) {
-                return albumData.genres.data.map(genre => genre.name.toLowerCase());
+                return albumData.genres.data.flatMap(genre => 
+                    genre.name.toLowerCase().split('/').map(g => g.trim()).filter(g => g.length > 0)
+                );
             }
 
             return [];
@@ -13601,7 +13603,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (tracksNeedingExternalFetch.length > 0) {
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
-        const SPLIT_CONCURRENCY = 6;
+        const SPLIT_CONCURRENCY = 6; 
         const queue = [...tracksNeedingExternalFetch];
         
         const worker = async (useDeezerGateway) => {
@@ -13636,9 +13638,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         };
       
         const normalWorkers = Array(SPLIT_CONCURRENCY).fill(null).map(() => worker(false));
-        const deezerWorkers = Array(SPLIT_CONCURRENCY).fill(null).map(() => worker(true));
+        const gatewayWorkers = Array(SPLIT_CONCURRENCY).fill(null).map(() => worker(true));
         
-        await Promise.all([...normalWorkers, ...deezerWorkers]);
+        await Promise.all([...normalWorkers, ...gatewayWorkers]);
     }
   
     if (dataToSave.length > 0) {
