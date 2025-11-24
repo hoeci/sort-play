@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.25.1";
+  const SORT_PLAY_VERSION = "5.25.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13669,6 +13669,44 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     if (tracksNeedingExternalFetch.length > 0) {
+        const uniqueArtistIds = new Set();
+        tracksNeedingExternalFetch.forEach(item => {
+            if (item.details && item.details.artists) {
+                item.details.artists.forEach(artist => {
+                    if (artist.uri) {
+                        const artistId = artist.uri.split(':')[2];
+                        if (artistId && !artistGenreCache.has(artistId)) {
+                            uniqueArtistIds.add(artistId);
+                        }
+                    }
+                });
+            }
+        });
+
+        const artistIdsToFetch = Array.from(uniqueArtistIds);
+        if (artistIdsToFetch.length > 0) {
+            mainButton.innerText = "Artists...";
+            for (let i = 0; i < artistIdsToFetch.length; i += 50) {
+                const batch = artistIdsToFetch.slice(i, i + 50);
+                try {
+                    const artistData = await withRetry(
+                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`),
+                        CONFIG.spotify.retryAttempts,
+                        CONFIG.spotify.retryDelay
+                    );
+                    
+                    if (artistData?.artists) {
+                        artistData.artists.forEach(artist => {
+                            const genres = (artist?.genres || []).map(g => g.toLowerCase()).filter(genre => !containsYear(genre) && !/^\d+$/.test(genre));
+                            artistGenreCache.set(artist.id, genres);
+                        });
+                    }
+                } catch (error) {
+                    console.warn(`[Sort-Play] Error pre-fetching artist genres:`, error);
+                }
+            }
+        }
+
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
         
