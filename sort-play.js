@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.25.00";
+  const SORT_PLAY_VERSION = "5.25.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -120,6 +120,7 @@
   const CACHE_EXPIRE_RELEASE_DATE = null;
   const CACHE_EXPIRE_AI_DATA = null;
   const CACHE_EXPIRE_PALETTE = null;
+  const CACHE_EXPIRE_METADATA = 24 * 60 * 60 * 1000; 
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
@@ -132,16 +133,16 @@
     db: null,
     mem: {},
     init: () => new Promise((resolve, reject) => {
-        const request = indexedDB.open("SortPlayDB", 1);
+        const request = indexedDB.open("SortPlayDB", 2);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData'].forEach(store => {
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata'].forEach(store => {
                 if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
             });
         };
         request.onsuccess = (e) => {
             idb.db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData'].forEach(s => idb.mem[s] = new Map());
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata'].forEach(s => idb.mem[s] = new Map());
             resolve();
         };
         request.onerror = (e) => reject(e);
@@ -5647,6 +5648,27 @@ sendButton.addEventListener("click", async () => {
     }
   }
   
+  async function processArtistPageTracks(tracks, isHeadless = false) {
+    if (!isHeadless) mainButton.innerText = "Correcting...";
+    
+    const refreshedTracks = await refreshTrackAlbumInfo(
+        tracks, 
+        (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.30)}%`; }
+    );
+
+    if (!isHeadless) mainButton.innerText = "Enriching...";
+    
+    const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
+        refreshedTracks, 
+        (progress) => { if (!isHeadless) mainButton.innerText = `${30 + Math.floor(progress * 0.60)}%`; }
+    );
+
+    const { unique } = deduplicateTracks(tracksWithPlayCounts, true, true);
+    
+    if (!isHeadless) mainButton.innerText = "Ready";
+    return unique;
+  }
+
   async function handleCustomFilter() {
     menuButtons.forEach((btn) => {
       if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
@@ -5672,11 +5694,14 @@ sendButton.addEventListener("click", async () => {
         }
 
         let tracks;
+        let isArtistPage = false;
+
         if (URI.isPlaylistV1OrV2(currentUri)) {
             const playlistId = currentUri.split(":")[2];
             tracks = await getPlaylistTracks(playlistId);
         } else if (URI.isArtist(currentUri)) {
             tracks = await getArtistTracks(currentUri);
+            isArtistPage = true;
         } else if (isLikedSongsPage(currentUri)) {
             tracks = await getLikedSongs();
         } else if (URI.isAlbum(currentUri)) {
@@ -5689,6 +5714,11 @@ sendButton.addEventListener("click", async () => {
         if (!tracks || tracks.length === 0) {
             throw new Error('No tracks found');
         }
+
+        if (isArtistPage) {
+            tracks = await processArtistPageTracks(tracks);
+        }
+
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks, 
             (progress) => { mainButton.innerText = progress; }
@@ -5704,7 +5734,6 @@ sendButton.addEventListener("click", async () => {
         }
         tracks = convertedTracks;
         mainButton.innerText = "0%";
-
 
         const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
             tracks,
@@ -14969,11 +14998,26 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function refreshTrackAlbumInfo(tracks, updateProgress = () => {}) {
     const BATCH_SIZE = 50;
     const refreshedTracks = [];
-    const trackIds = tracks.map(t => t.id || t.track?.id).filter(Boolean);
+    
+    const uniqueTracks = new Map();
+    tracks.forEach(t => {
+        const id = t.id || t.track?.id || (t.uri ? t.uri.split(':')[2] : null);
+        if (id && !uniqueTracks.has(id)) uniqueTracks.set(id, t);
+    });
 
-    for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
-        const batchIds = trackIds.slice(i, i + BATCH_SIZE);
+    const trackIds = Array.from(uniqueTracks.keys());
+    
+    const cachedMetadata = await idb.getMany('trackMetadata', trackIds, CACHE_EXPIRE_METADATA);
+    const missingIds = [];
 
+    trackIds.forEach(id => {
+        if (!cachedMetadata.has(id)) {
+            missingIds.push(id);
+        }
+    });
+
+    for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+        const batchIds = missingIds.slice(i, i + BATCH_SIZE);
         if (batchIds.length === 0) continue;
 
         try {
@@ -14981,43 +15025,66 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (trackDetailsResponse && trackDetailsResponse.tracks) {
                 trackDetailsResponse.tracks.forEach(detailedTrack => {
                     if (!detailedTrack) return;
-
-                    const newTrack = {
-                        uri: detailedTrack.uri,
+                    
+                    const cacheData = {
                         name: detailedTrack.name,
-                        albumName: detailedTrack.album.name,
-                        artistName: detailedTrack.artists[0]?.name,
-                        allArtists: detailedTrack.artists.map(a => a.name).join(", "),
-                        durationMs: detailedTrack.duration_ms,
+                        album: {
+                            name: detailedTrack.album.name,
+                            id: detailedTrack.album.id,
+                            uri: detailedTrack.album.uri,
+                            release_date: detailedTrack.album.release_date
+                        },
+                        artists: detailedTrack.artists.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            uri: a.uri
+                        })),
+                        duration_ms: detailedTrack.duration_ms,
                         popularity: detailedTrack.popularity,
-                        trackId: detailedTrack.id,
-                        albumId: detailedTrack.album.id,
-                        track: {
-                            id: detailedTrack.id,
-                            name: detailedTrack.name,
-                            uri: detailedTrack.uri,
-                            duration_ms: detailedTrack.duration_ms,
-                            album: {
-                                id: detailedTrack.album.id,
-                                name: detailedTrack.album.name,
-                                uri: detailedTrack.album.uri,
-                            },
-                            artists: detailedTrack.artists.map(a => ({
-                                id: a.id,
-                                name: a.name,
-                                uri: a.uri,
-                            })),
-                        }
+                        id: detailedTrack.id,
+                        uri: detailedTrack.uri
                     };
-                    refreshedTracks.push(newTrack);
+                    
+                    cachedMetadata.set(detailedTrack.id, cacheData);
+                    idb.set('trackMetadata', detailedTrack.id, cacheData);
                 });
             }
         } catch (error) {
             console.warn(`[Sort-Play] Failed to refresh a batch of track album info:`, error);
         }
-        const progress = Math.min(100, Math.floor(((i + BATCH_SIZE) / trackIds.length) * 100));
+        const progress = Math.min(100, Math.floor(((i + BATCH_SIZE) / missingIds.length) * 100));
         updateProgress(progress);
     }
+
+    trackIds.forEach(id => {
+        const meta = cachedMetadata.get(id);
+        if (meta) {
+            const newTrack = {
+                uri: meta.uri,
+                name: meta.name,
+                albumName: meta.album.name,
+                artistName: meta.artists[0]?.name,
+                allArtists: meta.artists.map(a => a.name).join(", "),
+                durationMs: meta.duration_ms,
+                popularity: meta.popularity,
+                releaseDate: meta.album.release_date,
+                trackId: meta.id,
+                albumId: meta.album.id,
+                track: {
+                    id: meta.id,
+                    name: meta.name,
+                    uri: meta.uri,
+                    duration_ms: meta.duration_ms,
+                    album: meta.album,
+                    artists: meta.artists,
+                }
+            };
+            refreshedTracks.push(newTrack);
+        } else {
+            refreshedTracks.push(uniqueTracks.get(id));
+        }
+    });
+
     return refreshedTracks;
   }
   
@@ -15034,15 +15101,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     updateProgress,
     totalProgressSteps = 1
   ) {
-    const trackIds = tracks.map((track) => track.trackId).filter((id) => id);
-    const batchSize = 100;
-    const results = [];
+    const trackIds = tracks.map((track) => track.trackId || (track.uri ? track.uri.split(':')[2] : null)).filter((id) => id);
+    const uniqueTrackIds = [...new Set(trackIds)];
+    
+    const cachedMetadata = await idb.getMany('trackMetadata', uniqueTrackIds, CACHE_EXPIRE_METADATA);
+    const missingIds = uniqueTrackIds.filter(id => !cachedMetadata.has(id));
+
+    const batchSize = 50;
     let tracksProcessed = 0;
     const maxRetries = 5;
-    const initialDelay = 1000;  
+    const initialDelay = 1000;
 
-    for (let i = 0; i < trackIds.length; i += batchSize) {
-      const batch = trackIds.slice(i, i + batchSize);
+    for (let i = 0; i < missingIds.length; i += batchSize) {
+      const batch = missingIds.slice(i, i + batchSize);
       let retries = 0;
       let delay = initialDelay;
       let success = false;
@@ -15055,53 +15126,58 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
           if (response && response.tracks) {
             response.tracks.forEach((trackData) => {
-              const originalTrack = tracks.find(
-                (t) => t.trackId === trackData.id
-              );
-              if (originalTrack) {
-                results.push({
-                  ...originalTrack,
-                  popularity: trackData.popularity,
-                });
-                tracksProcessed++;
-              }
+                if (trackData) {
+                    const cacheData = {
+                        name: trackData.name,
+                        album: {
+                            name: trackData.album.name,
+                            id: trackData.album.id,
+                            uri: trackData.album.uri,
+                            release_date: trackData.album.release_date
+                        },
+                        artists: trackData.artists.map(a => ({
+                            id: a.id,
+                            name: a.name,
+                            uri: a.uri
+                        })),
+                        duration_ms: trackData.duration_ms,
+                        popularity: trackData.popularity,
+                        id: trackData.id,
+                        uri: trackData.uri
+                    };
+                    cachedMetadata.set(trackData.id, cacheData);
+                    idb.set('trackMetadata', trackData.id, cacheData);
+                }
             });
-
-            const intermediateProgress = Math.round(
-              ((tracksProcessed / tracks.length) * 100) / totalProgressSteps
-            );
-            updateProgress(intermediateProgress);
-            success = true; 
-          } else {
+            success = true;
           }
         } catch (error) {
         }
+
         if (!success) {
           retries++;
           if (retries < maxRetries) {
             await new Promise((resolve) => setTimeout(resolve, delay));
-            delay *= 2; 
-          } else {
-              batch.forEach((trackId) => {
-                const originalTrack = tracks.find((t) => t.trackId === trackId);
-                if (originalTrack) {
-                  results.push({
-                    ...originalTrack,
-                    popularity: null,  
-                  });
-                }
-              });
-            tracksProcessed += batch.length; 
-            const intermediateProgress = Math.round(
-              ((tracksProcessed / tracks.length) * 100) / totalProgressSteps
-            );
-            updateProgress(intermediateProgress);
+            delay *= 2;
           }
         }
       }
+      
+      tracksProcessed += batch.length;
+      const intermediateProgress = Math.round(
+          ((tracksProcessed / missingIds.length) * 100) / totalProgressSteps
+      );
+      updateProgress(intermediateProgress);
     }
 
-    return results;
+    return tracks.map(track => {
+        const id = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+        const meta = cachedMetadata.get(id);
+        return {
+            ...track,
+            popularity: meta ? meta.popularity : (track.popularity || null)
+        };
+    });
   }
 
   async function getTrackDetailsWithReleaseDate(track) {
@@ -19092,10 +19168,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
     
             let tracks;
+            let isArtistPage = false;
+
             if (URI.isPlaylistV1OrV2(currentUri)) {
                 tracks = await getPlaylistTracks(currentUri.split(":")[2]);
             } else if (URI.isArtist(currentUri)) {
                 tracks = await getArtistTracks(currentUri);
+                isArtistPage = true;
             } else if (isLikedSongsPage(currentUri)) {
                 tracks = await getLikedSongs();
             } else if (URI.isAlbum(currentUri)) {
@@ -19106,6 +19185,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
             if (!tracks || tracks.length === 0) {
                 throw new Error('No tracks found to analyze');
+            }
+
+            if (isArtistPage) {
+                tracks = await processArtistPageTracks(tracks);
             }
             
             const openModal = async () => {
@@ -19334,25 +19417,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         let tracksWithPopularity;
 
-        if (playlistDeduplicate || sortType === 'deduplicateOnly' || isArtistPage) {
-          
-            let refreshedTracks = tracks;
-            if (isArtistPage) {
-                if (!isHeadless) mainButton.innerText = "Correcting...";
-                refreshedTracks = await refreshTrackAlbumInfo(
-                    tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.15)}%`; }
-                );
-            }
-  
+        if (isArtistPage) {
+            tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless);
+        } 
+        else if (playlistDeduplicate || sortType === 'deduplicateOnly') {
+            if (!isHeadless) mainButton.innerText = "Enriching...";
+            
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
-              refreshedTracks, (progress) => { if (!isHeadless) mainButton.innerText = `${15 + Math.floor(progress * 0.30)}%`; }
+              tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.40)}%`; }
             );
-            const tracksWithIds = await processBatchesWithDelay(
-              tracksWithPlayCounts, 50, 500, (progress) => { if (!isHeadless) mainButton.innerText = `${45 + Math.floor(progress * 0.20)}%`; },
-              collectTrackIdsForPopularity
-            );
+
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
-              tracksWithIds, (progress) => { if (!isHeadless) mainButton.innerText = `${65 + Math.floor(progress * 0.15)}%`; }
+              tracksWithPlayCounts, 
+              (progress) => { if (!isHeadless) mainButton.innerText = `${40 + Math.floor(progress * 0.60)}%`; }
             );
         
         } else if (sortType === 'playCount') {
@@ -19363,13 +19440,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         } else if (sortType === 'popularity') {
             if (!isHeadless) mainButton.innerText = "0%";
-            const tracksWithIds = await processBatchesWithDelay(
-              tracks, 50, 500, 
-              (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.10)}%`; },
-              collectTrackIdsForPopularity
-            );
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
-              tracksWithIds, 
+              tracks, 
               (progress) => { if (!isHeadless) mainButton.innerText = `${10 + Math.floor(progress * 0.90)}%`; }
             );
 
@@ -20711,11 +20783,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
 
                     let tracks;
+                    let isArtistPage = false;
+
                     if (URI.isPlaylistV1OrV2(currentUri)) {
                         const playlistId = currentUri.split(":")[2];
                         tracks = await getPlaylistTracks(playlistId);
                     } else if (URI.isArtist(currentUri)) {
                         tracks = await getArtistTracks(currentUri);
+                        isArtistPage = true;
                     } else if (isLikedSongsPage(currentUri)) {
                         tracks = await getLikedSongs();
                     } else if (URI.isAlbum(currentUri)) {
@@ -20727,6 +20802,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                     if (!tracks || tracks.length === 0) {
                         throw new Error("No tracks found");
+                    }
+
+                    if (isArtistPage) {
+                        tracks = await processArtistPageTracks(tracks);
                     }
 
                     const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
