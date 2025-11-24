@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.9";
+  const SORT_PLAY_VERSION = "5.24.10";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -11841,11 +11841,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   };
 
   const COUNTRY_MAPPINGS = {
-    "united states": ["usa", "us", "united states", "united states of america", "america", "american", "states", "u.s.a.", "yankee", "murica", "stars and stripes"],
+    "united states": ["usa", "us", "united states", "united states of america", "america", "american", "u.s.a.", "murica"],
     "canada": ["canada", "canadian", "canadien", "ca", "canuck", "great white north"],
     "mexico": ["mexico", "mexican", "mexicano", "mx", "mex", "aztec"],
     "united kingdom": ["uk", "united kingdom", "britain", "british", "great britain", "england", "english", "scotland", "scottish", "wales", "welsh", "northern ireland", "northern irish", "gb", "gbr", "brit", "albion", "blighty"],
-    "ireland": ["ireland", "irish", "eire", "ie", "hibernia", "emerald isle", "paddy"],
+    "ireland": ["ireland", "irish", "eire", "ie", "hibernia", "emerald isle"],
     "france": ["france", "french", "français", "francaise", "francophone", "fr", "hexagon", "gallia"],
     "germany": ["germany", "german", "deutschland", "deutsch", "de", "brd", "allemagne", "aleman"],
     "netherlands": ["netherlands", "dutch", "holland", "flemish", "nl", "nld", "low countries", "nederland"],
@@ -11903,7 +11903,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     "new zealand": ["new zealand", "nz", "kiwi", "aotearoa", "zealand"],
     "israel": ["israel", "israeli", "hebrew", "il", "isr", "zion"],
     "egypt": ["egypt", "egyptian", "eg", "egy", "misr"],
-    "iran": ["iran", "iranian", "persian", "farsi", "ir", "irn"],
+    "iran": ["iran", "iranian", "persian", "farsi", "ir", "irn", "Iranis", "irani"],
     "morocco": ["morocco", "moroccan", "ma", "mar", "maroc", "maghreb"],
     "algeria": ["algeria", "algerian", "dz", "dza", "algerie"],
     "nigeria": ["nigeria", "nigerian", "ng", "nga", "naija", "9ja"],
@@ -13019,6 +13019,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   const artistGenreCache = new Map();
   const lastfmCache = new Map();
+  const lastfmArtistTagsCache = new Map();
   const sessionGenreCache = new Map();
   
   const CONFIG = {
@@ -13109,17 +13110,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const result = { track_genres: [], artist_genres: [] };
   
     try {
-        const [trackResponse, artistResponse] = await Promise.all([
-            (async () => {
-                const params = new URLSearchParams({ method: 'track.getInfo', artist, track, format: 'json' });
-                return fetchLfmWithGateway(params);
-            })(),
-            (async () => {
-                const params = new URLSearchParams({ method: 'artist.getInfo', artist, format: 'json' });
-                return fetchLfmWithGateway(params);
-            })()
-        ]);
-
         const safeJson = async (response) => {
             try {
                 const text = await response.text();
@@ -13128,6 +13118,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return null;
             }
         };
+
+        const promises = [];
+
+        promises.push((async () => {
+            const params = new URLSearchParams({ method: 'track.getInfo', artist, track, format: 'json' });
+            return fetchLfmWithGateway(params);
+        })());
+
+        let cachedArtistTags = null;
+        if (lastfmArtistTagsCache.has(artist)) {
+            cachedArtistTags = lastfmArtistTagsCache.get(artist);
+        } else {
+            promises.push((async () => {
+                const params = new URLSearchParams({ method: 'artist.getInfo', artist, format: 'json' });
+                return fetchLfmWithGateway(params);
+            })());
+        }
+
+        const responses = await Promise.all(promises);
+        const trackResponse = responses[0];
+        const artistResponse = !cachedArtistTags && responses.length > 1 ? responses[1] : null;
   
         if (!trackResponse.ok && trackResponse.status !== 404) {
              throw new Error(`Last.fm track network error: ${trackResponse.status}`);
@@ -13146,20 +13157,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
   
-        if (!artistResponse.ok && artistResponse.status !== 404) {
-             throw new Error(`Last.fm artist network error: ${artistResponse.status}`);
-        }
+        if (cachedArtistTags) {
+            result.artist_genres = cachedArtistTags;
+        } else if (artistResponse) {
+            if (!artistResponse.ok && artistResponse.status !== 404) {
+                 throw new Error(`Last.fm artist network error: ${artistResponse.status}`);
+            }
 
-        if (artistResponse.ok) {
-            const artistData = await safeJson(artistResponse);
-            if (artistData && artistData.error) {
-                if (artistData.error !== 6) {
-                    throw new Error(`Last.fm API error: ${artistData.message}`);
+            if (artistResponse.ok) {
+                const artistData = await safeJson(artistResponse);
+                if (artistData && artistData.error) {
+                    if (artistData.error !== 6) {
+                        throw new Error(`Last.fm API error: ${artistData.message}`);
+                    }
+                } else if (artistData?.artist?.tags?.tag) {
+                    const tags = artistData.artist.tags.tag
+                        .map(tag => tag.name.toLowerCase())
+                        .filter(g => !/^\d+$/.test(g));
+                    
+                    lastfmArtistTagsCache.set(artist, tags);
+                    result.artist_genres = tags;
                 }
-            } else if (artistData?.artist?.tags?.tag) {
-                result.artist_genres = artistData.artist.tags.tag
-                    .map(tag => tag.name.toLowerCase())
-                    .filter(g => !/^\d+$/.test(g));
             }
         }
   
@@ -13323,7 +13341,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           await new Promise(resolve => setTimeout(resolve, 300));
       }
     }
-    console.log(`[Sort-Play] Finished saving ${newGenresData.length} items to Turso.`);
   }
 
   async function fetchAllTrackGenres(tracks) {
@@ -13414,8 +13431,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 isCompleteSuccess = false;
             }
     
-            const releaseDate = trackDetails.album?.release_date;
-            const releaseDateInDays = releaseDate ? Math.floor(new Date(releaseDate).getTime() / 86400000) : null;
+            const releaseDateStr = trackDetails.album?.release_date;
+            let releaseDateInDays = null;
+
+            if (releaseDateStr) {
+                const dateObj = new Date(releaseDateStr);
+                if (!isNaN(dateObj.getTime())) {
+                    releaseDateInDays = Math.floor(dateObj.getTime() / 86400000);
+                }
+            }
     
             return { 
                 success: true,
@@ -13608,7 +13632,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             fetchedCount++;
                             mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
 
-                            await new Promise(resolve => setTimeout(resolve, 500));
+                            await new Promise(resolve => setTimeout(resolve, 250));
 
                         } catch (error) {
                             const errorMsg = error.message || "";
