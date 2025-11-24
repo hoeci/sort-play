@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.24.10";
+  const SORT_PLAY_VERSION = "5.25.00";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -110,13 +110,16 @@
   const STORAGE_KEY_NOW_PLAYING_KEY_FORMAT = "sort-play-now-playing-key-format";
   const STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT = "sort-play-now-playing-popularity-format";
   const STORAGE_KEY_NOW_PLAYING_SEPARATOR = "sort-play-now-playing-separator";
-  const CACHE_KEY_PERSONAL_SCROBBLES = 'sort-play-personal-scrobbles-cache';
-  const CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES = 'sort-play-personal-scrobbles-cache-timestamp';
-  const CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES = 4;
-  const AI_DATA_CACHE_MAX_ITEMS = 1500;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
   const runningJobIds = new Set();
+
+  const CACHE_EXPIRE_PLAYCOUNTS = 6 * 60 * 60 * 1000; 
+  const CACHE_EXPIRE_PERSONAL_SCROBBLES = 4 * 60 * 60 * 1000; 
+  const CACHE_EXPIRE_GLOBAL_SCROBBLES = 2 * 24 * 60 * 60 * 1000; 
+  const CACHE_EXPIRE_RELEASE_DATE = null;
+  const CACHE_EXPIRE_AI_DATA = null;
+  const CACHE_EXPIRE_PALETTE = null;
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
@@ -124,6 +127,94 @@
   const DEEZER_GATEWAY_URL_2 = "https://deezer-proxy-2.hoeci.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
 
+
+  const idb = {
+    db: null,
+    mem: {},
+    init: () => new Promise((resolve, reject) => {
+        const request = indexedDB.open("SortPlayDB", 1);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData'].forEach(store => {
+                if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
+            });
+        };
+        request.onsuccess = (e) => {
+            idb.db = e.target.result;
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData'].forEach(s => idb.mem[s] = new Map());
+            resolve();
+        };
+        request.onerror = (e) => reject(e);
+    }),
+    isValid: (item, expiryMs) => {
+        if (!item || !item.ts) return false;
+        if (!expiryMs) return true; 
+        return (Date.now() - item.ts) < expiryMs;
+    },
+    get: (store, key, expiryMs = null) => new Promise(resolve => {
+        if (idb.mem[store]?.has(key)) {
+            const item = idb.mem[store].get(key);
+            if (idb.isValid(item, expiryMs)) return resolve(item.val);
+            else idb.mem[store].delete(key);
+        }
+        if (!idb.db) return resolve(null);
+        const tx = idb.db.transaction([store], "readonly");
+        const req = tx.objectStore(store).get(key);
+        req.onsuccess = () => {
+            const result = req.result;
+            if (result && idb.isValid(result, expiryMs)) {
+                idb.mem[store].set(key, result);
+                resolve(result.val);
+            } else {
+                resolve(null);
+            }
+        };
+        req.onerror = () => resolve(null);
+    }),
+    getMany: (store, keys, expiryMs = null) => new Promise(resolve => {
+        if (!idb.db) return resolve(new Map());
+        const results = new Map();
+        const missingKeys = [];
+        
+        keys.forEach(k => {
+            if (idb.mem[store]?.has(k)) {
+                const item = idb.mem[store].get(k);
+                if (idb.isValid(item, expiryMs)) results.set(k, item.val);
+                else missingKeys.push(k);
+            } else {
+                missingKeys.push(k);
+            }
+        });
+
+        if (missingKeys.length === 0) return resolve(results);
+
+        const tx = idb.db.transaction([store], "readonly");
+        const os = tx.objectStore(store);
+        
+        missingKeys.forEach(key => {
+            const r = os.get(key);
+            r.onsuccess = () => {
+                if (r.result && idb.isValid(r.result, expiryMs)) {
+                    results.set(key, r.result.val);
+                    idb.mem[store].set(key, r.result);
+                }
+            };
+        });
+        tx.oncomplete = () => resolve(results);
+        tx.onerror = () => resolve(results);
+    }),
+    set: (store, key, val) => {
+        const item = { val, ts: Date.now() };
+        if (idb.mem[store]) idb.mem[store].set(key, item);
+        return new Promise(resolve => {
+            if (!idb.db) return resolve();
+            const tx = idb.db.transaction([store], "readwrite");
+            tx.objectStore(store).put(item, key);
+            tx.oncomplete = () => resolve();
+        });
+    }
+  };
+  
   const L_F_M_Key_Pool = [
     "***REMOVED***",
     "***REMOVED***",
@@ -619,145 +710,14 @@
     return `${AI_DATA_CACHE_KEY_PREFIX}${trackId}-stats${includeSongStats}-lyrics${includeLyrics}-model${selectedAiModel}`;
   }
   
-  function getTrackCache(trackId, includeSongStats, includeLyrics, selectedAiModel) {
+  async function getTrackCache(trackId, includeSongStats, includeLyrics, selectedAiModel) {
     const cacheKey = getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel);
-    let cachedData;
-    
-    try {
-      cachedData = localStorage.getItem(cacheKey);
-      if (!cachedData) return null;
-      
-      const { timestamp, trackData, version } = JSON.parse(cachedData);
-      
-      if (version !== AI_DATA_CACHE_VERSION) {
-        localStorage.removeItem(cacheKey);
-        return null;
-      }
-      
-      const expiryTime = AI_DATA_CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-      if (Date.now() - timestamp > expiryTime) {
-        localStorage.removeItem(cacheKey);
-        return null;
-      }
-      
-      return trackData;
-    } catch (error) {
-      console.error('Error retrieving cache:', error);
-      if (cachedData) localStorage.removeItem(cacheKey);
-      return null;
-    }
+    return await idb.get('aiData', cacheKey, CACHE_EXPIRE_AI_DATA);
   }
-  
-  function setTrackCache(trackId, trackData, includeSongStats, includeLyrics, selectedAiModel) {
+  async function setTrackCache(trackId, trackData, includeSongStats, includeLyrics, selectedAiModel) {
     const cacheKey = getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel);
-    const cacheData = {
-      version: AI_DATA_CACHE_VERSION,
-      timestamp: Date.now(),
-      trackData: trackData
-    };
-    
-    const cacheDataString = JSON.stringify(cacheData);
-    const newItemSize = cacheDataString.length;
-  
-    if (newItemSize > AI_DATA_MAX_CACHE_SIZE_BYTES) {
-      console.warn(`[Sort-Play Cache] Item for track ${trackId} is too large to cache (${newItemSize} bytes). Skipping.`);
-      return;
-    }
-  
-    try {
-      localStorage.setItem(cacheKey, cacheDataString);
-    } catch (error) {
-      if (error.name === 'QuotaExceededError') {
-        console.warn('Cache quota exceeded. Running aggressive cleanup...');
-        manageCacheSize(newItemSize);
-        try {
-          localStorage.setItem(cacheKey, cacheDataString);
-        } catch (retryError) {
-          console.error('Cache write failed after cleanup:', retryError);
-        }
-      } else {
-        console.error('Error setting cache:', error);
-      }
-    }
+    await idb.set('aiData', cacheKey, trackData);
   }
-  
-  function clearOldCaches() {
-    const keysToRemove = [];
-    const expiryTime = AI_DATA_CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-  
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith(AI_DATA_CACHE_KEY_PREFIX)) {
-        try {
-          const data = JSON.parse(localStorage.getItem(key));
-          if (data && data.timestamp && (Date.now() - data.timestamp > expiryTime)) {
-            keysToRemove.push(key);
-          } else if (data && !data.version) {
-            keysToRemove.push(key);
-          }
-        } catch (error) {
-          console.error(`Error parsing cache data for key ${key}:`, error);
-          keysToRemove.push(key);
-        }
-      }
-    }
-  
-    keysToRemove.forEach(key => {
-      localStorage.removeItem(key);
-    });
-  }
-  
-  function manageCacheSize(newItemSize = 0) {
-    let cacheSize = 0;
-    const cacheItems = [];
-  
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith(AI_DATA_CACHE_KEY_PREFIX)) {
-        const item = localStorage.getItem(key);
-        cacheSize += item.length;
-        try {
-          const data = JSON.parse(item);
-          cacheItems.push({ 
-            key, 
-            size: item.length,
-            timestamp: data.timestamp || 0  
-          });
-        } catch (error) {
-          localStorage.removeItem(key);
-          console.error(`Removed corrupted cache item: ${key}`);
-        }
-      }
-    }
-    
-    cacheItems.sort((a, b) => a.timestamp - b.timestamp);
-  
-    const itemsToDeleteCount = cacheItems.length - AI_DATA_CACHE_MAX_ITEMS;
-    if (itemsToDeleteCount > 0) {
-        console.log(`[Sort-Play Cache] Exceeded item limit. Removing ${itemsToDeleteCount} oldest items.`);
-        for (let i = 0; i < itemsToDeleteCount; i++) {
-            const item = cacheItems[i];
-            localStorage.removeItem(item.key);
-            cacheSize -= item.size;
-        }
-        cacheItems.splice(0, itemsToDeleteCount);
-    }
-  
-    if (cacheSize + newItemSize > AI_DATA_MAX_CACHE_SIZE_BYTES) {
-      let removedSize = 0;
-      const targetSize = AI_DATA_MAX_CACHE_SIZE_BYTES - newItemSize;
-  
-      for (const item of cacheItems) {
-        localStorage.removeItem(item.key);
-        removedSize += item.size;
-        cacheSize -= item.size;
-        if (cacheSize <= targetSize) {
-          break;
-        }
-      }
-    }
-  }
-
   
   let googleAiSdk = null;
   async function loadGoogleAI() {
@@ -5222,14 +5182,19 @@ sendButton.addEventListener("click", async () => {
   }
 
   async function queryGeminiWithPlaylistTracks(tracks, userPrompt, apiKey, maxRetries = 3, initialDelay = 1000, includeSongStats = true, includeLyrics = true, modelName) {
-    clearOldCaches();
     let enrichedTracksCache = [];
     let tracksToProcess = [];
     let tracksNeedingLyrics = [];
 
-    for (const track of tracks) {
-        const trackId = track.uri.split(":")[2];
-        const cachedTrack = getTrackCache(trackId, includeSongStats, false, modelName);
+    const trackIds = tracks.map(t => t.uri.split(":")[2]);
+    const cacheKeys = trackIds.map(id => getCacheKey(id, includeSongStats, false, modelName));
+    
+    const bulkData = await idb.getMany('aiData', cacheKeys);
+
+    for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
+        const key = cacheKeys[i];
+        const cachedTrack = bulkData.get(key);
         
         if (cachedTrack) {
             if (includeLyrics && (!cachedTrack.lyrics || cachedTrack.lyrics === "Not included")) {
@@ -5293,7 +5258,7 @@ sendButton.addEventListener("click", async () => {
                         enrichedTrack.lyrics = lyrics;
                     }
                     
-                    setTrackCache(trackId, trackDataForCache, includeSongStats, false, modelName);
+                    await setTrackCache(trackId, trackDataForCache, includeSongStats, false, modelName);
                     return enrichedTrack;
                 }
             );
@@ -5313,8 +5278,6 @@ sendButton.addEventListener("click", async () => {
             enrichedTracksCache.push(...processedLyrics);
         }
 
-        manageCacheSize();
-        
         const tracksWithStats = enrichedTracksCache.filter(track => track !== null);
         const userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
         const combinedSystemInstruction = `${userSystemInstruction}\n${FIXED_SYSTEM_INSTRUCTION}`;
@@ -5590,39 +5553,15 @@ sendButton.addEventListener("click", async () => {
       }
   }
 
-  const PALETTE_ANALYSIS_CACHE_KEY = 'sort-play-palette-cache-v1';
-  const PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY = 'sort-play-palette-cache-timestamp-v1';
-  const PALETTE_ANALYSIS_CACHE_EXPIRY_DAYS = 7;
-
-  function initializePaletteAnalysisCache() {
-      const timestamp = localStorage.getItem(PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY);
-      if (!timestamp || (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24) > PALETTE_ANALYSIS_CACHE_EXPIRY_DAYS) {
-          localStorage.setItem(PALETTE_ANALYSIS_CACHE_TIMESTAMP_KEY, Date.now().toString());
-          localStorage.setItem(PALETTE_ANALYSIS_CACHE_KEY, JSON.stringify({}));
-      }
+  async function getCachedPaletteAnalysis(albumId) {
+      return await idb.get('palettes', albumId, CACHE_EXPIRE_PALETTE);
   }
-
-  function getCachedPaletteAnalysis(albumId) {
-      try {
-          const cache = JSON.parse(localStorage.getItem(PALETTE_ANALYSIS_CACHE_KEY) || '{}');
-          return cache[albumId] || null;
-      } catch (error) {
-          return null;
-      }
-  }
-
-  function setCachedPaletteAnalysis(albumId, analysisData) {
-      try {
-          const cache = JSON.parse(localStorage.getItem(PALETTE_ANALYSIS_CACHE_KEY) || '{}');
-          cache[albumId] = analysisData;
-          localStorage.setItem(PALETTE_ANALYSIS_CACHE_KEY, JSON.stringify(cache));
-      } catch (error) {
-          console.error('Error writing to palette analysis cache:', error);
-      }
+  async function setCachedPaletteAnalysis(albumId, analysisData) {
+      await idb.set('palettes', albumId, analysisData);
   }
 
   async function getAlbumColorAnalysis(albumId) {
-      const cachedAnalysis = getCachedPaletteAnalysis(albumId);
+      const cachedAnalysis = await getCachedPaletteAnalysis(albumId);
       if (cachedAnalysis) {
           return cachedAnalysis;
       }
@@ -5642,11 +5581,11 @@ sendButton.addEventListener("click", async () => {
           const imageUrl = images[images.length - 1].url;
           const analysisData = await getPaletteAnalysis(imageUrl);
 
-          setCachedPaletteAnalysis(albumId, analysisData);
+          await setCachedPaletteAnalysis(albumId, analysisData);
           return analysisData;
       } catch (error) {
           console.warn(`Could not get palette analysis for album ${albumId}:`, error);
-          setCachedPaletteAnalysis(albumId, null);
+          await setCachedPaletteAnalysis(albumId, null);
           return null;
       }
   }
@@ -5802,13 +5741,16 @@ sendButton.addEventListener("click", async () => {
         mainButton.innerText = "Analyzing...";
         const trackMap = new Map(tracksWithReleaseDates.map(t => [t.uri.split(":")[2], t]));
 
-        const trackIdsToFetch = tracksWithReleaseDates
-            .map(track => track.uri.split(":")[2])
-            .filter(trackId => !getTrackCache(trackId, true, false, selectedAiModel));
+        const trackIdsToFetch = [];
+        for (const track of tracksWithReleaseDates) {
+            const trackId = track.uri.split(":")[2];
+            const cached = await getTrackCache(trackId, true, false, selectedAiModel);
+            if (!cached) trackIdsToFetch.push(trackId);
+        }
 
         if (trackIdsToFetch.length > 0) {
             const batchStats = await getBatchTrackStats(trackIdsToFetch);
-            Object.entries(batchStats).forEach(([trackId, stats]) => {
+            for (const [trackId, stats] of Object.entries(batchStats)) {
                 const originalTrack = trackMap.get(trackId);
                 if (originalTrack) {
                     const cacheData = {
@@ -5818,17 +5760,24 @@ sendButton.addEventListener("click", async () => {
                         uri: originalTrack.uri,
                         stats: stats
                     };
-                    setTrackCache(trackId, cacheData, true, false, selectedAiModel);
+                    await setTrackCache(trackId, cacheData, true, false, selectedAiModel);
                 }
-            });
+            }
         }
+
+        const aiCacheKeys = tracksWithReleaseDates.map(t => {
+            return getCacheKey(t.uri.split(":")[2], true, false, selectedAiModel);
+        });
+        
+        const bulkAiData = await idb.getMany('aiData', aiCacheKeys);
 
         const tracksWithFeatures = tracksWithReleaseDates.map(track => {
             const trackId = track.uri.split(":")[2];
-            const cachedData = getTrackCache(trackId, true, false, selectedAiModel);
+            const cacheKey = getCacheKey(trackId, true, false, selectedAiModel);
+            const cachedData = bulkAiData.get(cacheKey);
             return { ...track, features: cachedData ? cachedData.stats : {} };
         });
-
+        
         showCustomFilterModal(tracksWithFeatures);
 
     } catch (error) {
@@ -9459,13 +9408,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let sortedTracks;
     switch (sortType) {
         case "playCount":
-            sortedTracks = uniqueTracks.filter(t => t.playCount !== "N/A").sort((a, b) => (b.playCount || 0) - (a.playCount || 0));
+            sortedTracks = uniqueTracks.sort((a, b) => {
+                const valA = (a.playCount === "N/A" || a.playCount == null) ? -1 : Number(a.playCount);
+                const valB = (b.playCount === "N/A" || b.playCount == null) ? -1 : Number(b.playCount);
+                return valB - valA;
+            });
             break;
         case "popularity":
-            sortedTracks = uniqueTracks.filter(t => t.popularity != null).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+            sortedTracks = uniqueTracks.sort((a, b) => {
+                const valA = (a.popularity == null) ? -1 : a.popularity;
+                const valB = (b.popularity == null) ? -1 : b.popularity;
+                return valB - valA;
+            });
             break;
         case "releaseDate":
-            sortedTracks = uniqueTracks.filter(t => t.releaseDate != null).sort((a, b) => (new Date(b.releaseDate).getTime() || 0) - (new Date(a.releaseDate).getTime() || 0));
+            sortedTracks = uniqueTracks.sort((a, b) => {
+                const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+                const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+                return valB - valA;
+            });
             break;
         case "scrobbles":
         case "personalScrobbles": {
@@ -9764,7 +9725,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     setInterval(() => {
         checkAndRunJobs();
         checkAndRunDedicatedJobs();
-        checkAndClearExpiredPersonalScrobblesCache();
     }, SCHEDULER_INTERVAL_MINUTES * 60 * 1000);
   }
 
@@ -12507,9 +12467,92 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
     
     groupGenresToggle.addEventListener("change", () => {
+        const oldSelectedSet = new Set(selectedGenres);
+        const oldExcludedSet = new Set(excludedGenres);
+        
         groupGenres = groupGenresToggle.checked;
-        selectedGenres = [];
-        excludedGenres = [];
+        
+        const newSelectedSet = new Set();
+        const newExcludedSet = new Set();
+
+        if (groupGenres) {
+            
+            const uniqueSelectedRawGenres = new Set();
+            const uniqueExcludedRawGenres = new Set();
+
+            tracks.forEach(track => {
+                const rawData = rawGenreData.get(track.uri);
+                if (!rawData) return;
+                const rawGenres = [
+                    ...(rawData.spotify_artist_genres || []),
+                    ...(rawData.lastfm_track_genres || []),
+                    ...(rawData.lastfm_artist_genres || []),
+                    ...(rawData.deezer_genres || [])
+                ];
+                rawGenres.forEach(r => {
+                    if (oldSelectedSet.has(r)) uniqueSelectedRawGenres.add(r);
+                    if (oldExcludedSet.has(r)) uniqueExcludedRawGenres.add(r);
+                });
+            });
+
+            const processVotes = (rawGenreSet) => {
+                const sVotes = new Set();
+                const wVotes = new Set();
+                
+                rawGenreSet.forEach(rawGenre => {
+                    const mappedGroupObjects = mapAndNormalizeGenres([{ name: rawGenre, source: 'spotify' }]);
+                    const groupNames = [...new Set(mappedGroupObjects.map(o => o.name))];
+                    
+                    if (groupNames.length === 1) {
+                        sVotes.add(groupNames[0]);
+                    } else {
+                        groupNames.forEach(g => wVotes.add(g));
+                    }
+                });
+                
+                const finalSet = new Set();
+                if (sVotes.size > 0) {
+                    sVotes.forEach(g => finalSet.add(g));
+                } else {
+                    wVotes.forEach(g => finalSet.add(g));
+                }
+                return finalSet;
+            };
+
+            const selectedGroups = processVotes(uniqueSelectedRawGenres);
+            const excludedGroups = processVotes(uniqueExcludedRawGenres);
+            
+            selectedGroups.forEach(g => newSelectedSet.add(g));
+            excludedGroups.forEach(g => newExcludedSet.add(g));
+
+        } else {
+            tracks.forEach(track => {
+                const rawData = rawGenreData.get(track.uri);
+                if (!rawData) return;
+
+                const rawGenres = [
+                    ...(rawData.spotify_artist_genres || []),
+                    ...(rawData.lastfm_track_genres || []),
+                    ...(rawData.lastfm_artist_genres || []),
+                    ...(rawData.deezer_genres || [])
+                ];
+
+                rawGenres.forEach(rawGenre => {
+                    const mappedGroupObjects = mapAndNormalizeGenres([{ name: rawGenre, source: 'spotify' }]);
+                    const groupNames = mappedGroupObjects.map(o => o.name);
+
+                    const isGroupSelected = groupNames.some(g => oldSelectedSet.has(g));
+                    const isGroupExcluded = groupNames.some(g => oldExcludedSet.has(g));
+                    
+                    if (isGroupSelected) newSelectedSet.add(rawGenre);
+                    if (isGroupExcluded) newExcludedSet.add(rawGenre);
+                });
+            });
+        }
+
+        selectedGenres = Array.from(newSelectedSet);
+        excludedGenres = Array.from(newExcludedSet);
+
         rebuildGenreMap();
         updateGenreButtons();
         updateFilteredTracksCount();
@@ -12942,20 +12985,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           }
     
           if (sortType === "playCount") {
-            sortedTracks = uniqueTracks
-              .filter((track) => track.playCount !== "N/A")
-              .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount);
+            const getVal = (t) => (t.playCount === "N/A" || t.playCount == null) ? -1 : Number(t.playCount);
+            sortedTracks = uniqueTracks.sort((a, b) => 
+                sortOrderState.playCount ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
+            );
           } else if (sortType === "popularity") {
-            sortedTracks = uniqueTracks
-              .filter((track) => track.popularity !== null)
-              .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity);
+            const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
+            sortedTracks = uniqueTracks.sort((a, b) => 
+                sortOrderState.popularity ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
+            );
         } else if (sortType === "releaseDate") {
           sortedTracks = uniqueTracks
-            .filter((track) => track.releaseDate !== null)
             .sort((a, b) => {
+              const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+              const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+
               const dateComparison = sortOrderState.releaseDate
-                ? (a.releaseDate || 0) - (b.releaseDate || 0)
-                : (b.releaseDate || 0) - (a.releaseDate || 0);
+                ? valA - valB
+                : valB - valA;
     
               if (dateComparison !== 0) {
                 return dateComparison;
@@ -14755,142 +14802,160 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function getTrackDetailsWithPlayCount(
-    track,
-    retries = 10,
-    retryDelay = 1000
-  ) {
+  async function getTrackDetailsWithPlayCount(track, retries = 10, retryDelay = 1000) {
+    const trackId = track.track.id;
     const albumId = track.track.album.id;
+
+    const cachedCount = await idb.get('playCounts', trackId, CACHE_EXPIRE_PLAYCOUNTS);
+    
+    if (cachedCount !== null && cachedCount !== undefined) {
+        return {
+            ...track,
+            playCount: cachedCount,
+            songTitle: track.name,
+            albumName: track.albumName || (track.album && track.album.name) || "Unknown Album",
+            trackId: trackId,
+            albumId: albumId,
+            uri: `spotify:track:${trackId}`,
+            artistName: track.artistName,
+            allArtists: track.allArtists
+        };
+    }
 
     try {
       const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
       let playCount = "N/A";
       const foundTrack = albumTracksWithPlayCounts.find(
-        (albumTrack) => albumTrack.uri === `spotify:track:${track.track.id}`
+        (albumTrack) => albumTrack.uri === `spotify:track:${trackId}`
       );
 
       if (foundTrack) {
         playCount = foundTrack.playcount;
+        if (playCount !== "N/A") {
+            await idb.set('playCounts', trackId, playCount);
+        }
       }
 
       return {
         trackNumber: foundTrack ? foundTrack.trackNumber : 0,
         songTitle: track.name, 
         albumName: track.albumName || (track.album && track.album.name) ||  "Unknown Album",
-        trackId: track.track.id,
+        trackId: trackId,
         albumId: albumId,
         durationMs: track.track.duration_ms,
         playCount: playCount,
-        uri: `spotify:track:${track.track.id}`,
+        uri: `spotify:track:${trackId}`,
         artistName: track.artistName,
         allArtists: track.allArtists,
       };
     } catch (error) {
-      console.error(
-        `Error getting details for track ${track.name} (album ${albumId}):`,
-        error
-      );
-
+      console.error(`Error getting details for track ${track.name}:`, error);
       if (retries > 0) {
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
-        return getTrackDetailsWithPlayCount(
-          track,
-          retries - 1,
-          retryDelay * 2
-        );
-      } else {
-        console.error(
-          `Failed to get details for track ${track.name} after multiple retries.`
-        );
-        return null;
+        return getTrackDetailsWithPlayCount(track, retries - 1, retryDelay * 2);
       }
+      return null;
     }
   }
 
   async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}) {
+    const tracksWithIds = tracks.map(t => {
+        const id = t.trackId || t.id || (t.track && t.track.id);
+        const albumId = t.albumId || (t.album && t.album.id) || (t.track && t.track.album && t.track.album.id);
+        return { ...t, _tempId: id, _tempAlbumId: albumId };
+    });
+
+    const trackIdsToCheck = tracksWithIds.map(t => t._tempId).filter(Boolean);
+
+    const cachedPlayCounts = await idb.getMany('playCounts', trackIdsToCheck, CACHE_EXPIRE_PLAYCOUNTS);
+
     const albumGroups = new Map();
-    tracks.forEach(track => {
-        const albumId = track?.track?.album?.id || track?.album?.id;
-        if (albumId) {
-            if (!albumGroups.has(albumId)) {
-                albumGroups.set(albumId, []);
+    const playCountMap = new Map(); 
+
+    tracksWithIds.forEach(track => {
+        if (!track._tempId) return;
+
+        const cachedVal = cachedPlayCounts.get(track._tempId);
+        
+        if (cachedVal !== undefined && cachedVal !== null) {
+            playCountMap.set(track._tempId, cachedVal);
+        } else if (track._tempAlbumId) {
+            if (!albumGroups.has(track._tempAlbumId)) {
+                albumGroups.set(track._tempAlbumId, []);
             }
-            albumGroups.get(albumId).push(track);
+            albumGroups.get(track._tempAlbumId).push(track);
         }
     });
 
     const uniqueAlbumIds = Array.from(albumGroups.keys());
-    const albumPlayCountData = new Map();
-    let processedAlbums = 0;
-    const totalAlbums = uniqueAlbumIds.length;
-    const CONCURRENCY_LIMIT = 10;
+    
+    if (uniqueAlbumIds.length > 0) {
+        let processedAlbums = 0;
+        const totalAlbums = uniqueAlbumIds.length;
+        const CONCURRENCY_LIMIT = 10;
 
-    async function processWithConcurrency(items, processorFn) {
-        const results = new Map();
-        const queue = [...items];
-        
-        async function worker() {
+        async function worker(queue) {
             while (queue.length > 0) {
                 const albumId = queue.shift();
-                if (albumId) {
-                    try {
-                        const albumTracks = await processorFn(albumId);
-                        results.set(albumId, new Map(albumTracks.map(t => [t.uri, t])));
-                    } catch (error) {
-                        console.error(`Failed to process album ${albumId} in pool`, error);
-                        results.set(albumId, new Map());
-                    } finally {
-                        processedAlbums++;
-                        if (totalAlbums > 0) {
-                            updateProgress(Math.floor((processedAlbums / totalAlbums) * 100));
+                try {
+                    const albumTracks = await getPlayCountsForAlbum(albumId);
+                    
+                    albumTracks.forEach(t => {
+                        const tId = t.uri.split(":")[2];
+                        if (t.playcount !== undefined) {
+                            playCountMap.set(tId, t.playcount);
+                            idb.set('playCounts', tId, t.playcount); 
                         }
+                    });
+                } catch (error) {
+                    console.error(`Failed to process album ${albumId}`, error);
+                } finally {
+                    processedAlbums++;
+                    if (totalAlbums > 0 && updateProgress) {
+                        updateProgress(Math.floor((processedAlbums / totalAlbums) * 100));
                     }
                 }
             }
         }
 
-        const workers = Array(CONCURRENCY_LIMIT).fill(null).map(() => worker());
+        const queue = [...uniqueAlbumIds];
+        const workers = Array(Math.min(CONCURRENCY_LIMIT, uniqueAlbumIds.length)).fill(null).map(() => worker(queue));
         await Promise.all(workers);
-        return results;
+    } else {
+        if (updateProgress) updateProgress(100);
     }
 
-    const processedData = await processWithConcurrency(uniqueAlbumIds, getPlayCountsForAlbum);
-    processedData.forEach((value, key) => {
-        albumPlayCountData.set(key, value);
-    });
-
     const enrichedTracks = tracks.map(track => {
-        const albumId = track?.track?.album?.id || track?.album?.id;
-        const trackId = track?.track?.id || track?.id;
-        
+        const albumId = track.albumId || (track.album && track.album.id) || (track.track && track.track.album && track.track.album.id) || track?.track?.album?.id;
+        const trackId = track.trackId || track.id || (track.track && track.track.id) || track?.track?.id;
+
+        const duration = track.durationMs || track.durationMilis || track.duration_ms || track?.track?.duration_ms || 0;
+
         if (!albumId || !trackId) {
             return { 
                 ...track, 
                 playCount: "N/A", 
                 trackNumber: 0,
-                songTitle: track.name,
+                songTitle: track.name || track.songTitle || "Unknown Title",
                 trackId: trackId,
                 albumId: albumId,
+                durationMs: duration,
                 uri: track.uri || (trackId ? `spotify:track:${trackId}` : undefined)
             };
         }
 
-        const trackUri = `spotify:track:${trackId}`;
-        const albumData = albumPlayCountData.get(albumId);
-        const foundTrack = albumData ? albumData.get(trackUri) : null;
-
-        const correctPlayCount = foundTrack ? foundTrack.playcount : "N/A";
+        const playCount = playCountMap.has(trackId) ? playCountMap.get(trackId) : "N/A";
 
         const enrichedData = {
-            trackNumber: foundTrack ? foundTrack.trackNumber : 0,
-            songTitle: track.name,
-            albumName: track.albumName || track?.album?.name || (track?.track?.album?.name) || "Unknown Album",
+            trackNumber: track.trackNumber || track.track_number || 0,
+            songTitle: track.name || track.songTitle,
+            albumName: track.albumName || track.album?.name || track?.track?.album?.name || "Unknown Album",
             trackId: trackId,
             albumId: albumId,
-            durationMs: track.durationMs || track.duration_ms || track?.track?.duration_ms,
-            playcount: correctPlayCount,
-            playCount: correctPlayCount,
-            uri: trackUri,
+            durationMs: duration,
+            playcount: playCount,
+            playCount: playCount,
+            uri: track.uri || `spotify:track:${trackId}`,
             artistName: track.artistName || track?.artists?.[0]?.name,
             allArtists: track.allArtists || track?.artists?.map(a => a.name).join(", "),
         };
@@ -15040,47 +15105,41 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getTrackDetailsWithReleaseDate(track) {
-    let albumId;
+    const trackId = track.uri.split(":")[2];
+    
+    const cachedDate = await idb.get('releaseDates', trackId, CACHE_EXPIRE_RELEASE_DATE);
+    if (cachedDate) {
+        return { ...track, releaseDate: cachedDate };
+    }
 
+    let albumId;
     if (track.albumId) {
       albumId = track.albumId;
     } else if (track.albumUri) {
       albumId = track.albumUri.split(":")[2];
     } else {
       console.warn(`Could not determine album ID for track ${track.name}`);
-      return {
-        ...track,
-        releaseDate: null,
-      };
+      return { ...track, releaseDate: null };
     }
-
 
     try {
       if (albumTracksDataCache[albumId]) {
         const trackData = albumTracksDataCache[albumId].find(t => t.uri === track.uri);
         if (trackData && trackData.releaseDate) {
-          return {
-            ...track,
-            releaseDate: trackData.releaseDate,
-          };
+          await setCachedReleaseDate(trackId, trackData.releaseDate);
+          return { ...track, releaseDate: trackData.releaseDate };
         }
       }
 
       const releaseDate = await getReleaseDatesForAlbum(albumId);
-      if (releaseDate === null) {
-        console.warn(`Could not fetch release date for track ${track.name}`);
+      if (releaseDate) {
+          await setCachedReleaseDate(trackId, releaseDate);
       }
 
-      return {
-        ...track,
-        releaseDate: releaseDate,
-      };
+      return { ...track, releaseDate: releaseDate };
     } catch (error) {
       console.error(`Error getting release date for track ${track.name} (album ${albumId}):`, error);
-      return {
-        ...track,
-        releaseDate: null,
-      };
+      return { ...track, releaseDate: null };
     }
   }
 
@@ -15212,7 +15271,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
-    const cachedData = isLocal ? null : getCachedPersonalScrobbles(trackId);
+    const cachedData = isLocal ? null : await getCachedPersonalScrobbles(trackId);
 
     if (cachedData && !cachedData.pendingUpdate && !isCurrentTrack) {
         return { ...track, personalScrobbles: cachedData.count };
@@ -15255,7 +15314,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (data.error) {
           if (data.error === 6) { 
             if (!isLocal) {
-                setCachedPersonalScrobbles(trackId, 0, false);
+                await setCachedPersonalScrobbles(trackId, 0, false);
             }
             return { ...track, personalScrobbles: 0 };
           } else {
@@ -15269,11 +15328,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const oldScrobbleCount = cachedData ? cachedData.count : -1;
 
             if (newScrobbleCount > oldScrobbleCount) {
-                setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
+                await setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
             } else if (cachedData) {
-                setCachedPersonalScrobbles(trackId, oldScrobbleCount, true);
+                await setCachedPersonalScrobbles(trackId, oldScrobbleCount, true);
             } else {
-                setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
+                await setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
             }
         }
 
@@ -19343,12 +19402,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             );
             tracksForDeduplication = tracksWithReleaseDates;
           } else if (sortType === "averageColor") {
+              const albumIds = [...new Set(tracksWithPopularity.map(t => t.albumId || t.track?.album?.id).filter(Boolean))];
+              const bulkPalettes = await idb.getMany('palettes', albumIds);
+
               const cachedTracks = [];
               const uncachedTracks = [];
+              
               for (const track of tracksWithPopularity) {
                   const albumId = track.albumId || track.track?.album?.id;
-                  if (albumId && getCachedPaletteAnalysis(albumId)) {
-                      cachedTracks.push(track);
+                  if (albumId && bulkPalettes.has(albumId)) {
+                      cachedTracks.push({ ...track, averageColor: bulkPalettes.get(albumId) });
                   } else {
                       uncachedTracks.push(track);
                   }
@@ -19393,21 +19456,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           removedTracks = deduplicationResult.removed;
 
           if (sortType === "playCount") {
-            sortedTracks = uniqueTracks
-              .filter((track) => track.playCount !== "N/A")
-              .sort((a, b) => sortOrderState.playCount ? a.playCount - b.playCount : b.playCount - a.playCount);
+            const getVal = (t) => (t.playCount === "N/A" || t.playCount == null) ? -1 : Number(t.playCount);
+            sortedTracks = uniqueTracks.sort((a, b) => 
+                sortOrderState.playCount ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
+            );
           } else if (sortType === "popularity") {
-            sortedTracks = uniqueTracks
-              .filter((track) => track.popularity !== null)
-              .sort((a, b) => sortOrderState.popularity ? a.popularity - b.popularity : b.popularity - a.popularity);
+            const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
+            sortedTracks = uniqueTracks.sort((a, b) => 
+                sortOrderState.popularity ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
+            );
         } else if (sortType === "releaseDate") {
           sortedTracks = uniqueTracks
-            .filter((track) => track.releaseDate !== null)
             .sort((a, b) => {
-              const dateComparison = sortOrderState.releaseDate
-                ? (a.releaseDate || 0) - (b.releaseDate || 0)
-                : (b.releaseDate || 0) - (a.releaseDate || 0);
+              const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+              const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
 
+              const dateComparison = sortOrderState.releaseDate
+                ? valA - valB
+                : valB - valA;
+    
               if (dateComparison !== 0) {
                 return dateComparison;
               }
@@ -20340,59 +20407,102 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (sortType !== 'scrobbles' && sortType !== 'personalScrobbles') {
       throw new Error('Invalid sort type for scrobbles sorting');
     }
-    if (sortType === 'personalScrobbles') {
+    const isPersonal = sortType === 'personalScrobbles';
+    if (isPersonal) {
       const lastFmUsername = loadLastFmUsername();
-      if (!lastFmUsername) {
-        throw new Error('Last.fm username required for personal scrobbles sorting');
-      }
+      if (!lastFmUsername) throw new Error('Last.fm username required for personal scrobbles sorting');
     }
 
-    const fetchFunction = sortType === 'personalScrobbles'
-      ? getTrackDetailsWithPersonalScrobbles
-      : getTrackDetailsWithScrobbles;
-
-    const tracksForScrobbleFetching = tracks.map(track => ({
+    const tracksWithIds = tracks.map(track => ({
       ...track,
-      name: track.songTitle || track.name,
-      artistName: track.artistName || (track.artists && track.artists[0]?.name),
-      artists: track.artists || [{ name: track.artistName }]
+      id: track.uri.split(":")[2]
     }));
+    const allIds = tracksWithIds.map(t => t.id);
+
+    const storeName = isPersonal ? 'personalScrobbles' : 'scrobbles';
+    const expiryTime = isPersonal ? CACHE_EXPIRE_PERSONAL_SCROBBLES : CACHE_EXPIRE_GLOBAL_SCROBBLES;
+    
+    const cachedMap = await idb.getMany(storeName, allIds, expiryTime);
 
     const results = [];
-    const totalTracks = tracksForScrobbleFetching.length;
-    
-    const safeConcurrencyPerKey = 5;
-    const validKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
-    const totalConcurrency = Math.min(50, Math.max(5, validKeys * safeConcurrencyPerKey));
+    const missingTracks = [];
 
-    const queue = [...tracksForScrobbleFetching];
-    let processedCount = 0;
+    tracksWithIds.forEach(track => {
+        const cached = cachedMap.get(track.id);
+        
+        let hasValidCache = false;
+        let val = null;
 
-    const worker = async () => {
-        while (queue.length > 0) {
-            const track = queue.shift();
-            if (!track) continue;
-
-            try {
-                const result = await fetchFunction(track);
-                if (result) {
-                    results.push(result);
-                }
-            } catch (error) {
-                console.error(`Error fetching scrobbles for track ${track.name}:`, error);
-            } finally {
-                processedCount++;
-                const progress = Math.round((processedCount / totalTracks) * 100);
-                updateProgress(progress);
+        if (isPersonal) {
+            if (cached && !cached.pendingUpdate) {
+                val = cached.count;
+                hasValidCache = true;
+            }
+        } else {
+            if (cached !== undefined && cached !== null) {
+                val = cached;
+                hasValidCache = true;
             }
         }
-    };
 
-    const workers = Array(totalConcurrency).fill(null).map(() => worker());
-    await Promise.all(workers);
+        if (hasValidCache) {
+            results.push({ ...track, [sortType]: val });
+        } else {
+            missingTracks.push({
+                ...track,
+                name: track.songTitle || track.name,
+                artistName: track.artistName || (track.artists && track.artists[0]?.name),
+                artists: track.artists || [{ name: track.artistName }]
+            });
+        }
+    });
+
+    if (missingTracks.length > 0) {
+        const fetchFunction = isPersonal ? getTrackDetailsWithPersonalScrobbles : getTrackDetailsWithScrobbles;
+        
+        const safeConcurrencyPerKey = 5;
+        const validKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
+        const totalConcurrency = Math.min(50, Math.max(5, validKeys * safeConcurrencyPerKey));
+
+        const queue = [...missingTracks];
+        let processedCount = 0;
+        const totalMissing = missingTracks.length;
+
+        const worker = async () => {
+            while (queue.length > 0) {
+                const track = queue.shift();
+                if (!track) continue;
+
+                try {
+                    const result = await fetchFunction(track);
+                    if (result) {
+                        if (isPersonal) {
+                            const val = (result.error) ? null : result.personalScrobbles;
+                            if (val !== null) setCachedPersonalScrobbles(track.id, val, false);
+                        } else {
+                            const val = result.scrobbles;
+                            if (val !== null) setCachedScrobbles(track.id, val);
+                        }
+                        results.push(result);
+                    }
+                } catch (error) {
+                    console.error(`Error fetching scrobbles for track ${track.name}:`, error);
+                } finally {
+                    processedCount++;
+                    const totalProgress = Math.round(((results.length) / tracks.length) * 100);
+                    updateProgress(totalProgress);
+                }
+            }
+        };
+
+        const workers = Array(totalConcurrency).fill(null).map(() => worker());
+        await Promise.all(workers);
+    } else {
+        updateProgress(100);
+    }
 
     if (results.length === 0) {
-      throw new Error(`No tracks found with ${sortType === 'personalScrobbles' ? 'personal ' : ''}Last.fm data to sort.`);
+      throw new Error(`No tracks found with ${isPersonal ? 'personal ' : ''}Last.fm data to sort.`);
     }
 
     return results;
@@ -20678,19 +20788,34 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getBatchTrackStats(trackIds, updateProgress = () => {}) {
-    if (trackIds.length === 0) {
-        return {};
-    }
+    if (trackIds.length === 0) return {};
+
+    const cacheKeys = trackIds.map(id => getCacheKey(id, true, false, "stats-column"));
+    const cachedDataMap = await idb.getMany('aiData', cacheKeys);
 
     const results = {};
+    const missingIds = [];
+
+    trackIds.forEach((id, index) => {
+        const key = cacheKeys[index];
+        const cached = cachedDataMap.get(key);
+        if (cached && cached.stats) {
+            results[id] = cached.stats;
+        } else {
+            missingIds.push(id);
+        }
+    });
+
+    if (missingIds.length === 0) return results;
+
     const BATCH_SIZE = 100;
     const MAX_RETRIES = 3;
     const INITIAL_DELAY = 1000;
     const CONCURRENCY_LIMIT = 10;
 
     const batches = [];
-    for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
-        batches.push(trackIds.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+        batches.push(missingIds.slice(i, i + BATCH_SIZE));
     }
 
     let tracksProcessed = 0;
@@ -20713,10 +20838,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
                 
-                audioFeaturesResponse.audio_features.forEach((features, index) => {
-                    if (features) {
-                        const trackDetails = trackDetailsResponse.tracks[index];
-                        results[features.id] = {
+                for (let i = 0; i < audioFeaturesResponse.audio_features.length; i++) {
+                    const features = audioFeaturesResponse.audio_features[i];
+                    const trackDetails = trackDetailsResponse.tracks[i];
+                    
+                    if (features && trackDetails) {
+                        const stats = {
                             danceability: features.danceability ? Math.round(100 * features.danceability) : null,
                             energy: features.energy ? Math.round(100 * features.energy) : null,
                             key_raw: features.key,
@@ -20729,27 +20856,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             liveness: features.liveness ? Math.round(100 * features.liveness) : null,
                             valence: features.valence ? Math.round(100 * features.valence) : null,
                             tempo: features.tempo ? Math.round(features.tempo) : null,
-                            popularity: trackDetails?.popularity ?? null,
-                            releaseDate: trackDetails?.album?.release_date ?? null
+                            popularity: trackDetails.popularity ?? null,
+                            releaseDate: trackDetails.album?.release_date ?? null
                         };
+                        
+                        results[features.id] = stats;
+                        
+                        await setTrackCache(features.id, stats, true, false, "stats-column");
                     }
-                });
+                }
                 success = true;
             } catch (error) {
                 retries++;
-                if (retries < MAX_RETRIES) {
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                    delay *= 2;
-                } else {
-                    console.error(`[Sort-Play] Failed to fetch batch track stats after ${MAX_RETRIES} attempts for a batch.`);
-                }
+                if (retries < MAX_RETRIES) await new Promise(resolve => setTimeout(resolve, delay *= 2));
+                else console.error(`[Sort-Play] Failed to fetch batch stats.`);
             }
         }
         tracksProcessed += batchIds.length;
-        const progress = Math.min(100, Math.floor((tracksProcessed / trackIds.length) * 100));
-        updateProgress(progress);
+        if (updateProgress) updateProgress(Math.min(100, Math.floor((tracksProcessed / missingIds.length) * 100)));
     };
 
+    const workers = [];
     for (let i = 0; i < batches.length; i += CONCURRENCY_LIMIT) {
         const concurrentBatch = batches.slice(i, i + CONCURRENCY_LIMIT);
         await Promise.all(concurrentBatch.map(batch => processBatch(batch)));
@@ -20791,87 +20918,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   };
 
-  const CACHE_KEY_SCROBBLES = 'spotify-scrobbles-cache3';
-  const CACHE_TIMESTAMP_KEY_SCROBBLES = 'spotify-scrobbles-cache-timestamp3';
-  const CACHE_EXPIRY_DAYS_SCROBBLES = 7;
-
-  function initializeScrobblesCache() {
-    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_SCROBBLES);
-    if (!timestamp) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY_SCROBBLES, Date.now().toString());
-      localStorage.setItem(CACHE_KEY_SCROBBLES, JSON.stringify({}));
-      return;
-    }
-
-    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
-    if (daysPassed >= CACHE_EXPIRY_DAYS_SCROBBLES) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY_SCROBBLES, Date.now().toString());
-      localStorage.setItem(CACHE_KEY_SCROBBLES, JSON.stringify({}));
-    }
-  }
-
-  function getCachedScrobbles(trackId) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_SCROBBLES) || '{}');
-      return cache[trackId] !== undefined ? cache[trackId] : null;
-    } catch (error) {
-      console.error('Error reading from scrobbles cache:', error);
-      return null;
-    }
-  }
-
-  function setCachedScrobbles(trackId, scrobbleCount) {
-    try {
-        const cache = JSON.parse(localStorage.getItem(CACHE_KEY_SCROBBLES) || '{}');
-        cache[trackId] = scrobbleCount;
-        localStorage.setItem(CACHE_KEY_SCROBBLES, JSON.stringify(cache));
-    } catch (error) {
-        console.error('Error writing to scrobbles cache:', error);
-    }
-  }
-
-  function initializePersonalScrobblesCache() {
-    localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
-    localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
-  }
-
-  function checkAndClearExpiredPersonalScrobblesCache() {
-    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES);
-    if (timestamp) {
-      const hoursPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60);
-      if (hoursPassed >= CACHE_EXPIRY_HOURS_PERSONAL_SCROBBLES) {
-        localStorage.setItem(CACHE_TIMESTAMP_KEY_PERSONAL_SCROBBLES, Date.now().toString());
-        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify({}));
-      }
-    }
+  async function setCachedScrobbles(trackId, scrobbleCount) {
+    await idb.set('scrobbles', trackId, scrobbleCount);
   }
   
-  function getCachedPersonalScrobbles(trackId) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
-      return cache[trackId] || null;
-    } catch (error) {
-      console.error('Error reading from personal scrobbles cache:', error);
-      return null;
-    }
+  async function getCachedPersonalScrobbles(trackId) {
+    return await idb.get('personalScrobbles', trackId, CACHE_EXPIRE_PERSONAL_SCROBBLES);
+  }
+  async function setCachedPersonalScrobbles(trackId, scrobbleCount, isPending) {
+    await idb.set('personalScrobbles', trackId, { count: scrobbleCount, pendingUpdate: isPending });
   }
 
-  function setCachedPersonalScrobbles(trackId, scrobbleCount, isPending) {
+  async function flagCachedPersonalScrobbleForUpdate(trackId) {
     try {
-        const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
-        cache[trackId] = { count: scrobbleCount, pendingUpdate: isPending };
-        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify(cache));
-    } catch (error) {
-        console.error('Error writing to personal scrobbles cache:', error);
-    }
-  }
-
-  function flagCachedPersonalScrobbleForUpdate(trackId) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY_PERSONAL_SCROBBLES) || '{}');
-      if (cache[trackId]) {
-        cache[trackId].pendingUpdate = true;
-        localStorage.setItem(CACHE_KEY_PERSONAL_SCROBBLES, JSON.stringify(cache));
+      const cached = await idb.get('personalScrobbles', trackId);
+      
+      if (cached) {
+        cached.pendingUpdate = true;
+        await idb.set('personalScrobbles', trackId, cached);
       }
     } catch (error) {
       console.error('Error flagging personal scrobble cache:', error);
@@ -20904,43 +20968,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
 
-  const RELEASE_DATE_CACHE_KEY = 'spotify-release-date-cache2';
-  const RELEASE_DATE_CACHE_TIMESTAMP_KEY = 'spotify-release-date-cache-timestamp2';
-  const RELEASE_DATE_CACHE_EXPIRY_DAYS = 10; 
-  
-  function initializeReleaseDateCache() {
-    const timestamp = localStorage.getItem(RELEASE_DATE_CACHE_TIMESTAMP_KEY);
-    if (!timestamp) {
-      localStorage.setItem(RELEASE_DATE_CACHE_TIMESTAMP_KEY, Date.now().toString());
-      localStorage.setItem(RELEASE_DATE_CACHE_KEY, JSON.stringify({}));
-      return;
-    }
-  
-    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60 * 24);
-    if (daysPassed >= RELEASE_DATE_CACHE_EXPIRY_DAYS) {
-      localStorage.setItem(RELEASE_DATE_CACHE_TIMESTAMP_KEY, Date.now().toString());
-      localStorage.setItem(RELEASE_DATE_CACHE_KEY, JSON.stringify({}));
-    }
-  }
-  
-  function getCachedReleaseDate(trackId) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(RELEASE_DATE_CACHE_KEY) || '{}');
-      return cache[trackId] !== undefined ? cache[trackId] : null;
-    } catch (error) {
-      console.error('Error reading from release date cache:', error);
-      return null;
-    }
-  }
-  
-  function setCachedReleaseDate(trackId, rawReleaseDate) { 
-    try {
-      const cache = JSON.parse(localStorage.getItem(RELEASE_DATE_CACHE_KEY) || '{}');
-      cache[trackId] = rawReleaseDate;
-      localStorage.setItem(RELEASE_DATE_CACHE_KEY, JSON.stringify(cache));
-    } catch (error) {
-      console.error('Error writing to release date cache:', error);
-    }
+  async function setCachedReleaseDate(trackId, rawReleaseDate) { 
+    await idb.set('releaseDates', trackId, rawReleaseDate);
   }
   
   function formatReleaseDate(rawDate, format = 'YYYY-MM-DD') {
@@ -21026,64 +21055,53 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   function cleanupLegacyGenreCache() {
-    if (localStorage.getItem('sort-play-legacy-cleanup-done') === 'true') {
+    if (localStorage.getItem('sort-play-idb-migration-cleanup-done') === 'true') {
         return;
     }
 
-    const LEGACY_PREFIX = 'sort-play-genre-cache-v2-';
+    const keysToRemove = [
+        'spotify-play-count-cache2', 
+        'spotify-play-count-cache-timestamp2',
+        'spotify-release-date-cache2', 
+        'spotify-release-date-cache-timestamp2',
+        'spotify-scrobbles-cache3', 
+        'spotify-scrobbles-cache-timestamp3',
+        'sort-play-personal-scrobbles-cache', 
+        'sort-play-personal-scrobbles-cache-timestamp',
+        'spotify-palette-analysis-cache',
+        'spotify-palette-analysis-cache-timestamp'
+    ];
+
     let removedCount = 0;
-    
+
+    keysToRemove.forEach(key => {
+        if (localStorage.getItem(key)) {
+            localStorage.removeItem(key);
+            removedCount++;
+        }
+    });
+
+    const prefixes = [
+        'sort-play-playlist-cache-v1-',
+        'sort-play-genre-cache-v2-'
+    ];
+
     Object.keys(localStorage).forEach(key => {
-      if (key.startsWith(LEGACY_PREFIX)) {
-        localStorage.removeItem(key);
-        removedCount++;
-      }
+        if (prefixes.some(prefix => key.startsWith(prefix))) {
+            localStorage.removeItem(key);
+            removedCount++;
+        }
     });
     
     if (removedCount > 0) {
-        console.log(`[Sort-Play] Cleaned up ${removedCount} legacy genre cache items.`);
+        console.log(`[Sort-Play] Migrated to IndexedDB: Cleaned up ${removedCount} legacy localStorage items.`);
     }
 
-    localStorage.setItem('sort-play-legacy-cleanup-done', 'true');
+    localStorage.setItem('sort-play-idb-migration-cleanup-done', 'true');
   }
 
-  const CACHE_KEY = 'spotify-play-count-cache2';
-  const CACHE_TIMESTAMP_KEY = 'spotify-play-count-cache-timestamp2';
-  const CACHE_EXPIRY_HOURS = 6;
-
-  function initializePlayCountCache() {
-    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY);
-    if (!timestamp) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-      localStorage.setItem(CACHE_KEY, JSON.stringify({}));
-      return;
-    }
-
-    const daysPassed = (Date.now() - parseInt(timestamp)) / (1000 * 60 * 60); 
-    if (daysPassed >= CACHE_EXPIRY_HOURS) {
-      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-      localStorage.setItem(CACHE_KEY, JSON.stringify({}));
-    }
-  }
-
-  function getCachedPlayCount(trackId) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-      return cache[trackId] || null;
-    } catch (error) {
-      console.error('Error reading from cache:', error);
-      return null;
-    }
-  }
-
-  function setCachedPlayCount(trackId, playCount) {
-    try {
-        const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-        cache[trackId] = playCount;
-        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-    } catch (error) {
-        console.error('Error writing to cache:', error);
-    }
+  async function setCachedPlayCount(trackId, playCount) {
+    await idb.set('playCounts', trackId, playCount);
   }
 
   function getTrackDataObject(trackElement) {
@@ -21117,12 +21135,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo', 'popularity'];
 
     if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)) {
-        if (showSecondAdditionalColumn) {
-            columnConfigs.push({ type: selectedSecondColumnType, dataSelector: ".sort-play-second-data" });
-        }
-        if (showAdditionalColumn) {
-            columnConfigs.push({ type: selectedColumnType, dataSelector: ".sort-play-data" });
-        }
+        if (showSecondAdditionalColumn) columnConfigs.push({ type: selectedSecondColumnType, dataSelector: ".sort-play-second-data" });
+        if (showAdditionalColumn) columnConfigs.push({ type: selectedColumnType, dataSelector: ".sort-play-data" });
     } else if (URI.isAlbum(currentUri)) {
         if (showAlbumColumn) columnConfigs.push({ type: selectedAlbumColumnType, dataSelector: ".sort-play-data" });
     } else if (URI.isArtist(currentUri)) {
@@ -21135,9 +21149,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const spotifyTracksToProcess = [];
 
     for (const trackElement of allTrackRows) {
-        if (trackElement.classList.contains('sort-play-processing') || trackElement.hasAttribute('data-sp-fetch-failed')) {
-            continue;
-        }
+        if (trackElement.classList.contains('sort-play-processing') || trackElement.hasAttribute('data-sp-fetch-failed')) continue;
         const trackUri = getTracklistTrackUri(trackElement);
         if (!trackUri) continue;
 
@@ -21147,21 +21159,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             if (trackData) {
                 const rawArtistName = trackData.artists[0]?.name || "";
-                let cleanedArtistName = rawArtistName;
-                if (rawArtistName.includes(';')) {
-                    cleanedArtistName = rawArtistName.split(';')[0].trim();
-                }
+                const cleanedArtistName = rawArtistName.includes(';') ? rawArtistName.split(';')[0].trim() : rawArtistName;
+                const localTrackInfo = { name: trackData.name, artistName: cleanedArtistName, artists: [{ name: cleanedArtistName }], uri: trackData.uri };
 
-                const localTrackInfo = {
-                    name: trackData.name,
-                    artistName: cleanedArtistName,
-                    artists: [{ name: cleanedArtistName }],
-                    uri: trackData.uri
-                };
-
-                for (const config of columnConfigs) {
+                const localPromises = columnConfigs.map(async (config) => {
                     const dataElement = trackElement.querySelector(config.dataSelector);
-                    if (!dataElement || dataElement.dataset.spProcessed) continue;
+                    if (!dataElement || dataElement.dataset.spProcessed) return;
 
                     try {
                         if (config.type === 'scrobbles') {
@@ -21172,8 +21175,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                 updateDisplay(dataElement, { error: "Set Last.fm username" }, config.type);
                             } else {
                                 const result = await getTrackDetailsWithPersonalScrobbles(localTrackInfo);
-                                const valueToDisplay = result.error ? { error: result.error } : result.personalScrobbles;
-                                updateDisplay(dataElement, valueToDisplay, config.type);
+                                updateDisplay(dataElement, result.error ? { error: result.error } : result.personalScrobbles, config.type);
                             }
                         } else {
                             updateDisplay(dataElement, "_", config.type);
@@ -21182,211 +21184,155 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         updateDisplay(dataElement, "_", config.type);
                         trackElement.setAttribute('data-sp-fetch-failed', 'true');
                     }
-                }
+                });
+                
+                Promise.all(localPromises).finally(() => {
+                    trackElement.classList.remove('sort-play-processing');
+                });
+            } else {
+                trackElement.classList.remove('sort-play-processing');
             }
-            trackElement.classList.remove('sort-play-processing');
         } else if (trackUri.includes("track")) {
             const needsProcessing = columnConfigs.some(config => {
                 const dataElement = trackElement.querySelector(config.dataSelector);
                 return dataElement && !dataElement.dataset.spProcessed;
             });
             if (needsProcessing) {
-                spotifyTracksToProcess.push(trackElement);
+                spotifyTracksToProcess.push({ element: trackElement, id: trackUri.split(":")[2] });
             }
         }
     }
 
     if (spotifyTracksToProcess.length === 0) return;
 
-    if (columnConfigs.some(c => c.type === 'playCount')) initializePlayCountCache();
-    if (columnConfigs.some(c => c.type === 'releaseDate')) initializeReleaseDateCache();
-    if (columnConfigs.some(c => c.type === 'scrobbles')) initializeScrobblesCache();
-    
-    const BATCH_SIZE = 30;
+    const BATCH_SIZE = 50; 
     
     for (let i = 0; i < spotifyTracksToProcess.length; i += BATCH_SIZE) {
         const batch = spotifyTracksToProcess.slice(i, i + BATCH_SIZE);
+        const batchIds = batch.map(item => item.id);
         
-        const needsAudioFeatures = columnConfigs.some(c => audioFeatureTypes.includes(c.type));
-        
-        if (needsAudioFeatures) {
-            const trackIdsToFetch = [];
-            const elementMap = new Map();
+        const dataMap = { playCounts: null, releaseDates: null, scrobbles: null, personal: null, ai: null };
+        const fetchPromises = [];
 
-            for (const trackElement of batch) {
-                const trackUri = getTracklistTrackUri(trackElement);
-                const trackId = trackUri ? trackUri.split(":")[2] : null;
-                if (!trackId) continue;
-
-                const statsCacheModel = "stats-column";
-                const cachedData = getTrackCache(trackId, true, false, statsCacheModel);
-                if (cachedData) {
-                    columnConfigs.forEach(config => {
-                        const dataElement = trackElement.querySelector(config.dataSelector);
-                        if (dataElement && audioFeatureTypes.includes(config.type)) {
-                            const value = config.type === 'djInfo' ? cachedData : cachedData[config.type];
-                            updateDisplay(dataElement, value, config.type);
-                        }
-                    });
-                } else {
-                    trackElement.classList.add('sort-play-processing');
-                    trackIdsToFetch.push(trackId);
-                    elementMap.set(trackId, trackElement);
-                }
-            }
-
-            if (trackIdsToFetch.length > 0) {
-                const batchStats = await getBatchTrackStats(trackIdsToFetch);
-                for (const trackId of trackIdsToFetch) {
-                    const trackElement = elementMap.get(trackId);
-                    const stats = batchStats[trackId];
-                    if (stats) {
-                        const statsCacheModel = "stats-column";
-                        setTrackCache(trackId, stats, true, false, statsCacheModel);
-                        
-                        columnConfigs.forEach(config => {
-                            if (audioFeatureTypes.includes(config.type)) {
-                                const dataElement = trackElement.querySelector(config.dataSelector);
-                                const value = config.type === 'djInfo' ? stats : stats[config.type];
-                                updateDisplay(dataElement, value, config.type);
-                            }
-                        });
-                    } else {
-                        columnConfigs.forEach(config => {
-                            if (audioFeatureTypes.includes(config.type)) {
-                                const dataElement = trackElement.querySelector(config.dataSelector);
-                                updateDisplay(dataElement, "_", config.type);
-                            }
-                        });
-                    }
-                    if (trackElement) trackElement.classList.remove('sort-play-processing');
-                }
-            }
+        if (columnConfigs.some(c => c.type === 'playCount')) {
+            fetchPromises.push(idb.getMany('playCounts', batchIds, CACHE_EXPIRE_PLAYCOUNTS).then(res => dataMap.playCounts = res));
+        }
+        if (columnConfigs.some(c => c.type === 'releaseDate')) {
+            fetchPromises.push(idb.getMany('releaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.releaseDates = res));
+        }
+        if (columnConfigs.some(c => c.type === 'scrobbles')) {
+            fetchPromises.push(idb.getMany('scrobbles', batchIds, CACHE_EXPIRE_GLOBAL_SCROBBLES).then(res => dataMap.scrobbles = res));
+        }
+        if (columnConfigs.some(c => c.type === 'personalScrobbles')) {
+            fetchPromises.push(idb.getMany('personalScrobbles', batchIds, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.personal = res));
         }
         
-        const nonAudioFeatureConfigs = columnConfigs.filter(c => !audioFeatureTypes.includes(c.type));
-        if (nonAudioFeatureConfigs.length > 0) {
-            const trackIdsToFetch = [];
-            const elementMap = new Map();
+        const audioFeatureConfig = columnConfigs.find(c => audioFeatureTypes.includes(c.type));
+        if (audioFeatureConfig) {
+            const aiKeys = batchIds.map(id => getCacheKey(id, true, false, "stats-column"));
+            fetchPromises.push(idb.getMany('aiData', aiKeys, CACHE_EXPIRE_AI_DATA).then(res => dataMap.ai = res));
+        }
 
-            for (const trackElement of batch) {
-                trackElement.classList.add('sort-play-processing');
-                const trackUri = getTracklistTrackUri(trackElement);
-                const trackId = trackUri ? trackUri.split(":")[2] : null;
-                if (!trackId) {
-                    trackElement.classList.remove('sort-play-processing');
-                    continue;
+        await Promise.all(fetchPromises);
+
+        const idsToFetchFromApi = [];
+        const elementsToFetchFromApi = new Map();
+
+        for (const { element, id } of batch) {
+            let isFullyCached = true;
+
+            for (const config of columnConfigs) {
+                const dataElement = element.querySelector(config.dataSelector);
+                if (!dataElement || (dataElement.textContent !== "" && dataElement.textContent !== "_")) continue;
+
+                let val = undefined;
+                if (config.type === 'playCount' && dataMap.playCounts) val = dataMap.playCounts.get(id);
+                else if (config.type === 'releaseDate' && dataMap.releaseDates) val = dataMap.releaseDates.get(id);
+                else if (config.type === 'scrobbles' && dataMap.scrobbles) val = dataMap.scrobbles.get(id);
+                else if (config.type === 'personalScrobbles' && dataMap.personal) {
+                    const d = dataMap.personal.get(id);
+                    if (d && !d.pendingUpdate) val = d.count;
+                } else if (audioFeatureTypes.includes(config.type) && dataMap.ai) {
+                    const aiKey = getCacheKey(id, true, false, "stats-column");
+                    const stats = dataMap.ai.get(aiKey);
+                    if (stats) val = config.type === 'djInfo' ? stats : stats[config.type];
                 }
 
-                let isCached = true;
-                for (const config of nonAudioFeatureConfigs) {
-                    const dataElement = trackElement.querySelector(config.dataSelector);
-                    if (dataElement && (dataElement.textContent === "" || dataElement.textContent === "_")) {
-                        let cachedValue = null;
-                        if (config.type === 'playCount') {
-                            cachedValue = getCachedPlayCount(trackId);
-                        } else if (config.type === 'releaseDate') {
-                            cachedValue = getCachedReleaseDate(trackId);
-                        } else if (config.type === 'scrobbles') {
-                            cachedValue = getCachedScrobbles(trackId);
-                        } else if (config.type === 'personalScrobbles') {
-                            const cachedData = getCachedPersonalScrobbles(trackId);
-                            if (cachedData && !cachedData.pendingUpdate) {
-                                cachedValue = cachedData.count;
-                            }
-                        }
-                        
-                        if (cachedValue !== null) {
-                            updateDisplay(dataElement, cachedValue, config.type);
-                        } else {
-                            isCached = false;
-                        }
-                    }
-                }
-
-                if (!isCached) {
-                    elementMap.set(trackId, trackElement);
-                    trackIdsToFetch.push(trackId);
+                if (val !== undefined && val !== null) {
+                    updateDisplay(dataElement, val, config.type);
                 } else {
-                    trackElement.classList.remove('sort-play-processing');
+                    element.classList.add('sort-play-processing');
+                    isFullyCached = false;
                 }
             }
 
-            if (trackIdsToFetch.length > 0) {
-                let success = false;
-                let retries = 0;
-                const maxRetries = 5;
-                let delay = 2000;
-                let trackDetailsResponse;
+            if (!isFullyCached) {
+                idsToFetchFromApi.push(id);
+                elementsToFetchFromApi.set(id, element);
+            }
+        }
 
-                while (!success && retries < maxRetries) {
-                    try {
-                        trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIdsToFetch.join(',')}`);
-                        if (trackDetailsResponse && trackDetailsResponse.tracks) success = true;
-                        else throw new Error("Invalid data from Spotify API.");
-                    } catch (error) {
-                        retries++;
-                        if (retries < maxRetries) await new Promise(resolve => setTimeout(resolve, delay *= 1.5));
+        if (idsToFetchFromApi.length > 0) {
+            if (audioFeatureConfig) {
+                try {
+                    const stats = await getBatchTrackStats(idsToFetchFromApi);
+                    for (const id of idsToFetchFromApi) {
+                        const el = elementsToFetchFromApi.get(id);
+                        const stat = stats[id];
+                        if (stat && el) {
+                            await setTrackCache(id, stat, true, false, "stats-column");
+                            columnConfigs.forEach(c => {
+                                if (audioFeatureTypes.includes(c.type)) {
+                                    updateDisplay(el.querySelector(c.dataSelector), c.type === 'djInfo' ? stat : stat[c.type], c.type);
+                                }
+                            });
+                        }
                     }
-                }
+                } catch(e) {}
+            }
 
-                if (success && trackDetailsResponse) {
-                    const processingPromises = trackDetailsResponse.tracks.map(async (trackDetails) => {
-                        if (!trackDetails) return;
-                        const trackElement = elementMap.get(trackDetails.id);
-                        if (!trackElement) return;
-
-                        for (const config of nonAudioFeatureConfigs) {
-                            const dataElement = trackElement.querySelector(config.dataSelector);
-                            if (!dataElement || (dataElement.textContent !== "" && dataElement.textContent !== "_")) continue;
+            const nonAudioConfigs = columnConfigs.filter(c => !audioFeatureTypes.includes(c.type));
+            if (nonAudioConfigs.length > 0) {
+                try {
+                    const resp = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${idsToFetchFromApi.join(',')}`);
+                    if (resp?.tracks) {
+                        const promises = resp.tracks.map(async (t) => {
+                            if(!t) return;
+                            const el = elementsToFetchFromApi.get(t.id);
+                            if(!el) return;
                             
-                            try {
-                                if (config.type === 'playCount') {
-                                    const result = await getTrackDetailsWithPlayCount({ track: { album: { id: trackDetails.album.id }, id: trackDetails.id } });
-                                    updateDisplay(dataElement, result.playCount, config.type);
-                                    if (result.playCount !== null && result.playCount !== "N/A") setCachedPlayCount(trackDetails.id, result.playCount);
-                                } else if (config.type === 'releaseDate') {
-                                    const releaseDate = trackDetails.album.release_date;
-                                    updateDisplay(dataElement, releaseDate, config.type);
-                                    if (releaseDate) setCachedReleaseDate(trackDetails.id, releaseDate);
-                                } else if (config.type === 'scrobbles' || config.type === 'personalScrobbles') {
-                                    const trackName = trackDetails.name;
-                                    const artistName = trackDetails.artists?.[0]?.name;
-                                    if (!artistName || !trackName) throw new Error("Missing artist/track name.");
+                            for (const c of nonAudioConfigs) {
+                                const dEl = el.querySelector(c.dataSelector);
+                                if (!dEl || dEl.dataset.spProcessed) continue;
 
-                                    if (config.type === 'scrobbles') {
-                                        const result = await getTrackDetailsWithScrobbles({ name: trackName, artists: [{ name: artistName }] });
-                                        updateDisplay(dataElement, result.scrobbles, config.type);
-                                        if (result.scrobbles !== null) setCachedScrobbles(trackDetails.id, result.scrobbles);
+                                if (c.type === 'playCount') {
+                                    const r = await getTrackDetailsWithPlayCount({ track: { album: { id: t.album.id }, id: t.id } });
+                                    updateDisplay(dEl, r.playCount, c.type);
+                                    if (r.playCount !== "N/A") await setCachedPlayCount(t.id, r.playCount);
+                                } else if (c.type === 'releaseDate') {
+                                    updateDisplay(dEl, t.album.release_date, c.type);
+                                    if (t.album.release_date) await setCachedReleaseDate(t.id, t.album.release_date);
+                                } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles') {
+                                    const info = { name: t.name, artists: t.artists };
+                                    if (c.type === 'scrobbles') {
+                                        const r = await getTrackDetailsWithScrobbles(info);
+                                        updateDisplay(dEl, r.scrobbles, c.type);
+                                        if (r.scrobbles !== null) await setCachedScrobbles(t.id, r.scrobbles);
                                     } else {
-                                        if (!loadLastFmUsername()) updateDisplay(dataElement, "_", config.type);
-                                        else {
-                                            const result = await getTrackDetailsWithPersonalScrobbles(trackDetails);
-                                            const valueToDisplay = result.error ? { error: result.error } : result.personalScrobbles;
-                                            updateDisplay(dataElement, valueToDisplay, config.type);
+                                        if (loadLastFmUsername()) {
+                                            const r = await getTrackDetailsWithPersonalScrobbles({ ...info, uri: t.uri });
+                                            updateDisplay(dEl, r.personalScrobbles, c.type);
                                         }
                                     }
                                 }
-                            } catch (e) {
-                                updateDisplay(dataElement, "_", config.type);
-                                trackElement.setAttribute('data-sp-fetch-failed', 'true');
                             }
-                        }
-                        trackElement.classList.remove('sort-play-processing');
-                    });
-                    await Promise.all(processingPromises);
-                } else {
-                    trackIdsToFetch.forEach(trackId => {
-                        const trackElement = elementMap.get(trackId);
-                        if (trackElement) {
-                            trackElement.classList.remove('sort-play-processing');
-                        }
-                    });
-                }
+                            el.classList.remove('sort-play-processing');
+                        });
+                        await Promise.all(promises);
+                    }
+                } catch(e) { console.error(e); }
             }
-        }
-        if (i < spotifyTracksToProcess.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 200));
+            idsToFetchFromApi.forEach(id => elementsToFetchFromApi.get(id)?.classList.remove('sort-play-processing'));
         }
     }
   }
@@ -22900,13 +22846,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }, 100);
 
+  await idb.init();
   loadSettings();
   fetchUserMarket();
-  initializePlayCountCache();
-  initializeReleaseDateCache();
-  initializeScrobblesCache();
-  initializePersonalScrobblesCache();
-  initializePaletteAnalysisCache();
   cleanupLegacyGenreCache();
 
   if (showLikeButton) {
