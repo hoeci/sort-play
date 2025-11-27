@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.26.2";
+  const SORT_PLAY_VERSION = "5.26.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13479,7 +13479,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         deezer_genres: [], 
                         release_date: null,
                         duration_ms: -1,
-                        release_date_text: "N/A" 
+                        release_date_text: "N/A",
+                        audio_features: null 
                     } 
                 };
             }
@@ -13565,13 +13566,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 isrc: isrc,
                 canSave: isCompleteSuccess, 
                 data: {
+                    isrc: isrc,
                     spotify_artist_genres: Array.from(spotifyGenres), 
                     lastfm_track_genres: lfmTrackGenres,
                     lastfm_artist_genres: lfmArtistGenres,
                     deezer_genres: deezer_genres,
                     release_date: releaseDateInDays,
                     duration_ms: safeVal(trackDetails.duration_ms),
-                    release_date_text: releaseDateStr || "N/A"
+                    release_date_text: releaseDateStr || "N/A",
+                    audio_features: null
                 }
             };
     
@@ -13808,7 +13811,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                 Object.assign(result.data, result.data.audio_features);
                             }
 
-                            result.data.isrc = item.isrc;
+                            if (!result.data.isrc) result.data.isrc = item.isrc;
 
                             finalGenresMap.set(item.uri, result.data);
                             
@@ -13854,7 +13857,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             for (const item of sharedQueue) {
                 try {
                     const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null);
-                    result.data.isrc = item.isrc;
+                    if (!result.data.isrc) result.data.isrc = item.isrc;
                     finalGenresMap.set(item.uri, result.data);
                     itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...result.data });
                 } catch (e) {} finally {
@@ -13866,7 +13869,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     finalGenresMap.forEach((data, uri) => {
-        if (data.release_date && !data.release_date_text && data.release_date_text !== "N/A") {
+        if ((data.release_date || data.release_date === 0) && !data.release_date_text && data.release_date_text !== "N/A") {
             const d = new Date(data.release_date * 86400000);
             if (!isNaN(d.getTime())) {
                 const year = d.getUTCFullYear();
@@ -21782,7 +21785,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       isUpdatingTracklist = false;
     }
   }
-
+  
   async function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
