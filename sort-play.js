@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.26.1";
+  const SORT_PLAY_VERSION = "5.26.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13808,6 +13808,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                 Object.assign(result.data, result.data.audio_features);
                             }
 
+                            result.data.isrc = item.isrc;
+
                             finalGenresMap.set(item.uri, result.data);
                             
                             itemsToSaveMap.set(item.uri, {
@@ -13852,6 +13854,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             for (const item of sharedQueue) {
                 try {
                     const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null);
+                    result.data.isrc = item.isrc;
                     finalGenresMap.set(item.uri, result.data);
                     itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...result.data });
                 } catch (e) {} finally {
@@ -21779,10 +21782,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       isUpdatingTracklist = false;
     }
   }
-  
-  window.sortPlayFixData = findAndFixMissingData;
 
-  
   async function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
