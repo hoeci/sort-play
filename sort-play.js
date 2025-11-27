@@ -13450,9 +13450,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return data;
     };
 
+    const safeVal = (val) => (val !== null && val !== undefined) ? val : -1;
+
+    const justFetchedTrackIds = new Set();
+
     async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null, deezerGatewayUrl = null) {
         const trackId = trackUri.split(":")[2];
-        let isCompleteSuccess = true;
+        let isCompleteSuccess = true; 
 
         try {
             const trackDetails = preFetchedTrackDetails || await withRetry(
@@ -13460,16 +13464,32 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 CONFIG.spotify.retryAttempts,
                 CONFIG.spotify.retryDelay
             );
-
+    
             if (trackDetails?.code || trackDetails?.error) throw new Error(trackDetails.message);
-            if (!trackDetails?.artists?.length) return { success: true, isrc: null, canSave: false, data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], release_date: null } };
-
+            
+            if (!trackDetails?.artists?.length) {
+                return { 
+                    success: true, 
+                    isrc: null, 
+                    canSave: false, 
+                    data: { 
+                        spotify_artist_genres: [], 
+                        lastfm_track_genres: [], 
+                        lastfm_artist_genres: [], 
+                        deezer_genres: [], 
+                        release_date: null,
+                        duration_ms: -1,
+                        release_date_text: "N/A" 
+                    } 
+                };
+            }
+            
             const isrc = trackDetails.external_ids?.isrc || null;
 
             const artistIds = [...new Set(trackDetails.artists.map(artist => artist.uri.split(":")[2]))];
             const spotifyGenres = new Set();
             const artistIdsToFetch = [];
-
+    
             artistIds.forEach(id => {
                 if (artistGenreCache.has(id)) {
                     artistGenreCache.get(id).forEach(genre => spotifyGenres.add(genre));
@@ -13477,13 +13497,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     artistIdsToFetch.push(id);
                 }
             });
-
+    
             if (artistIdsToFetch.length > 0) {
                 const artistBatches = [];
                 for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                     artistBatches.push(artistIdsToFetch.slice(i, i + 50));
                 }
-
+    
                 await Promise.all(artistBatches.map(async (batch) => {
                     try {
                         const artistData = await withRetry(
@@ -13491,7 +13511,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             CONFIG.spotify.retryAttempts,
                             CONFIG.spotify.retryDelay
                         );
-
+                        
                         if (artistData?.artists) {
                             artistData.artists.forEach(artist => {
                                 const genres = (artist?.genres || []).map(g => g.toLowerCase()).filter(genre => !containsYear(genre) && !/^\d+$/.test(genre));
@@ -13505,20 +13525,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
                 }));
             }
-
+    
             const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name);
             let lfmTrackGenres = [];
             let lfmArtistGenres = [];
-
+            
             if (lastfmGenresData === null) {
-                isCompleteSuccess = false;
+                isCompleteSuccess = false; 
             } else {
                 const artistNames = trackDetails.artists.map(artist => artist.name.toLowerCase());
                 const filterGenres = (genres) => genres.filter(genre => !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName)));
                 lfmTrackGenres = filterGenres(lastfmGenresData.track_genres);
                 lfmArtistGenres = filterGenres(lastfmGenresData.artist_genres);
             }
-
+    
             let deezer_genres = [];
             if (isrc && deezerGatewayUrl) {
                 try {
@@ -13529,7 +13549,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             } else if (isrc && !deezerGatewayUrl) {
                 isCompleteSuccess = false;
             }
-
+    
             const releaseDateStr = trackDetails.album?.release_date;
             let releaseDateInDays = null;
 
@@ -13539,30 +13559,30 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     releaseDateInDays = Math.floor(dateObj.getTime() / 86400000);
                 }
             }
-
-            return {
+    
+            return { 
                 success: true,
                 isrc: isrc,
-                canSave: isCompleteSuccess,
+                canSave: isCompleteSuccess, 
                 data: {
-                    spotify_artist_genres: Array.from(spotifyGenres),
+                    spotify_artist_genres: Array.from(spotifyGenres), 
                     lastfm_track_genres: lfmTrackGenres,
                     lastfm_artist_genres: lfmArtistGenres,
                     deezer_genres: deezer_genres,
                     release_date: releaseDateInDays,
-                    duration_ms: trackDetails.duration_ms,
-                    release_date_text: releaseDateStr
+                    duration_ms: safeVal(trackDetails.duration_ms),
+                    release_date_text: releaseDateStr || "N/A"
                 }
             };
-
+    
         } catch (error) {
-            throw error;
+            throw error; 
         }
     }
-
+  
     const trackUris = tracks.map(t => t.uri);
     mainButton.innerText = "Checking...";
-
+    
     const finalGenresMap = new Map();
     const urisNotInSession = [];
 
@@ -13578,28 +13598,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (urisNotInSession.length > 0) {
         cachedGenresByUri = await getGenresFromTurso(urisNotInSession, 'ids');
     }
-
+    
     const missingUris = [];
+    
     const todayInDays = Math.floor(Date.now() / 86400000);
 
     const isDataStale = (cached) => {
         if (!cached) return true;
 
         const daysSinceLastUpdate = cached.updated_at ? (todayInDays - cached.updated_at) : 9999;
+
         const allGenresEmpty = (!cached.spotify_artist_genres?.length) &&
-            (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
-            (!cached.deezer_genres?.length);
+                               (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
+                               (!cached.deezer_genres?.length);
 
         if (allGenresEmpty && daysSinceLastUpdate > 180) return true;
+
         if (!cached.release_date) return false;
 
         const daysSinceRelease = todayInDays - cached.release_date;
+        
         let refetchCooldown = 5;
         if (daysSinceRelease <= 5) {
             refetchCooldown = 2;
         }
 
         if (daysSinceLastUpdate < refetchCooldown) return false;
+        
         if (allGenresEmpty && daysSinceRelease < 70) return true;
 
         let sourceCount = 0;
@@ -13608,6 +13633,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (cached.deezer_genres?.length > 0) sourceCount++;
 
         if (sourceCount === 1 && daysSinceRelease < 40) return true;
+
         if (daysSinceRelease < 30) return true;
 
         return false;
@@ -13626,46 +13652,46 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     const tracksToFetch = tracks.filter(t => missingUris.includes(t.uri));
-    const tracksWithIsrcs = [];
-
+    const tracksWithIsrcs = []; 
+    
     if (tracksToFetch.length > 0) {
-        mainButton.innerText = "Details...";
-        const CHUNK_SIZE = 50;
-        let processedCount = 0;
+      mainButton.innerText = "Details...";
+      const CHUNK_SIZE = 50;
+      let processedCount = 0;
 
-        for (let i = 0; i < tracksToFetch.length; i += CHUNK_SIZE) {
-            const chunk = tracksToFetch.slice(i, i + CHUNK_SIZE);
-            const chunkTrackIds = chunk.map(t => t.uri.split(':')[2]);
+      for (let i = 0; i < tracksToFetch.length; i += CHUNK_SIZE) {
+        const chunk = tracksToFetch.slice(i, i + CHUNK_SIZE);
+        const chunkTrackIds = chunk.map(t => t.uri.split(':')[2]);
 
-            try {
-                const response = await withRetry(
-                    () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${chunkTrackIds.join(',')}`),
-                    CONFIG.spotify.retryAttempts,
-                    CONFIG.spotify.retryDelay
-                );
+        try {
+            const response = await withRetry(
+                () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${chunkTrackIds.join(',')}`),
+                CONFIG.spotify.retryAttempts,
+                CONFIG.spotify.retryDelay
+            );
 
-                if (response && response.tracks) {
-                    response.tracks.forEach((td, idx) => {
-                        if (td) {
-                            tracksWithIsrcs.push({
-                                uri: chunk[idx].uri,
-                                isrc: td.external_ids?.isrc,
-                                details: td
-                            });
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error(`[Sort-Play] Failed to fetch track details for ISRC lookup:`, error);
+            if (response && response.tracks) {
+                response.tracks.forEach((td, idx) => {
+                    if (td) {
+                        tracksWithIsrcs.push({
+                            uri: chunk[idx].uri,
+                            isrc: td.external_ids?.isrc,
+                            details: td
+                        });
+                    }
+                });
             }
-            processedCount += chunk.length;
-            mainButton.innerText = `Details ${Math.round((processedCount / tracksToFetch.length) * 100)}%`;
+        } catch (error) {
+            console.error(`[Sort-Play] Failed to fetch track details for ISRC lookup:`, error);
         }
+        processedCount += chunk.length;
+        mainButton.innerText = `Details ${Math.round((processedCount / tracksToFetch.length) * 100)}%`;
+      }
     }
 
     const isrcsToCheck = [...new Set(tracksWithIsrcs.map(t => t.isrc).filter(Boolean))];
     let cachedGenresByIsrc = new Map();
-
+    
     const isrcsNotInSession = [];
     isrcsToCheck.forEach(isrc => {
         if (sessionGenreCache.has(isrc)) {
@@ -13742,13 +13768,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
         const sharedQueue = [...tracksNeedingExternalFetch];
-
+        
         const gateways = [
             { url: DEEZER_GATEWAY_URL, active: true, failures: 0 },
             { url: DEEZER_GATEWAY_URL_2, active: true, failures: 0 },
             { url: DEEZER_GATEWAY_URL_3, active: true, failures: 0 }
         ];
-        const MAX_GATEWAY_FAILURES = 10;
+        const MAX_GATEWAY_FAILURES = 10; 
         const WORKERS_PER_GATEWAY = 3;
 
         const startGatewayWorkers = (gateway) => {
@@ -13756,14 +13782,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             for (let i = 0; i < WORKERS_PER_GATEWAY; i++) {
                 workers.push(async () => {
                     while (sharedQueue.length > 0 && gateway.active) {
-                        const item = sharedQueue.shift();
-                        if (!item) break;
+                        const item = sharedQueue.shift(); 
+                        if (!item) break; 
 
                         try {
                             const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, gateway.url);
-
+                            
                             const existing = cachedGenresByIsrc.get(item.isrc);
-                            if (existing && existing.tempo) {
+                            if (existing && (existing.tempo || existing.tempo === 0 || existing.tempo === -1)) {
                                 result.data.audio_features = {
                                     danceability: existing.danceability,
                                     energy: existing.energy,
@@ -13777,36 +13803,37 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                     mode: existing.mode,
                                     time_signature: existing.time_signature,
                                     loudness: existing.loudness,
-                                    duration_ms: existing.duration_ms
+                                    duration_ms: result.data.duration_ms || existing.duration_ms
                                 };
                                 Object.assign(result.data, result.data.audio_features);
                             }
 
                             finalGenresMap.set(item.uri, result.data);
-
+                            
                             itemsToSaveMap.set(item.uri, {
                                 track_uri: item.uri,
                                 isrc: item.isrc,
                                 ...result.data
                             });
-
+                            
                             fetchedCount++;
                             mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
                             await new Promise(resolve => setTimeout(resolve, 250));
 
                         } catch (error) {
                             const errorMsg = error.message || "";
-                            const isRateLimit = errorMsg.includes("Rate Limit") || errorMsg.includes("Quota") || errorMsg.includes("429") || errorMsg.includes("HTTP 5");
-
+                            const isRateLimit = errorMsg.includes("Rate Limit") || errorMsg.includes("Quota") || errorMsg.includes("429") || errorMsg.includes("HTTP 5"); 
+                            
                             if (isRateLimit) {
-                                sharedQueue.push(item);
-                                await new Promise(resolve => setTimeout(resolve, 3000));
-                            } else if (errorMsg.includes("Gateway") || errorMsg.includes("Network")) {
+                                sharedQueue.push(item); 
+                                await new Promise(resolve => setTimeout(resolve, 3000)); 
+                            }
+                            else if (errorMsg.includes("Gateway") || errorMsg.includes("Network")) {
                                 gateway.failures++;
-                                sharedQueue.push(item);
+                                sharedQueue.push(item); 
                                 if (gateway.failures >= MAX_GATEWAY_FAILURES) {
                                     gateway.active = false;
-                                    break;
+                                    break; 
                                 }
                             } else {
                                 fetchedCount++;
@@ -13836,7 +13863,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     finalGenresMap.forEach((data, uri) => {
-        if (data.release_date && !data.release_date_text) {
+        if (data.release_date && !data.release_date_text && data.release_date_text !== "N/A") {
             const d = new Date(data.release_date * 86400000);
             if (!isNaN(d.getTime())) {
                 const year = d.getUTCFullYear();
@@ -13859,8 +13886,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const trackIdsForMetadata = new Set();
     finalGenresMap.forEach((data, uri) => {
-        if ((!data.release_date_text || !data.duration_ms) && !trackIdsForMetadata.has(uri.split(':')[2])) {
-            trackIdsForMetadata.add(uri.split(':')[2]);
+        const id = uri.split(':')[2];
+        const needsText = !data.release_date_text && data.release_date_text !== "N/A";
+        const needsDuration = !data.duration_ms && data.duration_ms !== 0 && data.duration_ms !== -1;
+        
+        if ((needsText || needsDuration) && !trackIdsForMetadata.has(id) && !justFetchedTrackIds.has(id)) {
+            trackIdsForMetadata.add(id);
         }
     });
 
@@ -13882,8 +13913,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     response.tracks.forEach(track => {
                         if (track) {
                             const uri = `spotify:track:${track.id}`;
-                            const releaseDateText = track.album?.release_date || null;
-                            const durationMs = track.duration_ms;
+                            const releaseDateText = track.album?.release_date || "N/A";
+                            const durationMs = safeVal(track.duration_ms);
 
                             const genreData = finalGenresMap.get(uri);
                             if (genreData) {
@@ -13912,7 +13943,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const trackIdsForFeatures = new Set();
     finalGenresMap.forEach((data, uri) => {
-        if (!data.tempo && data.tempo !== 0 && !trackIdsForFeatures.has(uri.split(':')[2])) {
+        if (!data.tempo && data.tempo !== 0 && data.tempo !== -1 && !trackIdsForFeatures.has(uri.split(':')[2])) {
             trackIdsForFeatures.add(uri.split(':')[2]);
         }
     });
@@ -13932,26 +13963,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 );
 
                 if (response && response.audio_features) {
-                    response.audio_features.forEach(af => {
+                    response.audio_features.forEach((af, index) => {
+                        const uri = `spotify:track:${batch[index]}`;
+                        const genreData = finalGenresMap.get(uri);
+
                         if (af) {
-                            const uri = `spotify:track:${af.id}`;
                             const features = {
-                                danceability: af.danceability,
-                                energy: af.energy,
-                                valence: af.valence,
-                                acousticness: af.acousticness,
-                                instrumentalness: af.instrumentalness,
-                                speechiness: af.speechiness,
-                                liveness: af.liveness,
-                                tempo: af.tempo,
-                                key: af.key,
-                                mode: af.mode,
-                                time_signature: af.time_signature,
-                                loudness: af.loudness,
-                                duration_ms: af.duration_ms
+                                danceability: safeVal(af.danceability),
+                                energy: safeVal(af.energy),
+                                valence: safeVal(af.valence),
+                                acousticness: safeVal(af.acousticness),
+                                instrumentalness: safeVal(af.instrumentalness),
+                                speechiness: safeVal(af.speechiness),
+                                liveness: safeVal(af.liveness),
+                                tempo: safeVal(af.tempo),
+                                key: safeVal(af.key),
+                                mode: safeVal(af.mode),
+                                time_signature: safeVal(af.time_signature),
+                                loudness: safeVal(af.loudness),
+                                duration_ms: safeVal(af.duration_ms)
                             };
 
-                            const genreData = finalGenresMap.get(uri);
                             if (genreData) {
                                 Object.assign(genreData, features);
 
@@ -13963,6 +13995,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                         isrc: genreData.isrc,
                                         ...genreData,
                                         audio_features: features
+                                    };
+                                    itemsToSaveMap.set(uri, updatedEntry);
+                                }
+                            }
+                        } else {
+                            if (genreData) {
+                                const emptyFeatures = {
+                                    danceability: -1, energy: -1, valence: -1, acousticness: -1,
+                                    instrumentalness: -1, speechiness: -1, liveness: -1, tempo: -1,
+                                    key: -1, mode: -1, time_signature: -1, loudness: -1
+                                };
+                                Object.assign(genreData, emptyFeatures);
+                                
+                                if (genreData.isrc) {
+                                    const existing = itemsToSaveMap.get(uri);
+                                    const updatedEntry = {
+                                        ...(existing || {}),
+                                        track_uri: uri,
+                                        isrc: genreData.isrc,
+                                        ...genreData,
+                                        audio_features: emptyFeatures
                                     };
                                     itemsToSaveMap.set(uri, updatedEntry);
                                 }
@@ -21726,6 +21779,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       isUpdatingTracklist = false;
     }
   }
+  
+  window.sortPlayFixData = findAndFixMissingData;
 
   
   async function updateTracklistStructure(tracklist_) {
