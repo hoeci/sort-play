@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.25.2";
+  const SORT_PLAY_VERSION = "5.26.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -3132,86 +3132,114 @@
     modalContainer.style.cssText = `
         z-index: 2003;
         width: 500px !important;
+        height: auto !important;
         display: flex;
         flex-direction: column;
     `;
 
-    const wallets = [
-        { name: 'USDT (TRC20) / TRON', address: 'TU3tiVV3NLmFetXrsAZnuE9qu8JVSHDuAH' },
-        { name: 'TON', address: 'UQAFHn9aGKqTn1Vku5xSuPCkkvVbnfnN20B1RwijthZ8a2OE' },
-        { name: 'Bitcoin (BTC)', address: 'bc1q0vvhyffnk8s0g9hnf4k2c7z6ys3r2d7x6fjnvv' },
-    ];
-
-    let walletsHtml = wallets.map(wallet => `
-        <div class="wallet-entry">
-            <label class="wallet-label">${wallet.name}</label>
-            <div class="wallet-address-container">
-                <input type="text" class="wallet-address" value="${wallet.address}" readonly>
-                <button class="copy-button" data-address="${wallet.address}" title="Copy Address">
-                    ${copyIconSVG}
-                </button>
-            </div>
-        </div>
-    `).join('');
-
     modalContainer.innerHTML = `
       <style>
-        .support-modal-content { display: flex; flex-direction: column; gap: 16px; }
-        .wallet-entry { display: flex; flex-direction: column; gap: 6px; }
-        .wallet-label { color: #c1c1c1; font-size: 14px; font-weight: 500; }
-        .wallet-address-container { display: flex; align-items: center; gap: 8px; }
-        .wallet-address { 
-            flex-grow: 1; 
-            background-color: #121212; 
-            border: 1px solid #333; 
-            border-radius: 4px; 
-            padding: 8px 12px; 
-            color: #fff; 
-            font-family: monospace; 
-            font-size: 11px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .instruction-box {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 12px 70px;
+            text-align: center;
+            color: #b3b3b3;
+            font-size: 13px;
+            line-height: 1.5;
         }
-        .copy-button { 
-            flex-shrink: 0;
-            background-color: #333; 
-            border: 1px solid #555;
-            color: #fff; 
-            padding: 6px 6px; 
-            border-radius: 4px; 
-            cursor: pointer; 
+        .instruction-box strong {
+            color: #fff;
+            font-weight: 500;
+        }
+        .instruction-subtext {
+            font-size: 0.9em;
+            opacity: 0.9;
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: background-color 0.2s ease;
-            width: 32px;
-            height: 32px;
+            gap: 4px;
+            margin-top: 2px;
         }
-        .copy-button:hover { background-color: #444; }
-        .copy-button.copied {
-            background-color: #1ED760;
-            color: black;
+        .tooltip-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            cursor: help;
         }
-        .copy-button.copied:hover {
-            background-color: #1ED760;
+        .info-icon {
+            width: 14px;
+            height: 14px;
+            stroke: #b3b3b3;
+            fill: none;
+            stroke-width: 2;
+            transition: stroke 0.2s;
         }
-        .copy-button svg { width: 16px; height: 16px; }
+        .tooltip-wrapper:hover .info-icon {
+            stroke: #fff;
+        }
+        .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: #282828;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 8px;
+            position: absolute;
+            z-index: 10;
+            bottom: 140%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            pointer-events: none;
+            border: 1px solid #3e3e3e;
+        }
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #282828 transparent transparent transparent;
+        }
+        .tooltip-wrapper:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
       </style>
       <div class="main-trackCreditsModal-header">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Support Sort-Play</span></h1>
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 24px; font-weight: 700;'>Support Sort-Play</span></h1>
       </div>
-      <div class="main-trackCreditsModal-mainSection" style="padding: 22px 47px 20px !important; max-height: 60vh; flex-grow: 1;">
-        <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 25px;">If you enjoy using Sort-Play, please consider supporting its development. Thank you!</p>
-        <div class="support-modal-content">
-            ${walletsHtml}
-        </div>
+      
+      <div class="instruction-box">
+           <p style="margin-top: 0; margin-bottom: 10px; color: #e0e0e0;">If you enjoy using Sort-Play, please consider supporting its development. Thank you!</p>
+           Select amount and click <strong>Send</strong>.<br>
+           <div class="instruction-subtext">
+             (Minimum donation is $20)
+             <span class="tooltip-wrapper">
+                <svg class="info-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <span class="tooltip-text">This limit is set by the payment processor (Changelly)</span>
+             </span>
+           </div>
+      </div>
+
+      <div class="main-trackCreditsModal-mainSection" style="padding: 0 !important; flex-grow: 1; overflow: hidden;">
+        <iframe width="100%" height="450px" frameborder='none' allow="camera" src="https://widget.changelly.com?from=*&to=ltc&amount=20&address=ltc1qtelm3a85x3jz63qn5hrmnkg47tmq54j0znnhmz&fromDefault=usd&toDefault=ltc&merchant_id=ODwZfORKmphWgxlA&payment_id=&v=3&type=no-rev-share&color=1db954&headerId=1&logo=hide&buyButtonTextId=8&readOnlyDestinationAddress=true">Can't load widget</iframe>
       </div>
       <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
         <div style="display: flex; justify-content: flex-end;">
             <button id="closeSupportModal" class="main-buttons-button main-button-primary" 
                     style="background-color: #1ED760; color: black; padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
-                Done
+                Close
             </button>
         </div>
       </div>
@@ -3219,22 +3247,6 @@
     
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
-
-    modalContainer.querySelectorAll('.copy-button').forEach(button => {
-        button.addEventListener('click', () => {
-            const address = button.dataset.address;
-            navigator.clipboard.writeText(address).then(() => {
-                Spicetify.showNotification('Address copied to clipboard!');
-                button.classList.add('copied');
-                setTimeout(() => {
-                    button.classList.remove('copied');
-                }, 1000);
-            }, (err) => {
-                Spicetify.showNotification('Failed to copy address.', true);
-                console.error('Could not copy text: ', err);
-            });
-        });
-    });
 
     const closeModal = () => overlay.remove();
     
@@ -12710,7 +12722,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (details.isSelfTitle) return 2;
             if (details.name.length < 2) return 2;
             if (details.artists.size >= 3) return 1;
-            if (details.count >= 15) return 1;
+            if (details.count >= 15 && details.artists.size >= 2) return 1;
             if (totalUniqueArtistsInPlaylist < 3) {
                 const threshold = Math.min(4, Math.max(2, Math.ceil(tracks.length * 0.05)));
                 if (details.count >= threshold) return 1;
@@ -13378,6 +13390,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         deezer_genres: JSON.stringify(data.deezer_genres || []),
         release_date: data.release_date,
         updated_at: Math.floor(Date.now() / 86400000),
+        
+        duration_ms: data.duration_ms || null,
+        release_date_text: data.release_date_text || null,
+
+        audio_features: data.audio_features || {} 
       }));
 
       let success = false;
@@ -13426,6 +13443,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     mainButton.innerText = "0%";
+
+    const flattenAudioFeatures = (data) => {
+        if (data && data.audio_features) {
+            Object.assign(data, data.audio_features);
+        }
+        return data;
+    };
   
     async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null, deezerGatewayUrl = null) {
         const trackId = trackUri.split(":")[2];
@@ -13526,7 +13550,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     lastfm_track_genres: lfmTrackGenres,
                     lastfm_artist_genres: lfmArtistGenres,
                     deezer_genres: deezer_genres,
-                    release_date: releaseDateInDays
+                    release_date: releaseDateInDays,
+                    duration_ms: trackDetails.duration_ms,
+                    release_date_text: releaseDateStr
                 }
             };
     
@@ -13557,33 +13583,48 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const missingUris = [];
     
     const todayInDays = Math.floor(Date.now() / 86400000);
-    const REFETCH_COOLDOWN_DAYS = 3;
 
     const isDataStale = (cached) => {
         if (!cached) return true;
-        const hasBeenUpdatedRecently = cached.updated_at && (todayInDays - cached.updated_at < REFETCH_COOLDOWN_DAYS);
-        if (hasBeenUpdatedRecently) return false;
-        if (!cached.release_date) return false;
 
-        const daysSinceRelease = todayInDays - cached.release_date;
+        
+        const daysSinceLastUpdate = cached.updated_at ? (todayInDays - cached.updated_at) : 9999;
+
         const allGenresEmpty = (!cached.spotify_artist_genres?.length) &&
                                (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
                                (!cached.deezer_genres?.length);
+
+        if (allGenresEmpty && daysSinceLastUpdate > 180) return true;
+
+        if (!cached.release_date) return false;
+
+        const daysSinceRelease = todayInDays - cached.release_date;
         
-        if (allGenresEmpty && daysSinceRelease < 90) return true;
+        let refetchCooldown = 5;
+        if (daysSinceRelease <= 5) {
+            refetchCooldown = 2;
+        }
+
+        if (daysSinceLastUpdate < refetchCooldown) return false;
+        
+        if (allGenresEmpty && daysSinceRelease < 70) return true;
 
         let sourceCount = 0;
         if (cached.spotify_artist_genres?.length > 0) sourceCount++;
         if ((cached.lastfm_track_genres?.length > 0) || (cached.lastfm_artist_genres?.length > 0)) sourceCount++;
         if (cached.deezer_genres?.length > 0) sourceCount++;
 
-        if (sourceCount === 1 && daysSinceRelease < 60) return true;
+        if (sourceCount === 1 && daysSinceRelease < 40) return true;
+
         if (daysSinceRelease < 30) return true;
+
         return false;
     };
 
     urisNotInSession.forEach(uri => {
-        const cached = cachedGenresByUri.get(uri);
+        let cached = cachedGenresByUri.get(uri);
+        if (cached) cached = flattenAudioFeatures(cached);
+
         if (!cached || isDataStale(cached)) {
             missingUris.push(uri);
         } else {
@@ -13626,7 +13667,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             console.error(`[Sort-Play] Failed to fetch track details for ISRC lookup:`, error);
         }
         processedCount += chunk.length;
-        mainButton.innerText = `Data ${Math.round((processedCount / tracksToFetch.length) * 100)}%`;
+        mainButton.innerText = `Details ${Math.round((processedCount / tracksToFetch.length) * 100)}%`;
       }
     }
 
@@ -13646,8 +13687,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         mainButton.innerText = "Linking...";
         const tursoResults = await getGenresFromTurso(isrcsNotInSession, 'isrcs');
         tursoResults.forEach((val, key) => {
-            cachedGenresByIsrc.set(key, val);
-            sessionGenreCache.set(key, val);
+            const flattenedVal = flattenAudioFeatures(val);
+            cachedGenresByIsrc.set(key, flattenedVal);
+            sessionGenreCache.set(key, flattenedVal);
         });
     }
 
@@ -13661,7 +13703,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (!isDataStale(cached)) {
                 finalGenresMap.set(uri, cached);
                 sessionGenreCache.set(uri, cached);
-                dataToSave.push({ track_uri: uri, isrc: isrc, ...cached });
                 return;
             }
         }
@@ -13694,7 +13735,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         CONFIG.spotify.retryAttempts,
                         CONFIG.spotify.retryDelay
                     );
-                    
                     if (artistData?.artists) {
                         artistData.artists.forEach(artist => {
                             const genres = (artist?.genres || []).map(g => g.toLowerCase()).filter(genre => !containsYear(genre) && !/^\d+$/.test(genre));
@@ -13709,7 +13749,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const totalToFetch = tracksNeedingExternalFetch.length;
         let fetchedCount = 0;
-        
         const sharedQueue = [...tracksNeedingExternalFetch];
         
         const gateways = [
@@ -13717,7 +13756,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             { url: DEEZER_GATEWAY_URL_2, active: true, failures: 0 },
             { url: DEEZER_GATEWAY_URL_3, active: true, failures: 0 }
         ];
-        
         const MAX_GATEWAY_FAILURES = 10; 
         const WORKERS_PER_GATEWAY = 3;
 
@@ -13732,48 +13770,53 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         try {
                             const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, gateway.url);
                             
-                            finalGenresMap.set(item.uri, result.data);
-                            sessionGenreCache.set(item.uri, result.data);
-                            if (result.isrc) sessionGenreCache.set(result.isrc, result.data);
-                            
-                            if (result.isrc && result.canSave) {
-                                dataToSave.push({
-                                    track_uri: item.uri,
-                                    isrc: result.isrc,
-                                    ...result.data
-                                });
+                            const existing = cachedGenresByIsrc.get(item.isrc);
+                            if (existing && existing.tempo) {
+                                result.data.audio_features = {
+                                    danceability: existing.danceability,
+                                    energy: existing.energy,
+                                    valence: existing.valence,
+                                    acousticness: existing.acousticness,
+                                    instrumentalness: existing.instrumentalness,
+                                    speechiness: existing.speechiness,
+                                    liveness: existing.liveness,
+                                    tempo: existing.tempo,
+                                    key: existing.key,
+                                    mode: existing.mode,
+                                    time_signature: existing.time_signature,
+                                    loudness: existing.loudness
+                                };
+                                Object.assign(result.data, result.data.audio_features);
                             }
+
+                            finalGenresMap.set(item.uri, result.data);
+                            
+                            dataToSave.push({
+                                track_uri: item.uri,
+                                isrc: item.isrc,
+                                ...result.data
+                            });
+                            
                             fetchedCount++;
                             mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
-
                             await new Promise(resolve => setTimeout(resolve, 250));
 
                         } catch (error) {
                             const errorMsg = error.message || "";
-
-                            const isRateLimit = 
-                                errorMsg.includes("Rate Limit") || 
-                                errorMsg.includes("Quota") || 
-                                errorMsg.includes("429") || 
-                                errorMsg.includes("HTTP 5"); 
+                            const isRateLimit = errorMsg.includes("Rate Limit") || errorMsg.includes("Quota") || errorMsg.includes("429") || errorMsg.includes("HTTP 5"); 
                             
                             if (isRateLimit) {
-                                console.warn(`Gateway ${gateway.url} server issue/limit (${errorMsg}). Pausing worker briefly.`);
                                 sharedQueue.push(item); 
                                 await new Promise(resolve => setTimeout(resolve, 3000)); 
                             }
                             else if (errorMsg.includes("Gateway") || errorMsg.includes("Network")) {
-                                console.warn(`Gateway ${gateway.url} hard failed for ${item.uri}: ${errorMsg}. Fail count: ${gateway.failures + 1}`);
                                 gateway.failures++;
                                 sharedQueue.push(item); 
-
                                 if (gateway.failures >= MAX_GATEWAY_FAILURES) {
                                     gateway.active = false;
-                                    console.error(`Gateway ${gateway.url} marked inactive due to too many failures.`);
                                     break; 
                                 }
                             } else {
-                                console.error(`Non-gateway error for ${item.uri}: ${errorMsg}`);
                                 fetchedCount++;
                             }
                         }
@@ -13787,25 +13830,104 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         await Promise.all(allPools);
 
         if (sharedQueue.length > 0) {
-            console.warn(`[Sort-Play] All Deezer gateways failed or timed out. Processing ${sharedQueue.length} remaining tracks without Deezer.`);
             for (const item of sharedQueue) {
                 try {
                     const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null);
                     finalGenresMap.set(item.uri, result.data);
-                    sessionGenreCache.set(item.uri, result.data);
-                } catch (e) {
-                    console.error("Error in fallback processing:", e);
-                } finally {
+                    dataToSave.push({ track_uri: item.uri, isrc: item.isrc, ...result.data });
+                } catch (e) {} finally {
                     fetchedCount++;
                     mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
                 }
             }
         }
     }
+    
+    const trackIdsForFeatures = new Set();
+
+    dataToSave.forEach(item => {
+        if (!item.audio_features || !item.audio_features.tempo) {
+            const id = item.track_uri.split(':')[2];
+            trackIdsForFeatures.add(id);
+        }
+    });
+
+    finalGenresMap.forEach((data, uri) => {
+        if (!data.tempo && data.tempo !== 0 && !trackIdsForFeatures.has(uri.split(':')[2])) {
+            trackIdsForFeatures.add(uri.split(':')[2]);
+        }
+    });
+
+    if (trackIdsForFeatures.size > 0) {
+        mainButton.innerText = "Data...";
+        const ids = Array.from(trackIdsForFeatures);
+        const BATCH_SIZE = 100;
+        
+        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+            const batch = ids.slice(i, i + BATCH_SIZE);
+            try {
+                const response = await withRetry(
+                    () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batch.join(',')}`),
+                    CONFIG.spotify.retryAttempts,
+                    CONFIG.spotify.retryDelay
+                );
+
+                if (response && response.audio_features) {
+                    response.audio_features.forEach(af => {
+                        if (af) {
+                            const uri = `spotify:track:${af.id}`;
+                            const features = {
+                                danceability: af.danceability,
+                                energy: af.energy,
+                                valence: af.valence,
+                                acousticness: af.acousticness,
+                                instrumentalness: af.instrumentalness,
+                                speechiness: af.speechiness,
+                                liveness: af.liveness,
+                                tempo: af.tempo,
+                                key: af.key,
+                                mode: af.mode,
+                                time_signature: af.time_signature,
+                                loudness: af.loudness,
+                                duration_ms: af.duration_ms
+                            };
+
+                            const genreData = finalGenresMap.get(uri);
+                            if (genreData) {
+                                Object.assign(genreData, features); 
+                                
+                                const existingSaveItem = dataToSave.find(d => d.track_uri === uri);
+                                if (existingSaveItem) {
+                                    existingSaveItem.audio_features = features;
+                                } else {
+                                    if (genreData.isrc) {
+                                        dataToSave.push({
+                                            track_uri: uri,
+                                            isrc: genreData.isrc,
+                                            ...genreData,
+                                            audio_features: features
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("[Sort-Play] Error fetching batch audio features", e);
+            }
+            mainButton.innerText = `Data ${Math.round(((i + BATCH_SIZE) / ids.length) * 100)}%`;
+        }
+    }
+
+    finalGenresMap.forEach((data, uri) => {
+        sessionGenreCache.set(uri, data);
+        if (data.isrc) sessionGenreCache.set(data.isrc, data);
+    });
   
     if (dataToSave.length > 0) {
       saveGenresToTurso(dataToSave).then(() => {
-          console.log(`[Sort-Play] Background cloud genre caching complete for ${dataToSave.length} items.`);
+          console.log(`[Sort-Play] Background cloud genre/audio caching complete for ${dataToSave.length} items.`);
       }).catch(err => {
           console.error("[Sort-Play] Background cloud genre caching failed:", err);
           Spicetify.showNotification("[Sort-Play] Background cloud genre caching failed.", true);
