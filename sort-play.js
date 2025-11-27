@@ -13859,7 +13859,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const trackIdsForMetadata = new Set();
     finalGenresMap.forEach((data, uri) => {
-        if (!data.release_date_text && !trackIdsForMetadata.has(uri.split(':')[2])) {
+        if ((!data.release_date_text || !data.duration_ms) && !trackIdsForMetadata.has(uri.split(':')[2])) {
             trackIdsForMetadata.add(uri.split(':')[2]);
         }
     });
