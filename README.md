@@ -63,6 +63,12 @@ Load an artist's complete collection for sorting.
 *   **Complete Collection:** Gathers tracks from all albums, singles, compilations, and "Appears On" releases.
 *   **Intelligent Deduplication:** Automatically removes duplicate tracks, keeping the most popular version to create a clean, comprehensive discography.
 
+### ➕ Quick Filters
+Apply instant filters to your current view without opening complex menus.
+*   **Exclude Liked Songs:** Instantly hide tracks you have already saved. Automatically detects and filters out alternate versions using ISRC matching.
+*   **Deduplicate:** Instantly identify and remove duplicate tracks from the current list.
+*   **Format Filtering:** Quickly isolate specific release types by keeping Only Singles or Only Albums.
+
 ### ➕ Advanced Custom Filter
 A powerful modal to meticulously filter any playlist or discography.
 *   **Keyword Filtering:** Use keywords to filter by track title, album, and artist, with options to keep or exclude matches and match whole words.
