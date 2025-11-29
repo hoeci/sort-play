@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.26.3";
+  const SORT_PLAY_VERSION = "5.27.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -532,7 +532,10 @@
     danceability: false,
     valence: false,
     acousticness: false,
-    instrumentalness: false
+    instrumentalness: false,
+    filterLiked: false,
+    filterSingles: false,
+    filterAlbums: false
   };
 
   function loadSettings() {
@@ -3132,114 +3135,86 @@
     modalContainer.style.cssText = `
         z-index: 2003;
         width: 500px !important;
-        height: auto !important;
         display: flex;
         flex-direction: column;
     `;
 
+    const wallets = [
+        { name: 'USDT (TRC20) / TRON', address: 'TU3tiVV3NLmFetXrsAZnuE9qu8JVSHDuAH' },
+        { name: 'TON', address: 'UQAFHn9aGKqTn1Vku5xSuPCkkvVbnfnN20B1RwijthZ8a2OE' },
+        { name: 'Bitcoin (BTC)', address: 'bc1q0vvhyffnk8s0g9hnf4k2c7z6ys3r2d7x6fjnvv' },
+    ];
+
+    let walletsHtml = wallets.map(wallet => `
+        <div class="wallet-entry">
+            <label class="wallet-label">${wallet.name}</label>
+            <div class="wallet-address-container">
+                <input type="text" class="wallet-address" value="${wallet.address}" readonly>
+                <button class="copy-button" data-address="${wallet.address}" title="Copy Address">
+                    ${copyIconSVG}
+                </button>
+            </div>
+        </div>
+    `).join('');
+
     modalContainer.innerHTML = `
       <style>
-        .instruction-box {
-            background-color: rgba(255, 255, 255, 0.05);
-            padding: 12px 70px;
-            text-align: center;
-            color: #b3b3b3;
-            font-size: 13px;
-            line-height: 1.5;
+        .support-modal-content { display: flex; flex-direction: column; gap: 16px; }
+        .wallet-entry { display: flex; flex-direction: column; gap: 6px; }
+        .wallet-label { color: #c1c1c1; font-size: 14px; font-weight: 500; }
+        .wallet-address-container { display: flex; align-items: center; gap: 8px; }
+        .wallet-address { 
+            flex-grow: 1; 
+            background-color: #121212; 
+            border: 1px solid #333; 
+            border-radius: 4px; 
+            padding: 8px 12px; 
+            color: #fff; 
+            font-family: monospace; 
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .instruction-box strong {
-            color: #fff;
-            font-weight: 500;
-        }
-        .instruction-subtext {
-            font-size: 0.9em;
-            opacity: 0.9;
+        .copy-button { 
+            flex-shrink: 0;
+            background-color: #333; 
+            border: 1px solid #555;
+            color: #fff; 
+            padding: 6px 6px; 
+            border-radius: 4px; 
+            cursor: pointer; 
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
-            margin-top: 2px;
+            transition: background-color 0.2s ease;
+            width: 32px;
+            height: 32px;
         }
-        .tooltip-wrapper {
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            cursor: help;
+        .copy-button:hover { background-color: #444; }
+        .copy-button.copied {
+            background-color: #1ED760;
+            color: black;
         }
-        .info-icon {
-            width: 14px;
-            height: 14px;
-            stroke: #b3b3b3;
-            fill: none;
-            stroke-width: 2;
-            transition: stroke 0.2s;
+        .copy-button.copied:hover {
+            background-color: #1ED760;
         }
-        .tooltip-wrapper:hover .info-icon {
-            stroke: #fff;
-        }
-        .tooltip-text {
-            visibility: hidden;
-            width: 200px;
-            background-color: #282828;
-            color: #fff;
-            text-align: center;
-            border-radius: 4px;
-            padding: 8px;
-            position: absolute;
-            z-index: 10;
-            bottom: 140%;
-            left: 50%;
-            transform: translateX(-50%);
-            opacity: 0;
-            transition: opacity 0.2s;
-            font-size: 12px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            pointer-events: none;
-            border: 1px solid #3e3e3e;
-        }
-        .tooltip-text::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #282828 transparent transparent transparent;
-        }
-        .tooltip-wrapper:hover .tooltip-text {
-            visibility: visible;
-            opacity: 1;
-        }
+        .copy-button svg { width: 16px; height: 16px; }
       </style>
       <div class="main-trackCreditsModal-header">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 24px; font-weight: 700;'>Support Sort-Play</span></h1>
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Support Sort-Play</span></h1>
       </div>
-      
-      <div class="instruction-box">
-           <p style="margin-top: 0; margin-bottom: 10px; color: #e0e0e0;">If you enjoy using Sort-Play, please consider supporting its development. Thank you!</p>
-           Select amount and click <strong>Send</strong>.<br>
-           <div class="instruction-subtext">
-             (Minimum donation is $20)
-             <span class="tooltip-wrapper">
-                <svg class="info-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-                <span class="tooltip-text">This limit is set by the payment processor (Changelly)</span>
-             </span>
-           </div>
-      </div>
-
-      <div class="main-trackCreditsModal-mainSection" style="padding: 0 !important; flex-grow: 1; overflow: hidden;">
-        <iframe width="100%" height="450px" frameborder='none' allow="camera" src="https://widget.changelly.com?from=*&to=ltc&amount=20&address=ltc1qtelm3a85x3jz63qn5hrmnkg47tmq54j0znnhmz&fromDefault=usd&toDefault=ltc&merchant_id=ODwZfORKmphWgxlA&payment_id=&v=3&type=no-rev-share&color=1db954&headerId=1&logo=hide&buyButtonTextId=8&readOnlyDestinationAddress=true">Can't load widget</iframe>
+      <div class="main-trackCreditsModal-mainSection" style="padding: 22px 47px 20px !important; max-height: 60vh; flex-grow: 1;">
+        <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 25px;">If you enjoy using Sort-Play, please consider supporting its development. Thank you!</p>
+        <div class="support-modal-content">
+            ${walletsHtml}
+        </div>
       </div>
       <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
         <div style="display: flex; justify-content: flex-end;">
             <button id="closeSupportModal" class="main-buttons-button main-button-primary" 
                     style="background-color: #1ED760; color: black; padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
-                Close
+                Done
             </button>
         </div>
       </div>
@@ -3247,6 +3222,22 @@
     
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
+
+    modalContainer.querySelectorAll('.copy-button').forEach(button => {
+        button.addEventListener('click', () => {
+            const address = button.dataset.address;
+            navigator.clipboard.writeText(address).then(() => {
+                Spicetify.showNotification('Address copied to clipboard!');
+                button.classList.add('copied');
+                setTimeout(() => {
+                    button.classList.remove('copied');
+                }, 1000);
+            }, (err) => {
+                Spicetify.showNotification('Failed to copy address.', true);
+                console.error('Could not copy text: ', err);
+            });
+        });
+    });
 
     const closeModal = () => overlay.remove();
     
@@ -4321,7 +4312,7 @@
   }
 
 
-function isDirectSortType(sortType) {
+  function isDirectSortType(sortType) {
       const directSortTypes = [
           "playCount",
           "popularity",
@@ -4332,6 +4323,9 @@ function isDirectSortType(sortType) {
           "shuffle",
           "averageColor",
           "deduplicateOnly",
+          "filterLiked",
+          "filterSingles",
+          "filterAlbums",
           "energyWave",
           "tempo",
           "energy",
@@ -9357,7 +9351,28 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (!isHeadless) mainButton.innerText = "Filtering Liked...";
         const likedSongs = await getLikedSongs();
         const likedSongUris = new Set(likedSongs.map(s => s.uri));
-        filteredTracks = filteredTracks.filter(t => !likedSongUris.has(t.uri));
+        
+        if (!isHeadless) mainButton.innerText = "ISRCs...";
+        const tracksWithMetadata = await refreshTrackAlbumInfo(filteredTracks, (p) => {
+             if (!isHeadless) mainButton.innerText = `ISRCs ${Math.floor(p)}%`;
+        });
+
+        const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
+        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+        
+        const likedIsrcSet = new Set();
+        cachedLikedMetadata.forEach(meta => {
+            if (meta && meta.external_ids && meta.external_ids.isrc) {
+                likedIsrcSet.add(meta.external_ids.isrc);
+            }
+        });
+
+        filteredTracks = tracksWithMetadata.filter(track => {
+            if (likedSongUris.has(track.uri)) return false;
+            const isrc = track.track?.external_ids?.isrc;
+            if (isrc && likedIsrcSet.has(isrc)) return false;
+            return true;
+        });
     }
 
     if (filters.excludeListened) {
@@ -15310,8 +15325,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             name: detailedTrack.album.name,
                             id: detailedTrack.album.id,
                             uri: detailedTrack.album.uri,
-                            release_date: detailedTrack.album.release_date
+                            release_date: detailedTrack.album.release_date,
+                            album_type: detailedTrack.album.album_type
                         },
+                        albumType: detailedTrack.album.album_type,
                         artists: detailedTrack.artists.map(a => ({
                             id: a.id,
                             name: a.name,
@@ -15319,6 +15336,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         })),
                         duration_ms: detailedTrack.duration_ms,
                         popularity: detailedTrack.popularity,
+                        external_ids: detailedTrack.external_ids,
                         id: detailedTrack.id,
                         uri: detailedTrack.uri
                     };
@@ -15346,6 +15364,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 durationMs: meta.duration_ms,
                 popularity: meta.popularity,
                 releaseDate: meta.album.release_date,
+                albumType: meta.albumType,
                 trackId: meta.id,
                 albumId: meta.album.id,
                 track: {
@@ -15355,6 +15374,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     duration_ms: meta.duration_ms,
                     album: meta.album,
                     artists: meta.artists,
+                    external_ids: meta.external_ids
                 }
             };
             refreshedTracks.push(newTrack);
@@ -15420,6 +15440,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         })),
                         duration_ms: trackData.duration_ms,
                         popularity: trackData.popularity,
+                        external_ids: trackData.external_ids,
                         id: trackData.id,
                         uri: trackData.uri
                     };
@@ -15782,6 +15803,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
 
+  const ICON_PATHS = {
+    sortAsc: "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z",
+    sortDesc: "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z",
+    groupAlbum: "M4 6.1c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4.5 5.04 4.5 5.6 4.5h2.8c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C10 5.26 10 5.54 10 6.1v2.8c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H5.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C4 9.74 4 9.46 4 8.9V6.1zm9-.1c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541C20 5.301 20 5.534 20 6s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 6.699 13 6.466 13 6zm0 6c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541c.076.184.076.417.076.883s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 12.699 13 12.466 13 12zm0 6c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541c.076.184.076.417.076.883s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 18.699 13 18.466 13 18zm-9-2.9c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 13.5 5.04 13.5 5.6 13.5h2.8c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C10 14.26 10 14.54 10 15.1v2.8c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H5.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C4 18.74 4 18.46 4 17.9v-2.8z",
+    ungroupList: "M8 6L21 6.00078M8 12L21 12.0008M8 18L21 18.0007M3 6.5H4V5.5H3V6.5ZM3 12.5H4V11.5H3V12.5ZM3 18.5H4V17.5H3V18.5Z"
+  };
+  
   function getSortArrowSvg(reverse) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 16 16");
@@ -15789,18 +15817,35 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     svg.setAttribute("height", "50%");
     svg.style.fill = '#ffffffe6'; 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", reverse
-      ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z"
-      : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z"
-    );
+    path.setAttribute("d", reverse ? ICON_PATHS.sortAsc : ICON_PATHS.sortDesc);
 
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function getGroupingIconSvg(isGrouped) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "19px");
+    svg.setAttribute("height", "19px");
+    svg.style.fill = 'none';
+    svg.style.stroke = '#ffffffe6';
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("fill", "none");
+    path.setAttribute("d", isGrouped ? ICON_PATHS.groupAlbum : ICON_PATHS.ungroupList);
     svg.appendChild(path);
     return svg;
   }
 
   function createInnerButton(sortType, parentButton, svg) {
     const innerButton = document.createElement("button");
-    innerButton.title = "Toggle Order (Ascending/Descending)";
+    const isFilterAlbums = sortType === 'filterAlbums';
+    
+    innerButton.removeAttribute("title");
     innerButton.appendChild(svg);
 
     innerButton.style.cssText = `
@@ -15816,29 +15861,101 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
+      width: ${isFilterAlbums ? "35px" : "32px"};
+      height: ${isFilterAlbums ? "35px" : "32px"};
     `;
 
-    innerButton.addEventListener("mouseenter", () => {
-      svg.style.fill = "#1ED760";
+    const updateTooltipPosition = (tooltip) => {
+        if (!innerButton || !tooltip) return;
+        const rect = innerButton.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const margin = 10;
+
+        let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+        
+        if (left + tooltipRect.width > viewportWidth - margin) {
+            left = viewportWidth - tooltipRect.width - margin;
+        }
+        if (left < margin) {
+            left = margin;
+        }
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${rect.top - tooltipRect.height - 8}px`;
+    };
+
+    innerButton.addEventListener("mouseenter", (e) => {
+      if (isFilterAlbums) {
+          svg.style.stroke = "#1ED760";
+      } else {
+          svg.style.fill = "#1ED760";
+      }
+      
+      const tooltipText = isFilterAlbums 
+        ? (sortOrderState[sortType] ? "Ungroup Albums" : "Group by Album")
+        : "Toggle Order (Ascending/Descending)";
+
+      const tooltip = document.createElement("div");
+      tooltip.className = "sort-play-custom-tooltip";
+      tooltip.innerText = tooltipText;
+      tooltip.style.cssText = `
+        position: fixed;
+        background-color: #282828;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        z-index: 10000;
+        pointer-events: none;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.2s;
+      `;
+      
+      document.body.appendChild(tooltip);
+      updateTooltipPosition(tooltip);
+      
+      requestAnimationFrame(() => { 
+          tooltip.style.opacity = "1"; 
+      });
+      
+      innerButton._tooltip = tooltip;
     });
 
     innerButton.addEventListener("mouseleave", () => {
-      svg.style.fill = 'currentColor';
+      if (isFilterAlbums) {
+          svg.style.stroke = '#ffffffe6';
+      } else {
+          svg.style.fill = 'currentColor';
+      }
+      
+      if (innerButton._tooltip) {
+          innerButton._tooltip.remove();
+          innerButton._tooltip = null;
+      }
     });
 
     innerButton.addEventListener("click", (event) => {
       event.stopPropagation();
       sortOrderState[sortType] = !sortOrderState[sortType];
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
+      
       const path = svg.querySelector("path");
-        if (path) {
-          path.setAttribute("d", sortOrderState[sortType]
-            ? "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z"
-            : "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z"
-          );
-        }
+      if (path) {
+          const isReverse = sortOrderState[sortType];
+          if (isFilterAlbums) {
+              path.setAttribute("d", isReverse ? ICON_PATHS.groupAlbum : ICON_PATHS.ungroupList);
+              
+              if (innerButton._tooltip) {
+                  innerButton._tooltip.innerText = isReverse ? "Ungroup Albums" : "Group by Album";
+                  updateTooltipPosition(innerButton._tooltip);
+              }
+          } else {
+              path.setAttribute("d", isReverse ? ICON_PATHS.sortAsc : ICON_PATHS.sortDesc);
+          }
+      }
     });
 
     return innerButton;
@@ -15947,6 +16064,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         ],
       },
       {
+        type: "parent",
+        text: "Quick Filters",
+        sortType: "quickFiltersParent",
+        children: [
+             { backgroundColor: "transparent", color: "white", text: "Deduplicate", sortType: "deduplicateOnly" },
+             { backgroundColor: "transparent", color: "white", text: "Exclude Liked Songs", sortType: "filterLiked" },
+             { backgroundColor: "transparent", color: "white", text: "Keep Only Singles", sortType: "filterSingles" },
+             { backgroundColor: "transparent", color: "white", text: "Keep Only Albums", sortType: "filterAlbums", hasInnerButton: true },
+        ]
+      },
+      {
         backgroundColor: "transparent",
         color: "white",
         text: "Shuffle",
@@ -15958,12 +16086,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         color: "white",
         text: "Convert to Spotify",
         sortType: "convertToSpotify",
-      },
-      {
-        backgroundColor: "transparent",
-        color: "white",
-        text: "Deduplicate",
-        sortType: "deduplicateOnly",
       },
       {
         type: "divider",
@@ -16055,6 +16177,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   <path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
   
+  const quickFiltersIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M21 6H19M21 12H16M21 18H16M7 20V13.5612C7 13.3532 7 13.2492 6.97958 13.1497C6.96147 13.0615 6.93151 12.9761 6.89052 12.8958C6.84431 12.8054 6.77934 12.7242 6.64939 12.5617L3.35061 8.43826C3.22066 8.27583 3.15569 8.19461 3.10948 8.10417C3.06849 8.02393 3.03853 7.93852 3.02042 7.85026C3 7.75078 3 7.64677 3 7.43875V5.6C3 5.03995 3 4.75992 3.10899 4.54601C3.20487 4.35785 3.35785 4.20487 3.54601 4.10899C3.75992 4 4.03995 4 4.6 4H13.4C13.9601 4 14.2401 4 14.454 4.10899C14.6422 4.20487 14.7951 4.35785 14.891 4.54601C15 4.75992 15 5.03995 15 5.6V7.43875C15 7.64677 15 7.75078 14.9796 7.85026C14.9615 7.93852 14.9315 8.02393 14.8905 8.10417C14.8443 8.19461 14.7793 8.27583 14.6494 8.43826L11.3506 12.5617C11.2207 12.7242 11.1557 12.8054 11.1095 12.8958C11.0685 12.9761 11.0385 13.0615 11.0204 13.1497C11 13.2492 11 13.3532 11 13.5612V17L7 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>`;
+  
   const createPlaylistIconSvg = `
   <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path fill="none" d="M16 5V18M16 18C16 19.1046 14.6569 20 13 20C11.3431 20 10 19.1046 10 18C10 16.8954 11.3431 16 13 16C14.6569 16 16 16.8954 16 18ZM4 5H12M4 9H12M4 13H8M16 4L20 3V7L16 8V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -16083,11 +16210,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   const shuffleIconSvg = `
   <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
   <path fill="none" d="M18 4L21 7M21 7L18 10M21 7H17C16.0707 7 15.606 7 15.2196 7.07686C13.6329 7.39249 12.3925 8.63288 12.0769 10.2196C12 10.606 12 11.0707 12 12C12 12.9293 12 13.394 11.9231 13.7804C11.6075 15.3671 10.3671 16.6075 8.78036 16.9231C8.39397 17 7.92931 17 7 17H3M18 20L21 17M21 17L18 14M21 17H17C16.0707 17 15.606 17 15.2196 16.9231C15.1457 16.9084 15.0724 16.8917 15 16.873M3 7H7C7.92931 7 8.39397 7 8.78036 7.07686C8.85435 7.09158 8.92758 7.1083 9 7.12698" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const deduplicateIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M8 8H7.2C6.0799 8 5.51984 8 5.09202 8.21799C4.71569 8.40973 4.40973 8.71569 4.21799 9.09202C4 9.51984 4 10.0799 4 11.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.0799 20 7.2 20H12.8C13.9201 20 14.4802 20 14.908 19.782C15.2843 19.5903 15.5903 19.2843 15.782 18.908C16 18.4802 16 17.9201 16 16.8V16M11.2 16H16.8C17.9201 16 18.4802 16 18.908 15.782C19.2843 15.5903 19.5903 15.2843 19.782 14.908C20 14.4802 20 13.9201 20 12.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H11.2C10.0799 4 9.51984 4 9.09202 4.21799C8.71569 4.40973 8.40973 4.71569 8.21799 5.09202C8 5.51984 8 6.07989 8 7.2V12.8C8 13.9201 8 14.4802 8.21799 14.908C8.40973 15.2843 8.71569 15.5903 9.09202 15.782C9.51984 16 10.0799 16 11.2 16Z M17.186 6.814L10.814 13.186 M10.814 6.814L17.186 13.186" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`;
 
   const convertToSpotifyIconSvg = `
@@ -16309,8 +16431,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       leftContainer.style.gap = "10px";
 
       let iconSvgString;
-      if (style.text === "Personalized Sort") {
-        iconSvgString = personalizedSortIconSvg;
+      if (style.text === "Quick Filters") {
+        iconSvgString = quickFiltersIconSvg;
       } else {
         iconSvgString = sortIconSvg;
       }
@@ -16402,8 +16524,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         iconSvgString = aiPickIconSvg;
       } else if (style.text === "Shuffle") {
         iconSvgString = shuffleIconSvg;
-      } else if (style.text === "Deduplicate") {
-        iconSvgString = deduplicateIconSvg;
       } else if (style.text === "Convert to Spotify") {
         iconSvgString = convertToSpotifyIconSvg;
       } else if (style.isSetting) {
@@ -16443,7 +16563,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (sortType) {
                     const style = itemConfigs.find(item => item.sortType === sortType);
                     if (style && style.type === 'parent' && style.children) {
-                        const subMenu = createSubMenu(style.children);
+                        const width = style.sortType === 'quickFiltersParent' ? '170px' : '155px';
+                        const subMenu = createSubMenu(style.children, width);
                         document.body.appendChild(subMenu);
                         button._submenu = subMenu;
                         
@@ -16539,7 +16660,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
 
-  function createSubMenu(items) {
+  function createSubMenu(items, width = "155px") {
     const subMenu = document.createElement("div");
     subMenu.classList.add("submenu", "main-contextMenu-menu", "sort-play-font-scope");
     const bgColor = getNativeMenuBackgroundColor();
@@ -16558,6 +16679,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     subMenu._activeSubMenuParent = null;
 
     items.forEach((item) => {
+      if (item.type === "divider") {
+        const divider = document.createElement("hr");
+        divider.style.cssText = `
+          width: 100%;
+          border: none;
+          height: 1px;
+          background-color: rgba(255, 255, 255, 0.1);
+          margin: 0;
+        `;
+        subMenu.appendChild(divider);
+        return;
+      }
+
       if (item.type === "title") {
         const titleElement = document.createElement("div");
         titleElement.innerText = item.text;
@@ -16588,7 +16722,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           font-weight: 400;
           font-size: 0.875rem;
           height: 39px;
-          width: 155px;
+          width: ${width};
           text-align: left;
           position: relative;
           display: flex;
@@ -16646,7 +16780,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       button.style.fontWeight = "400";
       button.style.fontSize = "0.875rem";
       button.style.height = "37px";
-      button.style.width = "155px";
+      button.style.width = width;
       button.style.textAlign = "center";
       button.style.position = "relative";
       button.style.display = "flex";
@@ -16672,7 +16806,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       });
   
       if (item.hasInnerButton) {
-        const svg = getSortArrowSvg(sortOrderState[item.sortType]); 
+        const svg = item.sortType === 'filterAlbums' 
+            ? getGroupingIconSvg(sortOrderState[item.sortType]) 
+            : getSortArrowSvg(sortOrderState[item.sortType]);
+            
         const innerButton = createInnerButton(item.sortType, button, svg); 
         button.appendChild(innerButton);
       }
@@ -19743,7 +19880,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           sortType === "shuffle" ||
           sortType === "releaseDate" ||
           sortType === "averageColor" ||
-          sortType === "deduplicateOnly"
+          sortType === "deduplicateOnly" ||
+          sortType === "filterLiked" ||
+          sortType === "filterSingles" ||
+          sortType === "filterAlbums"
         ) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
@@ -19799,7 +19939,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           } else {
             tracksForDeduplication = tracksWithPopularity;
           }
-          
+          if (sortType === "filterSingles" || sortType === "filterAlbums") {
+            if (!isHeadless) mainButton.innerText = "Checking...";
+            if (!isArtistPage) {
+                tracksForDeduplication = await refreshTrackAlbumInfo(tracksForDeduplication, (progress) => {
+                    if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.50)}%`;
+                });
+            }
+         }
 
           const deduplicationResult = deduplicateTracks(tracksForDeduplication, sortType === "deduplicateOnly", isArtistPage);
           uniqueTracks = deduplicationResult.unique;
@@ -19891,7 +20038,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
                 sortedTracks = shuffleArray(uniqueTracks);
             }
-          } else if (sortType === "deduplicateOnly") {
+        } else if (sortType === "deduplicateOnly") {
             if (removedTracks.length === 0) {
                 Spicetify.showNotification("No duplicate tracks found.");
                 if (!isHeadless) resetButtons();
@@ -19908,7 +20055,79 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const orderB = originalOrderMap.get(b.uri);
                 return orderA - orderB;
             });
+        } else if (sortType === "filterLiked") {
+            if (!isHeadless) mainButton.innerText = "Checking...";
+            const likedSongs = await getLikedSongs();
+            const likedSongUris = new Set(likedSongs.map(s => s.uri));
+            
+            if (!isHeadless) mainButton.innerText = "ISRCs...";
+            
+            const tracksWithMetadata = await refreshTrackAlbumInfo(uniqueTracks, (progress) => {
+                if (!isHeadless) mainButton.innerText = `ISRCs ${Math.floor(progress)}%`;
+            });
+
+            const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
+            const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+            
+            const likedIsrcSet = new Set();
+            cachedLikedMetadata.forEach(meta => {
+                if (meta && meta.external_ids && meta.external_ids.isrc) {
+                    likedIsrcSet.add(meta.external_ids.isrc);
+                }
+            });
+
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+            
+            sortedTracks = uniqueTracks
+                .filter(track => {
+                    if (likedSongUris.has(track.uri)) return false;
+                    
+                    const meta = tracksWithMetadata.find(t => t.uri === track.uri);
+                    const isrc = meta?.track?.external_ids?.isrc;
+                    
+                    if (isrc && likedIsrcSet.has(isrc)) return false;
+                    
+                    return true;
+                })
+                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+                
+          } else if (sortType === "filterSingles") {
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+            
+            sortedTracks = uniqueTracks
+                .filter(track => {
+                    const type = track.albumType || track.track?.album?.album_type;
+                    return type === 'single';
+                })
+                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+
+          } else if (sortType === "filterAlbums") {
+            const filteredTracks = uniqueTracks.filter(track => {
+                const type = track.albumType || track.track?.album?.album_type;
+                return type === 'album' || type === 'compilation';
+            });
+
+            if (sortOrderState.filterAlbums) {
+                sortedTracks = filteredTracks.sort((a, b) => {
+                    const albumA = (a.albumName || "").toLowerCase();
+                    const albumB = (b.albumName || "").toLowerCase();
+                    const albumCompare = albumA.localeCompare(albumB);
+                    if (albumCompare !== 0) return albumCompare;
+                    
+                    const trackA = a.trackNumber || 0;
+                    const trackB = b.trackNumber || 0;
+                    return trackA - trackB;
+                });
+            } else {
+                const originalOrderMap = new Map();
+                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+                
+                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+            }
           }
+
           if (!isHeadless) mainButton.innerText = "100%";
 
         } else if (sortType === "energyWave") {
@@ -20096,16 +20315,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           finalSourceName = finalSourceName.replace(suffixPattern, "");
         }
         const sortTypeInfo = {
-          playCount: { fullName: "play count", shortName: "PlayCount" },
-          popularity: { fullName: "popularity", shortName: "Popularity" },
-          releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-          scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
-          personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
-          lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
-          shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-          averageColor: { fullName: "album color", shortName: "Color" },
-          deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
-          energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
+            playCount: { fullName: "play count", shortName: "PlayCount" },
+            popularity: { fullName: "popularity", shortName: "Popularity" },
+            releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
+            scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
+            personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
+            lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
+            shuffle: { fullName: "shuffle", shortName: "Shuffle" },
+            averageColor: { fullName: "album color", shortName: "Color" },
+            deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
+            filterLiked: { fullName: "hiding liked songs", shortName: "Unliked" },
+            filterSingles: { fullName: "singles only", shortName: "Singles" },
+            filterAlbums: { fullName: "albums only", shortName: "Albums" },
+            energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
           tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
           energy: { fullName: "energy", shortName: "Energy" },
           danceability: { fullName: "danceability", shortName: "Danceability" },
