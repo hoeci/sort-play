@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.27.0";
+  const SORT_PLAY_VERSION = "5.28.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -133,16 +133,16 @@
     db: null,
     mem: {},
     init: () => new Promise((resolve, reject) => {
-        const request = indexedDB.open("SortPlayDB", 2);
+        const request = indexedDB.open("SortPlayDB", 3);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata'].forEach(store => {
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers'].forEach(store => {
                 if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
             });
         };
         request.onsuccess = (e) => {
             idb.db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata'].forEach(s => idb.mem[s] = new Map());
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers'].forEach(s => idb.mem[s] = new Map());
             resolve();
         };
         request.onerror = (e) => reject(e);
@@ -373,16 +373,22 @@
     "\\(Instrumentalness\\)"
   ];
 
+  const BASE_COVERS_URL = "https://cdn.jsdelivr.net/gh/hoeci/sort-play@0100d9d9e901b1c4cc68310bff66337c2cd2020c/assets/base-covers/";
+  const COVER_TOP = `${BASE_COVERS_URL}top.png`;
+  const COVER_NEW = `${BASE_COVERS_URL}newrel.png`;
+  const COVER_DISCOVERY = `${BASE_COVERS_URL}discovery.png`;
+
   const DEDICATED_PLAYLIST_COVERS = {
-    'topThisMonth': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-m.png',
-    'topLast6Months': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-6.png',
-    'topAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/top-all.png',
-    'followedReleasesChronological': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/new-followed-full.png',
-    'recommendRecentVibe': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-recent.png',
-    'recommendAllTime': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-all.png',
-    'pureDiscovery': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@a60f56c9d251980034b8a77af1601bc9f8cb1352/assets/base-covers/discovery-pure.png',
-    'genreTreeExplorer': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@c547277eb4ab981d8dd8cf510c6c698efb57b4c6/assets/base-covers/discovery-genre.png',
-    'randomGenreExplorer': 'https://cdn.jsdelivr.net/gh/hoeci/sort-play@dfa6366221b286cde0f9fe5a75bef48bebf528a9/assets/base-covers/discovery-random-genre.png',
+    'topThisMonth': COVER_TOP,
+    'topLast6Months': COVER_TOP,
+    'topAllTime': COVER_TOP,
+    'followedReleasesChronological': COVER_NEW,
+    'recommendRecentVibe': COVER_DISCOVERY,
+    'recommendAllTime': COVER_DISCOVERY,
+    'pureDiscovery': COVER_DISCOVERY,
+    'genreTreeExplorer': COVER_DISCOVERY,
+    'randomGenreExplorer': COVER_DISCOVERY,
+    'default': COVER_TOP
   };
 
   const dedicatedJobRunners = {
@@ -478,11 +484,11 @@
     {
         title: 'Discovery',
         cards: [
-            { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer },
-            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer },
             { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe },
             { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime },
             { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery },
+            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer },
+            { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer },
         ]
     },
     {
@@ -3265,161 +3271,416 @@
     overlay.id = "sort-play-create-playlist-overlay";
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        backdrop-filter: blur(8px);
-        -webkit-backdrop-filter: blur(8px);
+        background-color: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
         z-index: 2002;
         display: flex; justify-content: center; align-items: center;
     `;
 
-    
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
     modalContainer.style.cssText = `
         z-index: 2003;
-        width: 1050px !important;
-        background-color: #181818 !important;
-        border: 1px solid #282828;
+        width: 1000px !important;
+        max-width: 45vw;
+        height: auto;
+        max-height: 80vh;
+        background-color: #121212 !important;
+        border: 1px solid #333;
         display: flex;
         flex-direction: column;
-        border-radius: 30px;
+        border-radius: 12px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
     `;
 
-    const STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE = "sort-play-create-playlist-collapse-state";
-    let collapseState = JSON.parse(localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE) || '{}');
     let dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
     const jobs = getDedicatedJobs();
-    const customSchedules = getCustomSchedules();
-
+    
     jobs.forEach(job => {
         if (job.dedicatedType && dedicatedJobRunners[job.dedicatedType]) {
             dedicatedPlaylistBehavior[job.dedicatedType] = 'autoUpdate';
         }
     });
-    Object.keys(dedicatedPlaylistBehavior).forEach(cardId => {
-        if (dedicatedPlaylistBehavior[cardId] === 'autoUpdate' && !jobs.some(job => job.dedicatedType === cardId)) {
-            delete dedicatedPlaylistBehavior[cardId];
+
+    const getScheduleBadgeText = (schedule) => {
+        if (!schedule) return "AUTO";
+        const map = {
+            10800000: "3H", 21600000: "6H", 43200000: "12H", 86400000: "DAILY",
+            172800000: "2 DAYS", 604800000: "WEEKLY", 2592000000: "MONTHLY",
+            'release-weekly': "WEEKLY", 'release-every-two-weeks': "BI-WEEKLY", 'release-monthly': "MONTHLY"
+        };
+        if (map[schedule]) return map[schedule];
+        if (typeof schedule === 'number') {
+            const hours = schedule / 3600000;
+            if (hours < 24) return `EVERY ${Math.round(hours)}H`;
+            const days = hours / 24;
+            return `EVERY ${Math.round(days)}D`;
         }
-    });
-    localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
-
-    const scheduleToTextMap = {
-        10800000: 'Every 3 Hours', 21600000: 'Every 6 Hours', 43200000: 'Every 12 Hours',
-        86400000: 'Daily', 172800000: 'Every 2 Days', 604800000: 'Weekly', 2592000000: 'Monthly',
-        'release-weekly': 'Weekly (on Friday)',
-        'release-every-two-weeks': 'Every Two Weeks (Fri)',
-        'release-monthly': 'Monthly (on a Friday)'
+        return "AUTO";
     };
-    
-    const scheduleToShortTextMap = {
-        'release-every-two-weeks': 'Every 2 Weeks (Fri)',
-        'release-monthly': 'Monthly (Fri)'
-    };
-    
-    customSchedules.forEach(s => { scheduleToTextMap[s.value] = s.text; });
 
-    let contentHtml = '';
-    playlistCardsData.forEach(section => {
-        const isCollapsed = collapseState[section.title] || false;
-        
-        contentHtml += `
-            <div class="collapsible-section-header" data-section-title="${section.title}" role="button" tabindex="0">
-                <h2 class="create-playlist-section-title">${section.title}</h2>
-                <svg class="chevron-icon ${isCollapsed ? 'collapsed' : ''}" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/></svg>
-            </div>
-        `;
-        contentHtml += `<div class="create-playlist-grid ${isCollapsed ? 'collapsed' : ''}">`;
-        section.cards.forEach(card => {
+    const getBadgeHtml = (mode, cardId) => {
+        if (mode === 'replace') return `<span class="mode-badge replace">REPLACE</span>`;
+        if (mode === 'autoUpdate') {
+            const job = jobs.find(j => j.dedicatedType === cardId);
+            const text = job ? getScheduleBadgeText(job.schedule) : "AUTO";
+            return `<span class="mode-badge auto">${text}</span>`;
+        }
+        return ''; 
+    };
+
+    const generateCardsHtml = (cards) => {
+        return cards.map(card => {
             const behavior = dedicatedPlaylistBehavior[card.id] || 'createOnce';
-            let autoUpdateOptionText = "Create & Auto-Update";
+            const badgeHtml = getBadgeHtml(behavior, card.id);
+            const allowSettings = card.id !== 'genreTreeExplorer';
 
-            if (behavior === 'autoUpdate') {
-                const job = jobs.find(j => j.dedicatedType === card.id);
-                if (job && job.schedule) {
-                    const shortText = scheduleToShortTextMap[job.schedule];
-                    const fullText = scheduleToTextMap[job.schedule];
-                    if (shortText) {
-                        autoUpdateOptionText = `Update ${shortText}`;
-                    } else if (fullText) {
-                        autoUpdateOptionText = `Update ${fullText}`;
-                    }
-                }
-            }
-
-            let settingsHtml = '';
-            if (card.id !== 'genreTreeExplorer') {
-                settingsHtml = `
-                    <div class="card-settings">
-                        <span class="card-settings-title">Create Mode:</span>
-                        <div class="card-settings-controls">
-                            <button class="card-settings-btn" data-id="${card.id}" data-name="${card.name}" title="Configure Auto-Update" style="display: ${behavior === 'autoUpdate' ? 'flex' : 'none'};">
-                            ${settingsSvg.replace('<svg', '<svg fill="#ffffff"')}
-                            </button>
-                            <select class="card-behavior-select" data-id="${card.id}">
-                                <option value="createOnce" ${behavior === 'createOnce' ? 'selected' : ''}>Create Once</option>
-                                <option value="replace" ${behavior === 'replace' ? 'selected' : ''}>Create & Replace</option>
-                                <option value="autoUpdate" ${behavior === 'autoUpdate' ? 'selected' : ''}>${autoUpdateOptionText}</option>
-                            </select>
+            return `
+                <div class="slim-card" data-id="${card.id}" data-name="${card.name}">
+                    <div class="card-bg" style="background-image: url('${card.thumbnailUrl}');"></div>
+                    <div class="card-overlay"></div>
+                    
+                    <div class="card-content-wrapper">
+                        <div class="card-text">
+                            <div class="card-title-row">
+                                <span class="card-title">${card.name}</span>
+                                <span class="badge-container">${badgeHtml}</span>
+                            </div>
+                            <span class="card-desc">${card.description}</span>
                         </div>
                     </div>
-                `;
-            } else {
-                 settingsHtml = `<div class="card-settings" style="height: 41px;"></div>`;
-            }
 
-            contentHtml += `
-                <div class="playlist-card-wrapper">
-                    <div class="playlist-card" data-id="${card.id}" role="button" tabindex="0">
-                        <div class="card-thumbnail-container">
-                            <img src="${card.thumbnailUrl}" alt="${card.name}" class="card-thumbnail">
+                    ${allowSettings ? `
+                    <button class="settings-trigger" title="Configure">
+                        ${settingsSvg.replace('<svg', '<svg fill="#fff" width="14" height="14"')}
+                    </button>
+                    <div class="settings-overlay-panel">
+                        <div class="settings-options">
+                            <button class="mode-btn ${behavior === 'createOnce' ? 'active' : ''}" data-val="createOnce">Once</button>
+                            <button class="mode-btn ${behavior === 'replace' ? 'active' : ''}" data-val="replace">Replace</button>
+                            <button class="mode-btn ${behavior === 'autoUpdate' ? 'active' : ''}" data-val="autoUpdate">Auto</button>
                         </div>
-                        <div class="card-content">
-                            <h3 class="card-title">${card.name}</h3>
-                            <p class="card-description">${card.description}</p>
-                        </div>
+                        <button class="close-settings">×</button>
                     </div>
-                    ${settingsHtml}
+                    ` : ''}
                 </div>
             `;
-        });
-        contentHtml += `</div>`;
-    });
+        }).join('');
+    };
+
+    const newReleasesData = playlistCardsData.find(s => s.title === 'New Releases');
+    const discoveryData = playlistCardsData.find(s => s.title === 'Discovery');
+    const topTracksData = playlistCardsData.find(s => s.title === 'My Top Tracks');
+
+    let contentHtml = `<div class="columns-container">`;
+    
+    contentHtml += `<div class="category-column">`;
+    
+    if (newReleasesData) {
+        contentHtml += `
+            <div class="category-section">
+                <div class="category-header">${newReleasesData.title}</div>
+                <div class="cards-stack">
+                    ${generateCardsHtml(newReleasesData.cards)}
+                </div>
+            </div>
+        `;
+    }
+
+    if (topTracksData) {
+        contentHtml += `
+            <div class="category-section">
+                <div class="category-header">${topTracksData.title}</div>
+                <div class="cards-stack">
+                    ${generateCardsHtml(topTracksData.cards)}
+                </div>
+            </div>
+        `;
+    }
+    
+    contentHtml += `</div>`; 
+
+    contentHtml += `<div class="category-column">`;
+    
+    if (discoveryData) {
+        contentHtml += `
+            <div class="category-section">
+                <div class="category-header">${discoveryData.title}</div>
+                <div class="cards-stack">
+                    ${generateCardsHtml(discoveryData.cards)}
+                </div>
+            </div>
+        `;
+    }
+    
+    contentHtml += `</div>`; 
+    
+    contentHtml += `</div>`;
 
     modalContainer.innerHTML = `
       <style>
-        .create-playlist-modal { display: flex; flex-direction: column; gap: 10px; }
-        .collapsible-section-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; margin: 7px 0; }
-        .create-playlist-section-title { color: white; font-weight: 700; font-size: 1.4rem; margin: 0; }
-        .chevron-icon { color: #b3b3b3; transition: transform 0.2s ease-in-out; }
-        .chevron-icon.collapsed { transform: rotate(-90deg); }
-        .create-playlist-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; overflow: hidden; max-height: 1000px; transition: all 0.2s ease-in-out; margin-top: 0; opacity: 1; }
-        .create-playlist-grid.collapsed { max-height: 0; margin-top: -10px; opacity: 0; }
-        .playlist-card-wrapper { background-color: #212121; border: 1px solid transparent; border-radius: 8px; display: flex; flex-direction: column; overflow: hidden; }
-        .playlist-card:hover { background-color: #282828; }
-        .playlist-card { padding: 10px; display: flex; flex-direction: row; align-items: center; gap: 16px; cursor: pointer; flex-grow: 1; transition: background-color 0.2s ease; }
-        .card-thumbnail-container { width: 60px; height: 60px; flex-shrink: 0; border-radius: 6px; overflow: hidden; background-color: #333; }
-        .card-thumbnail { width: 100%; height: 100%; object-fit: cover; }
-        .card-content { flex-grow: 1; min-width: 0; }
-        .card-title { font-size: 0.9rem; font-weight: 700; color: #fff; margin: 0 0 2px 0; }
-        .card-description { font-size: 0.85rem; color: #b3b3b3; margin: 0; line-height: 1.4; }
-        .card-settings { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border-top: 1px solid #333;}
-        .card-settings-title { font-size: 0.8rem; font-weight: 500; color: #b3b3b3; }
-        .card-settings-controls { display: flex; align-items: center; gap: 8px; }
-        .card-settings-btn { background: none; border: none; cursor: pointer; padding: 4px; color: #b3b3b3; display: flex; align-items: center; justify-content: center; }
-        .card-settings-btn:hover { color: white; }
-        .card-settings-btn svg { width: 16px; height: 16px; }
-        .card-behavior-select { background: #212121; color: white; border: 1px solid #444; border-radius: 4px; padding: 3px 8px; font-size: 12px; cursor: pointer; }
+        .create-playlist-modal-body {
+            flex-grow: 1;
+            overflow-y: hidden; 
+            padding: 25px 25px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .columns-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            height: 100%;
+        }
+
+        .category-column {
+            display: flex;
+            flex-direction: column;
+            gap: 45px;
+            min-width: 0;
+            overflow-y: auto;
+            scrollbar-width: none;
+        }
+
+        .category-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .category-header {
+            font-size: 13px;
+            font-weight: 700;
+            color: #b3b3b3;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #333;
+        }
+
+        .cards-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .slim-card {
+            position: relative;
+            height: 64px;
+            background-color: #202020;
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 1px solid transparent;
+            user-select: none;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            transform: translateZ(0);
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+
+        .slim-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-color: #444;
+            z-index: 2;
+        }
+        
+        .slim-card:has(.settings-overlay-panel.active) {
+            border-color: transparent;
+            z-index: 2;
+        }
+
+        .card-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-size: 100% auto;
+            background-position: top center;
+            filter: grayscale(0.2) brightness(0.7);
+            
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            will-change: transform;
+            transform-origin: center center;
+        }
+
+        .slim-card:hover .card-bg, .slim-card:has(.settings-overlay-panel.active) .card-bg {
+            transform: scale(1.05);
+        }
+
+        .card-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.0) 100%);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .card-content-wrapper {
+            position: relative;
+            z-index: 2;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding: 0 40px 0 12px;
+        }
+
+        .card-text {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .card-title-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-title {
+            color: #fff;
+            font-weight: 700;
+            font-size: 15px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        .badge-container {
+            display: flex;
+            align-items: center;
+        }
+
+        .mode-badge {
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 5px;
+            border-radius: 3px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            display: inline-block;
+            line-height: 1.1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .mode-badge.replace {
+            background-color: #3e2a0f; 
+            color: #ffaa00; 
+            border: 1px solid #5e431d;
+        }
+        
+        .mode-badge.auto {
+            background-color: #0f3318; 
+            color: #1ed760;
+            border: 1px solid #184f25;
+        }
+
+        .card-desc {
+            color: #ddd;
+            font-size: 12px;
+            opacity: 0.8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-top: 3px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+
+        .settings-trigger {
+            position: absolute;
+            top: 0;
+            right: 0;
+            height: 100%;
+            width: 30px;
+            z-index: 10;
+            background: transparent;
+            border: none;
+            border-left: 1px solid transparent;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s, background-color 0.2s, border-color 0.2s;
+            cursor: pointer;
+        }
+        .slim-card:hover .settings-trigger {
+            opacity: 1;
+        }
+        .settings-trigger:hover {
+            background-color: rgba(255,255,255,0.1);
+            border-left-color: rgba(255,255,255,0.1);
+        }
+
+        .settings-overlay-panel {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgb(255 255 255 / 10%);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 30px 0 10px;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+        .settings-overlay-panel.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .settings-options {
+            display: flex;
+            gap: 4px;
+            background: #181818;
+            padding: 3px;
+            border-radius: 4px;
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            color: #888;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .mode-btn:hover { color: #fff; background: #333; }
+        .mode-btn.active {
+            background: #1ED760;
+            color: #000;
+        }
+        
+        .close-settings {
+            position: absolute;
+            right: 0; top: 0; height: 100%; width: 30px;
+            background: transparent; border: none;
+            color: #888; font-size: 18px; cursor: pointer;
+        }
+        .close-settings:hover, .close-settings.hover { color: #fff; background: rgba(255,255,255,0.1); }
+
         .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
+
         .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
       </style>
-      <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px; font-weight: 700;'>Dedicated Playlist Creation</span></h1>
+
+      <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 15px 25px;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 20px; font-weight: 700; color: white;'>Dedicated Playlist Creation</span></h1>
           <button id="closeCreatePlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+            <svg width="20" height="20" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
           </button>
       </div>
-      <div class="main-trackCreditsModal-mainSection" style="padding: 24px 32px 38px !important; max-height: 80vh; flex-grow: 1; overflow-y: auto;">
-        <div class="create-playlist-modal">${contentHtml}</div>
+      <div class="create-playlist-modal-body">
+        ${contentHtml}
       </div>
     `;
     
@@ -3428,14 +3689,17 @@
 
     const closeModal = () => overlay.remove();
 
-    modalContainer.querySelectorAll('.playlist-card').forEach(card => {
-        card.addEventListener('click', () => {
-            const sortType = card.getAttribute('data-id');
-            const behavior = dedicatedPlaylistBehavior[sortType] || 'createOnce';
+    modalContainer.querySelectorAll('.slim-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('.settings-trigger') || e.target.closest('.settings-overlay-panel')) return;
+            if (e.target === card) return;
+
+            const cardId = card.getAttribute('data-id');
+            const behavior = dedicatedPlaylistBehavior[cardId] || 'createOnce';
             
             if (behavior === 'autoUpdate') {
                 const jobs = getDedicatedJobs();
-                const job = jobs.find(j => j.dedicatedType === sortType);
+                const job = jobs.find(j => j.dedicatedType === cardId);
                 if (job) {
                     job.lastRun = Date.now();
                     updateDedicatedJob(job);
@@ -3443,91 +3707,71 @@
             }
 
             closeModal();
-            if (sortType === 'genreTreeExplorer') {
+            if (cardId === 'genreTreeExplorer') {
                 showGenreTreeExplorerModal();
-            } else if (sortType === 'randomGenreExplorer') {
+            } else if (cardId === 'randomGenreExplorer') {
                 generateRandomGenrePlaylist();
             } else {
-                handleSortAndCreatePlaylist(sortType);
+                handleSortAndCreatePlaylist(cardId);
             }
         });
     });
 
-    modalContainer.querySelectorAll('.card-behavior-select').forEach(select => {
-        select.addEventListener('change', async (e) => {
-            const cardId = e.target.dataset.id;
-            const newBehavior = e.target.value;
-            const oldBehavior = dedicatedPlaylistBehavior[cardId] || 'createOnce';
-            dedicatedPlaylistBehavior[cardId] = newBehavior;
-            localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
-
-            const settingsBtn = modalContainer.querySelector(`.card-settings-btn[data-id="${cardId}"]`);
-            if (settingsBtn) {
-                settingsBtn.style.display = newBehavior === 'autoUpdate' ? 'flex' : 'none';
-            }
-
-            if (newBehavior === 'autoUpdate' && oldBehavior !== 'autoUpdate') {
-                const cardName = modalContainer.querySelector(`.playlist-card[data-id="${cardId}"] .card-title`).textContent;
-                
-                const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
-
-                if (newScheduleText) {
-                    const autoUpdateOption = select.querySelector('option[value="autoUpdate"]');
-                    if (autoUpdateOption) {
-                        autoUpdateOption.textContent = newScheduleText;
-                        select.value = 'autoUpdate';
-                    }
-                } else {
-                    select.value = oldBehavior;
-                    dedicatedPlaylistBehavior[cardId] = oldBehavior;
-                    localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
-                    if (settingsBtn) {
-                        settingsBtn.style.display = oldBehavior === 'autoUpdate' ? 'flex' : 'none';
-                    }
-                }
-            } else if (newBehavior !== 'autoUpdate' && oldBehavior === 'autoUpdate') {
-                const jobs = getDedicatedJobs();
-                const job = jobs.find(j => j.dedicatedType === cardId);
-                if (job) {
-                    deleteDedicatedJob(job.id);
-                    Spicetify.showNotification(`Auto-update disabled for "${job.targetPlaylistName || cardId}".`);
-                }
-                const autoUpdateOption = select.querySelector('option[value="autoUpdate"]');
-                if (autoUpdateOption) {
-                    autoUpdateOption.textContent = "Create & Auto-Update";
-                }
-            }
+    modalContainer.querySelectorAll('.settings-trigger').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const card = btn.closest('.slim-card');
+            const panel = card.querySelector('.settings-overlay-panel');
+            const closeBtn = panel.querySelector('.close-settings');
+            
+            modalContainer.querySelectorAll('.settings-overlay-panel.active').forEach(p => p.classList.remove('active'));
+            panel.classList.add('active');
+            
+            closeBtn.classList.add('hover');
+            closeBtn.addEventListener('mouseleave', () => {
+                closeBtn.classList.remove('hover');
+            }, { once: true });
         });
     });
 
-    modalContainer.querySelectorAll('.card-settings-btn').forEach(btn => {
+    modalContainer.querySelectorAll('.mode-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
-            const cardId = e.currentTarget.dataset.id;
-            const cardName = e.currentTarget.dataset.name;
-            const selectElement = e.currentTarget.closest('.card-settings-controls').querySelector('.card-behavior-select');
+            e.stopPropagation();
+            const newVal = btn.dataset.val;
+            const card = btn.closest('.slim-card');
+            const cardId = card.dataset.id;
+            const cardName = card.dataset.name;
+            const oldBehavior = dedicatedPlaylistBehavior[cardId] || 'createOnce';
+            const badgeContainer = card.querySelector('.badge-container');
 
-            const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
+            const updateUI = (val) => {
+                card.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.val === val));
+                badgeContainer.innerHTML = getBadgeHtml(val, cardId);
+                dedicatedPlaylistBehavior[cardId] = val;
+                localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
+                card.querySelector('.settings-overlay-panel').classList.remove('active');
+            };
 
-            if (newScheduleText) {
-                const autoUpdateOption = selectElement.querySelector('option[value="autoUpdate"]');
-                if (autoUpdateOption) {
-                    autoUpdateOption.textContent = newScheduleText;
-                    selectElement.value = 'autoUpdate';
+            if (newVal === 'autoUpdate') {
+                const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
+                if (newScheduleText) {
+                    updateUI('autoUpdate');
                 }
+            } else {
+                if (oldBehavior === 'autoUpdate') {
+                    const jobs = getDedicatedJobs();
+                    const job = jobs.find(j => j.dedicatedType === cardId);
+                    if (job) deleteDedicatedJob(job.id);
+                }
+                updateUI(newVal);
             }
         });
     });
 
-    modalContainer.querySelectorAll('.collapsible-section-header').forEach(header => {
-        header.addEventListener('click', () => {
-            const sectionTitle = header.dataset.sectionTitle;
-            const grid = header.nextElementSibling;
-            const chevron = header.querySelector('.chevron-icon');
-            const isNowCollapsed = !grid.classList.contains('collapsed');
-            grid.classList.toggle('collapsed', isNowCollapsed);
-            chevron.classList.toggle('collapsed', isNowCollapsed);
-            collapseState[sectionTitle] = isNowCollapsed;
-            localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST_COLLAPSE_STATE, JSON.stringify(collapseState));
+    modalContainer.querySelectorAll('.close-settings').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            btn.closest('.settings-overlay-panel').classList.remove('active');
         });
     });
 
@@ -9434,6 +9678,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
     }
 
+    if (filters.genreFilterSettings && (filters.genreFilterSettings.selectedGenres?.length > 0 || filters.genreFilterSettings.excludedGenres?.length > 0)) {
+        if (!isHeadless) mainButton.innerText = "Filtering Genres...";
+        const { selectedGenres, excludedGenres, matchAllGenres: jobMatchAll, groupGenres } = filters.genreFilterSettings;
+        
+        
+        const { trackGenreMap } = await fetchAllTrackGenres(
+            filteredTracks, 
+            (progress) => { if (!isHeadless) mainButton.innerText = `Genres ${progress}`; }
+        );
+
+        filteredTracks = filterTracksByGenres(
+            filteredTracks, 
+            selectedGenres || [], 
+            excludedGenres || [], 
+            trackGenreMap, 
+            jobMatchAll
+        );
+    }
+
     const tracks = Array.from(new Map(filteredTracks.map(track => [track.uri, track])).values());
 
     if (!tracks || tracks.length === 0) {
@@ -10237,6 +10500,542 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
+  async function showDynamicGenreFilterModal(sources, currentFilters, onScanComplete = null) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement("div");
+        overlay.id = "dynamic-genre-filter-overlay";
+        overlay.className = "sort-play-font-scope";
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); z-index: 2006;
+            display: flex; justify-content: center; align-items: center;
+        `;
+
+        const modalContainer = document.createElement("div");
+        modalContainer.className = "main-embedWidgetGenerator-container";
+        modalContainer.style.zIndex = "2007";
+        modalContainer.style.width = "750px";
+        modalContainer.style.backgroundColor = "#181818";
+        modalContainer.style.borderRadius = "25px";
+        modalContainer.style.border = "2px solid #282828";
+        modalContainer.style.maxHeight = "90vh";
+        modalContainer.style.display = "flex";
+        modalContainer.style.flexDirection = "column";
+
+        let selectedGenres = currentFilters.selectedGenres ? [...currentFilters.selectedGenres] : [];
+        let excludedGenres = currentFilters.excludedGenres ? [...currentFilters.excludedGenres] : [];
+        let matchAllGenres = currentFilters.matchAllGenres || false;
+        let groupGenres = currentFilters.groupGenres !== undefined ? currentFilters.groupGenres : true;
+        
+        let rawDetectedGenres = currentFilters.detectedGenres ? [...currentFilters.detectedGenres] : [];
+        let detectedGenres = [...rawDetectedGenres];
+
+        const normalizeList = (list) => {
+            if (!list || list.length === 0) return [];
+            const rawObjs = list.map(g => ({ name: g, source: 'spotify' }));
+            const normalizedObjs = mapAndNormalizeGenres(rawObjs);
+            return [...new Set(normalizedObjs.map(o => o.name))];
+        };
+
+        if (groupGenres && rawDetectedGenres.length > 0) {
+            detectedGenres = normalizeList(rawDetectedGenres);
+        }
+
+        let isScanned = false;
+        let allAvailableGenres = Object.keys(GENRE_MAPPINGS).sort();
+        
+        let lastScanResult = null; 
+        let scannedTracks = []; 
+        let genreCounts = new Map();
+        let currentTrackGenreMap = new Map();
+
+        const updateStats = () => {
+            const statsContainer = modalContainer.querySelector('.genre-stats-footer');
+            if (!statsContainer) return;
+
+            if (scannedTracks.length === 0) {
+                statsContainer.innerHTML = '';
+                return;
+            }
+
+            let tracksWithGenresCount = 0;
+            currentTrackGenreMap.forEach(genres => {
+                if (genres && genres.length > 0) tracksWithGenresCount++;
+            });
+
+            const filteredTracks = filterTracksByGenres(
+                scannedTracks,
+                selectedGenres,
+                excludedGenres,
+                currentTrackGenreMap,
+                matchAllGenres
+            );
+
+            statsContainer.innerHTML = `
+                <span class="stat-item">Total tracks: ${tracksWithGenresCount}(${scannedTracks.length})</span>
+                <span class="stat-item">Filtered tracks: ${filteredTracks.length}</span>
+            `;
+        };
+
+        const renderGenres = () => {
+            const container = modalContainer.querySelector('.genre-list-container');
+            const searchTerm = modalContainer.querySelector('.search-bar').value.toLowerCase();
+            
+            let html = '';
+
+            const renderGenreButton = (genre, isDetected = false) => {
+                let statusClass = '';
+                if (selectedGenres.includes(genre)) statusClass = 'selected';
+                else if (excludedGenres.includes(genre)) statusClass = 'excluded';
+                
+                const countDisplay = isDetected ? (genreCounts.has(genre) ? genreCounts.get(genre) : '-') : 0;
+                const hasCountClass = isDetected ? 'has-count' : '';
+                
+                return `
+                    <button class="genre-button ${statusClass} ${isDetected ? 'detected' : ''} ${hasCountClass}" data-genre="${genre}">
+                        <span>${genre}</span>
+                        ${isDetected ? `<span class="genre-count-badge">${countDisplay}</span>` : ''}
+                    </button>
+                `;
+            };
+
+            const filteredDetected = detectedGenres.filter(g => g.toLowerCase().includes(searchTerm));
+            const filteredCommon = allAvailableGenres.filter(g => g.toLowerCase().includes(searchTerm) && !detectedGenres.includes(g));
+
+            if (detectedGenres.length > 0) {
+                html += `<div class="genre-section-title">Detected Genres</div><div class="genre-group">`;
+                if (filteredDetected.length > 0) {
+                    html += filteredDetected.map(g => renderGenreButton(g, true)).join('');
+                } else {
+                    html += `<div class="no-results">No matching detected genres</div>`;
+                }
+                html += `</div>`;
+            }
+
+            html += `<div class="genre-section-title">Common Genres</div><div class="genre-group">`;
+            if (filteredCommon.length > 0) {
+                html += filteredCommon.map(g => renderGenreButton(g)).join('');
+            } else {
+                html += `<div class="no-results">No matching common genres</div>`;
+            }
+            html += `</div>`;
+
+            container.innerHTML = html;
+
+            container.querySelectorAll('.genre-button').forEach(btn => {
+                const genre = btn.dataset.genre;
+                btn.addEventListener('click', () => {
+                    if (excludedGenres.includes(genre)) {
+                        excludedGenres = excludedGenres.filter(g => g !== genre);
+                    }
+                    if (selectedGenres.includes(genre)) {
+                        selectedGenres = selectedGenres.filter(g => g !== genre);
+                    } else {
+                        selectedGenres.push(genre);
+                    }
+                    renderGenres();
+                    updateStats();
+                });
+                btn.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    if (selectedGenres.includes(genre)) {
+                        selectedGenres = selectedGenres.filter(g => g !== genre);
+                    }
+                    if (excludedGenres.includes(genre)) {
+                        excludedGenres = excludedGenres.filter(g => g !== genre);
+                    } else {
+                        excludedGenres.push(genre);
+                    }
+                    renderGenres();
+                    updateStats();
+                });
+            });
+        };
+
+        const processRawGenres = (rawGenresMap) => {
+            genreCounts.clear();
+            currentTrackGenreMap.clear();
+            
+            const capturedRawSet = new Set();
+            rawGenresMap.forEach(data => {
+                const genres = [
+                    ...(data.spotify_artist_genres || []),
+                    ...(data.lastfm_track_genres || []),
+                    ...(data.lastfm_artist_genres || []),
+                    ...(data.deezer_genres || [])
+                ];
+                genres.forEach(g => capturedRawSet.add(g));
+            });
+            rawDetectedGenres = Array.from(capturedRawSet).sort();
+            
+            const genreDetails = new Map();
+            const mainGenres = Object.keys(GENRE_MAPPINGS);
+            const countryKeys = Object.keys(COUNTRY_MAPPINGS);
+            
+            const playlistArtistNames = new Set();
+            const uriToArtistMap = new Map();
+            
+            if (scannedTracks.length > 0) {
+                scannedTracks.forEach(t => {
+                    const name = t.artistName || (t.artists && t.artists[0]?.name) || "";
+                    if (name) {
+                        const lowerName = name.toLowerCase();
+                        playlistArtistNames.add(lowerName);
+                        uriToArtistMap.set(t.uri, lowerName);
+                    }
+                });
+            }
+            const totalUniqueArtistsInPlaylist = playlistArtistNames.size;
+
+            scannedTracks.forEach(track => {
+                const rawData = rawGenresMap.get(track.uri);
+                let finalGenresForTrack = [];
+
+                if (rawData) {
+                    let combined = [
+                        ...(rawData.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
+                        ...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
+                        ...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
+                        ...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' }))
+                    ];
+
+                    let uniqueSet = new Set();
+                    if (groupGenres) {
+                        const mapped = mapAndNormalizeGenres(combined);
+                        mapped.forEach(g => uniqueSet.add(JSON.stringify(g))); 
+                    } else {
+                        combined.forEach(g => uniqueSet.add(JSON.stringify({ name: g.name.toLowerCase().trim(), source: g.source })));
+                    }
+                    
+                    finalGenresForTrack = Array.from(uniqueSet).map(s => JSON.parse(s));
+                }
+                
+                currentTrackGenreMap.set(track.uri, finalGenresForTrack);
+
+                const trackArtist = uriToArtistMap.get(track.uri) || "";
+                
+                const genresCountedForTrack = new Set();
+
+                finalGenresForTrack.forEach(gObj => {
+                    const genreName = gObj.name;
+                    const source = gObj.source;
+
+                    if (!genreDetails.has(genreName)) {
+                        const normalizedKey = getNormalizedGenreKey(genreName);
+                        let isMapped = !!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] || !!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey];
+                        
+                        if (!isMapped) {
+                            isMapped = mainGenres.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
+                            if (!isMapped) {
+                                isMapped = countryKeys.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
+                            }
+                        }
+
+                        genreDetails.set(genreName, {
+                            name: genreName,
+                            isTrusted: false,
+                            count: 0,
+                            artists: new Set(),
+                            isMapped: isMapped,
+                            isSelfTitle: false
+                        });
+                    }
+
+                    const details = genreDetails.get(genreName);
+                    
+                    if (trackArtist) details.artists.add(trackArtist);
+                    if (source === 'spotify' || source === 'deezer') details.isTrusted = true;
+                    if (trackArtist && genreName.toLowerCase() === trackArtist) details.isSelfTitle = true;
+
+                    if (!genresCountedForTrack.has(genreName)) {
+                        genreCounts.set(genreName, (genreCounts.get(genreName) || 0) + 1);
+                        details.count++;
+                        genresCountedForTrack.add(genreName);
+                    }
+                });
+            });
+
+            detectedGenres = Array.from(genreCounts.keys()).sort((a, b) => {
+                const detailsA = genreDetails.get(a) || { count: 0, isTrusted: false, artists: new Set(), isMapped: false };
+                const detailsB = genreDetails.get(b) || { count: 0, isTrusted: false, artists: new Set(), isMapped: false };
+
+                const getTier = (details) => {
+                    if (details.isTrusted) return 1;
+                    if (details.isMapped) return 1;
+                    if (details.isSelfTitle) return 2;
+                    if (details.name.length < 2) return 2;
+                    if (details.artists.size >= 3) return 1;
+                    if (details.count >= 15 && details.artists.size >= 2) return 1;
+                    if (totalUniqueArtistsInPlaylist < 3) {
+                        const threshold = Math.min(4, Math.max(2, Math.ceil(scannedTracks.length * 0.05)));
+                        if (details.count >= threshold) return 1;
+                    }
+                    return 2;
+                };
+
+                const tierA = getTier(detailsA);
+                const tierB = getTier(detailsB);
+
+                if (tierA !== tierB) return tierA - tierB;
+                if (detailsB.count !== detailsA.count) return detailsB.count - detailsA.count;
+                if (detailsA.isTrusted && !detailsB.isTrusted) return -1;
+                if (!detailsA.isTrusted && detailsB.isTrusted) return 1;
+
+                return a.localeCompare(b);
+            });
+            
+            if (onScanComplete) {
+                onScanComplete(detectedGenres);
+            }
+            
+            renderGenres();
+            updateStats();
+        };
+
+        modalContainer.innerHTML = `
+            <style>
+                .modal-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
+                .modal-title { font-size: 24px; font-weight: 700; color: white; }
+                .scan-banner { background-color: #2a2a2a; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #333; transition: opacity 0.3s ease; }
+                .scan-text { color: #b3b3b3; font-size: 14px; }
+                .scan-btn { background-color: #1ED760; color: black; border: none; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background-color 0.1s; }
+                .scan-btn:hover { background-color: #3BE377; }
+                .scan-btn:disabled { background-color: #555; color: #888; cursor: default; }
+                .modal-content { padding: 20px 32px; flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+                .search-container { position: relative; margin-bottom: 16px; }
+                .search-bar { width: 100%; padding: 10px 16px; background-color: #333; border: 1px solid #333; border-radius: 8px; color: white; font-size: 14px; box-sizing: border-box; }
+                .search-bar:focus { border-color: #555; outline: none; }
+                .settings-row { display: flex; gap: 20px; margin-bottom: 16px; align-items: center; }
+                .switch-label { color: #ccc; font-size: 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+                .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+                .switch input { opacity: 0; width: 0; height: 0; }
+                .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; transition: .2s; border-radius: 20px; }
+                .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
+                input:checked + .slider { background-color: #1ED760; }
+                input:checked + .slider:before { transform: translateX(16px); }
+                .genre-list-container { flex-grow: 1; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+                .genre-list-container::-webkit-scrollbar { width: 8px; }
+                .genre-list-container::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
+                .genre-section-title { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 16px 0 8px; letter-spacing: 0.5px; }
+                .genre-group { display: flex; flex-wrap: wrap; gap: 8px; }
+                .genre-button { background-color: #333; color: #ddd; padding: 6px 12px; border-radius: 16px; border: none; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.1s; }
+                .genre-button.selected { background-color: #1ED760; color: black; }
+                .genre-button.excluded { background-color: #a92121; color: white; }
+                .genre-button.has-count { padding: 4px 6px 4px 10px; }
+                .genre-count-badge { background-color: rgba(255, 255, 255, 0.1); color: #e0e0e0; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 400; min-width: 16px; text-align: center; }
+                .genre-button.selected .genre-count-badge { background-color: rgba(0, 0, 0, 0.2); color: #000; }
+                .genre-button.excluded .genre-count-badge { background-color: rgba(255, 255, 255, 0.2); color: #fff; }
+                .detected-badge { font-size: 8px; color: #1ED760; }
+                .modal-footer { padding: 16px 32px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
+                .genre-stats-footer { display: flex; gap: 20px; }
+                .footer-buttons { display: flex; gap: 12px; }
+                .stat-item { color: #b3b3b3; font-size: 14px; }
+                .btn-secondary { background: transparent; border: 1px solid #666; color: white; padding: 8px 20px; border-radius: 20px; font-weight: 600; cursor: pointer; }
+                .btn-secondary:hover { border-color: white; }
+                .btn-primary { background-color: #1ED760; border: none; color: black; padding: 8px 24px; border-radius: 20px; font-weight: 600; cursor: pointer; }
+                .btn-primary:hover { background-color: #3BE377; }
+                .no-results { color: #666; font-style: italic; font-size: 13px; width: 100%; text-align: center; padding: 10px; }
+                .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
+                .custom-tooltip { visibility: hidden; position: absolute; z-index: 10000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; pointer-events: none; }
+                .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+                .tooltip-container:hover .custom-tooltip { visibility: visible; }
+            </style>
+            <div class="modal-header">
+                <span class="modal-title">Genre Filter</span>
+                <button class="main-trackCreditsModal-closeBtn" id="close-modal-btn">
+                    <svg width="18" height="18" viewBox="0 0 32 32" fill="currentColor"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143"></path></svg>
+                </button>
+            </div>
+            <div class="scan-banner" style="${isScanned ? 'display: none;' : ''}">
+            <span class="scan-text" id="scan-status-text">${detectedGenres.length > 0 ? "Showing saved genres. Scan sources to update counts." : "Showing common genres. Click 'Scan Sources' to see actual genres from your sources."}</span>
+                <button class="scan-btn" id="scan-sources-btn">Scan Sources</button>
+            </div>
+            <div class="modal-content">
+                <div style="margin-bottom: 8px; font-size: 13px; color: #b3b3b3;">💡 Left-click to include • Right-click to exclude</div>
+                <div class="search-container">
+                    <input type="text" class="search-bar" placeholder="Search genres...">
+                </div>
+                <div class="settings-row">
+                    <label class="switch-label">
+                        <div class="switch"><input type="checkbox" id="match-all-toggle" ${matchAllGenres ? 'checked' : ''}><span class="slider"></span></div>
+                        Match All Selected
+                        <span class="tooltip-container">
+                            <span style="color: #888; margin-left: 4px; font-size: 12px;">?</span>
+                            <span class="custom-tooltip">Only include tracks matching all selected genres.</span>
+                        </span>
+                    </label>
+                    <label class="switch-label">
+                        <div class="switch"><input type="checkbox" id="group-genres-toggle" ${groupGenres ? 'checked' : ''}><span class="slider"></span></div>
+                        Group Similar Genres
+                        <span class="tooltip-container">
+                            <span style="color: #888; margin-left: 4px; font-size: 12px;">?</span>
+                            <span class="custom-tooltip">Enable to group similar genres (e.g. 'electro' -> 'electronic'). Disable to see raw tags.</span>
+                        </span>
+                    </label>
+                </div>
+                <div class="genre-list-container"></div>
+            </div>
+            <div class="modal-footer">
+                <div class="genre-stats-footer"></div>
+                <div class="footer-buttons">
+                    <button class="btn-secondary" id="cancel-btn">Cancel</button>
+                    <button class="btn-primary" id="save-btn">Save Filter</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+        overlay.appendChild(modalContainer);
+
+        renderGenres();
+
+        const scanBtn = modalContainer.querySelector('#scan-sources-btn');
+        const statusText = modalContainer.querySelector('#scan-status-text');
+        const scanBanner = modalContainer.querySelector('.scan-banner');
+        
+        const runScan = async (preFetchedTracks = null) => {
+            if (isScanned && !preFetchedTracks) return;
+            scanBtn.disabled = true;
+            statusText.textContent = "Fetching tracks from sources...";
+            
+            try {
+                let allTracks = preFetchedTracks;
+                if (!allTracks) {
+                    const trackFetchPromises = sources.map(async source => {
+                        const sourceUri = source.uri;
+                        let sourceTracks;
+                        if (URI.isPlaylistV1OrV2(sourceUri)) {
+                            sourceTracks = await getPlaylistTracks(sourceUri.split(":")[2]);
+                        } else if (URI.isArtist(sourceUri)) {
+                            sourceTracks = await getArtistTracks(sourceUri, true);
+                        } else if (isLikedSongsPage(sourceUri)) {
+                            sourceTracks = await getLikedSongs();
+                        } else if (URI.isAlbum(sourceUri)) {
+                            sourceTracks = await getAlbumTracks(sourceUri.split(":")[2]);
+                        }
+                        return sourceTracks ? sourceTracks.filter(track => !Spicetify.URI.isLocal(track.uri)) : [];
+                    });
+
+                    const trackArrays = await Promise.all(trackFetchPromises);
+                    allTracks = trackArrays.flat();
+                }
+                
+                if (allTracks.length === 0) {
+                    statusText.textContent = "No tracks found in sources.";
+                    scanBtn.disabled = false;
+                    return;
+                }
+
+                let genresReady = false;
+
+                await fetchAllTrackGenres(
+                    allTracks,
+                    (progress) => {
+                        if (!genresReady) {
+                            statusText.textContent = `Scanning genres: ${progress}`;
+                        }
+                    },
+                    (result) => {
+                        genresReady = true;
+                        isScanned = true;
+                        lastScanResult = result.rawTrackGenres;
+                        scannedTracks = allTracks;
+                        
+                        processRawGenres(lastScanResult);
+                        scanBanner.style.display = 'none';
+                    }
+                );
+
+            } catch (error) {
+                console.error("Genre scan failed:", error);
+                statusText.textContent = "Scan failed. Check console for details.";
+                scanBtn.disabled = false;
+            }
+        };
+
+        scanBtn.addEventListener('click', () => runScan());
+
+        if (!isScanned) {
+            (async () => {
+                try {
+                    const trackFetchPromises = sources.map(async source => {
+                        const sourceUri = source.uri;
+                        if (URI.isPlaylistV1OrV2(sourceUri)) {
+                            return await getPlaylistTracks(sourceUri.split(":")[2]);
+                        } else if (URI.isArtist(sourceUri)) {
+                            return await getArtistTracks(sourceUri, true);
+                        } else if (isLikedSongsPage(sourceUri)) {
+                            return await getLikedSongs();
+                        } else if (URI.isAlbum(sourceUri)) {
+                            return await getAlbumTracks(sourceUri.split(":")[2]);
+                        }
+                        return [];
+                    });
+
+                    const trackArrays = await Promise.all(trackFetchPromises);
+                    const allTracks = trackArrays.flat().filter(track => !Spicetify.URI.isLocal(track.uri));
+
+                    if (allTracks.length > 0) {
+                        let cachedCount = 0;
+                        allTracks.forEach(t => {
+                            if (sessionGenreCache.has(t.uri)) cachedCount++;
+                        });
+
+                        if (cachedCount > 0 && (cachedCount / allTracks.length) > 0.8) {
+                            runScan(allTracks);
+                        }
+                    }
+                } catch(e) {
+                    console.warn("Auto-scan check failed", e);
+                }
+            })();
+        }
+
+        modalContainer.querySelector('.search-bar').addEventListener('input', renderGenres);
+        
+        modalContainer.querySelector('#match-all-toggle').addEventListener('change', (e) => {
+            matchAllGenres = e.target.checked;
+            updateStats();
+        });
+
+        modalContainer.querySelector('#group-genres-toggle').addEventListener('change', (e) => {
+            groupGenres = e.target.checked;
+            if (lastScanResult) {
+                processRawGenres(lastScanResult);
+            } else {
+                if (groupGenres) {
+                    selectedGenres = normalizeList(selectedGenres);
+                    excludedGenres = normalizeList(excludedGenres);
+                    detectedGenres = normalizeList(rawDetectedGenres);
+                } else {
+                    detectedGenres = [...rawDetectedGenres];
+                }
+                renderGenres();
+                updateStats();
+            }
+        });
+
+        const closeModal = (data) => {
+            overlay.remove();
+            resolve(data);
+        };
+
+        modalContainer.querySelector('#save-btn').addEventListener('click', () => {
+            closeModal({
+                selectedGenres,
+                excludedGenres,
+                matchAllGenres,
+                groupGenres,
+                detectedGenres: rawDetectedGenres
+            });
+        });
+
+        modalContainer.querySelector('#cancel-btn').addEventListener('click', () => closeModal(null));
+        modalContainer.querySelector('#close-modal-btn').addEventListener('click', () => closeModal(null));
+        overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(null); });
+    });
+  }
+  
   async function showDynamicFilterModal(currentFilters) {
     return new Promise((resolve) => {
         const lastFmUsername = loadLastFmUsername();
@@ -10491,7 +11290,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
     });
   }
-  
+
   function showDynamicPlaylistsWindow() {
     const existingModal = document.getElementById('sort-play-dynamic-playlist-modal');
     if (existingModal) existingModal.remove();
@@ -11134,6 +11933,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   background-color: #3e3e3e;
                   border-color: #878787;
               }
+              #configure-genres-btn {
+                  background-color: #282828;
+              }
+              #configure-genres-btn:hover {
+                  background-color: #3e3e3e;
+                border-color: #878787;
+              }
           </style>
             <div class="job-form-modal">
                 <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
@@ -11229,6 +12035,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                 </span>
                                 <button id="configure-filters-btn" class="main-buttons-button main-button-secondary" style="padding: 6px 25px; border-radius: 20px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; transition: background-color 0.1s ease, border-color 0.1s ease;">Configure</button>
                             </div>
+                            <div class="setting-row" style="margin-top: 12px;">
+                                <span class="description">
+                                    Apply genre filter to tracks
+                                    <span class="tooltip-container">
+                                        <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                                        <span class="custom-tooltip">Filter tracks based on genres. Can exclude or require specific genres.</span>
+                                    </span>
+                                </span>
+                                <button id="configure-genres-btn" class="main-buttons-button main-button-secondary" style="padding: 6px 32px; border-radius: 20px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; transition: background-color 0.1s ease, border-color 0.1s ease;">Genres</button>
+                            </div>
                         </div>
                             <div class="card">
                                 <div class="card-title">Settings</div>
@@ -11269,12 +12085,51 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const limitTracksToggle = modalContainer.querySelector('#limit-tracks-toggle');
         const sourceListContainer = modalContainer.querySelector('#source-list-container');
         const configureFiltersBtn = modalContainer.querySelector('#configure-filters-btn');
-        
+        const configureGenresBtn = modalContainer.querySelector('#configure-genres-btn');
+
         if (configureFiltersBtn) {
             configureFiltersBtn.addEventListener('click', async () => {
                 const newFilters = await showDynamicFilterModal(jobFilters);
                 if (newFilters) {
-                    jobFilters = newFilters;
+                    jobFilters = { ...jobFilters, ...newFilters };
+                }
+            });
+        }
+
+        if (configureGenresBtn) {
+            configureGenresBtn.addEventListener('click', async () => {
+                if (sources.length === 0) {
+                    Spicetify.showNotification("Please add at least one source before configuring genres.", true);
+                    return;
+                }
+                
+                const currentGenreSettings = jobFilters.genreFilterSettings || {
+                    selectedGenres: [],
+                    excludedGenres: [],
+                    matchAllGenres: false,
+                    groupGenres: true,
+                    detectedGenres: []
+                };
+
+                const newGenreSettings = await showDynamicGenreFilterModal(
+                    sources, 
+                    currentGenreSettings,
+                    (detectedGenres) => {
+                        if (!jobFilters.genreFilterSettings) {
+                            jobFilters.genreFilterSettings = {
+                                selectedGenres: [],
+                                excludedGenres: [],
+                                matchAllGenres: false,
+                                groupGenres: true
+                            };
+                        }
+                        jobFilters.genreFilterSettings.detectedGenres = detectedGenres;
+                    }
+                );
+                
+                if (newGenreSettings) {
+                    jobFilters.genreFilterSettings = newGenreSettings;
+                    Spicetify.showNotification("Genre filters saved.");
                 }
             });
         }
@@ -12414,7 +13269,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 <div class="settings-title">Filter Settings:</div>
                 <div class="setting-row">
                     <label class="description" for="groupGenresToggle">
-                        Group Genres
+                        Group Similar Genres
                         <span class="tooltip-container">
                             <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
                             <span class="custom-tooltip">Enable to group similar genres (e.g. 'electro' -> 'electronic'). Disable to see raw tags.</span>
@@ -13451,12 +14306,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function fetchAllTrackGenres(tracks) {
+  async function fetchAllTrackGenres(tracks, updateProgressCallback = null, onGenresReadyCallback = null) {
+    const updateProgress = (msg) => {
+        if (updateProgressCallback) updateProgressCallback(msg);
+        else mainButton.innerText = msg;
+    };
+
     if (sessionGenreCache.size > 30000) {
         sessionGenreCache.clear();
     }
 
-    mainButton.innerText = "0%";
+    updateProgress("0%");
 
     const flattenAudioFeatures = (data) => {
         if (data && data.audio_features) {
@@ -13599,7 +14459,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   
     const trackUris = tracks.map(t => t.uri);
-    mainButton.innerText = "Checking...";
+    updateProgress("Checking...");
     
     const finalGenresMap = new Map();
     const urisNotInSession = [];
@@ -13673,7 +14533,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const tracksWithIsrcs = []; 
     
     if (tracksToFetch.length > 0) {
-      mainButton.innerText = "Details...";
+      updateProgress("Details...");
       const CHUNK_SIZE = 50;
       let processedCount = 0;
 
@@ -13703,7 +14563,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             console.error(`[Sort-Play] Failed to fetch track details for ISRC lookup:`, error);
         }
         processedCount += chunk.length;
-        mainButton.innerText = `Details ${Math.round((processedCount / tracksToFetch.length) * 100)}%`;
+        updateProgress(`Details ${Math.round((processedCount / tracksToFetch.length) * 100)}%`);
       }
     }
 
@@ -13720,7 +14580,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     if (isrcsNotInSession.length > 0) {
-        mainButton.innerText = "Linking...";
+        updateProgress("Linking...");
         const tursoResults = await getGenresFromTurso(isrcsNotInSession, 'isrcs');
         tursoResults.forEach((val, key) => {
             const flattenedVal = flattenAudioFeatures(val);
@@ -13762,7 +14622,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const artistIdsToFetch = Array.from(uniqueArtistIds);
         if (artistIdsToFetch.length > 0) {
-            mainButton.innerText = "Artists...";
+            updateProgress("Artists...");
             for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                 const batch = artistIdsToFetch.slice(i, i + 50);
                 try {
@@ -13788,10 +14648,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const sharedQueue = [...tracksNeedingExternalFetch];
         
         const gateways = [
-            { url: DEEZER_GATEWAY_URL, active: true, failures: 0 },
-            { url: DEEZER_GATEWAY_URL_2, active: true, failures: 0 },
-            { url: DEEZER_GATEWAY_URL_3, active: true, failures: 0 }
+            { url: DEEZER_GATEWAY_URL, active: true, failures: 0, rateLimitedUntil: 0 },
+            { url: DEEZER_GATEWAY_URL_2, active: true, failures: 0, rateLimitedUntil: 0 },
+            { url: DEEZER_GATEWAY_URL_3, active: true, failures: 0, rateLimitedUntil: 0 }
         ];
+        
+        for (let i = gateways.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [gateways[i], gateways[j]] = [gateways[j], gateways[i]];
+        }
+
         const MAX_GATEWAY_FAILURES = 10; 
         const WORKERS_PER_GATEWAY = 3;
 
@@ -13800,6 +14666,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             for (let i = 0; i < WORKERS_PER_GATEWAY; i++) {
                 workers.push(async () => {
                     while (sharedQueue.length > 0 && gateway.active) {
+                        
+                        if (gateway.rateLimitedUntil > Date.now()) {
+                            const waitTime = gateway.rateLimitedUntil - Date.now();
+                            if (waitTime > 0) {
+                                await new Promise(resolve => setTimeout(resolve, waitTime + Math.random() * 500));
+                            }
+                        }
+
+                        if (sharedQueue.length === 0 || !gateway.active) break;
+
                         const item = sharedQueue.shift(); 
                         if (!item) break; 
 
@@ -13837,7 +14713,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             });
                             
                             fetchedCount++;
-                            mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
+                            updateProgress(`Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`);
                             await new Promise(resolve => setTimeout(resolve, 250));
 
                         } catch (error) {
@@ -13846,7 +14722,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             
                             if (isRateLimit) {
                                 sharedQueue.push(item); 
-                                await new Promise(resolve => setTimeout(resolve, 3000)); 
+                                const backoffTime = 5000 + (Math.random() * 3000);
+                                const newRateLimit = Date.now() + backoffTime;
+                                if (newRateLimit > gateway.rateLimitedUntil) {
+                                    gateway.rateLimitedUntil = newRateLimit;
+                                }
                             }
                             else if (errorMsg.includes("Gateway") || errorMsg.includes("Network")) {
                                 gateway.failures++;
@@ -13855,6 +14735,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                     gateway.active = false;
                                     break; 
                                 }
+                                await new Promise(resolve => setTimeout(resolve, 1000));
                             } else {
                                 fetchedCount++;
                             }
@@ -13877,7 +14758,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...result.data });
                 } catch (e) {} finally {
                     fetchedCount++;
-                    mainButton.innerText = `Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`;
+                    updateProgress(`Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`);
                 }
             }
         }
@@ -13905,6 +14786,28 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
 
+    if (onGenresReadyCallback) {
+        updateProgress("Mapping...");
+        const trackGenreMap = new Map();
+        tracks.forEach(track => {
+            let genres = finalGenresMap.get(track.uri);
+            if (genres) {
+                let combined = [
+                    ...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
+                    ...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
+                    ...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
+                    ...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' }))
+                ];
+                const mappedAndNormalized = mapAndNormalizeGenres(combined);
+                const finalUniqueGenres = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
+                trackGenreMap.set(track.uri, finalUniqueGenres);
+            } else {
+                trackGenreMap.set(track.uri, []);
+            }
+        });
+        onGenresReadyCallback({ trackGenreMap, rawTrackGenres: finalGenresMap });
+    }
+
     const trackIdsForMetadata = new Set();
     finalGenresMap.forEach((data, uri) => {
         const id = uri.split(':')[2];
@@ -13917,7 +14820,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     if (trackIdsForMetadata.size > 0) {
-        mainButton.innerText = "Meta...";
+        updateProgress("Meta...");
         const ids = Array.from(trackIdsForMetadata);
         const BATCH_SIZE = 50;
 
@@ -13958,7 +14861,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             } catch (e) {
                 console.error("[Sort-Play] Error fetching batch metadata", e);
             }
-            mainButton.innerText = `Meta ${Math.round(((i + BATCH_SIZE) / ids.length) * 100)}%`;
+            updateProgress(`Meta ${Math.round(((i + BATCH_SIZE) / ids.length) * 100)}%`);
         }
     }
 
@@ -13970,7 +14873,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     if (trackIdsForFeatures.size > 0) {
-        mainButton.innerText = "Audio...";
+        updateProgress("Audio...");
         const ids = Array.from(trackIdsForFeatures);
         const BATCH_SIZE = 100;
 
@@ -14047,7 +14950,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             } catch (e) {
                 console.error("[Sort-Play] Error fetching batch audio features", e);
             }
-            mainButton.innerText = `Audio ${Math.round(((i + BATCH_SIZE) / ids.length) * 100)}%`;
+            updateProgress(`Audio ${Math.round(((i + BATCH_SIZE) / ids.length) * 100)}%`);
         }
     }
 
@@ -14067,7 +14970,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
     }
 
-    mainButton.innerText = "Mapping...";
+    updateProgress("Mapping...");
     const trackGenreMap = new Map();
 
     tracks.forEach(track => {
@@ -14171,15 +15074,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return Array.from(mappedGenres).map(item => JSON.parse(item));
   }
 
-  function filterTracksByGenres(tracks, selectedGenres, excludedGenres, trackGenreMap) {
+  function filterTracksByGenres(tracks, selectedGenres, excludedGenres, trackGenreMap, matchAll = null) {
+    const effectiveMatchAll = matchAll !== null ? matchAll : matchAllGenres;
+
     if (selectedGenres.length === 0 && excludedGenres.length === 0) {
-        return [];
+        return tracks;
     }
     let includedTracks;
 
     if (selectedGenres.length === 0) {
         includedTracks = tracks;
-    } else if (matchAllGenres) {
+    } else if (effectiveMatchAll) {
         includedTracks = tracks.filter((track) => {
             const trackGenres = trackGenreMap.get(track.uri);
             if (!trackGenres) return false;
@@ -17221,7 +18126,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return url.includes("mosaic.scdn.co") || url.includes("i.scdn.co/image/");
   }
   
-  async function generatePlaylistCover(userName, baseImageUrl, usernameColor) {
+  async function generatePlaylistCover(titleText, subtitleText, userName, baseImageUrl, textColor) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const size = 640;
@@ -17236,44 +18141,51 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             baseImage.onload = resolve;
             baseImage.onerror = reject;
         });
-
         ctx.drawImage(baseImage, 0, 0, size, size);
     } catch (error) {
-        console.error("Sort-Play: Failed to load base cover image. Using a black background.", error);
-        ctx.fillStyle = '#000000';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, size, size);
-    }
-
-    const MAX_USERNAME_LENGTH = 35;
-    let displayName = userName;
-
-    if (userName.length > MAX_USERNAME_LENGTH) {
-      displayName = userName.substring(0, MAX_USERNAME_LENGTH) + '...';
     }
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillStyle = textColor || '#24bf70';
 
-    ctx.fillStyle = usernameColor || '#24bf70'; 
-    
-    let userNameFontSize = 50;
+    let displayName = userName.length > 30 ? userName.substring(0, 30) + '...' : userName;
+    let userNameFontSize = 48;
     ctx.font = `bold ${userNameFontSize}px 'SpotifyMixUI', sans-serif`;
     const maxUserNameWidth = size * 0.8;
-
     while (ctx.measureText(displayName).width > maxUserNameWidth && userNameFontSize > 20) {
         userNameFontSize -= 2;
         ctx.font = `bold ${userNameFontSize}px 'SpotifyMixUI', sans-serif`;
     }
-
     const userNameY = size * 0.76; 
     ctx.fillText(displayName, size / 2, userNameY);
 
-    const timestamp = new Date().toISOString();
-    ctx.font = "10px sans-serif";
-    ctx.fillStyle = "rgba(0, 0, 0, 0.01)";
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(timestamp, 5, 5);
+    const contentCenterY = size * 0.42;
+    const titleUpper = titleText.toUpperCase();
+    const subUpper = subtitleText ? subtitleText.toUpperCase() : "";
+    
+    let titleFontSize = 90;
+    ctx.font = `800 ${titleFontSize}px 'SpotifyMixUI', sans-serif`;
+    while (ctx.measureText(titleUpper).width > (size * 0.90) && titleFontSize > 40) {
+        titleFontSize -= 5;
+        ctx.font = `800 ${titleFontSize}px 'SpotifyMixUI', sans-serif`;
+    }
+    
+    let titleY = contentCenterY;
+    if (subUpper) {
+        titleY = contentCenterY - (titleFontSize * 0.20); 
+    }
+    
+    ctx.fillText(titleUpper, size / 2, titleY);
+
+    if (subUpper) {
+        let subFontSize = titleFontSize * 0.7; 
+        ctx.font = `bold ${subFontSize}px 'SpotifyMixUI', sans-serif`;
+        const subY = titleY + (titleFontSize * 0.95); 
+        ctx.fillText(subUpper, size / 2, subY);
+    }
 
     return canvas.toDataURL('image/jpeg');
   }
@@ -17917,6 +18829,30 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const behavior = dedicatedPlaylistBehavior[sortType] || 'createOnce';
     const isUpdateEnabled = behavior === 'replace' || behavior === 'autoUpdate';
 
+    let finalPlaylistName = name;
+    let coverTitle = name;
+    let coverSubtitle = "";
+
+    const textMapping = {
+        'topThisMonth': { title: "Top Tracks", sub: "This Month" },
+        'topLast6Months': { title: "Top Tracks", sub: "Last 6 Months" },
+        'topAllTime': { title: "Top Tracks", sub: "All-Time" },
+        'followedReleasesChronological': { title: "New Releases", sub: "Followed", playlistName: "New Releases: Followed" },
+        'recommendRecentVibe': { title: "Discovery", sub: "Recent Vibe" },
+        'recommendAllTime': { title: "Discovery", sub: "All-Time" },
+        'pureDiscovery': { title: "Discovery", sub: "Pure" },
+        'genreTreeExplorer': { title: "Genre Explorer", sub: "" },
+        'randomGenreExplorer': { title: "Genre Explorer", sub: "Random" }
+    };
+
+    if (textMapping[sortType]) {
+        coverTitle = textMapping[sortType].title;
+        coverSubtitle = textMapping[sortType].sub;
+        if (textMapping[sortType].playlistName) {
+            finalPlaylistName = textMapping[sortType].playlistName;
+        }
+    }
+
     const releasePlaylistColor = '#3798a5';
     const discoveryPlaylistColor = '#8f46d7';
     const defaultUsernameColor = '#24bf70';
@@ -17950,7 +18886,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 try {
                     await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, {
-                        name: name,
+                        name: finalPlaylistName,
                         description: description
                     });
                 } catch (updateError) {
@@ -17961,7 +18897,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         try {
                             const user = await Spicetify.Platform.UserAPI.getUser();
                             const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                            const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
+                            const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
                             setPlaylistImage(playlistId, coverBase64);
                         } catch (coverError) {
                             console.error("Failed to update custom playlist cover:", coverError);
@@ -17971,7 +18907,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 await movePlaylistToTop(playlistUri);
 
-                const minimalPlaylistData = { id: playlistId, uri: playlistUri, name: name };
+                const minimalPlaylistData = { id: playlistId, uri: playlistUri, name: finalPlaylistName };
                 return { playlist: minimalPlaylistData, wasUpdated: true };
 
             } else {
@@ -17982,7 +18918,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     }
 
-    const newPlaylist = await createPlaylist(name, description, maxRetries, initialDelay);
+    const newPlaylist = await createPlaylist(finalPlaylistName, description, maxRetries, initialDelay);
 
     if (newPlaylist) {
         await new Promise(resolve => setTimeout(resolve, 250));
@@ -17992,7 +18928,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 try {
                     const user = await Spicetify.Platform.UserAPI.getUser();
                     const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                    const coverBase64 = await generatePlaylistCover(user.displayName, baseImageUrl, usernameColor);
+                    const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
                     setPlaylistImage(newPlaylist.id, coverBase64);
                 } catch (coverError) {
                     console.error("Failed to generate or set custom playlist cover:", coverError);
@@ -18723,7 +19659,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
 
         const trackUris = genuinelyNewTracks.map(track => track.uri);
-        const playlistName = "Followed Artists: Full Releases";
+        const playlistName = "New Releases: Followed";
         const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Created by Sort-Play.`;
         
         updateProgress("Creating...");
@@ -20315,19 +21251,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           finalSourceName = finalSourceName.replace(suffixPattern, "");
         }
         const sortTypeInfo = {
-            playCount: { fullName: "play count", shortName: "PlayCount" },
-            popularity: { fullName: "popularity", shortName: "Popularity" },
-            releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-            scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
-            personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
-            lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
-            shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-            averageColor: { fullName: "album color", shortName: "Color" },
-            deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
-            filterLiked: { fullName: "hiding liked songs", shortName: "Unliked" },
-            filterSingles: { fullName: "singles only", shortName: "Singles" },
-            filterAlbums: { fullName: "albums only", shortName: "Albums" },
-            energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
+          playCount: { fullName: "play count", shortName: "PlayCount" },
+          popularity: { fullName: "popularity", shortName: "Popularity" },
+          releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
+          scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
+          personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
+          lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
+          shuffle: { fullName: "shuffle", shortName: "Shuffle" },
+          averageColor: { fullName: "album color", shortName: "Color" },
+          deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
+          filterLiked: { fullName: "hiding liked songs", shortName: "Unliked" },
+          filterSingles: { fullName: "singles only", shortName: "Singles" },
+          filterAlbums: { fullName: "albums only", shortName: "Albums" },
+          energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
           tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
           energy: { fullName: "energy", shortName: "Energy" },
           danceability: { fullName: "danceability", shortName: "Danceability" },
