@@ -39,7 +39,7 @@ Filter by keywords (track, album, artist) and range sliders (Release Date, Durat
 Filter by genre using combined Spotify, Deezer and Last.fm data with intelligent mapping. Browse with track counts, search, and "match all" option.
 
 ### ➕ Dynamic Playlists
-Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
+Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies genre or keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
 
 ### ➕ Dedicated Playlist Creation
 Generate My Top Tracks, New Releases from Followed Artists, Genre Tree/Random Explorer, and Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery) with automated updates and customizable limits.
