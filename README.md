@@ -91,9 +91,10 @@ Filter any playlist or discography by genre with a powerful, interactive modal.
 Build powerful, self-updating playlists that manage themselves.
 *   **Multi-Source:** Combine tracks from any number of playlists, artists, albums, or your Liked Songs.
 *   **Automated Scheduling:** Set a custom schedule (e.g., every 3 hours, daily, weekly on Fridays) for automatic updates.
-*   **Advanced Filtering:** Automatically exclude tracks based on rules:
+*   **Advanced Filtering:** Automatically filter tracks based on rules:
     *   Exclude songs you have already liked.
     *   Exclude songs you have already listened to (via Last.fm scrobbles).
+    *   Filter by Genre: Include or exclude specific genres.
     *   Exclude songs based on keywords or a maximum play count.
 *   **Flexible Update Modes:**
     *   **Replace:** Overwrites all tracks in the playlist with fresh ones on each update.
