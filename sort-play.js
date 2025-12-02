@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.29.0";
+  const SORT_PLAY_VERSION = "5.30.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -217,6 +217,112 @@
     }
   };
   
+  const notificationStyles = document.createElement('style');
+  notificationStyles.innerHTML = `
+      #sort-play-notifications-wrapper {
+          position: fixed;
+          bottom: 110px;
+          left: 30px;
+          z-index: 2147483647;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+          pointer-events: none;
+          max-height: 80vh;
+      }
+      .sort-play-notification-toast {
+          background-color: #fff;
+          color: #000;
+          padding: 12px 20px;
+          border-radius: 6px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+          font-family: 'SpotifyMixUI', sans-serif;
+          font-size: 16px;
+          font-weight: 500;
+          opacity: 0;
+          transform: translateX(-20px);
+          transition: 
+              opacity 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), 
+              transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1),
+              margin-bottom 0.25s ease,
+              max-height 0.25s ease;
+          pointer-events: auto;
+          cursor: pointer;
+          max-width: 450px;
+          text-align: left;
+          border-left: 4px solid #1db954;
+          word-wrap: break-word;
+      }
+      .sort-play-notification-toast:hover {
+          filter: brightness(0.95);
+      }
+      .sort-play-notification-toast.visible {
+          opacity: 1;
+          transform: translateX(0);
+      }
+      .sort-play-notification-toast.sp-error {
+          background-color: #e91429;
+          color: white;
+          border-left: 4px solid #8a0c18;
+      }
+      .sort-play-notification-toast.hiding {
+          opacity: 0;
+          transform: translateX(-10px);
+          pointer-events: none;
+      }
+  `;
+  document.head.appendChild(notificationStyles);
+
+  let notificationContainer = document.getElementById('sort-play-notifications-wrapper');
+  if (!notificationContainer) {
+      notificationContainer = document.createElement('div');
+      notificationContainer.id = 'sort-play-notifications-wrapper';
+      document.body.appendChild(notificationContainer);
+  }
+
+  function showNotification(text, isError = false, duration = 4000) {
+      const toast = document.createElement('div');
+      toast.className = 'sort-play-notification-toast';
+      
+      if (isError) {
+          toast.classList.add('sp-error');
+      }
+      
+      if (typeof isError === 'number') {
+          duration = isError;
+          isError = false;
+      }
+
+      toast.innerText = text;
+
+      toast.onclick = () => {
+          removeToast(toast);
+      };
+
+      notificationContainer.appendChild(toast);
+
+      requestAnimationFrame(() => {
+          toast.classList.add('visible');
+      });
+
+      const autoDismiss = setTimeout(() => {
+          removeToast(toast);
+      }, duration);
+
+      function removeToast(element) {
+          if (!element || element.classList.contains('hiding')) return;
+          
+          clearTimeout(autoDismiss);
+          element.classList.remove('visible');
+          element.classList.add('hiding');
+          
+          setTimeout(() => {
+              if (element.parentNode) element.remove();
+          }, 300);
+      }
+  }
+
   const L_F_M_Key_Pool = [
     "***REMOVED***",
     "***REMOVED***",
@@ -469,10 +575,10 @@
             try {
                 const updatedJob = await runDedicatedJob(job);
                 updateDedicatedJob(updatedJob);
-                Spicetify.showNotification(`Dedicated playlist "${job.targetPlaylistName}" was updated.`);
+                showNotification(`Dedicated playlist "${job.targetPlaylistName}" was updated.`);
             } catch (error) {
                 console.error(`Failed to run dedicated playlist job for "${job.targetPlaylistName}":`, error);
-                Spicetify.showNotification(`Failed to update dedicated playlist: ${job.targetPlaylistName}`, true);
+                showNotification(`Failed to update dedicated playlist: ${job.targetPlaylistName}`, true);
                 job.lastRun = now;
                 updateDedicatedJob(job);
             }
@@ -537,6 +643,64 @@
   - Only provide a raw list of Spotify track URIs (e.g., spotify:track:123, spotify:track:456).
   - Do not include any additional text, explanations, or formatting.`;
 
+
+  const settingsSvg = `<?xml version="1.0" encoding="utf-8"?>
+  <!DOCTYPE svg>
+  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 256 256" enable-background="new 0 0 256 256" xml:space="preserve">
+  <g><g><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></g></g>
+  </svg>`;
+
+  const sortIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  
+  const quickFiltersIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M21 6H19M21 12H16M21 18H16M7 20V13.5612C7 13.3532 7 13.2492 6.97958 13.1497C6.96147 13.0615 6.93151 12.9761 6.89052 12.8958C6.84431 12.8054 6.77934 12.7242 6.64939 12.5617L3.35061 8.43826C3.22066 8.27583 3.15569 8.19461 3.10948 8.10417C3.06849 8.02393 3.03853 7.93852 3.02042 7.85026C3 7.75078 3 7.64677 3 7.43875V5.6C3 5.03995 3 4.75992 3.10899 4.54601C3.20487 4.35785 3.35785 4.20487 3.54601 4.10899C3.75992 4 4.03995 4 4.6 4H13.4C13.9601 4 14.2401 4 14.454 4.10899C14.6422 4.20487 14.7951 4.35785 14.891 4.54601C15 4.75992 15 5.03995 15 5.6V7.43875C15 7.64677 15 7.75078 14.9796 7.85026C14.9615 7.93852 14.9315 8.02393 14.8905 8.10417C14.8443 8.19461 14.7793 8.27583 14.6494 8.43826L11.3506 12.5617C11.2207 12.7242 11.1557 12.8054 11.1095 12.8958C11.0685 12.9761 11.0385 13.0615 11.0204 13.1497C11 13.2492 11 13.3532 11 13.5612V17L7 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>`;
+  
+  const createPlaylistIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M16 5V18M16 18C16 19.1046 14.6569 20 13 20C11.3431 20 10 19.1046 10 18C10 16.8954 11.3431 16 13 16C14.6569 16 16 16.8954 16 18ZM4 5H12M4 9H12M4 13H8M16 4L20 3V7L16 8V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const dynamicPlaylistIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const genreFilterIconSvg = `
+  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M20 20L18.2678 18.2678M18.2678 18.2678C18.7202 17.8154 19 17.1904 19 16.5C19 15.1193 17.8807 14 16.5 14C15.1193 14 14 15.1193 14 16.5C14 17.8807 15.1193 19 16.5 19C17.1904 19 17.8154 18.7202 18.2678 18.2678ZM15.6 10H18.4C18.9601 10 19.2401 10 19.454 9.89101C19.6422 9.79513 19.7951 9.64215 19.891 9.45399C20 9.24008 20 8.96005 20 8.4V5.6C20 5.03995 20 4.75992 19.891 4.54601C19.7951 4.35785 19.6422 4.20487 19.454 4.10899C19.2401 4 18.9601 4 18.4 4H15.6C15.0399 4 14.7599 4 14.546 4.10899C14.3578 4.20487 14.2049 4.35785 14.109 4.54601C14 4.75992 14 5.03995 14 5.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM5.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V5.6C10 5.03995 10 4.75992 9.89101 4.54601C9.79513 4.35785 9.64215 4.20487 9.45399 4.10899C9.24008 4 8.96005 4 8.4 4H5.6C5.03995 4 4.75992 4 4.54601 4.10899C4.35785 4.20487 4.20487 4.35785 4.10899 4.54601C4 4.75992 4 5.03995 4 5.6V8.4C4 8.96005 4 9.24008 4.10899 9.45399C4.20487 9.64215 4.35785 9.79513 4.54601 9.89101C4.75992 10 5.03995 10 5.6 10ZM5.6 20H8.4C8.96005 20 9.24008 20 9.45399 19.891C9.64215 19.7951 9.79513 19.6422 9.89101 19.454C10 19.2401 10 18.9601 10 18.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H5.6C5.03995 14 4.75992 14 4.54601 14.109C4.35785 14.2049 4.20487 14.3578 4.10899 14.546C4 14.7599 4 15.0399 4 15.6V18.4C4 18.9601 4 19.2401 4.10899 19.454C4.20487 19.6422 4.35785 19.7951 4.54601 19.891C4.75992 20 5.03995 20 5.6 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  
+  const customFilterIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M7 9H17M7 15H17M15 13V17M9 7V11M7.2 20H16.8C17.9201 20 18.4802 20 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H7.2C6.0799 4 5.51984 4 5.09202 4.21799C4.71569 4.40973 4.40973 4.71569 4.21799 5.09202C4 5.51984 4 6.07989 4 7.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.07989 20 7.2 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const aiPickIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M12 3L14.0357 8.16153C14.2236 8.63799 14.3175 8.87622 14.4614 9.0771C14.5889 9.25516 14.7448 9.41106 14.9229 9.53859C15.1238 9.68245 15.362 9.77641 15.8385 9.96432L21 12L15.8385 14.0357C15.362 14.2236 15.1238 14.3175 14.9229 14.4614C14.7448 14.5889 14.5889 14.7448 14.4614 14.9229C14.3175 15.1238 14.2236 15.362 14.0357 15.8385L12 21L9.96432 15.8385C9.77641 15.362 9.68245 15.1238 9.53859 14.9229C9.41106 14.7448 9.25516 14.5889 9.0771 14.4614C8.87622 14.3175 8.63799 14.2236 8.16153 14.0357L3 12L8.16153 9.96432C8.63799 9.77641 8.87622 9.68245 9.0771 9.53859C9.25516 9.41106 9.41106 9.25516 9.53859 9.0771C9.68245 8.87622 9.77641 8.63799 9.96432 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const shuffleIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M18 4L21 7M21 7L18 10M21 7H17C16.0707 7 15.606 7 15.2196 7.07686C13.6329 7.39249 12.3925 8.63288 12.0769 10.2196C12 10.606 12 11.0707 12 12C12 12.9293 12 13.394 11.9231 13.7804C11.6075 15.3671 10.3671 16.6075 8.78036 16.9231C8.39397 17 7.92931 17 7 17H3M18 20L21 17M21 17L18 14M21 17H17C16.0707 17 15.606 17 15.2196 16.9231C15.1457 16.9084 15.0724 16.8917 15 16.873M3 7H7C7.92931 7 8.39397 7 8.78036 7.07686C8.85435 7.09158 8.92758 7.1083 9 7.12698" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const convertToSpotifyIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M12 9.5V15.5M9 12.5H15M8.4 19C5.41766 19 3 16.6044 3 13.6493C3 11.2001 4.8 8.9375 7.5 8.5C8.34694 6.48637 10.3514 5 12.6893 5C15.684 5 18.1317 7.32251 18.3 10.25C19.8893 10.9449 21 12.6503 21 14.4969C21 16.9839 18.9853 19 16.5 19L8.4 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+
+  const settingsIconSvg = `
+  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path fill="none" d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path fill="none" d="M12.9046 3.06005C12.6988 3 12.4659 3 12 3C11.5341 3 11.3012 3 11.0954 3.06005C10.7942 3.14794 10.5281 3.32808 10.3346 3.57511C10.2024 3.74388 10.1159 3.96016 9.94291 4.39272C9.69419 5.01452 9.00393 5.33471 8.36857 5.123L7.79779 4.93281C7.3929 4.79785 7.19045 4.73036 6.99196 4.7188C6.70039 4.70181 6.4102 4.77032 6.15701 4.9159C5.98465 5.01501 5.83376 5.16591 5.53197 5.4677C5.21122 5.78845 5.05084 5.94882 4.94896 6.13189C4.79927 6.40084 4.73595 6.70934 4.76759 7.01551C4.78912 7.2239 4.87335 7.43449 5.04182 7.85566C5.30565 8.51523 5.05184 9.26878 4.44272 9.63433L4.16521 9.80087C3.74031 10.0558 3.52786 10.1833 3.37354 10.3588C3.23698 10.5141 3.13401 10.696 3.07109 10.893C3 11.1156 3 11.3658 3 11.8663C3 12.4589 3 12.7551 3.09462 13.0088C3.17823 13.2329 3.31422 13.4337 3.49124 13.5946C3.69158 13.7766 3.96395 13.8856 4.50866 14.1035C5.06534 14.3261 5.35196 14.9441 5.16236 15.5129L4.94721 16.1584C4.79819 16.6054 4.72367 16.829 4.7169 17.0486C4.70875 17.3127 4.77049 17.5742 4.89587 17.8067C5.00015 18.0002 5.16678 18.1668 5.5 18.5C5.83323 18.8332 5.99985 18.9998 6.19325 19.1041C6.4258 19.2295 6.68733 19.2913 6.9514 19.2831C7.17102 19.2763 7.39456 19.2018 7.84164 19.0528L8.36862 18.8771C9.00393 18.6654 9.6942 18.9855 9.94291 19.6073C10.1159 20.0398 10.2024 20.2561 10.3346 20.4249C10.5281 20.6719 10.7942 20.8521 11.0954 20.94C11.3012 21 11.5341 21 12 21C12.4659 21 12.6988 21 12.9046 20.94C13.2058 20.8521 13.4719 20.6719 13.6654 20.4249C13.7976 20.2561 13.8841 20.0398 14.0571 19.6073C14.3058 18.9855 14.9961 18.6654 15.6313 18.8773L16.1579 19.0529C16.605 19.2019 16.8286 19.2764 17.0482 19.2832C17.3123 19.2913 17.5738 19.2296 17.8063 19.1042C17.9997 18.9999 18.1664 18.8333 18.4996 18.5001C18.8328 18.1669 18.9994 18.0002 19.1037 17.8068C19.2291 17.5743 19.2908 17.3127 19.2827 17.0487C19.2759 16.8291 19.2014 16.6055 19.0524 16.1584L18.8374 15.5134C18.6477 14.9444 18.9344 14.3262 19.4913 14.1035C20.036 13.8856 20.3084 13.7766 20.5088 13.5946C20.6858 13.4337 20.8218 13.2329 20.9054 13.0088C21 12.7551 21 12.4589 21 11.8663C21 11.3658 21 11.1156 20.9289 10.893C20.866 10.696 20.763 10.5141 20.6265 10.3588C20.4721 10.1833 20.2597 10.0558 19.8348 9.80087L19.5569 9.63416C18.9478 9.26867 18.6939 8.51514 18.9578 7.85558C19.1262 7.43443 19.2105 7.22383 19.232 7.01543C19.2636 6.70926 19.2003 6.40077 19.0506 6.13181C18.9487 5.94875 18.7884 5.78837 18.4676 5.46762C18.1658 5.16584 18.0149 5.01494 17.8426 4.91583C17.5894 4.77024 17.2992 4.70174 17.0076 4.71872C16.8091 4.73029 16.6067 4.79777 16.2018 4.93273L15.6314 5.12287C14.9961 5.33464 14.3058 5.0145 14.0571 4.39272C13.8841 3.96016 13.7976 3.74388 13.6654 3.57511C13.4719 3.32808 13.2058 3.14794 12.9046 3.06005Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  
   let sortOrderState = {
     playCount: false,
     popularity: false,
@@ -728,8 +892,6 @@
 
   const AI_DATA_CACHE_VERSION = '1';
   const AI_DATA_CACHE_KEY_PREFIX = `sort-play-playlist-cache-v${AI_DATA_CACHE_VERSION}-`;
-  const AI_DATA_MAX_CACHE_SIZE_BYTES = 9 * 1024 * 1024;
-  const AI_DATA_CACHE_EXPIRY_DAYS = 14;
   
   function getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel) {
     return `${AI_DATA_CACHE_KEY_PREFIX}${trackId}-stats${includeSongStats}-lyrics${includeLyrics}-model${selectedAiModel}`;
@@ -867,9 +1029,9 @@
       resetMenuButtonStyles();
       
       if (username) {
-        Spicetify.showNotification("Last.fm username saved successfully!");
+        showNotification("Last.fm username saved successfully!");
       } else {
-        Spicetify.showNotification("Last.fm username cleared.");
+        showNotification("Last.fm username cleared.");
       }
 
       closeModal();
@@ -3215,13 +3377,13 @@
         button.addEventListener('click', () => {
             const address = button.dataset.address;
             navigator.clipboard.writeText(address).then(() => {
-                Spicetify.showNotification('Address copied to clipboard!');
+                showNotification('Address copied to clipboard!');
                 button.classList.add('copied');
                 setTimeout(() => {
                     button.classList.remove('copied');
                 }, 1000);
             }, (err) => {
-                Spicetify.showNotification('Failed to copy address.', true);
+                showNotification('Failed to copy address.', true);
                 console.error('Could not copy text: ', err);
             });
         });
@@ -3265,7 +3427,7 @@
     modalContainer.style.cssText = `
         z-index: 2003;
         width: 1100px !important;
-        max-width: 60vw;
+        max-width: 61vw;
         height: auto;
         max-height: 80vh;
         background-color: #121212 !important;
@@ -3290,10 +3452,16 @@
         const map = {
             10800000: "3H", 21600000: "6H", 43200000: "12H", 86400000: "DAILY",
             172800000: "2 DAYS", 604800000: "WEEKLY", 2592000000: "MONTHLY",
-            'release-weekly': "WEEKLY", 'release-every-two-weeks': "BI-WEEKLY", 'release-monthly': "MONTHLY"
+            'release-weekly': "WEEKLY (FRI)",
+            'release-every-two-weeks': "BI-WEEKLY (FRI)",
+            'release-monthly': "MONTHLY (FRI)"
         };
         if (map[schedule]) return map[schedule];
         if (typeof schedule === 'number') {
+            if (schedule < 3600000) {
+                const minutes = Math.round(schedule / 60000);
+                return `EVERY ${minutes}MIN`;
+            }
             const hours = schedule / 3600000;
             if (hours < 24) return `EVERY ${Math.round(hours)}H`;
             const days = hours / 24;
@@ -3305,7 +3473,8 @@
     const getBadgeHtml = (mode, cardId) => {
         if (mode === 'replace') return `<span class="mode-badge replace">REPLACE</span>`;
         if (mode === 'autoUpdate') {
-            const job = jobs.find(j => j.dedicatedType === cardId);
+            const currentJobs = getDedicatedJobs();
+            const job = currentJobs.find(j => j.dedicatedType === cardId);
             const text = job ? getScheduleBadgeText(job.schedule) : "AUTO";
             return `<span class="mode-badge auto">${text}</span>`;
         }
@@ -3328,6 +3497,10 @@
             const behavior = dedicatedPlaylistBehavior[card.id] || 'createOnce';
             const badgeHtml = getBadgeHtml(behavior, card.id);
             const allowSettings = card.id !== 'genreTreeExplorer';
+
+            const autoBtnContent = behavior === 'autoUpdate' 
+                ? `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}` 
+                : `Auto`;
 
             return `
                 <div class="slim-card" data-id="${card.id}" data-name="${card.name}">
@@ -3352,7 +3525,7 @@
                         <div class="settings-options">
                             <button class="mode-btn ${behavior === 'createOnce' ? 'active' : ''}" data-val="createOnce">Once</button>
                             <button class="mode-btn ${behavior === 'replace' ? 'active' : ''}" data-val="replace">Replace</button>
-                            <button class="mode-btn ${behavior === 'autoUpdate' ? 'active' : ''}" data-val="autoUpdate">Auto</button>
+                            <button class="mode-btn ${behavior === 'autoUpdate' ? 'active' : ''}" data-val="autoUpdate">${autoBtnContent}</button>
                         </div>
                         <button class="close-settings">×</button>
                     </div>
@@ -3559,6 +3732,7 @@
         .badge-container {
             display: flex;
             align-items: center;
+            transition: opacity 0.2s ease;
         }
 
         .mode-badge {
@@ -3664,11 +3838,17 @@
             border-radius: 3px;
             cursor: pointer;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .mode-btn:hover { color: #fff; background: #333; }
         .mode-btn.active {
             background: #1ED760;
             color: #000;
+        }
+        .mode-btn.active[data-val="autoUpdate"]:hover {
+            background-color: #3BE377;
         }
         
         .close-settings {
@@ -3781,16 +3961,53 @@
 
             const updateUI = (val) => {
                 card.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.val === val));
-                badgeContainer.innerHTML = getBadgeHtml(val, cardId);
+                
                 dedicatedPlaylistBehavior[cardId] = val;
                 localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, JSON.stringify(dedicatedPlaylistBehavior));
-                card.querySelector('.settings-overlay-panel').classList.remove('active');
+                
+                const autoBtn = card.querySelector('.mode-btn[data-val="autoUpdate"]');
+                if (autoBtn) {
+                    if (val === 'autoUpdate') {
+                        autoBtn.innerHTML = `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}`;
+                    } else {
+                        setTimeout(() => {
+                            if (dedicatedPlaylistBehavior[cardId] !== 'autoUpdate') {
+                                autoBtn.innerHTML = `Auto`;
+                            }
+                        }, 550);
+                    }
+                }
+
+                setTimeout(() => {
+                    badgeContainer.style.opacity = '0';
+                    setTimeout(() => {
+                        badgeContainer.innerHTML = getBadgeHtml(val, cardId);
+                        badgeContainer.style.opacity = '1';
+                    }, 200);
+                }, 550);
+
+                setTimeout(() => {
+                    const panel = card.querySelector('.settings-overlay-panel');
+                    if (panel) panel.classList.remove('active');
+                }, 300);
             };
 
             if (newVal === 'autoUpdate') {
-                const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
-                if (newScheduleText) {
-                    updateUI('autoUpdate');
+                if (oldBehavior === 'autoUpdate') {
+                     const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
+                     if (newScheduleText) {
+                         badgeContainer.style.opacity = '0';
+                         setTimeout(() => {
+                             badgeContainer.innerHTML = getBadgeHtml('autoUpdate', cardId);
+                             badgeContainer.style.opacity = '1';
+                         }, 200);
+                         updateUI('autoUpdate');
+                     }
+                } else {
+                    const newScheduleText = await showDedicatedScheduleModal(cardId, cardName);
+                    if (newScheduleText) {
+                        updateUI('autoUpdate');
+                    }
                 }
             } else {
                 if (oldBehavior === 'autoUpdate') {
@@ -3930,7 +4147,7 @@
                 });
                 if (confirmed === 'confirm') {
                     saveCustomSchedules([]);
-                    Spicetify.showNotification("All custom schedules have been cleared.");
+                    showNotification("All custom schedules have been cleared.");
                     closeModal();
                     resolve(await showDedicatedScheduleModal(cardId, cardName));
                 }
@@ -4014,7 +4231,7 @@
                 addDedicatedJob(newJob);
             }
             
-            Spicetify.showNotification("Auto-update schedule saved!");
+            showNotification("Auto-update schedule saved!");
             
             const fullScheduleText = scheduleSelect.options[scheduleSelect.selectedIndex].text;
             const shortScheduleText = scheduleToShortTextMap[newScheduleValue];
@@ -4140,7 +4357,7 @@
         }
     }
     const errorMessage = `${context}: ${error.message}\n${location}`;
-    Spicetify.showNotification(errorMessage, true, 8000);
+    showNotification(errorMessage, true, 8000);
     console.error(`[Sort-Play] ${context}:`, error);
   }
 
@@ -4515,7 +4732,7 @@
     const { PlayerAPI } = Spicetify.Platform;
 
     if (!PlayerAPI || !PlayerAPI._queue || !PlayerAPI._queue._client || !PlayerAPI._state || !Spicetify.Player) {
-        Spicetify.showNotification("Player API components missing for queue operation.", true);
+        showNotification("Player API components missing for queue operation.", true);
         console.error("Player API components missing for queue operation.");
         return;
     }
@@ -4535,7 +4752,7 @@
     }
 
     if (!tracksToPlay || !tracksToPlay.length) {
-        Spicetify.showNotification("No tracks to add to the queue.", false, 3000);
+        showNotification("No tracks to add to the queue.", false, 3000);
         return;
     }
 
@@ -4581,11 +4798,11 @@
         const message = source === 'shuffle' 
             ? `Shuffled ${count} ${trackWord} and added to queue.`
             : `Sorted tracks added to queue.`;
-        Spicetify.showNotification(message, false, 3000);
+        showNotification(message, false, 3000);
 
     } catch (error) {
         console.error("Error setting queue with internal method:", error);
-        Spicetify.showNotification("Failed to set the playback queue.", true);
+        showNotification("Failed to set the playback queue.", true);
         throw error;
     }
   }
@@ -5051,8 +5268,7 @@
       
           <div class="settings-left-wrapper">
             <div class="model-row">
-              <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:<span class="tooltip-container">
-                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+              <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:</label>
               <select id="aiModel">
                 <option value="gemini-2.5-pro" ${selectedAiModel === "gemini-2.5-pro" ? "selected" : ""}>Gemini 2.5 Pro</option>
                 <option value="gemini-flash-latest" ${selectedAiModel === "gemini-flash-latest" ? "selected" : ""}>Gemini 2.5 Flash</option>
@@ -5063,7 +5279,6 @@
               <button id="editSystemInstruction" class="secondary-button">Edit System Instruction</button>
             </div>
           </div>
-        </div>
         
         <div class="system-instruction" id="systemInstructionEditor">
           <label class="instruction-label">User System Instruction:</label>
@@ -5165,14 +5380,14 @@
         userSystemInstruction = DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
         textArea.value = DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
         saveSettings();
-        Spicetify.showNotification("System instruction reset to default");
+        showNotification("System instruction reset to default");
       }
     });
   
     saveButton.addEventListener("click", () => {
       const newInstruction = textArea.value.trim();
       if (!newInstruction) {
-        Spicetify.showNotification("System instruction cannot be empty", true);
+        showNotification("System instruction cannot be empty", true);
         return;
       }
       userSystemInstruction = newInstruction;
@@ -5191,7 +5406,7 @@
 sendButton.addEventListener("click", async () => {
       const userPrompt = document.getElementById("aiPrompt").value;
       if (!userPrompt) {
-        Spicetify.showNotification("Please enter a request.", true);
+        showNotification("Please enter a request.", true);
         return;
       }
   
@@ -5214,7 +5429,7 @@ sendButton.addEventListener("click", async () => {
     
         if (unconvertedCount > 0) {
             const plural = unconvertedCount === 1 ? "track" : "tracks";
-            Spicetify.showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`);
+            showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`);
         }
         
         if (convertedTracks.length === 0) {
@@ -5237,7 +5452,7 @@ sendButton.addEventListener("click", async () => {
         );
   
         if (!aiResponse || aiResponse.length === 0) {
-          Spicetify.showNotification("AI did not return any track URIs. Try a different prompt or model.", true);
+          showNotification("AI did not return any track URIs. Try a different prompt or model.", true);
           resetButtons();
           return;
         }
@@ -5266,7 +5481,7 @@ sendButton.addEventListener("click", async () => {
         }
 
         if (verifiedTracks.length === 0) {
-            Spicetify.showNotification("AI returned invalid or unavailable tracks. Please try again.", true);
+            showNotification("AI returned invalid or unavailable tracks. Please try again.", true);
             resetButtons();
             return;
         }
@@ -5320,13 +5535,13 @@ sendButton.addEventListener("click", async () => {
         
         await addPlaylistToLibrary(newPlaylist.uri);
 
-        Spicetify.showNotification(`AI Pick playlist created with ${verifiedTracks.length} tracks!`);
+        showNotification(`AI Pick playlist created with ${verifiedTracks.length} tracks!`);
         
         await navigateToPlaylist(newPlaylist);
 
       } catch (error) {
         console.error("Error handling AI pick:", error);
-        Spicetify.showNotification(
+        showNotification(
           "An error occurred while processing the AI request.",
           true
         );
@@ -5574,7 +5789,7 @@ sendButton.addEventListener("click", async () => {
 
         const { prunedTracks, notification } = pruneTracksForApiLimit(tracksWithStats, combinedSystemInstruction, userRequestPayload, maxPromptSizeBytes);
         if (notification) {
-            Spicetify.showNotification(notification);
+            showNotification(notification);
         }
         const trackDataPayload = `Playlist Tracks:\n${JSON.stringify(prunedTracks, null, 2)}`;
         fullPrompt = `${combinedSystemInstruction}\n\n${trackDataPayload}\n\n${userRequestPayload}`;
@@ -5722,10 +5937,10 @@ sendButton.addEventListener("click", async () => {
 
       if (apiKey) {
         localStorage.setItem("sort-play-gemini-api-key", apiKey);
-        Spicetify.showNotification("Gemini API key saved successfully!");
+        showNotification("Gemini API key saved successfully!");
       } else {
         localStorage.removeItem("sort-play-gemini-api-key");
-        Spicetify.showNotification("Gemini API key cleared.");
+        showNotification("Gemini API key cleared.");
       }
 
       closeModal();
@@ -5935,7 +6150,7 @@ sendButton.addEventListener("click", async () => {
         const currentUri = getCurrentUri();
         if (!currentUri) {
             resetButtons();
-            Spicetify.showNotification("Please select a playlist or artist first");
+            showNotification("Please select a playlist or artist first");
             return;
         }
 
@@ -5972,7 +6187,7 @@ sendButton.addEventListener("click", async () => {
     
         if (unconvertedCount > 0) {
             const plural = unconvertedCount === 1 ? "track" : "tracks";
-            Spicetify.showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`);
+            showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`);
         }
         
         if (convertedTracks.length === 0) {
@@ -6057,7 +6272,7 @@ sendButton.addEventListener("click", async () => {
 
     } catch (error) {
         console.error("Error in custom filter:", error);
-        Spicetify.showNotification(
+        showNotification(
             "An error occurred while preparing the custom filter.",
             true
         );
@@ -6302,7 +6517,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             e.stopPropagation();
 
             if (keywordSet.size === 0) {
-                Spicetify.showNotification("No keywords to save.");
+                showNotification("No keywords to save.");
                 return;
             }
 
@@ -6389,10 +6604,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
                     savedKeywordGroups[groupName] = [...keywordSet];
                     localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
-                    Spicetify.showNotification(`Keywords saved as "${groupName}"`);
+                    showNotification(`Keywords saved as "${groupName}"`);
                     closeModal();
                 } else {
-                    Spicetify.showNotification("Please enter a group name.");
+                    showNotification("Please enter a group name.");
                 }
             });
             overlay.addEventListener("click", closeModal);
@@ -6408,7 +6623,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const groupNames = Object.keys(savedKeywordGroups).reverse();
 
             if (groupNames.length === 0) {
-                Spicetify.showNotification("No saved keyword groups.");
+                showNotification("No saved keyword groups.");
                 return;
             }
 
@@ -6514,7 +6729,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     });
 
                     onUpdateCallback();
-                    Spicetify.showNotification(`Keywords loaded from "${groupName}"`);
+                    showNotification(`Keywords loaded from "${groupName}"`);
 
                     if (selectedOption) {
                         selectedOption.classList.remove("selected");
@@ -6533,11 +6748,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
 
                     option.remove();
-                    Spicetify.showNotification(`Removed keyword group "${groupName}"`);
+                    showNotification(`Removed keyword group "${groupName}"`);
 
                     if (Object.keys(savedKeywordGroups).length === 0) {
                         dropdown.remove();
-                        Spicetify.showNotification("No more saved keyword groups.");
+                        showNotification("No more saved keyword groups.");
                     }
                 });
 
@@ -9329,7 +9544,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const filteredTracks = tracks.filter(track => !track.isRemoved);
 
         if (filteredTracks.length === 0) {
-            Spicetify.showNotification("No tracks selected to create a playlist.");
+            showNotification("No tracks selected to create a playlist.");
             return;
         }
 
@@ -9422,14 +9637,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 }[selectedSortType];
 
-                Spicetify.showNotification(
+                showNotification(
                     `Playlist created with ${sortTypeInfo.fullName} and custom filter!`
                 );
 
                 await navigateToPlaylist(newPlaylist);
             } catch (error) {
                 console.error("Error creating or updating playlist:", error);
-                Spicetify.showNotification(
+                showNotification(
                     `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
                 );
             }
@@ -9625,7 +9840,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             filteredTracks = tracksWithScrobbles.filter(t => (t.personalScrobbles || 0) === 0);
         } else {
             console.warn("[Sort-Play Dynamic Filter] Cannot exclude listened tracks. Last.fm username not set.");
-            if (!isHeadless) Spicetify.showNotification("Last.fm username not set, cannot exclude listened tracks.", true);
+            if (!isHeadless) showNotification("Last.fm username not set, cannot exclude listened tracks.", true);
         }
     }
 
@@ -10024,7 +10239,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             try {
                 const updatedJob = await runJob(job);
                 updateJob(updatedJob);
-                Spicetify.showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
+                showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
             } catch (error) {
                 showDetailedError(error, `Failed to run dynamic playlist job for "${job.targetPlaylistName}"`);
                 job.lastRun = now;
@@ -11603,12 +11818,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 runningJobIds.add(job.id);
                 closeModal();
         
-                Spicetify.showNotification(`Running job for "${job.targetPlaylistName}"...`);
+                showNotification(`Running job for "${job.targetPlaylistName}"...`);
         
                 try {
                     const updatedJob = await runJob(job);
                     updateJob(updatedJob);
-                    Spicetify.showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
+                    showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
                 } catch (error) {
                     showDetailedError(error, `Failed to manually run dynamic playlist job for "${job.targetPlaylistName}"`);
                 } finally {
@@ -12095,7 +12310,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (configureGenresBtn) {
             configureGenresBtn.addEventListener('click', async () => {
                 if (sources.length === 0) {
-                    Spicetify.showNotification("Please add at least one source before configuring genres.", true);
+                    showNotification("Please add at least one source before configuring genres.", true);
                     return;
                 }
                 
@@ -12125,7 +12340,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 
                 if (newGenreSettings) {
                     jobFilters.genreFilterSettings = newGenreSettings;
-                    Spicetify.showNotification("Genre filters saved.");
+                    showNotification("Genre filters saved.");
                 }
             });
         }
@@ -12222,7 +12437,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             const uniqueNewSources = newSourcesData.filter(newSource => !existingUris.includes(newSource.uri));
 
                             if (uniqueNewSources.length < newSourcesData.length) {
-                                Spicetify.showNotification("Some selected sources were already in the list and have been ignored.");
+                                showNotification("Some selected sources were already in the list and have been ignored.");
                             }
 
                             if (uniqueNewSources.length > 0) {
@@ -12298,7 +12513,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         if (!sources.some(s => s.uri === newSource.uri)) {
                             sources.push(newSource);
                         } else {
-                            Spicetify.showNotification(`Source "${newSource.name}" is already in the list.`);
+                            showNotification(`Source "${newSource.name}" is already in the list.`);
                         }
                     });
                     renderSources();
@@ -12326,7 +12541,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 const customSchedules = getCustomSchedules();
                 if (customSchedules.length === 0) {
-                    Spicetify.showNotification("No custom schedules to clear.");
+                    showNotification("No custom schedules to clear.");
                     return;
                 }
 
@@ -12339,7 +12554,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 if (confirmed === 'confirm') {
                     saveCustomSchedules([]);
-                    Spicetify.showNotification("All custom schedules have been cleared.");
+                    showNotification("All custom schedules have been cleared.");
                     await renderJobForm(jobToEdit);
                 }
             } else {
@@ -12449,7 +12664,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 runJob(newJob, true)
                 .then(completedJob => {
                     addJob(completedJob);
-                    Spicetify.showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" created successfully!`);
+                    showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" created successfully!`);
                 })
                 .catch(error => {
                     showDetailedError(error, `Error creating dynamic playlist "${newJob.targetPlaylistName}"`);
@@ -13727,7 +13942,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       );
     
       if (filteredTracks.length === 0) {
-          Spicetify.showNotification("No tracks found for the selected genres.");
+          showNotification("No tracks found for the selected genres.");
           return;
       }
     
@@ -13759,7 +13974,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   aiPick: { fullName: "AI pick", shortName: "AI Pick" },
                   averageColor: { fullName: "album color", shortName: "Color" },
               }[sortType];
-              Spicetify.showNotification(
+              showNotification(
                   `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
               );
               
@@ -13767,7 +13982,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
           } catch (error) {
               console.error("Error creating or updating playlist:", error);
-              Spicetify.showNotification(
+              showNotification(
                   `An error occurred while creating or updating the playlist. Please check your internet connection and try again.`
               );
           } finally {
@@ -13955,7 +14170,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
           } catch (error) {
               resetButtons();
-              Spicetify.showNotification(error.message);
+              showNotification(error.message);
               return;
           }
       }
@@ -14962,7 +15177,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             console.log(`[Sort-Play] Background cloud genre/audio caching complete for ${dataToSave.length} items.`);
         }).catch(err => {
             console.error("[Sort-Play] Background cloud genre caching failed:", err);
-            Spicetify.showNotification("[Sort-Play] Background cloud genre caching failed.", true);
+            showNotification("[Sort-Play] Background cloud genre caching failed.", true);
         });
     }
 
@@ -15345,7 +15560,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     } catch (error)      {
       console.error("Error fetching liked songs:", error);
-      Spicetify.showNotification("Failed to fetch liked songs.", true);
+      showNotification("Failed to fetch liked songs.", true);
       return [];
     }
   }
@@ -15382,7 +15597,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }));
     } catch (error) {
         console.error("Error fetching local files:", error);
-        Spicetify.showNotification("Failed to fetch local files.", true);
+        showNotification("Failed to fetch local files.", true);
         return [];
     }
   }
@@ -15444,7 +15659,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     try {
                         return parsePlaylistAPITrack(track);
                     } catch (parseError) {
-                        Spicetify.showNotification(
+                        showNotification(
                             'Error processing some tracks. Please try again.',
                             true
                         );
@@ -15496,7 +15711,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     } catch (error) {
         console.error('Error in getPlaylistTracks:', error);
-        Spicetify.showNotification(
+        showNotification(
             `Failed to fetch playlist tracks: ${error.message}. Please try again.`,
             true
         );
@@ -15551,7 +15766,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }));
     } catch (error) {
       console.error(`Error fetching tracks for album ${albumId}:`, error);
-      Spicetify.showNotification("Failed to fetch all album tracks.", true);
+      showNotification("Failed to fetch all album tracks.", true);
       return [];
     }
   }
@@ -16918,7 +17133,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         await executeShuffleAndPlay(getCurrentUri());
       } catch (error) {
         console.error("Error during shuffle and play:", error);
-        Spicetify.showNotification(error.message, true);
+        showNotification(error.message, true);
       } finally {
         resetButtons();
       }
@@ -17066,63 +17281,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       },
     ],
   };
-  
-  const settingsSvg = `<?xml version="1.0" encoding="utf-8"?>
-  <!DOCTYPE svg>
-  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 256 256" enable-background="new 0 0 256 256" xml:space="preserve">
-  <g><g><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></g></g>
-  </svg>`;
-
-  const sortIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  
-  const quickFiltersIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M21 6H19M21 12H16M21 18H16M7 20V13.5612C7 13.3532 7 13.2492 6.97958 13.1497C6.96147 13.0615 6.93151 12.9761 6.89052 12.8958C6.84431 12.8054 6.77934 12.7242 6.64939 12.5617L3.35061 8.43826C3.22066 8.27583 3.15569 8.19461 3.10948 8.10417C3.06849 8.02393 3.03853 7.93852 3.02042 7.85026C3 7.75078 3 7.64677 3 7.43875V5.6C3 5.03995 3 4.75992 3.10899 4.54601C3.20487 4.35785 3.35785 4.20487 3.54601 4.10899C3.75992 4 4.03995 4 4.6 4H13.4C13.9601 4 14.2401 4 14.454 4.10899C14.6422 4.20487 14.7951 4.35785 14.891 4.54601C15 4.75992 15 5.03995 15 5.6V7.43875C15 7.64677 15 7.75078 14.9796 7.85026C14.9615 7.93852 14.9315 8.02393 14.8905 8.10417C14.8443 8.19461 14.7793 8.27583 14.6494 8.43826L11.3506 12.5617C11.2207 12.7242 11.1557 12.8054 11.1095 12.8958C11.0685 12.9761 11.0385 13.0615 11.0204 13.1497C11 13.2492 11 13.3532 11 13.5612V17L7 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  </svg>`;
-  
-  const createPlaylistIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M16 5V18M16 18C16 19.1046 14.6569 20 13 20C11.3431 20 10 19.1046 10 18C10 16.8954 11.3431 16 13 16C14.6569 16 16 16.8954 16 18ZM4 5H12M4 9H12M4 13H8M16 4L20 3V7L16 8V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const dynamicPlaylistIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const genreFilterIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M20 20L18.2678 18.2678M18.2678 18.2678C18.7202 17.8154 19 17.1904 19 16.5C19 15.1193 17.8807 14 16.5 14C15.1193 14 14 15.1193 14 16.5C14 17.8807 15.1193 19 16.5 19C17.1904 19 17.8154 18.7202 18.2678 18.2678ZM15.6 10H18.4C18.9601 10 19.2401 10 19.454 9.89101C19.6422 9.79513 19.7951 9.64215 19.891 9.45399C20 9.24008 20 8.96005 20 8.4V5.6C20 5.03995 20 4.75992 19.891 4.54601C19.7951 4.35785 19.6422 4.20487 19.454 4.10899C19.2401 4 18.9601 4 18.4 4H15.6C15.0399 4 14.7599 4 14.546 4.10899C14.3578 4.20487 14.2049 4.35785 14.109 4.54601C14 4.75992 14 5.03995 14 5.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM5.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V5.6C10 5.03995 10 4.75992 9.89101 4.54601C9.79513 4.35785 9.64215 4.20487 9.45399 4.10899C9.24008 4 8.96005 4 8.4 4H5.6C5.03995 4 4.75992 4 4.54601 4.10899C4.35785 4.20487 4.20487 4.35785 4.10899 4.54601C4 4.75992 4 5.03995 4 5.6V8.4C4 8.96005 4 9.24008 4.10899 9.45399C4.20487 9.64215 4.35785 9.79513 4.54601 9.89101C4.75992 10 5.03995 10 5.6 10ZM5.6 20H8.4C8.96005 20 9.24008 20 9.45399 19.891C9.64215 19.7951 9.79513 19.6422 9.89101 19.454C10 19.2401 10 18.9601 10 18.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H5.6C5.03995 14 4.75992 14 4.54601 14.109C4.35785 14.2049 4.20487 14.3578 4.10899 14.546C4 14.7599 4 15.0399 4 15.6V18.4C4 18.9601 4 19.2401 4.10899 19.454C4.20487 19.6422 4.35785 19.7951 4.54601 19.891C4.75992 20 5.03995 20 5.6 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  
-  const customFilterIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M7 9H17M7 15H17M15 13V17M9 7V11M7.2 20H16.8C17.9201 20 18.4802 20 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H7.2C6.0799 4 5.51984 4 5.09202 4.21799C4.71569 4.40973 4.40973 4.71569 4.21799 5.09202C4 5.51984 4 6.07989 4 7.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.07989 20 7.2 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const aiPickIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M12 3L14.0357 8.16153C14.2236 8.63799 14.3175 8.87622 14.4614 9.0771C14.5889 9.25516 14.7448 9.41106 14.9229 9.53859C15.1238 9.68245 15.362 9.77641 15.8385 9.96432L21 12L15.8385 14.0357C15.362 14.2236 15.1238 14.3175 14.9229 14.4614C14.7448 14.5889 14.5889 14.7448 14.4614 14.9229C14.3175 15.1238 14.2236 15.362 14.0357 15.8385L12 21L9.96432 15.8385C9.77641 15.362 9.68245 15.1238 9.53859 14.9229C9.41106 14.7448 9.25516 14.5889 9.0771 14.4614C8.87622 14.3175 8.63799 14.2236 8.16153 14.0357L3 12L8.16153 9.96432C8.63799 9.77641 8.87622 9.68245 9.0771 9.53859C9.25516 9.41106 9.41106 9.25516 9.53859 9.0771C9.68245 8.87622 9.77641 8.63799 9.96432 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const shuffleIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M18 4L21 7M21 7L18 10M21 7H17C16.0707 7 15.606 7 15.2196 7.07686C13.6329 7.39249 12.3925 8.63288 12.0769 10.2196C12 10.606 12 11.0707 12 12C12 12.9293 12 13.394 11.9231 13.7804C11.6075 15.3671 10.3671 16.6075 8.78036 16.9231C8.39397 17 7.92931 17 7 17H3M18 20L21 17M21 17L18 14M21 17H17C16.0707 17 15.606 17 15.2196 16.9231C15.1457 16.9084 15.0724 16.8917 15 16.873M3 7H7C7.92931 7 8.39397 7 8.78036 7.07686C8.85435 7.09158 8.92758 7.1083 9 7.12698" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const convertToSpotifyIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M12 9.5V15.5M9 12.5H15M8.4 19C5.41766 19 3 16.6044 3 13.6493C3 11.2001 4.8 8.9375 7.5 8.5C8.34694 6.48637 10.3514 5 12.6893 5C15.684 5 18.1317 7.32251 18.3 10.25C19.8893 10.9449 21 12.6503 21 14.4969C21 16.9839 18.9853 19 16.5 19L8.4 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const settingsIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path fill="none" d="M12.9046 3.06005C12.6988 3 12.4659 3 12 3C11.5341 3 11.3012 3 11.0954 3.06005C10.7942 3.14794 10.5281 3.32808 10.3346 3.57511C10.2024 3.74388 10.1159 3.96016 9.94291 4.39272C9.69419 5.01452 9.00393 5.33471 8.36857 5.123L7.79779 4.93281C7.3929 4.79785 7.19045 4.73036 6.99196 4.7188C6.70039 4.70181 6.4102 4.77032 6.15701 4.9159C5.98465 5.01501 5.83376 5.16591 5.53197 5.4677C5.21122 5.78845 5.05084 5.94882 4.94896 6.13189C4.79927 6.40084 4.73595 6.70934 4.76759 7.01551C4.78912 7.2239 4.87335 7.43449 5.04182 7.85566C5.30565 8.51523 5.05184 9.26878 4.44272 9.63433L4.16521 9.80087C3.74031 10.0558 3.52786 10.1833 3.37354 10.3588C3.23698 10.5141 3.13401 10.696 3.07109 10.893C3 11.1156 3 11.3658 3 11.8663C3 12.4589 3 12.7551 3.09462 13.0088C3.17823 13.2329 3.31422 13.4337 3.49124 13.5946C3.69158 13.7766 3.96395 13.8856 4.50866 14.1035C5.06534 14.3261 5.35196 14.9441 5.16236 15.5129L4.94721 16.1584C4.79819 16.6054 4.72367 16.829 4.7169 17.0486C4.70875 17.3127 4.77049 17.5742 4.89587 17.8067C5.00015 18.0002 5.16678 18.1668 5.5 18.5C5.83323 18.8332 5.99985 18.9998 6.19325 19.1041C6.4258 19.2295 6.68733 19.2913 6.9514 19.2831C7.17102 19.2763 7.39456 19.2018 7.84164 19.0528L8.36862 18.8771C9.00393 18.6654 9.6942 18.9855 9.94291 19.6073C10.1159 20.0398 10.2024 20.2561 10.3346 20.4249C10.5281 20.6719 10.7942 20.8521 11.0954 20.94C11.3012 21 11.5341 21 12 21C12.4659 21 12.6988 21 12.9046 20.94C13.2058 20.8521 13.4719 20.6719 13.6654 20.4249C13.7976 20.2561 13.8841 20.0398 14.0571 19.6073C14.3058 18.9855 14.9961 18.6654 15.6313 18.8773L16.1579 19.0529C16.605 19.2019 16.8286 19.2764 17.0482 19.2832C17.3123 19.2913 17.5738 19.2296 17.8063 19.1042C17.9997 18.9999 18.1664 18.8333 18.4996 18.5001C18.8328 18.1669 18.9994 18.0002 19.1037 17.8068C19.2291 17.5743 19.2908 17.3127 19.2827 17.0487C19.2759 16.8291 19.2014 16.6055 19.0524 16.1584L18.8374 15.5134C18.6477 14.9444 18.9344 14.3262 19.4913 14.1035C20.036 13.8856 20.3084 13.7766 20.5088 13.5946C20.6858 13.4337 20.8218 13.2329 20.9054 13.0088C21 12.7551 21 12.4589 21 11.8663C21 11.3658 21 11.1156 20.9289 10.893C20.866 10.696 20.763 10.5141 20.6265 10.3588C20.4721 10.1833 20.2597 10.0558 19.8348 9.80087L19.5569 9.63416C18.9478 9.26867 18.6939 8.51514 18.9578 7.85558C19.1262 7.43443 19.2105 7.22383 19.232 7.01543C19.2636 6.70926 19.2003 6.40077 19.0506 6.13181C18.9487 5.94875 18.7884 5.78837 18.4676 5.46762C18.1658 5.16584 18.0149 5.01494 17.8426 4.91583C17.5894 4.77024 17.2992 4.70174 17.0076 4.71872C16.8091 4.73029 16.6067 4.79777 16.2018 4.93273L15.6314 5.12287C14.9961 5.33464 14.3058 5.0145 14.0571 4.39272C13.8841 3.96016 13.7976 3.74388 13.6654 3.57511C13.4719 3.32808 13.2058 3.14794 12.9046 3.06005Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
 
   const buttonContainer = document.createElement("div");
   buttonContainer.style.position = "relative";
@@ -17990,7 +18148,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await addTracksToPlaylist(playlistId, validUris);
         } catch (error) {
             console.error(`[Sort-Play] Error updating playlist with local files using Platform API:`, error);
-            Spicetify.showNotification("Failed to update playlist with local files.", true);
+            showNotification("Failed to update playlist with local files.", true);
         }
     }
   }
@@ -18017,7 +18175,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 } catch (error) {
                     console.error(`[Sort-Play] Platform API Error adding batch to start (Attempt ${retries + 1}):`, error);
                     if (retries === maxRetries) {
-                        Spicetify.showNotification("Failed to add some tracks.", true);
+                        showNotification("Failed to add some tracks.", true);
                         break;
                     }
                     retries++;
@@ -18040,7 +18198,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 } catch (error) {
                     console.error(`[Sort-Play] CosmosAsync Error adding batch (Attempt ${retries + 1}):`, error);
                     if (retries === maxRetries) {
-                        Spicetify.showNotification("Failed to add some Spotify tracks.", true);
+                        showNotification("Failed to add some Spotify tracks.", true);
                         break;
                     }
                     retries++;
@@ -18265,7 +18423,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let finalSortedTracks;
 
     if (useEnergyWaveShuffle && !containsLocalFiles) {
-        Spicetify.showNotification("Performing Randomized Energy Wave Shuffle...");
+        showNotification("Performing Randomized Energy Wave Shuffle...");
         
         const trackIds = tracksToProcess.map(t => t.trackId || t.uri.split(":")[2]);
         const allStats = await getBatchTrackStats(trackIds);
@@ -18277,7 +18435,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         finalSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
     } else {
         if (useEnergyWaveShuffle && containsLocalFiles) {
-            Spicetify.showNotification("Local files detected. Reverting to standard shuffle.");
+            showNotification("Local files detected. Reverting to standard shuffle.");
         }
         finalSortedTracks = shuffleArray(tracksToProcess);
     }
@@ -18312,7 +18470,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await executeShuffleAndPlay(uris[0]);
         } catch (error) {
             console.error("Error from context menu shuffle:", error);
-            Spicetify.showNotification(error.message, true);
+            showNotification(error.message, true);
         } finally {
             resetButtons();
         }
@@ -18508,12 +18666,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 "adding to library"
             );
         } else {
-             Spicetify.showNotification("Could not find any matching tracks on Spotify.");
+             showNotification("Could not find any matching tracks on Spotify.");
         }
 
     } catch (error) {
         console.error("Error converting local playlist:", error);
-        Spicetify.showNotification(error.message, true);
+        showNotification(error.message, true);
     } finally {
         resetButtons();
         showConversionReportModal(logData, newPlaylist);
@@ -18789,7 +18947,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     console.error('Error saving file:', err);
-                    Spicetify.showNotification("Failed to export data.", true);
+                    showNotification("Failed to export data.", true);
                 }
             }
         } else {
@@ -18980,7 +19138,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (folderUri) {
                 requestBody = { ...requestBody, after: folderUri, before: undefined };
             } else {
-                Spicetify.showNotification("Failed to find/create folder. Creating playlist at the top.", true);
+                showNotification("Failed to find/create folder. Creating playlist at the top.", true);
             }
         }
 
@@ -18992,7 +19150,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     } catch (error) {
         console.warn("Internal playlist creation failed, using Web API fallback:", error);
-        Spicetify.showNotification("Using fallback to create playlist.", false, 2000);
+        showNotification("Using fallback to create playlist.", false, 2000);
         const user = await Spicetify.Platform.UserAPI.getUser();
         const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
         newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { name, description, public: !createPlaylistPrivate });
@@ -19068,7 +19226,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const { RootlistAPI } = Spicetify.Platform;
       if (!RootlistAPI) {
           console.error("Spicetify.Platform.RootlistAPI is not available.");
-          Spicetify.showNotification("Error: Cannot manage folders.", true);
+          showNotification("Error: Cannot manage folders.", true);
           return null;
       }
       try {
@@ -19087,7 +19245,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           }
       } catch (error) {
           console.error(`Error in findOrCreatePlaylistFolder for "${folderName}":`, error);
-          Spicetify.showNotification(`Error managing folder: ${folderName}`, true);
+          showNotification(`Error managing folder: ${folderName}`, true);
           return null;
       }
   }
@@ -19266,7 +19424,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await addTracksToPlaylist(newPlaylist.id, trackUris);
             }
             
-            Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
+            showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
             await navigateToPlaylist(newPlaylist);
             return;
         }
@@ -19436,12 +19594,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await addTracksToPlaylist(newPlaylist.id, trackUris);
         }
 
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
+        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
         await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error(`Error in generateSpotifyRecommendations (${vibeType}):`, error);
-        Spicetify.showNotification(error.message, true);
+        showNotification(error.message, true);
     } finally {
         if (!isHeadless) {
             resetButtons();
@@ -19677,7 +19835,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await addTracksToPlaylist(newPlaylist.id, trackUris);
         }
         
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
+        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
 
         if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
             const tempPath = "/library"; 
@@ -19689,7 +19847,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     } catch (error) {
         console.error("Error generating Chronological Followed Releases:", error);
-        Spicetify.showNotification(error.message, true);
+        showNotification(error.message, true);
     } finally {
         if (!isHeadless) {
             resetButtons();
@@ -20131,12 +20289,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await addTracksToPlaylist(newPlaylist.id, trackUris);
         }
 
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
+        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
         await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error generating Infinite Vibe:", error);
-        Spicetify.showNotification(`Infinite Vibe failed: ${error.message}`, true);
+        showNotification(`Infinite Vibe failed: ${error.message}`, true);
     } finally {
         if (!isHeadless) {
             resetButtons();
@@ -20149,7 +20307,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     const username = loadLastFmUsername();
     if (!username) {
-        if (!isHeadless) Spicetify.showNotification("Last.fm username not set. Please set it in Settings.", true);
+        if (!isHeadless) showNotification("Last.fm username not set. Please set it in Settings.", true);
         return;
     }
 
@@ -20468,12 +20626,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await addTracksToPlaylist(newPlaylist.id, trackUris);
         }
 
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
+        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
         await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error generating Neighbors Mix:", error);
-        Spicetify.showNotification(`Neighbors Mix failed: ${error.message}`, true);
+        showNotification(`Neighbors Mix failed: ${error.message}`, true);
     } finally {
         if (!isHeadless) {
             resetButtons();
@@ -20564,12 +20722,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await addTracksToPlaylist(newPlaylist.id, trackUris);
         }
 
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
+        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
         await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error in Genre Tree Explorer:", error);
-        Spicetify.showNotification(error.message, true);
+        showNotification(error.message, true);
     } finally {
         resetButtons();
     }
@@ -20670,12 +20828,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             await addTracksToPlaylist(newPlaylist.id, trackUris);
         }
 
-        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
+        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
         await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error in Random Genre Explorer:", error);
-        Spicetify.showNotification(error.message, true);
+        showNotification(error.message, true);
     } finally {
         if (!isHeadless) {
             resetButtons();
@@ -20781,7 +20939,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             genrePlaylistsCache = await response.json();
         } catch (e) {
             console.error("Sort-Play: Failed to fetch genre database for sorting.", e);
-            Spicetify.showNotification("Could not fetch genre database.", true);
+            showNotification("Could not fetch genre database.", true);
             genrePlaylistsCache = []; 
         }
     }
@@ -21156,7 +21314,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
         } catch (error) {
             console.error("Error preparing AI Pick:", error);
-            Spicetify.showNotification(error.message, true);
+            showNotification(error.message, true);
             resetButtons();
         }
         return;
@@ -21179,7 +21337,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const topTracksData = await getTopItems('tracks', topTrackSortTypes[sortType].time_range, topTracksLimit);
             
             if (!topTracksData || topTracksData.length === 0) {
-                Spicetify.showNotification(`No top tracks found for "${topTrackSortTypes[sortType].name}".`, true);
+                showNotification(`No top tracks found for "${topTrackSortTypes[sortType].name}".`, true);
                 if (!isHeadless) resetButtons();
                 return;
             }
@@ -21198,7 +21356,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await addTracksToPlaylist(newPlaylist.id, trackUris);
             }
             
-            Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
+            showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
 
             if (openPlaylistAfterSortEnabled && newPlaylist && newPlaylist.uri) { 
                 const tempPath = "/library"; 
@@ -21213,7 +21371,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         } catch (error) {
             console.error("Error creating top tracks playlist:", error);
-            Spicetify.showNotification("Failed to create top tracks playlist.", true);
+            showNotification("Failed to create top tracks playlist.", true);
         } finally {
             if (!isHeadless) {
                 resetButtons();
@@ -21239,7 +21397,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const currentUriAtStart = getCurrentUri(); 
       if (!currentUriAtStart) {
         if (!isHeadless) resetButtons();
-        Spicetify.showNotification("Please select a playlist or artist first");
+        showNotification("Please select a playlist or artist first");
         return;
       }
 
@@ -21287,7 +21445,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
 
       if (!tracks || tracks.length === 0) {
-          Spicetify.showNotification('No tracks found to sort');
+          showNotification('No tracks found to sort');
           if (!isHeadless) resetButtons();
           return;
       }
@@ -21321,7 +21479,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
 
         if (userChoice === 'cancel') {
-            Spicetify.showNotification("Sorting cancelled.");
+            showNotification("Sorting cancelled.");
             if (!isHeadless) resetButtons();
             return;
         } else if (userChoice === 'neutral') {
@@ -21340,7 +21498,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
       if (unconvertedLocalCount > 0 && !isHeadless) {
           const plural = unconvertedLocalCount === 1 ? "track" : "tracks";
-          Spicetify.showNotification(`${unconvertedLocalCount} local ${plural} not found on Spotify and were skipped.`);
+          showNotification(`${unconvertedLocalCount} local ${plural} not found on Spotify and were skipped.`);
       }
 
       let sortedTracks;
@@ -21363,7 +21521,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               if (!isHeadless) mainButton.innerText = "100%";
           } catch (error) {
               if (!isHeadless) resetButtons();
-              Spicetify.showNotification(error.message, true);
+              showNotification(error.message, true);
               return;
           }
       } else {
@@ -21573,13 +21731,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 sortedTracks = [...waveSortedTracks, ...shuffleArray(tracksWithoutData)];
             } else {
                 if (useEnergyWaveShuffle && containsLocalFiles && !isHeadless) {
-                    Spicetify.showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
+                    showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
                 }
                 sortedTracks = shuffleArray(uniqueTracks);
             }
         } else if (sortType === "deduplicateOnly") {
             if (removedTracks.length === 0) {
-                Spicetify.showNotification("No duplicate tracks found.");
+                showNotification("No duplicate tracks found.");
                 if (!isHeadless) resetButtons();
                 return;
             }
@@ -21805,7 +21963,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
               } catch (error) {
                 if (!isHeadless) resetButtons();
-                Spicetify.showNotification(error.message);
+                showNotification(error.message);
                 return;
               }
         } else if (sortType === "lastScrobbled") { 
@@ -21818,7 +21976,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (!isHeadless) mainButton.innerText = "100%";
             } catch (error) {
                 if (!isHeadless) resetButtons();
-                Spicetify.showNotification(error.message, true);
+                showNotification(error.message, true);
                 return;
             }
         }
@@ -21828,7 +21986,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (!sortedTracks || sortedTracks.length === 0) {
             console.log("No tracks left after sorting/filtering to create/modify playlist.");
             if (!addToQueueEnabled) {
-                Spicetify.showNotification("No tracks to process for playlist.");
+                showNotification("No tracks to process for playlist.");
             }
             if (!isHeadless) resetButtons();
             return;
@@ -21904,13 +22062,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const trackUris = sortedTracks.map((track) => track.uri);
                 await replacePlaylistTracks(playlistIdToModify, trackUris);
                 
-                Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
+                showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
                 playlistUriForQueue = currentUriAtStart; 
                 playlistWasModifiedOrCreated = true; 
 
             } catch (error) {
                 console.error("Error modifying current playlist:", error);
-                Spicetify.showNotification(`An error occurred while modifying the current playlist.`);
+                showNotification(`An error occurred while modifying the current playlist.`);
                 playlistWasModifiedOrCreated = false;
                 playlistUriForQueue = currentUriAtStart; 
                 modifiedPlaylistOriginalPath = null; 
@@ -21972,11 +22130,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
               await addPlaylistToLibrary(newPlaylist.uri);
 
-              Spicetify.showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
+              showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
 
             } catch (error) {
               console.error("Error creating or updating playlist:", error);
-              Spicetify.showNotification(`An error occurred while creating the playlist.`);
+              showNotification(`An error occurred while creating the playlist.`);
               playlistWasModifiedOrCreated = false;
               playlistUriForQueue = currentUriAtStart;
               newPlaylistObjectForNavigation = null;
@@ -21996,7 +22154,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const plural = missingDataCount === 1 ? "track was" : "tracks were";
         setTimeout(() => {
-            Spicetify.showNotification(`${missingDataCount} ${plural} missing ${sortTypeInfo.fullName} data.`);
+            showNotification(`${missingDataCount} ${plural} missing ${sortTypeInfo.fullName} data.`);
         }, 1500);
       }
       
@@ -22005,15 +22163,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           await setQueueFromTracks(sortedTracks, playlistUriForQueue);
         } catch (queueError) {
           console.error("Failed to add sorted tracks to queue:", queueError);
-          Spicetify.showNotification("Failed to add to queue.", true);
+          showNotification("Failed to add to queue.", true);
         }
       } else if (addToQueueEnabled && isDirectSortType(sortType) && (!sortedTracks || sortedTracks.length === 0)) {
-          Spicetify.showNotification("No tracks to add to queue after sorting/filtering.", true);
+          showNotification("No tracks to add to queue after sorting/filtering.", true);
       }
 
       if (isDirectSortType(sortType) && !playlistWasModifiedOrCreated && !addToQueueEnabled) {
         if (sortedTracks && sortedTracks.length > 0) {
-             Spicetify.showNotification(`Sorting complete for ${sortType}. No playlist created or queue modified as per settings.`);
+             showNotification(`Sorting complete for ${sortType}. No playlist created or queue modified as per settings.`);
         }
       } else if (isDirectSortType(sortType) && !createPlaylistAfterSort && addToQueueEnabled) {
         console.log(`Playlist creation skipped for ${sortType} due to setting, tracks added to queue.`);
@@ -22038,7 +22196,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     } catch (error) {
       console.error("Error during sorting process:", error);
-      Spicetify.showNotification(`An error occurred during the sorting process: ${error.message}`);
+      showNotification(`An error occurred during the sorting process: ${error.message}`);
     } finally {
       if (!isHeadless) {
         resetButtons();
@@ -22359,11 +22517,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     copyButton.addEventListener("click", () => {
       navigator.clipboard.writeText(trackListTextArea.value).then(
         () => {
-          Spicetify.showNotification("Tracks copied to clipboard!");
+          showNotification("Tracks copied to clipboard!");
         },
         (err) => {
           console.error("Failed to copy:", err);
-          Spicetify.showNotification("Failed to copy tracks to clipboard.");
+          showNotification("Failed to copy tracks to clipboard.");
         }
       );
     });
@@ -22817,7 +22975,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const currentUri = getCurrentUri();
                     if (!currentUri) {
                         resetButtons();
-                        Spicetify.showNotification("Please select a playlist first");
+                        showNotification("Please select a playlist first");
                         return;
                     }
 
@@ -22854,7 +23012,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
                     if (unconvertedCount > 0) {
                         const plural = unconvertedCount === 1 ? "track" : "tracks";
-                        Spicetify.showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`);
+                        showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`);
                     }
         
                     if (!convertedTracks || convertedTracks.length === 0) {
@@ -22872,7 +23030,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     await openModal();
                 } catch (error) {
                     console.error("Error during genre filtering:", error);
-                    Spicetify.showNotification(
+                    showNotification(
                         "An error occurred during the genre filtering process."
                     );
                 } finally {
@@ -24477,7 +24635,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
         const handleClick = async function () {
             if (!Spicetify.Platform?.LibraryAPI?.add || !Spicetify.Platform?.LibraryAPI?.remove) {
-                Spicetify.showNotification("Library API not available.", true);
+                showNotification("Library API not available.", true);
                 console.error("[Sort-Play Like Button] Spicetify.Platform.LibraryAPI.add/remove is not available.");
                 return;
             }
@@ -24487,7 +24645,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     proxy_likeButton_likedTracksIdsISRCs.delete(trackId);
                 } catch (error) {
                     console.error('[Sort-Play Like Button] Error unliking track with LibraryAPI:', error);
-                    Spicetify.showNotification("Failed to unlike song.", true);
+                    showNotification("Failed to unlike song.", true);
                 }
             } else {
                 try {
@@ -24497,7 +24655,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
                 } catch (error) {
                     console.error('[Sort-Play Like Button] Error liking track with LibraryAPI:', error);
-                    Spicetify.showNotification("Failed to like song.", true);
+                    showNotification("Failed to like song.", true);
                 }
             }
         };
