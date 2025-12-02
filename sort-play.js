@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.28.0";
+  const SORT_PLAY_VERSION = "5.29.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -68,6 +68,7 @@
   let selectedNowPlayingKeyFormat = 'standard';
   let selectedNowPlayingPopularityFormat = 'raw';
   let selectedNowPlayingSeparator = '•';
+  let includeZeroScrobbles = true;
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
@@ -373,10 +374,11 @@
     "\\(Instrumentalness\\)"
   ];
 
-  const BASE_COVERS_URL = "https://cdn.jsdelivr.net/gh/hoeci/sort-play@0100d9d9e901b1c4cc68310bff66337c2cd2020c/assets/base-covers/";
+  const BASE_COVERS_URL = "https://cdn.jsdelivr.net/gh/hoeci/sort-play@b4c938cd63194151d6b46c403b5404f1bd5f3c52/assets/base-covers/";
   const COVER_TOP = `${BASE_COVERS_URL}top.png`;
   const COVER_NEW = `${BASE_COVERS_URL}newrel.png`;
   const COVER_DISCOVERY = `${BASE_COVERS_URL}discovery.png`;
+  const COVER_LASTFM = `${BASE_COVERS_URL}lastfm.png`;
 
   const DEDICATED_PLAYLIST_COVERS = {
     'topThisMonth': COVER_TOP,
@@ -388,6 +390,8 @@
     'pureDiscovery': COVER_DISCOVERY,
     'genreTreeExplorer': COVER_DISCOVERY,
     'randomGenreExplorer': COVER_DISCOVERY,
+    'infiniteVibe': COVER_LASTFM,
+    'neighborsMix': COVER_LASTFM,
     'default': COVER_TOP
   };
 
@@ -400,6 +404,8 @@
     'recommendAllTime': (isHeadless = false) => generateSpotifyRecommendations('recommendAllTime', { isHeadless }),
     'pureDiscovery': (isHeadless = false) => generateSpotifyRecommendations('pureDiscovery', { isHeadless }),
     'randomGenreExplorer': (isHeadless = false) => generateRandomGenrePlaylist({ isHeadless }),
+    'infiniteVibe': (isHeadless = false) => generateInfiniteVibe({ isHeadless }),
+    'neighborsMix': (isHeadless = false) => generateNeighborsMix({ isHeadless }),
   };
 
   async function runDedicatedJob(jobConfig) {
@@ -478,7 +484,7 @@
     {
         title: 'New Releases',
         cards: [
-            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological },
+            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological },
         ]
     },
     {
@@ -489,6 +495,13 @@
             { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery },
             { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer },
             { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer },
+        ]
+    },
+    {
+        title: 'Last.fm',
+        cards: [
+            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'A continuous mood from your current song, recent obsessions, and deep cuts.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe },
+            { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix },
         ]
     },
     {
@@ -600,6 +613,7 @@
     selectedNowPlayingKeyFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_KEY_FORMAT) || 'standard';
     selectedNowPlayingPopularityFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT) || 'raw';
     selectedNowPlayingSeparator = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR) || '•';
+    includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -658,6 +672,7 @@
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_KEY_FORMAT, selectedNowPlayingKeyFormat);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT, selectedNowPlayingPopularityFormat);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR, selectedNowPlayingSeparator);
+    localStorage.setItem("sort-play-include-no-scrobbles", includeZeroScrobbles);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -765,116 +780,69 @@
     return localStorage.getItem(STORAGE_KEY_LASTFM_USERNAME);
   }
 
-  function showLastFmUsernameModal() {
-    const modalContainer = document.createElement("div");
+  function showLastFmUsernameModal(onSuccess = null) {
     const savedUsername = loadLastFmUsername();
-    let includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false"; 
 
-    modalContainer.innerHTML = `
-      <style>
-      .main-embedWidgetGenerator-container {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-lastfm-modal-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2005;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
         width: 420px !important;
         border-radius: 30px;
         overflow: hidden; 
         background-color: #181818 !important;
         border: 2px solid #282828;
-      }
-      .GenericModal > .main-embedWidgetGenerator-container {
-        height: auto !important;
-      } 
-      .main-trackCreditsModal-originalCredits{
-        padding-bottom: 20px !important;
-      }
-      .main-trackCreditsModal-header {
-        padding: 27px 32px 12px !important;
-      }
-      .main-trackCreditsModal-mainSection {
-        overflow-y: hidden !important;
-      }
-      .GenericModal__overlay .GenericModal {
-        border-radius: 30px;
-        overflow: hidden;
-      }
-      </style>
-      <div style="display: flex; flex-direction: column; gap: 15px;">
-        <div style="display: flex; flex-direction: column; gap: 5px;">
-          <label for="lastFmUsername">Last.fm Username:</label>
-          <input type="text" id="lastFmUsername" value="${savedUsername || ""}" 
-                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
-        </div>
-        <div style="display: flex; align-items: center; margin-bottom: 10px;">
-          <input type="checkbox" id="includeZeroScrobbles" ${includeZeroScrobbles ? "checked" : ""}>
-          <label for="includeZeroScrobbles" style="margin-left: 8px; color: white;">Include tracks with no personal scrobbles</label>
-        </div>
-        <div id="lastFmError" style="color: #ff4444; font-size: 12px; display: none;">
-          Please enter a valid Last.fm username.
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-          <button id="cancelLastFm" class="main-buttons-button" 
-                  style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-            Cancel
-          </button>
-          <button id="saveLastFm" class="main-buttons-button main-button-primary" 
-                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-            Save
-          </button>
-        </div>
+        display: flex;
+        flex-direction: column;
+    `;
+
+    modalContainer.innerHTML = `
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Last.fm Username</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 25px 32px 20px 32px !important;">
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <input type="text" id="lastFmUsername" value="${savedUsername || ""}" placeholder="Enter your username"
+                    style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
+              <button id="cancelLastFm" class="main-buttons-button" 
+                      style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                Cancel
+              </button>
+              <button id="saveLastFm" class="main-buttons-button main-button-primary" 
+                      style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                Save
+              </button>
+            </div>
+          </div>
       </div>
     `;
     
-    Spicetify.PopupModal.display({
-      title: "<span style='font-size: 25px;'>Last.fm Username</span>",
-      content: modalContainer,
-      isLarge: true,
-    });
-    tagActiveModalWithFontScope();
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
     
-    if (isMenuOpen) {
-      closeAllMenus();
-    }
+    const inputField = document.getElementById("lastFmUsername");
+    inputField.focus();
 
-    const modalContainerElement = document.querySelector(".main-popupModal-container");
-    if (modalContainerElement) {
-      modalContainerElement.style.zIndex = "2000";
-    }
-    preventDragCloseModal();
+    const closeModal = () => overlay.remove();
 
     const saveButton = document.getElementById("saveLastFm");
     const cancelButton = document.getElementById("cancelLastFm");
 
-    
-    saveButton.addEventListener("mouseenter", () => {
-      saveButton.style.backgroundColor = "#3BE377";
-    });
-    saveButton.addEventListener("mouseleave", () => {
-      saveButton.style.backgroundColor = "#1ED760";
-    });
+    saveButton.addEventListener("mouseenter", () => { saveButton.style.backgroundColor = "#3BE377"; });
+    saveButton.addEventListener("mouseleave", () => { saveButton.style.backgroundColor = "#1ED760"; });
+    cancelButton.addEventListener("mouseenter", () => { cancelButton.style.backgroundColor = "#444444"; });
+    cancelButton.addEventListener("mouseleave", () => { cancelButton.style.backgroundColor = "#333333"; });
 
-    cancelButton.addEventListener("mouseenter", () => {
-      cancelButton.style.backgroundColor = "#444444";
-    });
-
-    cancelButton.addEventListener("mouseleave", () => {
-      cancelButton.style.backgroundColor = "#333333";
-    });
-
-    function hideError() {
-      const errorDiv = document.getElementById("lastFmError");
-      errorDiv.style.display = "none";
-    }
-
-    function enableButton(button) {
-      button.disabled = false;
-      button.style.backgroundColor = "#1ED760";
-      button.style.cursor = "pointer";
-    }
-
-    menuButtons.forEach((button) => {
-      if (button.tagName.toLowerCase() === 'button') {
-        button.style.backgroundColor = "transparent";
-      }
-    });
-    
     function resetMenuButtonStyles() {
       const myScrobblesButton = menuButtons.find(
         (button) => button.querySelector("span")?.innerText === "My Scrobbles"
@@ -888,17 +856,14 @@
     }
 
     saveButton.addEventListener("click", () => {
-      const username = document.getElementById("lastFmUsername").value.trim();
-      includeZeroScrobbles = document.getElementById("includeZeroScrobbles").checked; 
+      const username = inputField.value.trim();
 
       saveButton.disabled = true;
       saveButton.style.backgroundColor = "#FFFFFFB3";
-      saveButton.style.cursor = "default";
       saveButton.textContent = "Saving...";
-      hideError();
 
       saveLastFmUsername(username);
-      Spicetify.PopupModal.hide();
+      
       resetMenuButtonStyles();
       
       if (username) {
@@ -907,16 +872,12 @@
         Spicetify.showNotification("Last.fm username cleared.");
       }
 
-      enableButton(saveButton);
-      saveButton.textContent = "Save";
-
-      localStorage.setItem("sort-play-include-no-scrobbles", includeZeroScrobbles);
+      closeModal();
+      if (onSuccess) onSuccess();
     });
 
-    cancelButton.addEventListener("click", () => {
-      Spicetify.PopupModal.hide();
-      enableButton(cancelButton);
-    });
+    cancelButton.addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
 
   function createAndInitializeChatPanel() {
@@ -1998,6 +1959,27 @@
             </select>
         </div>
     </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Last.fm
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="includeZeroScrobblesSetting">
+        <label class="col description">
+            Include Tracks with No Scrobbles
+            <span class="tooltip-container">
+                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                <span class="custom-tooltip">When sorting by "My Scrobbles", include tracks with 0 scrobbles.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="includeZeroScrobblesToggle" ${includeZeroScrobbles ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
     `;
 
     Spicetify.PopupModal.display({
@@ -2084,6 +2066,7 @@
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
+    const includeZeroScrobblesToggle = modalContainer.querySelector("#includeZeroScrobblesToggle");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
     const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
     const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
@@ -2271,17 +2254,11 @@
     });
 
     setGeminiApiKeyButton.addEventListener("click", () => {
-        Spicetify.PopupModal.hide();
-        setTimeout(() => {
-            showGeminiApiKeyModal();
-        }, 200);
+        showGeminiApiKeyModal();
     });
     
     setLastFmUsernameButton.addEventListener("click", () => {
-        Spicetify.PopupModal.hide();
-        setTimeout(() => {
-            showLastFmUsernameModal();
-        }, 200);
+        showLastFmUsernameModal();
     });
 
     setGeminiApiKeyButton.addEventListener("mouseenter", () => {
@@ -2295,6 +2272,11 @@
     });
     setLastFmUsernameButton.addEventListener("mouseleave", () => {
         setLastFmUsernameButton.style.backgroundColor = "#333333";
+    });
+
+    includeZeroScrobblesToggle.addEventListener("change", () => {
+        includeZeroScrobbles = includeZeroScrobblesToggle.checked;
+        saveSettings();
     });
 
     addToQueueToggle.addEventListener("change", () => {
@@ -3282,8 +3264,8 @@
     modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
     modalContainer.style.cssText = `
         z-index: 2003;
-        width: 1000px !important;
-        max-width: 45vw;
+        width: 1100px !important;
+        max-width: 60vw;
         height: auto;
         max-height: 80vh;
         background-color: #121212 !important;
@@ -3330,7 +3312,18 @@
         return ''; 
     };
 
-    const generateCardsHtml = (cards) => {
+    const generateCardsHtml = (cards, category) => {
+        let overlayStyle = '';
+        if (category === 'discovery') {
+            overlayStyle = 'background: linear-gradient(90deg, rgba(143, 70, 215, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+        } else if (category === 'newReleases') {
+            overlayStyle = 'background: linear-gradient(90deg, rgba(55, 152, 165, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+        } else if (category === 'topTracks') {
+            overlayStyle = 'background: linear-gradient(90deg, rgba(36, 191, 112, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+        } else if (category === 'lastFm') {
+            overlayStyle = 'background: linear-gradient(90deg, rgba(209, 23, 14, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+        }       
+
         return cards.map(card => {
             const behavior = dedicatedPlaylistBehavior[card.id] || 'createOnce';
             const badgeHtml = getBadgeHtml(behavior, card.id);
@@ -3339,7 +3332,7 @@
             return `
                 <div class="slim-card" data-id="${card.id}" data-name="${card.name}">
                     <div class="card-bg" style="background-image: url('${card.thumbnailUrl}');"></div>
-                    <div class="card-overlay"></div>
+                    <div class="card-overlay" style="${overlayStyle}"></div>
                     
                     <div class="card-content-wrapper">
                         <div class="card-text">
@@ -3372,6 +3365,7 @@
     const newReleasesData = playlistCardsData.find(s => s.title === 'New Releases');
     const discoveryData = playlistCardsData.find(s => s.title === 'Discovery');
     const topTracksData = playlistCardsData.find(s => s.title === 'My Top Tracks');
+    const lastFmData = playlistCardsData.find(s => s.title === 'Last.fm');
 
     let contentHtml = `<div class="columns-container">`;
     
@@ -3382,7 +3376,7 @@
             <div class="category-section">
                 <div class="category-header">${newReleasesData.title}</div>
                 <div class="cards-stack">
-                    ${generateCardsHtml(newReleasesData.cards)}
+                    ${generateCardsHtml(newReleasesData.cards, 'newReleases')}
                 </div>
             </div>
         `;
@@ -3393,13 +3387,13 @@
             <div class="category-section">
                 <div class="category-header">${topTracksData.title}</div>
                 <div class="cards-stack">
-                    ${generateCardsHtml(topTracksData.cards)}
+                    ${generateCardsHtml(topTracksData.cards, 'topTracks')}
                 </div>
             </div>
         `;
     }
     
-    contentHtml += `</div>`; 
+    contentHtml += `</div>`;
 
     contentHtml += `<div class="category-column">`;
     
@@ -3408,13 +3402,28 @@
             <div class="category-section">
                 <div class="category-header">${discoveryData.title}</div>
                 <div class="cards-stack">
-                    ${generateCardsHtml(discoveryData.cards)}
+                    ${generateCardsHtml(discoveryData.cards, 'discovery')}
                 </div>
             </div>
         `;
     }
     
-    contentHtml += `</div>`; 
+    contentHtml += `</div>`;
+
+    contentHtml += `<div class="category-column">`;
+
+    if (lastFmData) {
+        contentHtml += `
+            <div class="category-section">
+                <div class="category-header">Last.fm Engine</div>
+                <div class="cards-stack">
+                    ${generateCardsHtml(lastFmData.cards, 'lastFm')}
+                </div>
+            </div>
+        `;
+    }
+    
+    contentHtml += `</div>`;
     
     contentHtml += `</div>`;
 
@@ -3422,7 +3431,7 @@
       <style>
         .create-playlist-modal-body {
             flex-grow: 1;
-            overflow-y: hidden; 
+            overflow-y: auto; 
             padding: 25px 25px;
             display: flex;
             flex-direction: column;
@@ -3430,7 +3439,7 @@
 
         .columns-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 25px;
             height: 100%;
         }
@@ -3438,7 +3447,7 @@
         .category-column {
             display: flex;
             flex-direction: column;
-            gap: 45px;
+            gap: 56px;
             min-width: 0;
             overflow-y: auto;
             scrollbar-width: none;
@@ -3468,7 +3477,7 @@
 
         .slim-card {
             position: relative;
-            height: 64px;
+            height: 75px;
             background-color: #202020;
             border-radius: 6px;
             overflow: hidden;
@@ -3478,11 +3487,10 @@
             -webkit-backface-visibility: hidden;
             backface-visibility: hidden;
             transform: translateZ(0);
-            transition: box-shadow 0.2s, border-color 0.2s;
+            transition: border-color 0.1s;
         }
 
         .slim-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             border-color: #444;
             z-index: 2;
         }
@@ -3499,7 +3507,7 @@
             background-position: top center;
             filter: grayscale(0.2) brightness(0.7);
             
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             will-change: transform;
             transform-origin: center center;
         }
@@ -3581,11 +3589,14 @@
             color: #ddd;
             font-size: 12px;
             opacity: 0.8;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
             margin-top: 3px;
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            white-space: normal;
+            line-height: 1.2;
         }
 
         .settings-trigger {
@@ -3690,7 +3701,7 @@
     const closeModal = () => overlay.remove();
 
     modalContainer.querySelectorAll('.slim-card').forEach(card => {
-        card.addEventListener('click', (e) => {
+        card.addEventListener('click', async (e) => {
             if (e.target.closest('.settings-trigger') || e.target.closest('.settings-overlay-panel')) return;
             if (e.target === card) return;
 
@@ -3706,11 +3717,35 @@
                 }
             }
 
+            if (cardId === 'neighborsMix') {
+                const hasUsername = loadLastFmUsername();
+                if (!hasUsername) {
+                    const result = await showConfirmationModal({
+                        title: "Last.fm Account Required",
+                        description: "The Neighbors Mix requires a Last.fm username to find listeners with similar taste. Do you have an active Last.fm account linked to your Spotify?",
+                        confirmText: "I have one",
+                        cancelText: "I don't have one"
+                    });
+
+                    if (result === 'confirm') {
+                        showLastFmUsernameModal(() => {
+                            closeModal(); 
+                            generateNeighborsMix();
+                        });
+                    }
+                    return;
+                }
+            }
+
             closeModal();
             if (cardId === 'genreTreeExplorer') {
                 showGenreTreeExplorerModal();
             } else if (cardId === 'randomGenreExplorer') {
                 generateRandomGenrePlaylist();
+            } else if (cardId === 'neighborsMix') {
+                generateNeighborsMix();
+            } else if (cardId === 'infiniteVibe') {
+                generateInfiniteVibe();
             } else {
                 handleSortAndCreatePlaylist(cardId);
             }
@@ -5018,7 +5053,6 @@
             <div class="model-row">
               <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:<span class="tooltip-container">
                 <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                <span class="custom-tooltip">Added Gemini 2.5 models</span></label>
               <select id="aiModel">
                 <option value="gemini-2.5-pro" ${selectedAiModel === "gemini-2.5-pro" ? "selected" : ""}>Gemini 2.5 Pro</option>
                 <option value="gemini-flash-latest" ${selectedAiModel === "gemini-flash-latest" ? "selected" : ""}>Gemini 2.5 Flash</option>
@@ -5616,127 +5650,89 @@ sendButton.addEventListener("click", async () => {
   }
 
   function showGeminiApiKeyModal() {
-    const modalContainer = document.createElement("div");
     const savedApiKey = localStorage.getItem("sort-play-gemini-api-key");
 
-    modalContainer.innerHTML = `
-      <style>
-      .main-embedWidgetGenerator-container {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-gemini-modal-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2005;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
         width: 420px !important;
         border-radius: 30px;
         overflow: hidden; 
         background-color: #181818 !important;
         border: 2px solid #282828;
-      }
-      .GenericModal__overlay .GenericModal {
-        border-radius: 30px;
-        overflow: hidden;
-      }
-      .GenericModal > .main-embedWidgetGenerator-container {
-        height: auto !important;
-      } 
-      .main-trackCreditsModal-mainSection {
-        overflow-y: hidden !important;
-      }
-      .main-trackCreditsModal-header {
-        padding: 27px 32px 12px !important;
-      }
-      .main-trackCreditsModal-originalCredits{
-        padding-bottom: 20px !important;
-      }
-      .main-trackCreditsModal-originalCredits{
-        padding-bottom: 20px !important;
-      }
-      </style>
-      <div style="display: flex; flex-direction: column; gap: 15px;">
-        <div style="display: flex; flex-direction: column; gap: 5px;">
-          <label for="geminiApiKey">Gemini API Key:</label>
-          <input type="text" id="geminiApiKey" value="${savedApiKey || ""}" placeholder="Enter your API key (optional)"
-                style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
-          <a href="https://aistudio.google.com/apikey" target="_blank" style="color: #1ED760; font-size: 14px; margin-left: 2px; margin-top: 4px; text-decoration: none;">Get the free API key from here</a>
-        </div>
-        <div id="geminiApiError" style="color: #ff4444; font-size: 12px; display: none;">
-          Invalid API key.
-        </div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
-          <button id="cancelGeminiApi" class="main-buttons-button" 
-                  style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-            Cancel
-          </button>
-          <button id="saveGeminiApi" class="main-buttons-button main-button-primary" 
-                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-            Save
-          </button>
-        </div>
+        display: flex;
+        flex-direction: column;
+    `;
+
+    modalContainer.innerHTML = `
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Gemini API Key</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 25px 32px 20px 32px !important;">
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <input type="text" id="geminiApiKey" value="${savedApiKey || ""}" placeholder="Enter your API key (optional)"
+                    style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
+              <a href="https://aistudio.google.com/api-keys" target="_blank" style="color: #1ED760; font-size: 14px; margin-left: 2px; margin-top: 4px; text-decoration: none;">Get the free API key from here</a>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
+              <button id="cancelGeminiApi" class="main-buttons-button" 
+                      style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                Cancel
+              </button>
+              <button id="saveGeminiApi" class="main-buttons-button main-button-primary" 
+                      style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                Save
+              </button>
+            </div>
+          </div>
       </div>
     `;
 
-    Spicetify.PopupModal.display({
-      title: "<span style='font-size: 25px;'>Gemini API Key</span>",
-      content: modalContainer,
-      isLarge: true,
-    });
-    tagActiveModalWithFontScope();
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+    
+    const inputField = document.getElementById("geminiApiKey");
+    inputField.focus();
 
-    if (isMenuOpen) {
-      closeAllMenus();
-    }
-
-    const modalContainerElement = document.querySelector(".main-popupModal-container");
-    if (modalContainerElement) {
-      modalContainerElement.style.zIndex = "2000";
-    }
-    preventDragCloseModal();
+    const closeModal = () => overlay.remove();
 
     const saveButton = document.getElementById("saveGeminiApi");
     const cancelButton = document.getElementById("cancelGeminiApi");
 
-    saveButton.addEventListener("mouseenter", () => {
-      saveButton.style.backgroundColor = "#3BE377";
+    saveButton.addEventListener("mouseenter", () => { saveButton.style.backgroundColor = "#3BE377"; });
+    saveButton.addEventListener("mouseleave", () => { saveButton.style.backgroundColor = "#1ED760"; });
+    cancelButton.addEventListener("mouseenter", () => { cancelButton.style.backgroundColor = "#444444"; });
+    cancelButton.addEventListener("mouseleave", () => { cancelButton.style.backgroundColor = "#333333"; });
+
+    saveButton.addEventListener("click", async () => {
+      const apiKey = inputField.value.trim();
+
+      saveButton.disabled = true;
+      saveButton.style.backgroundColor = "#FFFFFFB3";
+      saveButton.textContent = "Saving...";
+
+      if (apiKey) {
+        localStorage.setItem("sort-play-gemini-api-key", apiKey);
+        Spicetify.showNotification("Gemini API key saved successfully!");
+      } else {
+        localStorage.removeItem("sort-play-gemini-api-key");
+        Spicetify.showNotification("Gemini API key cleared.");
+      }
+
+      closeModal();
     });
-    saveButton.addEventListener("mouseleave", () => {
-      saveButton.style.backgroundColor = "#1ED760";
-    });
 
-    cancelButton.addEventListener("mouseenter", () => {
-      cancelButton.style.backgroundColor = "#444444";
-    });
-
-    cancelButton.addEventListener("mouseleave", () => {
-      cancelButton.style.backgroundColor = "#333333";
-    });
-
-  function enableButton(button) {
-    button.disabled = false;
-    button.style.backgroundColor = "#1ED760";
-    button.style.cursor = "pointer";
-  }
-
-  saveButton.addEventListener("click", async () => {
-    const apiKey = document.getElementById("geminiApiKey").value.trim();
-
-    saveButton.disabled = true;
-    saveButton.style.backgroundColor = "#FFFFFFB3";
-    saveButton.style.cursor = "default";
-    saveButton.textContent = "Saving...";
-
-    if (apiKey) {
-      localStorage.setItem("sort-play-gemini-api-key", apiKey);
-      Spicetify.showNotification("Gemini API key saved successfully!");
-    } else {
-      localStorage.removeItem("sort-play-gemini-api-key");
-      Spicetify.showNotification("Gemini API key cleared.");
-    }
-
-    Spicetify.PopupModal.hide();
-    enableButton(saveButton);
-    saveButton.textContent = "Save";
-  });
-
-    cancelButton.addEventListener("click", () => {
-      Spicetify.PopupModal.hide();
-      enableButton(cancelButton);
-    });
+    cancelButton.addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
 
   function rgbToHsl(r, g, b) {
@@ -18842,7 +18838,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         'recommendAllTime': { title: "Discovery", sub: "All-Time" },
         'pureDiscovery': { title: "Discovery", sub: "Pure" },
         'genreTreeExplorer': { title: "Genre Explorer", sub: "" },
-        'randomGenreExplorer': { title: "Genre Explorer", sub: "Random" }
+        'randomGenreExplorer': { title: "Genre Explorer", sub: "Random" },
+        'infiniteVibe': { title: "Infinite Vibe", sub: "Last.fm" },
+        'neighborsMix': { title: "Neighbors Mix", sub: "Last.fm" }
     };
 
     if (textMapping[sortType]) {
@@ -18855,6 +18853,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const releasePlaylistColor = '#3798a5';
     const discoveryPlaylistColor = '#8f46d7';
+    const lastFmPlaylistColor = '#D1170E';
     const defaultUsernameColor = '#24bf70';
 
     const releasePlaylistTypes = playlistCardsData
@@ -18865,11 +18864,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .find(section => section.title === 'Discovery')?.cards
         .map(card => card.id) || [];
     
+    const lastFmPlaylistTypes = playlistCardsData
+        .find(section => section.title === 'Last.fm')?.cards
+        .map(card => card.id) || [];
+    
     let usernameColor;
     if (discoveryPlaylistTypes.includes(sortType)) {
         usernameColor = discoveryPlaylistColor;
     } else if (releasePlaylistTypes.includes(sortType)) {
         usernameColor = releasePlaylistColor;
+    } else if (lastFmPlaylistTypes.includes(sortType)) {
+        usernameColor = lastFmPlaylistColor;
     } else {
         usernameColor = defaultUsernameColor;
     }
@@ -19882,6 +19887,600 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return shuffleArray(recommendedTracks).slice(0, numTracksNeeded);
   }
 
+  async function generateInfiniteVibe(options = {}) {
+    const { isHeadless = false } = options;
+    
+    if (!isHeadless) {
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        toggleMenu();
+        closeAllMenus();
+    }
+
+    const updateProgress = (msg) => {
+        if (!isHeadless) mainButton.innerText = msg;
+    };
+
+    try {
+        updateProgress("Seeds...");
+        const seeds = [];
+        let anchorSongName = "Current Vibe";
+
+        const currentTrack = Spicetify.Player.data?.item;
+        if (currentTrack && currentTrack.uri.startsWith('spotify:track:') && !Spicetify.URI.isLocal(currentTrack.uri)) {
+            anchorSongName = currentTrack.name;
+            seeds.push({
+                name: currentTrack.name,
+                artist: currentTrack.artists[0].name,
+                source: 'anchor'
+            });
+        }
+
+        try {
+            const topTracks = await getTopItems('tracks', 'short_term', 20);
+            if (topTracks && topTracks.length > 0) {
+                const shuffledTop = shuffleArray(topTracks).slice(0, 3);
+                shuffledTop.forEach(t => seeds.push({
+                    name: t.name,
+                    artist: t.artists[0].name,
+                    source: 'obsession'
+                }));
+            }
+        } catch (e) {
+            console.warn("Failed to fetch recent obsessions for Infinite Vibe:", e);
+        }
+
+        const allLiked = await getLikedSongs();
+        if (allLiked.length > 0) {
+            const shuffledLiked = shuffleArray(allLiked).slice(0, 5);
+            shuffledLiked.forEach(t => seeds.push({
+                name: t.name,
+                artist: t.artistName || t.artists[0]?.name,
+                source: 'wildcat'
+            }));
+        }
+
+        if (seeds.length === 0) {
+            throw new Error("Could not generate seeds. Play a song or add liked songs.");
+        }
+
+        updateProgress("Echoes...");
+        const candidates = new Map(); 
+
+        const seedProcessingPromises = seeds.map(async (seed, index) => {
+            const params = new URLSearchParams({
+                method: 'track.getsimilar',
+                artist: seed.artist,
+                track: seed.name,
+                limit: '30',
+                format: 'json'
+            });
+            
+            try {
+                const res = await fetchLfmWithGateway(params);
+                if (res.ok) {
+                    const data = await res.json();
+                    const similarTracks = data.similartracks?.track || [];
+                    const seedArtistLower = seed.artist.toLowerCase().trim();
+                    
+                    similarTracks.forEach(simTrack => {
+                        const matchScore = parseFloat(simTrack.match);
+                        if (matchScore < 0.15) return;
+
+                        const sArtistName = simTrack.artist.name;
+                        const sArtistLower = sArtistName.toLowerCase().trim();
+
+                        if (sArtistLower.includes(seedArtistLower) || seedArtistLower.includes(sArtistLower)) {
+                            return;
+                        }
+
+                        const sName = simTrack.name;
+                        const key = `${sArtistLower}|${sName.toLowerCase().trim()}`;
+                        
+                        if (!candidates.has(key)) {
+                            candidates.set(key, {
+                                score: 0,
+                                sources: new Set(),
+                                trackName: sName,
+                                artistName: sArtistName
+                            });
+                        }
+                        
+                        const candidate = candidates.get(key);
+                        candidate.score += 1;
+                        candidate.sources.add(`seed-${index}`); 
+                    });
+                }
+            } catch (e) {
+                console.warn(`Failed to get similar tracks for seed: ${seed.name}`, e);
+            }
+        });
+
+        await Promise.all(seedProcessingPromises);
+
+        const scoredCandidates = [];
+        const seedKeys = new Set(seeds.map(s => `${s.artist.toLowerCase().trim()}|${s.name.toLowerCase().trim()}`));
+
+        candidates.forEach((cand, key) => {
+            if (seedKeys.has(key)) return;
+
+            if (cand.sources.size > 1) {
+                cand.score += 50;
+            }
+            scoredCandidates.push(cand);
+        });
+
+        scoredCandidates.sort((a, b) => b.score - a.score);
+        const topCandidates = scoredCandidates.slice(0, 80);
+
+        if (topCandidates.length === 0) {
+            throw new Error("No similar tracks found above threshold.");
+        }
+
+        updateProgress("Resolving...");
+        
+        const mockLocalTracks = topCandidates.map(c => ({
+            uri: "spotify:local:::::", 
+            name: c.trackName,
+            artistName: c.artistName
+        }));
+
+        const { convertedTracks: resolvedSpotifyTracks } = await convertLocalTracksToSpotify(
+            mockLocalTracks,
+            (progressMsg) => {
+                const displayMsg = progressMsg.replace("Find-Local", "Resolve");
+                updateProgress(displayMsg);
+            }
+        );
+
+        updateProgress("Verifying...");
+        const availableTracks = [];
+        for (const t of resolvedSpotifyTracks) {
+            if (await isTrackAvailable(t)) availableTracks.push(t);
+        }
+
+        updateProgress("Filtering...");
+        const likedUris = new Set(allLiked.map(s => s.uri));
+        const likedTrackIds = allLiked.map(s => s.uri.split(':')[2]).filter(Boolean);
+        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+        const likedIsrcs = new Set();
+        cachedLikedMetadata.forEach(meta => {
+            if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
+        });
+
+        const candidatesForMeta = availableTracks.map(t => ({
+            uri: t.uri,
+            id: t.id || t.uri.split(':')[2],
+            track: t.track || t, 
+            name: t.name,
+            artistName: t.artistName || (t.artists && t.artists[0]?.name) || "",
+            allArtists: t.allArtists || (t.artists && t.artists.map(a => a.name).join(", ")),
+            artists: t.artists
+        }));
+
+        const candidatesWithMeta = await refreshTrackAlbumInfo(candidatesForMeta, () => {});
+        
+        const likedFilteredPool = candidatesWithMeta.filter(c => {
+            if (likedUris.has(c.uri)) return false;
+            const isrc = c.track?.external_ids?.isrc;
+            if (isrc && likedIsrcs.has(isrc)) return false;
+            return true;
+        });
+
+        updateProgress("History...");
+        let finalPoolTracks = likedFilteredPool;
+        
+        if (loadLastFmUsername()) {
+             const poolWithScrobbles = await processBatchesWithDelay(
+                likedFilteredPool, 
+                50, 
+                200, 
+                (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; },
+                getTrackDetailsWithPersonalScrobbles
+            );
+
+            const unlistenedTracks = poolWithScrobbles.filter(t => !t.personalScrobbles || t.personalScrobbles === 0);
+            
+            if (unlistenedTracks.length < 50) {
+                const listenedTracks = poolWithScrobbles.filter(t => t.personalScrobbles > 0);
+                const needed = 50 - unlistenedTracks.length;
+                const backfill = listenedTracks.slice(0, needed);
+                finalPoolTracks = [...unlistenedTracks, ...backfill];
+            } else {
+                finalPoolTracks = unlistenedTracks;
+            }
+        }
+
+        updateProgress("Sequencing...");
+        const top50 = finalPoolTracks.slice(0, 50);
+        
+        if (top50.length === 0) {
+            throw new Error("No available tracks found after filtering.");
+        }
+
+        const trackIds = top50.map(t => t.uri.split(':')[2]);
+        const stats = await getBatchTrackStats(trackIds);
+        
+        const tracksWithFeatures = top50.map(t => {
+            const id = t.uri.split(':')[2];
+            return { ...t, features: stats[id] };
+        });
+
+        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+
+        const sorted = await energyWaveSort(validForWave);
+        const finalTracks = [...sorted, ...others];
+        
+        const trackUris = finalTracks.map(t => t.uri);
+
+        const playlistName = "Infinite Vibe";
+        const playlistDescription = `A continuous mood generated from '${anchorSongName}', recent obsessions, and library deep cuts. Created by Sort-Play.`;
+
+        updateProgress("Creating...");
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('infiniteVibe', playlistName, playlistDescription);
+
+        updateProgress("Saving...");
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
+
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
+        await navigateToPlaylist(newPlaylist);
+
+    } catch (error) {
+        console.error("Error generating Infinite Vibe:", error);
+        Spicetify.showNotification(`Infinite Vibe failed: ${error.message}`, true);
+    } finally {
+        if (!isHeadless) {
+            resetButtons();
+        }
+    }
+  }
+
+  async function generateNeighborsMix(options = {}) {
+    const { isHeadless = false } = options;
+    
+    const username = loadLastFmUsername();
+    if (!username) {
+        if (!isHeadless) Spicetify.showNotification("Last.fm username not set. Please set it in Settings.", true);
+        return;
+    }
+
+    if (!isHeadless) {
+        setButtonProcessing(true);
+        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+        mainButton.style.color = buttonStyles.main.disabledColor;
+        mainButton.style.cursor = "default";
+        svgElement.style.fill = buttonStyles.main.disabledColor;
+        menuButtons.forEach((button) => (button.disabled = true));
+        toggleMenu();
+        closeAllMenus();
+    }
+
+    const updateProgress = (msg) => {
+        if (!isHeadless) mainButton.innerText = msg;
+    };
+
+    const parseObsessionsFromDoc = (doc) => {
+        const items = doc.querySelectorAll('.obsession-history-item');
+        return Array.from(items).map(item => {
+            const trackName = item.querySelector('.obsession-history-item-heading')?.textContent?.trim();
+            const artistName = item.querySelector('.obsession-history-item-artist span a')?.textContent?.trim() || 
+                               item.querySelector('.obsession-history-item-artist')?.textContent?.trim();
+            
+            if (trackName && artistName) {
+                return { name: trackName, artist: { name: artistName } }; 
+            }
+            return null;
+        }).filter(Boolean);
+    };
+
+    const scrapeNeighborObsessions = async (neighborName) => {
+        try {
+            const gatewayUrlBase = LFM_GATEWAY_URL;
+            const baseUrl = `https://www.last.fm/user/${neighborName}/obsessions`;
+            
+            const response = await fetch(`${gatewayUrlBase}${encodeURIComponent(baseUrl)}`);
+            if (!response.ok) return [];
+            
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+
+            let allTracks = parseObsessionsFromDoc(doc);
+
+            const paginationLinks = doc.querySelectorAll('.pagination-page a');
+            let totalPages = 1;
+            if (paginationLinks.length > 0) {
+                const lastPageText = paginationLinks[paginationLinks.length - 1].textContent.trim();
+                totalPages = parseInt(lastPageText) || 1;
+            }
+
+            if (totalPages > 1) {
+                const pagesToFetch = new Set();
+                const maxPagePool = Math.min(totalPages, 15);
+                
+                while (pagesToFetch.size < 3 && pagesToFetch.size < maxPagePool - 1) {
+                    const p = Math.floor(Math.random() * (maxPagePool - 1)) + 2; 
+                    pagesToFetch.add(p);
+                }
+
+                const pagePromises = Array.from(pagesToFetch).map(async (pageNum) => {
+                    const pageUrl = `${baseUrl}?page=${pageNum}`;
+                    try {
+                        const pRes = await fetch(`${gatewayUrlBase}${encodeURIComponent(pageUrl)}`);
+                        if (pRes.ok) {
+                            const pHtml = await pRes.text();
+                            const pDoc = new DOMParser().parseFromString(pHtml, "text/html");
+                            return parseObsessionsFromDoc(pDoc);
+                        }
+                    } catch (e) { return []; }
+                    return [];
+                });
+
+                const extraTracks = await Promise.all(pagePromises);
+                extraTracks.forEach(tracks => allTracks.push(...tracks));
+            }
+
+            return shuffleArray(allTracks).slice(0, 20);
+
+        } catch (e) {
+            console.warn(`[Sort-Play] Failed to scrape obsessions for ${neighborName}`, e);
+            return [];
+        }
+    };
+
+    try {
+        updateProgress("Neighbors...");
+
+        const targetUrl = `https://www.last.fm/user/${username}/neighbours`;
+        const gatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(targetUrl)}`;
+        
+        let candidates = [];
+        try {
+            const response = await fetch(gatewayUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            
+            const htmlText = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlText, "text/html");
+            const neighborNodes = doc.querySelectorAll('.user-list-item .user-list-name a');
+            
+            candidates = Array.from(neighborNodes).map(node => ({
+                name: node.textContent.trim()
+            }));
+        } catch (scrapeError) {
+            throw new Error(`Failed to scrape neighbors: ${scrapeError.message}`);
+        }
+
+        if (candidates.length === 0) {
+             throw new Error("No neighbors found. Last.fm might not have calculated them yet.");
+        }
+            
+        candidates = shuffleArray(candidates);
+        const activeNeighbors = candidates.slice(0, 20);
+
+        if (activeNeighbors.length === 0) {
+            throw new Error("Could not find any neighbors.");
+        }
+
+        updateProgress("Scanning...");
+        const trackScoreMap = new Map();
+
+        const processTrack = (track, points, neighborName) => {
+            if (!track || !track.name || !track.artist) return;
+            const artistName = track.artist.name || track.artist['#text']; 
+            const trackName = track.name;
+            if (!artistName || !trackName) return;
+
+            const key = `${artistName.toLowerCase().trim()}|${trackName.toLowerCase().trim()}`;
+            
+            if (!trackScoreMap.has(key)) {
+                trackScoreMap.set(key, {
+                    artist: artistName,
+                    track: trackName,
+                    score: 0,
+                    neighbors: new Set()
+                });
+            }
+            
+            const entry = trackScoreMap.get(key);
+            entry.score += points;
+            entry.neighbors.add(neighborName);
+        };
+
+        let neighborIndex = 0;
+        const neighborPromises = activeNeighbors.map(async (neighbor) => {
+            const name = neighbor.name;
+            
+            const p1 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: name, period: '7day', limit: '20', format: 'json' }));
+            const p2 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: name, period: 'overall', limit: '20', format: 'json' }));
+            const p3 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.getlovedtracks', user: name, limit: '20', format: 'json' }));
+            
+            const p4 = scrapeNeighborObsessions(name);
+
+            const [r1, r2, r3, obsessions] = await Promise.all([p1, p2, p3, p4]);
+            
+            const d1 = r1.ok ? await r1.json() : {};
+            const d2 = r2.ok ? await r2.json() : {};
+            const d3 = r3.ok ? await r3.json() : {};
+
+            const tracks7day = d1.toptracks?.track || [];
+            const tracksOverall = d2.toptracks?.track || [];
+            const tracksLoved = d3.lovedtracks?.track || [];
+
+            (Array.isArray(tracks7day) ? tracks7day : []).forEach(t => processTrack(t, 15, name));
+            (Array.isArray(tracksOverall) ? tracksOverall : []).forEach(t => processTrack(t, 15, name));
+            (Array.isArray(tracksLoved) ? tracksLoved : []).forEach(t => processTrack(t, 20, name));
+            obsessions.forEach(t => processTrack(t, 25, name));
+
+            neighborIndex++;
+            updateProgress(`Scan ${Math.round((neighborIndex / activeNeighbors.length) * 100)}%`);
+        });
+
+        await Promise.all(neighborPromises);
+
+        trackScoreMap.forEach(entry => {
+            if (entry.neighbors.size > 1) {
+                entry.score = entry.score * 1.5;
+            }
+        });
+
+        const sortedRawCandidates = Array.from(trackScoreMap.values())
+            .sort((a, b) => b.score - a.score);
+
+        const finalCandidates = [];
+        const artistCounts = new Map();
+        const MAX_TRACKS_PER_ARTIST = 2;
+        const TARGET_CANDIDATE_COUNT = 150;
+
+        for (const candidate of sortedRawCandidates) {
+            if (finalCandidates.length >= TARGET_CANDIDATE_COUNT) break;
+
+            const artistKey = candidate.artist.toLowerCase().trim();
+            const currentCount = artistCounts.get(artistKey) || 0;
+
+            if (currentCount < MAX_TRACKS_PER_ARTIST) {
+                finalCandidates.push(candidate);
+                artistCounts.set(artistKey, currentCount + 1);
+            }
+        }
+
+        updateProgress("Resolving...");
+        
+        const mockLocalTracks = finalCandidates.map(c => ({
+            uri: "spotify:local:::::",
+            name: c.track,
+            artistName: c.artist
+        }));
+
+        const { convertedTracks: resolvedSpotifyTracks } = await convertLocalTracksToSpotify(
+            mockLocalTracks,
+            (progressMsg) => {
+                const displayMsg = progressMsg.replace("Find-Local", "Resolve");
+                updateProgress(displayMsg);
+            }
+        );
+
+        updateProgress("Verifying...");
+        const availableTracks = [];
+        for (const t of resolvedSpotifyTracks) {
+            if (await isTrackAvailable(t)) availableTracks.push(t);
+        }
+
+        updateProgress("Filtering...");
+        const likedSongs = await getLikedSongs();
+        const likedUris = new Set(likedSongs.map(s => s.uri));
+        
+        const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
+        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+        const likedIsrcs = new Set();
+        cachedLikedMetadata.forEach(meta => {
+            if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
+        });
+
+        const candidatesForMeta = availableTracks.map(t => ({
+            uri: t.uri,
+            id: t.id || t.uri.split(':')[2],
+            track: t.track || t, 
+            name: t.name,
+            artistName: t.artistName || (t.artists && t.artists[0]?.name) || "",
+            allArtists: t.allArtists || (t.artists && t.artists.map(a => a.name).join(", ")),
+            artists: t.artists
+        }));
+
+        const candidatesWithMeta = await refreshTrackAlbumInfo(candidatesForMeta, () => {});
+        
+        const likedFilteredPool = candidatesWithMeta.filter(c => {
+            if (likedUris.has(c.uri)) return false;
+            const isrc = c.track?.external_ids?.isrc;
+            if (isrc && likedIsrcs.has(isrc)) return false;
+            return true;
+        });
+
+        updateProgress("History...");
+        const poolWithScrobbles = await processBatchesWithDelay(
+            likedFilteredPool, 
+            50, 
+            200, 
+            (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; },
+            getTrackDetailsWithPersonalScrobbles
+        );
+
+        const unlistenedTracks = poolWithScrobbles.filter(t => !t.personalScrobbles || t.personalScrobbles === 0);
+        let finalPoolTracks = unlistenedTracks;
+
+        if (unlistenedTracks.length < 50) {
+            const listenedTracks = poolWithScrobbles.filter(t => t.personalScrobbles > 0);
+            const needed = 50 - unlistenedTracks.length;
+            
+            const backfill = listenedTracks.slice(0, needed);
+            finalPoolTracks = [...unlistenedTracks, ...backfill];
+            
+            if (backfill.length > 0 && !isHeadless) {
+                console.log(`[Sort-Play] Backfilled Neighbors Mix with ${backfill.length} listened tracks to prevent empty playlist.`);
+            }
+        }
+
+        updateProgress("Sequencing...");
+        const top50 = finalPoolTracks.slice(0, 50);
+        
+        if (top50.length === 0) {
+            throw new Error("No available tracks found after filtering.");
+        }
+
+        const trackIds = top50.map(t => t.uri.split(':')[2]);
+        const stats = await getBatchTrackStats(trackIds);
+        
+        const tracksWithFeatures = top50.map(t => {
+            const id = t.uri.split(':')[2];
+            return {
+                ...t,
+                features: stats[id]
+            };
+        });
+
+        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+
+        const sorted = await energyWaveSort(validForWave);
+        const finalTracks = [...sorted, ...others];
+        
+        const trackUris = finalTracks.map(t => t.uri);
+
+        const playlistName = "Neighbors Mix";
+        const playlistDescription = "A balanced mix of current obsessions, trends, and favorites from your Last.fm neighbors. Filtered for discovery. Created by Sort-Play.";
+
+        updateProgress("Creating...");
+        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('neighborsMix', playlistName, playlistDescription);
+
+        updateProgress("Saving...");
+        if (wasUpdated) {
+            await replacePlaylistTracks(newPlaylist.id, trackUris);
+        } else {
+            await addTracksToPlaylist(newPlaylist.id, trackUris);
+        }
+
+        Spicetify.showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
+        await navigateToPlaylist(newPlaylist);
+
+    } catch (error) {
+        console.error("Error generating Neighbors Mix:", error);
+        Spicetify.showNotification(`Neighbors Mix failed: ${error.message}`, true);
+    } finally {
+        if (!isHeadless) {
+            resetButtons();
+        }
+    }
+  }
+
   async function generateGenreTreePlaylist(selectedGenres) {
     setButtonProcessing(true);
     mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
@@ -20493,12 +21092,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         topAllTime:      { time_range: 'long_term',   name: 'All-Time',        description: 'of all time' }
     };
 
-    const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedReleasesChronological', 'genreTreeExplorer'];
+    const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedReleasesChronological', 'genreTreeExplorer', 'infiniteVibe', 'neighborsMix'];
     if (recommendationSortTypes.includes(sortType)) {
         if (sortType === 'genreTreeExplorer') {
             showGenreTreeExplorerModal();
         } else if (sortType === 'followedReleasesChronological') {
             await generateFollowedReleasesChronological(options);
+        } else if (sortType === 'neighborsMix') {
+            await generateNeighborsMix(options);
+        } else if (sortType === 'infiniteVibe') {
+            await generateInfiniteVibe(options);
         } else { 
             await generateSpotifyRecommendations(sortType, options);
         }
