@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.30.0";
+  const SORT_PLAY_VERSION = "5.30.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -128,6 +128,7 @@
   const DEEZER_GATEWAY_URL = "https://deezer-proxy.hunqo.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_2 = "https://deezer-proxy-2.hoeci.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
+  const STATS_URL = "https://sp-stats.niko2nio2.workers.dev";
 
 
   const idb = {
@@ -3482,15 +3483,15 @@
     };
 
     const generateCardsHtml = (cards, category) => {
-        let overlayStyle = '';
+        let rgbColor = '0, 0, 0';
         if (category === 'discovery') {
-            overlayStyle = 'background: linear-gradient(90deg, rgba(143, 70, 215, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+            rgbColor = '143, 70, 215';
         } else if (category === 'newReleases') {
-            overlayStyle = 'background: linear-gradient(90deg, rgba(55, 152, 165, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+            rgbColor = '55, 152, 165';
         } else if (category === 'topTracks') {
-            overlayStyle = 'background: linear-gradient(90deg, rgba(36, 191, 112, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+            rgbColor = '36, 191, 112';
         } else if (category === 'lastFm') {
-            overlayStyle = 'background: linear-gradient(90deg, rgba(209, 23, 14, 0.07) 0%, rgba(0, 0, 0, 0.3) 80%, rgba(0, 0, 0, 0) 100%)';
+            rgbColor = '209, 23, 14';
         }       
 
         return cards.map(card => {
@@ -3503,11 +3504,11 @@
                 : `Auto`;
 
             return `
-                <div class="slim-card" data-id="${card.id}" data-name="${card.name}">
+                <div class="slim-card" data-id="${card.id}" data-name="${card.name}" style="--overlay-color: ${rgbColor};">
                     <div class="card-bg" style="background-image: url('${card.thumbnailUrl}');"></div>
-                    <div class="card-overlay" style="${overlayStyle}"></div>
+                    <div class="card-overlay"></div>
                     
-                    <div class="card-content-wrapper">
+                    <div class="card-content-wrapper" style="padding-bottom: 14px;">
                         <div class="card-text">
                             <div class="card-title-row">
                                 <span class="card-title">${card.name}</span>
@@ -3515,6 +3516,12 @@
                             </div>
                             <span class="card-desc">${card.description}</span>
                         </div>
+                    </div>
+
+                    <div class="global-stats" data-id="${card.id}" style="position: absolute; bottom: 5px; left: 12px; z-index: 3; display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity 0.5s ease;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                        <span class="stats-count" style="font-size: 10px; font-weight: 700; color: #1ed760; letter-spacing: 0.5px;"></span>
+                        <span style="font-size: 10px; color: #888;">global creations</span>
                     </div>
 
                     ${allowSettings ? `
@@ -3620,7 +3627,7 @@
         .category-column {
             display: flex;
             flex-direction: column;
-            gap: 56px;
+            gap: 66px;
             min-width: 0;
             overflow-y: auto;
             scrollbar-width: none;
@@ -3650,8 +3657,8 @@
 
         .slim-card {
             position: relative;
-            height: 75px;
-            background-color: #202020;
+            height: 85px;
+            background-color: #252525;
             border-radius: 6px;
             overflow: hidden;
             cursor: pointer;
@@ -3664,7 +3671,6 @@
         }
 
         .slim-card:hover {
-            border-color: #444;
             z-index: 2;
         }
         
@@ -3675,26 +3681,53 @@
 
         .card-bg {
             position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0; left: -4px; width: 102%; height: 102%;
             background-size: 100% auto;
             background-position: top center;
             filter: grayscale(0.2) brightness(0.7);
             
-            transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             will-change: transform;
             transform-origin: center center;
         }
 
         .slim-card:hover .card-bg, .slim-card:has(.settings-overlay-panel.active) .card-bg {
-            transform: scale(1.05);
+            transform: scale(1.03);
         }
 
         .card-overlay {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(90deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, rgba(0,0,0,0.0) 100%);
             z-index: 1;
             pointer-events: none;
+        }
+        
+        .card-overlay::before,
+        .card-overlay::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            transition: opacity 0.3s ease;
+        }
+
+        .card-overlay::before {
+            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.07) 0%, rgba(0,0,0,0.2) 100%);
+            opacity: 1;
+        }
+
+        .card-overlay::after {
+            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.15) 0%, rgba(0,0,0,0.0) 100%);
+            opacity: 0;
+        }
+
+        .slim-card:hover .card-overlay::before,
+        .slim-card:has(.settings-overlay-panel.active) .card-overlay::before {
+            opacity: 0;
+        }
+
+        .slim-card:hover .card-overlay::after,
+        .slim-card:has(.settings-overlay-panel.active) .card-overlay::after {
+            opacity: 1;
         }
 
         .card-content-wrapper {
@@ -3877,6 +3910,19 @@
     
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
+
+    fetch(`${STATS_URL}/counts`)
+        .then(res => res.json())
+        .then(data => {
+            Object.entries(data).forEach(([key, count]) => {
+                const statEl = modalContainer.querySelector(`.global-stats[data-id="${key}"]`);
+                if (statEl) {
+                    statEl.querySelector('.stats-count').textContent = count.toLocaleString();
+                    statEl.style.opacity = '1';
+                }
+            });
+        })
+        .catch(() => {});
 
     const closeModal = () => overlay.remove();
 
@@ -19071,6 +19117,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await movePlaylistToTop(playlistUri);
 
                 const minimalPlaylistData = { id: playlistId, uri: playlistUri, name: finalPlaylistName };
+                fetch(`${STATS_URL}/increment?key=${sortType}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
                 return { playlist: minimalPlaylistData, wasUpdated: true };
 
             } else {
@@ -19106,6 +19153,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             dedicatedPlaylistMap[sortType] = newPlaylist.uri;
             localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
         }
+        
+        fetch(`${STATS_URL}/increment?key=${sortType}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
     }
 
     return { playlist: newPlaylist, wasUpdated: false };
@@ -20066,11 +20115,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     try {
         updateProgress("Seeds...");
         const seeds = [];
-        let anchorSongName = "Current Vibe";
 
         const currentTrack = Spicetify.Player.data?.item;
         if (currentTrack && currentTrack.uri.startsWith('spotify:track:') && !Spicetify.URI.isLocal(currentTrack.uri)) {
-            anchorSongName = currentTrack.name;
             seeds.push({
                 name: currentTrack.name,
                 artist: currentTrack.artists[0].name,
@@ -20079,9 +20126,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
 
         try {
-            const topTracks = await getTopItems('tracks', 'short_term', 20);
+            const topTracks = await getTopItems('tracks', 'short_term', 30);
             if (topTracks && topTracks.length > 0) {
-                const shuffledTop = shuffleArray(topTracks).slice(0, 3);
+                const shuffledTop = shuffleArray(topTracks).slice(0, 10);
                 shuffledTop.forEach(t => seeds.push({
                     name: t.name,
                     artist: t.artists[0].name,
@@ -20094,11 +20141,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const allLiked = await getLikedSongs();
         if (allLiked.length > 0) {
-            const shuffledLiked = shuffleArray(allLiked).slice(0, 5);
+            const shuffledLiked = shuffleArray(allLiked).slice(0, 7);
             shuffledLiked.forEach(t => seeds.push({
                 name: t.name,
                 artist: t.artistName || t.artists[0]?.name,
-                source: 'wildcat'
+                source: 'liked'
             }));
         }
 
@@ -20173,7 +20220,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
 
         scoredCandidates.sort((a, b) => b.score - a.score);
-        const topCandidates = scoredCandidates.slice(0, 80);
+        const topCandidates = scoredCandidates.slice(0, 100);
 
         if (topCandidates.length === 0) {
             throw new Error("No similar tracks found above threshold.");
@@ -20229,12 +20276,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return true;
         });
 
+        const albumSeen = new Set();
+        const albumFilteredPool = [];
+        
+        for (const track of likedFilteredPool) {
+            const albumId = track.albumId || track.track?.album?.id;
+            if (albumId && !albumSeen.has(albumId)) {
+                albumSeen.add(albumId);
+                albumFilteredPool.push(track);
+            } else if (!albumId) {
+                const albumName = track.albumName || track.track?.album?.name;
+                if (albumName && !albumSeen.has(albumName)) {
+                    albumSeen.add(albumName);
+                    albumFilteredPool.push(track);
+                } else if (!albumName) {
+                    albumFilteredPool.push(track);
+                }
+            }
+        }
+
         updateProgress("History...");
-        let finalPoolTracks = likedFilteredPool;
+        let finalPoolTracks = albumFilteredPool;
         
         if (loadLastFmUsername()) {
              const poolWithScrobbles = await processBatchesWithDelay(
-                likedFilteredPool, 
+                albumFilteredPool, 
                 50, 
                 200, 
                 (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; },
@@ -20277,7 +20343,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const trackUris = finalTracks.map(t => t.uri);
 
         const playlistName = "Infinite Vibe";
-        const playlistDescription = `A continuous mood generated from '${anchorSongName}', recent obsessions, and library deep cuts. Created by Sort-Play.`;
+        const playlistDescription = "A continuous mood generated from recent obsessions and library deep cuts. Created by Sort-Play.";
 
         updateProgress("Creating...");
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('infiniteVibe', playlistName, playlistDescription);
