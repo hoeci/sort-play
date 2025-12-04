@@ -9878,6 +9878,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const trackArrays = await Promise.all(trackFetchPromises);
         combinedTracks = trackArrays.flat();
+        
+        if (limitEnabled && !isHeadless) {
+             const totalLimit = sources.reduce((acc, s) => acc + (parseInt(s.limit) || 0), 0);
+             const fetchedCount = combinedTracks.length;
+             if (fetchedCount < totalLimit * 0.9 && fetchedCount > 0) {
+                 showNotification(`Fetched ${fetchedCount} tracks (Limit total: ${totalLimit}). Some sources may be short.`, true);
+             }
+        }
+
         const filteredAdditionalTracks = additionalTracksToInclude.filter(track => !Spicetify.URI.isLocal(track.uri));
         combinedTracks.push(...filteredAdditionalTracks);
     }
@@ -10009,6 +10018,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (audioFeatureSortTypes.includes(sortType)) {
         const trackIds = tracksWithPopularity.map(t => t.trackId || t.uri.split(":")[2]);
         const allStats = await getBatchTrackStats(trackIds);
+        
+        if (Object.keys(allStats).length === 0 && trackIds.length > 0) {
+             showNotification(`Failed to fetch audio features (e.g. ${sortType}). Results may be empty.`, true);
+        }
+
         tracksForProcessing = tracksWithPopularity.map(track => {
             const stats = allStats[track.trackId || track.uri.split(":")[2]] || {};
             return { ...track, ...stats };
@@ -10069,6 +10083,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const valB = b[sortType] || 0;
                     return valB - valA;
                 });
+            
+            if (sortedTracks.length < uniqueTracks.length && !isHeadless) {
+                 const dropped = uniqueTracks.length - sortedTracks.length;
+                 showNotification(`Dropped ${dropped} tracks missing ${sortType} data.`, true);
+            }
             break;
         case "shuffle":
             sortedTracks = shuffleArray(uniqueTracks);
@@ -10282,7 +10301,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (finalTrackUris && finalTrackUris.length > 0) {
         await replacePlaylistTracks(job.targetPlaylistUri.split(':')[2], finalTrackUris);
     } else {
-        console.warn(`[Sort-Play Dynamic] Job for "${job.targetPlaylistName}" resulted in zero tracks. Playlist will not be updated.`);
+        const msg = `[Sort-Play Dynamic] Job for "${job.targetPlaylistName}" resulted in 0 tracks. Check filters or audio data.`;
+        console.warn(msg);
+        showNotification(msg, true);
     }
 
     if (newDescription) {
