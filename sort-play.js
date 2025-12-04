@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.30.1";
+  const SORT_PLAY_VERSION = "5.30.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -111,6 +111,7 @@
   const STORAGE_KEY_NOW_PLAYING_KEY_FORMAT = "sort-play-now-playing-key-format";
   const STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT = "sort-play-now-playing-popularity-format";
   const STORAGE_KEY_NOW_PLAYING_SEPARATOR = "sort-play-now-playing-separator";
+  const STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS = "sort-play-global-playlist-counts";
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
   const runningJobIds = new Set();
@@ -3439,6 +3440,7 @@
         box-shadow: 0 20px 50px rgba(0,0,0,0.6);
     `;
 
+    const cachedCounts = JSON.parse(localStorage.getItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS) || '{}');
     let dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
     const jobs = getDedicatedJobs();
     
@@ -3503,6 +3505,11 @@
                 ? `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}` 
                 : `Auto`;
 
+            const cachedCount = cachedCounts[card.id];
+            const hasCached = cachedCount !== undefined && cachedCount !== null;
+            const opacityStyle = hasCached ? '1' : '0';
+            const countText = hasCached ? cachedCount.toLocaleString() : '';
+
             return `
                 <div class="slim-card" data-id="${card.id}" data-name="${card.name}" style="--overlay-color: ${rgbColor};">
                     <div class="card-bg" style="background-image: url('${card.thumbnailUrl}');"></div>
@@ -3518,9 +3525,9 @@
                         </div>
                     </div>
 
-                    <div class="global-stats" data-id="${card.id}" style="position: absolute; bottom: 5px; left: 12px; z-index: 3; display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity 0.5s ease;">
+                    <div class="global-stats" data-id="${card.id}" style="position: absolute; bottom: 5px; left: 12px; z-index: 3; display: flex; align-items: center; gap: 4px; opacity: ${opacityStyle}; transition: opacity 0.5s ease;">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                        <span class="stats-count" style="font-size: 10px; font-weight: 700; color: #1ed760; letter-spacing: 0.5px;"></span>
+                        <span class="stats-count" style="font-size: 10px; font-weight: 700; color: #1ed760; letter-spacing: 0.5px; font-variant-numeric: tabular-nums;">${countText}</span>
                         <span style="font-size: 10px; color: #888;">global creations</span>
                     </div>
 
@@ -3911,14 +3918,43 @@
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
 
+    const animateValue = (obj, start, end, duration) => {
+        if (start === end) return;
+        let startTimestamp = null;
+        const step = (timestamp) => {
+            if (!startTimestamp) startTimestamp = timestamp;
+            const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+            const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+            
+            const current = Math.floor(ease * (end - start) + start);
+            obj.textContent = current.toLocaleString();
+
+            if (progress < 1) {
+                window.requestAnimationFrame(step);
+            } else {
+                obj.textContent = end.toLocaleString();
+            }
+        };
+        window.requestAnimationFrame(step);
+    };
+
     fetch(`${STATS_URL}/counts`)
         .then(res => res.json())
         .then(data => {
+            localStorage.setItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS, JSON.stringify(data));
             Object.entries(data).forEach(([key, count]) => {
                 const statEl = modalContainer.querySelector(`.global-stats[data-id="${key}"]`);
                 if (statEl) {
-                    statEl.querySelector('.stats-count').textContent = count.toLocaleString();
-                    statEl.style.opacity = '1';
+                    const countEl = statEl.querySelector('.stats-count');
+                    const currentValStr = countEl.textContent.replace(/,/g, '');
+                    const currentVal = currentValStr ? parseInt(currentValStr, 10) : 0;
+                    
+                    if (statEl.style.opacity === '0' || statEl.style.opacity === '') {
+                        countEl.textContent = count.toLocaleString();
+                        statEl.style.opacity = '1';
+                    } else if (currentVal !== count) {
+                        animateValue(countEl, currentVal, count, 1500);
+                    }
                 }
             });
         })
