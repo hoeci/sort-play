@@ -3693,7 +3693,7 @@
             background-position: top center;
             filter: grayscale(0.2) brightness(0.7);
             
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             will-change: transform;
             transform-origin: center center;
         }
@@ -3714,7 +3714,7 @@
             content: "";
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            transition: opacity 0.3s ease;
+            transition: opacity 0.25s ease;
         }
 
         .card-overlay::before {
@@ -3723,7 +3723,7 @@
         }
 
         .card-overlay::after {
-            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.17) 0%, rgba(0,0,0,0.0) 100%);
+            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.18) 0%, rgba(var(--overlay-color), 0.03) 100%);
             opacity: 0;
         }
 
