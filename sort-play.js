@@ -3723,7 +3723,7 @@
         }
 
         .card-overlay::after {
-            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.15) 0%, rgba(0,0,0,0.0) 100%);
+            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.17) 0%, rgba(0,0,0,0.0) 100%);
             opacity: 0;
         }
 
