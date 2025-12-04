@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.30.2";
+  const SORT_PLAY_VERSION = "5.30.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -10084,7 +10084,37 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     };
   }
   
-  async function runJob(jobConfig, isInitialRun = false) {
+  const isJobDue = (job, currentTime) => {
+    if (job.isDeleted) return false;
+    const lastRun = job.lastRun || 0;
+    const schedule = job.schedule;
+
+    if (schedule === 'manual') {
+        return false;
+    }
+
+    if (typeof schedule === 'number') {
+        return currentTime > lastRun + schedule;
+    }
+
+    if (typeof schedule === 'string' && schedule.startsWith('release-')) {
+        const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
+
+        switch (schedule) {
+            case 'release-weekly':
+                return daysSinceLastRun > 6;
+            case 'release-every-two-weeks':
+                return daysSinceLastRun > 13;
+            case 'release-monthly':
+                return daysSinceLastRun > 27;
+            default:
+                return false;
+        }
+    }
+    return false;
+  };
+
+  async function runJob(jobConfig, isInitialRun = false, updateSchedule = true) {
     let job = { ...jobConfig };
     let finalTrackUris;
     let newDescription = null;
@@ -10208,7 +10238,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const sampledTrackUris = result.trackUris;
 
             if (!sampledTrackUris || sampledTrackUris.length === 0) {
-                job.lastRun = Date.now();
+                if (updateSchedule) job.lastRun = Date.now();
                 return job;
             }
             const targetTracks = await getPlaylistTracks(playlistId);
@@ -10221,10 +10251,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             job.sources.forEach(source => {
                 const newHistory = result.newUsedUrisBySource[source.uri];
                 if (newHistory) {
-                    source.usedTrackUris = newHistory;
+                    source.usedTrackURIs = newHistory;
                 }
             });
-            job.lastRun = Date.now();
+            if (updateSchedule) job.lastRun = Date.now();
             return job;
         } else if (updateMode === 'merge') {
             const targetTracks = await getPlaylistTracks(playlistId);
@@ -10266,58 +10296,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     }
 
-    job.lastRun = Date.now();
+    if (updateSchedule) job.lastRun = Date.now();
     return job;
   }
 
   async function checkAndRunJobs() {
     const jobs = getJobs();
     const now = Date.now();
-
-    const isJobDue = (job, currentTime) => {
-        const lastRun = job.lastRun || 0;
-        const schedule = job.schedule;
-
-        if (schedule === 'manual') {
-            return false;
-        }
-
-        if (typeof schedule === 'number') {
-            return currentTime > lastRun + schedule;
-        }
-
-        if (typeof schedule === 'string' && schedule.startsWith('release-')) {
-            const nowDate = new Date(currentTime);
-            const lastRunDate = new Date(lastRun);
-
-            if (nowDate.getDay() !== 5) {
-                return false;
-            }
-
-            if (lastRunDate.toDateString() === nowDate.toDateString()) {
-                return false;
-            }
-
-            const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
-
-            switch (schedule) {
-                case 'release-weekly':
-                    return daysSinceLastRun > 6;
-                case 'release-every-two-weeks':
-                    return daysSinceLastRun > 13;
-                case 'release-monthly':
-                    return daysSinceLastRun > 27;
-                default:
-                    return false;
-            }
-        }
-        return false;
-    };
-
-    const jobsToRun = jobs.filter(job => isJobDue(job, now));
+    const jobsToRun = jobs.filter(job => !job.isDeleted && isJobDue(job, now));
 
     if (jobsToRun.length > 0) {
-        for (const job of jobsToRun) {
+        await Promise.allSettled(jobsToRun.map(async (job) => {
             try {
                 const updatedJob = await runJob(job);
                 updateJob(updatedJob);
@@ -10327,7 +10316,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 job.lastRun = now;
                 updateJob(job);
             }
-        }
+        }));
     }
   }
 
@@ -11903,7 +11892,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 showNotification(`Running job for "${job.targetPlaylistName}"...`);
         
                 try {
-                    const updatedJob = await runJob(job);
+                    const shouldUpdateSchedule = isJobDue(job, Date.now());
+                    const updatedJob = await runJob(job, false, shouldUpdateSchedule);
                     updateJob(updatedJob);
                     showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
                 } catch (error) {
@@ -12714,6 +12704,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const value = parseInt(input.value, 10);
                     if (sources[index] && value > 0) {
                         sources[index].limit = value;
+                    }
+                });
+            }
+
+            if (isEditing && jobToEdit && jobToEdit.sources) {
+                sources.forEach(source => {
+                    const originalSource = jobToEdit.sources.find(s => s.uri === source.uri);
+                    if (originalSource && originalSource.usedTrackURIs) {
+                        source.usedTrackURIs = originalSource.usedTrackURIs;
                     }
                 });
             }
