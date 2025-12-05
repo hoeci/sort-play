@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.30.5";
+  const SORT_PLAY_VERSION = "5.30.6";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -270,8 +270,8 @@
   notificationStyles.innerHTML = `
       #sort-play-notifications-wrapper {
           position: fixed;
-          bottom: 110px;
-          left: 30px;
+          bottom: 108px;
+          left: 0;
           z-index: 2147483647;
           display: flex;
           flex-direction: column;
@@ -302,24 +302,24 @@
       .sort-play-notification-toast {
           background-color: #fff;
           color: #000;
-          padding: 12px 20px;
-          border-radius: 6px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+          padding: 14px 24px 14px 20px;
+          border-radius: 0 8px 8px 0;
+          box-shadow: 4px 4px 12px rgba(0,0,0,0.3);
           font-family: 'SpotifyMixUI', sans-serif;
           font-size: 16px;
           font-weight: 500;
           opacity: 0;
-          transform: translateX(-20px);
+          transform: translateX(-100%);
           transition: 
-              opacity 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), 
-              transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1),
+              opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), 
+              transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1),
               margin-bottom 0.25s ease,
               max-height 0.25s ease;
           pointer-events: auto;
           cursor: pointer;
           max-width: 450px;
           text-align: left;
-          border-left: 4px solid #1db954;
+          border-left: 10px solid #1db954;
           word-wrap: break-word;
       }
       .sort-play-notification-toast:hover {
@@ -332,24 +332,26 @@
       .sort-play-notification-toast.sp-error {
           background-color: #e91429;
           color: white;
-          border-left: 4px solid #8a0c18;
+          border-left: 10px solid #8a0c18;
       }
       .sort-play-notification-toast.sp-warning {
           background-color: #FFC107;
           color: #000;
-          border-left: 4px solid #ff7600;
+          border-left: 10px solid #ff7600;
       }
       .sort-play-notification-toast.sp-sticky {
           background-color: #2e77d0;
           color: white;
-          border-left: 4px solid #16457a;
+          border-left: 10px solid #16457a;
       }
       .sort-play-notification-toast.hiding {
           opacity: 0;
-          transform: translateX(-10px);
+          transform: translateX(-100%);
           pointer-events: none;
+          transition: transform 0.35s ease, opacity 0.3s ease;
       }
   `;
+
   document.head.appendChild(notificationStyles);
 
   let notificationContainer = document.getElementById('sort-play-notifications-wrapper');
@@ -381,7 +383,7 @@
       stickyNotificationContainer = notificationContainer.children[2];
   }
 
-  function showNotification(text, typeOrIsError = false, duration = 4000) {
+  function showNotification(text, typeOrIsError = false, duration = 4800) {
       let type = 'info';
       if (typeof typeOrIsError === 'boolean') {
           type = typeOrIsError ? 'error' : 'info';
@@ -409,7 +411,7 @@
       container.appendChild(toast);
       updateDivider();
 
-      requestAnimationFrame(() => toast.classList.add('visible'));
+      setTimeout(() => toast.classList.add('visible'), 50);
 
       let autoDismiss;
       if (duration > 0) {
@@ -424,7 +426,7 @@
           setTimeout(() => {
               if (element.parentNode) element.parentNode.removeChild(element);
               updateDivider();
-          }, 300);
+          }, 400);
       }
 
       function updateDivider() {
@@ -5001,7 +5003,7 @@
         const message = source === 'shuffle' 
             ? `Shuffled ${count} ${trackWord} and added to queue.`
             : `Sorted tracks added to queue.`;
-        showNotification(message, false, 3000);
+        showNotification(message);
 
     } catch (error) {
         console.error("Error setting queue with internal method:", error);
@@ -19478,7 +19480,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     } catch (error) {
         console.warn("Internal playlist creation failed, using Web API fallback:", error);
-        showNotification("Using fallback to create playlist.", false, 2000);
         const user = await Spicetify.Platform.UserAPI.getUser();
         const createPlaylistUrl = `https://api.spotify.com/v1/users/${user.username}/playlists`;
         newPlaylist = await Spicetify.CosmosAsync.post(createPlaylistUrl, { name, description, public: !createPlaylistPrivate });
