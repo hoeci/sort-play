@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.30.3";
+  const SORT_PLAY_VERSION = "5.30.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -136,16 +136,16 @@
     db: null,
     mem: {},
     init: () => new Promise((resolve, reject) => {
-        const request = indexedDB.open("SortPlayDB", 3);
+        const request = indexedDB.open("SortPlayDB", 4);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers'].forEach(store => {
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory'].forEach(store => {
                 if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
             });
         };
         request.onsuccess = (e) => {
             idb.db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers'].forEach(s => idb.mem[s] = new Map());
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory'].forEach(s => idb.mem[s] = new Map());
             resolve();
         };
         request.onerror = (e) => reject(e);
@@ -216,9 +216,56 @@
             tx.objectStore(store).put(item, key);
             tx.oncomplete = () => resolve();
         });
+    },
+    del: (store, key) => {
+        if (idb.mem[store]) idb.mem[store].delete(key);
+        return new Promise(resolve => {
+            if (!idb.db) return resolve();
+            const tx = idb.db.transaction([store], "readwrite");
+            tx.objectStore(store).delete(key);
+            tx.oncomplete = () => resolve();
+        });
     }
   };
   
+  async function migrateJobHistoryToIdb() {
+    const migrationFlag = "sort-play-history-migrated-v1";
+    if (localStorage.getItem(migrationFlag)) return;
+
+    console.log("[Sort-Play] Migrating track history to IDB...");
+    const jobsJson = localStorage.getItem("sort-play-dynamic-playlist-jobs");
+    if (!jobsJson) {
+        localStorage.setItem(migrationFlag, "true");
+        return;
+    }
+
+    try {
+        const jobs = JSON.parse(jobsJson);
+        let hasChanges = false;
+
+        for (const job of jobs) {
+            if (job.sources) {
+                for (const source of job.sources) {
+                    if (source.usedTrackURIs && Array.isArray(source.usedTrackURIs) && source.usedTrackURIs.length > 0) {
+                        const key = `${job.id}_${source.uri}`;
+                        await idb.set('jobHistory', key, source.usedTrackURIs);
+                        delete source.usedTrackURIs; 
+                        hasChanges = true;
+                    }
+                }
+            }
+        }
+
+        if (hasChanges) {
+            localStorage.setItem("sort-play-dynamic-playlist-jobs", JSON.stringify(jobs));
+            console.log("[Sort-Play] Migration successful. LocalStorage freed.");
+        }
+        localStorage.setItem(migrationFlag, "true");
+    } catch (e) {
+        console.error("[Sort-Play] Migration failed:", e);
+    }
+  }
+
   const notificationStyles = document.createElement('style');
   notificationStyles.innerHTML = `
       #sort-play-notifications-wrapper {
@@ -229,9 +276,28 @@
           display: flex;
           flex-direction: column;
           align-items: flex-start;
-          gap: 10px;
+          gap: 0;
           pointer-events: none;
           max-height: 80vh;
+      }
+      .sp-notification-section {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+          width: 100%;
+          transition: margin-top 0.2s ease;
+      }
+      .sp-notification-divider {
+          height: 1px;
+          background: rgba(255, 255, 255, 0.15);
+          width: 100%;
+          margin: 10px 0;
+          display: none;
+          max-width: 450px;
+      }
+      .sp-notification-divider.visible {
+          display: block;
       }
       .sort-play-notification-toast {
           background-color: #fff;
@@ -268,6 +334,16 @@
           color: white;
           border-left: 4px solid #8a0c18;
       }
+      .sort-play-notification-toast.sp-warning {
+          background-color: #FFC107;
+          color: #000;
+          border-left: 4px solid #ff7600;
+      }
+      .sort-play-notification-toast.sp-sticky {
+          background-color: #2e77d0;
+          color: white;
+          border-left: 4px solid #16457a;
+      }
       .sort-play-notification-toast.hiding {
           opacity: 0;
           transform: translateX(-10px);
@@ -277,52 +353,92 @@
   document.head.appendChild(notificationStyles);
 
   let notificationContainer = document.getElementById('sort-play-notifications-wrapper');
+  let normalNotificationContainer, stickyNotificationContainer, notificationDivider;
+
   if (!notificationContainer) {
       notificationContainer = document.createElement('div');
       notificationContainer.id = 'sort-play-notifications-wrapper';
       document.body.appendChild(notificationContainer);
   }
+  
+  if (!notificationContainer.querySelector('.sp-notification-section')) {
+      notificationContainer.innerHTML = '';
+      normalNotificationContainer = document.createElement('div');
+      normalNotificationContainer.className = 'sp-notification-section';
+      
+      notificationDivider = document.createElement('div');
+      notificationDivider.className = 'sp-notification-divider';
+      
+      stickyNotificationContainer = document.createElement('div');
+      stickyNotificationContainer.className = 'sp-notification-section';
+      
+      notificationContainer.appendChild(normalNotificationContainer);
+      notificationContainer.appendChild(notificationDivider);
+      notificationContainer.appendChild(stickyNotificationContainer);
+  } else {
+      normalNotificationContainer = notificationContainer.children[0];
+      notificationDivider = notificationContainer.children[1];
+      stickyNotificationContainer = notificationContainer.children[2];
+  }
 
-  function showNotification(text, isError = false, duration = 4000) {
+  function showNotification(text, typeOrIsError = false, duration = 4000) {
+      let type = 'info';
+      if (typeof typeOrIsError === 'boolean') {
+          type = typeOrIsError ? 'error' : 'info';
+      } else if (typeof typeOrIsError === 'string') {
+          type = typeOrIsError;
+      } else if (typeof typeOrIsError === 'number') {
+          duration = typeOrIsError;
+      }
+
+      const isSticky = type === 'sticky';
+      if (isSticky && arguments.length < 3) duration = 0;
+
+      const container = isSticky ? stickyNotificationContainer : normalNotificationContainer;
       const toast = document.createElement('div');
       toast.className = 'sort-play-notification-toast';
       
-      if (isError) {
-          toast.classList.add('sp-error');
-      }
-      
-      if (typeof isError === 'number') {
-          duration = isError;
-          isError = false;
-      }
+      if (type === 'error') toast.classList.add('sp-error');
+      else if (type === 'warning') toast.classList.add('sp-warning');
+      else if (type === 'sticky') toast.classList.add('sp-sticky');
 
       toast.innerText = text;
 
-      toast.onclick = () => {
-          removeToast(toast);
-      };
+      toast.onclick = () => removeToast(toast);
 
-      notificationContainer.appendChild(toast);
+      container.appendChild(toast);
+      updateDivider();
 
-      requestAnimationFrame(() => {
-          toast.classList.add('visible');
-      });
+      requestAnimationFrame(() => toast.classList.add('visible'));
 
-      const autoDismiss = setTimeout(() => {
-          removeToast(toast);
-      }, duration);
+      let autoDismiss;
+      if (duration > 0) {
+          autoDismiss = setTimeout(() => removeToast(toast), duration);
+      }
 
       function removeToast(element) {
           if (!element || element.classList.contains('hiding')) return;
-          
-          clearTimeout(autoDismiss);
+          if (autoDismiss) clearTimeout(autoDismiss);
           element.classList.remove('visible');
           element.classList.add('hiding');
-          
           setTimeout(() => {
-              if (element.parentNode) element.remove();
+              if (element.parentNode) element.parentNode.removeChild(element);
+              updateDivider();
           }, 300);
       }
+
+      function updateDivider() {
+          const hasNormal = normalNotificationContainer.children.length > 0;
+          const hasSticky = stickyNotificationContainer.children.length > 0;
+          if (hasNormal && hasSticky) notificationDivider.classList.add('visible');
+          else notificationDivider.classList.remove('visible');
+      }
+
+      return {
+          update: (newText) => toast.innerText = newText,
+          remove: () => removeToast(toast),
+          element: toast
+      };
   }
 
   const L_F_M_Key_Pool = [
@@ -534,9 +650,7 @@
         const lastRun = job.lastRun || 0;
         const schedule = job.schedule;
 
-        if (schedule === 'manual') {
-            return false;
-        }
+        if (schedule === 'manual') return false;
 
         if (typeof schedule === 'number') {
             return currentTime > lastRun + schedule;
@@ -546,44 +660,51 @@
             const nowDate = new Date(currentTime);
             const lastRunDate = new Date(lastRun);
 
-            if (nowDate.getDay() !== 5) {
-                return false;
-            }
-
-            if (lastRunDate.toDateString() === nowDate.toDateString()) {
-                return false;
-            }
+            if (nowDate.getDay() !== 5) return false;
+            if (lastRunDate.toDateString() === nowDate.toDateString()) return false;
 
             const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
 
             switch (schedule) {
-                case 'release-weekly':
-                    return daysSinceLastRun > 6;
-                case 'release-every-two-weeks':
-                    return daysSinceLastRun > 13;
-                case 'release-monthly':
-                    return daysSinceLastRun > 27;
-                default:
-                    return false;
+                case 'release-weekly': return daysSinceLastRun > 6;
+                case 'release-every-two-weeks': return daysSinceLastRun > 13;
+                case 'release-monthly': return daysSinceLastRun > 27;
+                default: return false;
             }
         }
         return false;
     };
 
     const jobsToRun = jobs.filter(job => isJobDue(job, now));
+    const totalJobs = jobsToRun.length;
 
-    if (jobsToRun.length > 0) {
-        for (const job of jobsToRun) {
-            try {
-                const updatedJob = await runDedicatedJob(job);
-                updateDedicatedJob(updatedJob);
-                showNotification(`Dedicated playlist "${job.targetPlaylistName}" was updated.`);
-            } catch (error) {
-                console.error(`Failed to run dedicated playlist job for "${job.targetPlaylistName}":`, error);
-                showNotification(`Failed to update dedicated playlist: ${job.targetPlaylistName}`, true);
-                job.lastRun = now;
-                updateDedicatedJob(job);
+    if (totalJobs > 0) {
+        const stickyNotification = showNotification(`Starting Dedicated Updates (0/${totalJobs})...`, 'sticky');
+
+        try {
+            for (let i = 0; i < totalJobs; i++) {
+                const job = jobsToRun[i];
+                const currentStep = i + 1;
+                
+                stickyNotification.update(`Updating Dedicated Playlists (${currentStep}/${totalJobs}): ${job.targetPlaylistName}`);
+
+                try {
+                    const updatedJob = await runDedicatedJob(job);
+                    updateDedicatedJob(updatedJob);
+                } catch (error) {
+                    console.error(`Failed to run dedicated playlist job for "${job.targetPlaylistName}":`, error);
+                    showNotification(`Failed to update dedicated playlist: ${job.targetPlaylistName}`, true);
+                    job.lastRun = now;
+                    updateDedicatedJob(job);
+                }
+                
+                if (i < totalJobs - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
             }
+        } finally {
+            stickyNotification.remove();
+            showNotification(`Finished updating ${totalJobs} dedicated playlists.`);
         }
     }
   }
@@ -5871,7 +5992,7 @@ sendButton.addEventListener("click", async () => {
 
         const { prunedTracks, notification } = pruneTracksForApiLimit(tracksWithStats, combinedSystemInstruction, userRequestPayload, maxPromptSizeBytes);
         if (notification) {
-            showNotification(notification);
+            showNotification(notification, 'warning');
         }
         const trackDataPayload = `Playlist Tracks:\n${JSON.stringify(prunedTracks, null, 2)}`;
         fullPrompt = `${combinedSystemInstruction}\n\n${trackDataPayload}\n\n${userRequestPayload}`;
@@ -9763,6 +9884,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function deleteJob(jobId) {
     let jobs = getJobs();
+    const jobToDelete = jobs.find(job => job.id === jobId);
+    
+    if (jobToDelete && jobToDelete.sources) {
+        jobToDelete.sources.forEach(source => {
+            idb.del('jobHistory', `${jobId}_${source.uri}`);
+        });
+    }
+
     jobs = jobs.filter(job => job.id !== jobId);
     saveJobs(jobs);
   }
@@ -9856,7 +9985,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
 
             if (limitEnabled && source.limit > 0) {
-                let usedUris = new Set(source.usedTrackURIs || []);
+                let historyKey = config.id ? `${config.id}_${source.uri}` : null;
+                let storedHistory = historyKey ? await idb.get('jobHistory', historyKey) : [];
+                let usedUris = new Set(storedHistory || source.usedTrackURIs || []);
+                
                 let availableTracks = sourceTracks.filter(t => !usedUris.has(t.uri));
                 let selectedTracks;
 
@@ -9883,7 +10015,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
              const totalLimit = sources.reduce((acc, s) => acc + (parseInt(s.limit) || 0), 0);
              const fetchedCount = combinedTracks.length;
              if (fetchedCount < totalLimit * 0.9 && fetchedCount > 0) {
-                 showNotification(`Fetched ${fetchedCount} tracks (Limit total: ${totalLimit}). Some sources may be short.`, true);
+                 showNotification(`Fetched ${fetchedCount} tracks (Limit total: ${totalLimit}). Some sources may be short.`, 'warning');
              }
         }
 
@@ -9931,7 +10063,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             filteredTracks = tracksWithScrobbles.filter(t => (t.personalScrobbles || 0) === 0);
         } else {
             console.warn("[Sort-Play Dynamic Filter] Cannot exclude listened tracks. Last.fm username not set.");
-            if (!isHeadless) showNotification("Last.fm username not set, cannot exclude listened tracks.", true);
+            if (!isHeadless) showNotification("Last.fm username not set, cannot exclude listened tracks.", 'warning');
         }
     }
 
@@ -10086,7 +10218,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             
             if (sortedTracks.length < uniqueTracks.length && !isHeadless) {
                  const dropped = uniqueTracks.length - sortedTracks.length;
-                 showNotification(`Dropped ${dropped} tracks missing ${sortType} data.`, true);
+                 showNotification(`Dropped ${dropped} tracks missing ${sortType} data.`, 'warning');
             }
             break;
         case "shuffle":
@@ -10197,12 +10329,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         const result = await executeSortOperation({ ...job, isHeadless: true });
         finalTrackUris = result.trackUris;
-        job.sources.forEach(source => {
-            const newHistory = result.newUsedUrisBySource[source.uri];
+        
+        for (const [sourceUri, newHistory] of Object.entries(result.newUsedUrisBySource)) {
             if (newHistory) {
-                source.usedTrackURIs = newHistory;
+                await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
             }
-        });
+        }
     } else {
         const playlistId = job.targetPlaylistUri.split(':')[2];
         try {
@@ -10267,34 +10399,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (newTrackUris.length > 0) {
                 await Spicetify.Platform.PlaylistAPI.add(job.targetPlaylistUri, newTrackUris, { before: 0 });
             }
-            job.sources.forEach(source => {
-                const newHistory = result.newUsedUrisBySource[source.uri];
+            for (const [sourceUri, newHistory] of Object.entries(result.newUsedUrisBySource)) {
                 if (newHistory) {
-                    source.usedTrackURIs = newHistory;
+                    await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
                 }
-            });
+            }
             if (updateSchedule) job.lastRun = Date.now();
             return job;
         } else if (updateMode === 'merge') {
             const targetTracks = await getPlaylistTracks(playlistId);
             const mergeResult = await executeSortOperation({ ...job, isHeadless: true, additionalTracksToInclude: targetTracks });
             finalTrackUris = mergeResult.trackUris;
-            job.sources.forEach(source => {
-                const newHistory = mergeResult.newUsedUrisBySource[source.uri];
+            for (const [sourceUri, newHistory] of Object.entries((updateMode === 'merge' ? mergeResult : updateResult).newUsedUrisBySource)) {
                 if (newHistory) {
-                    source.usedTrackURIs = newHistory;
+                    await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
                 }
-            });
+            }
         } else {
             const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri, totalTracks: 0 }];
             const updateResult = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
             finalTrackUris = updateResult.trackUris;
-            job.sources.forEach(source => {
-                const newHistory = updateResult.newUsedUrisBySource[source.uri];
+            for (const [sourceUri, newHistory] of Object.entries((updateMode === 'merge' ? mergeResult : updateResult).newUsedUrisBySource)) {
                 if (newHistory) {
-                    source.usedTrackURIs = newHistory;
+                    await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
                 }
-            });
+            }
         }
     }
     
@@ -10303,7 +10432,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     } else {
         const msg = `[Sort-Play Dynamic] Job for "${job.targetPlaylistName}" resulted in 0 tracks. Check filters or audio data.`;
         console.warn(msg);
-        showNotification(msg, true);
+        showNotification(msg, 'warning');
     }
 
     if (newDescription) {
@@ -10325,29 +10454,59 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const jobs = getJobs();
     const now = Date.now();
     const jobsToRun = jobs.filter(job => !job.isDeleted && isJobDue(job, now));
+    const totalJobs = jobsToRun.length;
 
-    if (jobsToRun.length > 0) {
-        await Promise.allSettled(jobsToRun.map(async (job) => {
-            try {
-                const updatedJob = await runJob(job);
-                updateJob(updatedJob);
-                showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
-            } catch (error) {
-                showDetailedError(error, `Failed to run dynamic playlist job for "${job.targetPlaylistName}"`);
-                job.lastRun = now;
-                updateJob(job);
+    if (totalJobs > 0) {
+        const stickyNotification = showNotification(`Starting Dynamic Updates (0/${totalJobs})...`, 'sticky');
+        
+        try {
+            for (let i = 0; i < totalJobs; i++) {
+                const job = jobsToRun[i];
+                const currentStep = i + 1;
+                
+                stickyNotification.update(`Updating Dynamic Playlists (${currentStep}/${totalJobs}): ${job.targetPlaylistName}`);
+
+                try {
+                    const updatedJob = await runJob(job);
+                    updateJob(updatedJob);
+                } catch (error) {
+                    showDetailedError(error, `Failed to run dynamic playlist job for "${job.targetPlaylistName}"`);
+                    job.lastRun = now;
+                    updateJob(job);
+                }
+
+                if (i < totalJobs - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
             }
-        }));
+        } finally {
+            stickyNotification.remove();
+            showNotification(`Finished updating ${totalJobs} dynamic playlists.`);
+        }
     }
   }
 
   function startScheduler() {
-    checkAndRunJobs(); 
-    checkAndRunDedicatedJobs();
-    setInterval(() => {
-        checkAndRunJobs();
-        checkAndRunDedicatedJobs();
-    }, SCHEDULER_INTERVAL_MINUTES * 60 * 1000);
+    let isSchedulerRunning = false;
+
+    const runSequence = async () => {
+        if (isSchedulerRunning) return;
+        isSchedulerRunning = true;
+        try {
+            await checkAndRunJobs();
+            
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            await checkAndRunDedicatedJobs();
+        } catch (e) {
+            console.error("[Sort-Play] Scheduler error:", e);
+        } finally {
+            isSchedulerRunning = false;
+        }
+    };
+
+    runSequence();
+    setInterval(runSequence, SCHEDULER_INTERVAL_MINUTES * 60 * 1000);
   }
 
 
@@ -12606,7 +12765,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         if (!sources.some(s => s.uri === newSource.uri)) {
                             sources.push(newSource);
                         } else {
-                            showNotification(`Source "${newSource.name}" is already in the list.`);
+                            showNotification(`Source "${newSource.name}" is already in the list.`, 'warning');
                         }
                     });
                     renderSources();
@@ -15279,7 +15438,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             console.log(`[Sort-Play] Background cloud genre/audio caching complete for ${dataToSave.length} items.`);
         }).catch(err => {
             console.error("[Sort-Play] Background cloud genre caching failed:", err);
-            showNotification("[Sort-Play] Background cloud genre caching failed.", true);
+            showNotification("[Sort-Play] Background cloud genre caching failed.", 'warning');
         });
     }
 
@@ -16146,6 +16305,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     await new Promise(resolve => setTimeout(resolve, retryInterval));
                 } else {
                     console.error(`[Sort-Play] Failed to set and verify playlist image for ${playlistId} after ${maxRetries} attempts.`);
+                    showNotification("Failed to update playlist cover image. Spotify may be slow.", 'warning');
                 }
             }
         }
@@ -18277,7 +18437,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 } catch (error) {
                     console.error(`[Sort-Play] Platform API Error adding batch to start (Attempt ${retries + 1}):`, error);
                     if (retries === maxRetries) {
-                        showNotification("Failed to add some tracks.", true);
+                        showNotification("Failed to add some tracks.", 'warning');
                         break;
                     }
                     retries++;
@@ -18300,7 +18460,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 } catch (error) {
                     console.error(`[Sort-Play] CosmosAsync Error adding batch (Attempt ${retries + 1}):`, error);
                     if (retries === maxRetries) {
-                        showNotification("Failed to add some Spotify tracks.", true);
+                        showNotification("Failed to add some Spotify tracks.", 'warning');
                         break;
                     }
                     retries++;
@@ -18537,7 +18697,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         finalSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
     } else {
         if (useEnergyWaveShuffle && containsLocalFiles) {
-            showNotification("Local files detected. Reverting to standard shuffle.");
+            showNotification("Local files detected. Reverting to standard shuffle.", 'warning');
         }
         finalSortedTracks = shuffleArray(tracksToProcess);
     }
@@ -18768,7 +18928,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 "adding to library"
             );
         } else {
-             showNotification("Could not find any matching tracks on Spotify.");
+             showNotification("Could not find any matching tracks on Spotify.", 'warning');
         }
 
     } catch (error) {
@@ -19307,6 +19467,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     await new Promise(resolve => setTimeout(resolve, retryInterval));
                 } else {
                     console.error(`[Sort-Play] Failed to set and verify playlist description for ${playlistId} after ${maxRetries} attempts.`);
+                    showNotification("Failed to update playlist description.", 'warning');
                 }
             }
         }
@@ -19952,7 +20113,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     } catch (error) {
         console.error("Error generating Chronological Followed Releases:", error);
-        showNotification(error.message, true);
+        const isNotFound = error.message.includes("No new releases found") || error.message.includes("not following any artists");
+        showNotification(error.message, isNotFound ? 'warning' : true);
     } finally {
         if (!isHeadless) {
             resetButtons();
@@ -21620,7 +21782,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
       if (unconvertedLocalCount > 0 && !isHeadless) {
           const plural = unconvertedLocalCount === 1 ? "track" : "tracks";
-          showNotification(`${unconvertedLocalCount} local ${plural} not found on Spotify and were skipped.`);
+          showNotification(`${unconvertedLocalCount} local ${plural} not found on Spotify and were skipped.`, 'warning');
       }
 
       let sortedTracks;
@@ -22108,7 +22270,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (!sortedTracks || sortedTracks.length === 0) {
             console.log("No tracks left after sorting/filtering to create/modify playlist.");
             if (!addToQueueEnabled) {
-                showNotification("No tracks to process for playlist.");
+                showNotification("No tracks to process for playlist.", 'warning');
             }
             if (!isHeadless) resetButtons();
             return;
@@ -22238,13 +22400,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const base64Image = await toBase64(artistImageUrl);
                     await setPlaylistImage(newPlaylist.id, base64Image);
                   }
-                } catch (error) { console.error("Error setting playlist image:", error); }
+                } catch (error) { 
+                    console.error("Error setting playlist image:", error);
+                    showNotification("Failed to copy artist image to playlist cover.", 'warning');
+                }
               } else if (sourcePlaylistCoverUrl && !isDefaultMosaicCover(sourcePlaylistCoverUrl)) {
                 try {
                   const base64Image = await imageUrlToBase64(sourcePlaylistCoverUrl);
                   await setPlaylistImage(newPlaylist.id, base64Image);
                 } catch (error) {
                   console.warn("Could not apply original playlist/album cover:", error);
+                  showNotification("Failed to copy original cover image.", 'warning');
                 }
               }
               const trackUris = sortedTracks.map((track) => track.uri);
@@ -22276,7 +22442,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const plural = missingDataCount === 1 ? "track was" : "tracks were";
         setTimeout(() => {
-            showNotification(`${missingDataCount} ${plural} missing ${sortTypeInfo.fullName} data.`);
+            showNotification(`${missingDataCount} ${plural} missing ${sortTypeInfo.fullName} data.`, 'warning');
         }, 1500);
       }
       
@@ -23134,7 +23300,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
                     if (unconvertedCount > 0) {
                         const plural = unconvertedCount === 1 ? "track" : "tracks";
-                        showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`);
+                        showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`, 'warning');
                     }
         
                     if (!convertedTracks || convertedTracks.length === 0) {
@@ -25244,6 +25410,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }, 100);
 
   await idb.init();
+  await migrateJobHistoryToIdb();
   loadSettings();
   fetchUserMarket();
   cleanupLegacyGenreCache();
