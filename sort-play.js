@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.30.4";
+  const SORT_PLAY_VERSION = "5.30.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -16099,7 +16099,26 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         for (const album of batch.albums) {
           if (!album || !album.tracks || !album.tracks.items) continue;
           
-          const tracksFromAlbum = album.tracks.items
+          let rawTracks = [...album.tracks.items];
+          
+          if (album.tracks.next) {
+              let trackNextUrl = album.tracks.next;
+              while (trackNextUrl) {
+                  try {
+                      await new Promise(r => setTimeout(r, 50)); 
+                      const nextData = await CosmosAsync.get(trackNextUrl);
+                      if (nextData && nextData.items) {
+                          rawTracks.push(...nextData.items);
+                      }
+                      trackNextUrl = nextData.next;
+                  } catch (e) {
+                      console.warn(`[Sort-Play] Failed to fetch next page of tracks for album ${album.name}`, e);
+                      trackNextUrl = null;
+                  }
+              }
+          }
+
+          const tracksFromAlbum = rawTracks
             .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
             .map(track => ({
               uri: track.uri,
