@@ -16069,7 +16069,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
   
         nextUrl = albumRes.next;
-        if (nextUrl) await new Promise(resolve => setTimeout(resolve, 100)); 
+        if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
       } while (nextUrl);
   
       const allTracks = [];
@@ -16079,7 +16079,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       
       for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
         const batch = allAlbumIdArray.slice(i, i + batchSize);
-        
         const promise = withRetry(
             () => CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`),
             CONFIG.spotify.retryAttempts,
@@ -16088,7 +16087,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             console.warn(`[Sort-Play] Failed to fetch album batch for artist ${artistName} (skipped):`, err);
             return { albums: [] }; 
         });
-        
         batchPromises.push(promise);
       }
       
@@ -16096,51 +16094,65 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       
       for (const batch of albumDataBatches) {
         if (!batch || !batch.albums) continue;
-        for (const album of batch.albums) {
-          if (!album || !album.tracks || !album.tracks.items) continue;
-          
-          let rawTracks = [...album.tracks.items];
-          
-          if (album.tracks.next) {
-              let trackNextUrl = album.tracks.next;
-              while (trackNextUrl) {
-                  try {
-                      await new Promise(r => setTimeout(r, 50)); 
-                      const nextData = await CosmosAsync.get(trackNextUrl);
-                      if (nextData && nextData.items) {
-                          rawTracks.push(...nextData.items);
-                      }
-                      trackNextUrl = nextData.next;
-                  } catch (e) {
-                      console.warn(`[Sort-Play] Failed to fetch next page of tracks for album ${album.name}`, e);
-                      trackNextUrl = null;
-                  }
-              }
-          }
 
-          const tracksFromAlbum = rawTracks
-            .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
-            .map(track => ({
-              uri: track.uri,
-              uid: null, 
-              name: track.name,
-              albumUri: album.uri,
-              albumName: album.name,
-              artistUris: track.artists.map(artist => artist.uri),
-              allArtists: track.artists.map(artist => artist.name).join(", "),
-              artistName: track.artists[0].name,
-              durationMilis: track.duration_ms,
-              album_type: album.album_type,
-              playcount: 0, popularity: 0, releaseDate: 0,
-              track: {
-                album: { id: album.id },
+        const batchResults = await Promise.all(batch.albums.map(async (album) => {
+            if (!album || !album.tracks || !album.tracks.items) return [];
+            
+            let rawTracks = [...album.tracks.items];
+            const totalTracks = album.total_tracks || 0;
+
+            if (totalTracks > 50) {
+                const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
+
+                
+                let shouldFetchMore = true;
+                if (isCompilation) {
+                    const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
+                    if (foundInFirstPage) {
+                        shouldFetchMore = false;
+                    }
+                }
+
+                if (shouldFetchMore) {
+                    const pagePromises = [];
+                    for (let offset = 50; offset < totalTracks; offset += 50) {
+                        const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
+                        pagePromises.push(CosmosAsync.get(url).catch(() => null));
+                    }
+
+                    const pageResults = await Promise.all(pagePromises);
+                    pageResults.forEach(res => {
+                        if (res && res.items) {
+                            rawTracks.push(...res.items);
+                        }
+                    });
+                }
+            }
+
+            return rawTracks
+              .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
+              .map(track => ({
+                uri: track.uri,
+                uid: null, 
                 name: track.name,
-                duration_ms: track.duration_ms,
-                id: track.id,
-              },
-            }));
-          allTracks.push(...tracksFromAlbum);
-        }
+                albumUri: album.uri,
+                albumName: album.name,
+                artistUris: track.artists.map(artist => artist.uri),
+                allArtists: track.artists.map(artist => artist.name).join(", "),
+                artistName: track.artists[0].name,
+                durationMilis: track.duration_ms,
+                album_type: album.album_type,
+                playcount: 0, popularity: 0, releaseDate: 0,
+                track: {
+                  album: { id: album.id },
+                  name: track.name,
+                  duration_ms: track.duration_ms,
+                  id: track.id,
+                },
+              }));
+        }));
+
+        batchResults.forEach(albumTracks => allTracks.push(...albumTracks));
       }
 
       const coreTracks = [];
@@ -16209,7 +16221,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
   
         nextUrl = albumRes.next;
-        if (nextUrl) await new Promise(resolve => setTimeout(resolve, 100)); 
+        if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
       } while (nextUrl);
   
       const allTracks = [];
@@ -16227,32 +16239,64 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       
       for (const batch of albumDataBatches) {
         if (!batch.albums) continue;
-        for (const album of batch.albums) {
-          if (!album || !album.tracks || !album.tracks.items) continue;
-          
-          const tracksFromAlbum = album.tracks.items
-            .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
-            .map(track => ({
-              uri: track.uri,
-              uid: null, 
-              name: track.name,
-              albumUri: album.uri,
-              albumName: album.name,
-              artistUris: track.artists.map(artist => artist.uri),
-              allArtists: track.artists.map(artist => artist.name).join(", "),
-              artistName: track.artists[0].name,
-              durationMilis: track.duration_ms,
-              album_type: album.album_type,
-              playcount: 0, popularity: 0, releaseDate: 0,
-              track: {
-                album: { id: album.id },
-                name: track.name,
-                duration_ms: track.duration_ms,
-                id: track.id,
-              },
-            }));
-          allTracks.push(...tracksFromAlbum);
-        }
+
+        const batchResults = await Promise.all(batch.albums.map(async (album) => {
+            if (!album || !album.tracks || !album.tracks.items) return [];
+
+            let rawTracks = [...album.tracks.items];
+            const totalTracks = album.total_tracks || 0;
+
+            if (totalTracks > 50) {
+                const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
+                
+                let shouldFetchMore = true;
+                if (isCompilation) {
+                    const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
+                    if (foundInFirstPage) {
+                        shouldFetchMore = false;
+                    }
+                }
+
+                if (shouldFetchMore) {
+                    const pagePromises = [];
+                    for (let offset = 50; offset < totalTracks; offset += 50) {
+                        const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
+                        pagePromises.push(CosmosAsync.get(url).catch(() => null));
+                    }
+
+                    const pageResults = await Promise.all(pagePromises);
+                    pageResults.forEach(res => {
+                        if (res && res.items) {
+                            rawTracks.push(...res.items);
+                        }
+                    });
+                }
+            }
+
+            return rawTracks
+                .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
+                .map(track => ({
+                  uri: track.uri,
+                  uid: null, 
+                  name: track.name,
+                  albumUri: album.uri,
+                  albumName: album.name,
+                  artistUris: track.artists.map(artist => artist.uri),
+                  allArtists: track.artists.map(artist => artist.name).join(", "),
+                  artistName: track.artists[0].name,
+                  durationMilis: track.duration_ms,
+                  album_type: album.album_type,
+                  playcount: 0, popularity: 0, releaseDate: 0,
+                  track: {
+                    album: { id: album.id },
+                    name: track.name,
+                    duration_ms: track.duration_ms,
+                    id: track.id,
+                  },
+                }));
+        }));
+
+        batchResults.forEach(tracks => allTracks.push(...tracks));
       }
   
       const uniqueTracksMap = new Map();
