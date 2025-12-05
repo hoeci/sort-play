@@ -10217,8 +10217,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const valB = b[sortType] || 0;
                     return valB - valA;
                 });
-            
-            if (sortedTracks.length < uniqueTracks.length && !isHeadless) {
+            if (sortedTracks.length < uniqueTracks.length && (!isHeadless || sortedTracks.length === 0)) {
                  const dropped = uniqueTracks.length - sortedTracks.length;
                  showNotification(`Dropped ${dropped} tracks missing ${sortType} data.`, 'warning');
             }
