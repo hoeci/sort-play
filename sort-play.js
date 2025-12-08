@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.30.6";
+  const SORT_PLAY_VERSION = "5.31.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -9986,7 +9986,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 sourceTracks = sourceTracks.filter(track => !Spicetify.URI.isLocal(track.uri));
             }
 
-            if (limitEnabled && source.limit > 0) {
+            if (limitEnabled && source.limit > 0 && source.limitEnabled !== false) {
+                let actualLimit = source.limit;
+                if (source.limitMode === 'percent') {
+                    actualLimit = Math.max(1, Math.ceil(sourceTracks.length * (source.limit / 100)));
+                }
+
                 let historyKey = config.id ? `${config.id}_${source.uri}` : null;
                 let storedHistory = historyKey ? await idb.get('jobHistory', historyKey) : [];
                 let usedUris = new Set(storedHistory || source.usedTrackURIs || []);
@@ -9994,13 +9999,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 let availableTracks = sourceTracks.filter(t => !usedUris.has(t.uri));
                 let selectedTracks;
 
-                if (availableTracks.length < source.limit && sourceTracks.length > 0) {
+                if (availableTracks.length < actualLimit && sourceTracks.length > 0) {
                     const shuffledAll = shuffleArray(sourceTracks);
-                    selectedTracks = shuffledAll.slice(0, source.limit);
+                    selectedTracks = shuffledAll.slice(0, actualLimit);
                     newUsedUrisBySource[source.uri] = selectedTracks.map(t => t.uri);
                 } else {
                     const shuffledAvailable = shuffleArray(availableTracks);
-                    selectedTracks = shuffledAvailable.slice(0, source.limit);
+                    selectedTracks = shuffledAvailable.slice(0, actualLimit);
                     const newUris = selectedTracks.map(t => t.uri);
                     newUris.forEach(uri => usedUris.add(uri));
                     newUsedUrisBySource[source.uri] = Array.from(usedUris);
@@ -12309,7 +12314,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               .job-form-modal .card { background-color: #282828; border-radius: 8px; padding: 16px; }
               .job-form-modal .card-title { font-weight: 700; color: white; margin-bottom: 12px; font-size: 1rem; }
               .job-form-modal #source-list-container { display: flex; flex-direction: column; gap: 8px; max-height: 335px; overflow-y: auto; padding-right: 5px; margin-right: -4px;scrollbar-width: thin; overflow-y: scroll;}
-              .job-form-modal .source-item { display: flex; align-items: center; gap: 8px; background-color: #3e3e3e; padding: 8px; border-radius: 6px; }
+              .job-form-modal .source-item { display: flex; align-items: center; gap: 10px; background-color: #3e3e3e; padding: 8px; border-radius: 6px; }
               .job-form-modal .source-cover-art-small { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
               .job-form-modal .source-text-info { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
               .job-form-modal .source-name { color: white; font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -12403,6 +12408,115 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               #configure-genres-btn:hover {
                   background-color: #3e3e3e;
                 border-color: #878787;
+              }
+              .job-form-modal .limit-input-group {
+                  display: flex;
+                  align-items: stretch;
+                  background-color: #2a2a2a;
+                  border: 1px solid #555;
+                  border-radius: 4px;
+                  overflow: hidden;
+                  transition: border-color 0.2s;
+                  height: 26px;
+              }
+              .job-form-modal .source-limit-input {
+                  width: 40px !important;
+                  border: none !important;
+                  background: transparent !important;
+                  padding: 0 4px !important;
+                  text-align: center;
+                  color: white !important;
+                  font-weight: 500;
+                  height: 100%;
+                  outline: none !important;
+                  -moz-appearance: textfield;
+              }
+              .job-form-modal .source-limit-input::-webkit-outer-spin-button,
+              .job-form-modal .source-limit-input::-webkit-inner-spin-button {
+                  -webkit-appearance: none;
+                  margin: 0;
+              }
+              .job-form-modal .limit-spinners {
+                  display: flex;
+                  flex-direction: column;
+                  width: 20px;
+                  border-left: 1px solid #555;
+                  border-right: 1px solid #555;
+              }
+              .job-form-modal .limit-spinner-btn {
+                  flex: 1;
+                  background-color: #444;
+                  border: none;
+                  color: #b3b3b3;
+                  cursor: pointer;
+                  padding: 0;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  transition: background 0.2s;
+                  line-height: 0;
+              }
+              .job-form-modal .limit-spinner-btn:hover {
+                  background-color: #666;
+                  color: white;
+              }
+              .job-form-modal .limit-spinner-btn.up {
+                  border-bottom: 1px solid #555;
+              }
+              .job-form-modal .limit-spinner-btn svg {
+                  width: 8px;
+                  height: 8px;
+                  fill: currentColor;
+              }
+              .job-form-modal .limit-mode-btn {
+                  background-color: #444;
+                  border: none;
+                  color: #b3b3b3;
+                  width: 28px;
+                  padding: 0;
+                  font-size: 11px;
+                  font-weight: 700;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  transition: all 0.2s;
+              }
+              .job-form-modal .limit-mode-btn:hover {
+                  background-color: #555;
+                  color: white;
+              }
+              .job-form-modal .limit-mode-btn.active {
+                  background-color: #1ed760;
+                  color: black;
+              }
+              .job-form-modal .limit-preview {
+                  font-size: 11px;
+                  color: #888;
+                  margin-left: 8px;
+                  white-space: nowrap;
+                  font-style: italic;
+              }
+              .job-form-modal .source-limit-toggle-btn {
+                  background-color: #444;
+                  border: 1px solid #555;
+                  color: #b3b3b3;
+                  padding: 0 10px;
+                  height: 24px;
+                  border-radius: 4px;
+                  font-size: 11px;
+                  font-weight: 700;
+                  cursor: pointer;
+                  margin-right: 5px;
+                  transition: all 0.2s;
+              }
+              .job-form-modal .source-limit-toggle-btn:hover {
+                  background-color: #555;
+                  color: white;
+              }
+              .job-form-modal .source-limit-toggle-btn.active {
+                  background-color: #fff;
+                  color: black;
               }
           </style>
             <div class="job-form-modal">
@@ -12658,15 +12772,53 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
 
             if (!container) return;
-            container.innerHTML = sources.map((source, index) => `
+            
+            container.innerHTML = sources.map((source, index) => {
+                const limitMode = source.limitMode || 'count';
+                const isPercent = limitMode === 'percent';
+                const total = parseInt(source.totalTracks) || 0;
+                let previewText = '';
+                if (isPercent && total > 0 && source.limit) {
+                    const calc = Math.ceil(total * (source.limit / 100));
+                    previewText = `(~${calc} tracks)`;
+                }
+
+                const isSourceLimitEnabled = source.limitEnabled !== false;
+                const limitBtnClass = isSourceLimitEnabled ? 'active' : '';
+                const limitControlsStyle = isSourceLimitEnabled ? 'opacity: 1; pointer-events: auto;' : 'opacity: 0.4; pointer-events: none;';
+
+                return `
                 <div class="source-item" data-uri="${source.uri}">
                     <img src="${source.coverUrl || 'https://i.imgur.com/33q4t4k.png'}" class="source-cover-art-small">
                     <div class="source-text-info">
                         <div class="source-name" title="${source.name}">${source.name}</div>
                         <div class="source-info">${source.info} • ${source.totalTracks ?? 'N/A'} tracks</div>
-                        <div class="source-limit-wrapper" style="display: none; margin-top: 4px; align-items: center; gap: 8px;">
-                            <label style="font-size: 12px; color: #b3b3b3;">Limit:</label>
-                            <input type="number" class="source-limit-input" data-index="${index}" value="${source.limit || 10}" min="1" max="${source.totalTracks || ''}" style="width: 60px; background-color: #3e3e3e; border: 1px solid #666; border-radius: 4px; color: white; padding: 2px 6px;">
+                        <div class="source-limit-wrapper" style="display: none; margin-top: 6px; align-items: center;">
+                            <button class="source-limit-toggle-btn ${limitBtnClass}" data-index="${index}" title="Toggle limit for this source">Limit</button>
+                            <div class="limit-controls-container" style="display: flex; align-items: center; transition: opacity 0.2s; ${limitControlsStyle}">
+                                <div class="limit-input-group">
+                                    <input type="number" 
+                                        class="source-limit-input" 
+                                        data-index="${index}" 
+                                        value="${source.limit || 10}" 
+                                        min="1" 
+                                        max="${isPercent ? 100 : (source.totalTracks || '')}">
+                                    <div class="limit-spinners">
+                                        <button class="limit-spinner-btn up" data-index="${index}" title="Increase">
+                                            <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>
+                                        </button>
+                                        <button class="limit-spinner-btn down" data-index="${index}" title="Decrease">
+                                            <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg>
+                                        </button>
+                                    </div>
+                                    <button class="limit-mode-btn ${isPercent ? 'active' : ''}" 
+                                            data-index="${index}" 
+                                            title="Click to toggle between Count (#) and Percentage (%)">
+                                        ${isPercent ? '%' : '#'}
+                                    </button>
+                                </div>
+                                <span class="limit-preview" id="limit-preview-${index}">${previewText}</span>
+                            </div>
                         </div>
                     </div>
                     <div class="source-item-actions">
@@ -12674,7 +12826,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         <button class="remove-source-btn" data-index="${index}" title="Remove source">&times;</button>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
 
             container.querySelectorAll('.edit-source-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -12683,21 +12835,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         "Change Source",
                         userLibraryPromise,
                         (newSourcesData) => {
-                            const existingUris = sources
-                                .filter((_, i) => i !== indexToChange)
-                                .map(s => s.uri);
-
+                            const existingUris = sources.filter((_, i) => i !== indexToChange).map(s => s.uri);
                             const uniqueNewSources = newSourcesData.filter(newSource => !existingUris.includes(newSource.uri));
-
-                            if (uniqueNewSources.length < newSourcesData.length) {
-                                showNotification("Some selected sources were already in the list and have been ignored.");
-                            }
-
-                            if (uniqueNewSources.length > 0) {
-                                sources.splice(indexToChange, 1, ...uniqueNewSources);
-                            } else {
-                                sources.splice(indexToChange, 1);
-                            }
+                            if (uniqueNewSources.length < newSourcesData.length) showNotification("Some selected sources were already in the list and have been ignored.");
+                            if (uniqueNewSources.length > 0) sources.splice(indexToChange, 1, ...uniqueNewSources);
+                            else sources.splice(indexToChange, 1);
                             renderSources();
                         },
                         true 
@@ -12713,6 +12855,59 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     updateFormState();
                 });
             });
+
+            container.querySelectorAll('.limit-spinner-btn').forEach(btn => {
+                let interval;
+                let timeout;
+                const isUp = btn.classList.contains('up');
+                const index = parseInt(btn.dataset.index, 10);
+                
+                const performUpdate = () => {
+                    const source = sources[index];
+                    const input = container.querySelector(`.source-limit-input[data-index="${index}"]`);
+                    const preview = container.querySelector(`#limit-preview-${index}`);
+                    
+                    if (!input) return;
+
+                    const currentVal = parseInt(input.value) || 0;
+                    const max = parseInt(input.max);
+                    const min = parseInt(input.min) || 1;
+                    
+                    let newVal = isUp ? currentVal + 1 : currentVal - 1;
+                    
+                    if (!isNaN(max) && newVal > max) newVal = max;
+                    if (newVal < min) newVal = min;
+                    
+                    if (newVal !== currentVal) {
+                        input.value = newVal;
+                        source.limit = newVal;
+                        
+                        if (source.limitMode === 'percent' && source.totalTracks && !isNaN(parseInt(source.totalTracks))) {
+                            const calc = Math.ceil(parseInt(source.totalTracks) * (newVal / 100));
+                            preview.textContent = `(~${calc} tracks)`;
+                        } else {
+                            preview.textContent = '';
+                        }
+                    }
+                };
+
+                const stop = () => {
+                    clearTimeout(timeout);
+                    clearInterval(interval);
+                };
+
+                btn.addEventListener('mousedown', (e) => {
+                    e.preventDefault(); 
+                    performUpdate();
+                    timeout = setTimeout(() => {
+                        interval = setInterval(performUpdate, 50);
+                    }, 400);
+                });
+
+                btn.addEventListener('mouseup', stop);
+                btn.addEventListener('mouseleave', stop);
+            });
+
             updateFormState();
         };
 
@@ -12733,19 +12928,82 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             toggleLimitInputs(e.target.checked);
         });
 
-        sourceListContainer.addEventListener('change', (e) => {
+        sourceListContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('source-limit-toggle-btn')) {
+                const btn = e.target;
+                const index = parseInt(btn.dataset.index, 10);
+                const source = sources[index];
+                
+                const newState = source.limitEnabled === false ? true : false;
+                source.limitEnabled = newState;
+                
+                if (newState) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+                
+                const controlsContainer = btn.nextElementSibling;
+                if (controlsContainer) {
+                    controlsContainer.style.opacity = newState ? '1' : '0.4';
+                    controlsContainer.style.pointerEvents = newState ? 'auto' : 'none';
+                }
+            }
+
+            if (e.target.classList.contains('limit-mode-btn')) {
+                const btn = e.target;
+                const index = parseInt(btn.dataset.index, 10);
+                const source = sources[index];
+                const input = sourceListContainer.querySelector(`.source-limit-input[data-index="${index}"]`);
+                const preview = sourceListContainer.querySelector(`#limit-preview-${index}`);
+                
+                if (!source.limitMode || source.limitMode === 'count') {
+                    source.limitMode = 'percent';
+                    btn.textContent = '%';
+                    btn.classList.add('active');
+                    input.max = 100;
+                    if (parseInt(input.value) > 100) {
+                        input.value = 100;
+                        source.limit = 100;
+                    }
+                } else {
+                    source.limitMode = 'count';
+                    btn.textContent = '#';
+                    btn.classList.remove('active');
+                    input.max = source.totalTracks || '';
+                }
+                
+                if (source.limitMode === 'percent' && source.totalTracks && !isNaN(parseInt(source.totalTracks))) {
+                    const calc = Math.ceil(parseInt(source.totalTracks) * (parseInt(input.value) / 100));
+                    preview.textContent = `(~${calc} tracks)`;
+                } else {
+                    preview.textContent = '';
+                }
+            }
+        });
+
+        sourceListContainer.addEventListener('input', (e) => {
             if (e.target.classList.contains('source-limit-input')) {
                 const index = parseInt(e.target.dataset.index, 10);
                 let value = parseInt(e.target.value, 10);
                 const max = parseInt(e.target.max, 10);
+                const source = sources[index];
 
                 if (!isNaN(max) && value > max) {
                     value = max;
                     e.target.value = max;
                 }
 
-                if (sources[index] && value > 0) {
-                    sources[index].limit = value;
+                if (source && value > 0) {
+                    source.limit = value;
+                    
+                    const preview = sourceListContainer.querySelector(`#limit-preview-${index}`);
+                    if (source.limitMode === 'percent' && source.totalTracks && !isNaN(parseInt(source.totalTracks))) {
+                        const calc = Math.ceil(parseInt(source.totalTracks) * (value / 100));
+                        preview.textContent = `(~${calc} tracks)`;
+                    } else {
+                        preview.textContent = '';
+                    }
                 }
             }
         });
@@ -12885,6 +13143,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const value = parseInt(input.value, 10);
                     if (sources[index] && value > 0) {
                         sources[index].limit = value;
+                        if (!sources[index].limitMode) sources[index].limitMode = 'count';
                     }
                 });
             }
