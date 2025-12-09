@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.32.0";
+  const SORT_PLAY_VERSION = "5.32.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -15204,7 +15204,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await Promise.all(artistBatches.map(async (batch) => {
                     try {
                         const artistData = await withRetry(
-                            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`),
+                            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`),
                             CONFIG.spotify.retryAttempts,
                             CONFIG.spotify.retryDelay
                         );
@@ -15448,7 +15448,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const batch = artistIdsToFetch.slice(i, i + 50);
                 try {
                     const artistData = await withRetry(
-                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}`),
+                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`),
                         CONFIG.spotify.retryAttempts,
                         CONFIG.spotify.retryDelay
                     );
