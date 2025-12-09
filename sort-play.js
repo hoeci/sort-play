@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.31.1";
+  const SORT_PLAY_VERSION = "5.32.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -10032,7 +10032,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     let filteredTracks = combinedTracks;
 
-    if (filters.excludeLiked) {
+    const likedFilterMode = filters.likedFilter || (filters.excludeLiked ? 'exclude' : 'all');
+    const scrobbleFilterMode = filters.scrobbleFilter || (filters.excludeListened ? 'exclude' : 'all');
+
+    if (likedFilterMode !== 'all') {
         if (!isHeadless) mainButton.innerText = "Filtering Liked...";
         const likedSongs = await getLikedSongs();
         const likedSongUris = new Set(likedSongs.map(s => s.uri));
@@ -10053,24 +10056,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
 
         filteredTracks = tracksWithMetadata.filter(track => {
-            if (likedSongUris.has(track.uri)) return false;
-            const isrc = track.track?.external_ids?.isrc;
-            if (isrc && likedIsrcSet.has(isrc)) return false;
+            const isLiked = likedSongUris.has(track.uri) || (track.track?.external_ids?.isrc && likedIsrcSet.has(track.track.external_ids.isrc));
+            
+            if (likedFilterMode === 'exclude') return !isLiked;
+            if (likedFilterMode === 'require') return isLiked;
             return true;
         });
     }
 
-    if (filters.excludeListened) {
-        if (!isHeadless) mainButton.innerText = "Filtering Listened...";
+    if (scrobbleFilterMode !== 'all') {
+        if (!isHeadless) mainButton.innerText = "Filtering History...";
         const lastFmUsername = loadLastFmUsername();
         if (lastFmUsername) {
             const tracksWithScrobbles = await processBatchesWithDelay(
                 filteredTracks, 50, 1000, () => {}, getTrackDetailsWithPersonalScrobbles
             );
-            filteredTracks = tracksWithScrobbles.filter(t => (t.personalScrobbles || 0) === 0);
+            
+            filteredTracks = tracksWithScrobbles.filter(t => {
+                const playCount = t.personalScrobbles || 0;
+                if (scrobbleFilterMode === 'exclude') return playCount === 0;
+                if (scrobbleFilterMode === 'require') return playCount > 0;
+                return true;
+            });
         } else {
-            console.warn("[Sort-Play Dynamic Filter] Cannot exclude listened tracks. Last.fm username not set.");
-            if (!isHeadless) showNotification("Last.fm username not set, cannot exclude listened tracks.", 'warning');
+            console.warn("[Sort-Play Dynamic Filter] Cannot filter by history. Last.fm username not set.");
+            if (!isHeadless) showNotification("Last.fm username not set, skipping history filter.", 'warning');
         }
     }
 
@@ -11511,6 +11521,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let titleAlbumKeywords = new Set();
         let artistKeywords = new Set();
         let keepMatchingMode, filterTitle, filterAlbum, filterArtist, matchWholeWord;
+        
+        let likedFilterMode = currentFilters.likedFilter || (currentFilters.excludeLiked ? 'exclude' : 'all');
+        let scrobbleFilterMode = currentFilters.scrobbleFilter || (currentFilters.excludeListened ? 'exclude' : 'all');
 
         const overlay = document.createElement("div");
         overlay.id = "filter-overlay";
@@ -11581,6 +11594,61 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             #filter-overlay .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
             #filter-overlay .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
             #filter-overlay .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+            
+            #filter-overlay .segmented-control { 
+                display: grid; 
+                grid-template-columns: 55px 1fr 1fr; 
+                background-color: #454545;
+                border-radius: 4px; 
+                padding: 1px;
+                width: 290px; 
+                gap: 1px;
+            }
+            
+            #filter-overlay .segment-btn { 
+                background: #282828; 
+                border: none; 
+                color: #b3b3b3; 
+                padding: 4px 2px; 
+                font-size: 12px; 
+                font-weight: 400; 
+                cursor: pointer; 
+                border-radius: 0;
+                transition: background-color 0.2s, color 0.2s;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+            }
+
+            #filter-overlay .segment-btn:first-child {
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+            }
+
+            #filter-overlay .segment-btn:last-child {
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            
+            #filter-overlay .segment-btn:hover { 
+                color: white; 
+                background-color: #333; 
+            }
+            
+            #filter-overlay .segment-btn.active { 
+                background-color: #555; 
+                color: white; 
+                font-weight: 600; 
+            }
+            
+            #filter-overlay .segment-btn.active[data-value="require"],
+            #filter-overlay .segment-btn.active[data-value="exclude"] { 
+                background-color: #1ED760; 
+                color: black; 
+            }
+            
+            #filter-overlay .setting-row.disabled .segmented-control { opacity: 0.5; pointer-events: none; }
           </style>
           <div class="main-trackCreditsModal-header">
               <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Track Filtering Options</span></h1>
@@ -11588,18 +11656,26 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           <div class="main-trackCreditsModal-mainSection">
               <div style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="setting-row">
-                      <span class="description">Exclude Liked Tracks</span>
-                      <label class="switch"><input type="checkbox" id="filter-exclude-liked"><span class="sliderx"></span></label>
+                      <span class="description">Liked Status</span>
+                      <div class="segmented-control" id="liked-filter-control">
+                          <button class="segment-btn ${likedFilterMode === 'all' ? 'active' : ''}" data-value="all" data-text="Any">Any</button>
+                          <button class="segment-btn ${likedFilterMode === 'exclude' ? 'active' : ''}" data-value="exclude" data-text="Exclude Liked">Exclude Liked</button>
+                          <button class="segment-btn ${likedFilterMode === 'require' ? 'active' : ''}" data-value="require" data-text="Only Liked">Only Liked</button>
+                      </div>
                   </div>
                   <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
                       <span class="description">
-                          Exclude My Scrobbled Tracks
+                          Scrobble History
                           <span class="tooltip-container">
                               <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                              <span class="custom-tooltip">Requires Last.fm. Removes tracks you have scrobbled at least once. ${isExcludeListenedDisabled ? '(Set Last.fm username in settings)' : ''}</span>
+                              <span class="custom-tooltip">Requires Last.fm. ${isExcludeListenedDisabled ? '(Set Last.fm username in settings)' : ''}</span>
                           </span>
                       </span>
-                      <label class="switch"><input type="checkbox" id="filter-exclude-listened" ${isExcludeListenedDisabled ? 'disabled' : ''}><span class="sliderx"></span></label>
+                      <div class="segmented-control" id="scrobble-filter-control">
+                          <button class="segment-btn ${scrobbleFilterMode === 'all' ? 'active' : ''}" data-value="all" data-text="Any">Any</button>
+                          <button class="segment-btn ${scrobbleFilterMode === 'exclude' ? 'active' : ''}" data-value="exclude" data-text="Exclude Played">Exclude Played</button>
+                          <button class="segment-btn ${scrobbleFilterMode === 'require' ? 'active' : ''}" data-value="require" data-text="Only Played">Only Played</button>
+                      </div>
                   </div>
                   <div class="setting-row">
                       <span class="description">
@@ -11689,8 +11765,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const titleAlbumContainer = modalContainer.querySelector("#titleAlbumKeywords");
         const artistContainer = modalContainer.querySelector("#artistKeywords");
 
-        document.getElementById('filter-exclude-liked').checked = currentFilters.excludeLiked || false;
-        document.getElementById('filter-exclude-listened').checked = currentFilters.excludeListened || false;
+        const setupSegmentedControl = (controlId, updateVar) => {
+            const control = modalContainer.querySelector(`#${controlId}`);
+            if (!control) return;
+            control.querySelectorAll('.segment-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    control.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updateVar(btn.dataset.value);
+                });
+            });
+        };
+
+        setupSegmentedControl('liked-filter-control', (val) => { likedFilterMode = val; });
+        setupSegmentedControl('scrobble-filter-control', (val) => { scrobbleFilterMode = val; });
+
         document.getElementById('filter-max-playcount').value = currentFilters.maxPlayCount || '';
         keywordFilterToggle.checked = currentFilters.keywordFilterEnabled || false;
         keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
@@ -11735,8 +11824,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             localStorage.setItem("sort-play-match-whole-word", matchWholeWord);
 
             const newFilters = {
-                excludeLiked: modalContainer.querySelector('#filter-exclude-liked').checked,
-                excludeListened: modalContainer.querySelector('#filter-exclude-listened').checked,
+                likedFilter: likedFilterMode,
+                scrobbleFilter: scrobbleFilterMode,
                 maxPlayCount: modalContainer.querySelector('#filter-max-playcount').value,
                 keywordFilterEnabled: modalContainer.querySelector('#keywordFilterToggle').checked,
                 keepMatchingMode,
@@ -18955,9 +19044,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         await CosmosAsync.post("sp://core-playlist/v1/rootlist", moveRequestBody);
 
     } catch (error) {
-        if (error.status !== 400) {
-            console.error("Unexpected error while moving playlist:", error);
-        }
     }
   }
 
