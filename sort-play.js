@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.32.1";
+  const SORT_PLAY_VERSION = "5.32.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13667,37 +13667,70 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         totalTracksStat.textContent = `Total tracks: ${tracksWithGenresCount} (${tracks.length})`;
     };
 
+    const existingModal = document.getElementById('genre-filter-modal-overlay');
+    if (existingModal) existingModal.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "genre-filter-modal-overlay";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        z-index: 2002; display: flex; justify-content: center; align-items: center;
+    `;
+
+    const closeModal = () => overlay.remove();
+    if (isMenuOpen) {
+        closeAllMenus();
+    }
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
     const modalContainer = document.createElement("div");
-    modalContainer.className = "genre-filter-modal";
+    modalContainer.className = "genre-filter-modal main-embedWidgetGenerator-container";
+    modalContainer.style.cssText = `
+        width: 620px !important; 
+        max-width: 620px !important;
+        display: flex; 
+        flex-direction: column;
+        border-radius: 30px; 
+        background-color: #181818 !important; 
+        border: 2px solid #282828;
+        max-height: 85vh;
+    `;
     modalContainer.innerHTML = `
     <style>
-    .main-embedWidgetGenerator-container {
-      width: 620px !important;
-      max-width: 620px !important;
-      border-radius: 30px;
-      overflow: hidden; 
-      background-color: #181818 !important;
-      border: 2px solid #282828;
-    }
-    .GenericModal__overlay .GenericModal {
-      border-radius: 30px;
-      overflow: hidden;
-    }
-    .GenericModal > .main-embedWidgetGenerator-container {
-      height: auto !important;
-    } 
-    .main-trackCreditsModal-mainSection {
+    .genre-filter-modal .main-trackCreditsModal-mainSection {
       overflow-y: hidden !important;
-      padding: 16px 32px 9px 32px;
+      padding: 17px 32px 32px 32px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
     }
-    .main-trackCreditsModal-originalCredits{
-      padding-bottom: 20px !important;
+    .genre-filter-modal .main-trackCreditsModal-header {
+      padding: 32px 32px 16px !important;
+      border-bottom: 1px solid #282828 !important;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
     }
-    .main-trackCreditsModal-header {
-      padding: 27px 32px 12px !important;
+    .genre-filter-modal .main-trackCreditsModal-closeBtn { 
+        background: transparent; 
+        border: 0; 
+        padding: 0; 
+        color: #b3b3b3; 
+        cursor: pointer; 
+        transition: color 0.2s ease; 
     }
-    .genre-filter-modal .main-popupModal-content {
-      overflow-y: auto;
+    .genre-filter-modal .main-trackCreditsModal-closeBtn:hover { 
+        color: #ffffff; 
     }
     .genre-filter-modal .genre-button {
       padding: 6px 7px 6px 16px;
@@ -13716,7 +13749,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       gap: 8px;
     }
     .genre-filter-modal .genre-button.related {
-    background-color: #283f2d; 
+      background-color: #283f2d; 
       color: white;
     }
     .genre-filter-modal .genre-button.selected {
@@ -13746,10 +13779,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     .genre-filter-modal .genre-button.selected .genre-count-badge {
       background-color: rgba(0, 0, 0, 0.2);
       color: #000;
-    }
-    .genre-filter-modal .genre-button.selected {
-      background-color: #1ED760;
-      color: black;
     }
     .genre-filter-modal .search-bar {
       width: 100%;
@@ -13805,6 +13834,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       font-size: 14px;
       transition: all 0.04s ease;
       margin-top: 10px;
+      flex-shrink: 0;
     }
     .genre-filter-modal .create-playlist-button:hover {
       background-color: #3BE377;
@@ -13812,8 +13842,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     .genre-filter-modal .genre-container {
       display: flex;
       flex-wrap: wrap;
-      margin-bottom: 5px;
-      max-height: 20vh;
+      flex: 1;
+      min-height: 0;
       overflow-y: auto;
       background-color: #1e1e1e; 
       border-radius: 20px; 
@@ -13853,11 +13883,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       align-items: center; 
       gap: 8px;  
     }
-    
     .genre-filter-modal .select-all-button:hover {
       filter: brightness(1.2); 
     }
-    
     .genre-filter-modal .select-all-button:active {
       background-color: #B3B3B3;
       color: black;
@@ -13870,42 +13898,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-    .modal-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.25);
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-      z-index: 999;
-    }
-    .GenericModal {
-      position: relative;
-      z-index: 1000;
-    }
-    .genre-filter-modal .setting-row::after {
-        content: "";
-        display: table;
-        clear: both;
+      flex-shrink: 0;
     }
     .genre-filter-modal .setting-row {
-        padding: 5px 0;
-        align-items: center;
-    }
-    .genre-filter-modal .setting-row .col.description {
-        float: left;
-        padding-right: 15px;
-        width: auto;
-        color: #c1c1c1;
-    }
-    .genre-filter-modal .setting-row .col.action {
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      justify-content: flex-end;
-      text-align: right;
+      padding: 5px 0;
+      width: auto; 
     }
     .genre-filter-modal .switch {
         position: relative;
@@ -13950,6 +13950,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       display: flex;
       gap: 15px;
       flex-direction: row-reverse;
+      flex-shrink: 0;
     }
     .genre-filter-modal .settings-right-wrapper,
     .genre-filter-modal .settings-left-wrapper {
@@ -13957,7 +13958,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       background-color: #282828;
       border-radius: 20px;
       padding: 25px;
-      height: 110px;
+      height: 150px;
     }
     .genre-filter-modal .settings-right-wrapper {
       display: flex;
@@ -13974,13 +13975,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       font-weight: bold;
       font-size: 14px;
       margin-bottom: 3px;
-    }
-    .genre-filter-modal .setting-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 5px 0;
-      width: auto; 
     }
     .genre-filter-modal .setting-row .description {
       color: white;
@@ -14024,7 +14018,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         border-style: solid;
         border-color: #373737 transparent transparent transparent;
     }
-    
     .tooltip-container:hover .custom-tooltip {
         visibility: visible;
     }
@@ -14041,8 +14034,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       margin-bottom: 5px; 
       position: relative;
       z-index: 1; 
+      flex-shrink: 0;
     }
-    
     .genre-filter-modal .genre-stats span {
       margin: 0 25px;
     }
@@ -14050,126 +14043,101 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       font-size: 15px;
       font-weight: 400;
       color: white;
-    }
-    .genre-filter-modal .settings-container {
-      display: flex;
-      gap: 15px;
-      flex-direction: row-reverse;
-    }
-    .genre-filter-modal .settings-right-wrapper,
-    .genre-filter-modal .settings-left-wrapper {
-      height: 145px;
+      flex-shrink: 0;
     }
     </style>
-    <div style="display: flex; flex-direction: column; gap: 15px;">
-    <h2 class="genre-modal-title">
-    Genres from Spotify, Last.fm, and Deezer
-    <span style="font-size: 0.85em; font-weight: normal; opacity: 0.5; margin-left: 8px;">
-    💡 Left-click to include • Right-click to exclude
-    </span>
-    </h2>
-        <div class="genre-header">
-          <div class="search-bar-container">
-                  <input type="text" class="search-bar" placeholder="Search genres...">
-                  <button class="clear-search-button">&times;</button>
-              </div>
-            <button class="select-all-button">
-                <span>Select All</span>
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18px" height="18px">
-                    <path d="M 4 2 C 2.895 2 2 2.895 2 4 L 2 16 C 2 17.105 2.895 18 4 18 L 16 18 C 17.105 18 18 17.105 18 16 L 18 4 C 18 2.895 17.105 2 16 2 L 4 2 z M 4 4 L 16 4 L 16 16 L 4 16 L 4 4 z M 20 6 L 20 20 L 6 20 L 6 22 L 20 22 C 21.105 22 22 21.105 22 20 L 22 6 L 20 6 z M 13.292969 6.2929688 L 9 10.585938 L 6.7070312 8.2929688 L 5.2929688 9.7070312 L 9 13.414062 L 14.707031 7.7070312 L 13.292969 6.2929688 z"/>
-                </svg>
-            </button>
-        </div>
-        <div class="genre-container"></div>
-        <div class="genre-stats">
-            <span id="total-tracks-stat">Total tracks: 0</span>
-            <span id="filtered-tracks-stat">Filtered tracks: 0</span>
-        </div>
-        <div class="settings-container">
-            <div class="settings-right-wrapper">
-                <div class="settings-title">Filter Settings:</div>
-                <div class="setting-row">
-                    <label class="description" for="groupGenresToggle">
-                        Group Similar Genres
-                        <span class="tooltip-container">
-                            <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                            <span class="custom-tooltip">Enable to group similar genres (e.g. 'electro' -> 'electronic'). Disable to see raw tags.</span>
-                        </span>
-                    </label>
-                    <div class="action">
-                        <label class="switch">
-                            <input type="checkbox" id="groupGenresToggle" checked>
-                            <span class="sliderx"></span>
+    
+    <div class="main-trackCreditsModal-header">
+        <h1 style="font-size: 26px; font-weight: 700; color: white; margin:0;">Genre Filter</h1>
+        <button id="closeGenreModalBtn" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+        </button>
+    </div>
+
+    <div class="main-trackCreditsModal-mainSection">
+        <div style="display: flex; flex-direction: column; gap: 15px; flex: 1; min-height: 0;">
+        <h2 class="genre-modal-title">
+        Genres from Spotify, Last.fm, and Deezer
+        <span style="font-size: 0.85em; font-weight: normal; opacity: 0.5; margin-left: 8px;">
+        💡 Left-click to include • Right-click to exclude
+        </span>
+        </h2>
+            <div class="genre-header">
+            <div class="search-bar-container">
+                    <input type="text" class="search-bar" placeholder="Search genres...">
+                    <button class="clear-search-button">&times;</button>
+                </div>
+                <button class="select-all-button">
+                    <span>Select All</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18px" height="18px">
+                        <path d="M 4 2 C 2.895 2 2 2.895 2 4 L 2 16 C 2 17.105 2.895 18 4 18 L 16 18 C 17.105 18 18 17.105 18 16 L 18 4 C 18 2.895 17.105 2 16 2 L 4 2 z M 4 4 L 16 4 L 16 16 L 4 16 L 4 4 z M 20 6 L 20 20 L 6 20 L 6 22 L 20 22 C 21.105 22 22 21.105 22 20 L 22 6 L 20 6 z M 13.292969 6.2929688 L 9 10.585938 L 6.7070312 8.2929688 L 5.2929688 9.7070312 L 9 13.414062 L 14.707031 7.7070312 L 13.292969 6.2929688 z"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="genre-container"></div>
+            <div class="genre-stats">
+                <span id="total-tracks-stat">Total tracks: 0</span>
+                <span id="filtered-tracks-stat">Filtered tracks: 0</span>
+            </div>
+            <div class="settings-container">
+                <div class="settings-right-wrapper">
+                    <div class="settings-title">Filter Settings:</div>
+                    <div class="setting-row">
+                        <label class="description" for="groupGenresToggle">
+                            Group Similar Genres
+                            <span class="tooltip-container">
+                                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                                <span class="custom-tooltip">Enable to group similar genres (e.g. 'electro' -> 'electronic'). Disable to see raw tags.</span>
+                            </span>
                         </label>
+                        <div class="action">
+                            <label class="switch">
+                                <input type="checkbox" id="groupGenresToggle" checked>
+                                <span class="sliderx"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <label class="description" for="matchAllGenresToggle">
+                            Match All Genres
+                            <span class="tooltip-container">
+                                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
+                                <span class="custom-tooltip">Only include tracks matching all selected genres.</span>
+                            </span>
+                        </label>
+                        <div class="action">
+                            <label class="switch">
+                                <input type="checkbox" id="matchAllGenresToggle" ${matchAllGenres ? 'checked' : ''}>
+                                <span class="sliderx"></span>
+                            </label>
+                        </div>
                     </div>
                 </div>
-                <div class="setting-row">
-                    <label class="description" for="matchAllGenresToggle">
-                        Match All Genres
-                        <span class="tooltip-container">
-                            <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                            <span class="custom-tooltip">Only include tracks matching all selected genres.</span>
-                        </span>
-                    </label>
-                    <div class="action">
-                        <label class="switch">
-                            <input type="checkbox" id="matchAllGenresToggle" ${matchAllGenres ? 'checked' : ''}>
-                            <span class="sliderx"></span>
-                        </label>
+                <div class="settings-left-wrapper">
+                    <div class="settings-title">Sort Type:</div>
+                    <div class="setting-row">
+                        <select class="sort-type-select">
+                            <option value="default">Default</option>
+                            <option value="playCount">Play Count</option>
+                            <option value="popularity">Popularity</option>
+                            <option value="releaseDate">Release Date</option>
+                            <option value="shuffle">Shuffle</option>
+                            <option value="scrobbles">Scrobbles</option>
+                            <option value="personalScrobbles">My Scrobbles</option>
+                        </select>
                     </div>
                 </div>
             </div>
-            <div class="settings-left-wrapper">
-                <div class="settings-title">Sort Type:</div>
-                <div class="setting-row">
-                    <select class="sort-type-select">
-                        <option value="default">Default</option>
-                        <option value="playCount">Play Count</option>
-                        <option value="popularity">Popularity</option>
-                        <option value="releaseDate">Release Date</option>
-                        <option value="shuffle">Shuffle</option>
-                        <option value="scrobbles">Scrobbles</option>
-                        <option value="personalScrobbles">My Scrobbles</option>
-                    </select>
-                </div>
-            </div>
+            <div id="genre-selection-error" style="color: #f15e6c; font-size: 13px; text-align: center; display: none;"></div>
+            <button class="create-playlist-button">Create Playlist</button>
         </div>
-        <div id="genre-selection-error" style="color: #f15e6c; font-size: 13px; text-align: center; display: none;"></div>
-        <button class="create-playlist-button">Create Playlist</button>
     </div>
   `;
 
-    Spicetify.PopupModal.display({
-      title: "<span style='font-size: 30px;'>Genre Filter</span>",
-      content: modalContainer,
-      isLarge: true,
-    });
-    tagActiveModalWithFontScope();
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
 
-    if (isMenuOpen) {
-      closeAllMenus();
-    }
-
-    const overlay = document.createElement("div");
-    overlay.className = "modal-overlay";
-
-    const genericModalOverlay = document.querySelector(".GenericModal__overlay");
-
-    if (genericModalOverlay) {
-      genericModalOverlay.appendChild(overlay);
-    }
-
-    if (overlay) {
-      overlay.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-    }
-
-    const modalContainerElement = document.querySelector(".main-popupModal-container");
-    if (modalContainerElement) {
-      modalContainerElement.style.zIndex = "2000";
-    }
+    modalContainer.querySelector('#closeGenreModalBtn').addEventListener('click', closeModal);
     preventDragCloseModal();
 
     const matchAllGenresToggle = modalContainer.querySelector("#matchAllGenresToggle");
@@ -14557,7 +14525,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
     
       const sortType = sortTypeSelect.value;
-      Spicetify.PopupModal.hide();
+      closeModal();
     
       let sortedTracks; 
     
