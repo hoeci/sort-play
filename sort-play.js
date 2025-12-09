@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.31.0";
+  const SORT_PLAY_VERSION = "5.31.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -18815,7 +18815,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (placePlaylistsInFolder) {
             const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
             if (folderUri) {
-                moveRequestBody.after = folderUri;
+                moveRequestBody.after = { uri: folderUri };
             } else {
                 moveRequestBody.before = "start";
             }
@@ -18944,7 +18944,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (placePlaylistsInFolder) {
             const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
             if (folderUri) {
-                moveRequestBody.after = folderUri;
+                moveRequestBody.after = { uri: folderUri };
             } else {
                 moveRequestBody.before = "start";
             }
@@ -19714,26 +19714,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const { RootlistAPI } = Platform;
         if (!RootlistAPI) throw new Error("RootlistAPI not available for folder creation.");
 
-        let requestBody = {
-            operation: "create",
-            name: name,
-            playlist: true,
-            before: "start",
-        };
-
         if (placePlaylistsInFolder) {
             const folderUri = await findOrCreatePlaylistFolder(sortPlayFolderName);
             if (folderUri) {
-                requestBody = { ...requestBody, after: folderUri, before: undefined };
+                const uri = await RootlistAPI.createPlaylist(name, { after: { uri: folderUri } });
+                newPlaylist = { uri: uri };
             } else {
                 showNotification("Failed to find/create folder. Creating playlist at the top.", true);
+                const uri = await RootlistAPI.createPlaylist(name, { before: "start" });
+                newPlaylist = { uri: uri };
             }
-        }
-
-        newPlaylist = await CosmosAsync.post("sp://core-playlist/v1/rootlist", requestBody);
-
-        if (!newPlaylist || !newPlaylist.uri) {
-            throw new Error("Internal playlist creation failed, trying fallback.");
+        } else {
+            const uri = await RootlistAPI.createPlaylist(name, { before: "start" });
+            newPlaylist = { uri: uri };
         }
 
     } catch (error) {
