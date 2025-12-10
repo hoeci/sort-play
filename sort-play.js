@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.32.2";
+  const SORT_PLAY_VERSION = "5.33.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -15053,6 +15053,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         duration_ms: data.duration_ms || null,
         release_date_text: data.release_date_text || null,
 
+        artist_name: JSON.stringify(data.artist_name || []),
+        explicit: data.explicit,
+        track_name: data.track_name || null,
+        popularity: data.popularity || null,
+        popularity_updated_at: Math.floor(Date.now() / 86400000),
+
         audio_features: data.audio_features || {} 
       }));
 
@@ -15225,6 +15231,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
             }
     
+            const artistNamesList = trackDetails.artists.map(a => a.name);
+
             return { 
                 success: true,
                 isrc: isrc,
@@ -15238,7 +15246,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     release_date: releaseDateInDays,
                     duration_ms: safeVal(trackDetails.duration_ms),
                     release_date_text: releaseDateStr || "N/A",
-                    audio_features: null
+                    audio_features: null,
+                    artist_name: artistNamesList,
+                    explicit: trackDetails.explicit,
+                    track_name: trackDetails.name,
+                    popularity: trackDetails.popularity
                 }
             };
     
@@ -15603,7 +15615,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const needsText = !data.release_date_text && data.release_date_text !== "N/A";
         const needsDuration = !data.duration_ms && data.duration_ms !== 0 && data.duration_ms !== -1;
         
-        if ((needsText || needsDuration) && !trackIdsForMetadata.has(id) && !justFetchedTrackIds.has(id)) {
+        const needsNewData = !data.artist_name || !data.track_name;
+
+        if ((needsText || needsDuration || needsNewData) && !trackIdsForMetadata.has(id) && !justFetchedTrackIds.has(id)) {
             trackIdsForMetadata.add(id);
         }
     });
@@ -15628,11 +15642,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             const uri = `spotify:track:${track.id}`;
                             const releaseDateText = track.album?.release_date || "N/A";
                             const durationMs = safeVal(track.duration_ms);
+                            
+                            const artistNames = track.artists ? track.artists.map(a => a.name) : [];
+                            const isExplicit = track.explicit;
+                            const trackName = track.name;
+                            const popularity = track.popularity;
 
                             const genreData = finalGenresMap.get(uri);
                             if (genreData) {
                                 genreData.release_date_text = releaseDateText;
                                 genreData.duration_ms = durationMs;
+                                
+                                genreData.artist_name = artistNames;
+                                genreData.explicit = isExplicit;
+                                genreData.track_name = trackName;
+                                genreData.popularity = popularity;
 
                                 if (genreData.isrc) {
                                     const existing = itemsToSaveMap.get(uri);
