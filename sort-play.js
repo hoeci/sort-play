@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.33.2";
+  const SORT_PLAY_VERSION = "5.33.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -4367,9 +4367,6 @@
         });
 
         modalContainer.querySelector('#set-custom-schedule-btn').addEventListener('click', () => {
-            const errorDiv = modalContainer.querySelector('#custom-schedule-error');
-            errorDiv.style.display = 'none';
-
             const days = parseInt(modalContainer.querySelector('#days').value) || 0;
             const hours = parseInt(modalContainer.querySelector('#hours').value) || 0;
             const minutes = parseInt(modalContainer.querySelector('#minutes').value) || 0;
@@ -4378,8 +4375,7 @@
             const minMs = SCHEDULER_INTERVAL_MINUTES * 60 * 1000;
 
             if (totalMs < minMs) {
-                errorDiv.textContent = `Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`;
-                errorDiv.style.display = 'block';
+                showNotification(`Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`, true);
                 return;
             }
 
@@ -4406,12 +4402,8 @@
         });
 
         document.getElementById("save-schedule").addEventListener("click", () => {
-            const errorDiv = modalContainer.querySelector('#custom-schedule-error');
-            errorDiv.style.display = 'none';
-
             if (scheduleSelect.value === 'custom') {
-                errorDiv.textContent = "Please 'Set' your custom schedule or choose another option before saving.";
-                errorDiv.style.display = 'block';
+                showNotification("Please 'Set' your custom schedule or choose another option before saving.", true);
                 return;
             }
 
@@ -10900,9 +10892,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     modalContainer.querySelector('#confirm-change-source').addEventListener('click', async (e) => {
         const confirmButton = e.currentTarget;
-        const errorDiv = modalContainer.querySelector('#source-change-error');
-        errorDiv.style.display = 'none';
-        
         const url = searchInput.value.trim();
         
         if (url && url.startsWith('http')) {
@@ -10910,15 +10899,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const uriObj = Spicetify.URI.fromString(url);
                 selectedSources.add(uriObj.toURI());
             } catch (err) {
-                errorDiv.textContent = "Invalid Spotify link pasted.";
-                errorDiv.style.display = 'block';
+                showNotification("Invalid Spotify link pasted.", true);
                 return;
             }
         }
 
         if (selectedSources.size === 0) {
-            errorDiv.textContent = "Please select an item or paste a link.";
-            errorDiv.style.display = 'block';
+            showNotification("Please select an item or paste a link.", true);
             return;
         }
 
@@ -10930,8 +10917,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             onSourceChanged(sourcesData);
             closeModal();
         } catch (error) {
-            errorDiv.textContent = error.message || "Invalid or unsupported Spotify link.";
-            errorDiv.style.display = 'block';
+            showNotification(error.message || "Invalid or unsupported Spotify link.", true);
             console.error("Error parsing source URL(s):", error);
         } finally {
             confirmButton.disabled = false;
@@ -13173,9 +13159,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
 
         modalContainer.querySelector('#set-custom-schedule-btn').addEventListener('click', () => {
-            const errorDiv = modalContainer.querySelector('#custom-schedule-error');
-            errorDiv.style.display = 'none';
-
             const days = parseInt(modalContainer.querySelector('#days').value) || 0;
             const hours = parseInt(modalContainer.querySelector('#hours').value) || 0;
             const minutes = parseInt(modalContainer.querySelector('#minutes').value) || 0;
@@ -13184,8 +13167,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const minMs = SCHEDULER_INTERVAL_MINUTES * 60 * 1000;
 
             if (totalMs < minMs) {
-                errorDiv.textContent = `Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`;
-                errorDiv.style.display = 'block';
+                showNotification(`Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`, true);
                 return;
             }
 
@@ -13216,12 +13198,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         modalContainer.querySelector('#cancel-job-btn').addEventListener('click', renderJobList);
         
         modalContainer.querySelector('#save-job-btn').addEventListener('click', (e) => {
-            const sourceErrorEl = modalContainer.querySelector('#source-error-message');
-            sourceErrorEl.style.display = 'none';
-
             if (sources.length === 0) {
-                sourceErrorEl.textContent = "Please add at least one source.";
-                sourceErrorEl.style.display = 'block';
+                showNotification("Please add at least one source.", true);
                 return;
             }
 
@@ -13678,6 +13656,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         background-color: rgba(0, 0, 0, 0.7);
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         z-index: 2002; display: flex; justify-content: center; align-items: center;
+        opacity: 0; transition: opacity 0.1s ease;
     `;
 
     const closeModal = () => overlay.remove();
@@ -13738,34 +13717,56 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       border-radius: 20px;
       border: none;
       cursor: pointer;
-      background-color: #343434;
+      background-color: #303030;
       color: white;
       font-weight: 500;
       font-size: 14px;
-      transition: all 0.04s ease;
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 8px;
+      position: relative;
+      overflow: hidden;
+      z-index: 0;
+      transition: background-color 0.20s ease, color 0.20s ease;
+    }
+    .genre-filter-modal .genre-button > * {
+      position: relative;
+      z-index: 2;
+    }
+    .genre-filter-modal .genre-button::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 1;
+      opacity: 0;
+      transition: opacity 0.20s ease;
     }
     .genre-filter-modal .genre-button.related {
-      background-color: #283f2d; 
+      background-color: rgb(52 123 77 / 30%);
+      border: none;
       color: white;
     }
     .genre-filter-modal .genre-button.selected {
-      background-color: #1ED760;
-      color: black;
+      border: none;
+      color: #ffffff;
+      background-color: transparent;
+    }
+    .genre-filter-modal .genre-button.selected::before {
+      background: linear-gradient(to right, rgb(30 215 96 / 35%), rgb(30 215 96 / 80%));
+      opacity: 1;
     }
     .genre-filter-modal .genre-button.excluded {
-      background-color: #a92121;
-      color: white;
+      color: #ffffff;
+      border: none;
+      background-color: transparent;
     }
-    .genre-filter-modal .genre-button.excluded .genre-count-badge {
-      background-color: rgba(255, 255, 255, 0.2);
-      color: #fff;
+    .genre-filter-modal .genre-button.excluded::before {
+      background: linear-gradient(to right, rgb(169 33 33 / 45%), rgb(169 33 33 / 85%));
+      opacity: 1;
     }
     .genre-filter-modal .genre-count-badge {
-      background-color: rgba(255, 255, 255, 0.1);
+      background-color: #454545;
       color: #e0e0e0;
       padding: 1px 8px;
       border-radius: 12px;
@@ -13774,28 +13775,44 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       min-width: 20px;
       text-align: center;
       line-height: 1.5;
-      transition: background-color 0.2s ease, color 0.2s ease;
+      transition: background-color 0.05s ease, color 0.05s ease;
     }
     .genre-filter-modal .genre-button.selected .genre-count-badge {
-      background-color: rgba(0, 0, 0, 0.2);
-      color: #000;
+      background-color: rgb(20 109 52);
+      color: #ffffff;
+    }
+    .genre-filter-modal .genre-button.excluded .genre-count-badge {
+      background-color: rgb(91 21 21);
+      color: #ffffff;
+    }
+    .genre-filter-modal .genre-button.related .genre-count-badge {
+      background-color: rgb(59 78 66);
+      color: #ffffff;
     }
     .genre-filter-modal .search-bar {
       width: 100%;
       padding-top: 10px;
       padding-right: 35px;
       padding-bottom: 10px;
-      padding-left: 15px;
-      border-radius: 20px;
-      border: 1px solid #282828;
-      background: #282828;
+      padding-left: 40px;
+      border-radius: 12px;
+      border: 1px solid #343434;
+      background: #1e1e1e;
       color: white;
     }
     .genre-filter-modal .search-bar-container {
       position: relative;
-      width: 77%;
+      flex: 1;
       display: flex;
       align-items: center;
+    }
+    .genre-filter-modal .search-icon {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+        color: #b3b3b3;
     }
     .genre-filter-modal .clear-search-button {
       position: absolute;
@@ -13816,12 +13833,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
     .genre-filter-modal .sort-type-select {
       padding: 8px;
-      border-radius: 4px;
-      border: 1px solid #666;
-      background: #282828;
+      border-radius: 10px;
+      border: 1px solid #434343;
+      background: #313131;
       color: white;
       width: 217px;
       cursor: pointer;
+      transition: border-color 0.05s ease;
+    }
+    .genre-filter-modal .sort-type-select:hover {
+      border: 1px solid #5b5b5b;
     }
     .genre-filter-modal .create-playlist-button {
       padding: 8px 18px;
@@ -13833,7 +13854,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       font-weight: 600;
       font-size: 14px;
       transition: all 0.04s ease;
-      margin-top: 10px;
+      margin-top: 5px;
       flex-shrink: 0;
     }
     .genre-filter-modal .create-playlist-button:hover {
@@ -13842,46 +13863,97 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     .genre-filter-modal .genre-container {
       display: flex;
       flex-wrap: wrap;
-      flex: 1;
-      min-height: 0;
+      height: 100%;
+      width: 100%;
       overflow-y: auto;
       background-color: #1e1e1e; 
-      border-radius: 20px; 
-      padding: 15px 10px;
-      margin-bottom: -15px; 
-      margin-top: 2px; 
+      border: 1px solid #343434;
+      padding: 10px 10px;
+      box-sizing: border-box;
       border-bottom-left-radius: 0;
       border-bottom-right-radius: 0;
-      border-top-left-radius: 20px;
-      border-top-right-radius: 20px;
-      scrollbar-width: thin;
-      scrollbar-color: #3b3b3b transparent;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      scrollbar-width: auto;
+      scrollbar-color: auto;
+    }
+    .genre-filter-modal .genre-scroll-wrapper {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        margin-bottom: -15px; 
+        margin-top: 2px;
+        z-index: 0;
+    }
+    .genre-filter-modal .genre-scroll-wrapper::before,
+    .genre-filter-modal .genre-scroll-wrapper::after {
+        content: "";
+        position: absolute;
+        left: 1px;
+        right: 8px;
+        height: 26px;
+        z-index: 10;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        opacity: 0;
+    }
+    .genre-filter-modal .genre-scroll-wrapper::before {
+        top: 1px;
+        border-top-left-radius: 12px;
+        border-top-right-radius: 12px;
+        background: linear-gradient(to bottom, #1e1e1e 0%, rgba(30, 30, 30, 0) 100%);
+    }
+    .genre-filter-modal .genre-scroll-wrapper::after {
+        bottom: 1px;
+        background: linear-gradient(to top, #1e1e1e 0%, rgba(30, 30, 30, 0) 100%);
+    }
+    .genre-filter-modal .genre-scroll-wrapper.no-transition::before,
+    .genre-filter-modal .genre-scroll-wrapper.no-transition::after {
+        transition: none !important;
+    }
+    .genre-filter-modal .genre-scroll-wrapper.can-scroll-top::before {
+        opacity: 1;
+    }
+    .genre-filter-modal .genre-scroll-wrapper.can-scroll-bottom::after {
+        opacity: 1;
     }
     .genre-filter-modal .genre-container::-webkit-scrollbar {
-      width: 6px;
+      width: 6px !important;
+    }
+    .genre-filter-modal .genre-container::-webkit-scrollbar-button {
+      display: none !important;
+      height: 0 !important;
+      width: 0 !important;
     }
     .genre-filter-modal .genre-container::-webkit-scrollbar-track {
-      background: #282828;
-      border-radius: 20px;
+      background: transparent !important; 
+      margin-top: 20px !important;
     }
     .genre-filter-modal .genre-container::-webkit-scrollbar-thumb {
-      background-color: #1DB954;
-      border-radius: 20px;
-      border: 2px solid #282828;
+      background-color: #343434 !important;
+      border-radius: 20px !important;
+    }
+    .genre-filter-modal .genre-container::-webkit-scrollbar-thumb:hover {
+      background-color: #777 !important;
+    }
+    .genre-filter-modal .genre-container::-webkit-scrollbar-corner {
+      background: transparent !important;
     }
     .genre-filter-modal .select-all-button {
-      padding: 10px 16px;
-      border-radius: 20px;
-      border: none;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid #343434;
       cursor: pointer;
-      background-color: #282828; 
+      background-color: #252525; 
       color: white;
       font-weight: 500;
       font-size: 14px;
       transition: all 0.4s ease;  
       display: flex;  
       align-items: center; 
-      gap: 8px;  
+      justify-content: center;
     }
     .genre-filter-modal .select-all-button:hover {
       filter: brightness(1.2); 
@@ -13892,11 +13964,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       transition: none;
     }
     .genre-filter-modal .select-all-button svg {
-      fill: currentColor; 
+      fill: #b3b3b3; 
     }
     .genre-filter-modal .genre-header {
       display: flex;
-      justify-content: space-between;
+      gap: 12px;
       align-items: center;
       flex-shrink: 0;
     }
@@ -13904,7 +13976,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 5px 0;
+      padding: 2px 0;
       width: auto; 
     }
     .genre-filter-modal .switch {
@@ -13948,42 +14020,41 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
     .genre-filter-modal .settings-container {
       display: flex;
-      gap: 15px;
-      flex-direction: row-reverse;
+      gap: 12px;
       flex-shrink: 0;
     }
-    .genre-filter-modal .settings-right-wrapper,
-    .genre-filter-modal .settings-left-wrapper {
+    .genre-filter-modal .settings-box {
       flex: 1;
-      background-color: #282828;
-      border-radius: 20px;
-      padding: 25px;
-      height: 150px;
-    }
-    .genre-filter-modal .settings-right-wrapper {
+      background-color: #252525;
+      border-radius: 12px;
+      border: 1px solid #343434;
+      padding: 12px 16px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      justify-content: center;
+      gap: 8px;
     }
-    .genre-filter-modal .settings-left-wrapper {
+    .genre-filter-modal .setting-row {
       display: flex;
-      flex-direction: column;
-      gap: 0px;
+      justify-content: space-between;
+      align-items: center;
     }
-    .genre-filter-modal .settings-title {
-      color: white;
-      font-weight: bold;
+    .genre-filter-modal .setting-label {
+      color: #ccc;
       font-size: 14px;
-      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .genre-filter-modal .setting-row .description {
-      color: white;
-      width: auto;
-      flex-grow: 1; 
-      font-size: 15px;
-    }
-    .genre-filter-modal .setting-row .action {
-      flex-shrink: 0;
+    .genre-filter-modal .sort-type-select {
+      padding: 6px 10px !important;
+      border-radius: 6px !important;
+      border: 1px solid #444 !important;
+      background: #333 !important;
+      color: white !important;
+      width: 100% !important;
+      cursor: pointer !important;
+      font-size: 14px !important;
     }
     .tooltip-container {
       position: relative; 
@@ -14027,10 +14098,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       align-items: center;    
       color: #c1c1c1;
       font-size: 14px;
-      background-color: #282828;
-      padding: 12px 0;
-      border-bottom-left-radius: 20px;
-      border-bottom-right-radius: 20px;
+      background-color: #252525;
+      padding: 10px 0;
+      border: 1px solid #343434;
+      border-top: none;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
       margin-bottom: 5px; 
       position: relative;
       z-index: 1; 
@@ -14064,57 +14137,30 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         </h2>
             <div class="genre-header">
             <div class="search-bar-container">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M 7 1.75 a 5.25 5.25 0 1 0 0 10.5 a 5.25 5.25 0 0 0 0 -10.5 M 0.25 7 a 6.75 6.75 0 1 1 12.096 4.12 l 3.184 3.185 a 0.75 0.75 0 1 1 -1.06 1.06 L 11.304 12.2 A 6.75 6.75 0 0 1 0.25 7"></path>
+                    </svg>
                     <input type="text" class="search-bar" placeholder="Search genres...">
                     <button class="clear-search-button">&times;</button>
                 </div>
-                <button class="select-all-button">
-                    <span>Select All</span>
+                <button class="select-all-button" title="Select All">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18px" height="18px">
                         <path d="M 4 2 C 2.895 2 2 2.895 2 4 L 2 16 C 2 17.105 2.895 18 4 18 L 16 18 C 17.105 18 18 17.105 18 16 L 18 4 C 18 2.895 17.105 2 16 2 L 4 2 z M 4 4 L 16 4 L 16 16 L 4 16 L 4 4 z M 20 6 L 20 20 L 6 20 L 6 22 L 20 22 C 21.105 22 22 21.105 22 20 L 22 6 L 20 6 z M 13.292969 6.2929688 L 9 10.585938 L 6.7070312 8.2929688 L 5.2929688 9.7070312 L 9 13.414062 L 14.707031 7.7070312 L 13.292969 6.2929688 z"/>
                     </svg>
                 </button>
             </div>
-            <div class="genre-container"></div>
+            <div class="genre-scroll-wrapper">
+                <div class="genre-container"></div>
+            </div>
             <div class="genre-stats">
                 <span id="total-tracks-stat">Total tracks: 0</span>
                 <span id="filtered-tracks-stat">Filtered tracks: 0</span>
             </div>
             <div class="settings-container">
-                <div class="settings-right-wrapper">
-                    <div class="settings-title">Filter Settings:</div>
+                <div class="settings-box">
                     <div class="setting-row">
-                        <label class="description" for="groupGenresToggle">
-                            Group Similar Genres
-                            <span class="tooltip-container">
-                                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                                <span class="custom-tooltip">Enable to group similar genres (e.g. 'electro' -> 'electronic'). Disable to see raw tags.</span>
-                            </span>
-                        </label>
-                        <div class="action">
-                            <label class="switch">
-                                <input type="checkbox" id="groupGenresToggle" checked>
-                                <span class="sliderx"></span>
-                            </label>
-                        </div>
+                        <span class="setting-label">Sort Order</span>
                     </div>
-                    <div class="setting-row">
-                        <label class="description" for="matchAllGenresToggle">
-                            Match All Genres
-                            <span class="tooltip-container">
-                                <span style="color: #888; margin-left: 4px; font-size: 12px; cursor: help;">?</span>
-                                <span class="custom-tooltip">Only include tracks matching all selected genres.</span>
-                            </span>
-                        </label>
-                        <div class="action">
-                            <label class="switch">
-                                <input type="checkbox" id="matchAllGenresToggle" ${matchAllGenres ? 'checked' : ''}>
-                                <span class="sliderx"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div class="settings-left-wrapper">
-                    <div class="settings-title">Sort Type:</div>
                     <div class="setting-row">
                         <select class="sort-type-select">
                             <option value="default">Default</option>
@@ -14125,6 +14171,34 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             <option value="scrobbles">Scrobbles</option>
                             <option value="personalScrobbles">My Scrobbles</option>
                         </select>
+                    </div>
+                </div>
+                <div class="settings-box">
+                    <div class="setting-row">
+                        <label class="setting-label" for="groupGenresToggle">
+                            Group Similar
+                            <span class="tooltip-container">
+                                <span style="color: #888; font-size: 11px; cursor: help;">?</span>
+                                <span class="custom-tooltip">Merges variations (e.g. 'electro' -> 'electronic').</span>
+                            </span>
+                        </label>
+                        <label class="switch">
+                            <input type="checkbox" id="groupGenresToggle" checked>
+                            <span class="sliderx"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="matchAllGenresToggle">
+                            Match All
+                            <span class="tooltip-container">
+                                <span style="color: #888; font-size: 11px; cursor: help;">?</span>
+                                <span class="custom-tooltip">Tracks must match ALL selected genres.</span>
+                            </span>
+                        </label>
+                        <label class="switch">
+                            <input type="checkbox" id="matchAllGenresToggle" ${matchAllGenres ? 'checked' : ''}>
+                            <span class="sliderx"></span>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -14143,6 +14217,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const matchAllGenresToggle = modalContainer.querySelector("#matchAllGenresToggle");
     const groupGenresToggle = modalContainer.querySelector("#groupGenresToggle");
     const genreContainer = modalContainer.querySelector(".genre-container");
+    const genreScrollWrapper = modalContainer.querySelector(".genre-scroll-wrapper");
     const searchBar = modalContainer.querySelector(".search-bar");
     const clearSearchButton = modalContainer.querySelector(".clear-search-button");
     const sortTypeSelect = modalContainer.querySelector(".sort-type-select");
@@ -14160,10 +14235,34 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SORT, sortTypeSelect.value);
     });
 
+    const updateScrollFades = () => {
+        const scrollTop = genreContainer.scrollTop;
+        const scrollHeight = genreContainer.scrollHeight;
+        const clientHeight = genreContainer.clientHeight;
+        
+        if (scrollTop > 0) {
+            genreScrollWrapper.classList.add('can-scroll-top');
+        } else {
+            genreScrollWrapper.classList.remove('can-scroll-top');
+        }
+
+        if (scrollHeight > clientHeight && scrollTop + clientHeight < scrollHeight - 1) {
+            genreScrollWrapper.classList.add('can-scroll-bottom');
+        } else {
+            genreScrollWrapper.classList.remove('can-scroll-bottom');
+        }
+    };
+
+    genreContainer.addEventListener('scroll', updateScrollFades);
+    
+    new ResizeObserver(() => updateScrollFades()).observe(genreContainer);
+
+    genreContainer.addEventListener('scroll', updateScrollFades);
     matchAllGenresToggle.addEventListener("change", () => {
       matchAllGenres = matchAllGenresToggle.checked;
       saveSettings();
       updateFilteredTracksCount();
+    setTimeout(updateScrollFades, 50);
     });
     
     groupGenresToggle.addEventListener("change", () => {
@@ -14504,11 +14603,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     searchBar.addEventListener("input", updateGenreButtons);
     updateGenreButtons();
 
+    genreScrollWrapper.classList.add('no-transition');
+    
+    updateScrollFades();
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+            
+            setTimeout(() => {
+                genreScrollWrapper.classList.remove('no-transition');
+            }, 200);
+        });
+    });
+
     createPlaylistButton.addEventListener("click", async () => {
       selectionErrorDiv.style.display = 'none';
       if (selectedGenres.length === 0 && excludedGenres.length === 0) {
-          selectionErrorDiv.textContent = "Please select at least one genre to include or exclude.";
-          selectionErrorDiv.style.display = 'block';
+          showNotification("Please select at least one genre to include or exclude.", true);
           return;
       }
     
@@ -21848,20 +21960,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     addBtn.addEventListener('click', async () => {
         const newGenre = searchBar.value.trim().toLowerCase();
-        errorDiv.style.display = 'none';
 
         if (!newGenre) return;
         if (mainGenreList.includes(newGenre) || userAddedGenres.has(newGenre)) {
-            errorDiv.textContent = `"${newGenre}" already exists in the list.`;
-            errorDiv.style.display = 'block';
-            setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
+            showNotification(`"${newGenre}" already exists in the list.`, true);
             return;
         }
 
         if (!genrePlaylistsCache) {
-            errorDiv.textContent = "Could not verify genre; genre database is unavailable.";
-            errorDiv.style.display = 'block';
-            setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
+            showNotification("Could not verify genre; genre database is unavailable.", true);
             return;
         }
 
@@ -21876,9 +21983,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             searchBar.value = '';
             fullRender();
         } else {
-            errorDiv.textContent = `No genre found for "${newGenre}". Try a broader term.`;
-            errorDiv.style.display = 'block';
-            setTimeout(() => { errorDiv.style.display = 'none'; }, 4000);
+            showNotification(`No genre found for "${newGenre}". Try a broader term.`, true);
         }
     });
 
@@ -21887,14 +21992,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const closeModal = () => overlay.remove();
     
     const createPlaylistBtn = modalContainer.querySelector('#createGenreTreePlaylist');
-    const selectionErrorDiv = modalContainer.querySelector('#genre-selection-error');
 
     createPlaylistBtn.addEventListener('click', () => {
         const allSelected = [...selectedMainGenres, ...selectedUserGenres];
         if (allSelected.length === 0) {
-            selectionErrorDiv.textContent = "Please select at least one genre.";
-            selectionErrorDiv.style.display = 'block';
-            setTimeout(() => { selectionErrorDiv.style.display = 'none'; }, 4000);
+            showNotification("Please select at least one genre.", true);
             return;
         }
         closeModal();
