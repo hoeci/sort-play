@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.33.1";
+  const SORT_PLAY_VERSION = "5.33.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -15615,7 +15615,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const needsText = !data.release_date_text && data.release_date_text !== "N/A";
         const needsDuration = !data.duration_ms && data.duration_ms !== 0 && data.duration_ms !== -1;
         
-        const needsNewData = !data.artist_name || !data.track_name;
+        const needsNewData = !data.artist_name || !data.track_name || data.popularity === undefined || data.popularity === null;
 
         if ((needsText || needsDuration || needsNewData) && !trackIdsForMetadata.has(id) && !justFetchedTrackIds.has(id)) {
             trackIdsForMetadata.add(id);
