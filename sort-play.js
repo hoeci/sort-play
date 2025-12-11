@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.33.0";
+  const SORT_PLAY_VERSION = "5.33.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -15056,7 +15056,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         artist_name: JSON.stringify(data.artist_name || []),
         explicit: data.explicit,
         track_name: data.track_name || null,
-        popularity: data.popularity || null,
+        popularity: (data.popularity !== undefined && data.popularity !== null) ? data.popularity : null,
         popularity_updated_at: Math.floor(Date.now() / 86400000),
 
         audio_features: data.audio_features || {} 
