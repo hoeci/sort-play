@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.33.3";
+  const SORT_PLAY_VERSION = "5.33.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -20181,10 +20181,32 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 .filter((track, index) => availabilityChecks[index])
                 .filter(track => !completeLikedSongUrisSet.has(track.uri))
                 .filter(track => track.artists.every(artist => !knownArtistIds.has(artist.id)));
+
+            const uniqueMainArtists = new Set();
+            newRecommendedTracks = newRecommendedTracks.filter(track => {
+                const mainArtistId = track.artists?.[0]?.id;
+                if (mainArtistId) {
+                    if (uniqueMainArtists.has(mainArtistId)) return false;
+                    uniqueMainArtists.add(mainArtistId);
+                }
+                return true;
+            });
             
             if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
             
-            const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
+            if (!isHeadless) mainButton.innerText = "Sorting...";
+            const tracksToSort = newRecommendedTracks.slice(0, discoveryPlaylistSize * 2);
+            const trackIds = tracksToSort.map(t => t.id);
+            const stats = await getBatchTrackStats(trackIds);
+            const tracksWithFeatures = tracksToSort.map(t => ({ ...t, features: stats[t.id] }));
+            
+            const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+            const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+            
+            const sortedTracks = await energyWaveSort(validForWave);
+            const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
+            
+            const trackUris = finalTracks.map(track => track.uri);
             
             if (!isHeadless) mainButton.innerText = "Creating...";
             const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
@@ -20352,9 +20374,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return !recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri));
         });
 
+        const uniqueMainArtists = new Set();
+        newRecommendedTracks = newRecommendedTracks.filter(track => {
+            const mainArtistId = track.artists?.[0]?.id;
+            if (mainArtistId) {
+                if (uniqueMainArtists.has(mainArtistId)) return false;
+                uniqueMainArtists.add(mainArtistId);
+            }
+            return true;
+        });
+
         if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
         
-        const trackUris = newRecommendedTracks.slice(0, discoveryPlaylistSize).map(track => track.uri);
+        if (!isHeadless) mainButton.innerText = "Sorting...";
+        const tracksToSort = newRecommendedTracks.slice(0, discoveryPlaylistSize * 2);
+        const trackIds = tracksToSort.map(t => t.id);
+        const stats = await getBatchTrackStats(trackIds);
+        const tracksWithFeatures = tracksToSort.map(t => ({ ...t, features: stats[t.id] }));
+        
+        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+        
+        const sortedTracks = await energyWaveSort(validForWave);
+        const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
+
+        const trackUris = finalTracks.map(track => track.uri);
         
         if (!isHeadless) mainButton.innerText = "Creating...";
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
