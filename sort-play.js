@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.33.4";
+  const SORT_PLAY_VERSION = "5.34.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -723,7 +723,7 @@
         cards: [
             { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe },
             { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime },
-            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery },
+            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v2' },
             { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer },
             { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer },
         ]
@@ -3642,6 +3642,7 @@
                         <div class="card-text">
                             <div class="card-title-row">
                                 <span class="card-title">${card.name}</span>
+                                ${card.version ? `<span class="card-version-tag">${card.version}</span>` : ''}
                                 <span class="badge-container">${badgeHtml}</span>
                             </div>
                             <span class="card-desc">${card.description}</span>
@@ -3879,7 +3880,7 @@
         .card-title-row {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
         }
 
         .card-title {
@@ -3890,6 +3891,18 @@
             overflow: hidden;
             text-overflow: ellipsis;
             text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        .card-version-tag {
+            font-size: 9px;
+            font-weight: 700;
+            color: #b3b3b3;
+            background-color: rgb(255 255 255 / 9%);
+            padding: 1px 4px;
+            border-radius: 4px;
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .badge-container {
@@ -20127,84 +20140,223 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             playlistDescription = "Discover new music from artists completely new to you. Created by Sort-Play.";
 
             mainButton.innerText = "Filtering...";
-            const knownArtistIds = await getComprehensiveKnownArtistsSet();
             
-            let topArtistsForSeeding = await getTopItems('artists', 'long_term', 100);
-            if (topArtistsForSeeding.length < 5) {
-                 topArtistsForSeeding = await getTopItems('artists', 'short_term', 100);
-            }
+            const knownArtistIds = await getComprehensiveKnownArtistsSet();
+            const userMarket = await fetchUserMarket() || 'US';
+            
+            allLikedSongs.forEach(song => {
+                if (song.artistUris) {
+                    song.artistUris.forEach(uri => {
+                        if (uri) knownArtistIds.add(uri.split(':')[2]);
+                    });
+                }
+            });
+
+            if (!isHeadless) mainButton.innerText = "Profiling...";
+            
+            const shortTermArtists = await getTopItems('artists', 'short_term', 50);
+            
+            const recentLikedArtists = allLikedSongs.slice(0, 50).map(song => {
+                if (song.artistUris && song.artistUris.length > 0) {
+                    return { id: song.artistUris[0].split(':')[2] };
+                }
+                return null;
+            }).filter(Boolean);
+
+            const combinedSeeds = new Map();
+            [...shortTermArtists, ...recentLikedArtists].forEach(a => combinedSeeds.set(a.id, a));
+            let topArtistsForSeeding = Array.from(combinedSeeds.values());
 
             if (topArtistsForSeeding.length === 0) {
-                throw new Error("Need more listening history to build a discovery profile.");
+                throw new Error("Need more listening history or liked songs to build a discovery profile.");
             }
+            
+            const fetchRelatedBatch = async (artists, sampleSize) => {
+                const shuffled = shuffleArray(artists).slice(0, sampleSize);
+                const results = new Map();
+                const promises = shuffled.map(async (artist) => {
+                    try {
+                        const relatedData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artist.id}/related-artists`);
+                        if (relatedData && relatedData.artists) {
+                            relatedData.artists.forEach(rel => results.set(rel.id, rel));
+                        }
+                    } catch (e) {}
+                });
+                await Promise.all(promises);
+                return Array.from(results.values());
+            };
 
             if (!isHeadless) mainButton.innerText = "Related...";
-            let relatedArtistPool = new Map();
-            const shuffledTopArtists = shuffleArray(topArtistsForSeeding);
+            const level1Raw = await fetchRelatedBatch(topArtistsForSeeding, 20);
+            const level1 = level1Raw.filter(a => !knownArtistIds.has(a.id));
 
-            for (const artist of shuffledTopArtists) {
-                if (relatedArtistPool.size > 500) break;
-                try {
-                    const related = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artist.id}/related-artists`);
-                    related.artists.forEach(relArtist => {
-                        if (!knownArtistIds.has(relArtist.id)) {
-                            relatedArtistPool.set(relArtist.id, relArtist);
+            if (level1.length < 10) {
+                const additionalLevel1 = await fetchRelatedBatch(topArtistsForSeeding, 30);
+                const additionalUnknowns = additionalLevel1.filter(a => !knownArtistIds.has(a.id));
+                const existingIds = new Set(level1.map(a => a.id));
+                additionalUnknowns.forEach(a => {
+                    if (!existingIds.has(a.id)) { level1.push(a); existingIds.add(a.id); }
+                });
+            }
+
+            const level2Raw = await fetchRelatedBatch(level1, 15);
+            const level2 = level2Raw.filter(a => !knownArtistIds.has(a.id));
+
+            if (level2.length < 10 && level1.length > 0) {
+                const additionalLevel2 = await fetchRelatedBatch(level1, 30);
+                const additionalUnknowns = additionalLevel2.filter(a => !knownArtistIds.has(a.id));
+                const existingIds = new Set(level2.map(a => a.id));
+                additionalUnknowns.forEach(a => {
+                    if (!existingIds.has(a.id)) { level2.push(a); existingIds.add(a.id); }
+                });
+            }
+
+            const level3Raw = await fetchRelatedBatch(level2, 15);
+            const level3 = level3Raw.filter(a => !knownArtistIds.has(a.id));
+
+            if (level3.length < 10 && level2.length > 0) {
+                const additionalLevel3 = await fetchRelatedBatch(level2, 30);
+                const additionalUnknowns = additionalLevel3.filter(a => !knownArtistIds.has(a.id));
+                const existingIds = new Set(level3.map(a => a.id));
+                additionalUnknowns.forEach(a => {
+                    if (!existingIds.has(a.id)) { level3.push(a); existingIds.add(a.id); }
+                });
+            }
+
+            const directPickCount = Math.floor(discoveryPlaylistSize / 2);
+            const directPool = [...level3, ...level2];
+            const uniqueDirectPool = Array.from(new Map(directPool.map(a => [a.id, a])).values());
+            
+            if (uniqueDirectPool.length < directPickCount) uniqueDirectPool.push(...level1);
+
+            if (!isHeadless) mainButton.innerText = "Picking...";
+            const chosenDirectArtists = shuffleArray(uniqueDirectPool).slice(0, directPickCount + 15); 
+            const directTracks = [];
+            const processedArtistIds = new Set(); 
+
+            const directBatches = [];
+            while(chosenDirectArtists.length) directBatches.push(chosenDirectArtists.splice(0, 5));
+
+            for (const batch of directBatches) {
+                if (directTracks.length >= directPickCount) break;
+
+                await Promise.all(batch.map(async (artist) => {
+                    if (knownArtistIds.has(artist.id) || processedArtistIds.has(artist.id)) return;
+
+                    try {
+                        const topTracksRes = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${userMarket}`);
+                        if (topTracksRes && topTracksRes.tracks && topTracksRes.tracks.length > 0) {
+                            const validTracks = [];
+                            for (const t of topTracksRes.tracks) {
+                                if (!completeLikedSongUrisSet.has(t.uri) && t.popularity > 0 && await isTrackAvailable(t)) {
+                                    validTracks.push(t);
+                                }
+                            }
+
+                            if (validTracks.length > 0) {
+                                let trackToPick;
+                                
+                                let poolSize = 1;
+                                const maxPool = Math.min(5, validTracks.length);
+                                
+                                for (let i = 0; i < maxPool - 1; i++) {
+                                    if ((validTracks[i].popularity - validTracks[i+1].popularity) > 4) {
+                                        break;
+                                    }
+                                    poolSize++;
+                                }
+                                
+                                const pickIndex = Math.floor(Math.random() * poolSize);
+                                trackToPick = validTracks[pickIndex];
+                                
+                                directTracks.push(trackToPick);
+                                processedArtistIds.add(artist.id);
+                                trackToPick.artists.forEach(a => knownArtistIds.add(a.id));
+                            }
                         }
-                    });
-                } catch (e) { console.warn(`Could not get related artists for ${artist.name}`); }
-            }
-            
-            const unknownRelatedArtists = Array.from(relatedArtistPool.values());
-            if (unknownRelatedArtists.length < 3) {
-                throw new Error("Couldn't find enough new artists related to your taste.");
+                    } catch (e) {}
+                }));
+                await new Promise(r => setTimeout(r, 100));
             }
 
-            const topTracksForSeeding = await getTopItems('tracks', 'long_term', 50);
-            const chosenUnknownArtists = shuffleArray(unknownRelatedArtists).slice(0, 3);
-            const chosenSeedTracks = shuffleArray(topTracksForSeeding).slice(0, 2);
+            if (!isHeadless) mainButton.innerText = "Get Recs...";
             
-            const seed_artists = chosenUnknownArtists.map(a => a.id);
-            const seed_tracks = chosenSeedTracks.map(t => t.id);
-            
-            if (!isHeadless) mainButton.innerText = "Get recs...";
-            const params = new URLSearchParams({ limit: 100 });
-            if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
-            if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
-            
-            const recommendations = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
-            
-            if (!recommendations?.tracks?.length) throw new Error("Spotify didn't return any recommendations. Try again!");
-            
-            if (!isHeadless) mainButton.innerText = "Excluding...";
-            const availabilityChecks = await Promise.all(recommendations.tracks.map(track => isTrackAvailable(track)));
-            let newRecommendedTracks = recommendations.tracks
-                .filter((track, index) => availabilityChecks[index])
-                .filter(track => !completeLikedSongUrisSet.has(track.uri))
-                .filter(track => track.artists.every(artist => !knownArtistIds.has(artist.id)));
+            const makeRecRequest = async (seeds) => {
+                const finalSeeds = (seeds && seeds.length > 0) ? seeds : shuffleArray(topArtistsForSeeding).slice(0, 3);
+                const seedIds = finalSeeds.map(a => a.id);
+                
+                const params = new URLSearchParams({ 
+                    limit: 35,
+                    min_popularity: '5',
+                    market: userMarket,
+                    seed_artists: seedIds.join(',')
+                });
+                
+                try {
+                    const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
+                    return res?.tracks || [];
+                } catch (e) { return []; }
+            };
 
-            const uniqueMainArtists = new Set();
-            newRecommendedTracks = newRecommendedTracks.filter(track => {
-                const mainArtistId = track.artists?.[0]?.id;
-                if (mainArtistId) {
-                    if (uniqueMainArtists.has(mainArtistId)) return false;
-                    uniqueMainArtists.add(mainArtistId);
-                }
+            const seedsL1 = shuffleArray(level1).slice(0, 3);
+            const seedsL2 = shuffleArray(level2).slice(0, 3);
+            const seedsL3 = shuffleArray(level3).slice(0, 3);
+
+            const [recsL1, recsL2, recsL3] = await Promise.all([
+                makeRecRequest(seedsL1),
+                makeRecRequest(seedsL2),
+                makeRecRequest(seedsL3)
+            ]);
+
+            const rawApiTracks = [...recsL1, ...recsL2, ...recsL3];
+            
+            let apiRecommendedTracks = [];
+            if (rawApiTracks.length > 0) {
+                const availabilityChecks = await Promise.all(rawApiTracks.map(track => isTrackAvailable(track)));
+                
+                const seenApiUris = new Set();
+                apiRecommendedTracks = rawApiTracks.filter((track, index) => {
+                    if (!availabilityChecks[index]) return false;
+                    if (seenApiUris.has(track.uri)) return false;
+                    seenApiUris.add(track.uri);
+                    
+                    if (completeLikedSongUrisSet.has(track.uri)) return false;
+                    
+                    const hasKnownArtist = track.artists.some(a => knownArtistIds.has(a.id));
+                    if (hasKnownArtist) return false;
+
+                    track.artists.forEach(a => knownArtistIds.add(a.id));
+                    return true;
+                });
+            }
+
+            if (!isHeadless) mainButton.innerText = "Combining...";
+            
+            const finalDirect = directTracks.slice(0, directPickCount);
+            const neededApi = discoveryPlaylistSize - finalDirect.length;
+            const finalApi = apiRecommendedTracks.slice(0, neededApi);
+            
+            let allCandidates = [...finalDirect, ...finalApi];
+            
+            const uniqueUriSet = new Set();
+            allCandidates = allCandidates.filter(t => {
+                if(uniqueUriSet.has(t.uri)) return false;
+                uniqueUriSet.add(t.uri);
                 return true;
             });
-            
-            if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
+
+            if (allCandidates.length === 0) throw new Error("Could not find enough tracks matching discovery criteria.");
             
             if (!isHeadless) mainButton.innerText = "Sorting...";
-            const tracksToSort = newRecommendedTracks.slice(0, discoveryPlaylistSize * 2);
-            const trackIds = tracksToSort.map(t => t.id);
+            const trackIds = allCandidates.map(t => t.id);
             const stats = await getBatchTrackStats(trackIds);
-            const tracksWithFeatures = tracksToSort.map(t => ({ ...t, features: stats[t.id] }));
+            const tracksWithFeatures = allCandidates.map(t => ({ ...t, features: stats[t.id] }));
             
             const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
             const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
             
             const sortedTracks = await energyWaveSort(validForWave);
-            const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
+            const finalTracks = [...sortedTracks, ...others];
             
             const trackUris = finalTracks.map(track => track.uri);
             
@@ -20302,7 +20454,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
         const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
 
-        if (!isHeadless) mainButton.innerText = "Get recs...";
+        if (!isHeadless) mainButton.innerText = "Get Recs...";
         const recommendationBatches = [];
         const NUM_CALLS = 6;
         
