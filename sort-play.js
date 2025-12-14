@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.35.1";
+  const SORT_PLAY_VERSION = "5.35.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -223,6 +223,15 @@
             if (!idb.db) return resolve();
             const tx = idb.db.transaction([store], "readwrite");
             tx.objectStore(store).delete(key);
+            tx.oncomplete = () => resolve();
+        });
+    },
+    clear: (store) => {
+        if (idb.mem[store]) idb.mem[store].clear();
+        return new Promise(resolve => {
+            if (!idb.db) return resolve();
+            const tx = idb.db.transaction([store], "readwrite");
+            tx.objectStore(store).clear();
             tx.oncomplete = () => resolve();
         });
     }
@@ -26266,6 +26275,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }, 100);
 
   await idb.init();
+  await idb.clear('personalScrobbles');
   await migrateJobHistoryToIdb();
   loadSettings();
   fetchUserMarket();
