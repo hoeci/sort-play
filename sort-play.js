@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.34.1";
+  const SORT_PLAY_VERSION = "5.35.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -117,7 +117,7 @@
   const runningJobIds = new Set();
 
   const CACHE_EXPIRE_PLAYCOUNTS = 6 * 60 * 60 * 1000; 
-  const CACHE_EXPIRE_PERSONAL_SCROBBLES = 1 * 60 * 60 * 1000; 
+  const CACHE_EXPIRE_PERSONAL_SCROBBLES = 30 * 60 * 1000;
   const CACHE_EXPIRE_GLOBAL_SCROBBLES = 2 * 24 * 60 * 60 * 1000; 
   const CACHE_EXPIRE_RELEASE_DATE = null;
   const CACHE_EXPIRE_AI_DATA = null;
@@ -16191,6 +16191,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     #sort-play-now-playing-data:hover .sort-play-np-value {
         text-decoration: underline;
     }
+    .sort-play-column-header {
+        cursor: pointer !important;
+    }
+    .sort-play-column-header:hover span {
+        color: #fff !important;
+    }
   `;
   document.head.appendChild(styleElement);
 
@@ -24410,6 +24416,126 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return null;
   }
 
+  function showColumnSelector(event, contextType) {
+    event.stopPropagation();
+    const existing = document.getElementById('sort-play-column-selector');
+    if (existing) existing.remove();
+
+    const options = [
+        { value: 'playCount', label: 'Play Count' },
+        { value: 'popularity', label: 'Popularity' },
+        { value: 'releaseDate', label: 'Release Date' },
+        { value: 'scrobbles', label: 'Scrobbles' },
+        { value: 'personalScrobbles', label: 'My Scrobbles' },
+        { value: 'djInfo', label: 'DJ Info' },
+        { value: 'key', label: 'Key' },
+        { value: 'tempo', label: 'Tempo (BPM)' },
+        { value: 'energy', label: 'Energy' },
+        { value: 'danceability', label: 'Danceability' },
+        { value: 'valence', label: 'Valence' }
+    ];
+
+    let currentOptions = options;
+    if (contextType === 'album') {
+        currentOptions = options.filter(o => o.value !== 'playCount');
+    }
+
+    const menu = document.createElement('div');
+    menu.id = 'sort-play-column-selector';
+    menu.className = 'main-contextMenu-menu sort-play-font-scope';
+    menu.style.cssText = `
+        position: fixed; z-index: 9999; background-color: #282828; border-radius: 4px; padding: 4px;
+        box-shadow: 0 16px 24px rgba(0,0,0,.3), 0 6px 8px rgba(0,0,0,.2); max-height: 400px; overflow-y: auto;
+        min-width: 140px; display: flex; flex-direction: column;
+    `;
+
+    currentOptions.forEach(opt => {
+        const item = document.createElement('button');
+        item.className = 'main-contextMenu-menuItemButton';
+        item.style.cssText = 'color: #b3b3b3; padding: 4px 8px; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; font-size: 13px; border-radius: 2px; height: 28px;';
+        item.innerText = opt.label;
+        
+        let isSelected = false;
+        if (contextType === 'playlist1' && selectedColumnType === opt.value) isSelected = true;
+        if (contextType === 'playlist2' && selectedSecondColumnType === opt.value) isSelected = true;
+        if (contextType === 'album' && selectedAlbumColumnType === opt.value) isSelected = true;
+        if (contextType === 'artist' && selectedArtistColumnType === opt.value) isSelected = true;
+
+        if (isSelected) {
+            item.style.color = '#fff';
+            item.style.fontWeight = 'bold';
+            item.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        }
+
+        item.onmouseenter = () => {
+            if (!isSelected) item.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            item.style.color = '#fff';
+        };
+        item.onmouseleave = () => {
+            if (!isSelected) {
+                item.style.backgroundColor = 'transparent';
+                item.style.color = '#b3b3b3';
+            } else {
+                item.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                item.style.color = '#fff';
+            }
+        };
+
+        item.onclick = () => {
+            if (contextType === 'playlist1') {
+                selectedColumnType = opt.value;
+                localStorage.setItem("sort-play-selected-column-type", selectedColumnType);
+                updateTracklist();
+            } else if (contextType === 'playlist2') {
+                selectedSecondColumnType = opt.value;
+                localStorage.setItem("sort-play-selected-second-column-type", selectedSecondColumnType);
+                updateTracklist();
+            } else if (contextType === 'album') {
+                selectedAlbumColumnType = opt.value;
+                localStorage.setItem("sort-play-selected-album-column-type", selectedAlbumColumnType);
+                updateAlbumTracklist();
+            } else if (contextType === 'artist') {
+                selectedArtistColumnType = opt.value;
+                localStorage.setItem("sort-play-selected-artist-column-type", selectedArtistColumnType);
+                updateArtistTracklist();
+            }
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        };
+        menu.appendChild(item);
+    });
+
+    document.body.appendChild(menu);
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth;
+    const menuHeight = menu.offsetHeight;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    let top = rect.bottom + 10;
+    let left = rect.left + (rect.width / 2) - (menuWidth / 2);
+
+    if (left + menuWidth > viewportWidth) {
+        left = viewportWidth - menuWidth - 10;
+    }
+    if (left < 10) left = 10;
+
+    if (top + menuHeight > viewportHeight) {
+        top = rect.top - menuHeight - 5;
+    }
+
+    menu.style.top = `${top}px`;
+    menu.style.left = `${left}px`;
+
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target) && e.target !== event.currentTarget) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+  }
+  
   async function loadAdditionalColumnData(tracklist_) {
     const currentUri = getCurrentUri();
     let columnConfigs = [];
@@ -24781,7 +24907,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 headerColumn.setAttribute("aria-colindex", colIndexInt.toString());
                 
                 const btn = document.createElement("button");
-                btn.className = "main-trackList-column main-trackList-sortable sort-play-header";
+                btn.className = "main-trackList-column main-trackList-sortable sort-play-column-header";
+                btn.onclick = (e) => showColumnSelector(e, 'playlist1');
                 const title = document.createElement("span");
                 title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
                 title.innerText = expectedHeaderText;
@@ -24835,7 +24962,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 headerColumn.setAttribute("aria-colindex", (colIndexInt - (showAdditionalColumn ? 1 : 0)).toString());
                 
                 const btn = document.createElement("button");
-                btn.className = "main-trackList-column main-trackList-sortable sort-play-header";
+                btn.className = "main-trackList-column main-trackList-sortable sort-play-column-header";
+                btn.onclick = (e) => showColumnSelector(e, 'playlist2');
                 const title = document.createElement("span");
                 title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
                 title.innerText = expectedSecondHeaderText;
@@ -25036,8 +25164,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         tracklistContainer.setAttribute('aria-colcount', '5');
         const newHeaderCell = document.createElement('div');
         newHeaderCell.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
-        newHeaderCell.innerHTML = `<button class="main-trackList-column"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
+        newHeaderCell.innerHTML = `<button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
         newHeaderCell.setAttribute('role', 'columnheader');
+        newHeaderCell.firstChild.onclick = (e) => showColumnSelector(e, 'album');
         newHeaderCell.setAttribute('aria-colindex', '4');
         newHeaderCell.style.justifyContent = 'center';
 
@@ -25132,10 +25261,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             <div class="main-trackList-rowSectionIndex" role="columnheader" aria-colindex="1"><div>#</div></div>
             <div class="main-trackList-rowSectionStart" role="columnheader" aria-colindex="2"><div class="main-trackList-column"><span class="encore-text-body-small">Title</span></div></div>
             <div class="main-trackList-rowSectionVariable" role="columnheader" aria-colindex="3"><div><span class="encore-text-body-small">Plays</span></div></div>
-            <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="justify-content: center;"><button class="main-trackList-column"><span class="encore-text-body-small">${expectedHeaderText}</span></button></div>
+            <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="justify-content: center;"><button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button></div>
             <div class="main-trackList-rowSectionEnd" role="columnheader" aria-colindex="5"><div aria-label="Duration" class="main-trackList-column main-trackList-durationHeader"><svg data-encore-id="icon" role="img" aria-hidden="true" viewBox="0 0 16 16" class="Svg-sc-ytk21e-0 Svg-img-icon-small"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg></div></div>
         </div>`;
         headerWrapper.style.cssText = 'position: sticky; top: 0px; z-index: 2;';
+        headerWrapper.querySelector('.sort-play-artist-col-header button').onclick = (e) => showColumnSelector(e, 'artist');
         const rootlistWrapper = tracklistContainer.querySelector('.main-rootlist-wrapper');
         if (rootlistWrapper) {
             tracklistContainer.insertBefore(headerWrapper, rootlistWrapper);
