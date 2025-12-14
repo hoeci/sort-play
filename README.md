@@ -136,6 +136,7 @@ Generate playlists from natural language prompts.
 ### ➕ UI & Enhancements
 *   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, and the Now Playing View.
 *   **Now Playing Data:** Display extra track info like Release Year, Play Count, BPM, and more directly in the player bar, with customizable position, data format, and separator character.
+*   **Quick Column Switching:** Click the header of any extra column to instantly switch its data type (e.g., from Play Count to BPM) without opening settings.
 *   **Playlist Organization:** Automatically organizes all created playlists into a dedicated "Sort-Play Library" folder.
 *   **Configurable Sorting:** Easily toggle ascending/descending order for all applicable sort types.
 *   **Open After Sorting:** An option to automatically navigate to the newly created or modified playlist once the sorting is complete.
