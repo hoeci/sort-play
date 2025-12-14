@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.34.0";
+  const SORT_PLAY_VERSION = "5.34.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -117,7 +117,7 @@
   const runningJobIds = new Set();
 
   const CACHE_EXPIRE_PLAYCOUNTS = 6 * 60 * 60 * 1000; 
-  const CACHE_EXPIRE_PERSONAL_SCROBBLES = 4 * 60 * 60 * 1000; 
+  const CACHE_EXPIRE_PERSONAL_SCROBBLES = 1 * 60 * 60 * 1000; 
   const CACHE_EXPIRE_GLOBAL_SCROBBLES = 2 * 24 * 60 * 60 * 1000; 
   const CACHE_EXPIRE_RELEASE_DATE = null;
   const CACHE_EXPIRE_AI_DATA = null;
@@ -11139,7 +11139,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     ...(data.spotify_artist_genres || []),
                     ...(data.lastfm_track_genres || []),
                     ...(data.lastfm_artist_genres || []),
-                    ...(data.deezer_genres || [])
+                    ...(data.deezer_genres || []),
+                    ...(data.apple_music_genres || [])
                 ];
                 genres.forEach(g => capturedRawSet.add(g));
             });
@@ -11173,7 +11174,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         ...(rawData.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
                         ...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
                         ...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                        ...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' }))
+                        ...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
+                        ...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
                     ];
 
                     let uniqueSet = new Set();
@@ -11221,7 +11223,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const details = genreDetails.get(genreName);
                     
                     if (trackArtist) details.artists.add(trackArtist);
-                    if (source === 'spotify' || source === 'deezer') details.isTrusted = true;
+                    if (source === 'spotify' || source === 'deezer' || source === 'apple_music') details.isTrusted = true;
                     if (trackArtist && genreName.toLowerCase() === trackArtist) details.isSelfTitle = true;
 
                     if (!genresCountedForTrack.has(genreName)) {
@@ -13626,8 +13628,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     ...(rawData.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
                     ...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
                     ...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                    ...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' }))
+                    ...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
+                    ...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
                 ];
+
 
                 let finalUniqueGenres;
                 if (groupGenres) {
@@ -14472,7 +14476,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 details.count++;
                 if (trackArtist) details.artists.add(trackArtist);
 
-                if (genreData?.source === 'spotify' || genreData?.source === 'deezer') {
+                if (genreData?.source === 'spotify' || genreData?.source === 'deezer' || genreData?.source === 'apple_music') {
                     details.isTrusted = true;
                 }
                 
@@ -15414,7 +15418,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const allGenresEmpty = (!cached.spotify_artist_genres?.length) &&
                                (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
-                               (!cached.deezer_genres?.length);
+                               (!cached.deezer_genres?.length) &&
+                               (!cached.apple_music_genres?.length);
 
         if (allGenresEmpty && daysSinceLastUpdate > 180) return true;
 
@@ -15435,6 +15440,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (cached.spotify_artist_genres?.length > 0) sourceCount++;
         if ((cached.lastfm_track_genres?.length > 0) || (cached.lastfm_artist_genres?.length > 0)) sourceCount++;
         if (cached.deezer_genres?.length > 0) sourceCount++;
+        if (cached.apple_music_genres?.length > 0) sourceCount++;
 
         if (sourceCount === 1 && daysSinceRelease < 40) return true;
 
@@ -15722,7 +15728,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     ...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
                     ...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
                     ...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                    ...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' }))
+                    ...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
+                    ...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
                 ];
                 const mappedAndNormalized = mapAndNormalizeGenres(combined);
                 const finalUniqueGenres = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
@@ -15918,9 +15925,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 ...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
                 ...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
                 ...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                ...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' }))
+                ...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
+                ...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
             ];
-
             const mappedAndNormalized = mapAndNormalizeGenres(combined);
             const finalUniqueGenres = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
 
@@ -17555,8 +17562,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
     const cachedData = isLocal ? null : await getCachedPersonalScrobbles(trackId);
 
-    if (cachedData && !cachedData.pendingUpdate && !isCurrentTrack) {
-        return { ...track, personalScrobbles: cachedData.count };
+    const LFM_UPDATE_LAG_COOLDOWN = 3 * 60 * 1000; 
+    
+    if (cachedData && !isCurrentTrack) {
+        if (!cachedData.pendingUpdate) {
+            return { ...track, personalScrobbles: cachedData.count };
+        }
+        if ((Date.now() - cachedData.ts) < LFM_UPDATE_LAG_COOLDOWN) {
+            return { ...track, personalScrobbles: cachedData.count };
+        }
     }
 
     const username = loadLastFmUsername();
@@ -17611,8 +17625,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             if (newScrobbleCount > oldScrobbleCount) {
                 await setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
-            } else if (cachedData) {
-                await setCachedPersonalScrobbles(trackId, oldScrobbleCount, true);
+            } else if (cachedData && cachedData.pendingUpdate) {
+                await setCachedPersonalScrobbles(trackId, newScrobbleCount, true);
             } else {
                 await setCachedPersonalScrobbles(trackId, newScrobbleCount, false);
             }
@@ -24197,6 +24211,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
   
+  let previousTrackUriForScrobbleCache = null;
+
   function initializeSongChangeWatcher() {
     if (!Spicetify || !Spicetify.Player) {
         setTimeout(initializeSongChangeWatcher, 100);
@@ -24205,7 +24221,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const handleSongChange = (uri) => {
         if (!uri) return;
+
+        if (!localStorage.getItem("sort-play-lastfm-username")) return;
+        
+        if (previousTrackUriForScrobbleCache && previousTrackUriForScrobbleCache !== uri) {
+            const prevId = previousTrackUriForScrobbleCache.split(":")[2];
+            if (prevId) flagCachedPersonalScrobbleForUpdate(prevId);
+        }
+
         currentTrackUriForScrobbleCache = uri;
+        previousTrackUriForScrobbleCache = uri; 
+        
         const trackId = uri.split(":")[2];
         flagCachedPersonalScrobbleForUpdate(trackId);
     };
