@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.37.0";
+  const SORT_PLAY_VERSION = "5.37.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -23795,6 +23795,28 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return val <= 1 ? val : val / 100;
     };
 
+    const versionKeywords = [
+        'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
+        'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
+        'radio edit', 'radio mix', 'radio', 'single version', 'single edit', 'album version',
+        'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
+        'special edition', 'original mix', 'original version', 'live', 'live at',
+        'live in', 'live from', 'feat\\.?', 'ft\\.?', 'featuring', 'demo',
+        'instrumental', 'acoustic'
+    ];
+    const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})[^\\)\\]]*[\\)\\]\\-]?`, 'gi');
+
+    const getCleanTitle = (rawTitle) => {
+        if (!rawTitle) return "";
+        return rawTitle
+            .toLowerCase()
+            .replace(versionRegex, '')
+            .replace(/['’ʼ]/g, "'")
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
     const trackProfiles = tracks.map(track => {
         const f = track.features || {};
         
@@ -23976,6 +23998,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const isFinalTrack = remainingTracks.length === 1;
         const isSecondToLast = remainingTracks.length === 2;
         
+        const lastTitle = getCleanTitle(lastTrack.songTitle || lastTrack.name);
+
         const scoredCandidates = remainingTracks.map(candidateTrack => {
             let score = 0;
             const candProfile = candidateTrack.profile;
@@ -23990,7 +24014,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             score += getFlowScore(lastProfile, candProfile);
 
-            
             if (isNearEnd && !isFinalTrack && persona !== 'party' && persona !== 'workout') {
                 if (candProfile.energy < 0.65) score += 18;
                 if (candProfile.valence > 0.40) score += 12;
@@ -24005,6 +24028,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (candProfile.valence >= 0.45) score += 25;
                 if (candProfile.popularity >= 40) score += 20;
                 if (candProfile.tempo >= 80 && candProfile.tempo <= 130) score += 15;
+            }
+
+            const candTitle = getCleanTitle(candidateTrack.songTitle || candidateTrack.name);
+            if (candTitle === lastTitle && candTitle.length > 0) {
+                score -= 1000; 
             }
 
             score += Math.random() * 4;
@@ -24039,6 +24067,28 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (val === undefined || val === null) return 'Medium';
         const normalized = val <= 1 ? val : val / 100;
         return normalized <= 0.33 ? 'Low' : normalized <= 0.66 ? 'Medium' : 'High';
+    };
+
+    const versionKeywords = [
+        'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
+        'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
+        'radio edit', 'radio mix', 'radio', 'single version', 'single edit', 'album version',
+        'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
+        'special edition', 'original mix', 'original version', 'live', 'live at',
+        'live in', 'live from', 'feat\\.?', 'ft\\.?', 'featuring', 'demo',
+        'instrumental', 'acoustic'
+    ];
+    const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})[^\\)\\]]*[\\)\\]\\-]?`, 'gi');
+
+    const getCleanTitle = (rawTitle) => {
+        if (!rawTitle) return "";
+        return rawTitle
+            .toLowerCase()
+            .replace(versionRegex, '')
+            .replace(/['’ʼ]/g, "'")
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
     };
 
     const trackProfiles = tracks.map(track => {
@@ -24240,6 +24290,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const isNearEnd = currentPosition >= tracks.length - 3;
         const isFinalTrack = remainingTracks.length === 1;
 
+        const lastTitle = getCleanTitle(lastTrack.songTitle || lastTrack.name);
+
         const scoredCandidates = remainingTracks.map(candidateTrack => {
             let score = 0;
             const candProfile = candidateTrack.profile;
@@ -24261,6 +24313,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             if (isNearEnd && !isFinalTrack && persona !== 'party') {
                 if (candProfile.energy < 0.65) score += 12;
+            }
+
+            const candTitle = getCleanTitle(candidateTrack.songTitle || candidateTrack.name);
+            if (candTitle === lastTitle && candTitle.length > 0) {
+                score -= 500;
             }
 
             return { track: candidateTrack, score };
