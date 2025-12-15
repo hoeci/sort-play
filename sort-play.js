@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.36.3";
+  const SORT_PLAY_VERSION = "5.36.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -25462,7 +25462,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             updateDisplay(dataElement, "_", config.type);
                         }
                     } catch (e) {
-                        updateDisplay(dataElement, "_", config.type);
+                        updateDisplay(dataElement, { error: "Local Load Failed", errorLabel: "Err" }, config.type);
                         trackElement.setAttribute('data-sp-fetch-failed', 'true');
                     }
                 });
@@ -25628,7 +25628,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
                 } catch(e) { console.error(e); }
             }
-            idsToFetchFromApi.forEach(id => elementsToFetchFromApi.get(id)?.classList.remove('sort-play-processing'));
+            idsToFetchFromApi.forEach(id => {
+                const el = elementsToFetchFromApi.get(id);
+                if (el) {
+                    el.classList.remove('sort-play-processing');
+                    columnConfigs.forEach(c => {
+                        const dEl = el.querySelector(c.dataSelector);
+                        if (dEl && (!dEl.textContent || dEl.textContent === "_") && !dEl.dataset.spProcessed) {
+                             updateDisplay(dEl, { error: "Fetch failed", errorLabel: "Err" }, c.type);
+                        }
+                    });
+                }
+            });
         }
     }
   }
@@ -25651,11 +25662,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return; 
     }
 
-    let displayValue = "_"; 
+    let displayValue = "";
 
     if (type === 'playCount') {
         if (value > 0 && !isNaN(value)) {
             displayValue = new Intl.NumberFormat('en-US').format(value);
+        } else {
+            displayValue = "_";
         }
     } else if (type === 'personalScrobbles') {
         if (value === 0) {
@@ -25666,14 +25679,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             } else { 
                 displayValue = new Intl.NumberFormat('en-US').format(value);
             }
+        } else {
+            displayValue = "Err"; 
         }
     } else if (type === 'scrobbles') {
-        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== -1) {
+        if (value !== null && value !== undefined && !isNaN(value) && value !== -1) {
             if (value > 0) {
                 displayValue = new Intl.NumberFormat('en-US').format(value);
             } else {
                 displayValue = "_";
             }
+        } else {
+             displayValue = "Err";
         }
     } else if (type === 'releaseDate') {
         displayValue = formatReleaseDate(value, releaseDateFormat);
@@ -25685,11 +25702,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (value.energy) parts.push(`E${value.energy}`);
             if (parts.length > 0) {
                 displayValue = parts.join(' | ');
+            } else {
+                displayValue = "_";
             }
+        } else {
+            displayValue = "_";
         }
     } else if (['key', 'tempo', 'energy', 'danceability', 'valence', 'popularity'].includes(type)) {
         if (value !== null && value !== undefined) {
             displayValue = String(value);
+        } else {
+            displayValue = "_";
         }
     }
 
