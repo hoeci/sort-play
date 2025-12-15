@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.36.2";
+  const SORT_PLAY_VERSION = "5.36.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -17480,17 +17480,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         trackName = track.name;
 
+        if (artistName) artistName = artistName.trim();
+        if (trackName) trackName = trackName.trim();
+
         if (!artistName || !trackName) {
           return {
             ...track,
             scrobbles: null,
+            error: "Missing track title or artist name",
+            errorLabel: "No Meta"
           };
         }
 
         const params = new URLSearchParams({
             method: 'track.getInfo',
-            artist: encodeURIComponent(artistName),
-            track: encodeURIComponent(trackName),
+            artist: artistName,
+            track: trackName,
             format: 'json'
         });
         
@@ -17516,20 +17521,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             );
             return {
               ...track,
-              scrobbles: null,  
+              scrobbles: -1,
+              error: "Track not found on Last.fm",
+              errorLabel: "N/A"
             };
           } else {
             throw new Error(`Last.fm API error: ${data.message}`);
           }
         }
-        if (!data.track || !data.track.playcount) {
-          return {
-            ...track,
-            scrobbles: null,
-          };
-        }
 
-        const scrobbles = parseInt(data.track.playcount);
+        let scrobbles = 0;
+        const rawCount = data.track?.playcount;
+        if (rawCount !== undefined && rawCount !== null && rawCount !== '') {
+             const parsed = parseInt(rawCount, 10);
+             if (!isNaN(parsed)) {
+                 scrobbles = parsed;
+             }
+        }
 
         return {
           ...track,
@@ -17554,6 +17562,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           return {
             ...track,
             scrobbles: null,
+            error: `Failed to fetch from Last.fm after ${maxRetries} attempts.`,
+            errorLabel: "Failed"
           };
         }
       }
@@ -17565,14 +17575,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const isLocal = Spicetify.URI.isLocal(track.uri);
     
     if (isLocal && (!track.name || !track.artistName)) {
-        return { ...track, personalScrobbles: null, error: "Local file missing metadata." };
+        return { ...track, personalScrobbles: null, error: "Local file missing metadata.", errorLabel: "No Meta" };
     }
     
     if (!trackId && !isLocal) {
-        return { ...track, personalScrobbles: null, error: "Invalid track ID." };
+        return { ...track, personalScrobbles: null, error: "Invalid track ID.", errorLabel: "Invalid" };
     }
 
-    const trackName = track.name;
+    let trackName = track.name;
     let artistName = track.artistName;
     if (!artistName && track.artists && track.artists.length > 0) {
         artistName = track.artists[0]?.name;
@@ -17583,6 +17593,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (artistName && artistName.includes(';')) {
         artistName = artistName.split(';')[0].trim();
     }
+
+    if (artistName) artistName = artistName.trim();
+    if (trackName) trackName = trackName.trim();
 
     const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
     const cachedData = isLocal ? null : await getCachedPersonalScrobbles(trackId);
@@ -17600,7 +17613,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const username = loadLastFmUsername();
     if (!username) {
-      return { ...track, personalScrobbles: null, error: "Last.fm username not set." };
+      return { ...track, personalScrobbles: null, error: "Last.fm username not set.", errorLabel: "No User" };
     }
 
     const maxRetries = 5;
@@ -17611,7 +17624,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     while (retries < maxRetries) {
       try {
         if (!artistName || !trackName) {
-          return { ...track, personalScrobbles: null, error: "Missing track metadata." };
+          return { ...track, personalScrobbles: null, error: "Missing track metadata.", errorLabel: "No Meta" };
         }
 
         const params = new URLSearchParams({
@@ -17635,15 +17648,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (data.error) {
           if (data.error === 6) { 
             if (!isLocal) {
-                await setCachedPersonalScrobbles(trackId, 0, false);
+                await setCachedPersonalScrobbles(trackId, -1, false);
             }
-            return { ...track, personalScrobbles: 0 };
+            return { ...track, personalScrobbles: -1, error: "Track not found on Last.fm", errorLabel: "N/A" };
           } else {
             throw new Error(`Last.fm API error: ${data.message}`);
           }
         }
         
-        const newScrobbleCount = data.track?.userplaycount ? parseInt(data.track.userplaycount) : 0;
+        let newScrobbleCount = 0;
+        const rawCount = data.track?.userplaycount;
+        if (rawCount !== undefined && rawCount !== null && rawCount !== '') {
+             const parsed = parseInt(rawCount, 10);
+             if (!isNaN(parsed)) {
+                 newScrobbleCount = parsed;
+             }
+        }
         
         if (!isLocal) {
             const oldScrobbleCount = cachedData ? cachedData.count : -1;
@@ -17666,7 +17686,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           await new Promise((resolve) => setTimeout(resolve, delay));
           delay *= 2;
         } else {
-          return { ...track, personalScrobbles: null, error: `Failed to fetch after ${maxRetries} attempts.` };
+          return { ...track, personalScrobbles: null, error: `Failed to fetch after ${maxRetries} attempts.`, errorLabel: "Failed" };
         }
       }
     }
@@ -24591,11 +24611,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const result = await fetchFunction(track);
                     if (result) {
                         if (isPersonal) {
-                            const val = (result.error) ? null : result.personalScrobbles;
-                            if (val !== null) setCachedPersonalScrobbles(track.id, val, false);
+                            const val = (result.error && result.personalScrobbles !== -1) ? null : result.personalScrobbles;
+                            if (val !== null && val !== undefined) setCachedPersonalScrobbles(track.id, val, false);
                         } else {
-                            const val = result.scrobbles;
-                            if (val !== null) setCachedScrobbles(track.id, val);
+                            const val = (result.error && result.scrobbles !== -1) ? null : result.scrobbles;
+                            if (val !== null && val !== undefined) setCachedScrobbles(track.id, val);
                         }
                         results.push(result);
                     }
@@ -25422,13 +25442,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     try {
                         if (config.type === 'scrobbles') {
                             const result = await getTrackDetailsWithScrobbles(localTrackInfo);
-                            updateDisplay(dataElement, result.scrobbles, config.type);
+                            if (result.scrobbles === -1 || result.error) {
+                                updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
+                            } else {
+                                updateDisplay(dataElement, result.scrobbles, config.type);
+                            }
                         } else if (config.type === 'personalScrobbles') {
                             if (!loadLastFmUsername()) {
-                                updateDisplay(dataElement, { error: "Set Last.fm username" }, config.type);
+                                updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type);
                             } else {
                                 const result = await getTrackDetailsWithPersonalScrobbles(localTrackInfo);
-                                updateDisplay(dataElement, result.error ? { error: result.error } : result.personalScrobbles, config.type);
+                                if (result.personalScrobbles === -1 || result.error) {
+                                    updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
+                                } else {
+                                    updateDisplay(dataElement, result.personalScrobbles, config.type);
+                                }
                             }
                         } else {
                             updateDisplay(dataElement, "_", config.type);
@@ -25512,7 +25540,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
 
                 if (val !== undefined && val !== null) {
-                    updateDisplay(dataElement, val, config.type);
+                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles') && val === -1) {
+                         updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type);
+                    } else {
+                         updateDisplay(dataElement, val, config.type);
+                    }
                 } else {
                     element.classList.add('sort-play-processing');
                     isFullyCached = false;
@@ -25569,12 +25601,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                     const info = { name: t.name, artists: t.artists };
                                     if (c.type === 'scrobbles') {
                                         const r = await getTrackDetailsWithScrobbles(info);
-                                        updateDisplay(dEl, r.scrobbles, c.type);
-                                        if (r.scrobbles !== null) await setCachedScrobbles(t.id, r.scrobbles);
+                                        if (r.scrobbles === -1 || r.error) {
+                                            updateDisplay(dEl, { error: r.error || "Track not found on Last.fm", errorLabel: r.errorLabel || "N/A" }, c.type);
+                                            await setCachedScrobbles(t.id, -1);
+                                        } else {
+                                            updateDisplay(dEl, r.scrobbles, c.type);
+                                            if (r.scrobbles !== null) await setCachedScrobbles(t.id, r.scrobbles);
+                                        }
                                     } else {
                                         if (loadLastFmUsername()) {
                                             const r = await getTrackDetailsWithPersonalScrobbles({ ...info, uri: t.uri });
-                                            updateDisplay(dEl, r.personalScrobbles, c.type);
+                                            if (r.personalScrobbles === -1 || r.error) {
+                                                updateDisplay(dEl, { error: r.error || "Track not found on Last.fm", errorLabel: r.errorLabel || "N/A" }, c.type);
+                                            } else {
+                                                updateDisplay(dEl, r.personalScrobbles, c.type);
+                                            }
+                                        } else {
+                                            updateDisplay(dEl, { error: "Set Last.fm username in setting", errorLabel: "No User" }, c.type);
                                         }
                                     }
                                 }
@@ -25594,6 +25637,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (!element) return;
     element.dataset.spProcessed = "true";
 
+    if (value && typeof value === 'object' && value.error) {
+        const label = value.errorLabel || "Error";
+        element.innerHTML = `
+            <span class="sort-play-failed-cell">
+                ${label}
+                <span class="sort-play-tooltip">${value.error}</span>
+            </span>
+        `;
+        element.style.fontSize = "14px";
+        element.style.fontWeight = "400";
+        element.style.color = "var(--spice-subtext)";
+        return; 
+    }
+
     let displayValue = "_"; 
 
     if (type === 'playCount') {
@@ -25601,15 +25658,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             displayValue = new Intl.NumberFormat('en-US').format(value);
         }
     } else if (type === 'personalScrobbles') {
-        if (value && typeof value === 'object' && value.error) {
-            element.innerHTML = `
-                <span class="sort-play-failed-cell">
-                    Failed
-                    <span class="sort-play-tooltip">${value.error}</span>
-                </span>
-            `;
-            return; 
-        } else if (value === 0) {
+        if (value === 0) {
             displayValue = "_";
         } else if (value > 0 && !isNaN(value)) {
             if (myScrobblesDisplayMode === 'sign') {
@@ -25617,12 +25666,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             } else { 
                 displayValue = new Intl.NumberFormat('en-US').format(value);
             }
-        } else {
-            displayValue = "Failed";
         }
     } else if (type === 'scrobbles') {
-        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined) {
-            displayValue = new Intl.NumberFormat('en-US').format(value);
+        if (value !== "_" && !isNaN(value) && value !== null && value !== undefined && value !== -1) {
+            if (value > 0) {
+                displayValue = new Intl.NumberFormat('en-US').format(value);
+            } else {
+                displayValue = "_";
+            }
         }
     } else if (type === 'releaseDate') {
         displayValue = formatReleaseDate(value, releaseDateFormat);
