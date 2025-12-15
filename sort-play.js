@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.36.6";
+  const SORT_PLAY_VERSION = "5.37.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -6349,7 +6349,7 @@ sendButton.addEventListener("click", async () => {
         (progress) => { if (!isHeadless) mainButton.innerText = `${30 + Math.floor(progress * 0.60)}%`; }
     );
 
-    const { unique } = deduplicateTracks(tracksWithPlayCounts, true, true);
+    const { unique } = await deduplicateTracks(tracksWithPlayCounts, true, true);
     
     if (!isHeadless) mainButton.innerText = "Ready";
     return unique;
@@ -10198,7 +10198,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
     }
 
-    const { unique: uniqueTracks } = deduplicate ? deduplicateTracks(tracksForProcessing, false, sources.some(s => URI.isArtist(s.uri))) : { unique: tracksForProcessing, removed: [] };
+    const { unique: uniqueTracks } = deduplicate ? await deduplicateTracks(tracksForProcessing, false, sources.some(s => URI.isArtist(s.uri))) : { unique: tracksForProcessing, removed: [] };
 
     let sortedTracks;
     switch (sortType) {
@@ -14827,9 +14827,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   },
                   getTrackDetailsWithReleaseDate
               );
-              uniqueTracks = deduplicateTracks(tracksWithReleaseDates).unique;
+              uniqueTracks = (await deduplicateTracks(tracksWithReleaseDates)).unique;
           } else {
-              uniqueTracks = deduplicateTracks(tracksWithPopularity).unique;
+              uniqueTracks = (await deduplicateTracks(tracksWithPopularity)).unique;
           }
     
           if (sortType === "playCount") {
@@ -19289,7 +19289,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const tracksWithPlayCounts = await enrichTracksWithPlayCounts(refreshedTracks);
       const tracksWithIds = await processBatchesWithDelay(tracksWithPlayCounts, 50, 500, () => {}, collectTrackIdsForPopularity);
       const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
-      const { unique: uniqueTracks } = deduplicateTracks(tracksWithPopularity, false, true);
+      const { unique: uniqueTracks } = await deduplicateTracks(tracksWithPopularity, false, true);
       tracksToProcess = uniqueTracks;
     } else {
       tracksToProcess = tracks;
@@ -23016,7 +23016,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
          }
 
-          const deduplicationResult = deduplicateTracks(tracksForDeduplication, sortType === "deduplicateOnly", isArtistPage);
+          const deduplicationResult = await deduplicateTracks(tracksForDeduplication, sortType === "deduplicateOnly", isArtistPage);
           uniqueTracks = deduplicationResult.unique;
           removedTracks = deduplicationResult.removed;
 
@@ -23208,7 +23208,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return { ...track, ...stats, features: stats };
             });
     
-            const deduplicationResult = deduplicateTracks(tracksWithAudioFeatures, false, isArtistPage);;
+            const deduplicationResult = await deduplicateTracks(tracksWithAudioFeatures, false, isArtistPage);;
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
     
@@ -23241,7 +23241,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return { ...track, ...stats };
             });
     
-            const deduplicationResult = deduplicateTracks(tracksWithAudioFeatures, false, isArtistPage);;
+            const deduplicationResult = await deduplicateTracks(tracksWithAudioFeatures, false, isArtistPage);;
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
     
@@ -23269,7 +23269,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   (progress) => { if (!isHeadless) mainButton.innerText = `${80 + Math.floor(progress * 0.20)}%`; }
                 );
 
-                const deduplicationResult = deduplicateTracks(tracksWithScrobbles, sortType === "deduplicateOnly", isArtistPage);
+                const deduplicationResult = await deduplicateTracks(tracksWithScrobbles, sortType === "deduplicateOnly", isArtistPage);
                 uniqueTracks = deduplicationResult.unique;
                 removedTracks = deduplicationResult.removed;
 
@@ -24430,14 +24430,111 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
   
 
-  function deduplicateTracks(tracks, force = false, isArtistPageContext = false) {
+  async function deduplicateTracks(tracks, force = false, isArtistPageContext = false) {
       if (!force && !playlistDeduplicate && !isArtistPageContext) {
           return { unique: tracks, removed: [] };
+      }
+
+      const isrcStartTime = Date.now();
+      
+      const tracksWithIds = tracks.filter(t => t.uri.startsWith("spotify:track:"));
+      const trackIds = tracksWithIds.map(t => t.uri.split(":")[2]);
+      const uniqueTrackIds = [...new Set(trackIds)];
+
+      const cachedMetadata = await idb.getMany('trackMetadata', uniqueTrackIds, CACHE_EXPIRE_METADATA);
+      const missingIds = uniqueTrackIds.filter(id => {
+          const meta = cachedMetadata.get(id);
+          return !meta || !meta.external_ids || !meta.external_ids.isrc;
+      });
+
+      if (missingIds.length > 0) {
+          const BATCH_SIZE = 50;
+          for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+              const batch = missingIds.slice(i, i + BATCH_SIZE);
+              try {
+                  const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
+                  if (response && response.tracks) {
+                      response.tracks.forEach(track => {
+                          if (track) {
+                              const cacheData = {
+                                  name: track.name,
+                                  album: {
+                                      name: track.album.name,
+                                      id: track.album.id,
+                                      uri: track.album.uri,
+                                      release_date: track.album.release_date,
+                                      album_type: track.album.album_type
+                                  },
+                                  artists: track.artists.map(a => ({
+                                      id: a.id,
+                                      name: a.name,
+                                      uri: a.uri
+                                  })),
+                                  duration_ms: track.duration_ms,
+                                  popularity: track.popularity,
+                                  external_ids: track.external_ids,
+                                  id: track.id,
+                                  uri: track.uri
+                              };
+                              cachedMetadata.set(track.id, cacheData);
+                              idb.set('trackMetadata', track.id, cacheData);
+                          }
+                      });
+                  }
+              } catch (e) {
+                  console.warn("[Sort-Play] Failed to fetch ISRC batch during deduplication", e);
+              }
+          }
       }
 
       const DURATION_THRESHOLD = 2000; 
       const finalUniqueTracks = [];
       const finalRemovedTracks = [];
+      let isrcTimeAccumulator = 0;
+
+      const fetchIsrc = async (id) => {
+          if (!id) return null;
+          
+          if (cachedMetadata.has(id)) {
+              return cachedMetadata.get(id)?.external_ids?.isrc;
+          }
+
+          const cached = await idb.get('trackMetadata', id, CACHE_EXPIRE_METADATA);
+          if (cached?.external_ids?.isrc) {
+              cachedMetadata.set(id, cached);
+              return cached.external_ids.isrc;
+          }
+
+          try {
+              const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${id}`);
+              if (res?.external_ids?.isrc) {
+                  const cacheData = {
+                      name: res.name,
+                      album: {
+                          name: res.album.name,
+                          id: res.album.id,
+                          uri: res.album.uri,
+                          release_date: res.album.release_date,
+                          album_type: res.album.album_type
+                      },
+                      artists: res.artists.map(a => ({
+                          id: a.id,
+                          name: a.name,
+                          uri: a.uri
+                      })),
+                      duration_ms: res.duration_ms,
+                      popularity: res.popularity,
+                      external_ids: res.external_ids,
+                      id: res.id,
+                      uri: res.uri
+                  };
+                  cachedMetadata.set(id, cacheData);
+                  await idb.set('trackMetadata', id, cacheData);
+                  return res.external_ids.isrc;
+              }
+          } catch(e) {}
+          return null;
+      };
 
       const versionKeywords = [
           'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
@@ -24477,7 +24574,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           return (a.uri || "").localeCompare(b.uri || "");
       });
 
-      sortedInputTracks.forEach(candidateTrack => {
+      for (const candidateTrack of sortedInputTracks) {
           let isConsideredDuplicateOfAnExistingUnique = false;
 
           for (const existingUniqueTrack of finalUniqueTracks) {
@@ -24555,12 +24652,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               }
           }
 
+          if (!isConsideredDuplicateOfAnExistingUnique) {
+              const startIsrc = Date.now();
+              const candidateCleanTitle = getCleanTitle(candidateTrack.songTitle || candidateTrack.name || "");
+              
+              const titleMatch = finalUniqueTracks.find(t => 
+                  getCleanTitle(t.songTitle || t.name || "") === candidateCleanTitle
+              );
+
+              if (titleMatch) {
+                  const cId = candidateTrack.uri.split(':')[2];
+                  const eId = titleMatch.uri.split(':')[2];
+                  if (cId && eId) {
+                      const [cIsrc, eIsrc] = await Promise.all([fetchIsrc(cId), fetchIsrc(eId)]);
+                      if (cIsrc && eIsrc && cIsrc === eIsrc) {
+                          isConsideredDuplicateOfAnExistingUnique = true;
+                      }
+                  }
+              }
+              isrcTimeAccumulator += (Date.now() - startIsrc);
+          }
+
           if (isConsideredDuplicateOfAnExistingUnique) {
               finalRemovedTracks.push(candidateTrack);
           } else {
               finalUniqueTracks.push(candidateTrack);
           }
-      });
+      }
 
       return { unique: finalUniqueTracks, removed: finalRemovedTracks };
   }
