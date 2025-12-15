@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.36.4";
+  const SORT_PLAY_VERSION = "5.36.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -17499,7 +17499,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             format: 'json'
         });
         
-        const response = await fetchLfmWithGateway(params);
+        let response = await fetchLfmWithGateway(params);
 
         if (!response.ok) {
           throw new Error(
@@ -17507,12 +17507,26 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           );
         }
 
-        const text = await response.text();
+        let text = await response.text();
         if (!text || text.trim() === '') {
              throw new Error("Received empty response from Last.fm");
         }
 
-        const data = JSON.parse(text);
+        let data = JSON.parse(text);
+
+        if (data.error === 6) {
+            params.set('autocorrect', '1');
+            const responseAuto = await fetchLfmWithGateway(params);
+            if (responseAuto.ok) {
+                const textAuto = await responseAuto.text();
+                if (textAuto && textAuto.trim() !== '') {
+                    const dataAuto = JSON.parse(textAuto);
+                    if (!dataAuto.error) {
+                        data = dataAuto;
+                    }
+                }
+            }
+        }
 
         if (data.error) {
           if (data.error === 6) { 
@@ -17635,15 +17649,29 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             format: 'json'
         });
         
-        const response = await fetchLfmWithGateway(params);
+        let response = await fetchLfmWithGateway(params);
         if (!response.ok) throw new Error(`Last.fm API request failed with status ${response.status}`);  
         
-        const text = await response.text();
+        let text = await response.text();
         if (!text || text.trim() === '') {
              throw new Error("Received empty response from Last.fm");
         }
 
-        const data = JSON.parse(text);
+        let data = JSON.parse(text);
+
+        if (data.error === 6) {
+            params.set('autocorrect', '1');
+            const responseAuto = await fetchLfmWithGateway(params);
+            if (responseAuto.ok) {
+                const textAuto = await responseAuto.text();
+                if (textAuto && textAuto.trim() !== '') {
+                    const dataAuto = JSON.parse(textAuto);
+                    if (!dataAuto.error) {
+                        data = dataAuto;
+                    }
+                }
+            }
+        }
 
         if (data.error) {
           if (data.error === 6) { 
