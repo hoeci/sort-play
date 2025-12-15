@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.35.2";
+  const SORT_PLAY_VERSION = "5.35.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -3005,6 +3005,7 @@
     modalContainer.style.cssText = `
         z-index: 2003;
         width: 600px !important;
+        overflow: visible !important;
     `;
     modalContainer.innerHTML = `
       <style>
@@ -13338,7 +13339,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     "dream pop": ["dream pop", "ethereal wave"],
     "drill": ["aussie drill", "bronx drill", "brooklyn drill", "chicago drill", "classical drill", "drill", "drill chileno", "drill espanol", "drill francais", "drill tuga", "florida drill", "german drill", "melodic drill", "ny drill", "uk drill"],
     "drone": ["drone", "drone's", "dronemusic", "drones"],
-    "drum and bass": ["d&b", "dnb", "drum & bass", "drum and bass", "drum n bass", "drumandbass"],
+    "drum and bass": ["d&b", "dnb", "drum & bass", "drum and bass", "drum n bass", "drumandbass", "Drum'n'bass"],
     "dubstep": ["brostep", "drumstep", "dub step", "dub-step", "dubstep", "dubstep's", "dubstepmusic"],
     "east coast hip hop": ["boom bap", "east coast hip hop", "hardcore hip hop"],
     "edm": ["edm", "edm music", "edm's", "edmmusic", "electronic dance", "electronic dance music"],
