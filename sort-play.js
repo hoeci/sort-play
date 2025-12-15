@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.36.5";
+  const SORT_PLAY_VERSION = "5.36.6";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -17693,7 +17693,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
              }
         }
         
-        if (!isLocal) {
+        if (!isLocal && !isCurrentTrack) {
             const oldScrobbleCount = cachedData ? cachedData.count : -1;
 
             if (newScrobbleCount > oldScrobbleCount) {
@@ -25133,7 +25133,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         previousTrackUriForScrobbleCache = uri; 
         
         const trackId = uri.split(":")[2];
-        flagCachedPersonalScrobbleForUpdate(trackId);
+        idb.del('personalScrobbles', trackId);
     };
 
     const currentTrack = Spicetify.Player.data?.item;
