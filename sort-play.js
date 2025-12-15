@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.35.3";
+  const SORT_PLAY_VERSION = "5.36.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -730,8 +730,8 @@
     {
         title: 'Discovery',
         cards: [
-            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe },
-            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime },
+            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v2' },
+            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v2' },
             { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v2' },
             { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer },
             { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer },
@@ -20143,6 +20143,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return knownArtistIds;
   }
   
+  function calculateAudioStatistics(tracksWithFeatures) {
+    const features = ['energy', 'valence', 'danceability', 'acousticness', 'tempo'];
+    const stats = {
+        averages: {},
+        ranges: {}
+    };
+
+    const validTracks = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+    if (validTracks.length === 0) return null;
+
+    features.forEach(feature => {
+        const sum = validTracks.reduce((acc, t) => acc + (t.features[feature] || 0), 0);
+        stats.averages[feature] = sum / validTracks.length;
+
+        const sorted = validTracks.map(t => t.features[feature] || 0).sort((a, b) => a - b);
+        const p10Index = Math.floor(sorted.length * 0.1);
+        const p90Index = Math.floor(sorted.length * 0.9);
+        
+        stats.ranges[feature] = {
+            min: sorted[p10Index],
+            max: sorted[p90Index]
+        };
+    });
+
+    return stats;
+  }
+
   async function generateSpotifyRecommendations(vibeType, options = {}) {
     const { isHeadless = false } = options;
     let playlistName = "";
@@ -20394,7 +20421,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
             const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
             
-            const sortedTracks = await energyWaveSort(validForWave);
+            const sortedTracks = await energyWaveSort(validForWave, 'discovery');
             const finalTracks = [...sortedTracks, ...others];
             
             const trackUris = finalTracks.map(track => track.uri);
@@ -20419,12 +20446,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         if (vibeType === 'recommendRecentVibe') {
             playlistName = "Discovery: Recent Taste";
-            playlistDescription = "A diverse mix based on your recent taste. Created by Sort-Play.";
+            playlistDescription = "A diverse mix based on your recent listening habits and sonic profile. Created by Sort-Play.";
             time_range = 'short_term';
             contrast_time_range = 'long_term';
         } else if (vibeType === 'recommendAllTime') {
             playlistName = "Discovery: All-Time Taste";
-            playlistDescription = "A diverse mix based on your all-time taste. Created by Sort-Play.";
+            playlistDescription = "A diverse mix based on your all-time favorites and sonic profile. Created by Sort-Play.";
             time_range = 'long_term';
             contrast_time_range = 'short_term';
         }
@@ -20446,27 +20473,165 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (topArtists.length < 1 || topTracks.length < 1) {
             throw new Error("Not enough listening history for diverse recommendations.");
         }
-        
+
         if (!isHeadless) mainButton.innerText = "Profiling...";
+
+        const tracksToProfile = [...topTracks];
+        
+        let likedSample = [];
+        if (vibeType === 'recommendAllTime') {
+            likedSample = shuffleArray(allLikedSongs).slice(0, 300);
+        } else if (vibeType === 'recommendRecentVibe') {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - 28);
+            
+            const recentLikes = allLikedSongs.filter(t => new Date(t.addedAt) >= cutoffDate);
+            
+            if (recentLikes.length < 15) {
+                likedSample = [...allLikedSongs]
+                    .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
+                    .slice(0, 20);
+            } else {
+                const now = Date.now();
+                const weightedTracks = recentLikes.map(t => {
+                    const daysAgo = (now - new Date(t.addedAt).getTime()) / (1000 * 60 * 60 * 24);
+                    const weight = Math.exp(-0.08 * Math.max(0, daysAgo));
+                    return { track: t, weight };
+                });
+
+                const selected = [];
+                const pool = [...weightedTracks];
+                for (let i = pool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                }
+
+                const sampleSize = Math.min(pool.length, 60);
+
+                for (let i = 0; i < sampleSize; i++) {
+                    let totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
+                    let r = Math.random() * totalWeight;
+                    let idx = 0;
+                    for (let j = 0; j < pool.length; j++) {
+                        r -= pool[j].weight;
+                        if (r <= 0) { idx = j; break; }
+                    }
+                    selected.push(pool[idx].track);
+                    pool.splice(idx, 1);
+                }
+                likedSample = selected;
+            }
+        } else {
+            likedSample = shuffleArray(allLikedSongs).slice(0, 50);
+        }
+
+        tracksToProfile.push(...likedSample.map(t => ({...t, id: t.uri.split(':')[2]})));
+        
+        const profileTrackIds = [...new Set(tracksToProfile.map(t => t.id))];
+        
+        const allAudioStats = await getBatchTrackStats(profileTrackIds);
+        
+        topTracks.forEach(t => t.features = allAudioStats[t.id]);
+        
+        const tracksWithFeatures = topTracks.filter(t => t.features);
+        const userAudioProfile = calculateAudioStatistics(tracksWithFeatures);
+
 
         const allGenres = new Set(topArtists.flatMap(a => a.genres));
         const shuffledGenres = shuffleArray(Array.from(allGenres));
         let genreBridgeSeeds = [];
+        let genreBridgeTargets = {};
+
         if (shuffledGenres.length >= 2) {
             const genre1 = shuffledGenres[0];
             const genre2 = shuffledGenres[1];
+            
             const artistsForGenre1 = shuffleArray(topArtists.filter(a => a.genres.includes(genre1))).slice(0, 3);
             const artistsForGenre2 = shuffleArray(topArtists.filter(a => a.genres.includes(genre2))).slice(0, 2);
             genreBridgeSeeds = [...artistsForGenre1, ...artistsForGenre2].map(a => a.id);
+
+            const getGenreTracks = (g) => topTracks.filter(t => t.features && t.artists.some(a => {
+                const artistObj = topArtists.find(ta => ta.id === a.id);
+                return artistObj && artistObj.genres.includes(g);
+            }));
+
+            const tracksG1 = getGenreTracks(genre1);
+            const tracksG2 = getGenreTracks(genre2);
+            
+            if (tracksG1.length > 0 && tracksG2.length > 0) {
+                const stat1 = calculateAudioStatistics(tracksG1).averages;
+                const stat2 = calculateAudioStatistics(tracksG2).averages;
+                
+                genreBridgeTargets = {
+                    target_energy: (stat1.energy + stat2.energy) / 2,
+                    target_valence: (stat1.valence + stat2.valence) / 2,
+                    target_danceability: (stat1.danceability + stat2.danceability) / 2,
+                };
+            }
         }
 
         const sortedByPopAsc = [...topTracks].sort((a, b) => a.popularity - b.popularity);
         const deepCutPool = sortedByPopAsc.slice(0, 50);
         const deepCutSeeds = shuffleArray(deepCutPool).slice(0, 5).map(t => t.id);
+        
+        let deepCutTargets = {};
+        const deepCutTracksWithFeatures = deepCutPool.filter(t => t.features);
+        if (deepCutTracksWithFeatures.length > 0) {
+            const dcStats = calculateAudioStatistics(deepCutTracksWithFeatures).averages;
+            deepCutTargets = {
+                target_energy: dcStats.energy,
+                target_valence: dcStats.valence,
+                target_acousticness: dcStats.acousticness,
+                max_popularity: 40
+            };
+        } else {
+            deepCutTargets = { max_popularity: 40 };
+        }
 
         let likedSongSeedUris = [];
         if (vibeType === 'recommendRecentVibe') {
-            likedSongSeedUris = shuffleArray(allLikedSongs.slice(0, 10)).slice(0, 5).map(t => t.uri.split(':')[2]);
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - 28);
+            
+            const recentLikes = allLikedSongs.filter(t => new Date(t.addedAt) >= cutoffDate);
+            
+            if (recentLikes.length < 10) {
+                const recentPool = [...allLikedSongs]
+                    .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
+                    .slice(0, 15);
+                likedSongSeedUris = shuffleArray(recentPool).slice(0, 5).map(t => t.uri.split(':')[2]);
+            } else {
+                const now = Date.now();
+                const weightedTracks = recentLikes.map(t => {
+                    const daysAgo = (now - new Date(t.addedAt).getTime()) / (1000 * 60 * 60 * 24);
+                    const weight = Math.exp(-0.08 * Math.max(0, daysAgo));
+                    return { track: t, weight };
+                });
+
+                const selectedSeeds = [];
+                const pool = [...weightedTracks];
+                for (let i = pool.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pool[i], pool[j]] = [pool[j], pool[i]];
+                }
+
+                const seedCount = Math.min(5, pool.length);
+
+                for (let i = 0; i < seedCount; i++) {
+                    let totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
+                    let r = Math.random() * totalWeight;
+                    let idx = 0;
+                    for (let j = 0; j < pool.length; j++) {
+                        r -= pool[j].weight;
+                        if (r <= 0) { idx = j; break; }
+                    }
+                    selectedSeeds.push(pool[idx].track);
+                    pool.splice(idx, 1);
+                }
+                likedSongSeedUris = selectedSeeds.map(t => t.uri.split(':')[2]);
+            }
+        } else if (vibeType === 'recommendAllTime') {
+            likedSongSeedUris = shuffleArray(allLikedSongs).slice(0, 5).map(t => t.uri.split(':')[2]);
         } else {
             likedSongSeedUris = shuffleArray(allLikedSongs.slice(-100)).slice(0, 5).map(t => t.uri.split(':')[2]);
         }
@@ -20475,12 +20640,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (vibeType === 'recommendAllTime') smartSongSeeds.add(shuffleArray(topTracks.slice(0, 20))[0]);
         else smartSongSeeds.add(shuffleArray(topTracks.slice(0, 5))[0]);
         
-        if (topTracks.length > 0) {
-             smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
-        }
-        if (deepCutPool.length > 0) {
-            smartSongSeeds.add(deepCutPool[0]);
-        }
+        if (topTracks.length > 0) smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
+        if (deepCutPool.length > 0) smartSongSeeds.add(deepCutPool[0]);
         if (contrastTopTracks.length > 0) smartSongSeeds.add(contrastTopTracks[0]);
         const randomLikedTopTrackPool = topTracks.filter(t => completeLikedSongUrisSet.has(t.uri));
         if(randomLikedTopTrackPool.length > 0) smartSongSeeds.add(shuffleArray(randomLikedTopTrackPool)[0]);
@@ -20493,26 +20654,70 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
         const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
 
+        let edgeExplorerTargets = {};
+        let edgeExplorerSeeds = shuffleArray(topTracks).slice(0, 5).map(t => t.id);
+        
+        if (userAudioProfile) {
+            const featuresToPush = ['energy', 'valence', 'acousticness'];
+            const featureToPush = featuresToPush[Math.floor(Math.random() * featuresToPush.length)];
+            const range = userAudioProfile.ranges[featureToPush];
+            const isHighPush = Math.random() > 0.5;
+
+            const safeParams = {};
+            featuresToPush.forEach(f => {
+                if (f !== featureToPush) {
+                    safeParams[`min_${f}`] = Math.max(0, userAudioProfile.ranges[f].min / 100);
+                    safeParams[`max_${f}`] = Math.min(1, userAudioProfile.ranges[f].max / 100);
+                }
+            });
+
+            if (isHighPush) {
+                edgeExplorerTargets = {
+                    ...safeParams,
+                    [`min_${featureToPush}`]: Math.min(0.95, userAudioProfile.ranges[featureToPush].max / 100),
+                    [`max_${featureToPush}`]: 1.0
+                };
+            } else {
+                edgeExplorerTargets = {
+                    ...safeParams,
+                    [`min_${featureToPush}`]: 0.0,
+                    [`max_${featureToPush}`]: Math.max(0.05, userAudioProfile.ranges[featureToPush].min / 100)
+                };
+            }
+        }
+
         if (!isHeadless) mainButton.innerText = "Get Recs...";
         const recommendationBatches = [];
-        const NUM_CALLS = 6;
+        const NUM_CALLS = 7;
         
         for (let i = 0; i < NUM_CALLS; i++) {
-            const params = new URLSearchParams({ limit: 100 });
+            let params = new URLSearchParams({ limit: 100 });
             let seed_artists = [], seed_tracks = [];
 
             if (i < 2) {
                 seed_artists = shuffleArray(topArtists).slice(0, 3).map(a => a.id);
                 seed_tracks = shuffleArray(topTracks).slice(0, 2).map(t => t.id);
-            } else if (i === 2) {
+            } 
+            else if (i === 2) {
                 seed_artists = genreBridgeSeeds;
-            } else if (i === 3) {
+                Object.keys(genreBridgeTargets).forEach(key => params.append(key, (genreBridgeTargets[key] / 100).toFixed(2)));
+            } 
+            else if (i === 3) {
                 seed_tracks = deepCutSeeds;
-                params.append('max_popularity', '40');
-            } else if (i === 4) {
+                Object.keys(deepCutTargets).forEach(key => {
+                    if (key === 'max_popularity') params.append(key, deepCutTargets[key]);
+                    else params.append(key, (deepCutTargets[key] / 100).toFixed(2));
+                });
+            } 
+            else if (i === 4) {
                 seed_tracks = likedSongSeedUris;
-            } else {
+            } 
+            else if (i === 5) {
                 seed_tracks = smartSeedUris;
+            } 
+            else if (i === 6) {
+                seed_tracks = edgeExplorerSeeds;
+                Object.keys(edgeExplorerTargets).forEach(key => params.append(key, edgeExplorerTargets[key].toFixed(2)));
             }
 
             if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
@@ -20579,12 +20784,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         if (!isHeadless) mainButton.innerText = "Sorting...";
         const tracksToSort = newRecommendedTracks.slice(0, discoveryPlaylistSize * 2);
+        
         const trackIds = tracksToSort.map(t => t.id);
         const stats = await getBatchTrackStats(trackIds);
-        const tracksWithFeatures = tracksToSort.map(t => ({ ...t, features: stats[t.id] }));
+        const tracksWithFeaturesFinal = tracksToSort.map(t => ({ ...t, features: stats[t.id] }));
         
-        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+        const validForWave = tracksWithFeaturesFinal.filter(t => t.features && t.features.energy != null);
+        const others = tracksWithFeaturesFinal.filter(t => !t.features || t.features.energy == null);
         
         const sortedTracks = await energyWaveSort(validForWave);
         const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
@@ -21295,7 +21501,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
         const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
 
-        const sorted = await energyWaveSort(validForWave);
+        const sorted = await energyWaveSort(validForWave, 'discovery');
         const finalTracks = [...sorted, ...others];
         
         const trackUris = finalTracks.map(t => t.uri);
@@ -23231,175 +23437,693 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
 
   function getHarmonicCompatibilityScore(camelotKey1, camelotKey2) {
-    if (!camelotKey1 || !camelotKey2) return 0;
+    if (!camelotKey1 || !camelotKey2) return 25;
 
     const num1 = parseInt(camelotKey1.slice(0, -1));
     const mode1 = camelotKey1.slice(-1);
     const num2 = parseInt(camelotKey2.slice(0, -1));
     const mode2 = camelotKey2.slice(-1);
 
-    if (num1 === num2 && mode1 === mode2) return 100;
-    if (num1 === num2) return 80;
+    if (isNaN(num1) || isNaN(num2)) return 25;
 
-    const diff = Math.abs(num1 - num2);
-    if (diff === 1 || diff === 11) return 85;
+    const sameMode = mode1 === mode2;
+    
+    const clockwiseDiff = ((num2 - num1) % 12 + 12) % 12;
+    const counterClockwiseDiff = ((num1 - num2) % 12 + 12) % 12;
+    const diff = Math.min(clockwiseDiff, counterClockwiseDiff);
 
-    return 0;
+    if (diff === 0 && sameMode) return 100;
+    
+    if (diff === 0 && !sameMode) return 85;
+
+    if (diff === 1) {
+        if (sameMode) return 90;
+        return 75;
+    }
+    
+    if (diff === 2) {
+        if (sameMode) return 60;
+        return 45;
+    }
+    
+    if (diff === 7 || diff === 5) {
+        if (sameMode) return 55;
+        return 40;
+    }
+    
+    if (diff === 3) {
+        if (sameMode) return 40;
+        return 30;
+    }
+    
+    if (diff === 4) {
+        if (sameMode) return 25;
+        return 15;
+    }
+    
+    if (diff === 6) return 5;
+    
+    return 10;
   }
 
 
   function generateJourneyMap(playlistLength, persona = 'wave') {
-    let journeyPattern;
-    switch (persona) {
-        case 'workout':
-            journeyPattern = [
-                'Medium-Energy/Positive-Valence', 'High-Energy/Positive-Valence', 'High-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence', 'Medium-Energy/Neutral-Valence', 'Low-Energy/Positive-Valence'
-            ];
-            break;
-        case 'wave':
-        default:
-            journeyPattern = [
-                'Medium-Energy/Neutral-Valence', 'Medium-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence', 'High-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence', 'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Neutral-Valence', 'Low-Energy/Positive-Valence'
-            ];
-            break;
+    const patterns = {
+        workout: {
+            core: [
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+                'High-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Positive-Valence',
+            closingOverride: 'Medium-Energy/Positive-Valence'
+        },
+        wave: {
+            core: [
+                'Medium-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+                'High-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Positive-Valence',
+                'Low-Energy/Positive-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Positive-Valence',
+            closingOverride: 'Medium-Energy/Positive-Valence'
+        },
+        chill: {
+            core: [
+                'Medium-Energy/Positive-Valence',
+                'Low-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Low-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Low-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Positive-Valence',
+            closingOverride: 'Low-Energy/Positive-Valence'
+        },
+        focus: {
+            core: [
+                'Medium-Energy/Neutral-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Neutral-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Neutral-Valence',
+            closingOverride: 'Medium-Energy/Neutral-Valence'
+        },
+        party: {
+            core: [
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+                'High-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Positive-Valence',
+            closingOverride: 'High-Energy/Positive-Valence'
+        },
+        discovery: {
+            core: [
+                'Medium-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Positive-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Positive-Valence',
+            closingOverride: 'Medium-Energy/Positive-Valence'
+        }
+    };
+
+    const selectedPattern = patterns[persona] || patterns.wave;
+    const { core, openingOverride, closingOverride } = selectedPattern;
+    
+    const journeyMap = [];
+
+    for (let i = 0; i < playlistLength; i++) {
+        let step;
+        
+        if (i < core.length) {
+            step = core[i];
+        } else {
+            const phasePosition = i % core.length;
+            step = core[phasePosition];
+            
+            if (i > core.length && Math.random() < 0.15) {
+                const tiers = ['Low', 'Medium', 'High'];
+                const valences = ['Negative-Valence', 'Neutral-Valence', 'Positive-Valence'];
+                
+                const [energyPart] = step.split('/');
+                const currentEnergyIndex = tiers.findIndex(t => energyPart.includes(t));
+                
+                const shift = Math.random() > 0.5 ? 1 : -1;
+                const newEnergyIndex = Math.max(0, Math.min(2, currentEnergyIndex + shift));
+                step = `${tiers[newEnergyIndex]}-Energy/${valences[1 + Math.floor(Math.random() * 2)]}`;
+            }
+        }
+        
+        journeyMap.push(step);
     }
-    return Array.from({ length: playlistLength }, (_, i) => journeyPattern[i % journeyPattern.length]);
+    
+    if (playlistLength >= 3) {
+        journeyMap[0] = openingOverride;
+        journeyMap[playlistLength - 1] = closingOverride;
+        
+        if (journeyMap[1]?.includes('High-Energy') && openingOverride.includes('Medium-Energy')) {
+            journeyMap[1] = 'Medium-Energy/Positive-Valence';
+        }
+    }
+    
+    return journeyMap;
   }
   
-  async function energyWaveSort(tracks) {
+  async function energyWaveSort(tracks, persona = 'wave') {
     if (tracks.length < 3) {
         return tracks;
     }
 
-    const trackProfiles = tracks.map(track => {
-        const features = track.features || {};
-        const energy = (features.energy || 50) / 100;
-        const valence = (features.valence || 50) / 100;
+    const getTier = (val) => {
+        if (val === undefined || val === null) return 'Medium';
+        const normalized = val <= 1 ? val : val / 100;
+        return normalized <= 0.33 ? 'Low' : normalized <= 0.66 ? 'Medium' : 'High';
+    };
 
-        const getTier = (val) => val <= 0.33 ? 'Low' : val <= 0.66 ? 'Medium' : 'High';
+    const normalize = (val) => {
+        if (val === undefined || val === null) return null;
+        return val <= 1 ? val : val / 100;
+    };
+
+    const trackProfiles = tracks.map(track => {
+        const f = track.features || {};
+        
+        const energy = normalize(f.energy);
+        const valence = normalize(f.valence);
+        const danceability = normalize(f.danceability);
+        const acousticness = normalize(f.acousticness);
+        const instrumentalness = normalize(f.instrumentalness);
+        const speechiness = normalize(f.speechiness);
+        const liveness = normalize(f.liveness);
+        
         const moodBucket = `${getTier(energy)}-Energy/${getTier(valence)}-Valence`;
 
-        const keyName = features.key || "C";
-        const mode = features.mode === 0 ? 'm' : '';
-        const camelotKey = KEY_TO_CAMELOT_MAP[keyName + mode] || KEY_TO_CAMELOT_MAP[keyName];
+        const keyName = f.key || "C";
+        const mode = f.mode === 0 ? 'm' : '';
+        const camelotKey = KEY_TO_CAMELOT_MAP[keyName + mode] || KEY_TO_CAMELOT_MAP[keyName] || null;
 
         return {
             ...track,
-            profile: { moodBucket, camelotKey, tempo: features.tempo || 120 }
+            profile: { 
+                moodBucket, 
+                camelotKey, 
+                tempo: f.tempo || null,
+                energy: energy ?? 0.5,
+                valence: valence ?? 0.5,
+                danceability: danceability ?? 0.5,
+                acousticness: acousticness ?? 0.5,
+                instrumentalness: instrumentalness ?? 0,
+                speechiness: speechiness ?? 0.1,
+                liveness: liveness ?? 0.2,
+                popularity: track.popularity ?? 50,
+                durationMs: track.duration_ms || f.duration_ms || 200000
+            }
         };
     });
 
-    const fullJourneyMap = generateJourneyMap(tracks.length);
+    const validTempos = trackProfiles.filter(t => t.profile.tempo !== null).map(t => t.profile.tempo);
+    const avgTempo = validTempos.length > 0 
+        ? validTempos.reduce((a, b) => a + b, 0) / validTempos.length 
+        : 120;
+    
+    trackProfiles.forEach(t => {
+        if (t.profile.tempo === null) t.profile.tempo = avgTempo;
+    });
+
+    const fullJourneyMap = generateJourneyMap(tracks.length, persona);
+
+    const getTempoScore = (lastTempo, candidateTempo) => {
+        const directDiff = Math.abs(candidateTempo - lastTempo);
+        const halfTimeDiff = Math.abs(candidateTempo - (lastTempo / 2));
+        const doubleTimeDiff = Math.abs(candidateTempo - (lastTempo * 2));
+        const thirdTimeDiff = Math.abs(candidateTempo - (lastTempo * 2 / 3));
+        
+        const effectiveDiff = Math.min(directDiff, halfTimeDiff, doubleTimeDiff, thirdTimeDiff);
+        const percentDiff = (effectiveDiff / lastTempo) * 100;
+        
+        if (percentDiff < 3) return 70;
+        if (percentDiff < 6) return 55;
+        if (percentDiff < 10) return 40;
+        if (percentDiff < 15) return 25;
+        if (percentDiff < 22) return 5;
+        if (percentDiff < 32) return -25;
+        if (percentDiff < 45) return -50;
+        return -75;
+    };
+
+    const getMoodMatchScore = (candidateBucket, targetBucket) => {
+        if (candidateBucket === targetBucket) return 100;
+        
+        const [candEnergy, candValence] = candidateBucket.split('/');
+        const [targetEnergy, targetValence] = targetBucket.split('/');
+        
+        let score = 0;
+        
+        if (candEnergy === targetEnergy) {
+            score += 45;
+        } else {
+            const energyTiers = ['Low-Energy', 'Medium-Energy', 'High-Energy'];
+            const candIndex = energyTiers.indexOf(candEnergy);
+            const targetIndex = energyTiers.indexOf(targetEnergy);
+            if (Math.abs(candIndex - targetIndex) === 1) score += 20;
+        }
+        
+        if (candValence === targetValence) {
+            score += 35;
+        } else {
+            const valenceTiers = ['Negative-Valence', 'Neutral-Valence', 'Positive-Valence'];
+            const candIndex = valenceTiers.indexOf(candValence);
+            const targetIndex = valenceTiers.indexOf(targetValence);
+            if (candIndex !== -1 && targetIndex !== -1 && Math.abs(candIndex - targetIndex) === 1) {
+                score += 15;
+            }
+        }
+        
+        return score;
+    };
+
+    const getFlowScore = (lastProfile, candProfile) => {
+        let score = 0;
+        
+        const energyDiff = Math.abs(candProfile.energy - lastProfile.energy);
+        if (energyDiff < 0.12) score += 30;
+        else if (energyDiff < 0.22) score += 15;
+        else if (energyDiff < 0.35) score += 0;
+        else if (energyDiff < 0.50) score -= 15;
+        else score -= 35;
+        
+        const danceDiff = Math.abs(candProfile.danceability - lastProfile.danceability);
+        if (danceDiff < 0.15) score += 20;
+        else if (danceDiff < 0.30) score += 8;
+        else if (danceDiff > 0.50) score -= 15;
+        
+        const acousticDiff = Math.abs(candProfile.acousticness - lastProfile.acousticness);
+        if (acousticDiff < 0.20) score += 18;
+        else if (acousticDiff < 0.40) score += 5;
+        else if (acousticDiff > 0.65) score -= 25;
+        
+        const instrDiff = Math.abs(candProfile.instrumentalness - lastProfile.instrumentalness);
+        if (instrDiff < 0.25) score += 12;
+        else if (instrDiff > 0.70) score -= 18;
+        
+        const valenceDiff = Math.abs(candProfile.valence - lastProfile.valence);
+        if (valenceDiff < 0.15) score += 15;
+        else if (valenceDiff < 0.30) score += 5;
+        else if (valenceDiff > 0.55) score -= 12;
+        
+        return score;
+    };
+
+    const selectOpeningTrack = () => {
+        const targetStart = fullJourneyMap[0];
+        const [targetEnergyTier, targetValenceTier] = targetStart.split('/');
+        
+        let idealEnergyMin, idealEnergyMax, idealValenceMin, idealValenceMax;
+        
+        if (targetEnergyTier === 'High-Energy') { idealEnergyMin = 0.66; idealEnergyMax = 1.0; }
+        else if (targetEnergyTier === 'Medium-Energy') { idealEnergyMin = 0.33; idealEnergyMax = 0.66; }
+        else { idealEnergyMin = 0.0; idealEnergyMax = 0.33; }
+
+        if (targetValenceTier === 'Positive-Valence') { idealValenceMin = 0.66; idealValenceMax = 1.0; }
+        else if (targetValenceTier === 'Neutral-Valence') { idealValenceMin = 0.33; idealValenceMax = 0.66; }
+        else { idealValenceMin = 0.0; idealValenceMax = 0.33; }
+
+        const candidates = trackProfiles.map(t => {
+            let score = 0;
+            
+            score += getMoodMatchScore(t.profile.moodBucket, targetStart);
+            
+            if (t.profile.energy >= idealEnergyMin && t.profile.energy <= idealEnergyMax) score += 30;
+            if (t.profile.valence >= idealValenceMin && t.profile.valence <= idealValenceMax) score += 20;
+
+            if (t.profile.popularity >= 40) score += 20;
+            else if (t.profile.popularity >= 20) score += 10;
+            
+            if (t.profile.instrumentalness > 0.8 && persona !== 'focus') score -= 20;
+            if (t.profile.speechiness > 0.66) score -= 20;
+            
+            score += Math.random() * 15;
+            
+            return { track: t, score };
+        });
+        
+        candidates.sort((a, b) => b.score - a.score);
+        return candidates[0].track;
+    };
 
     let remainingTracks = [...trackProfiles];
     const sortedPlaylist = [];
-
-    let firstTrackIndex = remainingTracks.findIndex(t => t.profile.moodBucket === fullJourneyMap[0]);
-    if (firstTrackIndex === -1) firstTrackIndex = 0;
     
-    let lastTrack = remainingTracks.splice(firstTrackIndex, 1)[0];
-    sortedPlaylist.push(lastTrack);
+    const firstTrack = selectOpeningTrack();
+    sortedPlaylist.push(firstTrack);
+    remainingTracks = remainingTracks.filter(t => t.uri !== firstTrack.uri);
+    let lastTrack = firstTrack;
 
     while (remainingTracks.length > 0) {
-        const currentJourneyStep = fullJourneyMap[sortedPlaylist.length];
-        const scoredCandidates = [];
-
-        for (const candidateTrack of remainingTracks) {
+        const currentPosition = sortedPlaylist.length;
+        const currentJourneyStep = fullJourneyMap[currentPosition] || fullJourneyMap[fullJourneyMap.length - 1];
+        const isNearEnd = currentPosition >= tracks.length - 4;
+        const isFinalTrack = remainingTracks.length === 1;
+        const isSecondToLast = remainingTracks.length === 2;
+        
+        const scoredCandidates = remainingTracks.map(candidateTrack => {
             let score = 0;
+            const candProfile = candidateTrack.profile;
+            const lastProfile = lastTrack.profile;
 
-            if (candidateTrack.profile.moodBucket === currentJourneyStep) score += 100;
+            score += getMoodMatchScore(candProfile.moodBucket, currentJourneyStep);
 
-            const harmonicScore = getHarmonicCompatibilityScore(lastTrack.profile.camelotKey, candidateTrack.profile.camelotKey);
-            score += harmonicScore * 0.8;
+            const harmonicScore = getHarmonicCompatibilityScore(lastProfile.camelotKey, candProfile.camelotKey);
+            score += harmonicScore * 0.85;
 
-            const tempoDiff = Math.abs(candidateTrack.profile.tempo - lastTrack.profile.tempo);
-            if (tempoDiff < 8) score += 50;
-            else if (tempoDiff < 15) score += 25;
+            score += getTempoScore(lastProfile.tempo, candProfile.tempo);
 
-            scoredCandidates.push({ track: candidateTrack, score });
-        }
+            score += getFlowScore(lastProfile, candProfile);
+
+            
+            if (isNearEnd && !isFinalTrack && persona !== 'party' && persona !== 'workout') {
+                if (candProfile.energy < 0.65) score += 18;
+                if (candProfile.valence > 0.40) score += 12;
+            }
+            
+            if (isSecondToLast) {
+                if (candProfile.energy >= 0.45 && candProfile.energy <= 0.75) score += 15;
+            }
+            
+            if (isFinalTrack) {
+                if (candProfile.energy >= 0.35 && candProfile.energy <= 0.70) score += 30;
+                if (candProfile.valence >= 0.45) score += 25;
+                if (candProfile.popularity >= 40) score += 20;
+                if (candProfile.tempo >= 80 && candProfile.tempo <= 130) score += 15;
+            }
+
+            score += Math.random() * 4;
+
+            return { track: candidateTrack, score };
+        });
 
         scoredCandidates.sort((a, b) => b.score - a.score);
-        
-        const selected = scoredCandidates[0];
+        const selected = scoredCandidates[0].track;
 
-        sortedPlaylist.push(selected.track);
-        remainingTracks = remainingTracks.filter(t => t.uri !== selected.track.uri);
-        
-        lastTrack = selected.track;
+        sortedPlaylist.push(selected);
+        remainingTracks = remainingTracks.filter(t => t.uri !== selected.uri);
+        lastTrack = selected;
     }
 
     return sortedPlaylist.map(profiledTrack => tracks.find(t => t.uri === profiledTrack.uri));
   }
 
-  async function randomizedEnergyWaveSort(tracks) {
+  async function randomizedEnergyWaveSort(tracks, options = {}) {
+    const { persona = 'wave', chaos = 0.5 } = options;
+    
     if (tracks.length < 3) {
-        return tracks;
+        return [...tracks].sort(() => Math.random() - 0.5);
     }
 
-    const trackProfiles = tracks.map(track => {
-        const features = track.features || {};
-        const energy = (features.energy / 100) || 0.5;
-        const valence = (features.valence / 100) || 0.5;
+    const normalize = (val) => {
+        if (val === undefined || val === null) return null;
+        return val <= 1 ? val : val / 100;
+    };
 
-        const getTier = (val) => val <= 0.33 ? 'Low' : val <= 0.66 ? 'Medium' : 'High';
+    const getTier = (val) => {
+        if (val === undefined || val === null) return 'Medium';
+        const normalized = val <= 1 ? val : val / 100;
+        return normalized <= 0.33 ? 'Low' : normalized <= 0.66 ? 'Medium' : 'High';
+    };
+
+    const trackProfiles = tracks.map(track => {
+        const f = track.features || {};
+        
+        const energy = normalize(f.energy);
+        const valence = normalize(f.valence);
+        const danceability = normalize(f.danceability);
+        const acousticness = normalize(f.acousticness);
+        const instrumentalness = normalize(f.instrumentalness);
+        
         const moodBucket = `${getTier(energy)}-Energy/${getTier(valence)}-Valence`;
 
-        const keyName = features.key || "C";
-        const mode = features.mode === 0 ? 'm' : '';
-        const camelotKey = KEY_TO_CAMELOT_MAP[keyName + mode] || KEY_TO_CAMELOT_MAP[keyName];
+        const keyName = f.key || "C";
+        const mode = f.mode === 0 ? 'm' : '';
+        const camelotKey = KEY_TO_CAMELOT_MAP[keyName + mode] || KEY_TO_CAMELOT_MAP[keyName] || null;
 
         return {
             ...track,
-            profile: { moodBucket, camelotKey, tempo: features.tempo || 120 }
+            profile: { 
+                moodBucket, 
+                camelotKey, 
+                tempo: f.tempo || null,
+                energy: energy ?? 0.5,
+                valence: valence ?? 0.5,
+                danceability: danceability ?? 0.5,
+                acousticness: acousticness ?? 0.5,
+                instrumentalness: instrumentalness ?? 0,
+                popularity: track.popularity ?? 50
+            }
         };
     });
 
-    const fullJourneyMap = generateJourneyMap(tracks.length);
+    const validTempos = trackProfiles.filter(t => t.profile.tempo !== null).map(t => t.profile.tempo);
+    const avgTempo = validTempos.length > 0 
+        ? validTempos.reduce((a, b) => a + b, 0) / validTempos.length 
+        : 120;
+    
+    trackProfiles.forEach(t => {
+        if (t.profile.tempo === null) t.profile.tempo = avgTempo;
+    });
+
+    const getPoolSize = (remainingCount, chaosLevel) => {
+        let baseSize;
+        if (remainingCount <= 10) baseSize = 2;
+        else if (remainingCount <= 25) baseSize = 3;
+        else if (remainingCount <= 50) baseSize = 4;
+        else if (remainingCount <= 100) baseSize = 5;
+        else baseSize = 6;
+        
+        const chaosAdjustment = Math.floor((chaosLevel - 0.5) * 4);
+        const finalSize = Math.max(2, Math.min(remainingCount, baseSize + chaosAdjustment));
+        
+        return finalSize;
+    };
+
+    const getTempoScore = (lastTempo, candidateTempo) => {
+        const directDiff = Math.abs(candidateTempo - lastTempo);
+        const halfTimeDiff = Math.abs(candidateTempo - (lastTempo / 2));
+        const doubleTimeDiff = Math.abs(candidateTempo - (lastTempo * 2));
+        const thirdTimeDiff = Math.abs(candidateTempo - (lastTempo * 2 / 3));
+        
+        const effectiveDiff = Math.min(directDiff, halfTimeDiff, doubleTimeDiff, thirdTimeDiff);
+        const percentDiff = (effectiveDiff / lastTempo) * 100;
+        
+        if (percentDiff < 3) return 70;
+        if (percentDiff < 6) return 55;
+        if (percentDiff < 10) return 40;
+        if (percentDiff < 15) return 25;
+        if (percentDiff < 22) return 5;
+        if (percentDiff < 32) return -25;
+        if (percentDiff < 45) return -50;
+        return -75;
+    };
+
+    const getMoodMatchScore = (candidateBucket, targetBucket) => {
+        if (candidateBucket === targetBucket) return 100;
+        
+        const [candEnergy, candValence] = candidateBucket.split('/');
+        const [targetEnergy, targetValence] = targetBucket.split('/');
+        
+        let score = 0;
+        
+        if (candEnergy === targetEnergy) {
+            score += 45;
+        } else {
+            const energyTiers = ['Low-Energy', 'Medium-Energy', 'High-Energy'];
+            const candIndex = energyTiers.indexOf(candEnergy);
+            const targetIndex = energyTiers.indexOf(targetEnergy);
+            if (Math.abs(candIndex - targetIndex) === 1) score += 20;
+        }
+        
+        if (candValence === targetValence) {
+            score += 35;
+        } else {
+            const valenceTiers = ['Negative-Valence', 'Neutral-Valence', 'Positive-Valence'];
+            const candIndex = valenceTiers.indexOf(candValence);
+            const targetIndex = valenceTiers.indexOf(targetValence);
+            if (candIndex !== -1 && targetIndex !== -1 && Math.abs(candIndex - targetIndex) === 1) {
+                score += 15;
+            }
+        }
+        
+        return score;
+    };
+
+    const getFlowScore = (lastProfile, candProfile) => {
+        let score = 0;
+        
+        const energyDiff = Math.abs(candProfile.energy - lastProfile.energy);
+        if (energyDiff < 0.12) score += 25;
+        else if (energyDiff < 0.22) score += 12;
+        else if (energyDiff < 0.35) score += 0;
+        else if (energyDiff < 0.50) score -= 10;
+        else score -= 25;
+        
+        const danceDiff = Math.abs(candProfile.danceability - lastProfile.danceability);
+        if (danceDiff < 0.15) score += 15;
+        else if (danceDiff < 0.30) score += 6;
+        else if (danceDiff > 0.50) score -= 12;
+        
+        const acousticDiff = Math.abs(candProfile.acousticness - lastProfile.acousticness);
+        if (acousticDiff < 0.20) score += 15;
+        else if (acousticDiff < 0.40) score += 4;
+        else if (acousticDiff > 0.65) score -= 20;
+        
+        const instrDiff = Math.abs(candProfile.instrumentalness - lastProfile.instrumentalness);
+        if (instrDiff < 0.25) score += 10;
+        else if (instrDiff > 0.70) score -= 15;
+        
+        return score;
+    };
+
+    const weightedRandomSelect = (candidates, chaosLevel) => {
+        if (candidates.length === 0) return null;
+        if (candidates.length === 1) return candidates[0];
+        
+        const minScore = Math.min(...candidates.map(c => c.score));
+        const normalizedCandidates = candidates.map(c => ({
+            ...c,
+            normalizedScore: c.score - minScore + 10
+        }));
+        
+        const flatteningPower = 1 - (chaosLevel * 0.8);
+        const weightedCandidates = normalizedCandidates.map(c => ({
+            ...c,
+            weight: Math.pow(c.normalizedScore, flatteningPower)
+        }));
+        
+        const totalWeight = weightedCandidates.reduce((sum, c) => sum + c.weight, 0);
+        
+        let random = Math.random() * totalWeight;
+        for (const candidate of weightedCandidates) {
+            random -= candidate.weight;
+            if (random <= 0) {
+                return candidate;
+            }
+        }
+        
+        return weightedCandidates[weightedCandidates.length - 1];
+    };
+
+    const fullJourneyMap = generateJourneyMap(tracks.length, persona);
+
+    const selectOpeningTrack = () => {
+        const candidates = trackProfiles.map(t => {
+            let score = 0;
+            
+            score += getMoodMatchScore(t.profile.moodBucket, fullJourneyMap[0]) * 0.7;
+            
+            if (t.profile.energy >= 0.40 && t.profile.energy <= 0.72) score += 35;
+            if (t.profile.valence >= 0.45) score += 25;
+            if (t.profile.tempo >= 85 && t.profile.tempo <= 135) score += 15;
+            
+            score += Math.random() * 30 * chaos;
+            
+            return { track: t, score };
+        });
+        
+        candidates.sort((a, b) => b.score - a.score);
+        
+        const openerPoolSize = Math.max(2, Math.floor(3 + chaos * 4));
+        const topOpeners = candidates.slice(0, Math.min(openerPoolSize, candidates.length));
+        
+        return weightedRandomSelect(topOpeners, chaos).track;
+    };
 
     let remainingTracks = [...trackProfiles];
     const sortedPlaylist = [];
 
-    let firstTrackIndex = remainingTracks.findIndex(t => t.profile.moodBucket === fullJourneyMap[0]);
-    if (firstTrackIndex === -1) firstTrackIndex = Math.floor(Math.random() * remainingTracks.length);
-    
-    let lastTrack = remainingTracks.splice(firstTrackIndex, 1)[0];
-    sortedPlaylist.push(lastTrack);
+    const firstTrack = selectOpeningTrack();
+    sortedPlaylist.push(firstTrack);
+    remainingTracks = remainingTracks.filter(t => t.uri !== firstTrack.uri);
+    let lastTrack = firstTrack;
 
     while (remainingTracks.length > 0) {
-        const currentJourneyStep = fullJourneyMap[sortedPlaylist.length];
-        const scoredCandidates = [];
+        const currentPosition = sortedPlaylist.length;
+        const currentJourneyStep = fullJourneyMap[currentPosition] || fullJourneyMap[fullJourneyMap.length - 1];
+        const isNearEnd = currentPosition >= tracks.length - 3;
+        const isFinalTrack = remainingTracks.length === 1;
 
-        for (const candidateTrack of remainingTracks) {
+        const scoredCandidates = remainingTracks.map(candidateTrack => {
             let score = 0;
+            const candProfile = candidateTrack.profile;
+            const lastProfile = lastTrack.profile;
 
-            if (candidateTrack.profile.moodBucket === currentJourneyStep) score += 100;
+            score += getMoodMatchScore(candProfile.moodBucket, currentJourneyStep) * 0.85;
 
-            const harmonicScore = getHarmonicCompatibilityScore(lastTrack.profile.camelotKey, candidateTrack.profile.camelotKey);
-            score += harmonicScore * 0.8;
+            const harmonicScore = getHarmonicCompatibilityScore(lastProfile.camelotKey, candProfile.camelotKey);
+            score += harmonicScore * 0.75;
 
-            const tempoDiff = Math.abs(candidateTrack.profile.tempo - lastTrack.profile.tempo);
-            if (tempoDiff < 8) score += 50;
-            else if (tempoDiff < 15) score += 25;
+            score += getTempoScore(lastProfile.tempo, candProfile.tempo);
 
-            scoredCandidates.push({ track: candidateTrack, score });
-        }
+            score += getFlowScore(lastProfile, candProfile) * 0.8;
+
+            if (isFinalTrack) {
+                if (candProfile.energy >= 0.35 && candProfile.energy <= 0.70) score += 20;
+                if (candProfile.valence >= 0.45) score += 15;
+            }
+
+            if (isNearEnd && !isFinalTrack && persona !== 'party') {
+                if (candProfile.energy < 0.65) score += 12;
+            }
+
+            return { track: candidateTrack, score };
+        });
 
         scoredCandidates.sort((a, b) => b.score - a.score);
-        
-        const CANDIDATE_POOL_SIZE = 5;
-        const topCandidates = scoredCandidates.slice(0, CANDIDATE_POOL_SIZE);
 
-        const randomIndex = Math.floor(Math.random() * topCandidates.length);
-        const selected = topCandidates[randomIndex];
+        const poolSize = getPoolSize(remainingTracks.length, chaos);
+        const topCandidates = scoredCandidates.slice(0, Math.min(poolSize, scoredCandidates.length));
+
+        const selected = weightedRandomSelect(topCandidates, chaos);
 
         sortedPlaylist.push(selected.track);
         remainingTracks = remainingTracks.filter(t => t.uri !== selected.track.uri);
-        
         lastTrack = selected.track;
     }
 
