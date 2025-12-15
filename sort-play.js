@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.36.1";
+  const SORT_PLAY_VERSION = "5.36.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -20476,39 +20476,62 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         if (!isHeadless) mainButton.innerText = "Profiling...";
 
-        const tracksToProfile = [...topTracks];
-        
+        let primarySeedTracks = [];
+        let primarySeedArtistIds = new Set();
         let likedSample = [];
+
         if (vibeType === 'recommendAllTime') {
-            likedSample = shuffleArray(allLikedSongs).slice(0, 300);
+            const shuffledLiked = shuffleArray(allLikedSongs).slice(0, 200);
+            likedSample = shuffledLiked;
+            
+            const mappedLiked = shuffledLiked.map(t => ({
+                id: t.uri.split(':')[2],
+                uri: t.uri,
+                name: t.name,
+                artists: (t.artistUris || []).map(u => ({ id: u.split(':')[2], uri: u })),
+                popularity: t.popularity || 50,
+                _isLikedSong: true
+            }));
+            
+            const likedPortion = Math.ceil(top_pool_size * 0.7);
+            const topPortion = Math.floor(top_pool_size * 0.3);
+            
+            primarySeedTracks = [
+                ...shuffleArray(mappedLiked).slice(0, likedPortion),
+                ...shuffleArray(topTracks).slice(0, topPortion)
+            ];
+            
+            mappedLiked.forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
+            
         } else if (vibeType === 'recommendRecentVibe') {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - 28);
             
             const recentLikes = allLikedSongs.filter(t => new Date(t.addedAt) >= cutoffDate);
             
-            if (recentLikes.length < 15) {
+            if (recentLikes.length < 10) {
                 likedSample = [...allLikedSongs]
                     .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
-                    .slice(0, 20);
+                    .slice(0, 30);
             } else {
                 const now = Date.now();
                 const weightedTracks = recentLikes.map(t => {
                     const daysAgo = (now - new Date(t.addedAt).getTime()) / (1000 * 60 * 60 * 24);
-                    const weight = Math.exp(-0.08 * Math.max(0, daysAgo));
+                    const weight = Math.exp(-0.05 * Math.max(0, daysAgo)); 
                     return { track: t, weight };
                 });
 
                 const selected = [];
                 const pool = [...weightedTracks];
+                
                 for (let i = pool.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [pool[i], pool[j]] = [pool[j], pool[i]];
                 }
 
-                const sampleSize = Math.min(pool.length, 60);
-
-                for (let i = 0; i < sampleSize; i++) {
+                const sampleSize = Math.min(pool.length, 80);
+                
+                for (let i = 0; i < sampleSize && pool.length > 0; i++) {
                     let totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
                     let r = Math.random() * totalWeight;
                     let idx = 0;
@@ -20521,19 +20544,66 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
                 likedSample = selected;
             }
+            
+            const mappedRecent = likedSample.map(t => ({
+                id: t.uri.split(':')[2],
+                uri: t.uri,
+                name: t.name,
+                artists: (t.artistUris || []).map(u => ({ id: u.split(':')[2], uri: u })),
+                popularity: t.popularity || 50,
+                _isLikedSong: true
+            }));
+            
+            const likedPortion = Math.ceil(top_pool_size * 0.8);
+            const topPortion = Math.floor(top_pool_size * 0.2);
+            
+            primarySeedTracks = [
+                ...mappedRecent.slice(0, likedPortion),
+                ...shuffleArray(topTracks).slice(0, topPortion)
+            ];
+            
+            mappedRecent.forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
+            
         } else {
             likedSample = shuffleArray(allLikedSongs).slice(0, 50);
+            primarySeedTracks = [...topTracks];
         }
 
-        tracksToProfile.push(...likedSample.map(t => ({...t, id: t.uri.split(':')[2]})));
-        
+        const originalTopTracks = [...topTracks];
+        topTracks = primarySeedTracks.length > 0 ? primarySeedTracks : topTracks;
+
+        if (primarySeedArtistIds.size > 0) {
+            const additionalArtistIds = Array.from(primarySeedArtistIds)
+                .filter(id => !topArtists.some(a => a.id === id));
+            
+            const additionalArtists = additionalArtistIds.slice(0, 50).map(id => ({ 
+                id, 
+                genres: [],
+                _fromLikedSongs: true 
+            }));
+            
+            if (vibeType === 'recommendRecentVibe') {
+                topArtists = [...additionalArtists, ...topArtists].slice(0, 150);
+            } else {
+                topArtists = shuffleArray([...topArtists, ...additionalArtists]).slice(0, 150);
+            }
+        }
+
+        const tracksToProfile = [...originalTopTracks];
+        if (likedSample.length > 0) {
+            tracksToProfile.push(...likedSample.map(t => ({...t, id: t.uri.split(':')[2]})));
+        }
+
         const profileTrackIds = [...new Set(tracksToProfile.map(t => t.id))];
-        
         const allAudioStats = await getBatchTrackStats(profileTrackIds);
-        
-        topTracks.forEach(t => t.features = allAudioStats[t.id]);
-        
-        const tracksWithFeatures = topTracks.filter(t => t.features);
+
+        originalTopTracks.forEach(t => t.features = allAudioStats[t.id]);
+        topTracks.forEach(t => {
+            if (!t.features) t.features = allAudioStats[t.id];
+        });
+
+        const profilingSource = primarySeedTracks.length > 0 ? primarySeedTracks : originalTopTracks;
+        const tracksWithFeatures = profilingSource.filter(t => t.features);
         const userAudioProfile = calculateAudioStatistics(tracksWithFeatures);
 
 
@@ -20687,12 +20757,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
 
         if (!isHeadless) mainButton.innerText = "Get Recs...";
+        
+        const trackArtistMap = new Map();
+        const addToLookup = (t) => {
+            const tid = t.id || (t.uri ? t.uri.split(':')[2] : null);
+            if (tid && !trackArtistMap.has(tid)) {
+                const aIds = new Set();
+                if (t.artists) t.artists.forEach(a => aIds.add(a.id || (a.uri ? a.uri.split(':')[2] : null)));
+                if (t.artistUris) t.artistUris.forEach(u => aIds.add(u.split(':')[2]));
+                trackArtistMap.set(tid, aIds);
+            }
+        };
+        topTracks.forEach(addToLookup);
+        allLikedSongs.forEach(addToLookup);
+
         const recommendationBatches = [];
         const NUM_CALLS = 7;
         
         for (let i = 0; i < NUM_CALLS; i++) {
             let params = new URLSearchParams({ limit: 100 });
             let seed_artists = [], seed_tracks = [];
+            const forbiddenArtistIds = new Set();
 
             if (i < 2) {
                 seed_artists = shuffleArray(topArtists).slice(0, 3).map(a => a.id);
@@ -20720,6 +20805,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 Object.keys(edgeExplorerTargets).forEach(key => params.append(key, edgeExplorerTargets[key].toFixed(2)));
             }
 
+            if (seed_artists.length > 0) {
+                seed_artists.forEach(id => forbiddenArtistIds.add(id));
+            }
+
+            if (seed_tracks.length > 0) {
+                seed_tracks.forEach(tid => {
+                    const aIds = trackArtistMap.get(tid);
+                    if (aIds) aIds.forEach(id => forbiddenArtistIds.add(id));
+                });
+            }
+
             if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
             if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
 
@@ -20727,7 +20823,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (seed_artists.length > 0 || seed_tracks.length > 0) {
                     const recsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
                     if (recsResponse?.tracks?.length > 0) {
-                        recommendationBatches.push(recsResponse.tracks);
+                        const filteredRecs = recsResponse.tracks.filter(t => {
+                            if (!t.artists) return true;
+                            return !t.artists.some(a => forbiddenArtistIds.has(a.id));
+                        });
+
+                        if (filteredRecs.length > 0) {
+                            recommendationBatches.push(filteredRecs);
+                        }
                     }
                 }
             } catch (e) { console.warn(`Recommendation call ${i+1} failed.`, e); }
