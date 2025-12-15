@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.36.0";
+  const SORT_PLAY_VERSION = "5.36.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -20446,12 +20446,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         if (vibeType === 'recommendRecentVibe') {
             playlistName = "Discovery: Recent Taste";
-            playlistDescription = "A diverse mix based on your recent listening habits and sonic profile. Created by Sort-Play.";
+            playlistDescription = "A diverse mix based on your recent taste. Created by Sort-Play.";
             time_range = 'short_term';
             contrast_time_range = 'long_term';
         } else if (vibeType === 'recommendAllTime') {
             playlistName = "Discovery: All-Time Taste";
-            playlistDescription = "A diverse mix based on your all-time favorites and sonic profile. Created by Sort-Play.";
+            playlistDescription = "A diverse mix based on your all-time taste. Created by Sort-Play.";
             time_range = 'long_term';
             contrast_time_range = 'short_term';
         }
