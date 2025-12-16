@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.37.5";
+  const SORT_PLAY_VERSION = "5.38.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -2158,7 +2158,7 @@
             Remove Duplicate Tracks While Sorting
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Setting won't affect artist pages or tracks with identical URLs</span>
+                <span class="custom-tooltip">Can make sorting slower.<br><br>This setting won't affect artist pages or tracks with identical URLs</span>
             </span>
         </label>
         <div class="col action">
@@ -3593,16 +3593,20 @@
     modalContainer.style.cssText = `
         z-index: 2003;
         width: 1100px !important;
-        max-width: 61vw;
+        max-width: 62vw;
         height: auto;
         max-height: 80vh;
         background-color: #121212 !important;
         border: 1px solid #333;
         display: flex;
         flex-direction: column;
-        border-radius: 12px;
+        border-radius: 30px;
         box-shadow: 0 20px 50px rgba(0,0,0,0.6);
     `;
+
+    const shadowRoot = modalContainer.attachShadow({ mode: 'open' });
+    modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
+    modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
 
     const cachedCounts = JSON.parse(localStorage.getItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS) || '{}');
     let dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
@@ -3779,12 +3783,18 @@
     
     contentHtml += `</div>`;
 
-    modalContainer.innerHTML = `
+    shadowRoot.innerHTML = `
       <style>
+        :host {
+            font-family: 'SpotifyMixUI', sans-serif !important;
+            color: #fff;
+        }
+        *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+        h1 { margin: 0; line-height: normal; }
         .create-playlist-modal-body {
             flex-grow: 1;
             overflow-y: auto; 
-            padding: 25px 25px;
+            padding: 30px 30px;
             display: flex;
             flex-direction: column;
         }
@@ -3831,7 +3841,7 @@
             position: relative;
             height: 85px;
             background-color: #252525;
-            border-radius: 6px;
+            border-radius: 12px;
             overflow: hidden;
             cursor: pointer;
             border: 1px solid transparent;
@@ -4081,8 +4091,8 @@
         .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
       </style>
 
-      <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 15px 25px;">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 20px; font-weight: 700; color: white;'>Dedicated Playlist Creation</span></h1>
+      <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 26px; font-weight: 700; color: white;'>Dedicated Playlist Creation</span></h1>
           <button id="closeCreatePlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
             <svg width="20" height="20" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
           </button>
@@ -6564,7 +6574,7 @@ sendButton.addEventListener("click", async () => {
 
     for (let i = 0; i < localTracks.length; i += BATCH_SIZE) {
         const batch = localTracks.slice(i, i + BATCH_SIZE);
-        updateProgress(`Find-Local ${Math.min(i + BATCH_SIZE, localTracks.length)}/${localTracks.length}`);
+        updateProgress(`${Math.min(i + BATCH_SIZE, localTracks.length)}/${localTracks.length}`);
 
         const searchPromises = batch.map(async (track, idx) => {
             const artistQuery = track.artistName || "";
@@ -11912,6 +11922,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         width: 900px !important; display: flex; flex-direction: column;
         border-radius: 30px; background-color: #181818 !important; border: 2px solid #282828;
     `;
+    const shadowRoot = modalContainer.attachShadow({ mode: 'open' });
+    modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
+    modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
 
     const closeModal = () => overlay.remove();
     overlay.addEventListener('click', (e) => {
@@ -11995,8 +12008,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             jobsHtml = `<div class="no-jobs-message">No dynamic playlists scheduled.</div>`;
         }
 
-        modalContainer.innerHTML = `
+        shadowRoot.innerHTML = `
             <style>
+                :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; font-size: 16px; font-weight: 400; }
+                *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+                h1 { margin: 0; line-height: normal; }
                 .dynamic-playlist-modal .main-trackCreditsModal-mainSection { 
                     padding: 24px 32px 38px !important; 
                     max-height: 70vh; 
@@ -12074,7 +12090,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 .dynamic-playlist-modal .job-source-name { 
                     color: white; 
                     font-weight: 500; 
-                    font-size: 1rem; 
+                    font-size: 16px; 
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis; 
@@ -12082,7 +12098,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
                 .dynamic-playlist-modal .job-info, .job-last-run { 
                     color: #b3b3b3; 
-                    font-size: 0.875rem; 
+                    font-size: 14px; 
                 }
                 .dynamic-playlist-modal .job-status-line {
                     display: flex;
@@ -12091,8 +12107,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 .dynamic-playlist-modal .job-deleted-status {
                     color: #ff8a8a;
                     font-weight: 500;
-                    font-size: 0.875rem;
+                    font-size: 14px;
                     margin-left: 3px;
+                }
+                .main-trackCreditsModal-closeBtn { 
+                    background: transparent; 
+                    border: 0; 
+                    padding: 0; 
+                    color: #b3b3b3; 
+                    cursor: pointer; 
+                    transition: color 0.2s ease;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .main-trackCreditsModal-closeBtn:hover { 
+                    color: #ffffff; 
                 }
                 .dynamic-playlist-modal .job-actions {
                     display: flex;
@@ -12164,8 +12194,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
             </style>
             <div class="dynamic-playlist-modal">
-                <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
-                    <h1 class="main-trackCreditsModal-title" style="font-size: 24px; font-weight: 700; color: white;">Dynamic Playlists (beta)</h1>
+                <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
+                    <h1 class="main-trackCreditsModal-title" style="font-size: 26px; font-weight: 700; color: white;">Dynamic Playlists (beta)</h1>
                     <button id="closeDynamicPlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
                         <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
                     </button>
@@ -12422,8 +12452,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 <option value="clear-custom" style="color: #f15e6c; font-style: italic;">Clear Custom Schedules...</option>
             `;
         }
-        modalContainer.innerHTML = `
+        shadowRoot.innerHTML = `
             <style>
+                :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; font-size: 16px; font-weight: 400; }
+                *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+                h1 { margin: 0; line-height: normal; }
                 .job-form-modal .main-trackCreditsModal-mainSection { 
                     padding: 24px 32px 38px !important; display: flex; flex-direction: column; scrollbar-width: none;
                 }
@@ -12443,7 +12476,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     gap: 16px;
                 }
               .job-form-modal .card { background-color: #282828; border-radius: 8px; padding: 16px; }
-              .job-form-modal .card-title { font-weight: 700; color: white; margin-bottom: 12px; font-size: 1rem; }
+              .job-form-modal .card-title { font-weight: 700; color: white; margin-bottom: 12px; font-size: 16px; }
               .job-form-modal #source-list-container { display: flex; flex-direction: column; gap: 8px; max-height: 335px; overflow-y: auto; padding-right: 5px; margin-right: -4px;scrollbar-width: thin; overflow-y: scroll;}
               .job-form-modal .source-item { display: flex; align-items: center; gap: 10px; background-color: #3e3e3e; padding: 8px; border-radius: 6px; }
               .job-form-modal .source-cover-art-small { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
@@ -12480,14 +12513,40 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               .job-form-modal #clear-sources-btn { flex-grow: 0; padding: 0 20px; }
               .job-form-modal .form-select {
                   width: 220px; background: #282828; color: white; border: 1px solid #666;
-                  border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 13px; cursor: pointer;
+                  border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 14px; cursor: pointer;
+                  font-family: 'SpotifyMixUI', sans-serif !important;
                   -webkit-appearance: none; -moz-appearance: none; appearance: none;
                   background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
                   background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
               }
+              .job-form-modal .form-select:focus {
+                  outline: none;
+                  border: 1px solid #666;
+              }
+              .job-form-modal .form-select option {
+                  background-color: #282828;
+                  color: white;
+                  font-family: 'SpotifyMixUI', sans-serif !important;
+                  font-size: 14px;
+                  padding: 4px;
+              }
               .job-form-modal .setting-row { display: flex; justify-content: space-between; align-items: center; }
               .job-form-modal .card .setting-row + .setting-row { margin-top: 12px; }
-              .job-form-modal .setting-row .description { color: #c1c1c1; font-size: 1rem; }
+              .job-form-modal .setting-row .description { color: #c1c1c1; font-size: 16px; }
+              .main-trackCreditsModal-closeBtn { 
+                  background: transparent; 
+                  border: 0; 
+                  padding: 0; 
+                  color: #b3b3b3; 
+                  cursor: pointer; 
+                  transition: color 0.2s ease;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+              }
+              .main-trackCreditsModal-closeBtn:hover { 
+                  color: #ffffff; 
+              }
               .job-form-modal .setting-row.disabled { opacity: 0.5; pointer-events: none; }
               .job-form-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
               .job-form-modal .switch input { opacity: 0; width: 0; height: 0; }
@@ -12651,8 +12710,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               }
           </style>
             <div class="job-form-modal">
-                <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
-                    <h1 class="main-trackCreditsModal-title" style="font-size: 24px; font-weight: 700; color: white;">${isEditing ? 'Edit' : 'New'} Dynamic Playlist</h1>
+                <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
+                    <h1 class="main-trackCreditsModal-title" style="font-size: 26px; font-weight: 700; color: white;">${isEditing ? 'Edit' : 'New'} Dynamic Playlist</h1>
                     <button id="closeDynamicPlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
                         <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
                     </button>
@@ -12680,7 +12739,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                     <label class="switch"><input type="checkbox" id="limit-tracks-toggle" ${isEditing && jobToEdit.limitEnabled ? 'checked' : ''}><span class="sliderx"></span></label>
                                 </div>
                                 <div style="margin-top: 16px;">
-                                    <label for="playlist-name-input" style="display: block; color: #b3b3b3; font-size: 0.875rem; margin-bottom: 8px;">New Playlist Name</label>
+                                    <label for="playlist-name-input" style="display: block; color: #b3b3b3; font-size: 14px; margin-bottom: 8px;">New Playlist Name</label>
                                     <input type="text" id="playlist-name-input" value="" style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 12px; color: white; box-sizing: border-box;">
                                 </div>
                             </div>
@@ -13740,8 +13799,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         border: 2px solid #282828;
         max-height: 85vh;
     `;
-    modalContainer.innerHTML = `
+    const shadowRoot = modalContainer.attachShadow({ mode: 'open' });
+    modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
+    modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
+
+    shadowRoot.innerHTML = `
     <style>
+    :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
+    *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+    h1 { margin: 0; line-height: normal; }
     .genre-filter-modal .main-trackCreditsModal-mainSection {
       overflow-y: hidden !important;
       padding: 17px 32px 32px 32px;
@@ -13751,7 +13817,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       min-height: 0;
     }
     .genre-filter-modal .main-trackCreditsModal-header {
-      padding: 32px 32px 16px !important;
+      padding: 29px 32px 19px 32px !important;
       border-bottom: 1px solid #282828 !important;
       display: flex;
       justify-content: space-between;
@@ -14181,7 +14247,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       flex-shrink: 0;
     }
     </style>
-    
+    <div class="genre-filter-modal" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
     <div class="main-trackCreditsModal-header">
         <h1 style="font-size: 26px; font-weight: 700; color: white; margin:0;">Genre Filter</h1>
         <button id="closeGenreModalBtn" aria-label="Close" class="main-trackCreditsModal-closeBtn">
@@ -14267,6 +14333,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             <div id="genre-selection-error" style="color: #f15e6c; font-size: 13px; text-align: center; display: none;"></div>
             <button class="create-playlist-button">Create Playlist</button>
         </div>
+    </div>
     </div>
   `;
 
@@ -16150,8 +16217,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       width: 8px;
       height: 8px;
       border-radius: 5px;
-      background-color: #555;
-      color: #555;
+      background-color: #b3b3b3;
+      color: #b3b3b3;
       animation: 0.4s linear 0.2s infinite alternate none running loader;
     }
     
@@ -16168,8 +16235,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       width: 8px;
       height: 8px;
       border-radius: 5px;
-      background-color: #555;
-      color: #555;
+      background-color: #b3b3b3;
+      color: #b3b3b3;
       animation: 0.4s ease 0s infinite alternate none running loader;
     }
     
@@ -16178,18 +16245,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       width: 8px;
       height: 8px;
       border-radius: 5px;
-      background-color: #555;
-      color: #555;
+      background-color: #b3b3b3;
+      color: #b3b3b3;
       animation: 0.4s ease 0.4s infinite alternate none running loader;
     }
     
     @keyframes loader {
       0% {
-        background-color: #555;
+        background-color: #8d8d8d;
       }
       50%,
       100% {
-        background-color: #888;
+        background-color: #cccccc;
       }
     }
     .Button-sc-qlcn5g-0.Button-small-buttonTertiary-useBrowserDefaultFocusStyle {
@@ -17892,15 +17959,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       border-radius: 2px;
       padding: 0;
       cursor: pointer;
-      position: absolute;
-      right: 0px;
-      top: 50%;
-      transform: translateY(-50%);
       display: flex;
       align-items: center;
       justify-content: center;
       width: ${isFilterAlbums ? "35px" : "32px"};
       height: ${isFilterAlbums ? "35px" : "32px"};
+      margin-left: 10px;
+      margin-right: -10px;
+      flex-shrink: 0;
     `;
 
     const updateTooltipPosition = (tooltip) => {
@@ -18012,19 +18078,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     innerButton.style.cssText = `
       color: #ffffffe6;
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 10px;
+      border-radius: 8px;
       padding: 0;
       width: 35px;
       height: 25px;
       cursor: pointer;
-      position: absolute;
-      right: 8px;
-      top: 50%;
-      transform: translateY(-50%);
       display: flex;
       align-items: center;
       justify-content: center;
       transition: background-color 0.1s ease;
+      margin-left: auto;
+      margin-right: -3px;
+      flex-shrink: 0;
     `;
 
     innerButton.style.backgroundColor = buttonBgColor;
@@ -18069,8 +18134,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       backgroundColor: "transparent",
       color: "#FFFFFFB3",
       clickBackgroundColor: "transparent",
-      disabledBackgroundColor: "#FFFFFFB3",
-      disabledColor: "#474747",
+      disabledBackgroundColor: "rgba(255, 255, 255, 0.25)",
+      disabledColor: "rgba(255, 255, 255, 0.8)",
     },
     menuItems: [
       {
@@ -18218,13 +18283,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   mainButton.style.border = "none";
   mainButton.style.padding = "4px 10px";
   mainButton.style.fontWeight = "400";
-  mainButton.style.fontSize = "14px";
+  mainButton.style.fontSize = "13px";
   mainButton.style.height = "30px";  
   mainButton.style.overflow = "hidden";
-  mainButton.style.width = "100px";
+  mainButton.style.width = "auto";
+  mainButton.style.minWidth = "100px";
   mainButton.style.display = "flex";
   mainButton.style.justifyContent = "center";
   mainButton.style.alignItems = "center";
+  mainButton.style.transition = "min-width 0.2s ease, background-color 0.1s ease, color 0.1s ease";
 
   const threeDotsSvg = `
     <svg width="15px" height="15px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
@@ -18395,7 +18462,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       parentButton.style.fontWeight = "400";
       parentButton.style.fontSize = "0.875rem";
       parentButton.style.height = "39px";
-      parentButton.style.width = "183px";
+      parentButton.style.width = "auto";
+      parentButton.style.minWidth = "183px";
+      parentButton.style.whiteSpace = "nowrap";
       parentButton.style.textAlign = "center";
       parentButton.style.opacity = "0";
       parentButton.style.transform = "translateY(-10px)";
@@ -18467,7 +18536,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       button.style.fontWeight = "400";
       button.style.fontSize = "0.875rem";
       button.style.height = "39px";
-      button.style.width = "183px";
+      button.style.width = "auto";
+      button.style.minWidth = "183px";
+      button.style.whiteSpace = "nowrap";
       button.style.textAlign = "left";
       button.style.opacity = "0";
       button.style.transform = "translateY(-10px)";
@@ -18703,7 +18774,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           font-weight: 400;
           font-size: 0.875rem;
           height: 39px;
-          width: ${width};
+          width: auto;
+          min-width: ${width};
+          white-space: nowrap;
           text-align: left;
           position: relative;
           display: flex;
@@ -18761,7 +18834,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       button.style.fontWeight = "400";
       button.style.fontSize = "0.875rem";
       button.style.height = "37px";
-      button.style.width = width;
+      button.style.width = "auto";
+      button.style.minWidth = width;
+      button.style.whiteSpace = "nowrap";
       button.style.textAlign = "center";
       button.style.position = "relative";
       button.style.display = "flex";
@@ -20437,7 +20512,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await new Promise(r => setTimeout(r, 100));
             }
 
-            if (!isHeadless) mainButton.innerText = "Get Recs...";
+            if (!isHeadless) mainButton.innerText = "Get recs...";
             
             const makeRecRequest = async (seeds) => {
                 const finalSeeds = (seeds && seeds.length > 0) ? seeds : shuffleArray(topArtistsForSeeding).slice(0, 3);
@@ -20848,7 +20923,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
 
-        if (!isHeadless) mainButton.innerText = "Get Recs...";
+        if (!isHeadless) mainButton.innerText = "Get recs...";
         
         const trackArtistMap = new Map();
         const addToLookup = (t) => {
@@ -21595,10 +21670,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const { convertedTracks: resolvedSpotifyTracks } = await convertLocalTracksToSpotify(
             mockLocalTracks,
-            (progressMsg) => {
-                const displayMsg = progressMsg.replace("Find-Local", "Resolve");
-                updateProgress(displayMsg);
-            }
         );
 
         updateProgress("Verifying...");
@@ -21946,10 +22017,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const { convertedTracks: resolvedSpotifyTracks } = await convertLocalTracksToSpotify(
             mockLocalTracks,
-            (progressMsg) => {
-                const displayMsg = progressMsg.replace("Find-Local", "Resolve");
-                updateProgress(displayMsg);
-            }
         );
 
         updateProgress("Verifying...");
@@ -22357,6 +22424,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         flex-direction: column;
         border-radius: 30px;
     `;
+    const shadowRoot = modalContainer.attachShadow({ mode: 'open' });
+    modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
+    modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
 
     if (!genrePlaylistsCache) {
         try {
@@ -22450,8 +22520,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         localStorage.setItem(STORAGE_KEY_USER_ADDED_GENRES, JSON.stringify(Array.from(userAddedGenres)));
     };
 
-    modalContainer.innerHTML = `
+    shadowRoot.innerHTML = `
       <style>
+        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
+        *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+        h1 { margin: 0; line-height: normal; }
         .genre-tree-modal .genre-container { max-height: 23vh; overflow-y: auto; background-color: #1e1e1e; border-radius: 20px; padding: 15px 10px; margin-top: 15px; scrollbar-width: thin; scrollbar-color: #3b3b3b transparent; }
         .genre-tree-modal .genre-container::-webkit-scrollbar { width: 6px; }
         .genre-tree-modal .genre-container::-webkit-scrollbar-track { background: transparent; }
