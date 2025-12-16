@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.37.3";
+  const SORT_PLAY_VERSION = "5.37.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -25879,12 +25879,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const el = elementsToFetchFromApi.get(id);
                 if (el) {
                     el.classList.remove('sort-play-processing');
-                    columnConfigs.forEach(c => {
-                        const dEl = el.querySelector(c.dataSelector);
-                        if (dEl && (!dEl.textContent || dEl.textContent === "_") && !dEl.dataset.spProcessed) {
-                             updateDisplay(dEl, { error: "Fetch failed", errorLabel: "Err" }, c.type);
-                        }
-                    });
                 }
             });
         }
