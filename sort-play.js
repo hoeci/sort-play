@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.37.1";
+  const SORT_PLAY_VERSION = "5.37.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -69,6 +69,7 @@
   let selectedNowPlayingPopularityFormat = 'raw';
   let selectedNowPlayingSeparator = '•';
   let includeZeroScrobbles = true;
+  let lastFmAutocorrect = false;
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
@@ -917,6 +918,7 @@
     selectedNowPlayingPopularityFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT) || 'raw';
     selectedNowPlayingSeparator = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR) || '•';
     includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
+    lastFmAutocorrect = localStorage.getItem("sort-play-lastfm-autocorrect") === "true";
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -976,6 +978,7 @@
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT, selectedNowPlayingPopularityFormat);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR, selectedNowPlayingSeparator);
     localStorage.setItem("sort-play-include-no-scrobbles", includeZeroScrobbles);
+    localStorage.setItem("sort-play-lastfm-autocorrect", lastFmAutocorrect);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -2281,6 +2284,21 @@
             </label>
         </div>
     </div>
+    <div class="setting-row" id="lastFmAutocorrectSetting">
+        <label class="col description">
+            Last.fm Autocorrect
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Uses Last.fm's native 'autocorrect' parameter to resolve misspelled artist/track names.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="lastFmAutocorrectToggle" ${lastFmAutocorrect ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
     `;
 
     Spicetify.PopupModal.display({
@@ -2368,6 +2386,7 @@
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
     const includeZeroScrobblesToggle = modalContainer.querySelector("#includeZeroScrobblesToggle");
+    const lastFmAutocorrectToggle = modalContainer.querySelector("#lastFmAutocorrectToggle");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
     const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
     const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
@@ -2578,6 +2597,14 @@
     includeZeroScrobblesToggle.addEventListener("change", () => {
         includeZeroScrobbles = includeZeroScrobblesToggle.checked;
         saveSettings();
+    });
+
+    lastFmAutocorrectToggle.addEventListener("change", async () => {
+        lastFmAutocorrect = lastFmAutocorrectToggle.checked;
+        saveSettings();
+        await idb.clear('scrobbles');
+        await idb.clear('personalScrobbles');
+        showNotification("Last.fm cache cleared.");
     });
 
     addToQueueToggle.addEventListener("change", () => {
@@ -17498,6 +17525,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             track: trackName,
             format: 'json'
         });
+
+        if (lastFmAutocorrect) {
+            params.set('autocorrect', '1');
+        }
         
         let response = await fetchLfmWithGateway(params);
 
@@ -17515,14 +17546,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let data = JSON.parse(text);
 
         if (data.error === 6) {
-            params.set('autocorrect', '1');
-            const responseAuto = await fetchLfmWithGateway(params);
-            if (responseAuto.ok) {
-                const textAuto = await responseAuto.text();
-                if (textAuto && textAuto.trim() !== '') {
-                    const dataAuto = JSON.parse(textAuto);
-                    if (!dataAuto.error) {
-                        data = dataAuto;
+            if (lastFmAutocorrect) {
+                params.set('autocorrect', '0');
+            } else {
+                params.set('autocorrect', '1');
+            }
+
+            const responseRetry = await fetchLfmWithGateway(params);
+            if (responseRetry.ok) {
+                const textRetry = await responseRetry.text();
+                if (textRetry && textRetry.trim() !== '') {
+                    const dataRetry = JSON.parse(textRetry);
+                    if (!dataRetry.error) {
+                        data = dataRetry;
                     }
                 }
             }
@@ -17648,6 +17684,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             username: username,
             format: 'json'
         });
+
+        if (lastFmAutocorrect) {
+            params.set('autocorrect', '1');
+        }
         
         let response = await fetchLfmWithGateway(params);
         if (!response.ok) throw new Error(`Last.fm API request failed with status ${response.status}`);  
@@ -17660,14 +17700,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let data = JSON.parse(text);
 
         if (data.error === 6) {
-            params.set('autocorrect', '1');
-            const responseAuto = await fetchLfmWithGateway(params);
-            if (responseAuto.ok) {
-                const textAuto = await responseAuto.text();
-                if (textAuto && textAuto.trim() !== '') {
-                    const dataAuto = JSON.parse(textAuto);
-                    if (!dataAuto.error) {
-                        data = dataAuto;
+            if (lastFmAutocorrect) {
+                params.set('autocorrect', '0');
+            } else {
+                params.set('autocorrect', '1');
+            }
+
+            const responseRetry = await fetchLfmWithGateway(params);
+            if (responseRetry.ok) {
+                const textRetry = await responseRetry.text();
+                if (textRetry && textRetry.trim() !== '') {
+                    const dataRetry = JSON.parse(textRetry);
+                    if (!dataRetry.error) {
+                        data = dataRetry;
                     }
                 }
             }
