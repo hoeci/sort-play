@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.37.2";
+  const SORT_PLAY_VERSION = "5.37.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -2604,7 +2604,6 @@
         saveSettings();
         await idb.clear('scrobbles');
         await idb.clear('personalScrobbles');
-        showNotification("Last.fm cache cleared.");
     });
 
     addToQueueToggle.addEventListener("change", () => {
@@ -17484,7 +17483,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function getTrackDetailsWithScrobbles(track) {
+  async function getTrackDetailsWithScrobbles(track, useFallback = false) {
     const maxRetries = 5;
     const initialDelay = 1000; 
     let retries = 0;
@@ -17545,7 +17544,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         let data = JSON.parse(text);
 
-        if (data.error === 6) {
+        if (data.error === 6 && useFallback) {
             if (lastFmAutocorrect) {
                 params.set('autocorrect', '0');
             } else {
@@ -17620,7 +17619,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function getTrackDetailsWithPersonalScrobbles(track) {
+  async function getTrackDetailsWithPersonalScrobbles(track, useFallback = false) {
     const trackId = track.uri ? track.uri.split(":")[2] : (track.track ? track.track.id : null);
     const isLocal = Spicetify.URI.isLocal(track.uri);
     
@@ -17699,7 +17698,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         let data = JSON.parse(text);
 
-        if (data.error === 6) {
+        if (data.error === 6 && useFallback) {
             if (lastFmAutocorrect) {
                 params.set('autocorrect', '0');
             } else {
@@ -25689,7 +25688,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                     try {
                         if (config.type === 'scrobbles') {
-                            const result = await getTrackDetailsWithScrobbles(localTrackInfo);
+                            const result = await getTrackDetailsWithScrobbles(localTrackInfo, true);
                             if (result.scrobbles === -1 || result.error) {
                                 updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
                             } else {
@@ -25699,7 +25698,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             if (!loadLastFmUsername()) {
                                 updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type);
                             } else {
-                                const result = await getTrackDetailsWithPersonalScrobbles(localTrackInfo);
+                                const result = await getTrackDetailsWithPersonalScrobbles(localTrackInfo, true);
                                 if (result.personalScrobbles === -1 || result.error) {
                                     updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
                                 } else {
@@ -25848,7 +25847,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                 } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles') {
                                     const info = { name: t.name, artists: t.artists };
                                     if (c.type === 'scrobbles') {
-                                        const r = await getTrackDetailsWithScrobbles(info);
+                                        const r = await getTrackDetailsWithScrobbles(info, true);
                                         if (r.scrobbles === -1 || r.error) {
                                             updateDisplay(dEl, { error: r.error || "Track not found on Last.fm", errorLabel: r.errorLabel || "N/A" }, c.type);
                                             await setCachedScrobbles(t.id, -1);
@@ -25858,7 +25857,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                         }
                                     } else {
                                         if (loadLastFmUsername()) {
-                                            const r = await getTrackDetailsWithPersonalScrobbles({ ...info, uri: t.uri });
+                                            const r = await getTrackDetailsWithPersonalScrobbles({ ...info, uri: t.uri }, true);
                                             if (r.personalScrobbles === -1 || r.error) {
                                                 updateDisplay(dEl, { error: r.error || "Track not found on Last.fm", errorLabel: r.errorLabel || "N/A" }, c.type);
                                             } else {
