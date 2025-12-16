@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.37.4";
+  const SORT_PLAY_VERSION = "5.37.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -24532,256 +24532,304 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
 
   async function deduplicateTracks(tracks, force = false, isArtistPageContext = false) {
-      if (!force && !playlistDeduplicate && !isArtistPageContext) {
-          return { unique: tracks, removed: [] };
-      }
+    if (!force && !playlistDeduplicate && !isArtistPageContext) {
+        return { unique: tracks, removed: [] };
+    }
 
-      const isrcStartTime = Date.now();
-      
-      const tracksWithIds = tracks.filter(t => t.uri.startsWith("spotify:track:"));
-      const trackIds = tracksWithIds.map(t => t.uri.split(":")[2]);
-      const uniqueTrackIds = [...new Set(trackIds)];
+    const tracksWithIds = tracks.filter(t => t.uri.startsWith("spotify:track:"));
+    const trackIds = tracksWithIds.map(t => t.uri.split(":")[2]);
+    const uniqueTrackIds = [...new Set(trackIds)];
 
-      const cachedMetadata = await idb.getMany('trackMetadata', uniqueTrackIds, CACHE_EXPIRE_METADATA);
-      const missingIds = uniqueTrackIds.filter(id => {
-          const meta = cachedMetadata.get(id);
-          return !meta || !meta.external_ids || !meta.external_ids.isrc;
-      });
+    const cachedMetadata = await idb.getMany('trackMetadata', uniqueTrackIds, CACHE_EXPIRE_METADATA);
+    const missingIds = uniqueTrackIds.filter(id => {
+        const meta = cachedMetadata.get(id);
+        return !meta || !meta.external_ids || !meta.external_ids.isrc;
+    });
 
-      if (missingIds.length > 0) {
-          const BATCH_SIZE = 50;
-          for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
-              const batch = missingIds.slice(i, i + BATCH_SIZE);
-              try {
-                  const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-                  if (response && response.tracks) {
-                      response.tracks.forEach(track => {
-                          if (track) {
-                              const cacheData = {
-                                  name: track.name,
-                                  album: {
-                                      name: track.album.name,
-                                      id: track.album.id,
-                                      uri: track.album.uri,
-                                      release_date: track.album.release_date,
-                                      album_type: track.album.album_type
-                                  },
-                                  artists: track.artists.map(a => ({
-                                      id: a.id,
-                                      name: a.name,
-                                      uri: a.uri
-                                  })),
-                                  duration_ms: track.duration_ms,
-                                  popularity: track.popularity,
-                                  external_ids: track.external_ids,
-                                  id: track.id,
-                                  uri: track.uri
-                              };
-                              cachedMetadata.set(track.id, cacheData);
-                              idb.set('trackMetadata', track.id, cacheData);
-                          }
-                      });
-                  }
-              } catch (e) {
-                  console.warn("[Sort-Play] Failed to fetch ISRC batch during deduplication", e);
-              }
-          }
-      }
+    if (missingIds.length > 0) {
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+            const batch = missingIds.slice(i, i + BATCH_SIZE);
+            try {
+                const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
+                if (response && response.tracks) {
+                    response.tracks.forEach(track => {
+                        if (track) {
+                            const cacheData = {
+                                name: track.name,
+                                album: {
+                                    name: track.album.name,
+                                    id: track.album.id,
+                                    uri: track.album.uri,
+                                    release_date: track.album.release_date,
+                                    album_type: track.album.album_type
+                                },
+                                artists: track.artists.map(a => ({
+                                    id: a.id,
+                                    name: a.name,
+                                    uri: a.uri
+                                })),
+                                duration_ms: track.duration_ms,
+                                popularity: track.popularity,
+                                external_ids: track.external_ids,
+                                id: track.id,
+                                uri: track.uri
+                            };
+                            cachedMetadata.set(track.id, cacheData);
+                            idb.set('trackMetadata', track.id, cacheData);
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn("[Sort-Play] Failed to fetch ISRC batch during deduplication", e);
+            }
+        }
+    }
 
-      const DURATION_THRESHOLD = 2000; 
-      const finalUniqueTracks = [];
-      const finalRemovedTracks = [];
-      let isrcTimeAccumulator = 0;
+    const DURATION_THRESHOLD = 2000; 
+    const finalUniqueTracks = [];
+    const finalRemovedTracks = [];
 
-      const fetchIsrc = async (id) => {
-          if (!id) return null;
-          
-          if (cachedMetadata.has(id)) {
-              return cachedMetadata.get(id)?.external_ids?.isrc;
-          }
+    const fetchIsrc = async (id) => {
+        if (!id) return null;
+        
+        if (cachedMetadata.has(id)) {
+            return cachedMetadata.get(id)?.external_ids?.isrc;
+        }
 
-          const cached = await idb.get('trackMetadata', id, CACHE_EXPIRE_METADATA);
-          if (cached?.external_ids?.isrc) {
-              cachedMetadata.set(id, cached);
-              return cached.external_ids.isrc;
-          }
+        const cached = await idb.get('trackMetadata', id, CACHE_EXPIRE_METADATA);
+        if (cached?.external_ids?.isrc) {
+            cachedMetadata.set(id, cached);
+            return cached.external_ids.isrc;
+        }
 
-          try {
-              const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${id}`);
-              if (res?.external_ids?.isrc) {
-                  const cacheData = {
-                      name: res.name,
-                      album: {
-                          name: res.album.name,
-                          id: res.album.id,
-                          uri: res.album.uri,
-                          release_date: res.album.release_date,
-                          album_type: res.album.album_type
-                      },
-                      artists: res.artists.map(a => ({
-                          id: a.id,
-                          name: a.name,
-                          uri: a.uri
-                      })),
-                      duration_ms: res.duration_ms,
-                      popularity: res.popularity,
-                      external_ids: res.external_ids,
-                      id: res.id,
-                      uri: res.uri
-                  };
-                  cachedMetadata.set(id, cacheData);
-                  await idb.set('trackMetadata', id, cacheData);
-                  return res.external_ids.isrc;
-              }
-          } catch(e) {}
-          return null;
-      };
+        try {
+            const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${id}`);
+            if (res?.external_ids?.isrc) {
+                const cacheData = {
+                    name: res.name,
+                    album: {
+                        name: res.album.name,
+                        id: res.album.id,
+                        uri: res.album.uri,
+                        release_date: res.album.release_date,
+                        album_type: res.album.album_type
+                    },
+                    artists: res.artists.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        uri: a.uri
+                    })),
+                    duration_ms: res.duration_ms,
+                    popularity: res.popularity,
+                    external_ids: res.external_ids,
+                    id: res.id,
+                    uri: res.uri
+                };
+                cachedMetadata.set(id, cacheData);
+                await idb.set('trackMetadata', id, cacheData);
+                return res.external_ids.isrc;
+            }
+        } catch(e) {}
+        return null;
+    };
 
-      const versionKeywords = [
-          'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
-          'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
-          'radio edit', 'radio mix', 'single version', 'single edit', 'album version',
-          'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
-          'special edition', 'original mix', 'original version'
-      ];
-      const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})\\s*[\\)\\]\\-]?`, 'i');
+    const versionKeywords = [
+        'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
+        'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
+        'radio edit', 'radio mix', 'single version', 'single edit', 'album version',
+        'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
+        'special edition', 'original mix', 'original version'
+    ];
+    const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})\\s*[\\)\\]\\-]?`, 'i');
 
-      const getCleanTitle = (rawTitle) => {
-          return rawTitle
-              .toLowerCase()
-              .replace(versionRegex, '')
-              .replace(/['’ʼ]/g, "'")
-              .replace(/[^a-z0-9\s]/g, '')
-              .replace(/\s+/g, ' ')
-              .trim();
-      };
-      
-      const getNormalizedTitle = (rawTitle) => {
-          return rawTitle
-              .trim()
-              .toLowerCase()
-              .replace(/['’ʼ]/g, "'")
-              .replace(/[()\[\],.:-]/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim();
-      };
+    const getCleanTitle = (rawTitle) => {
+        return rawTitle
+            .toLowerCase()
+            .replace(versionRegex, '')
+            .replace(/['’ʼ]/g, "'")
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+    
+    const getNormalizedTitle = (rawTitle) => {
+        return rawTitle
+            .trim()
+            .toLowerCase()
+            .replace(/['’ʼ]/g, "'")
+            .replace(/[()\[\],.:-]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
 
-      const sortedInputTracks = [...tracks].sort((a, b) => {
-          const popA = a.popularity || 0;
-          const popB = b.popularity || 0;
-          if (popB !== popA) {
-              return popB - popA;
-          }
-          return (a.uri || "").localeCompare(b.uri || "");
-      });
+    const normalizeAndSplitArtists = (artistStr) => {
+        const clean = (name) => name.toLowerCase().replace(/[.&]/g, '').replace(/\s+/g, ' ').trim();
+        return artistStr.split(',').map(a => clean(a.trim()));
+    };
 
-      for (const candidateTrack of sortedInputTracks) {
-          let isConsideredDuplicateOfAnExistingUnique = false;
+    const wordBuckets = new Map();
+    const fallbackBucket = [];
+    const cleanTitleBuckets = new Map();
 
-          for (const existingUniqueTrack of finalUniqueTracks) {
-              const candidateHasValidPlayCount = candidateTrack.playCount !== "N/A" &&
-                                                candidateTrack.playCount !== 0 &&
-                                                candidateTrack.playCount !== null &&
-                                                candidateTrack.playCount !== undefined;
-              const existingHasValidPlayCount = existingUniqueTrack.playCount !== "N/A" &&
-                                                existingUniqueTrack.playCount !== 0 &&
-                                                existingUniqueTrack.playCount !== null &&
-                                                existingUniqueTrack.playCount !== undefined;
+    const getTokens = (str) => {
+        if (!str) return [];
+        return str.toLowerCase()
+            .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+            .split(/\s+/)
+            .filter(w => w.length > 0);
+    };
 
-              const candidateRawTitle = candidateTrack.songTitle || candidateTrack.name || "Unknown Title";
-              const candidateDuration = candidateTrack.durationMs;
-              const candidateArtist = candidateTrack.allArtists || candidateTrack.artistName || "";
+    const sortedInputTracks = [...tracks].sort((a, b) => {
+        const popA = a.popularity || 0;
+        const popB = b.popularity || 0;
+        if (popB !== popA) {
+            return popB - popA;
+        }
+        return (a.uri || "").localeCompare(b.uri || "");
+    });
 
-              const existingRawTitle = existingUniqueTrack.songTitle || existingUniqueTrack.name || "Unknown Title";
-              const existingDuration = existingUniqueTrack.durationMs; 
-              const existingArtist = existingUniqueTrack.allArtists || existingUniqueTrack.artistName || "";
+    const BATCH_PROCESS_SIZE = 200; 
 
-              let areDuplicatesByNewRules = false;
+    for (let i = 0; i < sortedInputTracks.length; i++) {
+        if (i % BATCH_PROCESS_SIZE === 0 && i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
 
-              const normalizeAndSplitArtists = (artistStr) => {
-                  const clean = (name) => name.toLowerCase().replace(/[.&]/g, '').replace(/\s+/g, ' ').trim();
-                  return artistStr.split(',').map(a => clean(a.trim()));
-              };
-              
-              const candidateArtistSet = new Set(normalizeAndSplitArtists(candidateArtist));
-              const existingArtistSet = new Set(normalizeAndSplitArtists(existingArtist));
-              
-              const artistsOverlap = candidateArtist && existingArtist && 
-                  ([...candidateArtistSet].some(artist => existingArtistSet.has(artist)));
+        const candidateTrack = sortedInputTracks[i];
+        let isConsideredDuplicateOfAnExistingUnique = false;
 
-              if (candidateHasValidPlayCount && existingHasValidPlayCount) {
-                  if (Number(candidateTrack.playCount) === Number(existingUniqueTrack.playCount)) {
-                      
-                      if (!areDuplicatesByNewRules && 
-                          candidateRawTitle.trim().toLowerCase() === existingRawTitle.trim().toLowerCase() &&
-                          artistsOverlap) {
-                          areDuplicatesByNewRules = true;
-                      }
+        const candidateRawTitle = candidateTrack.songTitle || candidateTrack.name || "Unknown Title";
+        const candidateDuration = candidateTrack.durationMs;
+        const candidateArtist = candidateTrack.allArtists || candidateTrack.artistName || "";
+        
+        const candTokens = getTokens(candidateRawTitle);
+        const candidateCleanTitle = getCleanTitle(candidateRawTitle);
+        
+        const potentialMatches = new Set();
+        
+        if (candTokens.length === 0) {
+            for (let k = 0; k < fallbackBucket.length; k++) {
+                potentialMatches.add(fallbackBucket[k]);
+            }
+        } else {
+            for (let t = 0; t < candTokens.length; t++) {
+                const token = candTokens[t];
+                const bucket = wordBuckets.get(token);
+                if (bucket) {
+                    for (let k = 0; k < bucket.length; k++) {
+                        potentialMatches.add(bucket[k]);
+                    }
+                }
+            }
+        }
+        
+        for (const existingUniqueTrack of potentialMatches) {
+            const candidateHasValidPlayCount = candidateTrack.playCount !== "N/A" &&
+                                              candidateTrack.playCount !== 0 &&
+                                              candidateTrack.playCount !== null &&
+                                              candidateTrack.playCount !== undefined;
+            const existingHasValidPlayCount = existingUniqueTrack.playCount !== "N/A" &&
+                                              existingUniqueTrack.playCount !== 0 &&
+                                              existingUniqueTrack.playCount !== null &&
+                                              existingUniqueTrack.playCount !== undefined;
 
-                      if (!areDuplicatesByNewRules && artistsOverlap) {
-                          const hasVersionKeyword = versionRegex.test(candidateRawTitle) || versionRegex.test(existingRawTitle);
-                          if (hasVersionKeyword) {
-                              const cleanCandidateTitle = getCleanTitle(candidateRawTitle);
-                              const cleanExistingTitle = getCleanTitle(existingRawTitle);
-                              if (cleanCandidateTitle === cleanExistingTitle) {
-                                  areDuplicatesByNewRules = true;
-                              }
-                          }
-                      }
+            const existingRawTitle = existingUniqueTrack.songTitle || existingUniqueTrack.name || "Unknown Title";
+            const existingDuration = existingUniqueTrack.durationMs; 
+            const existingArtist = existingUniqueTrack.allArtists || existingUniqueTrack.artistName || "";
 
-                      if (!areDuplicatesByNewRules && artistsOverlap) {
-                          const durationDiff = Math.abs(candidateDuration - existingDuration);
-                          if (durationDiff <= DURATION_THRESHOLD) {
-                              areDuplicatesByNewRules = true;
-                          }
-                      }
-                  }
-              } else {
-                  const normalizedCandidateTitle = getNormalizedTitle(candidateRawTitle);
-                  const normalizedExistingTitle = getNormalizedTitle(existingRawTitle);
+            let areDuplicatesByNewRules = false;
+            
+            const candidateArtistSet = new Set(normalizeAndSplitArtists(candidateArtist));
+            const existingArtistSet = new Set(normalizeAndSplitArtists(existingArtist));
+            
+            const artistsOverlap = candidateArtist && existingArtist && 
+                ([...candidateArtistSet].some(artist => existingArtistSet.has(artist)));
 
-                  if (normalizedCandidateTitle === normalizedExistingTitle && artistsOverlap) {
-                      if (candidateDuration === existingDuration) {
-                          areDuplicatesByNewRules = true;
-                      }
-                  }
-              }
+            if (candidateHasValidPlayCount && existingHasValidPlayCount) {
+                if (Number(candidateTrack.playCount) === Number(existingUniqueTrack.playCount)) {
+                    
+                    if (!areDuplicatesByNewRules && 
+                        candidateRawTitle.trim().toLowerCase() === existingRawTitle.trim().toLowerCase() &&
+                        artistsOverlap) {
+                        areDuplicatesByNewRules = true;
+                    }
 
-              if (areDuplicatesByNewRules) {
-                  isConsideredDuplicateOfAnExistingUnique = true;
-                  break;
-              }
-          }
+                    if (!areDuplicatesByNewRules && artistsOverlap) {
+                        const hasVersionKeyword = versionRegex.test(candidateRawTitle) || versionRegex.test(existingRawTitle);
+                        if (hasVersionKeyword) {
+                            const cleanExistingTitle = getCleanTitle(existingRawTitle);
+                            if (candidateCleanTitle === cleanExistingTitle) {
+                                areDuplicatesByNewRules = true;
+                            }
+                        }
+                    }
 
-          if (!isConsideredDuplicateOfAnExistingUnique) {
-              const startIsrc = Date.now();
-              const candidateCleanTitle = getCleanTitle(candidateTrack.songTitle || candidateTrack.name || "");
-              
-              const titleMatch = finalUniqueTracks.find(t => 
-                  getCleanTitle(t.songTitle || t.name || "") === candidateCleanTitle
-              );
+                    if (!areDuplicatesByNewRules && artistsOverlap) {
+                        const durationDiff = Math.abs(candidateDuration - existingDuration);
+                        if (durationDiff <= DURATION_THRESHOLD) {
+                            areDuplicatesByNewRules = true;
+                        }
+                    }
+                }
+            } else {
+                const normalizedCandidateTitle = getNormalizedTitle(candidateRawTitle);
+                const normalizedExistingTitle = getNormalizedTitle(existingRawTitle);
 
-              if (titleMatch) {
-                  const cId = candidateTrack.uri.split(':')[2];
-                  const eId = titleMatch.uri.split(':')[2];
-                  if (cId && eId) {
-                      const [cIsrc, eIsrc] = await Promise.all([fetchIsrc(cId), fetchIsrc(eId)]);
-                      if (cIsrc && eIsrc && cIsrc === eIsrc) {
-                          isConsideredDuplicateOfAnExistingUnique = true;
-                      }
-                  }
-              }
-              isrcTimeAccumulator += (Date.now() - startIsrc);
-          }
+                if (normalizedCandidateTitle === normalizedExistingTitle && artistsOverlap) {
+                    if (candidateDuration === existingDuration) {
+                        areDuplicatesByNewRules = true;
+                    }
+                }
+            }
 
-          if (isConsideredDuplicateOfAnExistingUnique) {
-              finalRemovedTracks.push(candidateTrack);
-          } else {
-              finalUniqueTracks.push(candidateTrack);
-          }
-      }
+            if (areDuplicatesByNewRules) {
+                isConsideredDuplicateOfAnExistingUnique = true;
+                break;
+            }
+        }
 
-      return { unique: finalUniqueTracks, removed: finalRemovedTracks };
+        if (!isConsideredDuplicateOfAnExistingUnique) {
+            const titleMatches = cleanTitleBuckets.get(candidateCleanTitle);
+            
+            if (titleMatches && titleMatches.length > 0) {
+                const titleMatch = titleMatches[0];
+                const cId = candidateTrack.uri.split(':')[2];
+                const eId = titleMatch.uri.split(':')[2];
+                if (cId && eId) {
+                    const [cIsrc, eIsrc] = await Promise.all([fetchIsrc(cId), fetchIsrc(eId)]);
+                    if (cIsrc && eIsrc && cIsrc === eIsrc) {
+                        isConsideredDuplicateOfAnExistingUnique = true;
+                    }
+                }
+            }
+        }
+
+        if (isConsideredDuplicateOfAnExistingUnique) {
+            finalRemovedTracks.push(candidateTrack);
+        } else {
+            finalUniqueTracks.push(candidateTrack);
+
+            if (!cleanTitleBuckets.has(candidateCleanTitle)) {
+                cleanTitleBuckets.set(candidateCleanTitle, []);
+            }
+            cleanTitleBuckets.get(candidateCleanTitle).push(candidateTrack);
+            
+            if (candTokens.length === 0) {
+                fallbackBucket.push(candidateTrack);
+            } else {
+                for (let t = 0; t < candTokens.length; t++) {
+                    const token = candTokens[t];
+                    if (!wordBuckets.has(token)) {
+                        wordBuckets.set(token, []);
+                    }
+                    wordBuckets.get(token).push(candidateTrack);
+                }
+            }
+        }
+    }
+
+    return { unique: finalUniqueTracks, removed: finalRemovedTracks };
   }
 
   async function handleScrobblesSorting(tracks, sortType, updateProgress) {
