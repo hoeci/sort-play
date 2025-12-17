@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.38.0";
+  const SORT_PLAY_VERSION = "5.38.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -13318,7 +13318,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return;
             }
 
-            const limitEnabled = document.getElementById('limit-tracks-toggle').checked;
+            const limitEnabled = modalContainer.querySelector('#limit-tracks-toggle').checked;
             if (limitEnabled) {
                 modalContainer.querySelectorAll('.source-limit-input').forEach(input => {
                     const index = parseInt(input.dataset.index, 10);
@@ -13339,13 +13339,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 });
             }
 
-            const scheduleValue = document.getElementById('schedule-select').value;
+            const scheduleValue = modalContainer.querySelector('#schedule-select').value;
             const jobData = {
                 sources: sources,
                 limitEnabled: limitEnabled,
-                targetPlaylistName: document.getElementById('playlist-name-input').value.trim(),
-                updateMode: document.getElementById('update-mode-select').value,
-                sortType: document.getElementById('sort-type-select').value,
+                targetPlaylistName: modalContainer.querySelector('#playlist-name-input').value.trim(),
+                updateMode: modalContainer.querySelector('#update-mode-select').value,
+                sortType: modalContainer.querySelector('#sort-type-select').value,
                 deduplicate: currentDeduplicate,
                 updateFromSource: currentUpdateFromSource,
                 schedule: isNaN(parseInt(scheduleValue)) ? scheduleValue : parseInt(scheduleValue),
@@ -18291,7 +18291,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   mainButton.style.display = "flex";
   mainButton.style.justifyContent = "center";
   mainButton.style.alignItems = "center";
-  mainButton.style.transition = "min-width 0.2s ease, background-color 0.1s ease, color 0.1s ease";
+  mainButton.style.transition = "min-width 0.2s ease, background-color 0.2s ease, color 0.2s ease";
 
   const threeDotsSvg = `
     <svg width="15px" height="15px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
