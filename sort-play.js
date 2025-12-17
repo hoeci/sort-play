@@ -18283,7 +18283,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   mainButton.style.border = "none";
   mainButton.style.padding = "4px 10px";
   mainButton.style.fontWeight = "400";
-  mainButton.style.fontSize = "13px";
+  mainButton.style.fontSize = "14px";
   mainButton.style.height = "30px";  
   mainButton.style.overflow = "hidden";
   mainButton.style.width = "auto";
@@ -18291,7 +18291,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   mainButton.style.display = "flex";
   mainButton.style.justifyContent = "center";
   mainButton.style.alignItems = "center";
-  mainButton.style.transition = "min-width 0.2s ease, background-color 0.2s ease, color 0.2s ease";
+  mainButton.style.transition = "min-width 0.2s ease, background-color 0.1s ease, color 0.1s ease";
 
   const threeDotsSvg = `
     <svg width="15px" height="15px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
