@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.0";
+  const SORT_PLAY_VERSION = "5.39.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -24682,6 +24682,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return { unique: tracks, removed: [] };
     }
 
+    const fastYield = () => new Promise(resolve => {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = resolve;
+        channel.port2.postMessage(null);
+    });
+
     const tracksWithIds = tracks.filter(t => t.uri.startsWith("spotify:track:"));
     const trackIds = tracksWithIds.map(t => t.uri.split(":")[2]);
     const uniqueTrackIds = [...new Set(trackIds)];
@@ -24857,7 +24863,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     for (let i = 0; i < sortedInputTracks.length; i++) {
         if (i % BATCH_PROCESS_SIZE === 0 && i > 0) {
-            await new Promise(resolve => setTimeout(resolve, 0));
+            await fastYield();
             updateProgress(Math.floor((i / sortedInputTracks.length) * 100));
         }
 
@@ -24899,7 +24905,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         for (let m = 0; m < potentialMatchesArray.length; m++) {
             if (m > 0 && m % MATCH_BATCH_SIZE === 0) {
-                await new Promise(resolve => setTimeout(resolve, 0));
+                await fastYield();
             }
             
             const existingUniqueTrack = potentialMatchesArray[m];
