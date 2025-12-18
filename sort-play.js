@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.1";
+  const SORT_PLAY_VERSION = "5.39.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -53,6 +53,7 @@
   let chatPanelVisible = false;
   let userMarketPromise = null;
   let useEnergyWaveShuffle = false;
+  let energyWaveShuffleLimit = 6000;
   let showLikeButton = false;
   let likeButton_connectObserver = () => {};
   let showNowPlayingData = false;
@@ -100,6 +101,7 @@
   const STORAGE_KEY_USER_ADDED_GENRES = "sort-play-user-added-genres";
   const STORAGE_KEY_RANDOM_GENRE_HISTORY = "sort-play-random-genre-history";
   const STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE = "sort-play-use-energy-wave-shuffle";
+  const STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT = "sort-play-energy-wave-shuffle-limit";
   const STORAGE_KEY_SHOW_NOW_PLAYING_DATA = "sort-play-show-now-playing-data";
   const STORAGE_KEY_NOW_PLAYING_DATA_TYPE = "sort-play-now-playing-data-type";
   const STORAGE_KEY_NOW_PLAYING_DATA_POSITION = "sort-play-now-playing-data-position";
@@ -905,6 +907,7 @@
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
     showLikeButton = localStorage.getItem("sort-play-show-like-button") === "true";
     useEnergyWaveShuffle = localStorage.getItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE) === "true";
+    energyWaveShuffleLimit = parseInt(localStorage.getItem(STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT), 10) || 6000;
     showNowPlayingData = localStorage.getItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA) === "true";
     selectedNowPlayingDataType = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DATA_TYPE) || 'releaseDate';
     selectedNowPlayingDataPosition = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DATA_POSITION) || '.main-trackInfo-name';
@@ -965,6 +968,7 @@
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
     localStorage.setItem("sort-play-show-like-button", showLikeButton);
     localStorage.setItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE, useEnergyWaveShuffle);
+    localStorage.setItem(STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT, energyWaveShuffleLimit);
     localStorage.setItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA, showNowPlayingData);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_DATA_TYPE, selectedNowPlayingDataType);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_DATA_POSITION, selectedNowPlayingDataPosition);
@@ -1828,6 +1832,9 @@
             </span>
         </label>
         <div class="col action">
+            <button id="energyWaveSettingsBtn" class="column-settings-button" title="Configure Vibe & Flow">
+                ${settingsSvg}
+            </button>
             <label class="switch" id="useEnergyWaveShuffleSwitchLabel">
                 <input type="checkbox" id="useEnergyWaveShuffleToggle" ${useEnergyWaveShuffle ? 'checked' : ''}>
                 <span class="sliderx"></span>
@@ -2620,9 +2627,18 @@
         }
     });
 
+    energyWaveSettingsBtn.disabled = !useEnergyWaveShuffleToggle.checked;
+
     useEnergyWaveShuffleToggle.addEventListener("change", () => {
         useEnergyWaveShuffle = useEnergyWaveShuffleToggle.checked;
+        energyWaveSettingsBtn.disabled = !useEnergyWaveShuffle;
         saveSettings();
+    });
+    
+    energyWaveSettingsBtn.addEventListener("click", () => {
+        if (!energyWaveSettingsBtn.disabled) {
+            showEnergyWaveSettingsModal();
+        }
     });
     
     sortCurrentPlaylistToggle.addEventListener("change", () => {
@@ -2962,6 +2978,70 @@
     });
   }
 
+
+  function showEnergyWaveSettingsModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-energy-wave-settings-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2005;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        width: 420px !important;
+        border-radius: 30px;
+        overflow: hidden; 
+        background-color: #181818 !important;
+        border: 2px solid #282828;
+        display: flex;
+        flex-direction: column;
+    `;
+
+    modalContainer.innerHTML = `
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Vibe & Flow Config</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px 20px !important;">
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+                  <label for="energyWaveLimitInput" style="color: #c1c1c1; font-size: 14px;">Max tracks for 'Shuffle and Play':</label>
+                  <input type="number" id="energyWaveLimitInput" value="${energyWaveShuffleLimit}" 
+                        style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
+                  <span style="font-size: 12px; color: #888; line-height: 1.4;">If a playlist exceeds this size, standard shuffle will be used instead to avoid long wait times. Normal sorting is unaffected.</span>
+              </div>
+              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+                  <button id="cancelEnergyWave" class="main-buttons-button" style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase;">Cancel</button>
+                  <button id="saveEnergyWave" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase;">Save</button>
+              </div>
+          </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+    const input = document.getElementById("energyWaveLimitInput");
+    input.focus();
+
+    const closeModal = () => overlay.remove();
+
+    document.getElementById("saveEnergyWave").addEventListener("click", () => {
+      const newLimit = parseInt(input.value, 10);
+      if (!isNaN(newLimit) && newLimit > 0) {
+        energyWaveShuffleLimit = newLimit;
+        saveSettings();
+        closeModal();
+      } else {
+          showNotification("Please enter a valid number.", true);
+      }
+    });
+
+    document.getElementById("cancelEnergyWave").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  }
+  
   function showFolderNameModal() {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-folder-name-overlay";
@@ -3281,6 +3361,7 @@
     const tempoFormatSelect = modalContainer.querySelector("#npTempoFormatSelect");
     const energySettings = modalContainer.querySelector("#np-energy-settings");
     const energyFormatSelect = modalContainer.querySelector("#npEnergyFormatSelect");
+    const energyWaveSettingsBtn = modalContainer.querySelector("#energyWaveSettingsBtn");
     const danceabilitySettings = modalContainer.querySelector("#np-danceability-settings");
     const danceabilityFormatSelect = modalContainer.querySelector("#npDanceabilityFormatSelect");
     const valenceSettings = modalContainer.querySelector("#np-valence-settings");
@@ -4140,7 +4221,7 @@
                         countEl.textContent = count.toLocaleString();
                         statEl.style.opacity = '1';
                     } else if (currentVal !== count) {
-                        animateValue(countEl, currentVal, count, 1500);
+                        animateValue(countEl, currentVal, count, 1000);
                     }
                 }
             });
@@ -19464,7 +19545,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     let finalSortedTracks;
 
-    if (useEnergyWaveShuffle && !containsLocalFiles) {
+    if (useEnergyWaveShuffle && !containsLocalFiles && tracks.length <= energyWaveShuffleLimit) {
         showNotification("Performing Randomized Energy Wave Shuffle...");
         
         const trackIds = tracksToProcess.map(t => t.trackId || t.uri.split(":")[2]);
@@ -19473,11 +19554,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             ...track,
             features: allStats[track.trackId || track.uri.split(":")[2]]
         }));
-
+    
         finalSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
     } else {
-        if (useEnergyWaveShuffle && containsLocalFiles) {
-            showNotification("Local files detected. Reverting to standard shuffle.", 'warning');
+        if (useEnergyWaveShuffle) {
+            if (containsLocalFiles) {
+                showNotification("Local files detected. Reverting to standard shuffle.", 'warning');
+            } else if (tracks.length > energyWaveShuffleLimit) {
+                showNotification(`Playlist too large (>${energyWaveShuffleLimit}). Reverting to standard shuffle.`, 'warning');
+            }
         }
         finalSortedTracks = shuffleArray(tracksToProcess);
     }
@@ -25324,6 +25409,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             event.stopPropagation();
             showSettingsModal();
         });
+    } else if (buttonStyle.type === "parent" || buttonStyle.type === "divider") {
+        return;
     } else if (buttonStyle.sortType === "customFilter") {
         element.addEventListener("click", (event) => {
             event.stopPropagation();
