@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.4";
+  const SORT_PLAY_VERSION = "5.39.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -1414,7 +1414,7 @@
 
   function positionChatPanel(chatPanel) {
     if (!chatPanel) return;
-    const settingsModal = document.querySelector(".GenericModal > .main-embedWidgetGenerator-container");
+    const settingsModal = document.querySelector(".GenericModal > .main-embedWidgetGenerator-container") || document.querySelector(".sort-play-settings");
     if (!settingsModal) return;
 
     const modalRect = settingsModal.getBoundingClientRect();
@@ -1422,7 +1422,7 @@
     const panelWidth = chatPanel.offsetWidth;
     const gap = 10;
 
-    let top = modalRect.bottom - panelHeight;
+    let top = modalRect.bottom - panelHeight - 2;
     let left = modalRect.right + gap;
 
     if (left + panelWidth > window.innerWidth - gap) {
@@ -1451,38 +1451,56 @@
   const arrowRightIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.2328 16.4569C12.9328 16.7426 12.9212 17.2173 13.2069 17.5172C13.4926 17.8172 13.9673 17.8288 14.2672 17.5431L13.2328 16.4569ZM19.5172 12.5431C19.8172 12.2574 19.8288 11.7827 19.5431 11.4828C19.2574 11.1828 18.7827 11.1712 18.4828 11.4569L19.5172 12.5431ZM18.4828 12.5431C18.7827 12.8288 19.2574 12.8172 19.5431 12.5172C19.8288 12.2173 19.8172 11.7426 19.5172 11.4569L18.4828 12.5431ZM14.2672 6.4569C13.9673 6.17123 13.4926 6.18281 13.2069 6.48276C12.9212 6.78271 12.9328 7.25744 13.2328 7.5431L14.2672 6.4569ZM19 12.75C19.4142 12.75 19.75 12.4142 19.75 12C19.75 11.5858 19.4142 11.25 19 11.25V12.75ZM5 11.25C4.58579 11.25 4.25 11.5858 4.25 12C4.25 12.4142 4.58579 12.75 5 12.75V11.25ZM14.2672 17.5431L19.5172 12.5431L18.4828 11.4569L13.2328 16.4569L14.2672 17.5431ZM19.5172 11.4569L14.2672 6.4569L13.2328 7.5431L18.4828 12.5431L19.5172 11.4569ZM19 11.25L5 11.25V12.75L19 12.75V11.25Z" fill="currentColor"/></svg>`;
 
   function showSettingsModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-settings-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    `;
+
     const modalContainer = document.createElement("div");
-    modalContainer.className = "sort-play-settings";
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-settings sort-play-font-scope";
+    modalContainer.style.cssText = `
+        width: 550px !important;
+        border-radius: 30px;
+        overflow: hidden;
+        border: 2px solid #282828;
+        background-color: #181818 !important;
+        display: flex; 
+        flex-direction: column;
+        max-height: 90vh;
+        z-index: 2003;
+    `;
+
+    const closeModal = () => {
+        overlay.style.opacity = "0";
+        setTimeout(() => overlay.remove(), 200);
+    };
+
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeModal();
+    });
+
+    const headerHtml = `
+      <div class="main-trackCreditsModal-header" style="padding: 29px 32px 19px 32px !important; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 30px; color: white;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span></h1>
+          <button class="main-trackCreditsModal-closeBtn" id="closeSettingsModal" aria-label="Close" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center;">
+            <svg width="20" height="20" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+          </button>
+      </div>
+    `;
+
     modalContainer.innerHTML = `
     <style>
-    .GenericModal__overlay .main-embedWidgetGenerator-container {
-      max-height: 90vh !important;
-    }
-
-    .GenericModal > .main-embedWidgetGenerator-container {
-      height: auto !important;
-    } 
-
-    .main-embedWidgetGenerator-container {
-      width: 550px !important;
-      border-radius: 30px;
-      overflow: hidden;
-      border: 2px solid #282828;
-      background-color: #181818 !important;
-      display: flex; 
-      flex-direction: column;
-    }
-    .GenericModal__overlay {
-      backdrop-filter: blur(5px);
-      -webkit-backdrop-filter: blur(5px);
-    }
-    .GenericModal__overlay .GenericModal {
-      border-radius: 30px;
-      overflow: hidden;
-    }
     .main-trackCreditsModal-mainSection {
       overflow-y: auto !important; 
-      padding: 16px 25px 0 25px;
+      padding: 16px 45px 16px 45px;
       flex-grow: 1; 
        scrollbar-width: thin;
        scrollbar-color: #333333 #181818;
@@ -1503,7 +1521,7 @@
     }
     .sort-play-settings-footer {
         flex-shrink: 0;
-        padding: 15px 25px 20px 25px; 
+        padding: 10px 25px 12px 25px; 
         background-color: #181818; 
         border-top: 1px solid #282828;
         display: flex;
@@ -1518,10 +1536,6 @@
     .sort-play-settings-footer .support-me-button {
         position: absolute;
         left: 25px;
-    }
-    .sort-play-settings-footer .live-chat-button {
-        position: absolute;
-        right: 25px;
     }
     .sort-play-settings-footer .github-link-container a {
         color: #1ED760;
@@ -1571,19 +1585,6 @@
         height: 100%;
         border: none;
         border-radius: 13px;
-    }
-    .sort-play-settings-footer .github-link-container a {
-        color: #1ED760;
-        font-size: 14px;
-        text-decoration: none;
-    }
-    .main-trackCreditsModal-header {
-      padding: 27px 32px 12px !important;
-      flex-shrink: 0;
-    }
-    .main-trackCreditsModal-originalCredits{
-      padding: 0 22px 20px 22px !important;
-      flex-shrink: 0; 
     }
     .sort-play-settings .col {
         padding: 0;
@@ -1718,7 +1719,12 @@
         font-size: 14px;
         text-decoration: none;
     }
+    .main-trackCreditsModal-closeBtn:hover { 
+        color: #ffffff; 
+    }
     </style>
+    ${headerHtml}
+    <div class="main-trackCreditsModal-mainSection">
     <div style="display: flex; flex-direction: column; gap: 8px;">
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 8px;">
@@ -2306,57 +2312,50 @@
             </label>
         </div>
     </div>
+    </div>
+    </div>
+    <div class="sort-play-settings-footer">
+        <button id="supportMeBtn" class="footer-icon-button support-me-button" title="Support Sort-Play">
+            ${coffeeIconSVG}
+        </button>
+        <div class="github-link-container">
+            <a href="https://github.com/hoeci/sort-play" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
+        </div>
+        <button id="liveChatBtn" class="footer-icon-button live-chat-button" title="Live Chat">
+            ${liveChatIconSVG}
+        </button>
+    </div>
     `;
 
-    Spicetify.PopupModal.display({
-        title: `<span style='font-size: 30px; color: white;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span>`,
-        content: modalContainer,
-        isLarge: true,
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+        });
     });
-    tagActiveModalWithFontScope();
 
-    const modalRootElement = document.querySelector(".main-embedWidgetGenerator-container");
-    if (modalRootElement) {
-        const existingFooter = modalRootElement.querySelector(".sort-play-settings-footer");
-        if (existingFooter) {
-            existingFooter.remove();
-        }
-        const footerElement = document.createElement("div");
-        footerElement.className = "sort-play-settings-footer";
-        footerElement.innerHTML = `
-            <button id="supportMeBtn" class="footer-icon-button support-me-button" title="Support Sort-Play">
-                ${coffeeIconSVG}
-            </button>
-            <div class="github-link-container">
-                <a href="https://github.com/hoeci/sort-play" target="_blank">Star on GitHub, report bugs, and suggest features!</a>
-            </div>
-            <button id="liveChatBtn" class="footer-icon-button live-chat-button" title="Live Chat">
-                ${liveChatIconSVG}
-            </button>
-        `;
-        modalRootElement.appendChild(footerElement);
+    const liveChatBtn = modalContainer.querySelector("#liveChatBtn");
+    const supportMeBtn = modalContainer.querySelector("#supportMeBtn");
 
-        const liveChatBtn = footerElement.querySelector("#liveChatBtn");
-        const supportMeBtn = footerElement.querySelector("#supportMeBtn");
+    supportMeBtn.addEventListener("click", () => {
+        showSupportModal();
+    });
 
-        supportMeBtn.addEventListener("click", () => {
-            showSupportModal();
-        });
-
-        if (chatPanelVisible) {
-            const chatPanel = createAndInitializeChatPanel();
-            positionChatPanel(chatPanel);
-            setTimeout(() => {
-                const panel = document.getElementById('sort-play-chat-panel');
-                if (panel) panel.classList.add('visible');
-            }, 10);
-            liveChatBtn.classList.add('active');
-        }
-
-        liveChatBtn.addEventListener("click", () => {
-            toggleChatPanel();
-        });
+    if (chatPanelVisible) {
+        const chatPanel = createAndInitializeChatPanel();
+        positionChatPanel(chatPanel);
+        setTimeout(() => {
+            const panel = document.getElementById('sort-play-chat-panel');
+            if (panel) panel.classList.add('visible');
+        }, 10);
+        liveChatBtn.classList.add('active');
     }
+
+    liveChatBtn.addEventListener("click", () => {
+        toggleChatPanel();
+    });
 
     if (isMenuOpen) {
       closeAllMenus();
@@ -2368,6 +2367,8 @@
     }
     
     preventDragCloseModal();
+
+    modalContainer.querySelector("#closeSettingsModal").addEventListener("click", closeModal);
 
     const showAdditionalColumnToggle = modalContainer.querySelector("#showAdditionalColumnToggle");
     const showAlbumColumnToggle = modalContainer.querySelector("#showAlbumColumnToggle");
@@ -3667,6 +3668,8 @@
         -webkit-backdrop-filter: blur(15px);
         z-index: 2002;
         display: flex; justify-content: center; align-items: center;
+        opacity: 0;
+        transition: opacity 0.2s ease;
     `;
 
     const modalContainer = document.createElement("div");
@@ -4186,6 +4189,12 @@
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
 
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+        });
+    });
+
     const animateValue = (obj, start, end, duration) => {
         if (start === end) return;
         let startTimestamp = null;
@@ -4228,7 +4237,10 @@
         })
         .catch(() => {});
 
-    const closeModal = () => overlay.remove();
+    const closeModal = () => {
+        overlay.style.opacity = "0";
+        setTimeout(() => overlay.remove(), 200);
+    };
 
     modalContainer.querySelectorAll('.slim-card').forEach(card => {
         card.addEventListener('click', async (e) => {
@@ -5162,6 +5174,7 @@
           "averageColor",
           "deduplicateOnly",
           "filterLiked",
+          "keepLiked",
           "filterSingles",
           "filterAlbums",
           "energyWave",
@@ -12023,6 +12036,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         background-color: rgba(0, 0, 0, 0.7);
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         z-index: 2002; display: flex; justify-content: center; align-items: center;
+        opacity: 0; transition: opacity 0.2s ease;
     `;
 
     const modalContainer = document.createElement("div");
@@ -12035,7 +12049,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
     modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
 
-    const closeModal = () => overlay.remove();
+    const closeModal = () => {
+        overlay.style.opacity = "0";
+        setTimeout(() => overlay.remove(), 200);
+    };
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
             e.preventDefault();
@@ -12301,6 +12318,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 .dynamic-playlist-modal .main-button-primary:hover {
                     background-color: #3BE377;
                 }
+                @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+                .dynamic-playlist-modal { animation: fadeIn 0.2s ease; }
             </style>
             <div class="dynamic-playlist-modal">
                 <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
@@ -12332,9 +12351,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 img.addEventListener('load', showImage);
             }
         });
-
+        
         modalContainer.querySelector('#closeDynamicPlaylistModal').addEventListener('click', closeModal);
-        modalContainer.querySelector('#create-new-job-btn').addEventListener('click', () => renderJobForm());
+        modalContainer.querySelector('#create-new-job-btn').addEventListener('click', () => {
+            const content = modalContainer.shadowRoot.querySelector('.dynamic-playlist-modal');
+            if (content) {
+                content.style.transition = 'opacity 0.2s ease';
+                content.style.opacity = '0';
+                setTimeout(() => renderJobForm(), 200);
+            } else {
+                renderJobForm();
+            }
+        });
         
         modalContainer.querySelectorAll('.job-run-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
@@ -12365,7 +12393,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const jobId = e.currentTarget.dataset.jobId;
                 const jobToEdit = jobs.find(j => j.id === jobId);
                 if (jobToEdit) {
-                    renderJobForm(jobToEdit);
+                    const content = modalContainer.shadowRoot.querySelector('.dynamic-playlist-modal');
+                    if (content) {
+                        content.style.transition = 'opacity 0.2s ease';
+                        content.style.opacity = '0';
+                        setTimeout(() => renderJobForm(jobToEdit), 200);
+                    } else {
+                        renderJobForm(jobToEdit);
+                    }
                 }
             });
         });
@@ -12486,7 +12521,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         })();
     };
 
-    const renderJobForm = async (jobToEdit = null) => {
+    const renderJobForm = (jobToEdit = null) => {
         if (!userLibraryPromise) {
             userLibraryPromise = fetchUserLibrary();
         }
@@ -12498,34 +12533,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let currentDeduplicate = isEditing ? jobToEdit.deduplicate : playlistDeduplicate;
         let currentUpdateFromSource = isEditing ? jobToEdit.updateFromSource : (localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === null ? true : localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === 'true');
         
-        if (!isEditing && sources.length === 0) {
-            let sourceUri = getCurrentUri();
-            if (sourceUri && !isLocalFilesPage(sourceUri)) {
-                try {
-                    let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false, totalTracks = 'N/A';
-                    if (URI.isPlaylistV1OrV2(sourceUri)) {
-                        const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`);
-                        sourceName = data.name; 
-                        const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
-                        sourceInfo = `Playlist by ${ownerName}`; 
-                        sourceCoverUrl = data.images[0]?.url; 
-                        totalTracks = data.tracks.total;
-                    } else if (URI.isArtist(sourceUri)) {
-                        const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`);
-                        sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = 'N/A';
-                    } else if (isLikedSongsPage(sourceUri)) {
-                        sourceName = "Liked Songs"; sourceInfo = "Your collection"; sourceCoverUrl = 'https://misc.scdn.co/liked-songs/liked-songs-640.png';
-                        const likedSongs = await getLikedSongs();
-                        totalTracks = likedSongs.length;
-                    } else if (URI.isAlbum(sourceUri)) {
-                        const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-                        sourceName = data.name; sourceInfo = `Album by ${data.artists.map(a => a.name).join(', ')}`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = data.tracks.total;
-                    }
-                    sources.push({ uri: sourceUri, name: sourceName, info: sourceInfo, coverUrl: sourceCoverUrl, isStatic: isStaticSource, totalTracks: totalTracks });
-                } catch (e) { console.error("Could not fetch source details", e); }
-            }
-        }
-
         const savedSortType = localStorage.getItem(STORAGE_KEY_DYNAMIC_SORT_TYPE) || 'playCount';
         const savedSchedule = localStorage.getItem(STORAGE_KEY_DYNAMIC_SCHEDULE) || '86400000';
 
@@ -12817,6 +12824,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   background-color: #fff;
                   color: black;
               }
+              @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+              .job-form-modal { animation: fadeIn 0.2s ease; }
           </style>
             <div class="job-form-modal">
                 <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
@@ -13418,8 +13427,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             renderJobForm(jobToEdit); 
         });
 
-        modalContainer.querySelector('#closeDynamicPlaylistModal').addEventListener('click', renderJobList);
-        modalContainer.querySelector('#cancel-job-btn').addEventListener('click', renderJobList);
+        const transitionToList = () => {
+            const content = modalContainer.shadowRoot.querySelector('.job-form-modal');
+            if (content) {
+                content.style.transition = 'opacity 0.2s ease';
+                content.style.opacity = '0';
+                setTimeout(() => renderJobList(), 200);
+            } else {
+                renderJobList();
+            }
+        };
+
+        modalContainer.querySelector('#closeDynamicPlaylistModal').addEventListener('click', transitionToList);
+        modalContainer.querySelector('#cancel-job-btn').addEventListener('click', transitionToList);
         
         modalContainer.querySelector('#save-job-btn').addEventListener('click', (e) => {
             if (sources.length === 0) {
@@ -13464,7 +13484,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (isEditing) {
                 const updatedJob = { ...jobToEdit, ...jobData };
                 updateJob(updatedJob);
-                renderJobList();
+                transitionToList();
             } else {
                 const newJob = {
                     ...jobData,
@@ -13483,11 +13503,56 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 });
             }
         });
+
+        if (!isEditing && sources.length === 0) {
+            (async () => {
+                let sourceUri = getCurrentUri();
+                if (sourceUri && !isLocalFilesPage(sourceUri)) {
+                    try {
+                        let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false, totalTracks = 'N/A';
+                        if (URI.isPlaylistV1OrV2(sourceUri)) {
+                            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`);
+                            sourceName = data.name; 
+                            const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
+                            sourceInfo = `Playlist by ${ownerName}`; 
+                            sourceCoverUrl = data.images[0]?.url; 
+                            totalTracks = data.tracks.total;
+                        } else if (URI.isArtist(sourceUri)) {
+                            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`);
+                            sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = 'N/A';
+                        } else if (isLikedSongsPage(sourceUri)) {
+                            sourceName = "Liked Songs"; sourceInfo = "Your collection"; sourceCoverUrl = 'https://misc.scdn.co/liked-songs/liked-songs-640.png';
+                            const likedSongs = await getLikedSongs();
+                            totalTracks = likedSongs.length;
+                        } else if (URI.isAlbum(sourceUri)) {
+                            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
+                            sourceName = data.name; sourceInfo = `Album by ${data.artists.map(a => a.name).join(', ')}`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = data.tracks.total;
+                        }
+                        
+                        if (sourceName) {
+                            sources.push({ uri: sourceUri, name: sourceName, info: sourceInfo, coverUrl: sourceCoverUrl, isStatic: isStaticSource, totalTracks: totalTracks });
+                            renderSources();
+                            updateFormState();
+                            const limitToggle = modalContainer.querySelector('#limit-tracks-toggle');
+                            if (limitToggle && limitToggle.checked) {
+                                toggleLimitInputs(true);
+                            }
+                        }
+                    } catch (e) { console.error("Could not fetch source details", e); }
+                }
+            })();
+        }
     };
     
     renderJobList();
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+        });
+    });
   }
 
   const GENRE_MAPPINGS = {
@@ -13882,13 +13947,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         background-color: rgba(0, 0, 0, 0.7);
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         z-index: 2002; display: flex; justify-content: center; align-items: center;
-        opacity: 0; transition: opacity 0.1s ease;
+        opacity: 0; transition: opacity 0.2s ease;
     `;
 
-    const closeModal = () => overlay.remove();
-    if (isMenuOpen) {
-        closeAllMenus();
-    }
+    const closeModal = () => {
+        overlay.style.opacity = "0";
+        setTimeout(() => overlay.remove(), 200);
+    };
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
             e.preventDefault();
@@ -18295,10 +18360,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         text: "Quick Filters",
         sortType: "quickFiltersParent",
         children: [
-             { backgroundColor: "transparent", color: "white", text: "Deduplicate", sortType: "deduplicateOnly" },
-             { backgroundColor: "transparent", color: "white", text: "Exclude Liked Songs", sortType: "filterLiked" },
-             { backgroundColor: "transparent", color: "white", text: "Keep Only Singles", sortType: "filterSingles" },
-             { backgroundColor: "transparent", color: "white", text: "Keep Only Albums", sortType: "filterAlbums", hasInnerButton: true },
+             { backgroundColor: "transparent", color: "white", text: "Remove Duplicates", sortType: "deduplicateOnly" },
+             {
+                type: "divider",
+             },
+             { backgroundColor: "transparent", color: "white", text: "Remove Liked", sortType: "filterLiked" },
+             { backgroundColor: "transparent", color: "white", text: "Liked Only", sortType: "keepLiked" },
+             {
+                type: "divider",
+             },
+             { backgroundColor: "transparent", color: "white", text: "Singles Only", sortType: "filterSingles" },
+             { backgroundColor: "transparent", color: "white", text: "Albums Only", sortType: "filterAlbums", hasInnerButton: true },
         ]
       },
       {
@@ -18862,7 +18934,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           border: none;
           height: 1px;
           background-color: rgba(255, 255, 255, 0.1);
-          margin: 0;
+          margin: 0 auto;
         `;
         subMenu.appendChild(divider);
         return;
@@ -23200,6 +23272,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           sortType === "averageColor" ||
           sortType === "deduplicateOnly" ||
           sortType === "filterLiked" ||
+          sortType === "keepLiked" ||
           sortType === "filterSingles" ||
           sortType === "filterAlbums"
         ) {
@@ -23383,7 +23456,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const orderB = originalOrderMap.get(b.uri);
                 return orderA - orderB;
             });
-        } else if (sortType === "filterLiked") {
+        } else if (sortType === "filterLiked" || sortType === "keepLiked") {
             if (!isHeadless) mainButton.innerText = "Checking...";
             const likedSongs = await getLikedSongs();
             const likedSongUris = new Set(likedSongs.map(s => s.uri));
@@ -23409,14 +23482,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             
             sortedTracks = uniqueTracks
                 .filter(track => {
-                    if (likedSongUris.has(track.uri)) return false;
+                    let isLiked = likedSongUris.has(track.uri);
                     
-                    const meta = tracksWithMetadata.find(t => t.uri === track.uri);
-                    const isrc = meta?.track?.external_ids?.isrc;
+                    if (!isLiked) {
+                        const meta = tracksWithMetadata.find(t => t.uri === track.uri);
+                        const isrc = meta?.track?.external_ids?.isrc;
+                        if (isrc && likedIsrcSet.has(isrc)) isLiked = true;
+                    }
                     
-                    if (isrc && likedIsrcSet.has(isrc)) return false;
-                    
-                    return true;
+                    return sortType === "keepLiked" ? isLiked : !isLiked;
                 })
                 .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
                 
@@ -23668,6 +23742,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           averageColor: { fullName: "album color", shortName: "Color" },
           deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
           filterLiked: { fullName: "hiding liked songs", shortName: "Unliked" },
+          keepLiked: { fullName: "keeping only liked songs", shortName: "Liked Only" },
           filterSingles: { fullName: "singles only", shortName: "Singles" },
           filterAlbums: { fullName: "albums only", shortName: "Albums" },
           energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
@@ -25515,7 +25590,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         const { trackGenreMap, rawTrackGenres } = await fetchAllTrackGenres(
                             tracks
                         );
-                        await showGenreFilterModal(tracks, trackGenreMap, rawTrackGenres);
+                        const modalPromise = showGenreFilterModal(tracks, trackGenreMap, rawTrackGenres);
+                        setTimeout(() => resetButtons(), 100);
+                        await modalPromise;
                     };
         
                     await openModal();
@@ -25524,8 +25601,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     showNotification(
                         "An error occurred during the genre filtering process."
                     );
-                } finally {
                     resetButtons();
+                } finally {
                 }
             } else {
                 menuButtons.forEach((btn) => {
