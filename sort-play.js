@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.38.1";
+  const SORT_PLAY_VERSION = "5.39.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -6385,7 +6385,12 @@ sendButton.addEventListener("click", async () => {
         (progress) => { if (!isHeadless) mainButton.innerText = `${30 + Math.floor(progress * 0.60)}%`; }
     );
 
-    const { unique } = await deduplicateTracks(tracksWithPlayCounts, true, true);
+    const { unique } = await deduplicateTracks(
+        tracksWithPlayCounts, 
+        true, 
+        true,
+        (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+    );
     
     if (!isHeadless) mainButton.innerText = "Ready";
     return unique;
@@ -7355,8 +7360,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (valueB === "N/A") valueB = -Infinity;
 
             if (sortKey === 'releaseDate') {
-                valueA = valueA ? new Date(valueA).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
-                valueB = valueB ? new Date(valueB).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
+                const dateA = valueA ? new Date(valueA).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
+                const dateB = valueB ? new Date(valueB).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
+                
+                if (dateA !== dateB) {
+                    return direction === 'ascending' ? dateA - dateB : dateB - dateA;
+                }
+                
+                const albumA = (a.albumName || "").toLowerCase();
+                const albumB = (b.albumName || "").toLowerCase();
+                const albumCompare = albumA.localeCompare(albumB);
+                if (albumCompare !== 0) return albumCompare;
+
+                return (a.trackNumber || 0) - (b.trackNumber || 0);
             }
 
             if (typeof valueA === 'string' && typeof valueB === 'string') {
@@ -10234,7 +10250,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
     }
 
-    const { unique: uniqueTracks } = deduplicate ? await deduplicateTracks(tracksForProcessing, false, sources.some(s => URI.isArtist(s.uri))) : { unique: tracksForProcessing, removed: [] };
+    const { unique: uniqueTracks } = deduplicate ? await deduplicateTracks(
+        tracksForProcessing, 
+        false, 
+        sources.some(s => URI.isArtist(s.uri)),
+        (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+    ) : { unique: tracksForProcessing, removed: [] };
 
     let sortedTracks;
     switch (sortType) {
@@ -10256,7 +10277,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             sortedTracks = uniqueTracks.sort((a, b) => {
                 const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
                 const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-                return valB - valA;
+                if (valA !== valB) return valB - valA;
+
+                const albumA = (a.albumName || "").toLowerCase();
+                const albumB = (b.albumName || "").toLowerCase();
+                const albumCompare = albumA.localeCompare(albumB);
+                if (albumCompare !== 0) return albumCompare;
+
+                return (a.trackNumber || 0) - (b.trackNumber || 0);
             });
             break;
         case "scrobbles":
@@ -14916,13 +14944,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   50,
                   500,
                   (progress) => {
-                      mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
+                      if (!isHeadless) mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
                   },
                   getTrackDetailsWithReleaseDate
               );
-              uniqueTracks = (await deduplicateTracks(tracksWithReleaseDates)).unique;
+              uniqueTracks = (await deduplicateTracks(
+                  tracksWithReleaseDates, 
+                  false, 
+                  false,
+                  (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+              )).unique;
           } else {
-              uniqueTracks = (await deduplicateTracks(tracksWithPopularity)).unique;
+              uniqueTracks = (await deduplicateTracks(
+                  tracksWithPopularity, 
+                  false, 
+                  false,
+                  (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+              )).unique;
           }
     
           if (sortType === "playCount") {
@@ -14948,6 +14986,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               if (dateComparison !== 0) {
                 return dateComparison;
               }
+
+              const albumA = (a.albumName || "").toLowerCase();
+              const albumB = (b.albumName || "").toLowerCase();
+              const albumCompare = albumA.localeCompare(albumB);
+              if (albumCompare !== 0) return albumCompare;
               
               return (a.trackNumber || 0) - (b.trackNumber || 0);
             });
@@ -19408,7 +19451,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const tracksWithPlayCounts = await enrichTracksWithPlayCounts(refreshedTracks);
       const tracksWithIds = await processBatchesWithDelay(tracksWithPlayCounts, 50, 500, () => {}, collectTrackIdsForPopularity);
       const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
-      const { unique: uniqueTracks } = await deduplicateTracks(tracksWithPopularity, false, true);
+      const { unique: uniqueTracks } = await deduplicateTracks(
+          tracksWithPopularity, 
+          false, 
+          true,
+          (progress) => { mainButton.innerText = `Dedup ${progress}%`; }
+      );
       tracksToProcess = uniqueTracks;
     } else {
       tracksToProcess = tracks;
@@ -23133,7 +23181,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
          }
 
-          const deduplicationResult = await deduplicateTracks(tracksForDeduplication, sortType === "deduplicateOnly", isArtistPage);
+          const deduplicationResult = await deduplicateTracks(
+              tracksForDeduplication, 
+              sortType === "deduplicateOnly", 
+              isArtistPage,
+              (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+          );
           uniqueTracks = deduplicationResult.unique;
           removedTracks = deduplicationResult.removed;
 
@@ -23160,6 +23213,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               if (dateComparison !== 0) {
                 return dateComparison;
               }
+
+              const albumA = (a.albumName || "").toLowerCase();
+              const albumB = (b.albumName || "").toLowerCase();
+              const albumCompare = albumA.localeCompare(albumB);
+              if (albumCompare !== 0) return albumCompare;
               
               return (a.trackNumber || 0) - (b.trackNumber || 0);
             });
@@ -23325,7 +23383,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return { ...track, ...stats, features: stats };
             });
     
-            const deduplicationResult = await deduplicateTracks(tracksWithAudioFeatures, false, isArtistPage);;
+            const deduplicationResult = await deduplicateTracks(
+                tracksWithAudioFeatures, 
+                false, 
+                isArtistPage,
+                (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+            );
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
     
@@ -23358,7 +23421,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return { ...track, ...stats };
             });
     
-            const deduplicationResult = await deduplicateTracks(tracksWithAudioFeatures, false, isArtistPage);;
+            const deduplicationResult = await deduplicateTracks(
+                tracksWithAudioFeatures, 
+                false, 
+                isArtistPage,
+                (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+            );
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
     
@@ -23386,7 +23454,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   (progress) => { if (!isHeadless) mainButton.innerText = `${80 + Math.floor(progress * 0.20)}%`; }
                 );
 
-                const deduplicationResult = await deduplicateTracks(tracksWithScrobbles, sortType === "deduplicateOnly", isArtistPage);
+                const deduplicationResult = await deduplicateTracks(
+                    tracksWithScrobbles, 
+                    sortType === "deduplicateOnly", 
+                    isArtistPage,
+                    (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+                );
                 uniqueTracks = deduplicationResult.unique;
                 removedTracks = deduplicationResult.removed;
 
@@ -24604,7 +24677,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
   
 
-  async function deduplicateTracks(tracks, force = false, isArtistPageContext = false) {
+  async function deduplicateTracks(tracks, force = false, isArtistPageContext = false, updateProgress = () => {}) {
     if (!force && !playlistDeduplicate && !isArtistPageContext) {
         return { unique: tracks, removed: [] };
     }
@@ -24744,6 +24817,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const wordBuckets = new Map();
     const fallbackBucket = [];
     const cleanTitleBuckets = new Map();
+    const playCountBuckets = new Map();
 
     const getTokens = (str) => {
         if (!str) return [];
@@ -24762,23 +24836,46 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return (a.uri || "").localeCompare(b.uri || "");
     });
 
-    const BATCH_PROCESS_SIZE = 200; 
+    const BATCH_PROCESS_SIZE = 200;
 
+    const trackCleanData = new Map();
+    for (const track of sortedInputTracks) {
+        const rawTitle = track.songTitle || track.name || "Unknown Title";
+        const artist = track.allArtists || track.artistName || "";
+        trackCleanData.set(track, {
+            rawTitle,
+            rawTitleLower: rawTitle.trim().toLowerCase(),
+            cleanTitle: getCleanTitle(rawTitle),
+            normalizedTitle: getNormalizedTitle(rawTitle),
+            tokens: getTokens(rawTitle),
+            artistSet: new Set(normalizeAndSplitArtists(artist)),
+            artist,
+            duration: track.durationMs,
+            hasVersionKeyword: versionRegex.test(rawTitle)
+        });
+    }
+    
     for (let i = 0; i < sortedInputTracks.length; i++) {
         if (i % BATCH_PROCESS_SIZE === 0 && i > 0) {
             await new Promise(resolve => setTimeout(resolve, 0));
+            updateProgress(Math.floor((i / sortedInputTracks.length) * 100));
         }
 
         const candidateTrack = sortedInputTracks[i];
         let isConsideredDuplicateOfAnExistingUnique = false;
 
-        const candidateRawTitle = candidateTrack.songTitle || candidateTrack.name || "Unknown Title";
-        const candidateDuration = candidateTrack.durationMs;
-        const candidateArtist = candidateTrack.allArtists || candidateTrack.artistName || "";
+        const candData = trackCleanData.get(candidateTrack);
+        const candidateDuration = candData.duration;
+        const candidateArtist = candData.artist;
+        const candTokens = candData.tokens;
+        const candidateCleanTitle = candData.cleanTitle;
+        const candidateArtistSet = candData.artistSet;
         
-        const candTokens = getTokens(candidateRawTitle);
-        const candidateCleanTitle = getCleanTitle(candidateRawTitle);
-        
+        const candidateHasValidPlayCount = candidateTrack.playCount !== "N/A" &&
+                                          candidateTrack.playCount !== 0 &&
+                                          candidateTrack.playCount !== null &&
+                                          candidateTrack.playCount !== undefined;
+
         const potentialMatches = new Set();
         
         if (candTokens.length === 0) {
@@ -24797,41 +24894,50 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
         
-        for (const existingUniqueTrack of potentialMatches) {
-            const candidateHasValidPlayCount = candidateTrack.playCount !== "N/A" &&
-                                              candidateTrack.playCount !== 0 &&
-                                              candidateTrack.playCount !== null &&
-                                              candidateTrack.playCount !== undefined;
+        const potentialMatchesArray = [...potentialMatches];
+        const MATCH_BATCH_SIZE = 2500;
+        
+        for (let m = 0; m < potentialMatchesArray.length; m++) {
+            if (m > 0 && m % MATCH_BATCH_SIZE === 0) {
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+            
+            const existingUniqueTrack = potentialMatchesArray[m];
             const existingHasValidPlayCount = existingUniqueTrack.playCount !== "N/A" &&
                                               existingUniqueTrack.playCount !== 0 &&
                                               existingUniqueTrack.playCount !== null &&
                                               existingUniqueTrack.playCount !== undefined;
 
-            const existingRawTitle = existingUniqueTrack.songTitle || existingUniqueTrack.name || "Unknown Title";
-            const existingDuration = existingUniqueTrack.durationMs; 
-            const existingArtist = existingUniqueTrack.allArtists || existingUniqueTrack.artistName || "";
-
+            const existData = trackCleanData.get(existingUniqueTrack);
+            const existingDuration = existData.duration; 
+            const existingArtist = existData.artist;
+            const existingArtistSet = existData.artistSet;
+            
             let areDuplicatesByNewRules = false;
             
-            const candidateArtistSet = new Set(normalizeAndSplitArtists(candidateArtist));
-            const existingArtistSet = new Set(normalizeAndSplitArtists(existingArtist));
-            
-            const artistsOverlap = candidateArtist && existingArtist && 
-                ([...candidateArtistSet].some(artist => existingArtistSet.has(artist)));
+            let artistsOverlap = false;
+            if (candidateArtist && existingArtist) {
+                for (const artist of candidateArtistSet) {
+                    if (existingArtistSet.has(artist)) {
+                        artistsOverlap = true;
+                        break;
+                    }
+                }
+            }
 
             if (candidateHasValidPlayCount && existingHasValidPlayCount) {
                 if (Number(candidateTrack.playCount) === Number(existingUniqueTrack.playCount)) {
                     
                     if (!areDuplicatesByNewRules && 
-                        candidateRawTitle.trim().toLowerCase() === existingRawTitle.trim().toLowerCase() &&
+                        candData.rawTitleLower === existData.rawTitleLower &&
                         artistsOverlap) {
                         areDuplicatesByNewRules = true;
                     }
 
                     if (!areDuplicatesByNewRules && artistsOverlap) {
-                        const hasVersionKeyword = versionRegex.test(candidateRawTitle) || versionRegex.test(existingRawTitle);
+                        const hasVersionKeyword = candData.hasVersionKeyword || existData.hasVersionKeyword;
                         if (hasVersionKeyword) {
-                            const cleanExistingTitle = getCleanTitle(existingRawTitle);
+                            const cleanExistingTitle = existData.cleanTitle;
                             if (candidateCleanTitle === cleanExistingTitle) {
                                 areDuplicatesByNewRules = true;
                             }
@@ -24846,8 +24952,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
                 }
             } else {
-                const normalizedCandidateTitle = getNormalizedTitle(candidateRawTitle);
-                const normalizedExistingTitle = getNormalizedTitle(existingRawTitle);
+                const normalizedCandidateTitle = candData.normalizedTitle;
+                const normalizedExistingTitle = existData.normalizedTitle;
 
                 if (normalizedCandidateTitle === normalizedExistingTitle && artistsOverlap) {
                     if (candidateDuration === existingDuration) {
@@ -24878,6 +24984,37 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
 
+        if (!isConsideredDuplicateOfAnExistingUnique && candidateHasValidPlayCount) {
+            const pc = Number(candidateTrack.playCount);
+            const matches = playCountBuckets.get(pc);
+            if (matches && matches.length > 0) {
+                for (const existingMatch of matches) {
+                    const existDataForPC = trackCleanData.get(existingMatch);
+                    let artistsOverlapPC = false;
+                    if (candData.artist && existDataForPC.artist) {
+                        for (const artist of candData.artistSet) {
+                            if (existDataForPC.artistSet.has(artist)) {
+                                artistsOverlapPC = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (artistsOverlapPC) {
+                        const cId = candidateTrack.uri.split(':')[2];
+                        const eId = existingMatch.uri.split(':')[2];
+                        if (cId && eId) {
+                            const [cIsrc, eIsrc] = await Promise.all([fetchIsrc(cId), fetchIsrc(eId)]);
+                            if (cIsrc && eIsrc && cIsrc === eIsrc) {
+                                isConsideredDuplicateOfAnExistingUnique = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (isConsideredDuplicateOfAnExistingUnique) {
             finalRemovedTracks.push(candidateTrack);
         } else {
@@ -24887,6 +25024,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 cleanTitleBuckets.set(candidateCleanTitle, []);
             }
             cleanTitleBuckets.get(candidateCleanTitle).push(candidateTrack);
+            
+            if (candidateHasValidPlayCount) {
+                const pc = Number(candidateTrack.playCount);
+                if (!playCountBuckets.has(pc)) {
+                    playCountBuckets.set(pc, []);
+                }
+                playCountBuckets.get(pc).push(candidateTrack);
+            }
             
             if (candTokens.length === 0) {
                 fallbackBucket.push(candidateTrack);
