@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.2";
+  const SORT_PLAY_VERSION = "5.39.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -40,8 +40,8 @@
   let openPlaylistAfterSortEnabled = false;
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
-  let changeTitleOnCreate = true;
-  let changeTitleOnModify = true;
+  let changeTitleOnCreate = false;
+  let changeTitleOnModify = false;
   let selectedAiModel = "gemini-flash-latest";
   let topTracksLimit = 100;
   let discoveryPlaylistSize = 50;
@@ -899,9 +899,9 @@
     placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
     const changeTitleOnCreateStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE);
-    changeTitleOnCreate = changeTitleOnCreateStored === null ? true : changeTitleOnCreateStored === "true";
+    changeTitleOnCreate = changeTitleOnCreateStored === null ? false : changeTitleOnCreateStored === "true";
     const changeTitleStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY);
-    changeTitleOnModify = changeTitleStored === null ? true : changeTitleStored === "true";
+    changeTitleOnModify = changeTitleStored === null ? false : changeTitleStored === "true";
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
@@ -23742,43 +23742,63 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
               if (!isHeadless) mainButton.innerText = "Creating...";
 
-              let playlistName = finalSourceName;
+              let basePlaylistName = finalSourceName;
               if (changeTitleOnCreate) {
-                  playlistName = `${finalSourceName} (${sortTypeInfo.shortName})`;
+                  basePlaylistName = `${finalSourceName} (${sortTypeInfo.shortName})`;
               }
 
-              const newPlaylist = await createPlaylist(playlistName, playlistDescription);
-              
-              await new Promise(resolve => setTimeout(resolve, 1250));
-              
-              playlistUriForQueue = newPlaylist.uri;
-              newPlaylistObjectForNavigation = newPlaylist; 
-              playlistWasModifiedOrCreated = true;
-              if (!isHeadless) mainButton.innerText = "Saving...";
-              if (isArtistPage) {
-                try {
-                  const artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
-                  if (artistImageUrl) {
-                    const base64Image = await toBase64(artistImageUrl);
-                    await setPlaylistImage(newPlaylist.id, base64Image);
+              const allTrackUris = sortedTracks.map((track) => track.uri);
+              const PLAYLIST_LIMIT = 11000;
+              const totalParts = Math.ceil(allTrackUris.length / PLAYLIST_LIMIT);
+
+              for (let i = 0; i < totalParts; i++) {
+                  let currentPlaylistName = basePlaylistName;
+                  if (totalParts > 1) {
+                      currentPlaylistName += ` (${i + 1}/${totalParts})`;
                   }
-                } catch (error) { 
-                    console.error("Error setting playlist image:", error);
-                    showNotification("Failed to copy artist image to playlist cover.", 'warning');
-                }
-              } else if (sourcePlaylistCoverUrl && !isDefaultMosaicCover(sourcePlaylistCoverUrl)) {
-                try {
-                  const base64Image = await imageUrlToBase64(sourcePlaylistCoverUrl);
-                  await setPlaylistImage(newPlaylist.id, base64Image);
-                } catch (error) {
-                  console.warn("Could not apply original playlist/album cover:", error);
-                  showNotification("Failed to copy original cover image.", 'warning');
-                }
-              }
-              const trackUris = sortedTracks.map((track) => track.uri);
-              await addTracksToPlaylist(newPlaylist.id, trackUris);
 
-              await addPlaylistToLibrary(newPlaylist.uri);
+                  if (!isHeadless) mainButton.innerText = "Creating...";
+
+                  const newPlaylist = await createPlaylist(currentPlaylistName, playlistDescription);
+                  
+                  await new Promise(resolve => setTimeout(resolve, 1250));
+                  
+                  if (i === 0) {
+                      playlistUriForQueue = newPlaylist.uri;
+                      newPlaylistObjectForNavigation = newPlaylist; 
+                      playlistWasModifiedOrCreated = true;
+                  }
+
+                  if (!isHeadless) mainButton.innerText = "Saving...";
+                  
+                  if (isArtistPage) {
+                    try {
+                      const artistImageUrl = await getArtistImageUrl(currentUriAtStart.split(":")[2]);
+                      if (artistImageUrl) {
+                        const base64Image = await toBase64(artistImageUrl);
+                        await setPlaylistImage(newPlaylist.id, base64Image);
+                      }
+                    } catch (error) { 
+                        console.error("Error setting playlist image:", error);
+                        if (i === 0) showNotification("Failed to copy artist image to playlist cover.", 'warning');
+                    }
+                  } else if (sourcePlaylistCoverUrl && !isDefaultMosaicCover(sourcePlaylistCoverUrl)) {
+                    try {
+                      const base64Image = await imageUrlToBase64(sourcePlaylistCoverUrl);
+                      await setPlaylistImage(newPlaylist.id, base64Image);
+                    } catch (error) {
+                      console.warn("Could not apply original playlist/album cover:", error);
+                      if (i === 0) showNotification("Failed to copy original cover image.", 'warning');
+                    }
+                  }
+
+                  const start = i * PLAYLIST_LIMIT;
+                  const end = start + PLAYLIST_LIMIT;
+                  const batchUris = allTrackUris.slice(start, end);
+                  await addTracksToPlaylist(newPlaylist.id, batchUris);
+
+                  await addPlaylistToLibrary(newPlaylist.uri);
+              }
 
               showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
 
