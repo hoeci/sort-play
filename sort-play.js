@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.7";
+  const SORT_PLAY_VERSION = "5.39.8";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -4716,8 +4716,8 @@
   }
 
   function formatPlayCount(count, format) {
-    if (count === null || count === undefined || isNaN(count) || count === "N/A") {
-        return '_';
+    if (count === null || count === undefined || isNaN(count) || count === "N/A" || count === "_" || count === "―" || Number(count) === 0) {
+        return 'N/A';
     }
 
     const num = Number(count);
@@ -4750,7 +4750,7 @@
   }
 
   function formatTempo(value, format) {
-    if (value === null || isNaN(value)) return '_';
+    if (value === null || isNaN(value)) return '―';
     const rounded = Math.round(value);
     if (format === 'raw') {
         return rounded.toString();
@@ -4759,7 +4759,7 @@
   }
 
   function formatAudioFeature(value, format, unitName = '') {
-    if (value === null || isNaN(value)) return '_';
+    if (value === null || isNaN(value)) return '―';
     
     const roundedValue = Math.round(value);
 
@@ -4780,7 +4780,7 @@
   }
 
   function formatKey(key, mode, format) {
-    if (key === null || key === -1 || isNaN(key) || mode === null || isNaN(mode)) return '_';
+    if (key === null || key === -1 || isNaN(key) || mode === null || isNaN(mode)) return '―';
 
     const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
     
@@ -4812,7 +4812,7 @@
   }
 
   function formatPopularity(value, format) {
-    if (value === null || isNaN(value)) return '_';
+    if (value === null || isNaN(value)) return '―';
     const num = Math.round(value);
 
     switch (format) {
@@ -4879,7 +4879,7 @@
                     albumUri: track.album.uri,
                     name: track.name
                 });
-                dataValue = releaseDateData ? formatReleaseDate(releaseDateData.releaseDate, selectedNowPlayingDateFormat) : '_';
+                dataValue = releaseDateData ? formatReleaseDate(releaseDateData.releaseDate, selectedNowPlayingDateFormat) : '―';
             } else if (selectedNowPlayingDataType === 'popularity') {
                 const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
                 const rawPopularity = trackDetails.popularity !== null ? trackDetails.popularity : null;
@@ -4892,7 +4892,7 @@
                     },
                     name: track.name
                 });
-                const rawPlayCount = (playCountData && playCountData.playCount !== "N/A") ? playCountData.playCount : '_';
+                const rawPlayCount = (playCountData && playCountData.playCount !== "N/A") ? playCountData.playCount : '―';
                 dataValue = formatPlayCount(rawPlayCount, selectedNowPlayingPlayCountFormat);
             } else {
                 const audioFeatureTypes = ['tempo', 'energy', 'danceability', 'valence', 'key'];
@@ -4922,12 +4922,12 @@
                                 dataValue = String(value);
                         }
                     } else {
-                        dataValue = '_';
+                        dataValue = '―';
                     }
                 }
             }
 
-            if (dataValue === '_') return;
+            if (dataValue === '_' || dataValue === '―') return;
 
             const duplicateCheck = document.getElementById('sort-play-now-playing-data');
             if (duplicateCheck) {
@@ -9698,8 +9698,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     }
 
-    const playerStateHandler = ({ data: { isPaused } }) => {
-        updatePlayButton(!isPaused);
+    const playerStateHandler = (event) => {
+        if (event?.data) {
+            updatePlayButton(!event.data.isPaused);
+        }
     };
 
     Spicetify.Player.addEventListener('onplaypause', playerStateHandler);
@@ -14025,7 +14027,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       position: relative;
       overflow: hidden;
       z-index: 0;
-      transition: background-color 0.20s ease, color 0.20s ease;
+      transition: background-color 0.2s ease, color 0.2s ease;
     }
     .genre-filter-modal .genre-button > * {
       position: relative;
@@ -14037,7 +14039,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       top: 0; left: 0; width: 100%; height: 100%;
       z-index: 1;
       opacity: 0;
-      transition: opacity 0.20s ease;
+      transition: opacity 0.2s ease;
     }
     .genre-filter-modal .genre-button.related {
       background-color: rgb(52 123 77 / 30%);
@@ -14047,7 +14049,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     .genre-filter-modal .genre-button.selected {
       border: none;
       color: #ffffff;
-      background-color: transparent;
     }
     .genre-filter-modal .genre-button.selected::before {
       background: linear-gradient(to right, rgb(30 215 96 / 35%), rgb(30 215 96 / 80%));
@@ -14056,7 +14057,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     .genre-filter-modal .genre-button.excluded {
       color: #ffffff;
       border: none;
-      background-color: transparent;
     }
     .genre-filter-modal .genre-button.excluded::before {
       background: linear-gradient(to right, rgb(169 33 33 / 45%), rgb(169 33 33 / 85%));
@@ -14069,21 +14069,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       border-radius: 12px;
       font-size: 13px;
       font-weight: 400;
-      min-width: 20px;
+      min-width: 22px;
       text-align: center;
       line-height: 1.5;
-      transition: background-color 0.05s ease, color 0.05s ease;
+      transition: background-color 0.1s ease, color 0.1s ease;
     }
     .genre-filter-modal .genre-button.selected .genre-count-badge {
-      background-color: rgb(20 109 52);
+      background-color: rgb(20, 109, 52);
       color: #ffffff;
     }
     .genre-filter-modal .genre-button.excluded .genre-count-badge {
-      background-color: rgb(91 21 21);
+      background-color: rgb(91, 21, 21);
       color: #ffffff;
     }
     .genre-filter-modal .genre-button.related .genre-count-badge {
-      background-color: rgb(59 78 66);
+      background-color: rgb(59, 78, 66);
       color: #ffffff;
     }
     .genre-filter-modal .search-bar {
@@ -25836,8 +25836,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
   
   function formatReleaseDate(rawDate, format = 'YYYY-MM-DD') {
-    if (!rawDate || rawDate === "_") {
-        return "_";
+    if (!rawDate || rawDate === "_" || rawDate === "―") {
+        return "―";
     }
 
     let dateObj;
@@ -25857,11 +25857,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
         dateObj = new Date(dateStrToParse);
     } else {
-        return "_";
+        return "―";
     }
 
     if (isNaN(dateObj.getTime())) {
-        return "_";
+        return "―";
     }
 
     const year = dateObj.getFullYear();
@@ -26169,7 +26169,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                 }
                             }
                         } else {
-                            updateDisplay(dataElement, "_", config.type);
+                            updateDisplay(dataElement, "―", config.type);
                         }
                     } catch (e) {
                         updateDisplay(dataElement, { error: "Local Load Failed", errorLabel: "Err" }, config.type);
@@ -26234,7 +26234,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             for (const config of columnConfigs) {
                 const dataElement = element.querySelector(config.dataSelector);
-                if (!dataElement || (dataElement.textContent !== "" && dataElement.textContent !== "_")) continue;
+                if (!dataElement || (dataElement.textContent !== "" && dataElement.textContent !== "_" && dataElement.textContent !== "―")) continue;
 
                 let val = undefined;
                 if (config.type === 'playCount' && dataMap.playCounts) val = dataMap.playCounts.get(id);
@@ -26372,11 +26372,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (value > 0 && !isNaN(value)) {
             displayValue = new Intl.NumberFormat('en-US').format(value);
         } else {
-            displayValue = "_";
+            displayValue = "―";
         }
     } else if (type === 'personalScrobbles') {
         if (value === 0) {
-            displayValue = "_";
+            displayValue = "―";
         } else if (value > 0 && !isNaN(value)) {
             if (myScrobblesDisplayMode === 'sign') {
                 displayValue = '\u2705';
@@ -26391,7 +26391,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (value > 0) {
                 displayValue = new Intl.NumberFormat('en-US').format(value);
             } else {
-                displayValue = "_";
+                displayValue = "―";
             }
         } else {
              displayValue = "Err";
@@ -26407,16 +26407,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (parts.length > 0) {
                 displayValue = parts.join(' | ');
             } else {
-                displayValue = "_";
+                displayValue = "―";
             }
         } else {
-            displayValue = "_";
+            displayValue = "―";
         }
     } else if (['key', 'tempo', 'energy', 'danceability', 'valence', 'popularity'].includes(type)) {
         if (value !== null && value !== undefined) {
             displayValue = String(value);
         } else {
-            displayValue = "_";
+            displayValue = "―";
         }
     }
 
