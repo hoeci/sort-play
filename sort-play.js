@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.5";
+  const SORT_PLAY_VERSION = "5.39.6";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -12516,7 +12516,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             if (jobsWereUpdated) {
                 saveJobs(mutableJobs);
-                renderJobList();
             }
         })();
     };
@@ -15090,7 +15089,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   50,
                   500,
                   (progress) => {
-                      if (!isHeadless) mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
+                      mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
                   },
                   getTrackDetailsWithReleaseDate
               );
@@ -15098,14 +15097,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   tracksWithReleaseDates, 
                   false, 
                   false,
-                  (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+                  (progress) => { mainButton.innerText = `Dedup ${progress}%`; }
               )).unique;
           } else {
               uniqueTracks = (await deduplicateTracks(
                   tracksWithPopularity, 
                   false, 
                   false,
-                  (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+                  (progress) => { mainButton.innerText = `Dedup ${progress}%`; }
               )).unique;
           }
     
@@ -20396,7 +20395,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     await new Promise(resolve => setTimeout(resolve, retryInterval));
                 } else {
                     console.error(`[Sort-Play] Failed to set and verify playlist description for ${playlistId} after ${maxRetries} attempts.`);
-                    showNotification("Failed to update playlist description.", 'warning');
                 }
             }
         }
