@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.6";
+  const SORT_PLAY_VERSION = "5.39.7";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -5190,7 +5190,7 @@
 
   let userSystemInstruction;
   
-  async function showAiPickModal(tracks) {
+  async function showAiPickModal(tracks, currentUri) {
     const modalContainer = document.createElement("div");
     modalContainer.className = "ai-pick-modal";
     modalContainer.innerHTML = `
@@ -5841,7 +5841,7 @@ sendButton.addEventListener("click", async () => {
             return;
         }
   
-        const sourceUri = getCurrentUri();
+        const sourceUri = currentUri;
         const isArtistPage = URI.isArtist(sourceUri); 
         const isAlbumPage = URI.isAlbum(sourceUri);
         let sourceName;
@@ -6628,7 +6628,7 @@ sendButton.addEventListener("click", async () => {
             return { ...track, features: cachedData ? cachedData.stats : {} };
         });
         
-        showCustomFilterModal(tracksWithFeatures);
+        showCustomFilterModal(tracksWithFeatures, currentUri);
 
     } catch (error) {
         console.error("Error in custom filter:", error);
@@ -7158,7 +7158,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       return { titleAlbumKeywords, artistKeywords };
     }
 
-  async function showCustomFilterModal(tracks) {
+  async function showCustomFilterModal(tracks, currentUri) {
     const modalContainer = document.createElement("div");
     modalContainer.className = "custom-filter-modal";
     const originalTracks = [...tracks];
@@ -9315,7 +9315,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     const playlistTitleElement = modalContainer.querySelector(".playlist-title");
     updatePlaylistStats();
-    const currentUri = getCurrentUri();
+    
     if (URI.isPlaylistV1OrV2(currentUri)) {
         const playlistId = currentUri.split(":")[2];
         Spicetify.CosmosAsync.get(
@@ -9945,7 +9945,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
             mainButton.innerText = "100%";
 
-            const sourceUri = getCurrentUri();
+            const sourceUri = currentUri;
             let sourceName;
             if (URI.isArtist(sourceUri)) {
                 sourceName = await Spicetify.CosmosAsync.get(
@@ -13873,7 +13873,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   const mainGenres = Object.keys(GENRE_MAPPINGS);
 
-  async function showGenreFilterModal(tracks, initialTrackGenreMap, rawGenreData) {
+  async function showGenreFilterModal(tracks, initialTrackGenreMap, rawGenreData, sourceUri) {
     let trackGenreMap = initialTrackGenreMap;
     let allGenres = new Set();
     let genreCounts = new Map();
@@ -14983,7 +14983,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
     
     
-      const sourceUri = getCurrentUri();
       let sourceName;
       if (URI.isArtist(sourceUri)) {
           sourceName = await Spicetify.CosmosAsync.get(
@@ -22995,7 +22994,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
             
             const openModal = async () => {
-                await showAiPickModal(tracks);
+                await showAiPickModal(tracks, currentUri);
                 resetButtons(); 
             };
 
@@ -23698,6 +23697,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return;
             }
         }
+      }
+
+      if (isArtistPage && sortedTracks && sortedTracks.length > 0) {
+          const targetArtistId = currentUriAtStart.split(":")[2];
+          sortedTracks = sortedTracks.filter(t => {
+              const hasInArtistUris = t.artistUris && Array.isArray(t.artistUris) && t.artistUris.some(u => u && u.includes(targetArtistId));
+              const hasInTrackArtists = t.track && t.track.artists && Array.isArray(t.track.artists) && t.track.artists.some(a => a.uri && a.uri.includes(targetArtistId));
+              const hasInArtists = t.artists && Array.isArray(t.artists) && t.artists.some(a => a.uri && a.uri.includes(targetArtistId));
+              return hasInArtistUris || hasInTrackArtists || hasInArtists;
+          });
       }
       
       if (createPlaylistAfterSort && isDirectSortType(sortType)) {
@@ -25588,7 +25597,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         const { trackGenreMap, rawTrackGenres } = await fetchAllTrackGenres(
                             tracks
                         );
-                        const modalPromise = showGenreFilterModal(tracks, trackGenreMap, rawTrackGenres);
+                        const modalPromise = showGenreFilterModal(tracks, trackGenreMap, rawTrackGenres, currentUri);
                         setTimeout(() => resetButtons(), 100);
                         await modalPromise;
                     };
