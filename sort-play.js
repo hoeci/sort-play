@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.40.1";
+  const SORT_PLAY_VERSION = "5.40.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -220,7 +220,7 @@
       try {
           const hexId = spotifyHex(trackId);
           const token = Spicetify.Platform.Session.accessToken;
-          const url = `https://spclient.wg.spotify.com/metadata/4/track/${hexId}?market=from_token`;
+          const url = `https://spclient.wg.spotify.com/metadata/4/track/${hexId}?market=from_token&alt=json`;
           
           const response = await fetch(url, {
               headers: {
@@ -17959,9 +17959,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 }
 
   async function imageUrlToBase64(url) {
-    if (typeof url === 'string' && url.startsWith("spotify:image:")) {
-        const imageId = url.split(":")[2];
-        url = `https://i.scdn.co/image/${imageId}`;
+    if (typeof url === 'string') {
+        if (url.startsWith("spotify:image:")) {
+            const imageId = url.split(":")[2];
+            url = `https://i.scdn.co/image/${imageId}`;
+        } else if (url.startsWith("spotify:")) {
+            throw new Error("Unsupported URI scheme for image fetch");
+        }
     }
 
     const response = await fetch(url);
@@ -20380,7 +20384,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function isDefaultMosaicCover(url) {
     if (!url) return false;
-    return url.includes("mosaic.scdn.co") || url.includes("i.scdn.co/image/");
+    return url.startsWith("spotify:mosaic:") || url.includes("mosaic.scdn.co");
   }
   
   async function generatePlaylistCover(titleText, subtitleText, userName, baseImageUrl, textColor) {
@@ -24515,6 +24519,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     likedIsrcSet.add(meta.external_ids.isrc);
                 }
             });
+            
+            likedTrackIds.forEach(id => {
+                const storedIsrc = localStorage.getItem("sort-play-like-" + id);
+                if (storedIsrc) likedIsrcSet.add(storedIsrc);
+            });
 
             const originalOrderMap = new Map();
             tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
@@ -28377,9 +28386,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let promises = [];
         const processLikeInternal = async (id) => {
             const track = await fetchInternalTrackMetadata(id);
-            if (track && track.external_ids && track.external_ids.isrc) {
-                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
-                localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
+            if (track) {
+                const cacheData = {
+                    name: track.name,
+                    album: track.album,
+                    artists: track.artists,
+                    duration_ms: track.duration_ms,
+                    popularity: track.popularity,
+                    external_ids: track.external_ids,
+                    id: track.id,
+                    uri: track.uri
+                };
+                idb.set('trackMetadata', track.id, cacheData);
+
+                if (track.external_ids && track.external_ids.isrc) {
+                    newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+                    localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
+                }
             }
         };
 
