@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.40.0";
+  const SORT_PLAY_VERSION = "5.40.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -788,7 +788,16 @@
     const jobs = getDedicatedJobs();
     const now = Date.now();
 
+    const brokenTypes = new Set();
+    playlistCardsData.forEach(section => {
+        section.cards.forEach(card => {
+            if (card.broken) brokenTypes.add(card.id);
+        });
+    });
+
     const isJobDue = (job, currentTime) => {
+        if (brokenTypes.has(job.dedicatedType)) return false;
+
         const lastRun = job.lastRun || 0;
         const schedule = job.schedule;
 
@@ -855,32 +864,32 @@
     {
         title: 'New Releases',
         cards: [
-            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological },
+            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological, broken: false },
         ]
     },
     {
         title: 'Discovery',
         cards: [
-            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v2' },
-            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v2' },
-            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v2' },
-            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer },
-            { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer },
+            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v2', broken: true },
+            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v2', broken: true },
+            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v2', broken: true },
+            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer, broken: true },
+            { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer, broken: true },
         ]
     },
     {
         title: 'Last.fm',
         cards: [
-            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'A continuous mood from your current song, recent obsessions, and deep cuts.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe },
-            { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix },
+            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'A continuous mood from your current song, recent obsessions, and deep cuts.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: true },
+            { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: true },
         ]
     },
     {
         title: 'My Top Tracks',
         cards: [
-            { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth },
-            { id: 'topLast6Months', name: 'Top Tracks: Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months },
-            { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime },
+            { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth, broken: true },
+            { id: 'topLast6Months', name: 'Top Tracks: Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months, broken: true },
+            { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime, broken: true },
         ]
     }
   ];
@@ -3877,9 +3886,10 @@
         }       
 
         return cards.map(card => {
+            const isBroken = !!card.broken;
             const behavior = dedicatedPlaylistBehavior[card.id] || 'createOnce';
             const badgeHtml = getBadgeHtml(behavior, card.id);
-            const allowSettings = card.id !== 'genreTreeExplorer';
+            const allowSettings = card.id !== 'genreTreeExplorer' && !isBroken;
 
             const autoBtnContent = behavior === 'autoUpdate' 
                 ? `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}` 
@@ -3891,9 +3901,10 @@
             const countText = hasCached ? cachedCount.toLocaleString() : '';
 
             return `
-                <div class="slim-card" data-id="${card.id}" data-name="${card.name}" style="--overlay-color: ${rgbColor};">
+                <div class="slim-card ${isBroken ? 'broken-card' : ''}" data-id="${card.id}" data-name="${card.name}" style="--overlay-color: ${rgbColor};">
                     <div class="card-bg" style="background-image: url('${card.thumbnailUrl}');"></div>
                     <div class="card-overlay"></div>
+                    ${isBroken ? `<div class="broken-overlay"><span>Unavailable</span></div>` : ''}
                     
                     <div class="card-content-wrapper" style="padding-bottom: 14px;">
                         <div class="card-text">
@@ -4300,6 +4311,60 @@
 
         .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
 
+        .broken-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(12, 12, 12, 0.85);
+            z-index: 15;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+            opacity: 1;
+        }
+
+        .broken-overlay span {
+            color: #ff5c5c;
+            font-weight: 800;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding: 6px 14px;
+            border-radius: 5px;
+            background: rgba(255, 92, 92, 0.1);
+            border: 1px solid rgba(255, 92, 92, 0.25);
+            box-shadow: 0 0 15px rgba(255, 92, 92, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        .slim-card.broken-card {
+            cursor: not-allowed;
+            border-color: transparent !important;
+            box-shadow: none !important;
+            opacity: 0.7;
+            transition: opacity 0.3s ease;
+        }
+
+        .slim-card.broken-card:hover {
+            transform: none !important;
+            opacity: 1;
+            z-index: 1 !important;
+        }
+        
+        .slim-card.broken-card .card-bg {
+            filter: grayscale(100%) contrast(120%) brightness(40%) !important;
+            transform: none !important;
+        }
+        
+        .slim-card.broken-card .card-overlay::before, 
+        .slim-card.broken-card .card-overlay::after {
+            display: none !important;
+        }
+        
         .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
       </style>
 
@@ -4372,6 +4437,10 @@
 
     modalContainer.querySelectorAll('.slim-card').forEach(card => {
         card.addEventListener('click', async (e) => {
+            if (card.classList.contains('broken-card')) {
+                e.stopPropagation();
+                return;
+            }
             if (e.target.closest('.settings-trigger') || e.target.closest('.settings-overlay-panel')) return;
             if (e.target === card) return;
 
