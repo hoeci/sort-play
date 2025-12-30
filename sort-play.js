@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.40.5";
+  const SORT_PLAY_VERSION = "5.40.6";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -6701,7 +6701,6 @@ sendButton.addEventListener("click", async () => {
       }
 
       const fetchInternal = async () => {
-          // Fast Path: Metadata API (Matches Web API speed)
           try {
               const hexId = spotifyHex(albumId);
               const token = Spicetify.Platform.Session.accessToken;
@@ -6717,16 +6716,13 @@ sendButton.addEventListener("click", async () => {
                           width: img.width || 0,
                           height: img.height || 0
                       }));
-                      // Ensure largest is first, similar to Web API
                       images.sort((a, b) => b.width - a.width);
                       return { images: images };
                   }
               }
           } catch(e) {
-              // Silent fail to allow GraphQL fallback
           }
 
-          // Slow Path: GraphQL Fallback (If Metadata API fails)
           const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
               uri: `spotify:album:${albumId}`,
               locale: "en",
@@ -25097,6 +25093,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           if (!isHeadless) mainButton.innerText = "100%";
 
         } else if (sortType === "energyWave") {
+            if (isFallbackActive()) {
+                if (!isHeadless) resetButtons();
+                showNotification("Energy Wave is unavailable.", true);
+                return;
+            }
             if (!isHeadless) mainButton.innerText = "Analyzing...";
             const trackIds = tracksWithPopularity.map(t => t.trackId);
             const allStats = await getBatchTrackStats(trackIds);
@@ -25530,14 +25531,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
       }
 
-      if (missingDataCount > 0 && ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
+      if (missingDataCount > 0 && ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'energyWave'].includes(sortType)) {
         const sortTypeInfo = {
             tempo: { fullName: "tempo (BPM)" },
             energy: { fullName: "energy" },
             danceability: { fullName: "danceability" },
             valence: { fullName: "valence" },
             acousticness: { fullName: "acousticness" },
-            instrumentalness: { fullName: "instrumentalness" }
+            instrumentalness: { fullName: "instrumentalness" },
+            energyWave: { fullName: "audio features" }
         }[sortType];
 
         const plural = missingDataCount === 1 ? "track was" : "tracks were";
@@ -27332,6 +27334,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     if (missingIds.length === 0) return results;
+
+    if (isFallbackActive()) {
+        return results;
+    }
 
     const BATCH_SIZE = 100;
     const MAX_RETRIES = 3;
