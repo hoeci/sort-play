@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.40.6";
+  const SORT_PLAY_VERSION = "5.41.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -996,6 +996,7 @@
     acousticness: false,
     instrumentalness: false,
     filterLiked: false,
+    sortByLiked: false,
     filterSingles: false,
     filterAlbums: false
   };
@@ -5406,6 +5407,7 @@
           "deduplicateOnly",
           "filterLiked",
           "keepLiked",
+          "sortByLiked",
           "filterSingles",
           "filterAlbums",
           "energyWave",
@@ -19701,6 +19703,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           { backgroundColor: "transparent", color: "white", text: "Scrobbles", sortType: "scrobbles", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "My Scrobbles", sortType: "personalScrobbles", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Last Scrobbled", sortType: "lastScrobbled", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Liked Status", sortType: "sortByLiked", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Energy Wave", sortType: "energyWave", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Album Color", sortType: "averageColor", hasInnerButton: true },
           {
@@ -20329,7 +20332,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           border: none;
           border-radius: 2px;
           margin: 0;
-          padding: 4px 10px 4px 8px;
+          padding: 4px 10px 4px 9px;
           font-weight: 400;
           font-size: 0.875rem;
           height: 39px;
@@ -24828,6 +24831,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           sortType === "deduplicateOnly" ||
           sortType === "filterLiked" ||
           sortType === "keepLiked" ||
+          sortType === "sortByLiked" ||
           sortType === "filterSingles" ||
           sortType === "filterAlbums"
         ) {
@@ -25011,7 +25015,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const orderB = originalOrderMap.get(b.uri);
                 return orderA - orderB;
             });
-        } else if (sortType === "filterLiked" || sortType === "keepLiked") {
+        } else if (sortType === "filterLiked" || sortType === "keepLiked" || sortType === "sortByLiked") {
             if (!isHeadless) mainButton.innerText = "Checking...";
             const likedSongs = await getLikedSongs();
             const likedSongUris = new Set(likedSongs.map(s => s.uri));
@@ -25040,20 +25044,46 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const originalOrderMap = new Map();
             tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
             
-            sortedTracks = uniqueTracks
-                .filter(track => {
-                    let isLiked = likedSongUris.has(track.uri);
-                    
-                    if (!isLiked) {
-                        const meta = tracksWithMetadata.find(t => t.uri === track.uri);
-                        const isrc = meta?.track?.external_ids?.isrc;
-                        if (isrc && likedIsrcSet.has(isrc)) isLiked = true;
+            if (sortType === "sortByLiked") {
+                sortedTracks = uniqueTracks.sort((a, b) => {
+                    let isLikedA = likedSongUris.has(a.uri);
+                    let isLikedB = likedSongUris.has(b.uri);
+
+                    if (!isLikedA) {
+                        const metaA = tracksWithMetadata.find(t => t.uri === a.uri);
+                        const isrcA = metaA?.track?.external_ids?.isrc;
+                        if (isrcA && likedIsrcSet.has(isrcA)) isLikedA = true;
                     }
                     
-                    return sortType === "keepLiked" ? isLiked : !isLiked;
-                })
-                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
-                
+                    if (!isLikedB) {
+                        const metaB = tracksWithMetadata.find(t => t.uri === b.uri);
+                        const isrcB = metaB?.track?.external_ids?.isrc;
+                        if (isrcB && likedIsrcSet.has(isrcB)) isLikedB = true;
+                    }
+
+                    const valA = isLikedA ? 1 : 0;
+                    const valB = isLikedB ? 1 : 0;
+
+                    if (valA !== valB) {
+                        return sortOrderState.sortByLiked ? valA - valB : valB - valA;
+                    }
+                    return originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri);
+                });
+            } else {
+                sortedTracks = uniqueTracks
+                    .filter(track => {
+                        let isLiked = likedSongUris.has(track.uri);
+                        
+                        if (!isLiked) {
+                            const meta = tracksWithMetadata.find(t => t.uri === track.uri);
+                            const isrc = meta?.track?.external_ids?.isrc;
+                            if (isrc && likedIsrcSet.has(isrc)) isLiked = true;
+                        }
+                        
+                        return sortType === "keepLiked" ? isLiked : !isLiked;
+                    })
+                    .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+            }
           } else if (sortType === "filterSingles") {
             const originalOrderMap = new Map();
             tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
@@ -25197,51 +25227,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
 
                     sortedTracks = tracksToSort.sort((a, b) => {
-                        const getSortValue = (scrobbles) => {
-                            if (typeof scrobbles === 'number' && scrobbles > 0) return 2;
-                            if (scrobbles === 0) return 1;
-                            return 0;
-                        };
+                        const getVal = (t) => (typeof t.personalScrobbles === 'number') ? t.personalScrobbles : -1;
+                        const valA = getVal(a);
+                        const valB = getVal(b);
 
-                        const valA = getSortValue(a.personalScrobbles);
-                        const valB = getSortValue(b.personalScrobbles);
-
-                        if (valA !== valB) {
-                            return valB - valA;
+                        if (valA === valB) {
+                             return a.originalIndex - b.originalIndex;
                         }
 
-                        if (valA === 2) {
-                            return sortOrderState.personalScrobbles 
-                                ? a.personalScrobbles - b.personalScrobbles 
-                                : b.personalScrobbles - a.personalScrobbles;
-                        }
-
-                        return a.originalIndex - b.originalIndex;
+                        return sortOrderState.personalScrobbles 
+                            ? valA - valB 
+                            : valB - valA;
                     });
                 } else { 
                     const tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
 
                     sortedTracks = tracksToSort.sort((a, b) => {
-                        const getSortValue = (scrobbles) => {
-                            if (typeof scrobbles === 'number' && scrobbles > 0) return 2;
-                            if (scrobbles === 0) return 1;
-                            return 0;
-                        };
+                        const getVal = (t) => (typeof t.scrobbles === 'number') ? t.scrobbles : -1;
+                        const valA = getVal(a);
+                        const valB = getVal(b);
 
-                        const valA = getSortValue(a.scrobbles);
-                        const valB = getSortValue(b.scrobbles);
-
-                        if (valA !== valB) {
-                            return valB - valA;
+                        if (valA === valB) {
+                             return a.originalIndex - b.originalIndex;
                         }
 
-                        if (valA === 2) {
-                            return sortOrderState.scrobbles 
-                                ? (a.scrobbles ?? 0) - (b.scrobbles ?? 0) 
-                                : (b.scrobbles ?? 0) - (a.scrobbles ?? 0);
-                        }
-
-                        return a.originalIndex - b.originalIndex;
+                        return sortOrderState.scrobbles 
+                            ? valA - valB 
+                            : valB - valA;
                     });
                 }
                 if (!isHeadless) mainButton.innerText = "100%";
@@ -25350,6 +25362,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
           filterLiked: { fullName: "hiding liked songs", shortName: "Unliked" },
           keepLiked: { fullName: "keeping only liked songs", shortName: "Liked Only" },
+          sortByLiked: { fullName: "liked status", shortName: "Liked" },
           filterSingles: { fullName: "singles only", shortName: "Singles" },
           filterAlbums: { fullName: "albums only", shortName: "Albums" },
           energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
