@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.40.3";
+  const SORT_PLAY_VERSION = "5.40.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -45,7 +45,7 @@
   let selectedAiModel = "gemini-flash-latest";
   let topTracksLimit = 100;
   let discoveryPlaylistSize = 50;
-  let newReleasesDaysLimit = 14;
+  let newReleasesDaysLimit = 'release-2';
   let followedReleasesAlbumLimit = 'all';
   let colorThiefLib = null;
   let colorSortMode = 'perceptual';
@@ -1030,7 +1030,20 @@
     myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
     colorSortMode = localStorage.getItem(STORAGE_KEY_COLOR_SORT_MODE) || 'perceptual';
     topTracksLimit = parseInt(localStorage.getItem(STORAGE_KEY_TOP_TRACKS_LIMIT), 10) || 100;
-    newReleasesDaysLimit = parseInt(localStorage.getItem(STORAGE_KEY_NEW_RELEASES_LIMIT), 10) || 14;
+    const storedNewReleases = localStorage.getItem(STORAGE_KEY_NEW_RELEASES_LIMIT);
+    if (storedNewReleases) {
+        if (storedNewReleases.startsWith('release-')) {
+            newReleasesDaysLimit = storedNewReleases;
+        } else {
+            const intVal = parseInt(storedNewReleases, 10);
+            if (intVal === 7) newReleasesDaysLimit = 'release-1';
+            else if (intVal === 14) newReleasesDaysLimit = 'release-2';
+            else if (intVal === 21) newReleasesDaysLimit = 'release-3';
+            else newReleasesDaysLimit = intVal;
+        }
+    } else {
+        newReleasesDaysLimit = 'release-2';
+    }
     followedReleasesAlbumLimit = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT) || 'all';
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
     placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
@@ -2386,12 +2399,24 @@
         </label>
         <div class="col action">
             <select id="newReleasesLimitSelect" style="max-width: 180px;">
-                <option value="7">This Release Week</option>
-                <option value="14">Last 2 Release Weeks</option>
-                <option value="21">Last 3 Release Weeks</option>
-                <option value="30">Last 5 Release Weeks</option>
-                <option value="60">Last 9 Release Weeks</option>
-            </select>
+            <option value="release-1">This Release Week</option>
+            <option value="release-2">Last 2 Release Weeks</option>
+            <option value="release-3">Last 3 Release Weeks</option>
+            <option value="release-5">Last 5 Release Weeks</option>
+            <option value="release-9">Last 9 Release Weeks</option>
+            <option disabled>──────────</option>
+            <option value="1">Last 24 Hours</option>
+            <option value="2">Last 2 Days</option>
+            <option value="3">Last 3 Days</option>
+            <option value="4">Last 4 Days</option>
+            <option value="7">Last 7 Days</option>
+            <option value="10">Last 10 Days</option>
+            <option value="15">Last 15 Days</option>
+            <option value="30">Last 30 Days</option>
+            <option value="60">Last 60 Days</option>
+            <option value="90">Last 90 Days</option>
+            <option value="150">Last 150 Days</option>
+        </select>
         </div>
     </div>
 
@@ -2695,14 +2720,10 @@
         saveSettings();
     });
 
-    let currentNewReleasesLimit = newReleasesDaysLimit;
-    if ([1, 3].includes(currentNewReleasesLimit)) {
-        currentNewReleasesLimit = 7;
-    }
-    
-    newReleasesLimitSelect.value = currentNewReleasesLimit;
+    newReleasesLimitSelect.value = newReleasesDaysLimit;
     newReleasesLimitSelect.addEventListener("change", () => {
-        newReleasesDaysLimit = parseInt(newReleasesLimitSelect.value, 10);
+        const val = newReleasesLimitSelect.value;
+        newReleasesDaysLimit = val.startsWith('release-') ? val : parseInt(val, 10);
         saveSettings();
     });
     
@@ -4323,7 +4344,7 @@
             align-items: center;
             justify-content: center;
             pointer-events: none;
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(1px);
             opacity: 1;
         }
 
@@ -22377,10 +22398,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const dateLimit = new Date();
         dateLimit.setUTCHours(0, 0, 0, 0);
-        const daysSinceLastFriday = (dateLimit.getUTCDay() + 2) % 7;
-        const numberOfWeeks = Math.ceil(newReleasesDaysLimit / 7);
-        const totalDaysToSubtract = daysSinceLastFriday + (numberOfWeeks - 1) * 7;
-        dateLimit.setUTCDate(dateLimit.getUTCDate() - totalDaysToSubtract);
+        
+        let daysDesc = "";
+    
+        if (String(newReleasesDaysLimit).startsWith('release-')) {
+             const weeks = parseInt(newReleasesDaysLimit.split('-')[1], 10) || 1;
+             const daysSinceLastFriday = (dateLimit.getUTCDay() + 2) % 7;
+             const totalDaysToSubtract = daysSinceLastFriday + (weeks - 1) * 7;
+             dateLimit.setUTCDate(dateLimit.getUTCDate() - totalDaysToSubtract);
+             daysDesc = weeks === 1 ? "this release week" : `the last ${weeks} release weeks`;
+        } else {
+             const days = parseInt(newReleasesDaysLimit, 10) || 14;
+             dateLimit.setUTCDate(dateLimit.getUTCDate() - days);
+             daysDesc = `the last ${days} days`;
+        }
+    
         const newReleasesMap = new Map();
         
         const BATCH_SIZE = 300;
@@ -22420,7 +22452,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const allNewReleases = Array.from(newReleasesMap.values());
         if (allNewReleases.length === 0) {
-            throw new Error(`No new releases found in the last ${newReleasesDaysLimit} days.`);
+            throw new Error(`No new releases found in ${daysDesc}.`);
         }
 
         updateProgress(`Get tracks...`);
@@ -22618,7 +22650,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const trackUris = genuinelyNewTracks.map(track => track.uri);
         const playlistName = "New Releases: Followed";
-        const playlistDescription = `All new releases from artists you follow from the last ${newReleasesDaysLimit} days, sorted by release date. Created by Sort-Play.`;
+        const playlistDescription = `All new releases from artists you follow from ${daysDesc} (since ${dateLimit.toLocaleDateString()}), sorted by release date. Created by Sort-Play.`;
         
         updateProgress("Creating...");
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('followedReleasesChronological', playlistName, playlistDescription);
