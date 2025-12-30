@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.40.4";
+  const SORT_PLAY_VERSION = "5.40.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -6051,9 +6051,29 @@ sendButton.addEventListener("click", async () => {
         for (let i = 0; i < trackIds.length; i += batchSize) {
             const batch = trackIds.slice(i, i + batchSize);
             try {
-                const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-                if (response && response.tracks) {
-                    const availableTracks = await Promise.all(response.tracks.map(async track => {
+                let responseTracks = [];
+
+                const fetchBatchInternal = async () => {
+                    return await Promise.all(batch.map(id => fetchInternalTrackMetadata(id)));
+                };
+
+                if (isFallbackActive()) {
+                    responseTracks = await fetchBatchInternal();
+                } else {
+                    try {
+                        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
+                        responseTracks = response?.tracks || [];
+                    } catch (error) {
+                        if (registerWebApiFailure()) {
+                            responseTracks = await fetchBatchInternal();
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+
+                if (responseTracks) {
+                    const availableTracks = await Promise.all(responseTracks.map(async track => {
                         if (track && await isTrackAvailable(track)) {
                             return track.uri;
                         }
@@ -6073,24 +6093,71 @@ sendButton.addEventListener("click", async () => {
         }
   
         const sourceUri = currentUri;
-        const isArtistPage = URI.isArtist(sourceUri); 
+        const isArtistPage = URI.isArtist(sourceUri);
         const isAlbumPage = URI.isAlbum(sourceUri);
-        let sourceName;
-        
-        if (URI.isArtist(sourceUri)) {
-            sourceName = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
-        } else if (isLikedSongsPage(sourceUri)) {
-            sourceName = "Liked Songs";
-        } else if (isAlbumPage) {
-            sourceName = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
-        } else {
-            sourceName = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-            ).then((r) => r.name);
+        let sourceName = "Source";
+        const sourceId = sourceUri.split(":")[2];
+
+        try {
+            if (isArtistPage) {
+                const fetchArtistFallback = async () => {
+                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
+                    return res.data.artistUnion.profile.name;
+                };
+
+                if (isFallbackActive()) {
+                    sourceName = await fetchArtistFallback();
+                } else {
+                    try {
+                        const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceId}`);
+                        sourceName = artistData.name;
+                    } catch (e) {
+                        if (registerWebApiFailure()) {
+                            sourceName = await fetchArtistFallback();
+                        } else { throw e; }
+                    }
+                }
+            } else if (isLikedSongsPage(sourceUri)) {
+                sourceName = "Liked Songs";
+            } else if (isAlbumPage) {
+                const fetchAlbumFallback = async () => {
+                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                    return res.data.albumUnion.name;
+                };
+
+                if (isFallbackActive()) {
+                    sourceName = await fetchAlbumFallback();
+                } else {
+                    try {
+                        const albumData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
+                        sourceName = albumData.name;
+                    } catch (e) {
+                        if (registerWebApiFailure()) {
+                            sourceName = await fetchAlbumFallback();
+                        } else { throw e; }
+                    }
+                }
+            } else {
+                const fetchPlaylistFallback = async () => {
+                    const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(sourceUri);
+                    return meta.name;
+                };
+
+                if (isFallbackActive()) {
+                    sourceName = await fetchPlaylistFallback();
+                } else {
+                    try {
+                        const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceId}`);
+                        sourceName = playlistData.name;
+                    } catch (e) {
+                        if (registerWebApiFailure()) {
+                            sourceName = await fetchPlaylistFallback();
+                        } else { throw e; }
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to fetch source name for AI Pick playlist", e);
         }
 
         let suffixPattern = new RegExp(
@@ -6104,9 +6171,28 @@ sendButton.addEventListener("click", async () => {
         if (isArtistPage) {
           playlistDescription = `Tracks by ${sourceName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
         } else if (isAlbumPage) {
-          const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-          const artistName = albumDetails.artists[0].name;
-          playlistDescription = `Tracks from ${sourceName} by ${artistName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
+            let artistName = "Unknown Artist";
+            try {
+                const fetchAlbumArtistFallback = async () => {
+                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                    return res.data.albumUnion.artists.items[0]?.profile?.name || "Unknown Artist";
+                };
+
+                if (isFallbackActive()) {
+                    artistName = await fetchAlbumArtistFallback();
+                } else {
+                    try {
+                        const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
+                        artistName = albumDetails.artists[0].name;
+                    } catch (e) {
+                        if (registerWebApiFailure()) {
+                            artistName = await fetchAlbumArtistFallback();
+                        } else { throw e; }
+                    }
+                }
+            } catch (e) {}
+            
+            playlistDescription = `Tracks from ${sourceName} by ${artistName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
         } else {
           playlistDescription = `Tracks picked by AI using Sort-Play for request: "${userPrompt}"`;
         }
@@ -6614,12 +6700,66 @@ sendButton.addEventListener("click", async () => {
           return cachedAnalysis;
       }
 
+      const fetchInternal = async () => {
+          // Fast Path: Metadata API (Matches Web API speed)
+          try {
+              const hexId = spotifyHex(albumId);
+              const token = Spicetify.Platform.Session.accessToken;
+              const res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
+                  headers: { "Authorization": `Bearer ${token}` }
+              });
+              
+              if (res.ok) {
+                  const body = await res.json();
+                  if (body.cover_group && body.cover_group.image) {
+                      const images = body.cover_group.image.map(img => ({
+                          url: `https://i.scdn.co/image/${img.file_id}`,
+                          width: img.width || 0,
+                          height: img.height || 0
+                      }));
+                      // Ensure largest is first, similar to Web API
+                      images.sort((a, b) => b.width - a.width);
+                      return { images: images };
+                  }
+              }
+          } catch(e) {
+              // Silent fail to allow GraphQL fallback
+          }
+
+          // Slow Path: GraphQL Fallback (If Metadata API fails)
+          const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
+              uri: `spotify:album:${albumId}`,
+              locale: "en",
+              offset: 0,
+              limit: 1
+          });
+          const u = res.data.albumUnion;
+          if (u && u.coverArt && u.coverArt.sources && u.coverArt.sources.length > 0) {
+              return { images: u.coverArt.sources };
+          }
+          throw new Error(`No images found for album ${albumId} via Internal APIs`);
+      };
+
       try {
-          const albumDetails = await withRetry(
-            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`),
-            CONFIG.spotify.retryAttempts,
-            CONFIG.spotify.retryDelay
-          );
+          let albumDetails;
+
+          if (isFallbackActive()) {
+              albumDetails = await fetchInternal();
+          } else {
+              try {
+                  albumDetails = await withRetry(
+                    () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`),
+                    CONFIG.spotify.retryAttempts,
+                    CONFIG.spotify.retryDelay
+                  );
+              } catch (error) {
+                  if (registerWebApiFailure()) {
+                      albumDetails = await fetchInternal();
+                  } else {
+                      throw error;
+                  }
+              }
+          }
 
           const images = albumDetails?.images;
           if (!images || images.length === 0) {
@@ -9567,34 +9707,77 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const playlistTitleElement = modalContainer.querySelector(".playlist-title");
     updatePlaylistStats();
     
-    if (URI.isPlaylistV1OrV2(currentUri)) {
-        const playlistId = currentUri.split(":")[2];
-        Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/playlists/${playlistId}`
-        ).then((r) => {
-            playlistTitleElement.textContent = r.name;
-            playlistTitleElement.title = r.name;
-        });
-    } else if (URI.isArtist(currentUri)) {
-        Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/artists/${currentUri.split(":")[2]}`
-        ).then((r) => {
-            playlistTitleElement.textContent = `All tracks by ${r.name}`;
-            playlistTitleElement.title = `All tracks by ${r.name}`;
+    (async () => {
+        try {
+            const id = currentUri.split(":")[2];
+            if (URI.isPlaylistV1OrV2(currentUri)) {
+                const getName = async () => {
+                    if (isFallbackActive()) {
+                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUri);
+                        return meta.name;
+                    } else {
+                        try {
+                            const r = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${id}`);
+                            return r.name;
+                        } catch (e) {
+                            if (registerWebApiFailure()) {
+                                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUri);
+                                return meta.name;
+                            }
+                            throw e;
+                        }
+                    }
+                };
+                const name = await getName();
+                playlistTitleElement.textContent = name;
+                playlistTitleElement.title = name;
 
-        });
-    } else if (isLikedSongsPage(currentUri)) {
-        playlistTitleElement.textContent = "Liked Songs";
-        playlistTitleElement.title = "Liked Songs";
-    } else if (URI.isAlbum(currentUri)) {
-        const albumId = currentUri.split(":")[2];
-        Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/albums/${albumId}`
-        ).then((r) => {
-            playlistTitleElement.textContent = r.name;
-            playlistTitleElement.title = r.name;
-        });
-    }
+            } else if (URI.isArtist(currentUri)) {
+                const getName = async () => {
+                    const fetchFallback = async () => {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: currentUri, locale: "en", includePrerelease: false });
+                        return res.data.artistUnion.profile.name;
+                    };
+                    if (isFallbackActive()) return await fetchFallback();
+                    try {
+                        const r = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${id}`);
+                        return r.name;
+                    } catch (e) {
+                        if (registerWebApiFailure()) return await fetchFallback();
+                        throw e;
+                    }
+                };
+                const name = await getName();
+                playlistTitleElement.textContent = `All tracks by ${name}`;
+                playlistTitleElement.title = `All tracks by ${name}`;
+
+            } else if (isLikedSongsPage(currentUri)) {
+                playlistTitleElement.textContent = "Liked Songs";
+                playlistTitleElement.title = "Liked Songs";
+
+            } else if (URI.isAlbum(currentUri)) {
+                const getName = async () => {
+                    const fetchFallback = async () => {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUri, locale: "en", offset: 0, limit: 1 });
+                        return res.data.albumUnion.name;
+                    };
+                    if (isFallbackActive()) return await fetchFallback();
+                    try {
+                        const r = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${id}`);
+                        return r.name;
+                    } catch (e) {
+                        if (registerWebApiFailure()) return await fetchFallback();
+                        throw e;
+                    }
+                };
+                const name = await getName();
+                playlistTitleElement.textContent = name;
+                playlistTitleElement.title = name;
+            }
+        } catch (e) {
+            console.warn("Failed to set modal title", e);
+        }
+    })();
 
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
@@ -10199,21 +10382,69 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             mainButton.innerText = "100%";
 
             const sourceUri = currentUri;
-            let sourceName;
-            if (URI.isArtist(sourceUri)) {
-                sourceName = await Spicetify.CosmosAsync.get(
-                    `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-                ).then((r) => r.name);
-            } else if (isLikedSongsPage(sourceUri)) {
-                sourceName = "Liked Songs";
-            } else if (URI.isAlbum(sourceUri)) {
-                sourceName = await Spicetify.CosmosAsync.get(
-                    `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
-                ).then((r) => r.name);
-            } else {
-                sourceName = await Spicetify.CosmosAsync.get(
-                    `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-                ).then((r) => r.name);
+            const sourceId = sourceUri.split(":")[2];
+            let sourceName = "Source";
+
+            try {
+                if (URI.isArtist(sourceUri)) {
+                    const fetchArtistFallback = async () => {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
+                        return res.data.artistUnion.profile.name;
+                    };
+
+                    if (isFallbackActive()) {
+                        sourceName = await fetchArtistFallback();
+                    } else {
+                        try {
+                            const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceId}`);
+                            sourceName = artistData.name;
+                        } catch (e) {
+                            if (registerWebApiFailure()) {
+                                sourceName = await fetchArtistFallback();
+                            } else { throw e; }
+                        }
+                    }
+                } else if (isLikedSongsPage(sourceUri)) {
+                    sourceName = "Liked Songs";
+                } else if (URI.isAlbum(sourceUri)) {
+                    const fetchAlbumFallback = async () => {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                        return res.data.albumUnion.name;
+                    };
+
+                    if (isFallbackActive()) {
+                        sourceName = await fetchAlbumFallback();
+                    } else {
+                        try {
+                            const albumData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
+                            sourceName = albumData.name;
+                        } catch (e) {
+                            if (registerWebApiFailure()) {
+                                sourceName = await fetchAlbumFallback();
+                            } else { throw e; }
+                        }
+                    }
+                } else {
+                    const fetchPlaylistFallback = async () => {
+                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(sourceUri);
+                        return meta.name;
+                    };
+
+                    if (isFallbackActive()) {
+                        sourceName = await fetchPlaylistFallback();
+                    } else {
+                        try {
+                            const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceId}`);
+                            sourceName = playlistData.name;
+                        } catch (e) {
+                            if (registerWebApiFailure()) {
+                                sourceName = await fetchPlaylistFallback();
+                            } else { throw e; }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to fetch source name for Custom Filter playlist", e);
             }
 
             let suffixPattern = new RegExp(
@@ -10229,8 +10460,26 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (URI.isArtist(sourceUri)) {
                 baseDescription = `Tracks by ${sourceName} Filtered using Sort-Play`;
             } else if (URI.isAlbum(sourceUri)) {
-                const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-                const artistName = albumDetails.artists[0].name;
+                let artistName = "Unknown Artist";
+                try {
+                    const fetchAlbumArtistFallback = async () => {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                        return res.data.albumUnion.artists.items[0]?.profile?.name || "Unknown Artist";
+                    };
+
+                    if (isFallbackActive()) {
+                        artistName = await fetchAlbumArtistFallback();
+                    } else {
+                        try {
+                            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
+                            artistName = albumDetails.artists[0].name;
+                        } catch (e) {
+                            if (registerWebApiFailure()) {
+                                artistName = await fetchAlbumArtistFallback();
+                            } else { throw e; }
+                        }
+                    }
+                } catch (e) {}
                 baseDescription = `Tracks from ${sourceName} by ${artistName} Filtered using Sort-Play`;
             }
 
@@ -10785,8 +11034,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     } else {
         const playlistId = job.targetPlaylistUri.split(':')[2];
         try {
-            const currentPlaylistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-            const currentDescription = currentPlaylistData.description;
+            let currentDescription = null;
+
+            const fetchDescriptionInternal = async () => {
+                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(job.targetPlaylistUri);
+                return meta.description;
+            };
+
+            if (isFallbackActive()) {
+                currentDescription = await fetchDescriptionInternal();
+            } else {
+                try {
+                    const currentPlaylistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                    currentDescription = currentPlaylistData.description;
+                } catch (e) {
+                    if (registerWebApiFailure()) {
+                        currentDescription = await fetchDescriptionInternal();
+                    } else {
+                        throw e;
+                    }
+                }
+            }
 
             if (currentDescription && currentDescription.includes("Managed by Sort-Play.")) {
                 const allSortableItems = buttonStyles.menuItems.flatMap(item => {
@@ -10884,10 +11152,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (newDescription) {
         try {
-            await Spicetify.CosmosAsync.put(
-                `https://api.spotify.com/v1/playlists/${job.targetPlaylistUri.split(':')[2]}`,
-                { description: newDescription }
-            );
+            const playlistId = job.targetPlaylistUri.split(':')[2];
+            if (isFallbackActive()) {
+                await Spicetify.Platform.PlaylistAPI.setAttributes(job.targetPlaylistUri, { description: newDescription });
+            } else {
+                try {
+                    await Spicetify.CosmosAsync.put(
+                        `https://api.spotify.com/v1/playlists/${playlistId}`,
+                        { description: newDescription }
+                    );
+                } catch (e) {
+                    if (registerWebApiFailure()) {
+                        await Spicetify.Platform.PlaylistAPI.setAttributes(job.targetPlaylistUri, { description: newDescription });
+                    } else {
+                        throw e;
+                    }
+                }
+            }
         } catch (e) {
             console.warn("Sort-Play: Failed to update playlist description.", e);
         }
@@ -12900,7 +13181,29 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 try {
                     const playlistId = job.targetPlaylistUri.split(':')[2];
-                    const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                    let playlistData = null;
+
+                    const fetchMetaInternal = async () => {
+                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(job.targetPlaylistUri);
+                        return {
+                            name: meta.name,
+                            images: meta.images
+                        };
+                    };
+
+                    if (isFallbackActive()) {
+                        playlistData = await fetchMetaInternal();
+                    } else {
+                        try {
+                            playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                        } catch (e) {
+                            if (registerWebApiFailure()) {
+                                playlistData = await fetchMetaInternal();
+                            } else {
+                                throw e;
+                            }
+                        }
+                    }
                     
                     if (job.isDeleted) {
                         job.isDeleted = false;
@@ -15444,21 +15747,69 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
     
     
-      let sourceName;
-      if (URI.isArtist(sourceUri)) {
-          sourceName = await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`
-          ).then((r) => r.name);
-      } else if (isLikedSongsPage(sourceUri)) {
-          sourceName = "Liked Songs";
-      } else if (URI.isAlbum(sourceUri)) {
-          sourceName = await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`
-          ).then((r) => r.name);
-      } else {
-          sourceName = await Spicetify.CosmosAsync.get(
-              `https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`
-          ).then((r) => r.name);
+      let sourceName = "Source";
+      const sourceId = sourceUri.split(":")[2];
+
+      try {
+          if (URI.isArtist(sourceUri)) {
+              const fetchArtistFallback = async () => {
+                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
+                  return res.data.artistUnion.profile.name;
+              };
+
+              if (isFallbackActive()) {
+                  sourceName = await fetchArtistFallback();
+              } else {
+                  try {
+                      const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceId}`);
+                      sourceName = artistData.name;
+                  } catch (e) {
+                      if (registerWebApiFailure()) {
+                          sourceName = await fetchArtistFallback();
+                      } else { throw e; }
+                  }
+              }
+          } else if (isLikedSongsPage(sourceUri)) {
+              sourceName = "Liked Songs";
+          } else if (URI.isAlbum(sourceUri)) {
+              const fetchAlbumFallback = async () => {
+                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                  return res.data.albumUnion.name;
+              };
+
+              if (isFallbackActive()) {
+                  sourceName = await fetchAlbumFallback();
+              } else {
+                  try {
+                      const albumData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
+                      sourceName = albumData.name;
+                  } catch (e) {
+                      if (registerWebApiFailure()) {
+                          sourceName = await fetchAlbumFallback();
+                      } else { throw e; }
+                  }
+              }
+          } else {
+              const fetchPlaylistFallback = async () => {
+                  const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(sourceUri);
+                  return meta.name;
+              };
+
+              if (isFallbackActive()) {
+                  sourceName = await fetchPlaylistFallback();
+              } else {
+                  try {
+                      const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceId}`);
+                      sourceName = playlistData.name;
+                  } catch (e) {
+                      if (registerWebApiFailure()) {
+                          sourceName = await fetchPlaylistFallback();
+                      } else { throw e; }
+                  }
+              }
+          }
+      } catch (e) {
+          console.warn("Failed to fetch source name for Genre Filter playlist", e);
       }
     
       let suffixPattern = new RegExp(
@@ -15474,8 +15825,26 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       if (URI.isArtist(sourceUri)) {
           baseDescription = `Tracks by ${sourceName} ` + baseDescription;
       } else if (URI.isAlbum(sourceUri)) {
-          const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-          const artistName = albumDetails.artists[0].name;
+          let artistName = "Unknown Artist";
+          try {
+              const fetchAlbumArtistFallback = async () => {
+                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                  return res.data.albumUnion.artists.items[0]?.profile?.name || "Unknown Artist";
+              };
+
+              if (isFallbackActive()) {
+                  artistName = await fetchAlbumArtistFallback();
+              } else {
+                  try {
+                      const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
+                      artistName = albumDetails.artists[0].name;
+                  } catch (e) {
+                      if (registerWebApiFailure()) {
+                          artistName = await fetchAlbumArtistFallback();
+                      } else { throw e; }
+                  }
+              }
+          } catch (e) {}
           baseDescription = `Tracks from ${sourceName} by ${artistName} ` + baseDescription;
       }
     
@@ -20643,8 +21012,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     let finalSortedTracks;
+    const fallbackActive = isFallbackActive();
 
-    if (useEnergyWaveShuffle && !containsLocalFiles && tracks.length <= energyWaveShuffleLimit) {
+    if (useEnergyWaveShuffle && !containsLocalFiles && !fallbackActive && tracks.length <= energyWaveShuffleLimit) {
         showNotification("Performing Randomized Energy Wave Shuffle...");
         
         const trackIds = tracksToProcess.map(t => t.trackId || t.uri.split(":")[2]);
@@ -20657,7 +21027,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         finalSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
     } else {
         if (useEnergyWaveShuffle) {
-            if (containsLocalFiles) {
+            if (fallbackActive) {
+                showNotification("Web API unavailable. Reverting to standard shuffle.", 'warning');
+            } else if (containsLocalFiles) {
                 showNotification("Local files detected. Reverting to standard shuffle.", 'warning');
             } else if (tracks.length > energyWaveShuffleLimit) {
                 showNotification(`Playlist too large (>${energyWaveShuffleLimit}). Reverting to standard shuffle.`, 'warning');
@@ -22739,9 +23111,29 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const trackIds = batchToTest.map(t => t.uri.split(':')[2]);
         
         try {
-            const fullTrackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIds.join(',')}`);
-            if (fullTrackDetails && fullTrackDetails.tracks) {
-                for (const fullTrack of fullTrackDetails.tracks) {
+            let responseTracks = [];
+
+            const fetchBatchInternal = async () => {
+                return await Promise.all(trackIds.map(id => fetchInternalTrackMetadata(id)));
+            };
+
+            if (isFallbackActive()) {
+                responseTracks = await fetchBatchInternal();
+            } else {
+                try {
+                    const fullTrackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIds.join(',')}`);
+                    responseTracks = fullTrackDetails?.tracks || [];
+                } catch (error) {
+                    if (registerWebApiFailure()) {
+                        responseTracks = await fetchBatchInternal();
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+
+            if (responseTracks) {
+                for (const fullTrack of responseTracks) {
                     if (fullTrack && await isTrackAvailable(fullTrack)) {
                         directTracks.push(fullTrack);
                         if (directTracks.length >= numTracksNeeded) {
@@ -24982,10 +25374,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
 
                 try {
-                    await Spicetify.CosmosAsync.put(
-                        `https://api.spotify.com/v1/playlists/${playlistIdToModify}`,
-                        requestBody
-                    );
+                    if (isFallbackActive()) {
+                        await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistIdToModify}`, requestBody);
+                    } else {
+                        try {
+                            await Spicetify.CosmosAsync.put(
+                                `https://api.spotify.com/v1/playlists/${playlistIdToModify}`,
+                                requestBody
+                            );
+                        } catch (error) {
+                            if (registerWebApiFailure()) {
+                                await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistIdToModify}`, requestBody);
+                            } else {
+                                throw error;
+                            }
+                        }
+                    }
                 } catch (error) {
                     const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
                     if (!isExpectedJsonError) {
@@ -25020,8 +25424,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 playlistDescription = `Discography of ${finalSourceName} - created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
               } else if (isAlbumPage) {
                 const albumId = currentUriAtStart.split(":")[2];
-                const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
-                const artistName = albumDetails.artists[0].name;
+                let artistName = "Unknown Artist";
+                
+                try {
+                    const fetchAlbumArtistFallback = async () => {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUriAtStart, locale: "en", offset: 0, limit: 1 });
+                        if (res.data.albumUnion.artists.items.length > 0) {
+                            return res.data.albumUnion.artists.items[0].profile.name;
+                        }
+                        return "Unknown Artist";
+                    };
+
+                    if (isFallbackActive()) {
+                        artistName = await fetchAlbumArtistFallback();
+                    } else {
+                        try {
+                            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+                            artistName = albumDetails.artists[0].name;
+                        } catch (e) {
+                            if (registerWebApiFailure()) {
+                                artistName = await fetchAlbumArtistFallback();
+                            } else {
+                                throw e;
+                            }
+                        }
+                    }
+                } catch (e) { console.warn("Failed to fetch album artist for description", e); }
+
                 playlistDescription = `Tracks from ${finalSourceName} by ${artistName} - created and sorted by ${sortTypeInfo.fullName} using Sort-Play`;
               }
 
