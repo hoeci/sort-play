@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.39.8";
+  const SORT_PLAY_VERSION = "5.40.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -126,6 +126,8 @@
   const CACHE_EXPIRE_AI_DATA = null;
   const CACHE_EXPIRE_PALETTE = null;
   const CACHE_EXPIRE_METADATA = 24 * 60 * 60 * 1000; 
+  const STORAGE_KEY_FALLBACK_MODE = "sort-play-use-internal-fallback";
+  const STORAGE_KEY_WEB_API_FAILURES = "sort-play-web-api-failures";
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
@@ -133,7 +135,133 @@
   const DEEZER_GATEWAY_URL_2 = "https://deezer-proxy-2.hoeci.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
   const STATS_URL = "https://sp-stats.niko2nio2.workers.dev";
+  const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
 
+  let s_Access_Token = null;
+  let s_Token_Exp = 0;
+
+  async function get_S_Client_Token() {
+      if (s_Access_Token && Date.now() < s_Token_Exp) {
+          return s_Access_Token;
+      }
+
+      try {
+          const response = await fetch(TOKEN_SP_PROXY_URL);
+
+          if (!response.ok) {
+              console.error("[Sort-Play] Token Proxy failed:", response.status);
+              return null;
+          }
+
+          const data = await response.json();
+          if (data.access_token) {
+              s_Access_Token = data.access_token;
+              s_Token_Exp = Date.now() + (data.expires_in * 1000) - 60000;
+              return s_Access_Token;
+          } else {
+              console.error("[Sort-Play] Invalid response from Token Proxy");
+              return null;
+          }
+
+      } catch (e) {
+          console.error("[Sort-Play] Network error contacting Token Proxy:", e);
+          return null;
+      }
+  }
+  function spotifyHex(base62) {
+    const INVALID = "00000000000000000000000000000000";
+    if (!base62 || base62.length > 22) return INVALID;
+    const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let val = BigInt(0);
+    for (let i = 0; i < base62.length; i++) {
+        const idx = chars.indexOf(base62[i]);
+        if (idx === -1) return INVALID;
+        val = val * BigInt(62) + BigInt(idx);
+    }
+    return val.toString(16).padStart(32, "0");
+  }
+
+  const hexToBase62 = (hex) => {
+    const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let val = BigInt("0x" + hex);
+    let base62 = "";
+    while (val > 0n) {
+        base62 = alphabet[Number(val % 62n)] + base62;
+        val /= 62n;
+    }
+    return base62.padStart(22, "0");
+  };
+  
+  const MANUAL_FALLBACK_OVERRIDE = true;
+
+  function isFallbackActive() {
+      if (MANUAL_FALLBACK_OVERRIDE) return true;
+
+      const fallbackTs = localStorage.getItem(STORAGE_KEY_FALLBACK_MODE);
+      if (fallbackTs && (Date.now() - parseInt(fallbackTs)) < 24 * 60 * 60 * 1000) {
+          return true;
+      }
+      return false;
+  }
+
+  function registerWebApiFailure() {
+      let count = parseInt(localStorage.getItem(STORAGE_KEY_WEB_API_FAILURES) || "0");
+      count++;
+      localStorage.setItem(STORAGE_KEY_WEB_API_FAILURES, count);
+      if (count >= 5) {
+          localStorage.setItem(STORAGE_KEY_FALLBACK_MODE, Date.now().toString());
+          console.warn("[Sort-Play] Web API unstable. Switched to Internal Fallback mode for 24h.");
+          return true;
+      }
+      return false;
+  }
+
+  async function fetchInternalTrackMetadata(trackId) {
+      try {
+          const hexId = spotifyHex(trackId);
+          const token = Spicetify.Platform.Session.accessToken;
+          const url = `https://spclient.wg.spotify.com/metadata/4/track/${hexId}?market=from_token`;
+          
+          const response = await fetch(url, {
+              headers: {
+                  "Authorization": `Bearer ${token}`,
+                  "Accept": "application/json"
+              }
+          });
+          
+          if (!response.ok) return null;
+          const body = await response.json();
+          if (!body) return null;
+          
+          return {
+              name: body.name,
+              id: trackId,
+              uri: `spotify:track:${trackId}`,
+              popularity: body.popularity,
+              duration_ms: body.duration,
+              explicit: body.explicit,
+              album: {
+                  name: body.album?.name,
+                  id: body.album?.gid ? hexToBase62(body.album.gid) : null,
+                  uri: body.album?.gid ? `spotify:album:${hexToBase62(body.album.gid)}` : null,
+                  release_date: body.album?.date ? `${body.album.date.year}-${String(body.album.date.month || 1).padStart(2,'0')}-${String(body.album.date.day || 1).padStart(2,'0')}` : null,
+                  images: body.album?.cover_group?.image?.map(img => ({ url: `https://i.scdn.co/image/${img.file_id}` })) || []
+              },
+              artists: body.artist?.map(a => {
+                  const artistId = a.gid ? hexToBase62(a.gid) : null;
+                  return { 
+                      name: a.name, 
+                      id: artistId,
+                      uri: artistId ? `spotify:artist:${artistId}` : null 
+                  };
+              }) || [],
+              external_ids: body.external_id ? { isrc: body.external_id.find(i => i.type === 'isrc')?.id } : {}
+          };
+      } catch (e) {
+          console.error("[Sort-Play] Internal Metadata Fetch Error:", e);
+          return null;
+      }
+  }
 
   const idb = {
     db: null,
@@ -3133,7 +3261,7 @@
         .custom-select-wrapper { position: relative; width: 100%; }
         .custom-select-trigger {
             width: 100%;
-            padding: 6px 12px;
+            padding: 6px 0px 6px 12px;
             border-radius: 4px;
             border: 1px solid #434343;
             background: #3e3e3e;
@@ -3153,8 +3281,8 @@
             height: 100%;
         }
         .custom-select-trigger svg {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             transition: transform 0.2s ease;
         }
         .custom-select-trigger.open svg {
@@ -4881,8 +5009,21 @@
                 });
                 dataValue = releaseDateData ? formatReleaseDate(releaseDateData.releaseDate, selectedNowPlayingDateFormat) : '―';
             } else if (selectedNowPlayingDataType === 'popularity') {
-                const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                const rawPopularity = trackDetails.popularity !== null ? trackDetails.popularity : null;
+                let rawPopularity = null;
+                if (isFallbackActive()) {
+                    const meta = await fetchInternalTrackMetadata(trackId);
+                    if (meta) rawPopularity = meta.popularity;
+                } else {
+                    try {
+                        const trackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                        rawPopularity = trackDetails.popularity !== null ? trackDetails.popularity : null;
+                    } catch (e) {
+                        if (registerWebApiFailure()) {
+                            const meta = await fetchInternalTrackMetadata(trackId);
+                            if (meta) rawPopularity = meta.popularity;
+                        }
+                    }
+                }
                 dataValue = formatPopularity(rawPopularity, selectedNowPlayingPopularityFormat);
             } else if (selectedNowPlayingDataType === 'playCount') {
                 const playCountData = await getTrackDetailsWithPlayCount({
@@ -6427,39 +6568,59 @@ sendButton.addEventListener("click", async () => {
     }
 
     let albumId;
-    
     if (track.albumId) {
       albumId = track.albumId;
     } else if (track.albumUri) {
       albumId = track.albumUri.split(":")[2];
     } else {
-      console.warn(`Could not determine album ID for track ${track.name}`);
       return trackWithStandardReleaseDate;
     }
     
+    const trackId = track.uri.split(":")[2];
+
     try {
-      const result = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${track.uri.split(":")[2]}`);
+        let releaseDate = null;
+
+        if (isFallbackActive()) {
+            const meta = await fetchInternalTrackMetadata(trackId);
+            if (meta && meta.album && meta.album.release_date) {
+                releaseDate = meta.album.release_date;
+            }
+        } else {
+            try {
+                const result = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                if (result && result.album && result.album.release_date) {
+                    releaseDate = result.album.release_date;
+                }
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    const meta = await fetchInternalTrackMetadata(trackId);
+                    if (meta && meta.album && meta.album.release_date) {
+                        releaseDate = meta.album.release_date;
+                    }
+                }
+            }
+        }
+
+        if (!releaseDate) {
+             try {
+                 const albumResult = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+                 if (albumResult && albumResult.release_date) {
+                     releaseDate = albumResult.release_date;
+                 }
+             } catch(e) {}
+        }
       
-      if (result && result.album && result.album.release_date) {
+      if (releaseDate) {
         return {
           ...trackWithStandardReleaseDate,
-          releaseDate: result.album.release_date
-        };
-      }
-      
-      const albumResult = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
-      
-      if (albumResult && albumResult.release_date) {
-        return {
-          ...trackWithStandardReleaseDate,
-          releaseDate: albumResult.release_date
+          releaseDate: releaseDate
         };
       }
       
       return trackWithStandardReleaseDate;
       
     } catch (error) {
-      console.error(`Error getting single release date for track ${track.name}:`, error);
       return trackWithStandardReleaseDate;
     }
   }
@@ -10723,6 +10884,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         type: 'playlist'
                     };
                 } else {
+                    const fetchWithInternal = async () => {
+                        try {
+                            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(item.uri);
+                            const fetchedImages = meta.images || [];
+                            return {
+                                uri: item.uri,
+                                name: item.name || meta.name,
+                                info: 'Playlist',
+                                coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
+                                type: 'playlist'
+                            };
+                        } catch (e) {
+                            console.warn(`Sort-Play: Could not fetch metadata for playlist ${item.name}`, e);
+                            return {
+                                uri: item.uri,
+                                name: item.name,
+                                info: 'Playlist',
+                                coverUrl: null,
+                                type: 'playlist'
+                            };
+                        }
+                    };
+
+                    if (isFallbackActive()) {
+                        return await fetchWithInternal();
+                    }
+
                     try {
                         const playlistId = item.uri.split(':')[2];
                         const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
@@ -10735,6 +10923,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             type: 'playlist'
                         };
                     } catch (error) {
+                        if (registerWebApiFailure()) {
+                            return await fetchWithInternal();
+                        }
                         console.warn(`Sort-Play: Could not fetch full details for playlist ${item.name}`, error);
                         return {
                             uri: item.uri,
@@ -10749,19 +10940,54 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const resolvedPlaylists = await Promise.all(playlistPromises);
 
-        const albumsRes = await Spicetify.CosmosAsync.get('https://api.spotify.com/v1/me/albums?limit=50');
-        const resolvedAlbums = [];
-        if (albumsRes.items) {
-            albumsRes.items.forEach(item => {
-                const images = item.album.images || [];
-                resolvedAlbums.push({
-                    uri: item.album.uri,
-                    name: item.album.name,
-                    info: `Album by ${item.album.artists.map(a => a.name).join(', ')}`,
-                    coverUrl: images.length ? (images[images.length - 1] || images[0]).url : null,
-                    type: 'album'
+        const fetchAlbumsInternal = async () => {
+            const resolvedAlbumsInternal = [];
+            try {
+                const libItems = await Spicetify.Platform.LibraryAPI.getContents({ limit: 100, sort: { field: "ADDED", order: "DESC" } });
+                const albumItems = (libItems.items || []).filter(item => item.type === 'album' || (item.uri && item.uri.includes(':album:')));
+                
+                albumItems.forEach(item => {
+                    const imageUrl = item.images?.length ? item.images[0].url : (item.image?.url || null);
+                    resolvedAlbumsInternal.push({
+                        uri: item.uri,
+                        name: item.name,
+                        info: `Album by ${item.artists ? item.artists.map(a => a.name).join(', ') : 'Unknown'}`,
+                        coverUrl: imageUrl,
+                        type: 'album'
+                    });
                 });
-            });
+            } catch (e) {
+                console.warn("[Sort-Play] Internal Album fetch failed:", e);
+            }
+            return resolvedAlbumsInternal;
+        };
+
+        let resolvedAlbums = [];
+
+        if (isFallbackActive()) {
+            resolvedAlbums = await fetchAlbumsInternal();
+        } else {
+            try {
+                const albumsRes = await Spicetify.CosmosAsync.get('https://api.spotify.com/v1/me/albums?limit=50');
+                if (albumsRes.items) {
+                    albumsRes.items.forEach(item => {
+                        const images = item.album.images || [];
+                        resolvedAlbums.push({
+                            uri: item.album.uri,
+                            name: item.album.name,
+                            info: `Album by ${item.album.artists.map(a => a.name).join(', ')}`,
+                            coverUrl: images.length ? (images[images.length - 1] || images[0]).url : null,
+                            type: 'album'
+                        });
+                    });
+                }
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    resolvedAlbums = await fetchAlbumsInternal();
+                } else {
+                    console.warn("Failed to fetch albums via Web API", e);
+                }
+            }
         }
         
         return [...resolvedPlaylists, ...resolvedAlbums];
@@ -10998,12 +11224,51 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             hideSuggestions();
             return;
         }
+
+        const fetchFallback = async () => {
+            const token = await get_S_Client_Token();
+            if (!token) {
+                hideSuggestions();
+                return;
+            }
+            try {
+                const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist,artist&limit=8`, {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                
+                if (res.status === 429) {
+                    s_Access_Token = null; 
+                    throw new Error("Rate Limited");
+                }
+
+                const data = await res.json();
+                const playlists = data.playlists?.items?.filter(Boolean) || [];
+                const artists = data.artists?.items?.filter(Boolean) || [];
+                
+                renderSuggestions(playlists, artists);
+            } catch (e) {
+                console.error("Client Credentials Search failed:", e);
+                hideSuggestions();
+            }
+        };
+
+        if (isFallbackActive()) {
+            await fetchFallback();
+            return;
+        }
+
         try {
             const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist,artist&limit=8`);
-            renderSuggestions(res.playlists?.items, res.artists?.items);
+            const playlists = res.playlists?.items?.filter(Boolean) || [];
+            const artists = res.artists?.items?.filter(Boolean) || [];
+            renderSuggestions(playlists, artists);
         } catch (e) {
-            console.error("Search failed:", e);
-            hideSuggestions();
+            if (registerWebApiFailure()) {
+                await fetchFallback();
+            } else {
+                console.error("Search failed:", e);
+                hideSuggestions();
+            }
         }
     };
 
@@ -11050,28 +11315,103 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let newSourceData = { uri: newUri };
 
         if (URI.isPlaylistV1OrV2(newUri)) {
-            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${newUri.split(":")[2]}`);
-            newSourceData.name = data.name;
-            const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
-            newSourceData.info = `Playlist by ${ownerName}`;
-            newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
-            newSourceData.isStatic = false;
-            newSourceData.totalTracks = 'N/A';
-            newSourceData.totalTracks = data.tracks.total;
+            const fetchPlaylistFallback = async () => {
+                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(newUri);
+                const owner = meta.owner?.displayName || meta.owner?.name || meta.owner?.username || "Unknown Owner";
+                return {
+                    name: meta.name,
+                    info: `Playlist by ${owner}`,
+                    coverUrl: meta.images?.length ? (meta.images[meta.images.length - 1] || meta.images[0]).url : null,
+                    isStatic: false,
+                    totalTracks: meta.totalLength
+                };
+            };
+
+            if (isFallbackActive()) {
+                Object.assign(newSourceData, await fetchPlaylistFallback());
+            } else {
+                try {
+                    const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${newUri.split(":")[2]}`);
+                    newSourceData.name = data.name;
+                    const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
+                    newSourceData.info = `Playlist by ${ownerName}`;
+                    newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
+                    newSourceData.isStatic = false;
+                    newSourceData.totalTracks = data.tracks.total;
+                } catch (error) {
+                    if (registerWebApiFailure()) {
+                        Object.assign(newSourceData, await fetchPlaylistFallback());
+                    } else {
+                        throw error;
+                    }
+                }
+            }
         } else if (URI.isArtist(newUri)) {
-            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${newUri.split(":")[2]}`);
-            newSourceData.name = data.name;
-            newSourceData.info = `Artist Page`;
-            newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
-            newSourceData.isStatic = true;
+            const fetchArtistFallback = async () => {
+                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, {
+                    uri: newUri, locale: "en", includePrerelease: false
+                });
+                const u = res.data.artistUnion;
+                return {
+                    name: u.profile.name,
+                    info: `Artist Page`,
+                    coverUrl: u.visuals.avatarImage?.sources?.[0]?.url || null,
+                    isStatic: true,
+                    totalTracks: 'N/A'
+                };
+            };
+
+            if (isFallbackActive()) {
+                Object.assign(newSourceData, await fetchArtistFallback());
+            } else {
+                try {
+                    const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${newUri.split(":")[2]}`);
+                    newSourceData.name = data.name;
+                    newSourceData.info = `Artist Page`;
+                    newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
+                    newSourceData.isStatic = true;
+                    newSourceData.totalTracks = 'N/A';
+                } catch (error) {
+                    if (registerWebApiFailure()) {
+                        Object.assign(newSourceData, await fetchArtistFallback());
+                    } else {
+                        throw error;
+                    }
+                }
+            }
         } else if (URI.isAlbum(newUri)) {
-            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${newUri.split(":")[2]}`);
-            newSourceData.name = data.name;
-            newSourceData.info = `Album by ${data.artists.map(a => a.name).join(', ')}`;
-            newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
-            newSourceData.isStatic = true;
-            newSourceData.totalTracks = 'N/A';
-            newSourceData.totalTracks = data.tracks.total;
+            const fetchAlbumFallback = async () => {
+                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
+                    uri: newUri, locale: "en", offset: 0, limit: 1
+                });
+                const u = res.data.albumUnion;
+                return {
+                    name: u.name,
+                    info: `Album by ${u.artists.items.map(a => a.profile.name).join(', ')}`,
+                    coverUrl: u.coverArt.sources?.[0]?.url || null,
+                    isStatic: true,
+                    totalTracks: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount
+                };
+            };
+
+            if (isFallbackActive()) {
+                Object.assign(newSourceData, await fetchAlbumFallback());
+            } else {
+                try {
+                    const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${newUri.split(":")[2]}`);
+                    newSourceData.name = data.name;
+                    newSourceData.info = `Album by ${data.artists.map(a => a.name).join(', ')}`;
+                    newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
+                    newSourceData.isStatic = true;
+                    newSourceData.totalTracks = data.tracks.total;
+                } catch (error) {
+                    if (registerWebApiFailure()) {
+                        Object.assign(newSourceData, await fetchAlbumFallback());
+                    } else {
+                        throw error;
+                    }
+                }
+            }
         } else {
             throw new Error("Unsupported link type. Please use a Playlist, Album, or Artist link.");
         }
@@ -13512,22 +13852,53 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     try {
                         let sourceName, sourceInfo, sourceCoverUrl, isStaticSource = false, totalTracks = 'N/A';
                         if (URI.isPlaylistV1OrV2(sourceUri)) {
-                            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceUri.split(":")[2]}`);
+                            const data = await Spicetify.Platform.PlaylistAPI.getMetadata(sourceUri);
                             sourceName = data.name; 
-                            const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
+                            const ownerName = data.owner?.displayName || data.owner?.name || "Unknown Owner";
                             sourceInfo = `Playlist by ${ownerName}`; 
-                            sourceCoverUrl = data.images[0]?.url; 
-                            totalTracks = data.tracks.total;
+                            sourceCoverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
+                            totalTracks = data.totalLength;
                         } else if (URI.isArtist(sourceUri)) {
-                            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUri.split(":")[2]}`);
-                            sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = 'N/A';
+                            const id = sourceUri.split(":")[2];
+                            let data;
+                            if (isFallbackActive()) {
+                                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
+                                data = { name: res.data.artistUnion.profile.name, images: [{ url: res.data.artistUnion.visuals.avatarImage?.sources?.[0]?.url }] };
+                            } else {
+                                try {
+                                    data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${id}`);
+                                } catch(e) {
+                                    if(registerWebApiFailure()) {
+                                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
+                                        data = { name: res.data.artistUnion.profile.name, images: [{ url: res.data.artistUnion.visuals.avatarImage?.sources?.[0]?.url }] };
+                                    }
+                                }
+                            }
+                            sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images?.[0]?.url; isStaticSource = true; totalTracks = 'N/A';
                         } else if (isLikedSongsPage(sourceUri)) {
                             sourceName = "Liked Songs"; sourceInfo = "Your collection"; sourceCoverUrl = 'https://misc.scdn.co/liked-songs/liked-songs-640.png';
                             const likedSongs = await getLikedSongs();
                             totalTracks = likedSongs.length;
                         } else if (URI.isAlbum(sourceUri)) {
-                            const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-                            sourceName = data.name; sourceInfo = `Album by ${data.artists.map(a => a.name).join(', ')}`; sourceCoverUrl = data.images[0]?.url; isStaticSource = true; totalTracks = data.tracks.total;
+                            const id = sourceUri.split(":")[2];
+                            let data;
+                            if (isFallbackActive()) {
+                                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                                const u = res.data.albumUnion;
+                                data = { name: u.name, artists: u.artists.items, images: [{ url: u.coverArt.sources[0].url }], tracks: { total: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount } };
+                            } else {
+                                try {
+                                    data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${id}`);
+                                } catch(e) {
+                                    if(registerWebApiFailure()) {
+                                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                                        const u = res.data.albumUnion;
+                                        data = { name: u.name, artists: u.artists.items, images: [{ url: u.coverArt.sources[0].url }], tracks: { total: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount } };
+                                    }
+                                }
+                            }
+                            const artistNames = data.artists.map(a => a.profile ? a.profile.name : a.name).join(', ');
+                            sourceName = data.name; sourceInfo = `Album by ${artistNames}`; sourceCoverUrl = data.images?.[0]?.url; isStaticSource = true; totalTracks = data.tracks.total;
                         }
                         
                         if (sourceName) {
@@ -15557,13 +15928,29 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let isCompleteSuccess = true; 
 
         try {
-            const trackDetails = preFetchedTrackDetails || await withRetry(
-                () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`),
-                CONFIG.spotify.retryAttempts,
-                CONFIG.spotify.retryDelay
-            );
-    
-            if (trackDetails?.code || trackDetails?.error) throw new Error(trackDetails.message);
+            let trackDetails = preFetchedTrackDetails;
+            
+            if (!trackDetails) {
+                if (isFallbackActive()) {
+                    trackDetails = await fetchInternalTrackMetadata(trackId);
+                } else {
+                    try {
+                        trackDetails = await withRetry(
+                            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`),
+                            CONFIG.spotify.retryAttempts,
+                            CONFIG.spotify.retryDelay
+                        );
+                    } catch (error) {
+                        if (registerWebApiFailure()) {
+                            trackDetails = await fetchInternalTrackMetadata(trackId);
+                        } else {
+                            throw error;
+                        }
+                    }
+                }
+            }
+            
+            if (!trackDetails || trackDetails.error) throw new Error("Failed to fetch track details");
             
             if (!trackDetails?.artists?.length) {
                 return { 
@@ -16760,7 +17147,74 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getAlbumTracks(albumId) {
-    const { CosmosAsync } = Spicetify;
+    const { CosmosAsync, GraphQL } = Spicetify;
+    const albumUri = `spotify:album:${albumId}`;
+
+    const fetchAlbumTracksGQL = async () => {
+        const res = await GraphQL.Request(GraphQL.Definitions.queryAlbumTracks, {
+            uri: albumUri,
+            offset: 0,
+            limit: 500,
+            locale: "en"
+        });
+
+        const album = res.data?.albumUnion;
+        const tracks = album?.tracksV2?.items || album?.tracks?.items;
+        if (!tracks) throw new Error("GraphQL Album fetch failed");
+
+        const releaseDate = album.date?.isoString || album.date?.year?.toString();
+
+        return tracks.map(item => {
+            const t = item.track;
+            const artists = t.artists.items.map(a => ({
+                name: a.profile.name,
+                uri: a.uri,
+                id: a.uri ? a.uri.split(':')[2] : null
+            }));
+            const rawPlaycount = t.playcount ? parseInt(t.playcount, 10) : 0;
+
+            return {
+                uri: t.uri,
+                uid: null,
+                name: t.name,
+                songTitle: t.name,
+                albumUri: albumUri,
+                albumName: album.name,
+                artistUris: artists.map(a => a.uri),
+                allArtists: artists.map(a => a.name).join(", "),
+                artistName: artists[0]?.name,
+                durationMilis: t.duration.totalMilliseconds,
+                durationMs: t.duration.totalMilliseconds,
+                playcount: rawPlaycount,
+                playCount: rawPlaycount > 0 ? rawPlaycount : "N/A",
+                popularity: null,
+                releaseDate: releaseDate,
+                track: {
+                    album: { 
+                        id: albumId, 
+                        name: album.name, 
+                        release_date: releaseDate,
+                        images: album.coverArt?.sources?.map(s => ({ url: s.url })) || []
+                    },
+                    name: t.name,
+                    duration_ms: t.duration.totalMilliseconds, 
+                    id: t.uri.split(':')[2],
+                    artists: artists,
+                    external_ids: {}
+                }
+            };
+        });
+    };
+
+    if (isFallbackActive()) {
+        try {
+            return await fetchAlbumTracksGQL();
+        } catch (e) {
+            console.error("[Sort-Play] Fallback getAlbumTracks failed:", e);
+            return [];
+        }
+    }
+
     try {
       const albumData = await CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
       if (!albumData || !albumData.tracks) {
@@ -16784,26 +17238,32 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         uri: track.uri,
         uid: null,
         name: track.name,
+        songTitle: track.name,
         albumUri: albumData.uri,
         albumName: albumData.name,
         artistUris: track.artists.map(artist => artist.uri),
         allArtists: track.artists.map(artist => artist.name).join(", "),
         artistName: track.artists[0].name,
         durationMilis: track.duration_ms,
+        durationMs: track.duration_ms,
         playCount: "N/A",
         popularity: null,
         releaseDate: null,
         track: {
-          album: {
-            id: albumId,
-            name: albumData.name,
-          },
+          album: { id: albumId, name: albumData.name },
           name: track.name,
           duration_ms: track.duration_ms,
           id: track.id,
         }
       }));
     } catch (error) {
+      if (registerWebApiFailure()) {
+          try {
+              return await fetchAlbumTracksGQL();
+          } catch (e) {
+              return [];
+          }
+      }
       console.error(`Error fetching tracks for album ${albumId}:`, error);
       showNotification("Failed to fetch all album tracks.", true);
       return [];
@@ -16813,7 +17273,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function getArtistTracks(artistUri, isHeadless = false) {
     const { Locale, GraphQL, CosmosAsync } = Spicetify;
   
-    const queryArtistOverview = {
+    const queryArtistOverview = Spicetify.GraphQL.Definitions.queryArtistOverview || {
       name: "queryArtistOverview",
       operation: "query",
       sha256Hash: "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497",
@@ -16835,109 +17295,238 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const artistName = artistData.data.artistUnion.profile.name;
       const artistId = artistUri.split(":")[2];
 
-      const allAlbumIds = new Set();
-      let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
-  
-      do {
-        const albumRes = await CosmosAsync.get(nextUrl);
-        if (!albumRes.items) break;
-  
-        albumRes.items.forEach((album) => {
-          allAlbumIds.add(album.id);
-        });
-  
-        nextUrl = albumRes.next;
-        if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
-      } while (nextUrl);
+      const allAlbumMetadata = new Map();
+
+      const fetchAlbumIdsWeb = async () => {
+          let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
+          while (nextUrl) {
+            const albumRes = await CosmosAsync.get(nextUrl);
+            if (!albumRes.items) break;
+            albumRes.items.forEach((album) => {
+                allAlbumMetadata.set(album.id, { type: album.album_type, date: album.release_date });
+            });
+            nextUrl = albumRes.next;
+            if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
+          }
+      };
+
+      const fetchAlbumIdsGQL = async () => {
+          let offset = 0;
+          let limit = 100;
+          let total = null;
+          while (total === null || offset < total) {
+              const res = await GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, {
+                  uri: artistUri,
+                  offset: offset,
+                  limit: limit
+              });
+              const disc = res.data.artistUnion.discography.all;
+              total = disc.totalCount;
+              
+              disc.items.forEach(group => {
+                  if (group.releases && group.releases.items) {
+                      group.releases.items.forEach(rel => {
+                          const id = rel.uri.split(':')[2];
+                          allAlbumMetadata.set(id, { 
+                              type: rel.type || 'album',
+                              date: rel.date?.isoString || rel.date?.year 
+                          });
+                      });
+                  }
+              });
+              offset += limit;
+          }
+      };
+
+      const fetchAppearsOnIdsGQL = async () => {
+          let offset = 0;
+          let limit = 100;
+          let total = null;
+          while (total === null || offset < total) {
+              try {
+                  const res = await GraphQL.Request(GraphQL.Definitions.queryArtistAppearsOn, {
+                      uri: artistUri,
+                      offset: offset,
+                      limit: limit
+                  });
+                  const appearsOn = res?.data?.artistUnion?.relatedContent?.appearsOn;
+                  if (!appearsOn) break;
+                  
+                  total = appearsOn.totalCount;
+                  
+                  if (appearsOn.items) {
+                      appearsOn.items.forEach(item => {
+                          const release = item.releases?.items?.[0];
+                          if (release) {
+                              const id = release.uri.split(':')[2];
+                              if (!allAlbumMetadata.has(id)) {
+                                  allAlbumMetadata.set(id, { 
+                                      type: 'appears_on', 
+                                      date: null 
+                                  });
+                              }
+                          }
+                      });
+                  }
+                  offset += limit;
+              } catch (e) {
+                  console.warn("Failed to fetch Appears On batch", e);
+                  break;
+              }
+          }
+      };
+
+      if (isFallbackActive()) {
+          await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL()]);
+      } else {
+          try {
+              await fetchAlbumIdsWeb();
+          } catch (e) {
+              if (registerWebApiFailure()) {
+                  await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL()]);
+              } else {
+                  throw e;
+              }
+          }
+      }
   
       const allTracks = [];
-      const batchSize = 20; 
-      const allAlbumIdArray = Array.from(allAlbumIds);
-      const batchPromises = [];
-      
-      for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
-        const batch = allAlbumIdArray.slice(i, i + batchSize);
-        const promise = withRetry(
-            () => CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`),
-            CONFIG.spotify.retryAttempts,
-            CONFIG.spotify.retryDelay
-        ).catch(err => {
-            console.warn(`[Sort-Play] Failed to fetch album batch for artist ${artistName} (skipped):`, err);
-            return { albums: [] }; 
-        });
-        batchPromises.push(promise);
-      }
-      
-      const albumDataBatches = await Promise.all(batchPromises);
-      
-      for (const batch of albumDataBatches) {
-        if (!batch || !batch.albums) continue;
+      const allAlbumIdArray = Array.from(allAlbumMetadata.keys());
 
-        const batchResults = await Promise.all(batch.albums.map(async (album) => {
-            if (!album || !album.tracks || !album.tracks.items) return [];
-            
-            let rawTracks = [...album.tracks.items];
-            const totalTracks = album.total_tracks || 0;
+      const fetchTracksWeb = async () => {
+          const batchSize = 20; 
+          const batchPromises = [];
+          
+          for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
+            const batch = allAlbumIdArray.slice(i, i + batchSize);
+            const promise = withRetry(
+                () => CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`),
+                CONFIG.spotify.retryAttempts,
+                CONFIG.spotify.retryDelay
+            ).catch(err => {
+                console.warn(`[Sort-Play] Failed to fetch album batch for artist ${artistName} (skipped):`, err);
+                return { albums: [] }; 
+            });
+            batchPromises.push(promise);
+          }
+          
+          const albumDataBatches = await Promise.all(batchPromises);
+          
+          for (const batch of albumDataBatches) {
+            if (!batch || !batch.albums) continue;
 
-            if (totalTracks > 50) {
-                const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
-
+            const batchResults = await Promise.all(batch.albums.map(async (album) => {
+                if (!album || !album.tracks || !album.tracks.items) return [];
                 
-                let shouldFetchMore = true;
-                if (isCompilation) {
-                    const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
-                    if (foundInFirstPage) {
-                        shouldFetchMore = false;
-                    }
-                }
+                let rawTracks = [...album.tracks.items];
+                const totalTracks = album.total_tracks || 0;
 
-                if (shouldFetchMore) {
-                    const pagePromises = [];
-                    for (let offset = 50; offset < totalTracks; offset += 50) {
-                        const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
-                        pagePromises.push(CosmosAsync.get(url).catch(() => null));
-                    }
-
-                    const pageResults = await Promise.all(pagePromises);
-                    pageResults.forEach(res => {
-                        if (res && res.items) {
-                            rawTracks.push(...res.items);
+                if (totalTracks > 50) {
+                    const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
+                    
+                    let shouldFetchMore = true;
+                    if (isCompilation) {
+                        const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
+                        if (foundInFirstPage) {
+                            shouldFetchMore = false;
                         }
-                    });
+                    }
+
+                    if (shouldFetchMore) {
+                        const pagePromises = [];
+                        for (let offset = 50; offset < totalTracks; offset += 50) {
+                            const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
+                            pagePromises.push(CosmosAsync.get(url).catch(() => null));
+                        }
+
+                        const pageResults = await Promise.all(pagePromises);
+                        pageResults.forEach(res => {
+                            if (res && res.items) {
+                                rawTracks.push(...res.items);
+                            }
+                        });
+                    }
                 }
-            }
 
-            return rawTracks
-              .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
-              .map(track => ({
-                uri: track.uri,
-                uid: null, 
-                name: track.name,
-                albumUri: album.uri,
-                albumName: album.name,
-                artistUris: track.artists.map(artist => artist.uri),
-                allArtists: track.artists.map(artist => artist.name).join(", "),
-                artistName: track.artists[0].name,
-                durationMilis: track.duration_ms,
-                album_type: album.album_type,
-                playcount: 0, popularity: 0, releaseDate: 0,
-                track: {
-                  album: { id: album.id },
-                  name: track.name,
-                  duration_ms: track.duration_ms,
-                  id: track.id,
-                },
-              }));
-        }));
+                return rawTracks
+                  .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
+                  .map(track => ({
+                    uri: track.uri,
+                    uid: null, 
+                    name: track.name,
+                    albumUri: album.uri,
+                    albumName: album.name,
+                    artistUris: track.artists.map(artist => artist.uri),
+                    allArtists: track.artists.map(artist => artist.name).join(", "),
+                    artistName: track.artists[0].name,
+                    durationMilis: track.duration_ms,
+                    album_type: album.album_type,
+                    playcount: 0, popularity: 0, releaseDate: 0,
+                    track: {
+                      album: { id: album.id },
+                      name: track.name,
+                      duration_ms: track.duration_ms,
+                      id: track.id,
+                    },
+                  }));
+            }));
 
-        batchResults.forEach(albumTracks => allTracks.push(...albumTracks));
+            batchResults.forEach(albumTracks => allTracks.push(...albumTracks));
+          }
+      };
+
+      const fetchTracksFallback = async () => {
+          const albumIds = Array.from(allAlbumMetadata.keys());
+          const BATCH_SIZE = 50;
+          
+          for (let i = 0; i < albumIds.length; i += BATCH_SIZE) {
+              const batch = albumIds.slice(i, i + BATCH_SIZE);
+              
+              const promises = batch.map(async (id) => {
+                  const meta = allAlbumMetadata.get(id);
+                  const tracks = await getAlbumTracks(id);
+                  
+                  return tracks.filter(track => {
+                      const hasArtistUri = track.artistUris && track.artistUris.includes(artistUri);
+                      const hasArtistName = track.allArtists && track.allArtists.includes(artistName);
+                      return hasArtistUri || hasArtistName;
+                  }).map(track => {
+                      if (track.track && track.track.album) {
+                          track.track.album.album_type = meta.type;
+                      }
+                      return {
+                          ...track,
+                          albumType: meta.type, 
+                          album_type: meta.type 
+                      };
+                  });
+              });
+              
+              const results = await Promise.all(promises);
+              results.forEach(tracks => allTracks.push(...tracks));
+          }
+      };
+
+      if (isFallbackActive()) {
+          await fetchTracksFallback();
+      } else {
+          try {
+              await fetchTracksWeb();
+          } catch (e) {
+              if (registerWebApiFailure()) {
+                  await fetchTracksFallback();
+              } else {
+                  throw e;
+              }
+          }
       }
 
       const coreTracks = [];
       const compilationTracks = [];
 
       for (const track of allTracks) {
-        if (track.album_type === 'album' || track.album_type === 'single') {
+        const type = (track.album_type || 'album').toLowerCase(); 
+        if (type === 'album' || type === 'single') {
           coreTracks.push(track);
         } else {
           compilationTracks.push(track);
@@ -16970,7 +17559,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function getArtistTracksForShuffle(artistUri) {
     const { Locale, GraphQL, CosmosAsync } = Spicetify;
   
-    const queryArtistOverview = {
+    const queryArtistOverview = Spicetify.GraphQL.Definitions.queryArtistOverview || {
       name: "queryArtistOverview",
       operation: "query",
       sha256Hash: "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497",
@@ -16988,93 +17577,166 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const artistId = artistUri.split(":")[2];
 
       const allAlbumIds = new Set();
-      let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
-  
-      do {
-        const albumRes = await CosmosAsync.get(nextUrl);
-        if (!albumRes.items) break;
-  
-        albumRes.items.forEach((album) => {
-          allAlbumIds.add(album.id);
-        });
-  
-        nextUrl = albumRes.next;
-        if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
-      } while (nextUrl);
+
+      const fetchAlbumIdsWeb = async () => {
+          let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
+          while (nextUrl) {
+            const albumRes = await CosmosAsync.get(nextUrl);
+            if (!albumRes.items) break;
+            albumRes.items.forEach((album) => allAlbumIds.add(album.id));
+            nextUrl = albumRes.next;
+            if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
+          }
+      };
+
+      const fetchAlbumIdsGQL = async () => {
+          let offset = 0;
+          let limit = 100;
+          let total = null;
+          while (total === null || offset < total) {
+              const res = await GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, {
+                  uri: artistUri,
+                  offset: offset,
+                  limit: limit
+              });
+              const disc = res.data.artistUnion.discography.all;
+              total = disc.totalCount;
+              disc.items.forEach(group => {
+                  group.releases.items.forEach(rel => {
+                      allAlbumIds.add(rel.uri.split(':')[2]);
+                  });
+              });
+              offset += limit;
+          }
+      };
+
+      if (isFallbackActive()) {
+          await fetchAlbumIdsGQL();
+      } else {
+          try {
+              await fetchAlbumIdsWeb();
+          } catch (e) {
+              if (registerWebApiFailure()) {
+                  await fetchAlbumIdsGQL();
+              } else {
+                  throw e;
+              }
+          }
+      }
   
       const allTracks = [];
-      const batchSize = 20; 
       const allAlbumIdArray = Array.from(allAlbumIds);
-      const batchPromises = [];
-      
-      for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
-        const batch = allAlbumIdArray.slice(i, i + batchSize);
-        const promise = CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`);
-        batchPromises.push(promise);
-      }
-      
-      const albumDataBatches = await Promise.all(batchPromises);
-      
-      for (const batch of albumDataBatches) {
-        if (!batch.albums) continue;
 
-        const batchResults = await Promise.all(batch.albums.map(async (album) => {
-            if (!album || !album.tracks || !album.tracks.items) return [];
+      const fetchTracksWeb = async () => {
+          const batchSize = 20; 
+          const batchPromises = [];
+          
+          for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
+            const batch = allAlbumIdArray.slice(i, i + batchSize);
+            const promise = withRetry(
+                () => CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`),
+                CONFIG.spotify.retryAttempts,
+                CONFIG.spotify.retryDelay
+            ).catch(err => {
+                console.warn(`[Sort-Play] Failed to fetch album batch for shuffle:`, err);
+                return { albums: [] }; 
+            });
+            batchPromises.push(promise);
+          }
+          
+          const albumDataBatches = await Promise.all(batchPromises);
+          
+          for (const batch of albumDataBatches) {
+            if (!batch || !batch.albums) continue;
 
-            let rawTracks = [...album.tracks.items];
-            const totalTracks = album.total_tracks || 0;
+            const batchResults = await Promise.all(batch.albums.map(async (album) => {
+                if (!album || !album.tracks || !album.tracks.items) return [];
 
-            if (totalTracks > 50) {
-                const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
-                
-                let shouldFetchMore = true;
-                if (isCompilation) {
-                    const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
-                    if (foundInFirstPage) {
-                        shouldFetchMore = false;
-                    }
-                }
+                let rawTracks = [...album.tracks.items];
+                const totalTracks = album.total_tracks || 0;
 
-                if (shouldFetchMore) {
-                    const pagePromises = [];
-                    for (let offset = 50; offset < totalTracks; offset += 50) {
-                        const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
-                        pagePromises.push(CosmosAsync.get(url).catch(() => null));
-                    }
-
-                    const pageResults = await Promise.all(pagePromises);
-                    pageResults.forEach(res => {
-                        if (res && res.items) {
-                            rawTracks.push(...res.items);
+                if (totalTracks > 50) {
+                    const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
+                    
+                    let shouldFetchMore = true;
+                    if (isCompilation) {
+                        const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
+                        if (foundInFirstPage) {
+                            shouldFetchMore = false;
                         }
-                    });
+                    }
+
+                    if (shouldFetchMore) {
+                        const pagePromises = [];
+                        for (let offset = 50; offset < totalTracks; offset += 50) {
+                            const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
+                            pagePromises.push(CosmosAsync.get(url).catch(() => null));
+                        }
+
+                        const pageResults = await Promise.all(pagePromises);
+                        pageResults.forEach(res => {
+                            if (res && res.items) {
+                                rawTracks.push(...res.items);
+                            }
+                        });
+                    }
                 }
-            }
 
-            return rawTracks
-                .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
-                .map(track => ({
-                  uri: track.uri,
-                  uid: null, 
-                  name: track.name,
-                  albumUri: album.uri,
-                  albumName: album.name,
-                  artistUris: track.artists.map(artist => artist.uri),
-                  allArtists: track.artists.map(artist => artist.name).join(", "),
-                  artistName: track.artists[0].name,
-                  durationMilis: track.duration_ms,
-                  album_type: album.album_type,
-                  playcount: 0, popularity: 0, releaseDate: 0,
-                  track: {
-                    album: { id: album.id },
-                    name: track.name,
-                    duration_ms: track.duration_ms,
-                    id: track.id,
-                  },
-                }));
-        }));
+                return rawTracks
+                    .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
+                    .map(track => ({
+                      uri: track.uri,
+                      uid: null, 
+                      name: track.name,
+                      albumUri: album.uri,
+                      albumName: album.name,
+                      artistUris: track.artists.map(artist => artist.uri),
+                      allArtists: track.artists.map(artist => artist.name).join(", "),
+                      artistName: track.artists[0].name,
+                      durationMilis: track.duration_ms,
+                      album_type: album.album_type,
+                      playcount: 0, popularity: 0, releaseDate: 0,
+                      track: {
+                        album: { id: album.id },
+                        name: track.name,
+                        duration_ms: track.duration_ms,
+                        id: track.id,
+                      },
+                    }));
+            }));
 
-        batchResults.forEach(tracks => allTracks.push(...tracks));
+            batchResults.forEach(tracks => allTracks.push(...tracks));
+          }
+      };
+
+      const fetchTracksFallback = async () => {
+          const promises = allAlbumIdArray.map(async (id) => {
+              const tracks = await getAlbumTracks(id);
+              return tracks.filter(track => {
+                  const hasArtistUri = track.artistUris && track.artistUris.includes(artistUri);
+                  const hasArtistName = track.allArtists && track.allArtists.includes(artistName);
+                  return hasArtistUri || hasArtistName;
+              }).map(track => ({
+                  ...track,
+                  album_type: 'album' 
+              }));
+          });
+          const results = await Promise.all(promises);
+          results.forEach(tracks => allTracks.push(...tracks));
+      };
+
+      if (isFallbackActive()) {
+          await fetchTracksFallback();
+      } else {
+          try {
+              await fetchTracksWeb();
+          } catch (e) {
+              if (registerWebApiFailure()) {
+                  await fetchTracksFallback();
+              } else {
+                  throw e;
+              }
+          }
       }
   
       const uniqueTracksMap = new Map();
@@ -17109,44 +17771,118 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getArtistImageUrl(artistId) {
-    const artistData = await Spicetify.CosmosAsync.get(
-      `https://api.spotify.com/v1/artists/${artistId}`
-    );
-    return artistData.images[0]?.url;
+    const fetchWeb = async () => {
+        const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artistId}`);
+        return artistData.images[0]?.url;
+    };
+
+    const fetchGQL = async () => {
+        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, {
+            uri: `spotify:artist:${artistId}`,
+            locale: "en",
+            includePrerelease: false
+        });
+        
+        const sources = res.data.artistUnion.visuals.avatarImage?.sources;
+        if (!sources || sources.length === 0) return null;
+
+        const bestSource = sources.reduce((prev, curr) => (prev.width > curr.width ? prev : curr));
+        return bestSource.url;
+    };
+
+    if (isFallbackActive()) {
+        try { return await fetchGQL(); } catch(e) { return null; }
+    }
+
+    try {
+        return await fetchWeb();
+    } catch (e) {
+        if (registerWebApiFailure()) {
+            try { return await fetchGQL(); } catch(e) { return null; }
+        }
+        return null;
+    }
   }
   
   function setPlaylistImage(playlistId, base64Image, maxRetries = 10, retryInterval = 4000) {
     (async () => {
+        const playlistUri = `spotify:playlist:${playlistId}`;
+
+        const setInternalImage = async () => {
+            const bufferToHex = (buffer) => Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const getFileFromBase64 = async (b64) => {
+                const res = await fetch(b64);
+                const blob = await res.blob();
+                return new File([blob], "cover.jpg", { type: "image/jpeg" });
+            };
+
+            const file = await getFileFromBase64(base64Image);
+            const sessionToken = Spicetify.Platform.Session.accessToken;
+            const uploadToken = await Spicetify.Platform.PlaylistAPI.uploadImage(file);
+            
+            if (!uploadToken) throw new Error("Upload failed: No token returned");
+
+            const regRes = await fetch(`https://spclient.wg.spotify.com/playlist/v2/playlist/${playlistId}/register-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${sessionToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ uploadToken })
+            });
+
+            if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status}`);
+
+            const buffer = await regRes.arrayBuffer();
+            const fullHex = bufferToHex(buffer);
+            const cleanHexId = fullHex.startsWith('0a14') ? fullHex.slice(4) : fullHex;
+
+            await Spicetify.Platform.PlaylistAPI.setAttributes(playlistUri, { picture: cleanHexId });
+            if (typeof Spicetify.Platform.PlaylistAPI.resync === 'function') await Spicetify.Platform.PlaylistAPI.resync(playlistUri);
+        };
+
+        const setWebApiImage = async () => {
+            try {
+                await Spicetify.CosmosAsync.put(
+                    `https://api.spotify.com/v1/playlists/${playlistId}/images`,
+                    base64Image.split("base64,")[1]
+                );
+            } catch (putError) {
+                const isExpectedJsonError = putError instanceof SyntaxError && putError.message.includes("Unexpected end of JSON input");
+                if (!isExpectedJsonError) throw putError;
+            }
+        };
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                try {
-                    await Spicetify.CosmosAsync.put(
-                        `https://api.spotify.com/v1/playlists/${playlistId}/images`,
-                        base64Image.split("base64,")[1]
-                    );
-                } catch (putError) {
-                    const isExpectedJsonError = putError instanceof SyntaxError && putError.message.includes("Unexpected end of JSON input");
-                    if (!isExpectedJsonError) {
-                        throw putError;
+                if (isFallbackActive()) {
+                    await setInternalImage();
+                } else {
+                    try {
+                        await setWebApiImage();
+                    } catch (error) {
+                        if (registerWebApiFailure()) {
+                            await setInternalImage();
+                        } else {
+                            throw error;
+                        }
                     }
                 }
 
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                await new Promise(resolve => setTimeout(resolve, 1500));
 
-                const updatedPlaylist = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-                
-                if (updatedPlaylist?.images?.length > 0 && !isDefaultMosaicCover(updatedPlaylist.images[0].url)) {
+                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri);
+                if (meta && meta.images && meta.images.length > 0 && !isDefaultMosaicCover(meta.images[0].url)) {
                     return;
-                } else {
-                    throw new Error("Verification failed: Image not updated on Spotify's side yet.");
                 }
+                
+                throw new Error("Verification failed: Image not updated on Spotify side yet.");
 
             } catch (error) {                
                 if (attempt < maxRetries) {
                     await new Promise(resolve => setTimeout(resolve, retryInterval));
                 } else {
-                    console.error(`[Sort-Play] Failed to set and verify playlist image for ${playlistId} after ${maxRetries} attempts.`);
-                    showNotification("Failed to update playlist cover image. Spotify may be slow.", 'warning');
+                    console.error(`[Sort-Play] Failed to set and verify playlist image for ${playlistId} after ${maxRetries} attempts.`, error);
                 }
             }
         }
@@ -17154,6 +17890,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 }
 
   async function imageUrlToBase64(url) {
+    if (typeof url === 'string' && url.startsWith("spotify:image:")) {
+        const imageId = url.split(":")[2];
+        url = `https://i.scdn.co/image/${imageId}`;
+    }
+
     const response = await fetch(url);
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
@@ -17528,44 +18269,81 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
 
+    const processRefreshInternal = async (id) => {
+        const data = await fetchInternalTrackMetadata(id);
+        if (data) {
+            const cacheData = {
+                name: data.name,
+                album: {
+                    name: data.album.name,
+                    id: data.album.id,
+                    uri: data.album.uri,
+                    release_date: data.album.release_date,
+                    album_type: 'album'
+                },
+                albumType: 'album',
+                artists: data.artists.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    uri: a.uri
+                })),
+                duration_ms: data.duration_ms,
+                popularity: data.popularity,
+                external_ids: data.external_ids,
+                id: data.id,
+                uri: data.uri
+            };
+            cachedMetadata.set(data.id, cacheData);
+            idb.set('trackMetadata', data.id, cacheData);
+        }
+    };
+
     for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
         const batchIds = missingIds.slice(i, i + BATCH_SIZE);
         if (batchIds.length === 0) continue;
 
-        try {
-            const trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
-            if (trackDetailsResponse && trackDetailsResponse.tracks) {
-                trackDetailsResponse.tracks.forEach(detailedTrack => {
-                    if (!detailedTrack) return;
-                    
-                    const cacheData = {
-                        name: detailedTrack.name,
-                        album: {
-                            name: detailedTrack.album.name,
-                            id: detailedTrack.album.id,
-                            uri: detailedTrack.album.uri,
-                            release_date: detailedTrack.album.release_date,
-                            album_type: detailedTrack.album.album_type
-                        },
-                        albumType: detailedTrack.album.album_type,
-                        artists: detailedTrack.artists.map(a => ({
-                            id: a.id,
-                            name: a.name,
-                            uri: a.uri
-                        })),
-                        duration_ms: detailedTrack.duration_ms,
-                        popularity: detailedTrack.popularity,
-                        external_ids: detailedTrack.external_ids,
-                        id: detailedTrack.id,
-                        uri: detailedTrack.uri
-                    };
-                    
-                    cachedMetadata.set(detailedTrack.id, cacheData);
-                    idb.set('trackMetadata', detailedTrack.id, cacheData);
-                });
+        if (isFallbackActive()) {
+            await Promise.all(batchIds.map(id => processRefreshInternal(id)));
+        } else {
+            try {
+                const trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
+                if (trackDetailsResponse && trackDetailsResponse.tracks) {
+                    trackDetailsResponse.tracks.forEach(detailedTrack => {
+                        if (!detailedTrack) return;
+                        
+                        const cacheData = {
+                            name: detailedTrack.name,
+                            album: {
+                                name: detailedTrack.album.name,
+                                id: detailedTrack.album.id,
+                                uri: detailedTrack.album.uri,
+                                release_date: detailedTrack.album.release_date,
+                                album_type: detailedTrack.album.album_type
+                            },
+                            albumType: detailedTrack.album.album_type,
+                            artists: detailedTrack.artists.map(a => ({
+                                id: a.id,
+                                name: a.name,
+                                uri: a.uri
+                            })),
+                            duration_ms: detailedTrack.duration_ms,
+                            popularity: detailedTrack.popularity,
+                            external_ids: detailedTrack.external_ids,
+                            id: detailedTrack.id,
+                            uri: detailedTrack.uri
+                        };
+                        
+                        cachedMetadata.set(detailedTrack.id, cacheData);
+                        idb.set('trackMetadata', detailedTrack.id, cacheData);
+                    });
+                }
+            } catch (error) {
+                if (registerWebApiFailure()) {
+                    await Promise.all(batchIds.map(id => processRefreshInternal(id)));
+                } else {
+                    console.warn(`[Sort-Play] Failed to refresh a batch of track album info:`, error);
+                }
             }
-        } catch (error) {
-            console.warn(`[Sort-Play] Failed to refresh a batch of track album info:`, error);
         }
         const progress = Math.min(100, Math.floor(((i + BATCH_SIZE) / missingIds.length) * 100));
         updateProgress(progress);
@@ -17629,56 +18407,92 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const maxRetries = 5;
     const initialDelay = 1000;
 
+    const processInternalItem = async (id) => {
+        const data = await fetchInternalTrackMetadata(id);
+        if (data) {
+            const cacheData = {
+                name: data.name,
+                album: {
+                    name: data.album.name,
+                    id: data.album.id,
+                    uri: data.album.id ? `spotify:album:${data.album.id}` : null,
+                    release_date: data.album.release_date
+                },
+                artists: data.artists.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    uri: a.id ? `spotify:artist:${a.id}` : null
+                })),
+                duration_ms: data.duration_ms,
+                popularity: data.popularity,
+                external_ids: data.external_ids,
+                id: data.id,
+                uri: data.uri
+            };
+            cachedMetadata.set(data.id, cacheData);
+            idb.set('trackMetadata', data.id, cacheData);
+        }
+    };
+
     for (let i = 0; i < missingIds.length; i += batchSize) {
       const batch = missingIds.slice(i, i + batchSize);
-      let retries = 0;
-      let delay = initialDelay;
-      let success = false;
+      
+      if (isFallbackActive()) {
+          await Promise.all(batch.map(id => processInternalItem(id)));
+      } else {
+          let retries = 0;
+          let delay = initialDelay;
+          let success = false;
 
-      while (retries < maxRetries && !success) {
-        try {
-          const response = await Spicetify.CosmosAsync.get(
-            `https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`
-          );
+          while (retries < maxRetries && !success) {
+            try {
+              const response = await Spicetify.CosmosAsync.get(
+                `https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`
+              );
 
-          if (response && response.tracks) {
-            response.tracks.forEach((trackData) => {
-                if (trackData) {
-                    const cacheData = {
-                        name: trackData.name,
-                        album: {
-                            name: trackData.album.name,
-                            id: trackData.album.id,
-                            uri: trackData.album.uri,
-                            release_date: trackData.album.release_date
-                        },
-                        artists: trackData.artists.map(a => ({
-                            id: a.id,
-                            name: a.name,
-                            uri: a.uri
-                        })),
-                        duration_ms: trackData.duration_ms,
-                        popularity: trackData.popularity,
-                        external_ids: trackData.external_ids,
-                        id: trackData.id,
-                        uri: trackData.uri
-                    };
-                    cachedMetadata.set(trackData.id, cacheData);
-                    idb.set('trackMetadata', trackData.id, cacheData);
-                }
-            });
-            success = true;
+              if (response && response.tracks) {
+                response.tracks.forEach((trackData) => {
+                    if (trackData) {
+                        const cacheData = {
+                            name: trackData.name,
+                            album: {
+                                name: trackData.album.name,
+                                id: trackData.album.id,
+                                uri: trackData.album.uri,
+                                release_date: trackData.album.release_date
+                            },
+                            artists: trackData.artists.map(a => ({
+                                id: a.id,
+                                name: a.name,
+                                uri: a.uri
+                            })),
+                            duration_ms: trackData.duration_ms,
+                            popularity: trackData.popularity,
+                            external_ids: trackData.external_ids,
+                            id: trackData.id,
+                            uri: trackData.uri
+                        };
+                        cachedMetadata.set(trackData.id, cacheData);
+                        idb.set('trackMetadata', trackData.id, cacheData);
+                    }
+                });
+                success = true;
+              }
+            } catch (error) {
+               if (registerWebApiFailure()) {
+                   await Promise.all(batch.map(id => processInternalItem(id)));
+                   success = true;
+               }
+            }
+
+            if (!success) {
+              retries++;
+              if (retries < maxRetries) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                delay *= 2;
+              }
+            }
           }
-        } catch (error) {
-        }
-
-        if (!success) {
-          retries++;
-          if (retries < maxRetries) {
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            delay *= 2;
-          }
-        }
       }
       
       tracksProcessed += batch.length;
@@ -19298,8 +20112,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function replacePlaylistTracks(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const validUris = trackUris.filter(uri => typeof uri === 'string' && (uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(uri)));
     const hasLocalTracks = validUris.some(uri => Spicetify.URI.isLocal(uri));
+    const playlistUri = `spotify:playlist:${playlistId}`;
 
-    if (!hasLocalTracks) {
+    const replaceInternal = async (uris) => {
+        const content = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri);
+        if (content.items.length > 0) {
+            const toRemove = content.items.map(i => ({ uri: i.uri, uid: i.uid }));
+            for (let i = 0; i < toRemove.length; i += 100) {
+                await Spicetify.Platform.PlaylistAPI.remove(playlistUri, toRemove.slice(i, i + 100));
+            }
+        }
+        await addTracksToPlaylist(playlistId, uris, maxRetries, initialDelay);
+    };
+
+    if (hasLocalTracks || isFallbackActive()) {
+        await replaceInternal(validUris);
+    } else {
         const BATCH_SIZE = 100;
         const firstBatch = validUris.slice(0, BATCH_SIZE);
         const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
@@ -19313,12 +20141,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await Spicetify.CosmosAsync.put(playlistUrl, { uris: firstBatch });
                 success = true;
             } catch (error) {
+                if (registerWebApiFailure()) {
+                    await replaceInternal(validUris);
+                    return;
+                }
                 console.error(`[Sort-Play] Error replacing tracks in playlist ${playlistId} (Attempt ${retries + 1}):`, error);
                 retries++;
                 if (retries <= maxRetries) {
                     await new Promise(resolve => setTimeout(resolve, currentDelay));
                     currentDelay *= 2;
                 } else {
+                    try { await replaceInternal(validUris); return; } catch(e) {}
                     throw new Error(`Failed to replace tracks in playlist ${playlistId}.`);
                 }
             }
@@ -19327,19 +20160,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (success && validUris.length > BATCH_SIZE) {
             const remainingUris = validUris.slice(BATCH_SIZE);
             await addTracksToPlaylist(playlistId, remainingUris);
-        }
-    } else {
-        const playlistUri = `spotify:playlist:${playlistId}`;
-        try {
-            const { items } = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri);
-            if (items.length > 0) {
-                const tracksToRemove = items.map(track => ({ uri: track.uri, uid: track.uid }));
-                await Spicetify.Platform.PlaylistAPI.remove(playlistUri, tracksToRemove);
-            }
-            await addTracksToPlaylist(playlistId, validUris);
-        } catch (error) {
-            console.error(`[Sort-Play] Error updating playlist with local files using Platform API:`, error);
-            showNotification("Failed to update playlist with local files.", true);
         }
     }
   }
@@ -19350,7 +20170,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const hasLocalTracks = validUris.some(uri => Spicetify.URI.isLocal(uri));
     const BATCH_SIZE = 100;
 
-    if (hasLocalTracks) {
+    const addInternal = async (uris) => {
+        for (let i = uris.length; i > 0; i -= BATCH_SIZE) {
+            const start = Math.max(0, i - BATCH_SIZE);
+            const batch = uris.slice(start, i);
+            await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { before: 0 });
+        }
+    };
+
+    if (hasLocalTracks || isFallbackActive()) {
         for (let i = validUris.length; i > 0; i -= BATCH_SIZE) {
             const start = Math.max(0, i - BATCH_SIZE);
             const batch = validUris.slice(start, i);
@@ -19379,17 +20207,32 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
         for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
             const batch = validUris.slice(i, i + BATCH_SIZE);
+            
+            if (isFallbackActive()) {
+                try { await addInternal(batch); continue; } catch(e) {}
+            }
+
             let retries = 0;
             let currentDelay = initialDelay;
+            let success = false;
 
             while (retries <= maxRetries) {
                 try {
                     await Spicetify.CosmosAsync.post(playlistUrl, { uris: batch });
+                    success = true;
                     break;
                 } catch (error) {
+                    if (registerWebApiFailure()) {
+                        try {
+                            await addInternal(batch);
+                            success = true;
+                            break;
+                        } catch(e) {}
+                    }
                     console.error(`[Sort-Play] CosmosAsync Error adding batch (Attempt ${retries + 1}):`, error);
                     if (retries === maxRetries) {
-                        showNotification("Failed to add some Spotify tracks.", 'warning');
+                        try { await addInternal(batch); success = true; break; } catch(e) {}
+                        if(!success) showNotification("Failed to add some Spotify tracks.", 'warning');
                         break;
                     }
                     retries++;
@@ -20366,34 +21209,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function updatePlaylistDescription(playlistId, description, maxRetries = 12, retryInterval = 5000) {
     (async () => {
+        const playlistUri = `spotify:playlist:${playlistId}`;
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                try {
-                    await Spicetify.CosmosAsync.put(`https://api.spotify.com/v1/playlists/${playlistId}`, {
-                        description: description,
-                    });
-                } catch (putError) {
-                    const isExpectedJsonError = putError instanceof SyntaxError && putError.message.includes("Unexpected end of JSON input");
-                    if (!isExpectedJsonError) {
-                        throw putError;
-                    }
-                }
+                await Spicetify.Platform.PlaylistAPI.setAttributes(playlistUri, { description: description });
 
                 await new Promise(resolve => setTimeout(resolve, 1000));
 
-                const updatedPlaylist = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri);
                 
-                if (updatedPlaylist && updatedPlaylist.description === description) {
+                if (meta && meta.description === description) {
                     return;
-                } else {
-                    throw new Error("Verification failed: Description not updated on Spotify's side yet.");
                 }
+                
+                throw new Error("Verification failed: Description not updated on Spotify's side yet.");
 
-            } catch (error) {                
+            } catch (error) {
                 if (attempt < maxRetries) {
                     await new Promise(resolve => setTimeout(resolve, retryInterval));
                 } else {
-                    console.error(`[Sort-Play] Failed to set and verify playlist description for ${playlistId} after ${maxRetries} attempts.`);
+                    console.error(`[Sort-Play] Failed to set and verify playlist description for ${playlistId} after ${maxRetries} attempts.`, error);
                 }
             }
         }
@@ -20470,6 +21306,26 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getAllFollowedArtists() {
+    if (isFallbackActive()) {
+        try {
+            if (Spicetify.Platform?.LibraryAPI?.getContents) {
+                const res = await Spicetify.Platform.LibraryAPI.getContents({ limit: 50000, sort: { field: "NAME", order: "ASC" } });
+                const items = res.items || [];
+                const artists = items
+                    .filter(item => item.type === 'artist' || (item.uri && item.uri.includes(':artist:')))
+                    .map(a => ({ 
+                        uri: a.uri, 
+                        name: a.name, 
+                        id: a.uri.split(':')[2] 
+                    }));
+                return artists;
+            }
+        } catch (e) {
+            console.warn("[Sort-Play] LibraryAPI.getContents fallback failed", e);
+        }
+        return [];
+    }
+
     let allArtists = [];
     let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
 
@@ -20484,6 +21340,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
     } catch (error) {
+        if (registerWebApiFailure()) {
+            return getAllFollowedArtists();
+        }
         console.error("Failed to fetch all followed artists:", error);
     }
     return allArtists;
@@ -21311,16 +22170,37 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         updateProgress("Get artists...");
         
         async function getFollowedArtists() {
+            if (isFallbackActive()) {
+                try {
+                    if (Spicetify.Platform?.LibraryAPI?.getContents) {
+                        const res = await Spicetify.Platform.LibraryAPI.getContents({ limit: 50000, sort: { field: "NAME", order: "ASC" } });
+                        return (res.items || [])
+                            .filter(item => item.type === 'artist' || (item.uri && item.uri.includes(':artist:')))
+                            .map(a => ({ uri: a.uri, name: a.name, id: a.uri.split(':')[2] }));
+                    }
+                } catch (e) {
+                    console.warn("[Sort-Play] LibraryAPI fallback failed", e);
+                }
+                return [];
+            }
+
             let artists = [];
             let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
-            while (nextUrl) {
-                const response = await Spicetify.CosmosAsync.get(nextUrl);
-                if (response.artists?.items) {
-                    artists.push(...response.artists.items);
-                    nextUrl = response.artists.next;
-                } else {
-                    nextUrl = null;
+            try {
+                while (nextUrl) {
+                    const response = await Spicetify.CosmosAsync.get(nextUrl);
+                    if (response.artists?.items) {
+                        artists.push(...response.artists.items);
+                        nextUrl = response.artists.next;
+                    } else {
+                        nextUrl = null;
+                    }
                 }
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    return getFollowedArtists();
+                }
+                throw e;
             }
             return artists;
         }
@@ -21380,45 +22260,110 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         updateProgress(`Get tracks...`);
         let initialTrackPool = [];
-        const albumUris = allNewReleases.map(album => album.uri);
-
-        for (let i = 0; i < albumUris.length; i += 20) {
-            const albumIdBatch = albumUris.slice(i, i + 20).map(uri => uri.split(':')[2]);
-            const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumIdBatch.join(',')}`);
-            if (albumsData.albums) {
-                for (const album of albumsData.albums) {
-                    if (album && album.tracks && album.tracks.items) {
-                        let tracksFromAlbum = album.tracks.items;
-                        if (followedReleasesAlbumLimit !== 'all') {
-                            tracksFromAlbum = tracksFromAlbum.slice(0, parseInt(followedReleasesAlbumLimit, 10));
-                        }
-                        initialTrackPool.push(...tracksFromAlbum);
-                    }
-                }
-            }
-        }
-        
-        if (initialTrackPool.length === 0) {
-            throw new Error("Could not fetch any tracks from the new releases.");
-        }
-
-        updateProgress("Verifying...");
         const verifiedNewTracks = [];
-        const trackIdsToVerify = initialTrackPool.map(t => t.id);
 
-        for (let i = 0; i < trackIdsToVerify.length; i += 50) {
-            const batchIds = trackIdsToVerify.slice(i, i + 50);
-            const trackDetailsResponse = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
+        if (isFallbackActive()) {
+            const CONCURRENCY = 5;
+            let processedCount = 0;
+            
+            for (let i = 0; i < allNewReleases.length; i += CONCURRENCY) {
+                const batch = allNewReleases.slice(i, i + CONCURRENCY);
+                const results = await Promise.all(batch.map(async (albumMeta) => {
+                    try {
+                        const albumId = albumMeta.uri.split(':')[2];
+                        let tracks = await getAlbumTracks(albumId);
+                        
+                        if (!tracks || !Array.isArray(tracks)) tracks = [];
 
-            if (trackDetailsResponse && trackDetailsResponse.tracks) {
-                for (const detailedTrack of trackDetailsResponse.tracks) {
-                    if (detailedTrack && detailedTrack.album && detailedTrack.album.release_date) {
-                        const trackReleaseDate = new Date(detailedTrack.album.release_date);
-                        if (trackReleaseDate >= dateLimit) {
-                            verifiedNewTracks.push(detailedTrack);
+                        if (followedReleasesAlbumLimit !== 'all') {
+                            const limit = parseInt(followedReleasesAlbumLimit, 10);
+                            if (!isNaN(limit)) tracks = tracks.slice(0, limit);
+                        }
+                        
+                        return tracks.map(t => ({
+                            track: t,
+                            albumMeta: albumMeta 
+                        }));
+                    } catch (e) { return []; }
+                }));
+                
+                results.flat().forEach(item => {
+                    const t = item.track;
+                    const meta = item.albumMeta;
+                    
+                    const adapted = {
+                        uri: t.uri,
+                        id: t.uri.split(':')[2],
+                        name: t.name,
+                        duration_ms: t.durationMilis,
+                        track_number: t.trackNumber || (t.track?.track_number) || 0,
+                        artists: t.track?.artists || (t.artistUris || []).map((u, idx) => ({ id: u.split(':')[2], name: (t.allArtists || "").split(', ')[idx] || 'Unknown' })),
+                        album: {
+                            name: t.albumName,
+                            release_date: meta.date?.isoString || t.releaseDate,
+                            album_type: meta.type || 'album',
+                            total_tracks: 0 
+                        }
+                    };
+                    verifiedNewTracks.push(adapted);
+                });
+                
+                processedCount += batch.length;
+                updateProgress(`Tracks ${Math.round((processedCount / allNewReleases.length) * 100)}%`);
+            }
+        } else {
+            const albumUris = allNewReleases.map(a => a.uri);
+            try {
+                for (let i = 0; i < albumUris.length; i += 20) {
+                    const albumIdBatch = albumUris.slice(i, i + 20).map(uri => uri.split(':')[2]);
+                    const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumIdBatch.join(',')}`);
+                    if (albumsData.albums) {
+                        for (const album of albumsData.albums) {
+                            if (album && album.tracks && album.tracks.items) {
+                                let tracksFromAlbum = album.tracks.items;
+                                if (followedReleasesAlbumLimit !== 'all') {
+                                    tracksFromAlbum = tracksFromAlbum.slice(0, parseInt(followedReleasesAlbumLimit, 10));
+                                }
+                                initialTrackPool.push(...tracksFromAlbum);
+                            }
                         }
                     }
                 }
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    return generateFollowedReleasesChronological(options);
+                }
+                throw e;
+            }
+
+            if (initialTrackPool.length === 0) {
+                throw new Error("Could not fetch any tracks from the new releases.");
+            }
+
+            updateProgress("Verifying...");
+            const trackIdsToVerify = initialTrackPool.map(t => t.id);
+
+            try {
+                for (let i = 0; i < trackIdsToVerify.length; i += 50) {
+                    const batchIds = trackIdsToVerify.slice(i, i + 50);
+                    const trackDetailsResponse = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
+
+                    if (trackDetailsResponse && trackDetailsResponse.tracks) {
+                        for (const detailedTrack of trackDetailsResponse.tracks) {
+                            if (detailedTrack && detailedTrack.album && detailedTrack.album.release_date) {
+                                const trackReleaseDate = new Date(detailedTrack.album.release_date);
+                                if (trackReleaseDate >= dateLimit) {
+                                    verifiedNewTracks.push(detailedTrack);
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    return generateFollowedReleasesChronological(options);
+                }
+                throw e;
             }
         }
         
@@ -21433,7 +22378,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         for (const track of verifiedNewTracks) {
             const duration = track.duration_ms;
-            const artistIds = track.artists.map(a => a.id).sort().join(',');
+            const artistIds = track.artists ? track.artists.map(a => a.id).sort().join(',') : "";
             const firstWord = getFirstWord(track.name);
 
             const key = `${duration}|${artistIds}|${firstWord}`;
@@ -21447,9 +22392,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const finalDeduplicatedTracks = [];
 
         const getTypeScore = (type) => {
-            if (type === 'album') return 3;
-            if (type === 'compilation') return 2;
-            if (type === 'single') return 1;
+            const t = (type || '').toLowerCase();
+            if (t === 'album') return 3;
+            if (t === 'compilation') return 2;
+            if (t === 'single') return 1;
             return 0;
         };
 
@@ -23102,7 +24048,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const playlistId = currentUriAtStart.split(":")[2];
         tracks = await getPlaylistTracks(playlistId);
         try {
-            currentPlaylistDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+            if (isFallbackActive()) {
+                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUriAtStart);
+                currentPlaylistDetails = { name: meta.name, owner: { id: meta.owner.uri.split(':')[2], display_name: meta.owner.name }, images: meta.images };
+            } else {
+                try {
+                    currentPlaylistDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                } catch (e) {
+                    if (registerWebApiFailure()) {
+                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUriAtStart);
+                        currentPlaylistDetails = { name: meta.name, owner: { id: meta.owner.uri.split(':')[2], display_name: meta.owner.name }, images: meta.images };
+                    }
+                }
+            }
             sourceNameForDialog = currentPlaylistDetails?.name || "Current Playlist";
             if (currentPlaylistDetails?.images?.length > 0) {
                 sourcePlaylistCoverUrl = currentPlaylistDetails.images[0].url;
@@ -23122,7 +24080,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         tracks = await getAlbumTracks(albumId);
         isAlbumPage = true;
         try {
-            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+            let albumDetails;
+            if (isFallbackActive()) {
+                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUriAtStart, locale: "en", offset: 0, limit: 1 });
+                const u = res.data.albumUnion;
+                albumDetails = { name: u.name, images: [{ url: u.coverArt.sources[0].url }] };
+            } else {
+                try {
+                    albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
+                } catch(e) {
+                    if (registerWebApiFailure()) {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUriAtStart, locale: "en", offset: 0, limit: 1 });
+                        const u = res.data.albumUnion;
+                        albumDetails = { name: u.name, images: [{ url: u.coverArt.sources[0].url }] };
+                    }
+                }
+            }
             sourceNameForDialog = albumDetails?.name || "Current Album";
             if (albumDetails?.images?.length > 0) {
                 sourcePlaylistCoverUrl = albumDetails.images[0].url;
@@ -23702,10 +24675,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       if (isArtistPage && sortedTracks && sortedTracks.length > 0) {
           const targetArtistId = currentUriAtStart.split(":")[2];
           sortedTracks = sortedTracks.filter(t => {
-              const hasInArtistUris = t.artistUris && Array.isArray(t.artistUris) && t.artistUris.some(u => u && u.includes(targetArtistId));
-              const hasInTrackArtists = t.track && t.track.artists && Array.isArray(t.track.artists) && t.track.artists.some(a => a.uri && a.uri.includes(targetArtistId));
-              const hasInArtists = t.artists && Array.isArray(t.artists) && t.artists.some(a => a.uri && a.uri.includes(targetArtistId));
-              return hasInArtistUris || hasInTrackArtists || hasInArtists;
+              const checkId = (id) => id && (id === targetArtistId || id.includes(targetArtistId));
+              
+              const inArtistUris = t.artistUris && Array.isArray(t.artistUris) && t.artistUris.some(checkId);
+              
+              const inTrackArtists = t.track && t.track.artists && Array.isArray(t.track.artists) && 
+                                    t.track.artists.some(a => checkId(a.uri) || checkId(a.id));
+              
+              const inArtists = t.artists && Array.isArray(t.artists) && 
+                               t.artists.some(a => checkId(a.uri) || checkId(a.id));
+              
+              return inArtistUris || inTrackArtists || inArtists;
           });
       }
       
@@ -23722,14 +24702,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const sourceUriForNaming = currentUriAtStart; 
         let finalSourceName;
         if (URI.isArtist(sourceUriForNaming)) {
-            finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceUriForNaming.split(":")[2]}`).then((r) => r.name);
+            const id = sourceUriForNaming.split(":")[2];
+            try {
+                if (isFallbackActive()) {
+                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUriForNaming, locale: "en", includePrerelease: false });
+                    finalSourceName = res.data.artistUnion.profile.name;
+                } else {
+                    finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${id}`).then((r) => r.name);
+                }
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUriForNaming, locale: "en", includePrerelease: false });
+                    finalSourceName = res.data.artistUnion.profile.name;
+                }
+            }
         } else if (isLikedSongsPage(sourceUriForNaming)) {
             finalSourceName = "Liked Songs";
         } else if (isLocalFilesPage(sourceUriForNaming)) {
             finalSourceName = "Local Files";
         } else if (URI.isAlbum(sourceUriForNaming)) {
             const albumId = sourceUriForNaming.split(":")[2];
-            finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`).then((r) => r.name);
+            try {
+                if (isFallbackActive()) {
+                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUriForNaming, locale: "en", offset: 0, limit: 1 });
+                    finalSourceName = res.data.albumUnion.name;
+                } else {
+                    finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`).then((r) => r.name);
+                }
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUriForNaming, locale: "en", offset: 0, limit: 1 });
+                    finalSourceName = res.data.albumUnion.name;
+                }
+            }
         } else {
             finalSourceName = currentPlaylistDetails?.name || "Current Playlist";
         }
@@ -24887,40 +25892,78 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (missingIds.length > 0) {
         const BATCH_SIZE = 50;
+        
+        const processDedupeInternal = async (id) => {
+            const data = await fetchInternalTrackMetadata(id);
+            if (data) {
+                const cacheData = {
+                    name: data.name,
+                    album: {
+                        name: data.album.name,
+                        id: data.album.id,
+                        uri: data.album.uri,
+                        release_date: data.album.release_date,
+                        album_type: 'album'
+                    },
+                    artists: data.artists.map(a => ({
+                        id: a.id,
+                        name: a.name,
+                        uri: a.uri
+                    })),
+                    duration_ms: data.duration_ms,
+                    popularity: data.popularity,
+                    external_ids: data.external_ids,
+                    id: data.id,
+                    uri: data.uri
+                };
+                cachedMetadata.set(data.id, cacheData);
+                idb.set('trackMetadata', data.id, cacheData);
+            }
+        };
+
         for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
             const batch = missingIds.slice(i, i + BATCH_SIZE);
-            try {
-                const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-                if (response && response.tracks) {
-                    response.tracks.forEach(track => {
-                        if (track) {
-                            const cacheData = {
-                                name: track.name,
-                                album: {
-                                    name: track.album.name,
-                                    id: track.album.id,
-                                    uri: track.album.uri,
-                                    release_date: track.album.release_date,
-                                    album_type: track.album.album_type
-                                },
-                                artists: track.artists.map(a => ({
-                                    id: a.id,
-                                    name: a.name,
-                                    uri: a.uri
-                                })),
-                                duration_ms: track.duration_ms,
-                                popularity: track.popularity,
-                                external_ids: track.external_ids,
-                                id: track.id,
-                                uri: track.uri
-                            };
-                            cachedMetadata.set(track.id, cacheData);
-                            idb.set('trackMetadata', track.id, cacheData);
-                        }
-                    });
+            
+            if (isFallbackActive()) {
+                await Promise.all(batch.map(id => processDedupeInternal(id)));
+            } else {
+                try {
+                    const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
+                    if (response && response.tracks) {
+                        response.tracks.forEach(track => {
+                            if (track) {
+                                const cacheData = {
+                                    name: track.name,
+                                    album: {
+                                        name: track.album.name,
+                                        id: track.album.id,
+                                        uri: track.album.uri,
+                                        release_date: track.album.release_date,
+                                        album_type: track.album.album_type
+                                    },
+                                    artists: track.artists.map(a => ({
+                                        id: a.id,
+                                        name: a.name,
+                                        uri: a.uri
+                                    })),
+                                    duration_ms: track.duration_ms,
+                                    popularity: track.popularity,
+                                    external_ids: track.external_ids,
+                                    id: track.id,
+                                    uri: track.uri
+                                };
+                                cachedMetadata.set(track.id, cacheData);
+                                idb.set('trackMetadata', track.id, cacheData);
+                            }
+                        });
+                    }
+                } catch (e) {
+                    if (registerWebApiFailure()) {
+                        await Promise.all(batch.map(id => processDedupeInternal(id)));
+                    } else {
+                        console.warn("[Sort-Play] Failed to fetch ISRC batch during deduplication", e);
+                    }
                 }
-            } catch (e) {
-                console.warn("[Sort-Play] Failed to fetch ISRC batch during deduplication", e);
             }
         }
     }
@@ -26115,7 +27158,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function loadAdditionalColumnData(tracklist_) {
     const currentUri = getCurrentUri();
     let columnConfigs = [];
-    const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo', 'popularity'];
+    const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo'];
 
     if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)) {
         if (showSecondAdditionalColumn) columnConfigs.push({ type: selectedSecondColumnType, dataSelector: ".sort-play-second-data" });
@@ -26189,7 +27232,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return dataElement && !dataElement.dataset.spProcessed;
             });
             if (needsProcessing) {
-                spotifyTracksToProcess.push({ element: trackElement, id: trackUri.split(":")[2] });
+                const props = getTrackDataObject(trackElement);
+                spotifyTracksToProcess.push({ element: trackElement, id: trackUri.split(":")[2], props });
             }
         }
     }
@@ -26228,8 +27272,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const idsToFetchFromApi = [];
         const elementsToFetchFromApi = new Map();
+        const propsMap = new Map();
 
-        for (const { element, id } of batch) {
+        for (const { element, id, props } of batch) {
             let isFullyCached = true;
 
             for (const config of columnConfigs) {
@@ -26264,6 +27309,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (!isFullyCached) {
                 idsToFetchFromApi.push(id);
                 elementsToFetchFromApi.set(id, element);
+                if (props) propsMap.set(id, props);
             }
         }
 
@@ -26288,56 +27334,93 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             const nonAudioConfigs = columnConfigs.filter(c => !audioFeatureTypes.includes(c.type));
             if (nonAudioConfigs.length > 0) {
-                try {
-                    const resp = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${idsToFetchFromApi.join(',')}`);
-                    if (resp?.tracks) {
-                        const promises = resp.tracks.map(async (t) => {
-                            if(!t) return;
-                            const el = elementsToFetchFromApi.get(t.id);
-                            if(!el) return;
-                            
-                            for (const c of nonAudioConfigs) {
-                                const dEl = el.querySelector(c.dataSelector);
-                                if (!dEl || dEl.dataset.spProcessed) continue;
+                const processTrackData = async (t) => {
+                    if (!t) return;
+                    const el = elementsToFetchFromApi.get(t.id);
+                    if (!el) return;
+                    
+                    for (const c of nonAudioConfigs) {
+                        const dEl = el.querySelector(c.dataSelector);
+                        if (!dEl || dEl.dataset.spProcessed) continue;
 
-                                if (c.type === 'playCount') {
-                                    const r = await getTrackDetailsWithPlayCount({ track: { album: { id: t.album.id }, id: t.id } });
-                                    updateDisplay(dEl, r.playCount, c.type);
-                                    if (r.playCount !== "N/A") await setCachedPlayCount(t.id, r.playCount);
-                                } else if (c.type === 'releaseDate') {
-                                    updateDisplay(dEl, t.album.release_date, c.type);
-                                    if (t.album.release_date) await setCachedReleaseDate(t.id, t.album.release_date);
-                                } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles') {
-                                    const info = { name: t.name, artists: t.artists };
-                                    if (c.type === 'scrobbles') {
-                                        const r = await getTrackDetailsWithScrobbles(info, true);
-                                        if (r.scrobbles === -1 || r.error) {
-                                            updateDisplay(dEl, { error: r.error || "Track not found on Last.fm", errorLabel: r.errorLabel || "N/A" }, c.type);
-                                            await setCachedScrobbles(t.id, -1);
-                                        } else {
-                                            updateDisplay(dEl, r.scrobbles, c.type);
-                                            if (r.scrobbles !== null) await setCachedScrobbles(t.id, r.scrobbles);
-                                        }
-                                    } else {
-                                        if (loadLastFmUsername()) {
-                                            const r = await getTrackDetailsWithPersonalScrobbles({ ...info, uri: t.uri }, true);
-                                            if (r.personalScrobbles === -1 || r.error) {
-                                                updateDisplay(dEl, { error: r.error || "Track not found on Last.fm", errorLabel: r.errorLabel || "N/A" }, c.type);
-                                            } else {
-                                                updateDisplay(dEl, r.personalScrobbles, c.type);
-                                            }
-                                        } else {
-                                            updateDisplay(dEl, { error: "Set Last.fm username in setting", errorLabel: "No User" }, c.type);
-                                        }
-                                    }
+                        if (c.type === 'playCount') {
+                            const r = await getTrackDetailsWithPlayCount({ track: { album: { id: t.album.id }, id: t.id } });
+                            updateDisplay(dEl, r?.playCount, c.type);
+                            if (r?.playCount !== "N/A") await setCachedPlayCount(t.id, r.playCount);
+                        } else if (c.type === 'releaseDate') {
+                            updateDisplay(dEl, t.album.release_date, c.type);
+                            if (t.album.release_date) await setCachedReleaseDate(t.id, t.album.release_date);
+                        } else if (c.type === 'popularity') {
+                            updateDisplay(dEl, t.popularity, c.type);
+                        } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles') {
+                            const info = { name: t.name, artists: t.artists, uri: t.uri };
+                            if (c.type === 'scrobbles') {
+                                const r = await getTrackDetailsWithScrobbles(info, true);
+                                if (r.scrobbles === -1 || r.error) {
+                                    updateDisplay(dEl, { error: r.error || "Not found", errorLabel: "N/A" }, c.type);
+                                } else {
+                                    updateDisplay(dEl, r.scrobbles, c.type);
+                                    if (r.scrobbles !== null) await setCachedScrobbles(t.id, r.scrobbles);
+                                }
+                            } else {
+                                if (loadLastFmUsername()) {
+                                    const r = await getTrackDetailsWithPersonalScrobbles(info, true);
+                                    updateDisplay(dEl, (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.personalScrobbles, c.type);
+                                } else {
+                                    updateDisplay(dEl, { error: "Set username", errorLabel: "No User" }, c.type);
                                 }
                             }
-                            el.classList.remove('sort-play-processing');
-                        });
-                        await Promise.all(promises);
+                        }
                     }
-                } catch(e) { console.error(e); }
+                    el.classList.remove('sort-play-processing');
+                };
+
+                const fetchAndProcessInternal = async () => {
+                    const currentUri = getCurrentUri();
+                    const isAlbum = Spicetify.URI.isAlbum(currentUri);
+                    const albumIdFromUrl = isAlbum ? currentUri.split(':')[2] : null;
+
+                    await Promise.all(idsToFetchFromApi.map(async (id) => {
+                        let t = null;
+                        const props = propsMap.get(id);
+                        
+                        const needsPopularity = nonAudioConfigs.some(c => c.type === 'popularity');
+                        const needsReleaseDate = nonAudioConfigs.some(c => c.type === 'releaseDate');
+
+                        if (props) {
+                            const albId = props.album?.uri ? props.album.uri.split(':')[2] : albumIdFromUrl;
+                            const hasReleaseDate = props.album?.release_date;
+                            
+                            if (albId && (!needsPopularity) && (!needsReleaseDate || hasReleaseDate)) {
+                                t = {
+                                    id: id,
+                                    name: props.name,
+                                    album: { id: albId, release_date: props.album?.release_date },
+                                    artists: props.artists || [],
+                                    uri: `spotify:track:${id}`
+                                };
+                            }
+                        }
+                        
+                        if (!t) t = await fetchInternalTrackMetadata(id);
+                        await processTrackData(t);
+                    }));
+                };
+
+                if (isFallbackActive()) {
+                    await fetchAndProcessInternal();
+                } else {
+                    try {
+                        const resp = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${idsToFetchFromApi.join(',')}`);
+                        if (resp?.tracks) {
+                            await Promise.all(resp.tracks.map(processTrackData));
+                        }
+                    } catch(e) {
+                        if (registerWebApiFailure()) await fetchAndProcessInternal();
+                    }
+                }
             }
+            
             idsToFetchFromApi.forEach(id => {
                 const el = elementsToFetchFromApi.get(id);
                 if (el) {
@@ -27223,22 +28306,36 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
 
         let promises = [];
-        for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 50) {
-            let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
-            promises.push(
-                Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`).then(response => {
-                    if (response && response.tracks) {
-                        response.tracks.forEach(track => {
-                            if (track && track.external_ids && track.external_ids.isrc) {
-                                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
-                                localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
-                            }
-                        });
-                    }
-                }).catch(error => {
-                    console.error("[Sort-Play Like Button] Error fetching track details for ISRC:", error);
-                })
-            );
+        const processLikeInternal = async (id) => {
+            const track = await fetchInternalTrackMetadata(id);
+            if (track && track.external_ids && track.external_ids.isrc) {
+                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+                localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
+            }
+        };
+
+        if (isFallbackActive()) {
+            promises = likedTracksIdsWithUnknownISRCs.map(id => processLikeInternal(id));
+        } else {
+            for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 50) {
+                let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
+                promises.push(
+                    Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`).then(response => {
+                        if (response && response.tracks) {
+                            response.tracks.forEach(track => {
+                                if (track && track.external_ids && track.external_ids.isrc) {
+                                    newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+                                    localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
+                                }
+                            });
+                        }
+                    }).catch(error => {
+                        if (registerWebApiFailure()) {
+                            return Promise.all(batch.map(id => processLikeInternal(id)));
+                        }
+                    })
+                );
+            }
         }
         await Promise.all(promises);
 
@@ -27355,7 +28452,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             async function initISRC() {
                 try {
                     if (isrc == null && trackId) {
-                        let track = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                        let track = null;
+                        if (isFallbackActive()) {
+                            track = await fetchInternalTrackMetadata(trackId);
+                        } else {
+                            try {
+                                track = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
+                            } catch (e) {
+                                if (registerWebApiFailure()) {
+                                    track = await fetchInternalTrackMetadata(trackId);
+                                }
+                            }
+                        }
+
                         if (track && track.external_ids && track.external_ids.isrc) {
                             setISRC(track.external_ids.isrc);
                             localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
