@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.41.0";
+  const SORT_PLAY_VERSION = "5.41.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -217,50 +217,70 @@
   }
 
   async function fetchInternalTrackMetadata(trackId) {
-      try {
-          const hexId = spotifyHex(trackId);
-          const token = Spicetify.Platform.Session.accessToken;
-          const url = `https://spclient.wg.spotify.com/metadata/4/track/${hexId}?market=from_token&alt=json`;
-          
-          const response = await fetch(url, {
-              headers: {
-                  "Authorization": `Bearer ${token}`,
-                  "Accept": "application/json"
+      const maxRetries = 3;
+      let attempt = 0;
+
+      while (attempt < maxRetries) {
+          try {
+              const hexId = spotifyHex(trackId);
+              const token = Spicetify.Platform.Session.accessToken;
+              const url = `https://spclient.wg.spotify.com/metadata/4/track/${hexId}?market=from_token&alt=json`;
+              
+              const response = await fetch(url, {
+                  headers: {
+                      "Authorization": `Bearer ${token}`,
+                      "Accept": "application/json"
+                  }
+              });
+              
+              if (response.status === 401) {
+                  attempt++;
+                  if (attempt < maxRetries) {
+                      console.warn(`[Sort-Play] Token expired (401). Triggering refresh (Attempt ${attempt})...`);
+                      try {
+                          await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                      } catch (e) {
+                      }
+                      await new Promise(r => setTimeout(r, 1500));
+                      continue;
+                  }
+                  return null;
               }
-          });
-          
-          if (!response.ok) return null;
-          const body = await response.json();
-          if (!body) return null;
-          
-          return {
-              name: body.name,
-              id: trackId,
-              uri: `spotify:track:${trackId}`,
-              popularity: body.popularity,
-              duration_ms: body.duration,
-              explicit: body.explicit,
-              album: {
-                  name: body.album?.name,
-                  id: body.album?.gid ? hexToBase62(body.album.gid) : null,
-                  uri: body.album?.gid ? `spotify:album:${hexToBase62(body.album.gid)}` : null,
-                  release_date: body.album?.date ? `${body.album.date.year}-${String(body.album.date.month || 1).padStart(2,'0')}-${String(body.album.date.day || 1).padStart(2,'0')}` : null,
-                  images: body.album?.cover_group?.image?.map(img => ({ url: `https://i.scdn.co/image/${img.file_id}` })) || []
-              },
-              artists: body.artist?.map(a => {
-                  const artistId = a.gid ? hexToBase62(a.gid) : null;
-                  return { 
-                      name: a.name, 
-                      id: artistId,
-                      uri: artistId ? `spotify:artist:${artistId}` : null 
-                  };
-              }) || [],
-              external_ids: body.external_id ? { isrc: body.external_id.find(i => i.type === 'isrc')?.id } : {}
-          };
-      } catch (e) {
-          console.error("[Sort-Play] Internal Metadata Fetch Error:", e);
-          return null;
+
+              if (!response.ok) return null;
+              const body = await response.json();
+              if (!body) return null;
+              
+              return {
+                  name: body.name,
+                  id: trackId,
+                  uri: `spotify:track:${trackId}`,
+                  popularity: body.popularity,
+                  duration_ms: body.duration,
+                  explicit: body.explicit,
+                  album: {
+                      name: body.album?.name,
+                      id: body.album?.gid ? hexToBase62(body.album.gid) : null,
+                      uri: body.album?.gid ? `spotify:album:${hexToBase62(body.album.gid)}` : null,
+                      release_date: body.album?.date ? `${body.album.date.year}-${String(body.album.date.month || 1).padStart(2,'0')}-${String(body.album.date.day || 1).padStart(2,'0')}` : null,
+                      images: body.album?.cover_group?.image?.map(img => ({ url: `https://i.scdn.co/image/${img.file_id}` })) || []
+                  },
+                  artists: body.artist?.map(a => {
+                      const artistId = a.gid ? hexToBase62(a.gid) : null;
+                      return { 
+                          name: a.name, 
+                          id: artistId,
+                          uri: artistId ? `spotify:artist:${artistId}` : null 
+                      };
+                  }) || [],
+                  external_ids: body.external_id ? { isrc: body.external_id.find(i => i.type === 'isrc')?.id } : {}
+              };
+          } catch (e) {
+              console.error("[Sort-Play] Internal Metadata Fetch Error:", e);
+              return null;
+          }
       }
+      return null;
   }
 
   const idb = {
@@ -599,9 +619,11 @@
   let lfmKeyIndex = 0;
 
   function getNextLfmKey() {
-    const validKeys = L_F_M_Key_Pool.filter(key => !revokedLfmKeys.has(key));
+    let validKeys = L_F_M_Key_Pool.filter(key => !revokedLfmKeys.has(key));
     if (validKeys.length === 0) {
-      return null;
+      console.warn("[Sort-Play] All Last.fm keys revoked. Resetting pool to recover from potential transient errors.");
+      revokedLfmKeys.clear();
+      validKeys = L_F_M_Key_Pool;
     }
     const keyIndex = lfmKeyIndex % validKeys.length;
     const key = validKeys[keyIndex];
