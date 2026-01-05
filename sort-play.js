@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.43.1";
+  const SORT_PLAY_VERSION = "5.44.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -3420,7 +3420,7 @@
                       </label>
                   </div>
                   <div class="setting-row">
-                      <label class="setting-label" for="npLastfmToggle">Last.fm (Filtered Track or Artist Tags)</label>
+                      <label class="setting-label" for="npLastfmToggle">Last.fm (Filtered Track & Artist Tags)</label>
                       <label class="switch">
                           <input type="checkbox" id="npLastfmToggle" ${genreSourcesNpLastfm ? 'checked' : ''}>
                           <span class="sliderx"></span>
@@ -5424,6 +5424,191 @@
     }
   }
   
+  function showGenreDetailsModal(genreMap, trackName, artistName) {
+      const existing = document.getElementById("sort-play-genre-details-overlay");
+      if (existing) existing.remove();
+
+      const overlay = document.createElement("div");
+      overlay.id = "sort-play-genre-details-overlay";
+      overlay.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background-color: transparent; z-index: 2002;
+          display: flex; justify-content: center; align-items: center;
+          pointer-events: none;
+      `;
+
+      const modalContainer = document.createElement("div");
+      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+      modalContainer.style.cssText = `
+          z-index: 2003;
+          width: 550px !important;
+          max-height: 80vh;
+          display: flex;
+          flex-direction: column;
+          background-color: #181818;
+          border: 1px solid #333;
+          border-radius: 8px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.8);
+          overflow: hidden;
+          pointer-events: auto;
+      `;
+
+      const categoryMap = new Map();
+      const order = ['Spotify (Artist)', 'Last.fm (Track)', 'Last.fm (Artist)', 'Deezer (Album)', 'Other'];
+      
+      order.forEach(c => categoryMap.set(c, []));
+
+      genreMap.forEach(item => {
+          item.sources.forEach(source => {
+              let category = 'Other';
+              if (source.startsWith("Spotify")) category = 'Spotify (Artist)';
+              else if (source.startsWith("Last.fm Track")) category = 'Last.fm (Track)';
+              else if (source.startsWith("Last.fm Artist")) category = 'Last.fm (Artist)';
+              else if (source.startsWith("Deezer")) category = 'Deezer (Album)';
+
+              if (!categoryMap.has(category)) categoryMap.set(category, []);
+              
+              const list = categoryMap.get(category);
+              let entry = list.find(e => e.name === item.name);
+              if (!entry) {
+                  entry = { name: item.name, sources: [] };
+                  list.push(entry);
+              }
+              entry.sources.push(source);
+          });
+      });
+
+      let contentHtml = '';
+      let hasGenres = false;
+
+      const smallCopyIcon = copyIconSVG.replace('width="16px"', 'width="12px"').replace('height="16px"', 'height="12px"');
+
+      categoryMap.forEach((genres, category) => {
+          if (genres.length > 0) {
+              hasGenres = true;
+              genres.sort((a, b) => a.name.localeCompare(b.name));
+
+              contentHtml += `
+                  <div style="margin-bottom: 24px;">
+                      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 6px;">
+                          <div style="color: #fff; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                              ${category}
+                          </div>
+                      </div>
+                      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                          ${genres.map(g => {
+                              const titleCase = g.name.replace(/\b\w/g, l => l.toUpperCase());
+                              const uniqueSources = [...new Set(g.sources)];
+                              const tooltip = uniqueSources.join(' & ');
+                              return `
+                                <div class="genre-detail-tag" data-genre="${g.name}" title="Source: ${tooltip}" style="background: #2a2a2a; color: #eee; padding: 4px 6px 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; user-select: none; display: flex; align-items: center; gap: 8px;">
+                                    <span class="genre-text">${titleCase}</span>
+                                    <button class="genre-copy-btn" title="Copy" style="background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.2s;">
+                                        ${smallCopyIcon}
+                                    </button>
+                                </div>`;
+                          }).join('')}
+                      </div>
+                  </div>
+              `;
+          }
+      });
+
+      if (!hasGenres) {
+          contentHtml = '<div style="color: #b3b3b3; text-align: center; padding: 40px 20px;">No genres found for this track.</div>';
+      }
+
+      modalContainer.innerHTML = `
+          <div class="main-trackCreditsModal-header" style="padding: 18px 24px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background-color: #181818;">
+              <div style="display: flex; flex-direction: column; gap: 2px; overflow: hidden; padding-right: 16px;">
+                  <h1 style="font-size: 18px; font-weight: 700; margin: 0; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">All Genres</h1>
+                  <span style="font-size: 13px; color: #b3b3b3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${trackName} • ${artistName}">${trackName} • ${artistName}</span>
+              </div>
+              <button class="close-details-btn" style="background: none; border: none; color: #b3b3b3; cursor: pointer; display: flex; padding: 4px; transition: color 0.2s; flex-shrink: 0;">
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"/></svg>
+              </button>
+          </div>
+          <div class="main-trackCreditsModal-mainSection" style="padding: 24px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 transparent; background-color: #181818;">
+              ${contentHtml}
+          </div>
+      `;
+
+      document.body.appendChild(overlay);
+      overlay.appendChild(modalContainer);
+
+      const closeModal = () => overlay.remove();
+      
+      const closeBtn = modalContainer.querySelector('.close-details-btn');
+      closeBtn.addEventListener('click', closeModal);
+      closeBtn.addEventListener('mouseenter', () => closeBtn.style.color = '#fff');
+      closeBtn.addEventListener('mouseleave', () => closeBtn.style.color = '#b3b3b3');
+
+      overlay.addEventListener('mousedown', (e) => {
+          if (e.target === overlay) closeModal();
+      });
+
+      modalContainer.querySelectorAll('.genre-detail-tag').forEach(tag => {
+          tag.addEventListener('mouseenter', () => {
+              tag.style.background = '#3e3e3e';
+              tag.style.borderColor = '#555';
+          });
+          tag.addEventListener('mouseleave', () => {
+              tag.style.background = '#2a2a2a';
+              tag.style.borderColor = 'transparent';
+          });
+          
+          tag.addEventListener('click', (e) => {
+              if (e.target.closest('.genre-copy-btn')) return;
+
+              const genreName = tag.dataset.genre;
+              let path;
+              if (useGenrePlaylistDatabase && genrePlaylistsCache) {
+                  const normalized = normalizeGenre(genreName);
+                  const matched = genrePlaylistsCache.find(p => normalizeGenre(p.genre) === normalized);
+                  if (matched) {
+                      try {
+                          const uriObj = Spicetify.URI.fromString(matched.uri);
+                          path = uriObj.toURLPath(true);
+                      } catch(err) {
+                          const id = matched.uri.split(":").pop();
+                          path = `/playlist/${id}`;
+                      }
+                  }
+              }
+              if (!path) {
+                  path = `/search/${encodeURIComponent(genreName)}/playlists`;
+              }
+              Spicetify.Platform.History.push(path);
+              closeModal();
+          });
+      });
+
+      modalContainer.querySelectorAll('.genre-copy-btn').forEach(btn => {
+          btn.addEventListener('mouseenter', () => {
+              btn.style.backgroundColor = 'rgba(255,255,255,0.2)';
+              btn.style.color = '#fff';
+          });
+          btn.addEventListener('mouseleave', () => {
+              btn.style.backgroundColor = 'transparent';
+              btn.style.color = '#b3b3b3';
+          });
+
+          btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const tag = btn.closest('.genre-detail-tag');
+              const genreName = tag.dataset.genre;
+              
+              navigator.clipboard.writeText(genreName).then(() => {
+                  const originalHtml = btn.innerHTML;
+                  btn.style.color = '#1ED760';
+                  setTimeout(() => {
+                      btn.style.color = '#b3b3b3';
+                  }, 1000);
+              });
+          });
+      });
+  }
+
   async function getGenreMapping() {
       const cached = await idb.get('staticData', 'genre_playlist_map');
       if (cached) {
@@ -5739,168 +5924,179 @@
   }
 
   async function displayGenreTags() {
-      if (!showGenreTags || !showGenreTagsNowPlaying) {
-          document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
-          return;
-      }
+    if (!showGenreTags || !showGenreTagsNowPlaying) {
+        document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
+        return;
+    }
 
-      const MAX_RETRIES = 10;
-      let retryDelay = 200;
+    const MAX_RETRIES = 10;
+    let retryDelay = 200;
 
-      for (let i = 0; i < MAX_RETRIES; i++) {
-          const track = Spicetify.Player.data?.item;
-          
-          if (!track || !track.uri) {
-              await new Promise(resolve => setTimeout(resolve, retryDelay));
-              retryDelay = Math.min(retryDelay * 1.5, 3000);
-              continue;
-          }
+    for (let i = 0; i < MAX_RETRIES; i++) {
+        const track = Spicetify.Player.data?.item;
+        
+        if (!track || !track.uri) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retryDelay = Math.min(retryDelay * 1.5, 3000);
+            continue;
+        }
 
-          if (Spicetify.URI.isLocalTrack(track.uri)) {
-              document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
-              return;
-          }
+        if (Spicetify.URI.isLocalTrack(track.uri)) {
+            document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
+            return;
+        }
 
-          const currentUriAtStart = track.uri;
+        const currentUriAtStart = track.uri;
 
-          const targetContainer = document.querySelector(".main-nowPlayingWidget-trackInfo");
-          if (!targetContainer) {
-              await new Promise(resolve => setTimeout(resolve, retryDelay));
-              retryDelay = Math.min(retryDelay * 1.5, 3000);
-              continue;
-          }
+        const targetContainer = document.querySelector(".main-nowPlayingWidget-trackInfo");
+        if (!targetContainer) {
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            retryDelay = Math.min(retryDelay * 1.5, 3000);
+            continue;
+        }
 
-          const computedStyle = window.getComputedStyle(targetContainer);
-          const gridTemplate = computedStyle.getPropertyValue("grid-template");
-          
-          if (gridTemplate) {
-              const parts = gridTemplate.split("/");
-              if (parts.length >= 2) {
-                  let rows = parts[0].trim();
-                  const cols = parts.slice(1).join("/").trim(); 
-                  const genreRow = '"genres genres"';
-                  if (!rows.includes(genreRow)) {
-                      rows = rows.replace(/;$/, '').trim(); 
-                      const newTemplate = `${rows} ${genreRow} / ${cols}`;
-                      targetContainer.style.setProperty("grid-template", newTemplate);
-                  }
-              }
-          }
+        const computedStyle = window.getComputedStyle(targetContainer);
+        const gridTemplate = computedStyle.getPropertyValue("grid-template");
+        
+        if (gridTemplate) {
+            const parts = gridTemplate.split("/");
+            if (parts.length >= 2) {
+                let rows = parts[0].trim();
+                const cols = parts.slice(1).join("/").trim(); 
+                const genreRow = '"genres genres"';
+                if (!rows.includes(genreRow)) {
+                    rows = rows.replace(/;$/, '').trim(); 
+                    const newTemplate = `${rows} ${genreRow} / ${cols}`;
+                    targetContainer.style.setProperty("grid-template", newTemplate);
+                }
+            }
+        }
 
-          let genreContainer = targetContainer.querySelector('.sort-play-genre-container');
-          if (!genreContainer) {
-              genreContainer = document.createElement("div");
-              genreContainer.className = "sort-play-genre-container ellipsis-one-line";
-              genreContainer.style.fontSize = "12px";
-              genreContainer.style.color = "var(--spice-subtext)";
-              genreContainer.style.setProperty("grid-area", "genres");
-              genreContainer.style.overflow = "hidden";
-              genreContainer.style.textOverflow = "ellipsis";
-              genreContainer.style.whiteSpace = "nowrap";
-              targetContainer.appendChild(genreContainer);
-          }
-          
-          if (genreContainer.dataset.uri !== currentUriAtStart) {
-             genreContainer.innerHTML = "ㅤ";
-             genreContainer.dataset.uri = currentUriAtStart;
-          }
+        let genreContainer = targetContainer.querySelector('.sort-play-genre-container');
+        if (!genreContainer) {
+            genreContainer = document.createElement("div");
+            genreContainer.className = "sort-play-genre-container ellipsis-one-line";
+            genreContainer.style.fontSize = "12px";
+            genreContainer.style.color = "var(--spice-subtext)";
+            genreContainer.style.setProperty("grid-area", "genres");
+            genreContainer.style.overflow = "hidden";
+            genreContainer.style.textOverflow = "ellipsis";
+            genreContainer.style.whiteSpace = "nowrap";
+            targetContainer.appendChild(genreContainer);
 
-          const genreSourcesMap = await fetchDisplayGenres(track);
-          
-          const liveTrack = Spicetify.Player.data?.item;
-          if (!liveTrack || liveTrack.uri !== currentUriAtStart) {
-              return;
-          }
+            genreContainer.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (genreContainer._genreMap && genreContainer._genreMap.size > 0) {
+                    showGenreDetailsModal(genreContainer._genreMap, genreContainer._trackName, genreContainer._artistName);
+                }
+            });
+        }
+        
+        if (genreContainer.dataset.uri !== currentUriAtStart) {
+           genreContainer.innerHTML = "ㅤ";
+           genreContainer.dataset.uri = currentUriAtStart;
+        }
 
-          if (genreSourcesMap.size === 0) {
-              genreContainer.innerHTML = "";
-              return;
-          }
+        const genreSourcesMap = await fetchDisplayGenres(track);
+        genreContainer._genreMap = genreSourcesMap;
+        genreContainer._trackName = track.metadata?.title || track.name || "Unknown Track";
+        genreContainer._artistName = track.metadata?.artist_name || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
+        
+        const liveTrack = Spicetify.Player.data?.item;
+        if (!liveTrack || liveTrack.uri !== currentUriAtStart) {
+            return;
+        }
 
-          const genreMap = await getGenreMapping();
-          
-          const genreItems = Array.from(genreSourcesMap.values());
+        if (genreSourcesMap.size === 0) {
+            genreContainer.innerHTML = "";
+            return;
+        }
 
-          const hasSpotify = (sources) => {
-              for (const s of sources) if (s.startsWith('Spotify Artist')) return true;
-              return false;
-          };
-          
-          const hasLastFm = (sources) => {
-              for (const s of sources) if (s.startsWith('Last.fm')) return true;
-              return false;
-          };
+        const genreMap = await getGenreMapping();
+        
+        const genreItems = Array.from(genreSourcesMap.values());
 
-          genreItems.sort((a, b) => {
-              const aSize = a.sources.size;
-              const bSize = b.sources.size;
-              
-              if (aSize > 1 && bSize <= 1) return -1;
-              if (bSize > 1 && aSize <= 1) return 1;
-              
-              if (aSize > 1 && bSize > 1) {
-                  return bSize - aSize;
-              }
+        const hasSpotify = (sources) => {
+            for (const s of sources) if (s.startsWith('Spotify Artist')) return true;
+            return false;
+        };
+        
+        const hasLastFm = (sources) => {
+            for (const s of sources) if (s.startsWith('Last.fm')) return true;
+            return false;
+        };
 
-              const aSpotify = hasSpotify(a.sources);
-              const bSpotify = hasSpotify(b.sources);
-              
-              if (aSpotify && !bSpotify) return -1;
-              if (!aSpotify && bSpotify) return 1;
+        genreItems.sort((a, b) => {
+            const aSize = a.sources.size;
+            const bSize = b.sources.size;
+            
+            if (aSize > 1 && bSize <= 1) return -1;
+            if (bSize > 1 && aSize <= 1) return 1;
+            
+            if (aSize > 1 && bSize > 1) {
+                return bSize - aSize;
+            }
 
-              const aLfm = hasLastFm(a.sources);
-              const bLfm = hasLastFm(b.sources);
-              
-              if (aLfm && !bLfm) return -1;
-              if (!aLfm && bLfm) return 1;
+            const aSpotify = hasSpotify(a.sources);
+            const bSpotify = hasSpotify(b.sources);
+            
+            if (aSpotify && !bSpotify) return -1;
+            if (!aSpotify && bSpotify) return 1;
 
-              return 0;
-          });
-          
-          const genreLinks = genreItems.map(item => {
-              const rawName = item.name;
-              const sources = Array.from(item.sources).join(' & ');
-              
-              const titleCaseGenre = rawName.replace(/\b\w/g, l => l.toUpperCase());
-              
-              const matchedPlaylist = useGenrePlaylistDatabase ? genreMap.find(p => 
-                  normalizeGenre(p.genre) === normalizeGenre(rawName)
-              ) : null;
-              
-              let href = "#";
-              let style = "color: var(--spice-subtext); text-decoration: none; cursor: pointer;";
-              let clickAction = "";
+            const aLfm = hasLastFm(a.sources);
+            const bLfm = hasLastFm(b.sources);
+            
+            if (aLfm && !bLfm) return -1;
+            if (!aLfm && bLfm) return 1;
 
-              if (matchedPlaylist) {
-                  try {
-                      const uriObj = Spicetify.URI.fromString(matchedPlaylist.uri);
-                      const path = uriObj.toURLPath(true);
-                      href = path;
-                      clickAction = `Spicetify.Platform.History.push('${path}')`;
-                  } catch (e) {
-                      href = matchedPlaylist.uri;
-                      const id = matchedPlaylist.uri.split(":").pop();
-                      clickAction = `Spicetify.Platform.History.push('/playlist/${id}')`;
-                  }
-              } else {
-                  href = `/search/${encodeURIComponent(rawName)}/playlists`;
-                  clickAction = `Spicetify.Platform.History.push('${href}')`;
-              }
+            return 0;
+        });
+        
+        const genreLinks = genreItems.map(item => {
+            const rawName = item.name;
+            const sources = Array.from(item.sources).join(' & ');
+            
+            const titleCaseGenre = rawName.replace(/\b\w/g, l => l.toUpperCase());
+            
+            const matchedPlaylist = useGenrePlaylistDatabase ? genreMap.find(p => 
+                normalizeGenre(p.genre) === normalizeGenre(rawName)
+            ) : null;
+            
+            let href = "#";
+            let style = "color: var(--spice-subtext); text-decoration: none; cursor: pointer;";
+            let clickAction = "";
 
-              return `<a href="${href}" 
-                      title="Source: ${sources}"
-                      style="${style}" 
-                      onmouseover="this.style.color='var(--spice-text)'" 
-                      onmouseout="this.style.color='var(--spice-subtext)'"
-                      data-uri="${href}"
-                      onclick="event.preventDefault(); event.stopPropagation(); ${clickAction}"
-                      >${titleCaseGenre}</a>`;
-          }).join("<span>, </span>");
+            if (matchedPlaylist) {
+                try {
+                    const uriObj = Spicetify.URI.fromString(matchedPlaylist.uri);
+                    const path = uriObj.toURLPath(true);
+                    href = path;
+                    clickAction = `Spicetify.Platform.History.push('${path}')`;
+                } catch (e) {
+                    href = matchedPlaylist.uri;
+                    const id = matchedPlaylist.uri.split(":").pop();
+                    clickAction = `Spicetify.Platform.History.push('/playlist/${id}')`;
+                }
+            } else {
+                href = `/search/${encodeURIComponent(rawName)}/playlists`;
+                clickAction = `Spicetify.Platform.History.push('${href}')`;
+            }
 
-          genreContainer.innerHTML = genreLinks;
-          return;
-      }
-  }
+            return `<a href="${href}" 
+                    title="Source: ${sources}"
+                    style="${style}" 
+                    onmouseover="this.style.color='var(--spice-text)'" 
+                    onmouseout="this.style.color='var(--spice-subtext)'"
+                    data-uri="${href}"
+                    onclick="event.preventDefault(); event.stopPropagation(); ${clickAction}"
+                    >${titleCaseGenre}</a>`;
+        }).join("<span>, </span>");
+
+        genreContainer.innerHTML = genreLinks;
+        return;
+    }
+}
 
   async function updateArtistPageGenres() {
       if (!showGenreTags || !showGenreTagsArtistPage) {
@@ -18258,7 +18454,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return genre
       .toLowerCase()
       .replace(/&/g, 'and')
-      .replace(/\s?music/g, '') 
       .replace(/[\s-]+/g, '');
   }
 
