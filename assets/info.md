@@ -42,7 +42,7 @@ Filter by genre using combined Spotify, Deezer and Last.fm data with intelligent
 Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies genre or keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
 
 ### ➕ Dedicated Playlist Creation
-Generate My Top Tracks, New Releases from Followed Artists, Genre Tree/Random Explorer, and Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery) with automated updates and customizable limits.
+Generate My Top Tracks, New Releases from Followed Artists, Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery), Genre Tree/Random Explorer, and Last.fm Generators (Infinite Vibe, Neighbors Mix) with automated updates and customizable limits.
 
 ### ➕ AI-Powered Playlists
 Generate playlists from natural language prompts using Google Gemini. Context-aware with customizable instructions, model selection, and data toggles. Use your own API key.
@@ -51,7 +51,7 @@ Generate playlists from natural language prompts using Google Gemini. Context-aw
 Automatic conversion when sorting/filtering. Dedicated tool converts Local Files library to Spotify playlist with detailed export reports.
 
 ### ➕ UI & Enhancements
-Old Like Button returns the heart icon. Display Now Playing Data in the player bar. Automatic playlist organization into "Sort-Play Library" folder. Configurable sort order, auto-open after sorting, and deduplication reports.
+Old Like Button returns the heart icon. Display Now Playing Data and Interactive Genre Tags in the player bar. Automatic playlist organization into "Sort-Play Library" folder. Configurable sort order, auto-open after sorting, and deduplication reports.
 
 ## 📷 Screenshots 
 <table>
