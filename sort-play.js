@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.42.0";
+  const SORT_PLAY_VERSION = "5.43.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   let isProcessing = false;
@@ -72,6 +72,8 @@
   let includeZeroScrobbles = true;
   let lastFmAutocorrect = false;
   let showGenreTags = false;
+  let showGenreTagsNowPlaying = true;
+  let showGenreTagsArtistPage = true;
   let genreSourcesNpSpotify = true;
   let genreSourcesNpLastfm = true;
   let genreSourcesNpDeezer = true;
@@ -88,6 +90,8 @@
   const pendingGenreFetches = new Map();
   const pendingArtistPageFetches = new Map();
   const STORAGE_KEY_SHOW_GENRE_TAGS = "sort-play-show-genre-tags";
+  const STORAGE_KEY_SHOW_GENRE_TAGS_NP = "sort-play-show-genre-tags-np";
+  const STORAGE_KEY_SHOW_GENRE_TAGS_AP = "sort-play-show-genre-tags-ap";
   const STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY = "sort-play-genre-sources-np-spotify";
   const STORAGE_KEY_GENRE_SOURCES_NP_LASTFM = "sort-play-genre-sources-np-lastfm";
   const STORAGE_KEY_GENRE_SOURCES_NP_DEEZER = "sort-play-genre-sources-np-deezer";
@@ -1145,6 +1149,8 @@
     includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
     lastFmAutocorrect = localStorage.getItem("sort-play-lastfm-autocorrect") === "true";
     showGenreTags = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS) === "true";
+    showGenreTagsNowPlaying = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP) !== "false";
+    showGenreTagsArtistPage = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP) !== "false";
     genreSourcesNpSpotify = localStorage.getItem(STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY) !== "false";
     genreSourcesNpLastfm = localStorage.getItem(STORAGE_KEY_GENRE_SOURCES_NP_LASTFM) !== "false";
     genreSourcesNpDeezer = localStorage.getItem(STORAGE_KEY_GENRE_SOURCES_NP_DEEZER) !== "false";
@@ -1213,6 +1219,8 @@
     localStorage.setItem("sort-play-include-no-scrobbles", includeZeroScrobbles);
     localStorage.setItem("sort-play-lastfm-autocorrect", lastFmAutocorrect);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS, showGenreTags);
+    localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP, showGenreTagsNowPlaying);
+    localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP, showGenreTagsArtistPage);
     localStorage.setItem(STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY, genreSourcesNpSpotify);
     localStorage.setItem(STORAGE_KEY_GENRE_SOURCES_NP_LASTFM, genreSourcesNpLastfm);
     localStorage.setItem(STORAGE_KEY_GENRE_SOURCES_NP_DEEZER, genreSourcesNpDeezer);
@@ -3343,6 +3351,24 @@
       </div>
       <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px 25px !important;">
           <div style="display: flex; flex-direction: column; gap: 24px;">
+
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <div class="section-header">Display Location</div>
+                  <div class="setting-row">
+                      <label class="setting-label" for="showTagsNpToggle">Now Playing View</label>
+                      <label class="switch">
+                          <input type="checkbox" id="showTagsNpToggle" ${showGenreTagsNowPlaying ? 'checked' : ''}>
+                          <span class="sliderx"></span>
+                      </label>
+                  </div>
+                  <div class="setting-row">
+                      <label class="setting-label" for="showTagsApToggle">Artist Page</label>
+                      <label class="switch">
+                          <input type="checkbox" id="showTagsApToggle" ${showGenreTagsArtistPage ? 'checked' : ''}>
+                          <span class="sliderx"></span>
+                      </label>
+                  </div>
+              </div>
               
               <div style="display: flex; flex-direction: column; gap: 4px;">
                   <div class="section-header">Behavior</div>
@@ -3420,6 +3446,8 @@
 
     const closeModal = () => overlay.remove();
 
+    const showTagsNpToggle = modalContainer.querySelector("#showTagsNpToggle");
+    const showTagsApToggle = modalContainer.querySelector("#showTagsApToggle");
     const npSpotifyToggle = modalContainer.querySelector("#npSpotifyToggle");
     const npLastfmToggle = modalContainer.querySelector("#npLastfmToggle");
     const npDeezerToggle = modalContainer.querySelector("#npDeezerToggle");
@@ -3429,6 +3457,8 @@
     const doneButton = modalContainer.querySelector("#doneGenreSources");
 
     const updateVarsAndSave = () => {
+        showGenreTagsNowPlaying = showTagsNpToggle.checked;
+        showGenreTagsArtistPage = showTagsApToggle.checked;
         genreSourcesNpSpotify = npSpotifyToggle.checked;
         genreSourcesNpLastfm = npLastfmToggle.checked;
         genreSourcesNpDeezer = npDeezerToggle.checked;
@@ -3443,7 +3473,9 @@
         displayGenreTags();
         updateArtistPageGenres();
     };
-
+    
+    showTagsNpToggle.addEventListener("change", updateVarsAndSave);
+    showTagsApToggle.addEventListener("change", updateVarsAndSave);
     npSpotifyToggle.addEventListener("change", updateVarsAndSave);
     npLastfmToggle.addEventListener("change", updateVarsAndSave);
     npDeezerToggle.addEventListener("change", updateVarsAndSave);
@@ -5625,151 +5657,175 @@
   }
 
   async function displayGenreTags() {
-      if (!showGenreTags) {
+      if (!showGenreTags || !showGenreTagsNowPlaying) {
           document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
           return;
       }
 
-      const track = Spicetify.Player.data?.item;
-      if (!track || !track.uri || Spicetify.URI.isLocalTrack(track.uri)) {
-          document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
-          return;
-      }
+      const MAX_RETRIES = 10;
+      let retryDelay = 200;
 
-      const currentUriAtStart = track.uri;
+      for (let i = 0; i < MAX_RETRIES; i++) {
+          const track = Spicetify.Player.data?.item;
+          
+          if (!track || !track.uri) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              retryDelay = Math.min(retryDelay * 1.5, 3000);
+              continue;
+          }
 
-      const targetContainer = await waitForElement(".main-nowPlayingWidget-trackInfo");
-      if (!targetContainer) return;
+          if (Spicetify.URI.isLocalTrack(track.uri)) {
+              document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
+              return;
+          }
 
-      const computedStyle = window.getComputedStyle(targetContainer);
-      const gridTemplate = computedStyle.getPropertyValue("grid-template");
-      
-      if (gridTemplate) {
-          const parts = gridTemplate.split("/");
-          if (parts.length >= 2) {
-              let rows = parts[0].trim();
-              const cols = parts.slice(1).join("/").trim(); 
-              const genreRow = '"genres genres"';
-              if (!rows.includes(genreRow)) {
-                  rows = rows.replace(/;$/, '').trim(); 
-                  const newTemplate = `${rows} ${genreRow} / ${cols}`;
-                  targetContainer.style.setProperty("grid-template", newTemplate);
+          const currentUriAtStart = track.uri;
+
+          const targetContainer = document.querySelector(".main-nowPlayingWidget-trackInfo");
+          if (!targetContainer) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+              retryDelay = Math.min(retryDelay * 1.5, 3000);
+              continue;
+          }
+
+          const computedStyle = window.getComputedStyle(targetContainer);
+          const gridTemplate = computedStyle.getPropertyValue("grid-template");
+          
+          if (gridTemplate) {
+              const parts = gridTemplate.split("/");
+              if (parts.length >= 2) {
+                  let rows = parts[0].trim();
+                  const cols = parts.slice(1).join("/").trim(); 
+                  const genreRow = '"genres genres"';
+                  if (!rows.includes(genreRow)) {
+                      rows = rows.replace(/;$/, '').trim(); 
+                      const newTemplate = `${rows} ${genreRow} / ${cols}`;
+                      targetContainer.style.setProperty("grid-template", newTemplate);
+                  }
               }
           }
-      }
 
-      let genreContainer = targetContainer.querySelector('.sort-play-genre-container');
-      if (!genreContainer) {
-          genreContainer = document.createElement("div");
-          genreContainer.className = "sort-play-genre-container ellipsis-one-line";
-          genreContainer.style.fontSize = "12px";
-          genreContainer.style.color = "var(--spice-subtext)";
-          genreContainer.style.setProperty("grid-area", "genres");
-          genreContainer.style.overflow = "hidden";
-          genreContainer.style.textOverflow = "ellipsis";
-          genreContainer.style.whiteSpace = "nowrap";
-          targetContainer.appendChild(genreContainer);
-      }
-      
-      genreContainer.innerHTML = "ㅤ";
-
-      const genreSourcesMap = await fetchDisplayGenres(track);
-      
-      const liveTrack = Spicetify.Player.data?.item;
-      if (!liveTrack || liveTrack.uri !== currentUriAtStart) {
-          return;
-      }
-
-      if (genreSourcesMap.size === 0) {
-          genreContainer.innerHTML = "";
-          return;
-      }
-
-      const genreMap = await getGenreMapping();
-      
-      const genreItems = Array.from(genreSourcesMap.values());
-
-      const hasSpotify = (sources) => {
-          for (const s of sources) if (s.startsWith('Spotify Artist')) return true;
-          return false;
-      };
-      
-      const hasLastFm = (sources) => {
-          for (const s of sources) if (s.startsWith('Last.fm')) return true;
-          return false;
-      };
-
-      genreItems.sort((a, b) => {
-          const aSize = a.sources.size;
-          const bSize = b.sources.size;
+          let genreContainer = targetContainer.querySelector('.sort-play-genre-container');
+          if (!genreContainer) {
+              genreContainer = document.createElement("div");
+              genreContainer.className = "sort-play-genre-container ellipsis-one-line";
+              genreContainer.style.fontSize = "12px";
+              genreContainer.style.color = "var(--spice-subtext)";
+              genreContainer.style.setProperty("grid-area", "genres");
+              genreContainer.style.overflow = "hidden";
+              genreContainer.style.textOverflow = "ellipsis";
+              genreContainer.style.whiteSpace = "nowrap";
+              targetContainer.appendChild(genreContainer);
+          }
           
-          if (aSize > 1 && bSize <= 1) return -1;
-          if (bSize > 1 && aSize <= 1) return 1;
-          
-          if (aSize > 1 && bSize > 1) {
-              return bSize - aSize;
+          if (genreContainer.dataset.uri !== currentUriAtStart) {
+             genreContainer.innerHTML = "ㅤ";
+             genreContainer.dataset.uri = currentUriAtStart;
           }
 
-          const aSpotify = hasSpotify(a.sources);
-          const bSpotify = hasSpotify(b.sources);
+          const genreSourcesMap = await fetchDisplayGenres(track);
           
-          if (aSpotify && !bSpotify) return -1;
-          if (!aSpotify && bSpotify) return 1;
+          const liveTrack = Spicetify.Player.data?.item;
+          if (!liveTrack || liveTrack.uri !== currentUriAtStart) {
+              return;
+          }
 
-          const aLfm = hasLastFm(a.sources);
-          const bLfm = hasLastFm(b.sources);
-          
-          if (aLfm && !bLfm) return -1;
-          if (!aLfm && bLfm) return 1;
+          if (genreSourcesMap.size === 0) {
+              genreContainer.innerHTML = "";
+              return;
+          }
 
-          return 0;
-      });
-      
-      const genreLinks = genreItems.map(item => {
-          const rawName = item.name;
-          const sources = Array.from(item.sources).join(' & ');
+          const genreMap = await getGenreMapping();
           
-          const titleCaseGenre = rawName.replace(/\b\w/g, l => l.toUpperCase());
-          
-          const matchedPlaylist = useGenrePlaylistDatabase ? genreMap.find(p => 
-              normalizeGenre(p.genre) === normalizeGenre(rawName)
-          ) : null;
-          
-          let href = "#";
-          let style = "color: var(--spice-subtext); text-decoration: none; cursor: pointer;";
-          let clickAction = "";
+          const genreItems = Array.from(genreSourcesMap.values());
 
-          if (matchedPlaylist) {
-              try {
-                  const uriObj = Spicetify.URI.fromString(matchedPlaylist.uri);
-                  const path = uriObj.toURLPath(true);
-                  href = path;
-                  clickAction = `Spicetify.Platform.History.push('${path}')`;
-              } catch (e) {
-                  href = matchedPlaylist.uri;
-                  const id = matchedPlaylist.uri.split(":").pop();
-                  clickAction = `Spicetify.Platform.History.push('/playlist/${id}')`;
+          const hasSpotify = (sources) => {
+              for (const s of sources) if (s.startsWith('Spotify Artist')) return true;
+              return false;
+          };
+          
+          const hasLastFm = (sources) => {
+              for (const s of sources) if (s.startsWith('Last.fm')) return true;
+              return false;
+          };
+
+          genreItems.sort((a, b) => {
+              const aSize = a.sources.size;
+              const bSize = b.sources.size;
+              
+              if (aSize > 1 && bSize <= 1) return -1;
+              if (bSize > 1 && aSize <= 1) return 1;
+              
+              if (aSize > 1 && bSize > 1) {
+                  return bSize - aSize;
               }
-          } else {
-              href = `/search/${encodeURIComponent(rawName)}/playlists`;
-              clickAction = `Spicetify.Platform.History.push('${href}')`;
-          }
 
-          return `<a href="${href}" 
-                  title="Source: ${sources}"
-                  style="${style}" 
-                  onmouseover="this.style.color='var(--spice-text)'" 
-                  onmouseout="this.style.color='var(--spice-subtext)'"
-                  data-uri="${href}"
-                  onclick="event.preventDefault(); event.stopPropagation(); ${clickAction}"
-                  >${titleCaseGenre}</a>`;
-      }).join("<span>, </span>");
+              const aSpotify = hasSpotify(a.sources);
+              const bSpotify = hasSpotify(b.sources);
+              
+              if (aSpotify && !bSpotify) return -1;
+              if (!aSpotify && bSpotify) return 1;
 
-      genreContainer.innerHTML = genreLinks;
+              const aLfm = hasLastFm(a.sources);
+              const bLfm = hasLastFm(b.sources);
+              
+              if (aLfm && !bLfm) return -1;
+              if (!aLfm && bLfm) return 1;
+
+              return 0;
+          });
+          
+          const genreLinks = genreItems.map(item => {
+              const rawName = item.name;
+              const sources = Array.from(item.sources).join(' & ');
+              
+              const titleCaseGenre = rawName.replace(/\b\w/g, l => l.toUpperCase());
+              
+              const matchedPlaylist = useGenrePlaylistDatabase ? genreMap.find(p => 
+                  normalizeGenre(p.genre) === normalizeGenre(rawName)
+              ) : null;
+              
+              let href = "#";
+              let style = "color: var(--spice-subtext); text-decoration: none; cursor: pointer;";
+              let clickAction = "";
+
+              if (matchedPlaylist) {
+                  try {
+                      const uriObj = Spicetify.URI.fromString(matchedPlaylist.uri);
+                      const path = uriObj.toURLPath(true);
+                      href = path;
+                      clickAction = `Spicetify.Platform.History.push('${path}')`;
+                  } catch (e) {
+                      href = matchedPlaylist.uri;
+                      const id = matchedPlaylist.uri.split(":").pop();
+                      clickAction = `Spicetify.Platform.History.push('/playlist/${id}')`;
+                  }
+              } else {
+                  href = `/search/${encodeURIComponent(rawName)}/playlists`;
+                  clickAction = `Spicetify.Platform.History.push('${href}')`;
+              }
+
+              return `<a href="${href}" 
+                      title="Source: ${sources}"
+                      style="${style}" 
+                      onmouseover="this.style.color='var(--spice-text)'" 
+                      onmouseout="this.style.color='var(--spice-subtext)'"
+                      data-uri="${href}"
+                      onclick="event.preventDefault(); event.stopPropagation(); ${clickAction}"
+                      >${titleCaseGenre}</a>`;
+          }).join("<span>, </span>");
+
+          genreContainer.innerHTML = genreLinks;
+          return;
+      }
   }
 
   async function updateArtistPageGenres() {
-      if (!showGenreTags) return;
+      if (!showGenreTags || !showGenreTagsArtistPage) {
+          const existing = document.querySelector('.sort-play-artist-genres');
+          if (existing) existing.remove();
+          return;
+      }
 
       const currentUri = getCurrentUri();
       const isArtist = currentUri && (
