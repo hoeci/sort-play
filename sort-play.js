@@ -12,83 +12,12 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.43.0";
+  const SORT_PLAY_VERSION = "5.43.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
-  let isProcessing = false;
-  let useLfmGateway = false;
-  let showAdditionalColumn = false;
-  let showSecondAdditionalColumn = false;
-  let selectedColumnType = 'playCount';
-  let selectedSecondColumnType = 'releaseDate';
-  let selectedAlbumColumnType = 'scrobbles';
-  let selectedArtistColumnType = 'releaseDate';
-  let myScrobblesDisplayMode = 'number';
-  let releaseDateFormat = 'YYYY-MM-DD';
-  let showAlbumColumn = false;
-  let showArtistColumn = false; 
-  let removeDateAdded = false;
-  let playlistDeduplicate = false;
-  let showRemovedDuplicates = false;
-  let includeSongStats = true;
-  let includeLyrics = false;
-  let matchAllGenres  = false;
-  let addToQueueEnabled = false; 
-  let createPlaylistAfterSort = true; 
-  let sortCurrentPlaylistEnabled = false;
-  let createPlaylistPrivate = true;
-  let openPlaylistAfterSortEnabled = false;
-  let placePlaylistsInFolder = false;
-  let sortPlayFolderName = "Sort-Play Library";
-  let changeTitleOnCreate = false;
-  let changeTitleOnModify = false;
-  let selectedAiModel = "gemini-flash-latest";
-  let topTracksLimit = 100;
-  let discoveryPlaylistSize = 50;
-  let newReleasesDaysLimit = 'release-2';
-  let followedReleasesAlbumLimit = 'all';
-  let colorThiefLib = null;
-  let colorSortMode = 'perceptual';
-  let setDedicatedPlaylistCovers = true;
-  let chatPanelVisible = false;
-  let userMarketPromise = null;
-  let useEnergyWaveShuffle = false;
-  let energyWaveShuffleLimit = 6000;
-  let showLikeButton = false;
-  let likeButton_connectObserver = () => {};
-  let showNowPlayingData = false;
-  let currentTrackUriForScrobbleCache = null;
-  let selectedNowPlayingDataType = 'releaseDate';
-  let selectedNowPlayingDataPosition = '.main-trackInfo-name';
-  let selectedNowPlayingDateFormat = 'YYYY';
-  let selectedNowPlayingPlayCountFormat = 'raw';
-  let selectedNowPlayingTempoFormat = 'with_unit';
-  let selectedNowPlayingEnergyFormat = 'percentage';
-  let selectedNowPlayingDanceabilityFormat = 'percentage';
-  let selectedNowPlayingValenceFormat = 'percentage';
-  let selectedNowPlayingKeyFormat = 'standard';
-  let selectedNowPlayingPopularityFormat = 'raw';
-  let selectedNowPlayingSeparator = '•';
-  let includeZeroScrobbles = true;
-  let lastFmAutocorrect = false;
-  let showGenreTags = false;
-  let showGenreTagsNowPlaying = true;
-  let showGenreTagsArtistPage = true;
-  let genreSourcesNpSpotify = true;
-  let genreSourcesNpLastfm = true;
-  let genreSourcesNpDeezer = true;
-  let genreSourcesApSpotify = true;
-  let genreSourcesApLastfm = true;
-  let useGenrePlaylistDatabase = true;
-  const artistGenreCache = new Map();
-  const lastfmCache = new Map();
-  const lastfmArtistTagsCache = new Map();
-  const sessionGenreCache = new Map();
-  const nowPlayingGenreCache = new Map();
-  const artistPageGenreCache = new Map();
-  const lastfmTrackTagsCache = new Map();
-  const pendingGenreFetches = new Map();
-  const pendingArtistPageFetches = new Map();
+  const RANDOM_GENRE_HISTORY_SIZE = 200;
+  const RANDOM_GENRE_SELECTION_SIZE = 20;
+  const spotifyApiLimits = { maxRequestsPerSecond: 20, requests: [] };
   const STORAGE_KEY_SHOW_GENRE_TAGS = "sort-play-show-genre-tags";
   const STORAGE_KEY_SHOW_GENRE_TAGS_NP = "sort-play-show-genre-tags-np";
   const STORAGE_KEY_SHOW_GENRE_TAGS_AP = "sort-play-show-genre-tags-ap";
@@ -142,9 +71,113 @@
   const STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT = "sort-play-now-playing-popularity-format";
   const STORAGE_KEY_NOW_PLAYING_SEPARATOR = "sort-play-now-playing-separator";
   const STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS = "sort-play-global-playlist-counts";
-  const RANDOM_GENRE_HISTORY_SIZE = 200;
-  const RANDOM_GENRE_SELECTION_SIZE = 20;
+  const STORAGE_KEY_FALLBACK_MODE = "sort-play-use-internal-fallback";
+  const STORAGE_KEY_WEB_API_FAILURES = "sort-play-web-api-failures";
+  let showAdditionalColumn = false;
+  let showSecondAdditionalColumn = false;
+  let selectedColumnType = 'playCount';
+  let selectedSecondColumnType = 'releaseDate';
+  let selectedAlbumColumnType = 'scrobbles';
+  let selectedArtistColumnType = 'releaseDate';
+  let myScrobblesDisplayMode = 'number';
+  let releaseDateFormat = 'YYYY-MM-DD';
+  let showAlbumColumn = false;
+  let showArtistColumn = false; 
+  let removeDateAdded = false;
+  let playlistDeduplicate = false;
+  let showRemovedDuplicates = false;
+  let addToQueueEnabled = false; 
+  let createPlaylistAfterSort = true; 
+  let sortCurrentPlaylistEnabled = false;
+  let createPlaylistPrivate = true;
+  let openPlaylistAfterSortEnabled = false;
+  let placePlaylistsInFolder = false;
+  let sortPlayFolderName = "Sort-Play Library";
+  let changeTitleOnCreate = false;
+  let changeTitleOnModify = false;
+  let setDedicatedPlaylistCovers = true;
+  let selectedAiModel = "gemini-flash-latest";
+  let topTracksLimit = 100;
+  let discoveryPlaylistSize = 50;
+  let newReleasesDaysLimit = 'release-2';
+  let followedReleasesAlbumLimit = 'all';
+  let colorSortMode = 'perceptual';
+  let useEnergyWaveShuffle = false;
+  let energyWaveShuffleLimit = 6000;
+  let includeSongStats = true;
+  let includeLyrics = false;
+  let useLfmGateway = false;
+  let includeZeroScrobbles = true;
+  let lastFmAutocorrect = false;
+  let chatPanelVisible = false;
+  let showLikeButton = false;
+  let showNowPlayingData = false;
+  let selectedNowPlayingDataType = 'releaseDate';
+  let selectedNowPlayingDataPosition = '.main-trackInfo-name';
+  let selectedNowPlayingDateFormat = 'YYYY';
+  let selectedNowPlayingPlayCountFormat = 'raw';
+  let selectedNowPlayingTempoFormat = 'with_unit';
+  let selectedNowPlayingEnergyFormat = 'percentage';
+  let selectedNowPlayingDanceabilityFormat = 'percentage';
+  let selectedNowPlayingValenceFormat = 'percentage';
+  let selectedNowPlayingKeyFormat = 'standard';
+  let selectedNowPlayingPopularityFormat = 'raw';
+  let selectedNowPlayingSeparator = '•';
+  let showGenreTags = false;
+  let showGenreTagsNowPlaying = true;
+  let showGenreTagsArtistPage = true;
+  let matchAllGenres  = false;
+  let useGenrePlaylistDatabase = true;
+  let genreSourcesNpSpotify = true;
+  let genreSourcesNpLastfm = true;
+  let genreSourcesNpDeezer = true;
+  let genreSourcesApSpotify = true;
+  let genreSourcesApLastfm = true;
+  let isProcessing = false;
+  let isMenuOpen = false;
+  let areSubMenusCreated = false;
+  let activeSubMenuParent = null;
+  let isButtonClicked = false;
+  let isAdjustingStyle = false;
+  let isUpdatingTracklist = false;
+  let internalTokenRefreshPromise = null;
+  let userMarketPromise = null;
+  let s_Access_Token = null;
+  let s_Token_Exp = 0;
+  let lfmKeyIndex = 0;
+  let googleAiSdk = null;
+  let colorThiefLib = null;
+  let genrePlaylistsCache = null;
+  let userSystemInstruction;
+  let currentTrackUriForScrobbleCache = null;
+  let tracklistObserver;
+  let albumTracklistObserver;
+  let artistTracklistObserver;
+  let likeButton_tracklistObserver;
+  let likeButton_observerInitialized = false;
+  let likeButton_connectObserver = () => {};
+  let updateDebounceTimeout;
+  let mountLikeButton_debounceTimer = null;
+  let mountLikeButton_isRunning = false;
+  let mountLikeButton_failedAttempts = 0;
+  const revokedLfmKeys = new Set();
   const runningJobIds = new Set();
+  const artistGenreCache = new Map();
+  const lastfmCache = new Map();
+  const lastfmArtistTagsCache = new Map();
+  const lastfmTrackTagsCache = new Map();
+  const sessionGenreCache = new Map();
+  const nowPlayingGenreCache = new Map();
+  const artistPageGenreCache = new Map();
+  const pendingGenreFetches = new Map();
+  const pendingArtistPageFetches = new Map();
+  const albumDataCache = {};
+  const albumReleaseDateCache = {};
+  const albumTracksDataCache = {};
+  const inFlightAlbumRequests = {};
+  const inFlightAlbumReleaseDateRequests = {};
+  const VARIANT_TO_MAIN_GENRE_MAP = {};
+  const VARIANT_TO_MAIN_COUNTRY_MAP = {};
 
   const CACHE_EXPIRE_PLAYCOUNTS = 6 * 60 * 60 * 1000; 
   const CACHE_EXPIRE_PERSONAL_SCROBBLES = 30 * 60 * 1000;
@@ -153,8 +186,6 @@
   const CACHE_EXPIRE_AI_DATA = null;
   const CACHE_EXPIRE_PALETTE = null;
   const CACHE_EXPIRE_METADATA = 24 * 60 * 60 * 1000; 
-  const STORAGE_KEY_FALLBACK_MODE = "sort-play-use-internal-fallback";
-  const STORAGE_KEY_WEB_API_FAILURES = "sort-play-web-api-failures";
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
@@ -163,9 +194,6 @@
   const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
   const STATS_URL = "https://sp-stats.niko2nio2.workers.dev";
   const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
-
-  let s_Access_Token = null;
-  let s_Token_Exp = 0;
 
   async function get_S_Client_Token() {
       if (s_Access_Token && Date.now() < s_Token_Exp) {
@@ -242,8 +270,6 @@
       }
       return false;
   }
-
-  let internalTokenRefreshPromise = null;
 
   async function fetchInternalTrackMetadata(trackId) {
       const maxRetries = 3;
@@ -668,8 +694,6 @@
     "***REMOVED***",
     "***REMOVED***"
   ];
-  const revokedLfmKeys = new Set();
-  let lfmKeyIndex = 0;
 
   function getNextLfmKey() {
     let validKeys = L_F_M_Key_Pool.filter(key => !revokedLfmKeys.has(key));
@@ -970,7 +994,6 @@
   ];
 
   const GENRE_PLAYLISTS_URL = "https://raw.githubusercontent.com/hoeci/sort-play/main/assets/genre_playlist_ids.json";
-  let genrePlaylistsCache = null;
 
   const PLACEHOLDER_SVG_DATA_URI = `url("data:image/svg+xml,%3csvg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.5 8.89001V18.5M12.5 8.89001V5.57656C12.5 5.36922 12.5 5.26554 12.5347 5.17733C12.5653 5.09943 12.615 5.03047 12.6792 4.97678C12.752 4.91597 12.8503 4.88318 13.047 4.81761L17.447 3.35095C17.8025 3.23245 17.9803 3.17319 18.1218 3.20872C18.2456 3.23982 18.3529 3.31713 18.4216 3.42479C18.5 3.54779 18.5 3.73516 18.5 4.10989V7.42335C18.5 7.63069 18.5 7.73436 18.4653 7.82258C18.4347 7.90048 18.385 7.96943 18.3208 8.02313C18.248 8.08394 18.1497 8.11672 17.953 8.18229L13.553 9.64896C13.1975 9.76746 13.0197 9.82671 12.8782 9.79119C12.7544 9.76009 12.6471 9.68278 12.5784 9.57512C12.5 9.45212 12.5 9.26475 12.5 8.89001ZM12.5 18.5C12.5 19.8807 10.933 21 9 21C7.067 21 5.5 19.8807 5.5 18.5C5.5 17.1192 7.067 16 9 16C10.933 16 12.5 17.1192 12.5 18.5Z' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`;
 
@@ -1296,7 +1319,6 @@
     await idb.set('aiData', cacheKey, trackData);
   }
   
-  let googleAiSdk = null;
   async function loadGoogleAI() {
     if (googleAiSdk) {
       return googleAiSdk;
@@ -5656,6 +5678,66 @@
       return await fetchPromise;
   }
 
+  
+  async function prefetchNextTrackData() {
+      if (!Spicetify.Platform?.PlayerAPI?.getQueue) return;
+
+      try {
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          const queueData = await Spicetify.Platform.PlayerAPI.getQueue();
+          const allUpcoming = [...(queueData.queued || []), ...(queueData.nextUp || [])];
+          
+          if (allUpcoming.length === 0) return;
+          const nextTrack = allUpcoming[0];
+          
+          if (!nextTrack || !nextTrack.uri || Spicetify.URI.isLocal(nextTrack.uri)) return;
+
+          const trackId = nextTrack.uri.split(":")[2];
+          let albumId = nextTrack.album?.uri?.split(":")[2];
+          
+          if (!albumId && nextTrack.metadata?.album_uri) {
+              albumId = nextTrack.metadata.album_uri.split(":")[2];
+          }
+
+          const mockTrackObj = {
+              uri: nextTrack.uri,
+              name: nextTrack.name,
+              artists: nextTrack.artists || [],
+              albumUri: albumId ? `spotify:album:${albumId}` : null,
+              albumId: albumId,
+              track: {
+                  id: trackId,
+                  album: { id: albumId }
+              }
+          };
+
+          if (showGenreTags && showGenreTagsNowPlaying) {
+              fetchDisplayGenres(mockTrackObj).catch(() => {});
+          }
+
+          if (showNowPlayingData) {
+              if (selectedNowPlayingDataType === 'releaseDate') {
+                  getTrackDetailsWithReleaseDate(mockTrackObj).catch(() => {});
+              } else if (selectedNowPlayingDataType === 'playCount' && albumId) {
+                  getTrackDetailsWithPlayCount(mockTrackObj).catch(() => {});
+              } else if (selectedNowPlayingDataType === 'popularity') {
+                  if (isFallbackActive()) {
+                      fetchInternalTrackMetadata(trackId).catch(() => {});
+                  } else {
+                      Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`).catch(() => {});
+                  }
+              } else {
+                  const audioFeatureTypes = ['tempo', 'energy', 'danceability', 'valence', 'key'];
+                  if (audioFeatureTypes.includes(selectedNowPlayingDataType)) {
+                      getBatchTrackStats([trackId]).catch(() => {});
+                  }
+              }
+          }
+      } catch (e) {
+      }
+  }
+
   async function displayGenreTags() {
       if (!showGenreTags || !showGenreTagsNowPlaying) {
           document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
@@ -5837,12 +5919,38 @@
 
       const artistId = currentUri.split(':')[2];
       
-      const existing = document.querySelector('.sort-play-artist-genres');
-      if (existing) {
-          if (existing.dataset.artistId === artistId) return; 
-          existing.remove(); 
+      const header = document.querySelector("div.main-entityHeader-headerText");
+      if (!header) return;
+
+      let container = header.querySelector('.sort-play-artist-genres');
+      
+      if (!container) {
+          container = document.createElement("div");
+          container.className = "main-entityHeader-detailsText sort-play-artist-genres";
+          container.style.display = "block";
+          
+          container.dataset.artistId = artistId;
+          container.dataset.status = 'loading';
+          container.innerHTML = `<span>Artist Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
+          
+          const details = header.querySelector("span.main-entityHeader-detailsText");
+          if (details) {
+              header.insertBefore(container, details);
+          } else {
+              header.appendChild(container);
+          }
+      }
+
+      if (container.dataset.artistId !== artistId) {
+          container.dataset.artistId = artistId;
+          container.dataset.status = 'loading';
+          container.innerHTML = `<span>Artist Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
       }
       
+      if (container.dataset.status === 'loaded') {
+          return;
+      }
+
       if (pendingArtistPageFetches.has(artistId)) {
           return;
       }
@@ -5850,15 +5958,7 @@
       pendingArtistPageFetches.set(artistId, true);
 
       try {
-          const header = await waitForElement("div.main-entityHeader-headerText");
-          if (!header) return;
-          
-          if (header.querySelector(`.sort-play-artist-genres[data-artist-id="${artistId}"]`)) {
-              return;
-          }
-
           let genreSourcesMap;
-          
           const genreMap = await getGenreMapping();
 
           if (artistPageGenreCache.has(artistId)) {
@@ -5960,11 +6060,14 @@
               return;
           }
           
-          if (header.querySelector(`.sort-play-artist-genres[data-artist-id="${artistId}"]`)) {
+          container = header.querySelector('.sort-play-artist-genres');
+          if (!container) return;
+
+          if (genreSourcesMap.size === 0) {
+              container.innerHTML = `<span>Artist Genres : </span><span style="opacity: 0.6;">No genres found</span>`;
+              container.dataset.status = 'loaded';
               return;
           }
-
-          if (genreSourcesMap.size === 0) return;
 
           const genreItems = Array.from(genreSourcesMap.values());
 
@@ -6030,20 +6133,10 @@
                       >${titleCaseGenre}</a>`;
           }).join("<span>, </span>");
 
-          const container = document.createElement("div");
-          container.className = "main-entityHeader-detailsText sort-play-artist-genres";
-          container.dataset.artistId = artistId; 
-          container.style.display = "block";
           container.innerHTML = `<span>Artist Genres : </span>${genreLinks}`;
+          
+          container.dataset.status = 'loaded';
 
-          if (!header.querySelector(`.sort-play-artist-genres[data-artist-id="${artistId}"]`)) {
-              const details = header.querySelector("span.main-entityHeader-detailsText");
-              if (details) {
-                  header.insertBefore(container, details);
-              } else {
-                  header.appendChild(container);
-              }
-          }
       } finally {
           pendingArtistPageFetches.delete(artistId);
       }
@@ -6419,8 +6512,6 @@
       return directSortTypes.includes(sortType);
   }
 
-  let userSystemInstruction;
-  
   async function showAiPickModal(tracks, currentUri) {
     const modalContainer = document.createElement("div");
     modalContainer.className = "ai-pick-modal";
@@ -17033,11 +17124,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   };
 
-  const spotifyApiLimits = {
-    maxRequestsPerSecond: 20, 
-    requests: [],
-  };
-
   function canCallSpotifyApi() {
     const now = Date.now();
     const oneSecondAgo = now - 1000;
@@ -18176,7 +18262,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       .replace(/[\s-]+/g, '');
   }
 
-  const VARIANT_TO_MAIN_GENRE_MAP = {};
   Object.entries(GENRE_MAPPINGS).forEach(([mainGenre, variants]) => {
     const canonicalMainGenre = mainGenre;
     variants.forEach(variant => {
@@ -18194,7 +18279,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   });
   
-  const VARIANT_TO_MAIN_COUNTRY_MAP = {};
   Object.entries(COUNTRY_MAPPINGS).forEach(([mainCountry, variants]) => {
     variants.forEach(variant => {
       const normalizedKey = getNormalizedGenreKey(variant);
@@ -18427,12 +18511,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   `;
   document.head.appendChild(styleElement);
-
-  const albumDataCache = {};
-  const inFlightAlbumRequests = {};
-  const albumReleaseDateCache = {};
-  const albumTracksDataCache = {};
-  const inFlightAlbumReleaseDateRequests = {};
 
   const excludedPlaylistNames = ["New Music Friday", "Discover Weekly", "Release Radar"];
 
@@ -20863,13 +20941,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   svgElement.style.bottom = "1px";
   mainButton.appendChild(svgElement);
 
-  let isButtonClicked = false;
-
   const originalFontSize = "14px";
   const originalLineHeight = "normal";
   mainButton.style.lineHeight = originalLineHeight;
 
-  let isAdjustingStyle = false;
   const buttonTextObserver = new MutationObserver(() => {
       if (isAdjustingStyle) return;
       isAdjustingStyle = true;
@@ -21159,10 +21234,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   });
 
   menuButtons.forEach(button => menuContainer.appendChild(button));
-  
-  let isMenuOpen = false;
-  let areSubMenusCreated = false;
-  let activeSubMenuParent = null;
 
   function toggleMenu() {
     isMenuOpen = !isMenuOpen;
@@ -29153,12 +29224,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     element.style.fontWeight = "400";
     element.style.color = "var(--spice-subtext)";
   }
-
-
-  let isUpdatingTracklist = false;
-  let tracklistObserver;
-  let albumTracklistObserver;
-  let artistTracklistObserver;
   
   async function updateTracklist() {
     const currentUri = getCurrentUri();
@@ -29660,8 +29725,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     loadAdditionalColumnData(tracklistContainer);
   }
   
-  let updateDebounceTimeout;
-
   async function initializeTracklistObserver() {
     const currentUri = getCurrentUri();
     if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
@@ -30243,10 +30306,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             )
         );
     });
-
-    let mountLikeButton_debounceTimer = null;
-    let mountLikeButton_isRunning = false;
-    let mountLikeButton_failedAttempts = 0;
     
     async function mountLikeButton(isDebounced = false) {
         if (!isDebounced) {
@@ -30531,15 +30590,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.className }), likeButtonElement);
     };
 
-    let likeButton_tracklistObserver;
     const likeButton_processTracklist = (mainView) => {
         const tracklist = mainView.querySelector(".main-trackList-indexable, div[data-testid='track-list'], div[aria-label='Songs search results']");
         if (tracklist) {
             tracklist.querySelectorAll('.main-trackList-trackListRow, div[role="row"][aria-selected]').forEach(likeButton_addLikeButtonToRow);
         }
     };
-
-    let likeButton_observerInitialized = false;
 
     likeButton_connectObserver = () => {
         if (likeButton_observerInitialized) {
@@ -30662,12 +30718,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
   startScheduler();
   initializeSongChangeWatcher();
-  Spicetify.Player.addEventListener("songchange", () => {
-      displayNowPlayingData();
-      displayGenreTags();
+  
+  Spicetify.Player.addEventListener("songchange", async () => {
+      const p1 = displayNowPlayingData();
+      const p2 = displayGenreTags();
+      
+      await Promise.allSettled([p1, p2]);
+      
+      prefetchNextTrackData();
   });
+
   displayNowPlayingData();
   displayGenreTags();
+  prefetchNextTrackData();
   console.log(`Sort-Play loaded`);
   onPageChange();
   }
