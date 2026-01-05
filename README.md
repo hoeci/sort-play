@@ -115,8 +115,8 @@ Generate a variety of curated playlists with a single click.
         *   **All-Time Taste:** Recommendations based on your long-term listening history.
         *   **Pure Discovery:** Recommendations exclusively from artists completely new to your listening history.
     *   **Last.fm Generators:**
-            *   **Infinite Vibe:** A continuous mood generated from your current track, recent obsessions, and library deep cuts.
-            *   **Neighbors Mix:** A balanced mix of obsessions, trends, and favorites from your Last.fm neighbors, filtered for discovery.
+        *   **Infinite Vibe:** A continuous mood generated from your current track, recent obsessions, and library deep cuts.
+        *   **Neighbors Mix:** A balanced mix of obsessions, trends, and favorites from your Last.fm neighbors, filtered for discovery.
 *   **Automated Updates:** Schedule your dedicated playlists to update automatically (e.g., daily, weekly on Fridays) to always keep them fresh.
 *   **Customizable Limits:** Configure the size of your Top Tracks and Discovery playlists, the time window for New Releases, and the number of tracks to pull from each new album.
 
