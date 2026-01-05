@@ -114,6 +114,9 @@ Generate a variety of curated playlists with a single click.
         *   **Recent Taste:** Recommendations based on your recent listening habits.
         *   **All-Time Taste:** Recommendations based on your long-term listening history.
         *   **Pure Discovery:** Recommendations exclusively from artists completely new to your listening history.
+    *   **Last.fm Generators:**
+            *   **Infinite Vibe:** A continuous mood generated from your current track, recent obsessions, and library deep cuts.
+            *   **Neighbors Mix:** A balanced mix of obsessions, trends, and favorites from your Last.fm neighbors, filtered for discovery.
 *   **Automated Updates:** Schedule your dedicated playlists to update automatically (e.g., daily, weekly on Fridays) to always keep them fresh.
 *   **Customizable Limits:** Configure the size of your Top Tracks and Discovery playlists, the time window for New Releases, and the number of tracks to pull from each new album.
 
@@ -135,6 +138,7 @@ Generate playlists from natural language prompts.
 
 ### ➕ UI & Enhancements
 *   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, and the Now Playing View.
+*   **Interactive Genre Tags:** Displays clickable genre tags on the Now Playing bar and Artist pages. link directly to curated EveryNoise playlists.
 *   **Now Playing Data:** Display extra track info like Release Year, Play Count, BPM, and more directly in the player bar, with customizable position, data format, and separator character.
 *   **Quick Column Switching:** Click the header of any extra column to instantly switch its data type (e.g., from Play Count to BPM) without opening settings.
 *   **Playlist Organization:** Automatically organizes all created playlists into a dedicated "Sort-Play Library" folder.
