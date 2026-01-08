@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.46.0";
+  const SORT_PLAY_VERSION = "5.46.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -6749,119 +6749,145 @@
             await Promise.all(promises);
 
             const renderSection = async (container, items, isTitleSection) => {
-                if (!container || items.length === 0) return;
-
-                let contentReady = false;
-                let checkAttempts = 0;
-                const targetText = isTitleSection ? track.name : (track.artists[0]?.name || "");
-                
-                while (checkAttempts < 50) {
-                    const textContent = container.textContent || "";
-                    if (targetText && (textContent.includes(targetText) || textContent.includes(targetText.split('(')[0].trim()))) {
-                        contentReady = true;
-                        break;
-                    }
-                    if (!isTitleSection && container.querySelectorAll('a').length > 0) {
-                         const links = Array.from(container.querySelectorAll('a'));
-                         if (links.some(l => targetText && l.textContent.includes(targetText))) {
-                             contentReady = true;
-                             break;
-                         }
-                    }
-                    
-                    await new Promise(r => setTimeout(r, 50));
-                    checkAttempts++;
-                }
-
-                if (container.querySelector('.sort-play-np-container')) return;
-
-                container.style.display = 'flex';
-                container.style.alignItems = 'center';
-                container.classList.add('sort-play-modified-parent');
-
-                const wrapper = document.createElement("div");
-                wrapper.className = 'sort-play-np-container';
-                wrapper.dataset.renderedForUri = track.uri;
-                wrapper.style.display = 'flex';
-                wrapper.style.alignItems = 'center';
-                wrapper.style.flexShrink = '0';
-                wrapper.style.whiteSpace = 'nowrap';
-                wrapper.style.cursor = 'pointer';
-                wrapper.title = "Click to configure Sort-Play data";
-                
-                wrapper.addEventListener('mouseenter', () => {
-                    wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'underline');
-                });
-                wrapper.addEventListener('mouseleave', () => {
-                    wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'none');
-                });
-
-                wrapper.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    showNowPlayingSettingsModal(false);
-                });
-
-                items.forEach(item => {
-                    const rawData = dataContext[item.type];
-                    const formatted = formatItemValue(rawData, item.type, item.format);
-                    
-                    if (formatted) {
-                        const itemContainer = document.createElement("span");
-                        itemContainer.style.display = "flex";
-                        itemContainer.style.alignItems = "center";
-                        
-                        if (wrapper.children.length === 0) {
-                            itemContainer.style.marginLeft = "4px"; 
-                        } else {
-                            itemContainer.style.marginLeft = "9px";
-                        }
-
-                        itemContainer.style.color = "var(--text-subdued)";
-                        itemContainer.style.fontSize = "14px"; 
-                        
-                        const sep = item.separator !== undefined ? item.separator : '•';
-                        
-                        if (sep && sep !== ' ') {
-                            const sepSpan = document.createElement("span");
-                            sepSpan.textContent = sep;
-                            sepSpan.style.marginRight = "4px"; 
-                            itemContainer.appendChild(sepSpan);
-                        } else if (sep === ' ') {
-                            const sepSpan = document.createElement("span");
-                            sepSpan.style.marginRight = "3px"; 
-                            itemContainer.appendChild(sepSpan);
-                        }
-
-                        const valSpan = document.createElement("span");
-                        valSpan.className = "sort-play-np-value";
-                        valSpan.textContent = formatted;
-                        valSpan.style.marginLeft = "5px"; 
-                        
-                        const nativeText = container.querySelector('[data-encore-id="text"]');
-                        if (nativeText) {
-                            const s = window.getComputedStyle(nativeText);
-                            itemContainer.style.fontSize = s.fontSize;
-                            itemContainer.style.fontWeight = s.fontWeight;
-                            itemContainer.style.lineHeight = s.lineHeight;
-                            itemContainer.style.letterSpacing = s.letterSpacing;
-                            itemContainer.style.textTransform = s.textTransform;
-                        }
-
-                        itemContainer.appendChild(valSpan);
-                        wrapper.appendChild(itemContainer);
-                    }
-                });
-
-                if (wrapper.children.length > 0) {
-                    const overlayElement = container.querySelector('.main-trackInfo-overlay');
-                    if (overlayElement && overlayElement.nextSibling) {
-                        container.insertBefore(wrapper, overlayElement.nextSibling);
-                    } else {
-                        container.appendChild(wrapper);
-                    }
-                }
-            };
+                  if (!container || items.length === 0) return;
+              
+                  if (!isTitleSection) {
+                      const titleContainer = document.querySelector('.main-trackInfo-name');
+                      if (titleContainer) {
+                          let titleCheckAttempts = 0;
+                          while (titleCheckAttempts < 50) {
+                              const titleText = titleContainer.textContent || "";
+                              if (track.name && (titleText.includes(track.name) || titleText.includes(track.name.split('(')[0].trim()))) {
+                                  break;
+                              }
+                              await new Promise(r => setTimeout(r, 50));
+                              titleCheckAttempts++;
+                          }
+                          await new Promise(r => setTimeout(r, 50));
+                      }
+                  }
+              
+                  let contentReady = false;
+                  let checkAttempts = 0;
+                  const targetText = isTitleSection ? track.name : (track.artists[0]?.name || "");
+                  
+                  while (checkAttempts < 50) {
+                      const overlayElement = container.querySelector('.main-trackInfo-overlay');
+                      if (!overlayElement || container.firstElementChild !== overlayElement) {
+                          await new Promise(r => setTimeout(r, 50));
+                          checkAttempts++;
+                          continue;
+                      }
+                      
+                      const textContent = container.textContent || "";
+                      if (targetText && (textContent.includes(targetText) || textContent.includes(targetText.split('(')[0].trim()))) {
+                          contentReady = true;
+                          break;
+                      }
+                      if (!isTitleSection && container.querySelectorAll('a').length > 0) {
+                          const links = Array.from(container.querySelectorAll('a'));
+                          if (links.some(l => targetText && l.textContent.includes(targetText))) {
+                              contentReady = true;
+                              break;
+                          }
+                      }
+                      
+                      await new Promise(r => setTimeout(r, 50));
+                      checkAttempts++;
+                  }
+              
+                  const existingNpContainer = container.querySelector('.sort-play-np-container');
+                  if (existingNpContainer) {
+                      existingNpContainer.remove();
+                  }
+              
+                  container.style.display = 'flex';
+                  container.style.alignItems = 'center';
+                  container.classList.add('sort-play-modified-parent');
+              
+                  const wrapper = document.createElement("div");
+                  wrapper.className = 'sort-play-np-container';
+                  wrapper.dataset.renderedForUri = track.uri;
+                  wrapper.style.display = 'flex';
+                  wrapper.style.alignItems = 'center';
+                  wrapper.style.flexShrink = '0';
+                  wrapper.style.whiteSpace = 'nowrap';
+                  wrapper.style.cursor = 'pointer';
+                  wrapper.title = "Click to configure Sort-Play data";
+                  
+                  wrapper.addEventListener('mouseenter', () => {
+                      wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'underline');
+                  });
+                  wrapper.addEventListener('mouseleave', () => {
+                      wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'none');
+                  });
+              
+                  wrapper.addEventListener('click', (e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      showNowPlayingSettingsModal(false);
+                  });
+              
+                  items.forEach(item => {
+                      const rawData = dataContext[item.type];
+                      const formatted = formatItemValue(rawData, item.type, item.format);
+                      
+                      if (formatted) {
+                          const itemContainer = document.createElement("span");
+                          itemContainer.style.display = "flex";
+                          itemContainer.style.alignItems = "center";
+                          
+                          if (wrapper.children.length === 0) {
+                              itemContainer.style.marginLeft = "4px"; 
+                          } else {
+                              itemContainer.style.marginLeft = "9px";
+                          }
+              
+                          itemContainer.style.color = "var(--text-subdued)";
+                          itemContainer.style.fontSize = "14px"; 
+                          
+                          const sep = item.separator !== undefined ? item.separator : '•';
+                          
+                          if (sep && sep !== ' ') {
+                              const sepSpan = document.createElement("span");
+                              sepSpan.textContent = sep;
+                              sepSpan.style.marginRight = "4px"; 
+                              itemContainer.appendChild(sepSpan);
+                          } else if (sep === ' ') {
+                              const sepSpan = document.createElement("span");
+                              sepSpan.style.marginRight = "3px"; 
+                              itemContainer.appendChild(sepSpan);
+                          }
+              
+                          const valSpan = document.createElement("span");
+                          valSpan.className = "sort-play-np-value";
+                          valSpan.textContent = formatted;
+                          valSpan.style.marginLeft = "5px"; 
+                          
+                          const nativeText = container.querySelector('[data-encore-id="text"]');
+                          if (nativeText) {
+                              const s = window.getComputedStyle(nativeText);
+                              itemContainer.style.fontSize = s.fontSize;
+                              itemContainer.style.fontWeight = s.fontWeight;
+                              itemContainer.style.lineHeight = s.lineHeight;
+                              itemContainer.style.letterSpacing = s.letterSpacing;
+                              itemContainer.style.textTransform = s.textTransform;
+                          }
+              
+                          itemContainer.appendChild(valSpan);
+                          wrapper.appendChild(itemContainer);
+                      }
+                  });
+              
+                  if (wrapper.children.length > 0) {
+                      const overlayElement = container.querySelector('.main-trackInfo-overlay');
+                      if (overlayElement) {
+                          overlayElement.insertAdjacentElement('afterend', wrapper);
+                      } else {
+                          container.appendChild(wrapper);
+                      }
+                  }
+              };
 
             if (titleNeeded) {
                 await renderSection(currentTitleParent, nowPlayingConfig.title.items, true);
