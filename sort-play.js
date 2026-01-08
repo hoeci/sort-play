@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.46.1";
+  const SORT_PLAY_VERSION = "5.46.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -5865,10 +5865,78 @@
       }
   }
 
+  const GENRE_ALIASES_RAW = {
+    "r&b": ["r&b", "rnb", "r and b", "r n b", "rhythm and blues", "rhythm & blues"],
+    "neo soul": ["neo soul", "neosoul", "neo-soul"],
+    "hip hop": ["hip hop", "hip-hop", "hiphop"],
+    "lo-fi": ["lo-fi", "lofi", "lo fi"],
+    "trap": ["trap", "trap music"],
+    "pop": ["pop", "pop music"],
+    "indie pop": ["indie pop", "indiepop", "indie-pop"],
+    "synth pop": ["synth pop", "synthpop", "synth-pop"],
+    "electropop": ["electropop", "electro-pop", "electro pop"],
+    "dream pop": ["dream pop", "dreampop"],
+    "art pop": ["art pop", "art-pop"],
+    "k-pop": ["k-pop", "kpop", "k pop"],
+    "j-pop": ["j-pop", "jpop", "j pop"],
+    "c-pop": ["c-pop", "cpop", "c pop"],
+    "rock and roll": ["rock & roll", "rock n roll", "rock and roll", "rock'n'roll"],
+    "alternative rock": ["alternative rock", "alt rock", "alt-rock"],
+    "indie rock": ["indie rock", "indierock", "indie-rock"],
+    "hard rock": ["hard rock", "hardrock"],
+    "soft rock": ["soft rock", "softrock"],
+    "psychedelic rock": ["psychedelic rock", "psych rock"],
+    "pop punk": ["pop punk", "poppunk", "pop-punk"],
+    "post-punk": ["post-punk", "postpunk", "post punk"],
+    "new wave": ["new wave", "newwave"],
+    "post-rock": ["post-rock", "postrock", "post rock"],
+    "shoegaze": ["shoegaze", "shoe gaze"],
+    "metal": ["metal", "heavy metal", "heavymetal"],
+    "death metal": ["death metal", "deathmetal"],
+    "black metal": ["black metal", "blackmetal"],
+    "metalcore": ["metalcore", "metal core"],
+    "nu metal": ["nu metal", "numetal", "nu-metal"],
+    "power metal": ["power metal", "powermetal"],
+    "thrash metal": ["thrash metal", "thrashmetal"],
+    "doom metal": ["doom metal", "doommetal"],
+    "electronic": ["electronic", "electronica"],
+    "edm": ["edm", "electronic dance music"],
+    "house": ["house", "house music"],
+    "deep house": ["deep house", "deephouse"],
+    "tech house": ["tech house", "techhouse"],
+    "drum and bass": ["drum and bass", "dnb", "d&b", "drum n bass", "drum & bass"],
+    "psytrance": ["psytrance", "psy trance", "psy-trance"],
+    "synthwave": ["synthwave", "synth wave", "synth-wave"],
+    "vaporwave": ["vaporwave", "vapor wave"],
+    "chillwave": ["chillwave", "chill wave"],
+    "latin": ["latin", "latin music"],
+    "reggaeton": ["reggaeton", "reggaetón", "regueton"],
+    "bossa nova": ["bossa nova", "bossanova"],
+    "salsa": ["salsa", "salsa music"],
+    "singer-songwriter": ["singer-songwriter", "singer songwriter", "singer/songwriter"],
+    "nu disco": ["nu disco", "nu-disco", "nudisco"],
+    "soundtrack": ["soundtrack", "ost", "original soundtrack"],
+    "country": ["country", "country music"],
+    "classical": ["classical", "classical music"],
+    "world": ["world", "world music"],
+    "christian": ["christian", "christian music", "ccm"]
+  };
+
+  const GENRE_ALIAS_MAP = new Map();
+  for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+      GENRE_ALIAS_MAP.set(canonical, canonical);
+      aliases.forEach(alias => GENRE_ALIAS_MAP.set(alias, canonical));
+  }
+
   function normalizeGenre(genre) {
-      return genre
-          .toLowerCase()
-          .trim()
+      if (!genre) return "";
+      let lower = genre.toLowerCase().trim();
+      
+      if (GENRE_ALIAS_MAP.has(lower)) {
+          return GENRE_ALIAS_MAP.get(lower);
+      }
+
+      return lower
           .replace(/-/g, ' ')
           .replace(/&/g, 'and')
           .replace(/\s+/g, ' ');
@@ -5917,11 +5985,11 @@
               const genreMap = await getGenreMapping();
 
               const addGenres = (list, sourceLabel) => {
-                  if (!list || !Array.isArray(list) || list.length === 0) return;
+                  if (!list || !Array.isArray(list)) return;
                   list.forEach(g => {
                       const normalized = normalizeGenre(g);
                       if (!genreSourcesMap.has(normalized)) {
-                          genreSourcesMap.set(normalized, { name: g, sources: new Set() });
+                          genreSourcesMap.set(normalized, { name: normalized, sources: new Set() });
                       }
                       genreSourcesMap.get(normalized).sources.add(sourceLabel);
                   });
@@ -6222,6 +6290,7 @@
             genreContainer.style.overflow = "hidden";
             genreContainer.style.textOverflow = "ellipsis";
             genreContainer.style.whiteSpace = "nowrap";
+            genreContainer.style.opacity = '1';
             targetContainer.appendChild(genreContainer);
 
             genreContainer.addEventListener('contextmenu', (e) => {
@@ -6233,9 +6302,18 @@
             });
         }
         
+        const isCached = nowPlayingGenreCache.has(track.uri);
+
         if (genreContainer.dataset.uri !== currentUriAtStart) {
-           genreContainer.innerHTML = "ㅤ";
            genreContainer.dataset.uri = currentUriAtStart;
+           if (!isCached) {
+               genreContainer.style.transition = 'none';
+               genreContainer.style.opacity = '0';
+           } else {
+               genreContainer.style.transition = 'none';
+               genreContainer.style.opacity = '1';
+           }
+           genreContainer.innerHTML = "ㅤ";
         }
 
         const genreSourcesMap = await fetchDisplayGenres(track);
@@ -6250,6 +6328,7 @@
 
         if (genreSourcesMap.size === 0) {
             genreContainer.innerHTML = "";
+            genreContainer.style.opacity = '1';
             return;
         }
 
@@ -6334,9 +6413,19 @@
         }).join("<span>, </span>");
 
         genreContainer.innerHTML = genreLinks;
+
+        if (!isCached) {
+            requestAnimationFrame(() => {
+                genreContainer.style.transition = 'opacity 0.1s ease-in';
+                genreContainer.style.opacity = '1';
+            });
+        } else {
+            genreContainer.style.transition = 'none';
+            genreContainer.style.opacity = '1';
+        }
         return;
     }
-}
+  }
 
   async function updateArtistPageGenres() {
       if (!showGenreTags || !showGenreTagsArtistPage) {
@@ -6411,7 +6500,7 @@
                   list.forEach(g => {
                       const normalized = normalizeGenre(g);
                       if (!genreSourcesMap.has(normalized)) {
-                          genreSourcesMap.set(normalized, { name: g, sources: new Set() });
+                          genreSourcesMap.set(normalized, { name: normalized, sources: new Set() });
                       }
                       genreSourcesMap.get(normalized).sources.add(sourceLabel);
                   });
@@ -6749,152 +6838,162 @@
             await Promise.all(promises);
 
             const renderSection = async (container, items, isTitleSection) => {
-                  if (!container || items.length === 0) return;
-              
-                  if (!isTitleSection) {
-                      const titleContainer = document.querySelector('.main-trackInfo-name');
-                      if (titleContainer) {
-                          let titleCheckAttempts = 0;
-                          while (titleCheckAttempts < 50) {
-                              const titleText = titleContainer.textContent || "";
-                              if (track.name && (titleText.includes(track.name) || titleText.includes(track.name.split('(')[0].trim()))) {
-                                  break;
-                              }
-                              await new Promise(r => setTimeout(r, 50));
-                              titleCheckAttempts++;
-                          }
-                          await new Promise(r => setTimeout(r, 50));
-                      }
-                  }
-              
-                  let contentReady = false;
-                  let checkAttempts = 0;
-                  const targetText = isTitleSection ? track.name : (track.artists[0]?.name || "");
-                  
-                  while (checkAttempts < 50) {
-                      const overlayElement = container.querySelector('.main-trackInfo-overlay');
-                      if (!overlayElement || container.firstElementChild !== overlayElement) {
-                          await new Promise(r => setTimeout(r, 50));
-                          checkAttempts++;
-                          continue;
-                      }
-                      
-                      const textContent = container.textContent || "";
-                      if (targetText && (textContent.includes(targetText) || textContent.includes(targetText.split('(')[0].trim()))) {
-                          contentReady = true;
-                          break;
-                      }
-                      if (!isTitleSection && container.querySelectorAll('a').length > 0) {
-                          const links = Array.from(container.querySelectorAll('a'));
-                          if (links.some(l => targetText && l.textContent.includes(targetText))) {
-                              contentReady = true;
-                              break;
-                          }
-                      }
-                      
-                      await new Promise(r => setTimeout(r, 50));
-                      checkAttempts++;
-                  }
-              
-                  const existingNpContainer = container.querySelector('.sort-play-np-container');
-                  if (existingNpContainer) {
-                      existingNpContainer.remove();
-                  }
-              
-                  container.style.display = 'flex';
-                  container.style.alignItems = 'center';
-                  container.classList.add('sort-play-modified-parent');
-              
-                  const wrapper = document.createElement("div");
-                  wrapper.className = 'sort-play-np-container';
-                  wrapper.dataset.renderedForUri = track.uri;
-                  wrapper.style.display = 'flex';
-                  wrapper.style.alignItems = 'center';
-                  wrapper.style.flexShrink = '0';
-                  wrapper.style.whiteSpace = 'nowrap';
-                  wrapper.style.cursor = 'pointer';
-                  wrapper.title = "Click to configure Sort-Play data";
-                  
-                  wrapper.addEventListener('mouseenter', () => {
-                      wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'underline');
-                  });
-                  wrapper.addEventListener('mouseleave', () => {
-                      wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'none');
-                  });
-              
-                  wrapper.addEventListener('click', (e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      showNowPlayingSettingsModal(false);
-                  });
-              
-                  items.forEach(item => {
-                      const rawData = dataContext[item.type];
-                      const formatted = formatItemValue(rawData, item.type, item.format);
-                      
-                      if (formatted) {
-                          const itemContainer = document.createElement("span");
-                          itemContainer.style.display = "flex";
-                          itemContainer.style.alignItems = "center";
-                          
-                          if (wrapper.children.length === 0) {
-                              itemContainer.style.marginLeft = "4px"; 
-                          } else {
-                              itemContainer.style.marginLeft = "9px";
-                          }
-              
-                          itemContainer.style.color = "var(--text-subdued)";
-                          itemContainer.style.fontSize = "14px"; 
-                          
-                          const sep = item.separator !== undefined ? item.separator : '•';
-                          
-                          if (sep && sep !== ' ') {
-                              const sepSpan = document.createElement("span");
-                              sepSpan.textContent = sep;
-                              sepSpan.style.marginRight = "4px"; 
-                              itemContainer.appendChild(sepSpan);
-                          } else if (sep === ' ') {
-                              const sepSpan = document.createElement("span");
-                              sepSpan.style.marginRight = "3px"; 
-                              itemContainer.appendChild(sepSpan);
-                          }
-              
-                          const valSpan = document.createElement("span");
-                          valSpan.className = "sort-play-np-value";
-                          valSpan.textContent = formatted;
-                          valSpan.style.marginLeft = "5px"; 
-                          
-                          const nativeText = container.querySelector('[data-encore-id="text"]');
-                          if (nativeText) {
-                              const s = window.getComputedStyle(nativeText);
-                              itemContainer.style.fontSize = s.fontSize;
-                              itemContainer.style.fontWeight = s.fontWeight;
-                              itemContainer.style.lineHeight = s.lineHeight;
-                              itemContainer.style.letterSpacing = s.letterSpacing;
-                              itemContainer.style.textTransform = s.textTransform;
-                          }
-              
-                          itemContainer.appendChild(valSpan);
-                          wrapper.appendChild(itemContainer);
-                      }
-                  });
-              
-                  if (wrapper.children.length > 0) {
-                      const overlayElement = container.querySelector('.main-trackInfo-overlay');
-                      if (overlayElement) {
-                          overlayElement.insertAdjacentElement('afterend', wrapper);
-                      } else {
-                          container.appendChild(wrapper);
-                      }
-                  }
-              };
+                if (!container || items.length === 0) return;
+            
+                if (!isTitleSection && !nowPlayingConfig.title.enabled) {
+                    const titleContainer = document.querySelector('.main-trackInfo-name');
+                    if (titleContainer) {
+                        let titleCheckAttempts = 0;
+                        while (titleCheckAttempts < 50) {
+                            const titleText = titleContainer.textContent || "";
+                            if (track.name && (titleText.includes(track.name) || titleText.includes(track.name.split('(')[0].trim()))) {
+                                break;
+                            }
+                            await new Promise(r => setTimeout(r, 50));
+                            titleCheckAttempts++;
+                        }
+                        await new Promise(r => setTimeout(r, 50));
+                    }
+                }
+            
+                let contentReady = false;
+                let checkAttempts = 0;
+                const targetText = isTitleSection ? track.name : (track.artists[0]?.name || "");
+                
+                while (checkAttempts < 50) {
+                    const overlayElement = container.querySelector('.main-trackInfo-overlay');
+                    if (!overlayElement || container.firstElementChild !== overlayElement) {
+                        await new Promise(r => setTimeout(r, 50));
+                        checkAttempts++;
+                        continue;
+                    }
+                    
+                    const textContent = container.textContent || "";
+                    if (targetText && (textContent.includes(targetText) || textContent.includes(targetText.split('(')[0].trim()))) {
+                        contentReady = true;
+                        break;
+                    }
+                    if (!isTitleSection && container.querySelectorAll('a').length > 0) {
+                        const links = Array.from(container.querySelectorAll('a'));
+                        if (links.some(l => targetText && l.textContent.includes(targetText))) {
+                            contentReady = true;
+                            break;
+                        }
+                    }
+                    
+                    await new Promise(r => setTimeout(r, 50));
+                    checkAttempts++;
+                }
+            
+                const existingNpContainer = container.querySelector('.sort-play-np-container');
+                if (existingNpContainer) {
+                    existingNpContainer.remove();
+                }
+            
+                container.style.display = 'flex';
+                container.style.alignItems = 'center';
+                container.classList.add('sort-play-modified-parent');
+            
+                const wrapper = document.createElement("div");
+                wrapper.className = 'sort-play-np-container';
+                wrapper.dataset.renderedForUri = track.uri;
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.flexShrink = '0';
+                wrapper.style.whiteSpace = 'nowrap';
+                wrapper.style.cursor = 'pointer';
+                wrapper.title = "Click to configure Sort-Play data";
+                wrapper.style.opacity = '0';
+                wrapper.style.transition = 'opacity 0.1s ease-in';
 
+                wrapper.addEventListener('mouseenter', () => {
+                    wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'underline');
+                });
+                wrapper.addEventListener('mouseleave', () => {
+                    wrapper.querySelectorAll('.sort-play-np-value').forEach(el => el.style.textDecoration = 'none');
+                });
+            
+                wrapper.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    showNowPlayingSettingsModal(false);
+                });
+            
+                items.forEach(item => {
+                    const rawData = dataContext[item.type];
+                    const formatted = formatItemValue(rawData, item.type, item.format);
+                    
+                    if (formatted) {
+                        const itemContainer = document.createElement("span");
+                        itemContainer.style.display = "flex";
+                        itemContainer.style.alignItems = "center";
+                        
+                        if (wrapper.children.length === 0) {
+                            itemContainer.style.marginLeft = "4px"; 
+                        } else {
+                            itemContainer.style.marginLeft = "9px";
+                        }
+            
+                        itemContainer.style.color = "var(--text-subdued)";
+                        itemContainer.style.fontSize = "14px"; 
+                        
+                        const sep = item.separator !== undefined ? item.separator : '•';
+                        
+                        if (sep && sep !== ' ') {
+                            const sepSpan = document.createElement("span");
+                            sepSpan.textContent = sep;
+                            sepSpan.style.marginRight = "4px"; 
+                            itemContainer.appendChild(sepSpan);
+                        } else if (sep === ' ') {
+                            const sepSpan = document.createElement("span");
+                            sepSpan.style.marginRight = "3px"; 
+                            itemContainer.appendChild(sepSpan);
+                        }
+            
+                        const valSpan = document.createElement("span");
+                        valSpan.className = "sort-play-np-value";
+                        valSpan.textContent = formatted;
+                        valSpan.style.marginLeft = "5px"; 
+                        
+                        const nativeText = container.querySelector('[data-encore-id="text"]');
+                        if (nativeText) {
+                            const s = window.getComputedStyle(nativeText);
+                            itemContainer.style.fontSize = s.fontSize;
+                            itemContainer.style.fontWeight = s.fontWeight;
+                            itemContainer.style.lineHeight = s.lineHeight;
+                            itemContainer.style.letterSpacing = s.letterSpacing;
+                            itemContainer.style.textTransform = s.textTransform;
+                        }
+            
+                        itemContainer.appendChild(valSpan);
+                        wrapper.appendChild(itemContainer);
+                    }
+                });
+            
+                if (wrapper.children.length > 0) {
+                    const overlayElement = container.querySelector('.main-trackInfo-overlay');
+                    if (overlayElement) {
+                        overlayElement.insertAdjacentElement('afterend', wrapper);
+                    } else {
+                        container.appendChild(wrapper);
+                    }
+                    
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            wrapper.style.opacity = '1';
+                        });
+                    });
+                }
+            };
+
+            const renderPromises = [];
             if (titleNeeded) {
-                await renderSection(currentTitleParent, nowPlayingConfig.title.items, true);
+                renderPromises.push(renderSection(currentTitleParent, nowPlayingConfig.title.items, true));
             }
             if (artistNeeded) {
-                await renderSection(currentArtistParent, nowPlayingConfig.artist.items, false);
+                renderPromises.push(renderSection(currentArtistParent, nowPlayingConfig.artist.items, false));
             }
+            await Promise.all(renderPromises);
 
             return;
 
