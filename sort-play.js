@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.45.0";
+  const SORT_PLAY_VERSION = "5.46.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -29,6 +29,7 @@
   const STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE = "sort-play-use-genre-playlist-database";
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
+  const STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU = "sort-play-show-lastfm-context-menu";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2 = "sort-play-user-system-instruction-v2";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
@@ -112,6 +113,7 @@
   let useLfmGateway = false;
   let includeZeroScrobbles = true;
   let lastFmAutocorrect = false;
+  let showLastFmContextMenu = false;
   let chatPanelVisible = false;
   let showLikeButton = false;
   let showNowPlayingData = false;
@@ -169,6 +171,7 @@
   let mountLikeButton_debounceTimer = null;
   let mountLikeButton_isRunning = false;
   let mountLikeButton_failedAttempts = 0;
+  let lastFmContextMenuItem = null;
   const revokedLfmKeys = new Set();
   const runningJobIds = new Set();
   const artistGenreCache = new Map();
@@ -1182,6 +1185,7 @@
     selectedNowPlayingPersonalScrobblesFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT) || 'raw';
     includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
     lastFmAutocorrect = localStorage.getItem("sort-play-lastfm-autocorrect") === "true";
+    showLastFmContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU) === "true";
     showGenreTags = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS) === "true";
     showGenreTagsNowPlaying = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP) !== "false";
     showGenreTagsArtistPage = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP) !== "false";
@@ -1255,6 +1259,8 @@
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT, selectedNowPlayingPersonalScrobblesFormat);
     localStorage.setItem("sort-play-include-no-scrobbles", includeZeroScrobbles);
     localStorage.setItem("sort-play-lastfm-autocorrect", lastFmAutocorrect);
+    localStorage.setItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, showLastFmContextMenu);
+    updateLastFmContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS, showGenreTags);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP, showGenreTagsNowPlaying);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP, showGenreTagsArtistPage);
@@ -2666,6 +2672,23 @@
             </label>
         </div>
     </div>
+
+    <div class="setting-row" id="lastFmContextMenuSetting">
+        <label class="col description">
+            Show "Last.fm Details" in Menu
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Adds a "Last.fm Details" option to the song right-click menu.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="showLastFmContextMenuToggle" ${showLastFmContextMenu ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div class="setting-row" id="lastFmAutocorrectSetting">
         <label class="col description">
             Last.fm Autocorrect
@@ -2764,6 +2787,7 @@
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
     const includeZeroScrobblesToggle = modalContainer.querySelector("#includeZeroScrobblesToggle");
     const lastFmAutocorrectToggle = modalContainer.querySelector("#lastFmAutocorrectToggle");
+    const showLastFmContextMenuToggle = modalContainer.querySelector("#showLastFmContextMenuToggle");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
     const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
     const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
@@ -2998,6 +3022,11 @@
         saveSettings();
         await idb.clear('scrobbles');
         await idb.clear('personalScrobbles');
+    });
+
+    showLastFmContextMenuToggle.addEventListener("change", () => {
+        showLastFmContextMenu = showLastFmContextMenuToggle.checked;
+        saveSettings();
     });
 
     addToQueueToggle.addEventListener("change", () => {
@@ -29306,7 +29335,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       overlay.id = "sort-play-lfm-details-overlay";
       overlay.style.cssText = `
           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-          background-color: rgba(0, 0, 0, 0.7); z-index: 2002;
+          background-color: rgba(0, 0, 0, 0.7) !important; z-index: 2002;
           display: flex; justify-content: center; align-items: center;
           backdrop-filter: blur(8px);
       `;
@@ -29316,10 +29345,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       modalContainer.style.cssText = `
           z-index: 2003;
           width: 640px !important;
-          background-color: #181818;
-          border: 1px solid #282828;
-          border-radius: 16px;
-          box-shadow: 0 10px 60px rgba(0,0,0,0.8);
+          background-color: #181818 !important;
+          border: 1px solid #282828 !important;
+          border-radius: 16px !important;
+          box-shadow: 0 10px 60px rgba(0,0,0,0.8) !important;
           overflow: hidden;
           display: flex;
           flex-direction: column;
@@ -29329,7 +29358,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       modalContainer.innerHTML = `
           <div style="height: 350px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 15px;">
               <div class="loader"></div>
-              <span style="color: #b3b3b3; font-size: 14px; font-weight: 500;">Fetching Last.fm Data...</span>
+              <span style="color: #b3b3b3 !important; font-size: 14px; font-weight: 500;">Fetching Last.fm Data...</span>
           </div>
       `;
 
@@ -29365,9 +29394,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
           if (!tData) {
               modalContainer.innerHTML = `
-                  <div style="padding: 50px; text-align: center; color: #fff;">
-                      <h3 style="margin-bottom: 20px;">Track not found on Last.fm</h3>
-                      <button id="lfm-close-btn" class="main-buttons-button main-button-secondary">Close</button>
+                  <div style="padding: 50px; text-align: center; color: #fff !important;">
+                      <h3 style="margin-bottom: 20px; color: #fff !important;">Track not found on Last.fm</h3>
+                      <button id="lfm-close-btn" class="main-buttons-button main-button-secondary" style="background-color: #333 !important; color: white !important;">Close</button>
                   </div>
               `;
               const btn = modalContainer.querySelector('#lfm-close-btn');
@@ -29401,19 +29430,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           const artistTags = filterTags(aData?.tags?.tag).slice(0, 5);
           
           const albumIcon = `
-          <svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3;">
+          <svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3 !important; min-width: 16px !important; min-height: 16px !important;">
             <path d="M4.00033 7H20.00033M5.00033 4H19.00033M6.89629 20H17.1044C18.1275 20 18.639 20 19.0447 19.8084C19.402 19.6396 19.7012 19.3687 19.9047 19.03C20.1358 18.6454 20.1867 18.1364 20.2885 17.1184L20.7365 12.6388C20.8279 11.7244 20.8736 11.2672 20.7236 10.9138C20.5918 10.6034 20.3593 10.3465 20.0635 10.1844C19.7268 10 19.2673 10 18.3484 10H5.6523C4.73336 10 4.27389 10 3.93718 10.1844C3.64141 10.3465 3.40887 10.6034 3.27708 10.9138C3.12706 11.2672 3.17278 11.7244 3.26422 12.6388L3.71218 17.1184C3.81398 18.1364 3.86488 18.6454 4.09593 19.03C4.29943 19.3687 4.59872 19.6396 4.95601 19.8084C5.36167 20 5.87321 20 6.89629 20ZM15.0003 15C15.0003 16.1046 13.6572 17 12.0003 17C10.3435 17 9.00033 16.1046 9.00033 15C9.00033 13.8954 10.3435 13 12.0003 13C13.6572 13 15.0003 13.8954 15.0003 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>`;
 
           const barsIcon = `
-          <svg width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="#b3b3b3">
+          <svg width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="none" style="color: #b3b3b3 !important; fill: #b3b3b3 !important; min-width: 18px !important; min-height: 18px !important;">
             <g fill="currentColor">
                 <path d="M12 2a1 1 0 011 1v10a1 1 0 11-2 0V3a1 1 0 011-1zM8 6a1 1 0 011 1v6a1 1 0 11-2 0V7a1 1 0 011-1zM5 10a1 1 0 00-2 0v3a1 1 0 102 0v-3z"/>
             </g>
           </svg>`;
 
           const myPlaysIcon = `
-          <svg viewBox="0 0 24 24" width="20px" height="20px" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3;">
+          <svg viewBox="0 0 24 24" width="20px" height="20px" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3 !important; min-width: 20px !important; min-height: 20px !important;">
             <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
             <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
             <g id="SVGRepo_iconCarrier"> 
@@ -29423,16 +29452,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           </svg>`;
 
           const listenersIcon = `
-          <svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3;">
+          <svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3 !important; min-width: 20px !important; min-height: 20px !important;">
             <path d="M13 20V18C13 15.2386 10.7614 13 8 13C5.23858 13 3 15.2386 3 18V20H13ZM13 20H21V19C21 16.0545 18.7614 14 16 14C14.5867 14 13.3103 14.6255 12.4009 15.6311M11 7C11 8.65685 9.65685 10 8 10C6.34315 10 5 8.65685 5 7C5 5.34315 6.34315 4 8 4C9.65685 4 11 5.34315 11 7ZM18 9C18 10.1046 17.1046 11 16 11C14.8954 11 14 10.1046 14 9C14 7.89543 14.8954 7 16 7C17.1046 7 18 7.89543 18 9Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>`;
 
           modalContainer.innerHTML = `
             <style>
+                #sort-play-lfm-details-overlay * {
+                    box-sizing: border-box;
+                }
                 .lfm-header {
                     display: flex;
                     padding: 30px 24px 24px;
-                    background: linear-gradient(180deg, #222 0%, #181818 100%);
+                    background: linear-gradient(180deg, #222 0%, #181818 100%) !important;
                     gap: 24px;
                     align-items: flex-start;
                 }
@@ -29453,9 +29485,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     height: 140px;
                 }
                 .lfm-title {
-                    font-size: 26px; /* Slightly reduced font */
+                    font-size: 26px;
                     font-weight: 800;
-                    color: white;
+                    color: white !important;
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis;
@@ -29465,14 +29497,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 .lfm-artist {
                     font-size: 18px;
                     font-weight: 500;
-                    color: white;
+                    color: white !important;
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis;
                 }
                 .lfm-album {
                     font-size: 14px;
-                    color: #b3b3b3;
+                    color: #b3b3b3 !important;
                     display: flex;
                     align-items: center;
                     gap: 8px;
@@ -29483,6 +29515,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     white-space: nowrap; 
                     overflow: hidden; 
                     text-overflow: ellipsis;
+                    color: #b3b3b3 !important;
                 }
                 .lfm-album svg { flex-shrink: 0; }
                 
@@ -29491,6 +29524,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     display: flex;
                     flex-direction: column;
                     gap: 20px;
+                    background-color: #181818 !important;
                 }
 
                 .lfm-stats-grid {
@@ -29499,19 +29533,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     gap: 12px;
                 }
                 .lfm-stat-box {
-                    background: #242424;
-                    border-radius: 8px;
-                    padding: 16px 20px;
+                    background: #242424 !important;
+                    border-radius: 8px !important;
+                    padding: 16px 20px !important;
                     display: flex;
                     flex-direction: column;
                     justify-content: center;
                     gap: 6px;
-                    border: 1px solid #333;
+                    border: 1px solid #333 !important;
                     transition: border-color 0.2s;
                     min-height: 85px;
                 }
                 .lfm-stat-box:hover {
-                    border-color: #444;
+                    border-color: #444 !important;
                 }
                 .lfm-stat-header {
                     display: flex;
@@ -29521,7 +29555,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
                 .lfm-stat-label {
                     font-size: 11px;
-                    color: #b3b3b3;
+                    color: #b3b3b3 !important;
                     text-transform: uppercase;
                     letter-spacing: 1px;
                     font-weight: 700;
@@ -29529,12 +29563,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 .lfm-stat-value {
                     font-size: 22px;
                     font-weight: 700;
-                    color: white;
+                    color: white !important;
                     letter-spacing: -0.5px;
                 }
                 .lfm-stat-sub {
                     font-size: 12px; 
-                    color:#888; 
+                    color:#888 !important; 
                     margin-top: -2px;
                 }
 
@@ -29545,7 +29579,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
                 .tag-section-header {
                     font-size: 12px;
-                    color: #888;
+                    color: #888 !important;
                     text-transform: uppercase;
                     font-weight: 700;
                     margin-left: 4px;
@@ -29556,69 +29590,69 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     gap: 8px;
                 }
                 .lfm-tag {
-                    background: #2a2a2a;
-                    color: #ddd;
-                    padding: 6px 14px;
-                    border-radius: 16px;
-                    font-size: 13px;
-                    font-weight: 500;
-                    border: 1px solid transparent;
+                    background: #2a2a2a !important;
+                    color: #ddd !important;
+                    padding: 6px 14px !important;
+                    border-radius: 16px !important;
+                    font-size: 13px !important;
+                    font-weight: 500 !important;
+                    border: 1px solid transparent !important;
                 }
                 .lfm-tag:hover {
-                    background-color: #333;
-                    border-color: #444;
-                    color: white;
+                    background-color: #333 !important;
+                    border-color: #444 !important;
+                    color: white !important;
                 }
 
                 .lfm-footer {
                     padding: 20px 24px;
-                    border-top: 1px solid #282828;
+                    border-top: 1px solid #282828 !important;
                     display: flex;
                     justify-content: flex-end;
-                    background: #181818;
+                    background: #181818 !important;
                     margin-top: auto;
                 }
                 .lfm-btn {
-                    background-color: #ba0000;
-                    color: white;
-                    border: none;
-                    padding: 10px 24px;
-                    border-radius: 24px;
-                    font-weight: 700;
-                    font-size: 14px;
-                    cursor: pointer;
-                    text-decoration: none;
+                    background-color: #ba0000 !important;
+                    color: white !important;
+                    border: none !important;
+                    padding: 10px 24px !important;
+                    border-radius: 24px !important;
+                    font-weight: 700 !important;
+                    font-size: 14px !important;
+                    cursor: pointer !important;
+                    text-decoration: none !important;
                     display: flex;
                     align-items: center;
                     gap: 8px;
                     transition: background-color 0.2s;
                 }
                 .lfm-btn:hover {
-                    background-color: #d60000;
+                    background-color: #d60000 !important;
                 }
                 .close-icon-btn {
                     position: absolute;
                     top: 20px;
                     right: 20px;
-                    background: rgba(0,0,0,0.4);
-                    border: none;
-                    border-radius: 50%;
-                    width: 32px;
-                    height: 32px;
-                    color: white;
-                    cursor: pointer;
+                    background: rgba(0,0,0,0.4) !important;
+                    border: none !important;
+                    border-radius: 50% !important;
+                    width: 32px !important;
+                    height: 32px !important;
+                    color: white !important;
+                    cursor: pointer !important;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     transition: background 0.2s;
                     z-index: 10;
                 }
-                .close-icon-btn:hover { background: rgba(0,0,0,0.7); }
+                .close-icon-btn:hover { background: rgba(0,0,0,0.7) !important; }
                 .username-warning {
                     font-size: 12px;
-                    color: #f15e6c;
-                    cursor: pointer;
-                    text-decoration: underline;
+                    color: #f15e6c !important;
+                    cursor: pointer !important;
+                    text-decoration: underline !important;
                 }
             </style>
 
@@ -29660,7 +29694,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             <span class="lfm-stat-label">Your Track Scrobbles</span>
                         </div>
                         <div class="lfm-stat-value">
-                            ${username ? Number(userPlaycount).toLocaleString() : `<span style="color:#666; font-size: 18px;">N/A</span>`}
+                            ${username ? Number(userPlaycount).toLocaleString() : `<span style="color:#666 !important; font-size: 18px;">N/A</span>`}
                         </div>
                         ${!username ? `<div class="username-warning" id="set-user-btn">Set Last.fm Username</div>` : ''}
                     </div>
@@ -29716,14 +29750,79 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }).catch(err => {
           console.error(err);
           modalContainer.innerHTML = `
-            <div style="padding: 40px; text-align: center; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-                <h3 style="margin-bottom: 20px;">Failed to load data</h3>
-                <p style="color:#b3b3b3; font-size: 14px; margin-bottom: 20px;">Please check your connection and try again.</p>
-                <button id="lfm-close-err-btn" class="main-buttons-button main-button-secondary">Close</button>
+            <div style="padding: 40px; text-align: center; color: #fff !important; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                <h3 style="margin-bottom: 20px; color: #fff !important;">Failed to load data</h3>
+                <p style="color:#b3b3b3 !important; font-size: 14px; margin-bottom: 20px;">Please check your connection and try again.</p>
+                <button id="lfm-close-err-btn" class="main-buttons-button main-button-secondary" style="background-color: #333 !important; color: white !important;">Close</button>
             </div>`;
           const closeBtn = modalContainer.querySelector('#lfm-close-err-btn');
           if(closeBtn) closeBtn.onclick = closeModal;
       });
+  }
+
+  function updateLastFmContextMenu() {
+      if (showLastFmContextMenu && !lastFmContextMenuItem) {
+          if (!Spicetify.SVGIcons["lastfm"]) {
+              Spicetify.SVGIcons["lastfm"] = `<svg width="18" height="18" viewBox="1 0 24 24" fill="currentColor"><path d="M7,13v6a1,1,0,0,1-2,0V13a1,1,0,0,1,2,0Zm11,7a1,1,0,0,0,1-1V5a1,1,0,0,0-2,0V19A1,1,0,0,0,18,20Zm-6,0a1,1,0,0,0,1-1V9a1,1,0,0,0-2,0V19A1,1,0,0,0,12,20Z"/></svg>`;
+          }
+
+          lastFmContextMenuItem = new Spicetify.ContextMenu.Item(
+              "Last.fm Details",
+              async (uris) => {
+                  const uri = uris[0];
+                  let track = null;
+
+                  if (Spicetify.URI.isLocal(uri)) {
+                      const parts = uri.split(':');
+                      if (parts.length >= 6) {
+                          track = {
+                              name: decodeURIComponent(parts[4].replace(/\+/g, ' ')),
+                              artists: [{ name: decodeURIComponent(parts[2].replace(/\+/g, ' ')) }],
+                              album: { name: decodeURIComponent(parts[3].replace(/\+/g, ' ')) }
+                          };
+                          track.artistName = track.artists[0].name;
+                          track.albumName = track.album.name;
+                      }
+                  } else {
+                      const id = uri.split(':')[2];
+                      track = await fetchInternalTrackMetadata(id);
+                      if (!track) {
+                          try {
+                              const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${id}`);
+                              if (res) {
+                                  track = {
+                                      name: res.name,
+                                      artists: res.artists,
+                                      artistName: res.artists[0]?.name,
+                                      albumName: res.album?.name,
+                                      uri: res.uri
+                                  };
+                              }
+                          } catch (e) {}
+                      } else {
+                          track.artistName = track.artists[0]?.name;
+                          track.albumName = track.album?.name;
+                      }
+                  }
+
+                  if (track) {
+                      showLastFmTrackDetailsModal(track);
+                  } else {
+                      showNotification("Could not fetch track details", true);
+                  }
+              },
+              (uris) => {
+                  if (uris.length !== 1) return false;
+                  const uri = uris[0];
+                  return uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(uri);
+              },
+              "lastfm"
+          );
+          lastFmContextMenuItem.register();
+      } else if (!showLastFmContextMenu && lastFmContextMenuItem) {
+          lastFmContextMenuItem.deregister();
+          lastFmContextMenuItem = null;
+      }
   }
 
   function showColumnSelector(event, contextType) {
@@ -31784,6 +31883,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   displayNowPlayingData();
   displayGenreTags();
   prefetchNextTrackData();
+  updateLastFmContextMenu();
   console.log(`Sort-Play loaded`);
   onPageChange();
   }
