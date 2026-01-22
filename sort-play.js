@@ -29393,8 +29393,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     trackIds.forEach((id, index) => {
         const key = cacheKeys[index];
         const cached = cachedDataMap.get(key);
-        if (cached && cached.stats) {
-            results[id] = cached.stats;
+        const stats = cached ? (cached.stats || cached) : null;
+        
+        if (stats && stats.energy !== undefined && stats.key_raw !== undefined && stats.key_raw !== -1) {
+            results[id] = stats;
         } else {
             missingIds.push(id);
         }
@@ -29407,7 +29409,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const internalStats = await fetchInternalAudioFeaturesBatch(missingIds);
             for (const [id, stats] of Object.entries(internalStats)) {
                 results[id] = stats;
-                await setTrackCache(id, stats, true, false, "stats-column");
+                await setTrackCache(id, { stats: stats }, true, false, "stats-column");
             }
         } catch (e) {
             console.error("Fallback audio features fetch failed", e);
@@ -29444,6 +29446,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
 
                 const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+                const idsNeedingInternal = [];
+                const tempResults = {};
                 
                 for (let i = 0; i < audioFeaturesResponse.audio_features.length; i++) {
                     const features = audioFeaturesResponse.audio_features[i];
@@ -29467,11 +29471,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             releaseDate: trackDetails.album?.release_date ?? null
                         };
                         
-                        results[features.id] = stats;
-                        
-                        await setTrackCache(features.id, stats, true, false, "stats-column");
+                        tempResults[features.id] = stats;
+
+                        if (stats.key_raw === -1 || !stats.tempo) {
+                            idsNeedingInternal.push(features.id);
+                        }
                     }
                 }
+
+                if (idsNeedingInternal.length > 0) {
+                    try {
+                        const internalData = await fetchInternalAudioFeaturesBatch(idsNeedingInternal);
+                        Object.keys(internalData).forEach(id => {
+                            if (tempResults[id]) {
+                                const int = internalData[id];
+                                if (int.key_raw !== -1) {
+                                    tempResults[id].key_raw = int.key_raw;
+                                    tempResults[id].mode = int.mode;
+                                    tempResults[id].key = int.key;
+                                    tempResults[id].camelot = int.camelot;
+                                }
+                                if (int.tempo) tempResults[id].tempo = int.tempo;
+                            }
+                        });
+                    } catch (e) {
+                        console.warn("Secondary internal fetch failed for audio features", e);
+                    }
+                }
+
+                Object.keys(tempResults).forEach(id => {
+                    results[id] = tempResults[id];
+                    setTrackCache(id, { stats: tempResults[id] }, true, false, "stats-column");
+                });
+
                 success = true;
             } catch (error) {
                 retries++;
@@ -30588,7 +30620,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     if (d && !d.pendingUpdate) val = d.count;
                 } else if (audioFeatureTypes.includes(config.type) && dataMap.ai) {
                     const aiKey = getCacheKey(id, true, false, "stats-column");
-                    const stats = dataMap.ai.get(aiKey);
+                    const cached = dataMap.ai.get(aiKey);
+                    const stats = cached ? (cached.stats || cached) : null;
                     if (stats) val = (config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type];
                 }
 
@@ -30640,7 +30673,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         const el = elementsToFetchFromApi.get(id);
                         const stat = stats[id];
                         if (stat && el) {
-                            await setTrackCache(id, stat, true, false, "stats-column");
+                            await setTrackCache(id, { stats: stat }, true, false, "stats-column");
+                            
                             columnConfigs.forEach(c => {
                                 if (audioFeatureTypes.includes(c.type)) {
                                     updateDisplay(el.querySelector(c.dataSelector), (c.type === 'djInfo' || c.type === 'key') ? stat : stat[c.type], c.type);
