@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.47.0";
+  const SORT_PLAY_VERSION = "5.47.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -17828,14 +17828,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               menuButtons.forEach((button) => (button.disabled = true));
               mainButton.innerHTML = "0%";
     
-              const result = await handleScrobblesSorting(
+              const tracksWithScrobbles = await handleScrobblesSorting(
                   filteredTracks,
                   sortType,
                   (progress) => {
                       mainButton.innerText = `${Math.floor(progress * 0.90)}%`;
                   }
               );
-              sortedTracks = result.sortedTracks; 
+
+              sortedTracks = tracksWithScrobbles.sort((a, b) => {
+                  const valA = a[sortType] || 0;
+                  const valB = b[sortType] || 0;
+                  
+                  return sortOrderState[sortType] 
+                      ? valA - valB 
+                      : valB - valA;
+              });
+
               const totalTracks = sortedTracks.length;
               sortedTracks.forEach((_, index) => {
                   const progress = 90 + Math.floor(((index + 1) / totalTracks) * 10);
@@ -17844,7 +17853,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               mainButton.innerText = "100%";
     
               await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
-    
     
           } catch (error) {
               resetButtons();
