@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.46.2";
+  const SORT_PLAY_VERSION = "5.47.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -84,6 +84,7 @@
   let selectedAlbumColumnType = 'scrobbles';
   let selectedArtistColumnType = 'releaseDate';
   let myScrobblesDisplayMode = 'number';
+  let keyDisplayMode = 'standard';
   let releaseDateFormat = 'YYYY-MM-DD';
   let showAlbumColumn = false;
   let showArtistColumn = false; 
@@ -1139,6 +1140,7 @@
     const openPlaylistStored = localStorage.getItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT);
     openPlaylistAfterSortEnabled = openPlaylistStored === null ? false : openPlaylistStored === "true";
     myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
+    keyDisplayMode = localStorage.getItem("sort-play-key-display-mode") || 'standard';
     colorSortMode = localStorage.getItem(STORAGE_KEY_COLOR_SORT_MODE) || 'perceptual';
     topTracksLimit = parseInt(localStorage.getItem(STORAGE_KEY_TOP_TRACKS_LIMIT), 10) || 100;
     const storedNewReleases = localStorage.getItem(STORAGE_KEY_NEW_RELEASES_LIMIT);
@@ -1229,6 +1231,7 @@
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, createPlaylistPrivate);
     localStorage.setItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, openPlaylistAfterSortEnabled);
     localStorage.setItem("sort-play-my-scrobbles-display-mode", myScrobblesDisplayMode);
+    localStorage.setItem("sort-play-key-display-mode", keyDisplayMode);
     localStorage.setItem(STORAGE_KEY_COLOR_SORT_MODE, colorSortMode);
     localStorage.setItem(STORAGE_KEY_TOP_TRACKS_LIMIT, topTracksLimit);
     localStorage.setItem(STORAGE_KEY_NEW_RELEASES_LIMIT, newReleasesDaysLimit);
@@ -2223,6 +2226,9 @@
             <button id="myScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
+            <button id="keySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
             <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
                 <option value="playCount" ${selectedColumnType === 'playCount' ? 'selected' : ''}>Play Count</option>
                 <option value="popularity" ${selectedColumnType === 'popularity' ? 'selected' : ''}>Popularity</option>
@@ -2255,6 +2261,13 @@
                 <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
                 <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
             </div>
+            <div id="keyDropdownContainer" class="column-settings-dropdown">
+                <button data-mode="standard" class="${keyDisplayMode === 'standard' ? 'selected' : ''}">Standard (Cm)</button>
+                <button data-mode="camelot" class="${keyDisplayMode === 'camelot' ? 'selected' : ''}">Camelot (5A)</button>
+                <button data-mode="openkey" class="${keyDisplayMode === 'openkey' ? 'selected' : ''}">Open Key (4d)</button>
+                <button data-mode="full_name" class="${keyDisplayMode === 'full_name' ? 'selected' : ''}">Full Name (C Minor)</button>
+                <button data-mode="standard_camelot" class="${keyDisplayMode === 'standard_camelot' ? 'selected' : ''}">Standard + Camelot</button>
+            </div>
         </div>
     </div>
     
@@ -2267,6 +2280,9 @@
                 ${settingsSvg}
             </button>
             <button id="secondMyScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
+            <button id="secondKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
             <select id="secondColumnTypeSelect" class="column-type-select" ${!showSecondAdditionalColumn ? 'disabled' : ''}>
@@ -2301,6 +2317,13 @@
                 <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
                 <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
             </div>
+            <div id="secondKeyDropdownContainer" class="column-settings-dropdown">
+                <button data-mode="standard" class="${keyDisplayMode === 'standard' ? 'selected' : ''}">Standard (Cm)</button>
+                <button data-mode="camelot" class="${keyDisplayMode === 'camelot' ? 'selected' : ''}">Camelot (5A)</button>
+                <button data-mode="openkey" class="${keyDisplayMode === 'openkey' ? 'selected' : ''}">Open Key (4d)</button>
+                <button data-mode="full_name" class="${keyDisplayMode === 'full_name' ? 'selected' : ''}">Full Name (C Minor)</button>
+                <button data-mode="standard_camelot" class="${keyDisplayMode === 'standard_camelot' ? 'selected' : ''}">Standard + Camelot</button>
+            </div>
         </div>
     </div>
 
@@ -2313,6 +2336,9 @@
                 ${settingsSvg}
             </button>
             <button id="albumMyScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
+            <button id="albumKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
             <select id="albumColumnTypeSelect" class="column-type-select" ${!showAlbumColumn ? 'disabled' : ''}>
@@ -2346,6 +2372,13 @@
                 <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
                 <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
             </div>
+            <div id="albumKeyDropdownContainer" class="column-settings-dropdown">
+                <button data-mode="standard" class="${keyDisplayMode === 'standard' ? 'selected' : ''}">Standard (Cm)</button>
+                <button data-mode="camelot" class="${keyDisplayMode === 'camelot' ? 'selected' : ''}">Camelot (5A)</button>
+                <button data-mode="openkey" class="${keyDisplayMode === 'openkey' ? 'selected' : ''}">Open Key (4d)</button>
+                <button data-mode="full_name" class="${keyDisplayMode === 'full_name' ? 'selected' : ''}">Full Name (C Minor)</button>
+                <button data-mode="standard_camelot" class="${keyDisplayMode === 'standard_camelot' ? 'selected' : ''}">Standard + Camelot</button>
+            </div>
         </div>
     </div>
 
@@ -2358,6 +2391,9 @@
                 ${settingsSvg}
             </button>
             <button id="artistMyScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
+            <button id="artistKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
             <select id="artistColumnTypeSelect" class="column-type-select" ${!showArtistColumn ? 'disabled' : ''}>
@@ -2390,6 +2426,13 @@
             <div id="artistMyScrobblesDropdownContainer" class="column-settings-dropdown">
                 <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
                 <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
+            </div>
+            <div id="artistKeyDropdownContainer" class="column-settings-dropdown">
+                <button data-mode="standard" class="${keyDisplayMode === 'standard' ? 'selected' : ''}">Standard (Cm)</button>
+                <button data-mode="camelot" class="${keyDisplayMode === 'camelot' ? 'selected' : ''}">Camelot (5A)</button>
+                <button data-mode="openkey" class="${keyDisplayMode === 'openkey' ? 'selected' : ''}">Open Key (4d)</button>
+                <button data-mode="full_name" class="${keyDisplayMode === 'full_name' ? 'selected' : ''}">Full Name (C Minor)</button>
+                <button data-mode="standard_camelot" class="${keyDisplayMode === 'standard_camelot' ? 'selected' : ''}">Standard + Camelot</button>
             </div>
         </div>
     </div>
@@ -2780,6 +2823,14 @@
     const albumMyScrobblesDropdownContainer = modalContainer.querySelector("#albumMyScrobblesDropdownContainer");
     const artistDateFormatDropdownContainer = modalContainer.querySelector("#artistDateFormatDropdownContainer");
     const artistMyScrobblesDropdownContainer = modalContainer.querySelector("#artistMyScrobblesDropdownContainer");
+    const keySettingsBtn = modalContainer.querySelector("#keySettingsBtn");
+    const secondKeySettingsBtn = modalContainer.querySelector("#secondKeySettingsBtn");
+    const albumKeySettingsBtn = modalContainer.querySelector("#albumKeySettingsBtn");
+    const artistKeySettingsBtn = modalContainer.querySelector("#artistKeySettingsBtn");
+    const keyDropdownContainer = modalContainer.querySelector("#keyDropdownContainer");
+    const secondKeyDropdownContainer = modalContainer.querySelector("#secondKeyDropdownContainer");
+    const albumKeyDropdownContainer = modalContainer.querySelector("#albumKeyDropdownContainer");
+    const artistKeyDropdownContainer = modalContainer.querySelector("#artistKeyDropdownContainer");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
@@ -3133,10 +3184,16 @@
         dateFormatSettingsBtn.style.display = showDateSettings ? 'flex' : 'none';
         dateFormatSettingsBtn.disabled = !showDateSettings;
         if (!showDateSettings) dateFormatDropdownContainer.style.display = 'none';
+        
         const showScrobbleSettings = showAdditionalColumn && selectedColumnType === 'personalScrobbles';
         myScrobblesSettingsBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
         myScrobblesSettingsBtn.disabled = !showScrobbleSettings;
         if (!showScrobbleSettings) myScrobblesDropdownContainer.style.display = 'none';
+
+        const showKeySettings = showAdditionalColumn && selectedColumnType === 'key';
+        keySettingsBtn.style.display = showKeySettings ? 'flex' : 'none';
+        keySettingsBtn.disabled = !showKeySettings;
+        if (!showKeySettings) keyDropdownContainer.style.display = 'none';
     };
 
     const updateSecondPlaylistColumnSettingsVisibility = () => {
@@ -3144,10 +3201,16 @@
         secondDateFormatSettingsBtn.style.display = showDateSettings ? 'flex' : 'none';
         secondDateFormatSettingsBtn.disabled = !showDateSettings;
         if (!showDateSettings) secondDateFormatDropdownContainer.style.display = 'none';
+        
         const showScrobbleSettings = showSecondAdditionalColumn && selectedSecondColumnType === 'personalScrobbles';
         secondMyScrobblesSettingsBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
         secondMyScrobblesSettingsBtn.disabled = !showScrobbleSettings;
         if (!showScrobbleSettings) secondMyScrobblesDropdownContainer.style.display = 'none';
+
+        const showKeySettings = showSecondAdditionalColumn && selectedSecondColumnType === 'key';
+        secondKeySettingsBtn.style.display = showKeySettings ? 'flex' : 'none';
+        secondKeySettingsBtn.disabled = !showKeySettings;
+        if (!showKeySettings) secondKeyDropdownContainer.style.display = 'none';
     };
 
     const updateAlbumColumnSettingsVisibility = () => {
@@ -3155,10 +3218,16 @@
         albumDateFormatSettingsBtn.style.display = showDateSettings ? 'flex' : 'none';
         albumDateFormatSettingsBtn.disabled = !showDateSettings;
         if (!showDateSettings) albumDateFormatDropdownContainer.style.display = 'none';
+        
         const showScrobbleSettings = showAlbumColumn && selectedAlbumColumnType === 'personalScrobbles';
         albumMyScrobblesSettingsBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
         albumMyScrobblesSettingsBtn.disabled = !showScrobbleSettings;
         if (!showScrobbleSettings) albumMyScrobblesDropdownContainer.style.display = 'none';
+
+        const showKeySettings = showAlbumColumn && selectedAlbumColumnType === 'key';
+        albumKeySettingsBtn.style.display = showKeySettings ? 'flex' : 'none';
+        albumKeySettingsBtn.disabled = !showKeySettings;
+        if (!showKeySettings) albumKeyDropdownContainer.style.display = 'none';
     };
 
     const updateArtistColumnSettingsVisibility = () => {
@@ -3166,10 +3235,16 @@
         artistDateFormatSettingsBtn.style.display = showDateSettings ? 'flex' : 'none';
         artistDateFormatSettingsBtn.disabled = !showDateSettings;
         if (!showDateSettings) artistDateFormatDropdownContainer.style.display = 'none';
+        
         const showScrobbleSettings = showArtistColumn && selectedArtistColumnType === 'personalScrobbles';
         artistMyScrobblesSettingsBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
         artistMyScrobblesSettingsBtn.disabled = !showScrobbleSettings;
         if (!showScrobbleSettings) artistMyScrobblesDropdownContainer.style.display = 'none';
+
+        const showKeySettings = showArtistColumn && selectedArtistColumnType === 'key';
+        artistKeySettingsBtn.style.display = showKeySettings ? 'flex' : 'none';
+        artistKeySettingsBtn.disabled = !showKeySettings;
+        if (!showKeySettings) artistKeyDropdownContainer.style.display = 'none';
     };
 
     updatePlaylistColumnSettingsVisibility();
@@ -3178,10 +3253,10 @@
     updateArtistColumnSettingsVisibility();
 
     const allDropdownsForScroll = [
-        dateFormatDropdownContainer, myScrobblesDropdownContainer,
-        albumDateFormatDropdownContainer, albumMyScrobblesDropdownContainer,
-        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer,
-        secondDateFormatDropdownContainer, secondMyScrobblesDropdownContainer
+        dateFormatDropdownContainer, myScrobblesDropdownContainer, keyDropdownContainer,
+        albumDateFormatDropdownContainer, albumMyScrobblesDropdownContainer, albumKeyDropdownContainer,
+        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer, artistKeyDropdownContainer,
+        secondDateFormatDropdownContainer, secondMyScrobblesDropdownContainer, secondKeyDropdownContainer
     ];
     
     allDropdownsForScroll.forEach(dropdown => {
@@ -3280,6 +3355,7 @@
 
     const allDateFormatContainers = [dateFormatDropdownContainer, albumDateFormatDropdownContainer, artistDateFormatDropdownContainer, secondDateFormatDropdownContainer];
     const allScrobbleContainers = [myScrobblesDropdownContainer, albumMyScrobblesDropdownContainer, artistMyScrobblesDropdownContainer, secondMyScrobblesDropdownContainer];
+    const allKeyContainers = [keyDropdownContainer, albumKeyDropdownContainer, artistKeyDropdownContainer, secondKeyDropdownContainer];
 
     const setupGlobalSettingListeners = (containers, settingKey, updateFunc) => {
         containers.forEach(container => {
@@ -3293,8 +3369,15 @@
                         const matchingButton = c.querySelector(`[data-${settingKey}="${newValue}"]`);
                         if (matchingButton) matchingButton.classList.add("selected");
                     });
-                    allDateFormatContainers.forEach(c => c.style.display = 'none');
-                    allScrobbleContainers.forEach(c => c.style.display = 'none');
+                    
+                    const allContainers = [...allDateFormatContainers, ...allScrobbleContainers, ...allKeyContainers];
+                    allContainers.forEach(c => c.style.display = 'none');
+                    
+                    document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
+                        el.textContent = "";
+                        delete el.dataset.spProcessed;
+                    });
+                    
                     saveSettings();
                     onPageChange();
                 });
@@ -3307,6 +3390,9 @@
     });
     setupGlobalSettingListeners(allScrobbleContainers, 'mode', (value) => {
         myScrobblesDisplayMode = value;
+    });
+    setupGlobalSettingListeners(allKeyContainers, 'mode', (value) => {
+        keyDisplayMode = value;
     });
 
     const setupSettingsButtonToggle = (button, dropdown, otherDropdowns) => {
@@ -3369,7 +3455,7 @@
         });
     };
 
-    const allDropdowns = [...allDateFormatContainers, ...allScrobbleContainers];
+    const allDropdowns = [...allDateFormatContainers, ...allScrobbleContainers, ...allKeyContainers];
     setupSettingsButtonToggle(dateFormatSettingsBtn, dateFormatDropdownContainer, allDropdowns.filter(d => d !== dateFormatDropdownContainer));
     setupSettingsButtonToggle(myScrobblesSettingsBtn, myScrobblesDropdownContainer, allDropdowns.filter(d => d !== myScrobblesDropdownContainer));
     setupSettingsButtonToggle(albumDateFormatSettingsBtn, albumDateFormatDropdownContainer, allDropdowns.filter(d => d !== albumDateFormatDropdownContainer));
@@ -3378,6 +3464,10 @@
     setupSettingsButtonToggle(artistMyScrobblesSettingsBtn, artistMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== artistMyScrobblesDropdownContainer));
     setupSettingsButtonToggle(secondDateFormatSettingsBtn, secondDateFormatDropdownContainer, allDropdowns.filter(d => d !== secondDateFormatDropdownContainer));
     setupSettingsButtonToggle(secondMyScrobblesSettingsBtn, secondMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== secondMyScrobblesDropdownContainer));
+    setupSettingsButtonToggle(keySettingsBtn, keyDropdownContainer, allDropdowns.filter(d => d !== keyDropdownContainer));
+    setupSettingsButtonToggle(secondKeySettingsBtn, secondKeyDropdownContainer, allDropdowns.filter(d => d !== secondKeyDropdownContainer));
+    setupSettingsButtonToggle(albumKeySettingsBtn, albumKeyDropdownContainer, allDropdowns.filter(d => d !== albumKeyDropdownContainer));
+    setupSettingsButtonToggle(artistKeySettingsBtn, artistKeyDropdownContainer, allDropdowns.filter(d => d !== artistKeyDropdownContainer));
 
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
@@ -3811,7 +3901,10 @@
         ],
         key: [
             { value: 'standard', label: 'Standard (Cm)' },
-            { value: 'camelot', label: 'Camelot (5A)' }
+            { value: 'camelot', label: 'Camelot (5A)' },
+            { value: 'openkey', label: 'Open Key (4d)' },
+            { value: 'full_name', label: 'Full Name (C Minor)' },
+            { value: 'standard_camelot', label: 'Standard + Camelot (Cm (5A))' }
         ],
         default: [
             { value: 'raw', label: 'Raw Value' },
@@ -5577,7 +5670,8 @@
     return `${roundedValue}%`;
   }
 
-  function formatKey(key, mode, format) {
+  function formatKey(key, mode, format, rawCamelot) {
+    if (format === 'camelot' && rawCamelot) return rawCamelot;
     if (key === null || key === -1 || isNaN(key) || mode === null || isNaN(mode)) return '―';
 
     const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
@@ -5596,16 +5690,21 @@
         { major: '4d', minor: '1m' }, { major: '11d', minor: '8m' }, { major: '6d', minor: '3m' }
     ];
 
+    const standardKey = mode === 0 ? `${pitchClasses[key]}m` : pitchClasses[key];
+    const camelotKey = rawCamelot || (mode === 1 ? camelotMap[key].major : camelotMap[key].minor);
+
     switch (format) {
         case 'camelot':
-            return mode === 1 ? camelotMap[key].major : camelotMap[key].minor;
+            return camelotKey;
         case 'openkey':
             return mode === 1 ? openKeyMap[key].major : openKeyMap[key].minor;
         case 'full_name':
             return `${pitchClasses[key]} ${mode === 1 ? 'Major' : 'Minor'}`;
+        case 'standard_camelot':
+             return `${standardKey} (${camelotKey})`;
         case 'standard':
         default:
-            return pitchClasses[key];
+            return standardKey;
     }
   }
 
@@ -6681,7 +6780,7 @@
           case 'energy': val = dataObj.energy; break;
           case 'danceability': val = dataObj.danceability; break;
           case 'valence': val = dataObj.valence; break;
-          case 'key': val = { key: dataObj.key_raw, mode: dataObj.mode }; break;
+          case 'key': val = { key: dataObj.key_raw, mode: dataObj.mode, camelot: dataObj.camelot }; break;
           default: val = dataObj[type];
       }
 
@@ -6694,7 +6793,7 @@
           case 'scrobbles': return formatScrobbles(val, format);
           case 'personalScrobbles': return formatPersonalScrobbles(val, format);
           case 'tempo': return formatTempo(val, format);
-          case 'key': return formatKey(val.key, val.mode, format);
+          case 'key': return formatKey(val.key, val.mode, format, val.camelot);
           case 'energy': return formatAudioFeature(val, format, 'Energy');
           case 'danceability': return formatAudioFeature(val, format, 'Dance');
           case 'valence': return formatAudioFeature(val, format, 'Valence');
@@ -29048,6 +29147,232 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
 
+  const extendedMetadataJsonDescriptor = {
+    nested: {
+        Message: {
+            fields: {
+                header: { type: "Header", id: 1 },
+                request: { type: "Request", id: 2, rule: "repeated" }
+            }
+        },
+        Header: {
+            fields: {
+                country: { type: "string", id: 1 },
+                catalogue: { type: "string", id: 2 },
+                task_id: { type: "bytes", id: 3 }
+            }
+        },
+        Request: {
+            fields: {
+                entity_uri: { type: "string", id: 1 },
+                query: { type: "Query", id: 2 }
+            }
+        },
+        Query: {
+            fields: {
+                extension_kind: { type: "uint32", id: 1 }
+            }
+        }
+    }
+  };
+
+  const audioFeaturesJsonDescriptor = {
+    nested: {
+        Message: {
+            fields: {
+                header: { type: "Header", id: 1 },
+                extension_kind: { type: "uint32", id: 2 },
+                response: { type: "Response", id: 3, rule: "repeated" }
+            }
+        },
+        Header: {
+            fields: { status: { type: "uint32", id: 1 } }
+        },
+        Response: {
+            fields: {
+                info: { type: "ResponseInfo", id: 1 },
+                track: { type: "string", id: 2 },
+                attributes: { type: "AudioAttributesWrapper", id: 3, rule: "optional" }
+            }
+        },
+        ResponseInfo: {
+            fields: { status: { type: "uint32", id: 1 } }
+        },
+        AudioAttributesWrapper: {
+            fields: {
+                typestr: { type: "string", id: 1 },
+                attributes: { type: "AudioAttributes", id: 2 }
+            }
+        },
+        AudioAttributes: {
+            fields: {
+                bpm: { type: "double", id: 1 },
+                key: { type: "Key", id: 2 },
+                danceability: { type: "double", id: 3 },
+                energy: { type: "double", id: 4 }
+            }
+        },
+        Key: {
+            fields: {
+                key: { type: "string", id: 1 },
+                majorMinor: { type: "uint32", id: 2 },
+                camelot: { type: "CamelotKey", id: 3 }
+            }
+        },
+        CamelotKey: {
+            fields: {
+                key: { type: "string", id: 1 },
+                backgroundColor: { type: "string", id: 2 }
+            }
+        }
+    }
+  };
+
+  async function loadProtobuf() {
+    if (typeof protobuf !== 'undefined') return protobuf;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/protobufjs@7.2.5/dist/protobuf.min.js';
+        script.onload = () => resolve(window.protobuf);
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+  }
+
+  async function fetchInternalAudioFeaturesBatch(trackIds) {
+    if (!trackIds || trackIds.length === 0) return {};
+    
+    try {
+        const protobuf = await loadProtobuf();
+        
+        const { AuthorizationAPI, ProductStateAPI, PlatformData } = Spicetify.Platform;
+        const token = AuthorizationAPI.getState().token.accessToken;
+        const productState = await ProductStateAPI.getValues();
+        const country = productState.country || "US";
+        const catalogue = productState.catalogue || "premium";
+
+        const rootRequest = protobuf.Root.fromJSON(extendedMetadataJsonDescriptor).lookupType("Message");
+        const rootResponse = protobuf.Root.fromJSON(audioFeaturesJsonDescriptor).lookupType("Message");
+
+        const taskId = new Uint8Array(16);
+        crypto.getRandomValues(taskId);
+
+        const BATCH_SIZE = 100;
+        const results = {};
+
+        const keyStringToInt = {
+            "C": 0, "C#": 1, "Db": 1, "DB": 1, 
+            "D": 2, "D#": 3, "Eb": 3, "EB": 3,
+            "E": 4, 
+            "F": 5, "F#": 6, "Gb": 6, "GB": 6, 
+            "G": 7, "G#": 8, "Ab": 8, "AB": 8,
+            "A": 9, "A#": 10, "Bb": 10, "BB": 10, 
+            "B": 11
+        };
+
+        const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+
+        for (let i = 0; i < trackIds.length; i += BATCH_SIZE) {
+            const batch = trackIds.slice(i, i + BATCH_SIZE);
+            
+            const payload = {
+                header: {
+                    country: country,
+                    catalogue: catalogue,
+                    task_id: taskId
+                },
+                request: batch.map(id => ({
+                    entity_uri: `spotify:track:${id}`,
+                    query: { extension_kind: 222 }
+                }))
+            };
+
+            const buffer = rootRequest.encode(payload).finish();
+
+            const res = await fetch("https://spclient.wg.spotify.com/extended-metadata/v0/extended-metadata", {
+                method: "POST",
+                body: buffer,
+                headers: {
+                    "Content-Type": "application/protobuf",
+                    "Authorization": `Bearer ${token}`,
+                    "Spotify-App-Version": Spicetify.Platform.version,
+                    "App-Platform": PlatformData.app_platform
+                }
+            });
+
+            if (!res.ok) continue;
+
+            const resBuffer = new Uint8Array(await res.arrayBuffer());
+            const decoded = rootResponse.decode(resBuffer);
+            const data = rootResponse.toObject(decoded, {
+                longs: String,
+                enums: String,
+                bytes: String,
+            });
+
+            if (data.response) {
+                data.response.forEach(resp => {
+                    if (resp.attributes && resp.attributes.attributes) {
+                        const attr = resp.attributes.attributes;
+                        const trackId = resp.track.split(":")[2];
+                        
+                        let keyRaw = -1;
+                        let mode = -1;
+                        let camelotVal = null;
+                        
+                        if (attr.key) {
+                            if (typeof attr.key.key === 'string') {
+                                const kStr = attr.key.key;
+                                const kIdx = parseInt(kStr);
+                                
+                                if (!isNaN(kIdx) && String(kIdx) === kStr && kIdx >= 0 && kIdx <= 11) {
+                                    keyRaw = kIdx;
+                                } else {
+                                    const upperKey = kStr.toUpperCase();
+                                    if (keyStringToInt[kStr] !== undefined) {
+                                        keyRaw = keyStringToInt[kStr];
+                                    } else if (keyStringToInt[upperKey] !== undefined) {
+                                        keyRaw = keyStringToInt[upperKey];
+                                    }
+                                }
+                            }
+                            if (attr.key.majorMinor !== undefined) {
+                                mode = attr.key.majorMinor === 2 ? 1 : 0;
+                            }
+                            if (attr.key.camelot && attr.key.camelot.key) {
+                                camelotVal = attr.key.camelot.key;
+                            }
+                        }
+
+                        let keyString = "Undefined";
+                        if (keyRaw !== -1) {
+                            keyString = pitchClasses[keyRaw];
+                            if (mode === 0) keyString += "m";
+                        }
+
+                        results[trackId] = {
+                            tempo: attr.bpm ? Math.round(attr.bpm) : null,
+                            key_raw: keyRaw,
+                            mode: mode,
+                            key: keyString,
+                            camelot: camelotVal,
+                            energy: attr.energy || null,
+                            danceability: attr.danceability || null,
+                            valence: null, acousticness: null, 
+                            instrumentalness: null, speechiness: null, 
+                            liveness: null, loudness: null
+                        };
+                    }
+                });
+            }
+        }
+        return results;
+    } catch (e) {
+        console.error("Internal Audio Features fetch failed:", e);
+        return {};
+    }
+  }
+
   async function getBatchTrackStats(trackIds, updateProgress = () => {}) {
     if (trackIds.length === 0) return {};
 
@@ -29070,6 +29395,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (missingIds.length === 0) return results;
 
     if (isFallbackActive()) {
+        try {
+            const internalStats = await fetchInternalAudioFeaturesBatch(missingIds);
+            for (const [id, stats] of Object.entries(internalStats)) {
+                results[id] = stats;
+                await setTrackCache(id, stats, true, false, "stats-column");
+            }
+        } catch (e) {
+            console.error("Fallback audio features fetch failed", e);
+        }
         return results;
     }
 
@@ -30247,7 +30581,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 } else if (audioFeatureTypes.includes(config.type) && dataMap.ai) {
                     const aiKey = getCacheKey(id, true, false, "stats-column");
                     const stats = dataMap.ai.get(aiKey);
-                    if (stats) val = config.type === 'djInfo' ? stats : stats[config.type];
+                    if (stats) val = (config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type];
                 }
 
                 if ((config.type === 'scrobbles' || config.type === 'personalScrobbles') && !trackInfo) {
@@ -30301,7 +30635,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             await setTrackCache(id, stat, true, false, "stats-column");
                             columnConfigs.forEach(c => {
                                 if (audioFeatureTypes.includes(c.type)) {
-                                    updateDisplay(el.querySelector(c.dataSelector), c.type === 'djInfo' ? stat : stat[c.type], c.type);
+                                    updateDisplay(el.querySelector(c.dataSelector), (c.type === 'djInfo' || c.type === 'key') ? stat : stat[c.type], c.type);
                                 }
                             });
                         }
@@ -30477,7 +30811,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     } else if (type === 'djInfo') {
         if (value && typeof value === 'object') {
             const parts = [];
-            if (value.key && value.key !== 'Undefined') parts.push(value.key);
+            const k = formatKey(value.key_raw, value.mode, keyDisplayMode, value.camelot);
+            if (k && k !== '―') parts.push(k);
             if (value.tempo) parts.push(`${value.tempo}♫`);
             if (value.energy) parts.push(`E${value.energy}`);
             if (parts.length > 0) {
@@ -30488,7 +30823,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         } else {
             displayValue = "―";
         }
-    } else if (['key', 'tempo', 'energy', 'danceability', 'valence', 'popularity'].includes(type)) {
+    } else if (type === 'key') {
+        if (value && typeof value === 'object') {
+            displayValue = formatKey(value.key_raw, value.mode, keyDisplayMode, value.camelot);
+        } else if (value !== null && value !== undefined) {
+            displayValue = String(value);
+        } else {
+            displayValue = "―";
+        }
+    } else if (['tempo', 'energy', 'danceability', 'valence', 'popularity'].includes(type)) {
         if (value !== null && value !== undefined) {
             displayValue = String(value);
         } else {
