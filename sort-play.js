@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.47.1";
+  const SORT_PLAY_VERSION = "5.48.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -992,16 +992,16 @@
     {
         title: 'Last.fm',
         cards: [
-            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'A continuous mood from your current song, recent obsessions, and deep cuts.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: true },
-            { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: true },
+            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'A continuous mood from your current song, recent obsessions, and deep cuts.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: false },
+            { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: false },
         ]
     },
     {
         title: 'My Top Tracks',
         cards: [
-            { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth, broken: true },
+            { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth, broken: false },
             { id: 'topLast6Months', name: 'Top Tracks: Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months, broken: true },
-            { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime, broken: true },
+            { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime, broken: false },
         ]
     }
   ];
@@ -5017,7 +5017,7 @@
             align-items: center;
             justify-content: center;
             pointer-events: none;
-            backdrop-filter: blur(1px);
+            backdrop-filter: blur(0.8px);
             opacity: 1;
         }
 
@@ -5088,9 +5088,8 @@
         const step = (timestamp) => {
             if (!startTimestamp) startTimestamp = timestamp;
             const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-            const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
             
-            const current = Math.floor(ease * (end - start) + start);
+            const current = Math.floor(progress * (end - start) + start);
             obj.textContent = current.toLocaleString();
 
             if (progress < 1) {
@@ -5117,7 +5116,7 @@
                         countEl.textContent = count.toLocaleString();
                         statEl.style.opacity = '1';
                     } else if (currentVal !== count) {
-                        animateValue(countEl, currentVal, count, 1000);
+                        animateValue(countEl, currentVal, count, 1250);
                     }
                 }
             });
@@ -6591,8 +6590,13 @@
               genreSourcesMap = new Map();
               
               let domArtistName = "";
-              const artistNameElement = header.querySelector("h1");
-              if (artistNameElement) domArtistName = artistNameElement.innerText.trim();
+              let attempts = 0;
+              while (!domArtistName && attempts < 10) {
+                  const artistNameElement = header.querySelector("h1");
+                  if (artistNameElement) domArtistName = artistNameElement.innerText.trim();
+                  if (!domArtistName) await new Promise(r => setTimeout(r, 100));
+                  attempts++;
+              }
 
               const addGenres = (list, sourceLabel) => {
                   if (!list || !Array.isArray(list)) return;
@@ -6676,7 +6680,9 @@
 
               await Promise.all(promises);
               
-              artistPageGenreCache.set(artistId, genreSourcesMap);
+              if (genreSourcesMap.size > 0) {
+                  artistPageGenreCache.set(artistId, genreSourcesMap);
+              }
           }
 
           const currentUriNow = getCurrentUri();
@@ -6689,7 +6695,14 @@
 
           if (genreSourcesMap.size === 0) {
               container.innerHTML = `<span>Artist Genres : </span><span style="opacity: 0.6;">No genres found</span>`;
-              container.dataset.status = 'loaded';
+              
+              if (!container.dataset.retried) {
+                  container.dataset.retried = "true";
+                  setTimeout(() => {
+                      pendingArtistPageFetches.delete(artistId);
+                      updateArtistPageGenres();
+                  }, 2000);
+              }
               return;
           }
 
@@ -6758,7 +6771,6 @@
           }).join("<span>, </span>");
 
           container.innerHTML = `<span>Artist Genres : </span>${genreLinks}`;
-          
           container.dataset.status = 'loaded';
 
       } finally {
@@ -8904,6 +8916,50 @@ sendButton.addEventListener("click", async () => {
         }
     }
 
+    async function searchTracks(query, limit = 5) {
+        if (isFallbackActive()) {
+            try {
+                const res = await Spicetify.Platform.SearchAPI.search({ query: query, types: ["track"], limit: limit });
+                const trackHits = res?.hits?.find(h => h.type === 'track')?.hits || [];
+                return {
+                    tracks: {
+                        items: trackHits.map(t => ({
+                            uri: t.uri,
+                            id: t.uri.split(':')[2],
+                            name: t.name,
+                            artists: t.artists.map(a => ({ name: a.name, uri: a.uri, id: a.uri?.split(':')[2] })),
+                            album: {
+                                name: t.album.name,
+                                uri: t.album.uri,
+                                id: t.album.uri?.split(':')[2],
+                                images: t.album.coverArt?.sources?.map(s => ({ url: s.url })) || []
+                            },
+                            duration_ms: t.duration?.totalMilliseconds
+                        }))
+                    }
+                };
+            } catch (e) {
+                const token = await get_S_Client_Token();
+                if (token) {
+                    const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+                    if (res.ok) return await res.json();
+                }
+                throw e;
+            }
+        } else {
+            try {
+                return await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    return searchTracks(query, limit);
+                }
+                throw e;
+            }
+        }
+    }
+
     for (let i = 0; i < localTracks.length; i += BATCH_SIZE) {
         const batch = localTracks.slice(i, i + BATCH_SIZE);
         updateProgress(`${Math.min(i + BATCH_SIZE, localTracks.length)}/${localTracks.length}`);
@@ -8934,7 +8990,7 @@ sendButton.addEventListener("click", async () => {
                 };
 
                 const lenientResult = await retryOperation(
-                    () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(lenientQuery)}&type=track&limit=5`),
+                    () => searchTracks(lenientQuery, 5),
                     `track ${i + idx + 1} (lenient)`
                 );
 
@@ -8945,7 +9001,7 @@ sendButton.addEventListener("click", async () => {
 
                 if (!verifiedTrack) {
                     const strictResult = await retryOperation(
-                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(strictQuery)}&type=track&limit=5`),
+                        () => searchTracks(strictQuery, 5),
                         `track ${i + idx + 1} (strict)`
                     );
                     if (strictResult.tracks && strictResult.tracks.items.length > 0) {
@@ -22961,6 +23017,50 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     }
 
+    async function searchTracks(query, limit = 5) {
+        if (isFallbackActive()) {
+            try {
+                const res = await Spicetify.Platform.SearchAPI.search({ query: query, types: ["track"], limit: limit });
+                const trackHits = res?.hits?.find(h => h.type === 'track')?.hits || [];
+                return {
+                    tracks: {
+                        items: trackHits.map(t => ({
+                            uri: t.uri,
+                            id: t.uri.split(':')[2],
+                            name: t.name,
+                            artists: t.artists.map(a => ({ name: a.name, uri: a.uri, id: a.uri?.split(':')[2] })),
+                            album: {
+                                name: t.album.name,
+                                uri: t.album.uri,
+                                id: t.album.uri?.split(':')[2],
+                                images: t.album.coverArt?.sources?.map(s => ({ url: s.url })) || []
+                            },
+                            duration_ms: t.duration?.totalMilliseconds
+                        }))
+                    }
+                };
+            } catch (e) {
+                const token = await get_S_Client_Token();
+                if (token) {
+                    const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`, {
+                        headers: { "Authorization": `Bearer ${token}` }
+                    });
+                    if (res.ok) return await res.json();
+                }
+                throw e;
+            }
+        } else {
+            try {
+                return await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
+            } catch (e) {
+                if (registerWebApiFailure()) {
+                    return searchTracks(query, limit);
+                }
+                throw e;
+            }
+        }
+    }
+
     let newPlaylist = null;
 
     try {
@@ -23011,7 +23111,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     };
 
                     const lenientResult = await retryOperation(
-                        () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(lenientQuery)}&type=track&limit=5`),
+                        () => searchTracks(lenientQuery, 5),
                         `track ${i + idx + 1} (lenient)`
                     );
 
@@ -23022,7 +23122,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                     if (!verifiedTrack) {
                         const strictResult = await retryOperation(
-                            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(strictQuery)}&type=track&limit=5`),
+                            () => searchTracks(strictQuery, 5),
                             `track ${i + idx + 1} (strict)`
                         );
                         if (strictResult.tracks && strictResult.tracks.items.length > 0) {
@@ -23667,27 +23767,125 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
 
   async function getTopItems(type, time_range, totalLimit) {
+    if (isFallbackActive()) {
+        const timeRangeMap = {
+            'short_term': 'SHORT_TERM',
+            'long_term': 'LONG_TERM',
+            'medium_term': null
+        };
+        const gqlTimeRange = timeRangeMap[time_range];
+
+        if (!gqlTimeRange) {
+            return [];
+        }
+
+        let allItems = [];
+        const offsets = [0, 50, 100]; 
+        
+        for (const offset of offsets) {
+            if (allItems.length >= totalLimit) break;
+
+            try {
+                const variables = {
+                    includeTopArtists: type === 'artists',
+                    topArtistsInput: {
+                        offset: offset,
+                        limit: 50,
+                        sortBy: "AFFINITY",
+                        timeRange: gqlTimeRange
+                    },
+                    includeTopTracks: type === 'tracks',
+                    topTracksInput: {
+                        offset: offset,
+                        limit: 50,
+                        sortBy: "AFFINITY",
+                        timeRange: gqlTimeRange
+                    }
+                };
+
+                const res = await Spicetify.GraphQL.Request({
+                    name: "userTopContent",
+                    operation: "query",
+                    sha256Hash: "49ee15704de4a7fdeac65a02db20604aa11e46f02e809c55d9a89f6db9754356",
+                    value: null,
+                }, variables);
+
+                let items = [];
+                if (type === 'artists' && res?.data?.me?.profile?.topArtists?.items) {
+                    items = res.data.me.profile.topArtists.items.map(i => {
+                        const d = i.data;
+                        return {
+                            id: d.uri.split(':')[2],
+                            uri: d.uri,
+                            name: d.profile?.name,
+                            genres: [],
+                            images: d.visuals?.avatarImage?.sources || []
+                        };
+                    });
+                } else if (type === 'tracks' && res?.data?.me?.profile?.topTracks?.items) {
+                    items = res.data.me.profile.topTracks.items.map(i => {
+                        const d = i.data;
+                        return {
+                            id: d.uri.split(':')[2],
+                            uri: d.uri,
+                            name: d.name,
+                            artists: d.artists?.items?.map(a => ({
+                                name: a.profile?.name,
+                                uri: a.uri,
+                                id: a.uri.split(':')[2]
+                            })) || [],
+                            album: {
+                                name: d.albumOfTrack?.name,
+                                uri: d.albumOfTrack?.uri,
+                                images: d.albumOfTrack?.coverArt?.sources || []
+                            },
+                            duration_ms: d.duration?.totalMilliseconds
+                        };
+                    });
+                }
+
+                if (items.length === 0) break;
+                allItems = allItems.concat(items);
+
+                if (items.length < 50) break;
+
+            } catch (e) {
+                console.error(`[Sort-Play] GQL Top Items fetch failed for offset ${offset}`, e);
+                break;
+            }
+        }
+        
+        return allItems.slice(0, totalLimit);
+    }
+
     let allItems = [];
     let offset = 0;
     const limitPerRequest = 50;
 
-    while (allItems.length < totalLimit) {
-        const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/me/top/${type}`, {
-            time_range: time_range,
-            limit: limitPerRequest,
-            offset: offset
-        });
+    try {
+        while (allItems.length < totalLimit) {
+            const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/me/top/${type}`, {
+                time_range: time_range,
+                limit: limitPerRequest,
+                offset: offset
+            });
 
-        if (!res.items || res.items.length === 0) {
-            break;
+            if (!res.items || res.items.length === 0) {
+                break;
+            }
+
+            allItems = allItems.concat(res.items);
+            offset += limitPerRequest;
+
+            if (res.items.length < limitPerRequest) {
+                break;
+            }
         }
-
-        allItems = allItems.concat(res.items);
-        offset += limitPerRequest;
-
-        if (res.items.length < limitPerRequest) {
-            break;
+    } catch (e) {
+        if (registerWebApiFailure()) {
+            return getTopItems(type, time_range, totalLimit);
         }
+        throw e;
     }
     return allItems.slice(0, totalLimit);
   }
@@ -25252,6 +25450,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         cachedLikedMetadata.forEach(meta => {
             if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
         });
+        
+        likedTrackIds.forEach(id => {
+            const storedIsrc = localStorage.getItem("sort-play-like-" + id);
+            if (storedIsrc) likedIsrcs.add(storedIsrc);
+        });
 
         const candidatesForMeta = availableTracks.map(t => ({
             uri: t.uri,
@@ -25315,7 +25518,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
 
-        updateProgress("Sequencing...");
         const top50 = finalPoolTracks.slice(0, 50);
         
         if (top50.length === 0) {
@@ -25330,11 +25532,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return { ...t, features: stats[id] };
         });
 
-        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
-
-        const sorted = await energyWaveSort(validForWave, 'discovery');
-        const finalTracks = [...sorted, ...others];
+        let finalTracks;
+        
+        if (isFallbackActive()) {
+            const validForFlow = tracksWithFeatures.filter(t => t.features && t.features.tempo != null);
+            const others = tracksWithFeatures.filter(t => !t.features || t.features.tempo == null);
+            
+            const sorted = await harmonicTempoSort(validForFlow);
+            finalTracks = [...sorted, ...others];
+        } else {
+            const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+            const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+    
+            const sorted = await energyWaveSort(validForWave, 'discovery');
+            finalTracks = [...sorted, ...others];
+        }
         
         const trackUris = finalTracks.map(t => t.uri);
 
@@ -25602,6 +25814,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
         });
 
+        likedTrackIds.forEach(id => {
+            const storedIsrc = localStorage.getItem("sort-play-like-" + id);
+            if (storedIsrc) likedIsrcs.add(storedIsrc);
+        });
+
         const candidatesForMeta = availableTracks.map(t => ({
             uri: t.uri,
             id: t.id || t.uri.split(':')[2],
@@ -25645,7 +25862,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
 
-        updateProgress("Sequencing...");
         const top50 = finalPoolTracks.slice(0, 50);
         
         if (top50.length === 0) {
@@ -25663,11 +25879,21 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             };
         });
 
-        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+        let finalTracks;
 
-        const sorted = await energyWaveSort(validForWave);
-        const finalTracks = [...sorted, ...others];
+        if (isFallbackActive()) {
+            const validForFlow = tracksWithFeatures.filter(t => t.features && t.features.tempo != null);
+            const others = tracksWithFeatures.filter(t => !t.features || t.features.tempo == null);
+            
+            const sorted = await harmonicTempoSort(validForFlow);
+            finalTracks = [...sorted, ...others];
+        } else {
+            const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+            const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+    
+            const sorted = await energyWaveSort(validForWave);
+            finalTracks = [...sorted, ...others];
+        }
         
         const trackUris = finalTracks.map(t => t.uri);
 
@@ -27635,6 +27861,75 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return journeyMap;
   }
   
+  async function harmonicTempoSort(tracks) {
+    if (tracks.length < 3) return [...tracks];
+
+    const tracksWithProfile = tracks.map(track => {
+        const f = track.features || {};
+        
+        let camelotKey = f.camelot;
+        if (!camelotKey && (f.key_raw !== undefined && f.key_raw !== -1 && f.mode !== undefined)) {
+            const keyName = (f.key || "C").replace("m", ""); 
+            const modeSuffix = f.mode === 0 ? 'm' : '';
+            const lookup = keyName + modeSuffix;
+            camelotKey = KEY_TO_CAMELOT_MAP[lookup];
+        }
+
+        return {
+            ...track,
+            profile: {
+                tempo: f.tempo || 120,
+                camelotKey: camelotKey
+            }
+        };
+    });
+
+    const validTracks = tracksWithProfile.filter(t => t.profile.camelotKey);
+    const others = tracksWithProfile.filter(t => !t.profile.camelotKey);
+
+    if (validTracks.length === 0) return tracks;
+
+    const avgTempo = validTracks.reduce((sum, t) => sum + t.profile.tempo, 0) / validTracks.length;
+    
+    validTracks.sort((a, b) => Math.abs(a.profile.tempo - avgTempo) - Math.abs(b.profile.tempo - avgTempo));
+    
+    const sorted = [validTracks.shift()];
+    let currentTrack = sorted[0];
+
+    while (validTracks.length > 0) {
+        let bestIdx = -1;
+        let bestScore = -Infinity;
+
+        for (let i = 0; i < validTracks.length; i++) {
+            const candidate = validTracks[i];
+            
+            const harmScore = getHarmonicCompatibilityScore(currentTrack.profile.camelotKey, candidate.profile.camelotKey);
+            
+            const tempoDiff = Math.abs(currentTrack.profile.tempo - candidate.profile.tempo);
+            const doubleDiff = Math.abs(currentTrack.profile.tempo - (candidate.profile.tempo * 2));
+            const halfDiff = Math.abs(currentTrack.profile.tempo - (candidate.profile.tempo / 2));
+            
+            const effectiveTempoDiff = Math.min(tempoDiff, doubleDiff, halfDiff);
+            const tempoScore = 100 - (effectiveTempoDiff * 2);
+
+            const totalScore = (harmScore * 1.5) + tempoScore + (Math.random() * 10);
+
+            if (totalScore > bestScore) {
+                bestScore = totalScore;
+                bestIdx = i;
+            }
+        }
+
+        currentTrack = validTracks.splice(bestIdx, 1)[0];
+        sorted.push(currentTrack);
+    }
+
+    return [...sorted, ...others].map(t => {
+        const { profile, ...rest } = t;
+        return rest;
+    });
+  }
+
   async function energyWaveSort(tracks, persona = 'wave') {
     if (tracks.length < 3) {
         return tracks;
