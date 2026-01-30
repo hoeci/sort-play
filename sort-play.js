@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.48.0";
+  const SORT_PLAY_VERSION = "5.49.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -30741,10 +30741,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
   async function loadAdditionalColumnData(tracklist_) {
     const currentUri = getCurrentUri();
+    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
     let columnConfigs = [];
     const audioFeatureTypes = ['key', 'tempo', 'energy', 'danceability', 'valence', 'djInfo'];
 
-    if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)) {
+    const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
+
+    if (isValidPlaylistPage || isSearch) {
         if (showSecondAdditionalColumn) columnConfigs.push({ type: selectedSecondColumnType, dataSelector: ".sort-play-second-data" });
         if (showAdditionalColumn) columnConfigs.push({ type: selectedColumnType, dataSelector: ".sort-play-data" });
     } else if (URI.isAlbum(currentUri)) {
@@ -31184,7 +31187,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
   async function updateTracklist() {
     const currentUri = getCurrentUri();
-    if (!showAdditionalColumn || !currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) {
+    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
+
+    const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
+
+    if (!showAdditionalColumn || (!isValidPlaylistPage && !isSearch)) {
       return;
     }
   
@@ -31205,6 +31212,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           loadAdditionalColumnData(tracklist_);
         });
       }
+
+      const recommendationContainer = document.querySelector('[data-testid="recommended-track"]');
+      if (recommendationContainer) {
+        const recTracklist = recommendationContainer.querySelector('.main-trackList-trackList');
+        if (recTracklist && !recTracklist.classList.contains('main-trackList-indexable')) {
+          await updateRecommendationTracklistStructure(recTracklist);
+          requestAnimationFrame(() => {
+            loadAdditionalColumnData(recTracklist);
+          });
+        }
+      }
     } finally {
       isUpdatingTracklist = false;
     }
@@ -31212,7 +31230,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
   async function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
-    if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
+    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
+    
+    const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
+    
+    if (!isValidPlaylistPage && !isSearch) return;
 
     await new Promise(resolve => requestAnimationFrame(resolve));
 
@@ -31223,7 +31245,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const currentPlaylistName = getCurrentPlaylistName();
     const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
-    const shouldRemoveDateAdded = removeDateAdded && !isExcludedPlaylist;
+    const shouldRemoveDateAdded = !isSearch && removeDateAdded && !isExcludedPlaylist;
     const gridCss = getGridCss(shouldRemoveDateAdded);
 
     const existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
@@ -31272,6 +31294,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
                 const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
                 tracklistHeader.style.cssText = newGridTemplate;
+                tracklist_.setAttribute('aria-colcount', (colIndexInt + 1).toString());
 
                 const insertionPoint = shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn;
                 let headerColumn = document.createElement("div");
@@ -31309,6 +31332,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (lastColumn) {
                 const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
                 lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+                tracklist_.setAttribute('aria-colcount', (colIndexInt - 1).toString());
                 switch (colIndexInt - 1) {
                     case 4: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
                     case 5: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
@@ -31325,6 +31349,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
                 const newGridTemplate = colIndexInt === 5 ? gridCss.sixColumnGridCss_twoExtra : colIndexInt === 6 ? gridCss.sevenColumnGridCss_twoExtra : gridCss.sevenColumnGridCss_twoExtra;
                 tracklistHeader.style.cssText = newGridTemplate;
+                tracklist_.setAttribute('aria-colcount', (colIndexInt + 1).toString());
 
                 const firstColumnHeader = tracklistHeader.querySelector(".sort-play-column");
                 const insertionPoint = firstColumnHeader || (shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn);
@@ -31365,6 +31390,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (lastColumn) {
                 const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
                 lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
+                tracklist_.setAttribute('aria-colcount', (colIndexInt - 1).toString());
                 const newGridTemplate = colIndexInt - 1 === 4 ? gridCss.fiveColumnGridCss : colIndexInt - 1 === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
                 tracklistHeader.style.cssText = newGridTemplate;
             }
@@ -31467,6 +31493,64 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
+  async function updateRecommendationTracklistStructure(tracklist_) {
+    const currentUri = getCurrentUri();
+    if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
+    if (!showAdditionalColumn && !showSecondAdditionalColumn) return;
+
+    await new Promise(resolve => requestAnimationFrame(resolve));
+
+    const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
+    
+    for (const track of allRows) {
+        const existingDataColumn = track.querySelector(".sort-play-data-column");
+        const existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
+
+        const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
+        if (!lastColumn) continue;
+
+        let columnsAdded = 0;
+
+        if (showSecondAdditionalColumn && !existingSecondDataColumn) {
+            let dataColumn = document.createElement("div");
+            dataColumn.className = "main-trackList-rowSectionVariable sort-play-second-data-column sort-play-second-column";
+            dataColumn.setAttribute("role", "gridcell");
+            dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
+            dataColumn.innerHTML = `<span class="sort-play-second-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+            
+            const insertionPoint = existingDataColumn || lastColumn;
+            track.insertBefore(dataColumn, insertionPoint);
+            columnsAdded++;
+        }
+
+        if (showAdditionalColumn && !existingDataColumn) {
+            let dataColumn = document.createElement("div");
+            dataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
+            dataColumn.setAttribute("role", "gridcell");
+            dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
+            dataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+            
+            track.insertBefore(dataColumn, lastColumn);
+            columnsAdded++;
+        }
+
+        if (columnsAdded > 0 || existingDataColumn || existingSecondDataColumn) {
+            let template;
+            const hasTwo = (showAdditionalColumn || existingDataColumn) && (showSecondAdditionalColumn || existingSecondDataColumn);
+            const hasOne = (showAdditionalColumn || existingDataColumn) || (showSecondAdditionalColumn || existingSecondDataColumn);
+            
+            if (hasTwo) {
+                template = "grid-template-columns: [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px, 1fr) !important";
+            } else if (hasOne) {
+                template = "grid-template-columns: [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px, 1fr) !important";
+            }
+            
+            if (template) {
+                track.style.cssText = template;
+            }
+        }
+    }
+  }
   
   const getGridCss = (removeDateAdded) => {
     if (removeDateAdded) {
@@ -31684,7 +31768,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
   async function initializeTracklistObserver() {
     const currentUri = getCurrentUri();
-    if (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri))) return;
+    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
+
+    if (!isSearch && (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)))) return;
 
     const tracklist = await waitForElement(".main-trackList-indexable");
     if (!tracklist) return;
@@ -31703,6 +31789,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         tracklistObserver.observe(rowContainer, { childList: true });
     } else {
         tracklistObserver.observe(tracklist, { childList: true, subtree: true });
+    }
+
+    const recommendationContainer = document.querySelector('[data-testid="recommended-track"]');
+    if (recommendationContainer) {
+        const recTracklist = recommendationContainer.querySelector('.main-trackList-trackList');
+        if (recTracklist) {
+            const recRowContainer = recTracklist.querySelector(':scope > [role="presentation"]');
+            if (recRowContainer) {
+                tracklistObserver.observe(recRowContainer, { childList: true });
+            } else {
+                tracklistObserver.observe(recTracklist, { childList: true, subtree: true });
+            }
+        }
     }
   }
 
@@ -32632,6 +32731,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         } else if (URI.isArtist(currentUri)) {
             initializeArtistTracklistObserver();
         }
+    }
+    
+    if (isSearchPage) {
+        initializeTracklistObserver();
     }
   }
 
