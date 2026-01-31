@@ -30,7 +30,7 @@ Intelligent Shuffle prevents artist repeats. Vibe & Flow Shuffle creates dynamic
 Load complete collections from all releases with intelligent deduplication that keeps the most popular versions.
 
 ### ➕ Quick Filters
-Instantly apply filters without complex menus. Deduplicate tracks, keep only singles or albums, and exclude liked songs with ISRC detection.
+Instantly apply filters without complex menus. Deduplicate tracks, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
 
 ### ➕ Advanced Custom Filter
 Filter by keywords (track, album, artist) and range sliders (Release Date, Duration, Play Count, Popularity, Tempo, Energy, Danceability, Valence). View results in an interactive table with integrated mini-player. Save and load keyword sets.
