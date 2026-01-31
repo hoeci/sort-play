@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.49.2";
+  const SORT_PLAY_VERSION = "5.50.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -5812,13 +5812,20 @@
       });
 
       let contentHtml = '';
-      let hasGenres = false;
-
       const smallCopyIcon = copyIconSVG.replace('width="16px"', 'width="12px"').replace('height="16px"', 'height="12px"');
 
       categoryMap.forEach((genres, category) => {
+          let shouldShow = false;
           if (genres.length > 0) {
-              hasGenres = true;
+              shouldShow = true;
+          } else {
+              if (category === 'Spotify (Artist)' && genreSourcesNpSpotify) shouldShow = true;
+              else if (category === 'Last.fm (Track)' && genreSourcesNpLastfm) shouldShow = true;
+              else if (category === 'Last.fm (Artist)' && genreSourcesNpLastfm) shouldShow = true;
+              else if (category === 'Deezer (Album)' && genreSourcesNpDeezer) shouldShow = true;
+          }
+
+          if (shouldShow) {
               genres.sort((a, b) => a.name.localeCompare(b.name));
 
               contentHtml += `
@@ -5828,26 +5835,33 @@
                               ${category}
                           </div>
                       </div>
-                      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                          ${genres.map(g => {
-                              const titleCase = g.name.replace(/\b\w/g, l => l.toUpperCase());
-                              const uniqueSources = [...new Set(g.sources)];
-                              const tooltip = uniqueSources.join(' & ');
-                              return `
-                                <div class="genre-detail-tag" data-genre="${g.name}" title="Source: ${tooltip}" style="background: #2a2a2a; color: #eee; padding: 4px 6px 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; user-select: none; display: flex; align-items: center; gap: 8px;">
-                                    <span class="genre-text">${titleCase}</span>
-                                    <button class="genre-copy-btn" title="Copy" style="background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.2s;">
-                                        ${smallCopyIcon}
-                                    </button>
-                                </div>`;
-                          }).join('')}
+                      <div style="display: flex; flex-wrap: wrap; gap: 6px;">`;
+              
+              if (genres.length > 0) {
+                  contentHtml += genres.map(g => {
+                      const titleCase = g.name.replace(/\b\w/g, l => l.toUpperCase());
+                      const uniqueSources = [...new Set(g.sources)];
+                      const tooltip = uniqueSources.join(' & ');
+                      return `
+                        <div class="genre-detail-tag" data-genre="${g.name}" title="Source: ${tooltip}" style="background: #2a2a2a; color: #eee; padding: 4px 6px 4px 12px; border-radius: 4px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; user-select: none; display: flex; align-items: center; gap: 8px;">
+                            <span class="genre-text">${titleCase}</span>
+                            <button class="genre-copy-btn" title="Copy" style="background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.2s;">
+                                ${smallCopyIcon}
+                            </button>
+                        </div>`;
+                  }).join('');
+              } else {
+                  contentHtml += `<span style="color: #555; font-size: 13px; font-style: italic; padding-left: 2px;">No genres found</span>`;
+              }
+
+              contentHtml += `
                       </div>
                   </div>
               `;
           }
       });
 
-      if (!hasGenres) {
+      if (contentHtml === '') {
           contentHtml = '<div style="color: #b3b3b3; text-align: center; padding: 40px 20px;">No genres found for this track.</div>';
       }
 
@@ -6614,6 +6628,13 @@
               let spotifyFetchPromise;
               if (genreSourcesApSpotify) {
                   spotifyFetchPromise = (async () => {
+                      if (artistGenreCache.has(artistId)) {
+                          const cachedGenres = artistGenreCache.get(artistId);
+                          const nameLabel = domArtistName || "This Artist";
+                          addGenres(cachedGenres, `Spotify Artist (${nameLabel})`);
+                          return domArtistName;
+                      }
+
                       const fetchWithClientToken = async () => {
                           const token = await get_S_Client_Token();
                           if (!token) throw new Error("No client token");
@@ -6638,6 +6659,9 @@
                               }
                           }
                           if (data) {
+                              if (data.genres) {
+                                  artistGenreCache.set(artistId, data.genres);
+                              }
                               addGenres(data.genres, `Spotify Artist (${data.name})`);
                               return data.name;
                           }
@@ -6658,6 +6682,14 @@
                       }
 
                       if (nameToUse) {
+                          if (lastfmArtistTagsCache.has(nameToUse)) {
+                              const validTags = lastfmArtistTagsCache.get(nameToUse);
+                              if (validTags.length > 0) {
+                                  addGenres(validTags, 'Last.fm Artist');
+                              }
+                              return;
+                          }
+
                           try {
                               const params = new URLSearchParams({ method: 'artist.getInfo', artist: nameToUse, format: 'json' });
                               const res = await fetchLfmWithGateway(params);
@@ -6666,6 +6698,9 @@
                                   if (data?.artist?.tags?.tag) {
                                       const tags = data.artist.tags.tag.map(t => t.name.toLowerCase());
                                       const validTags = tags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
+                                      
+                                      lastfmArtistTagsCache.set(nameToUse, validTags);
+                                      
                                       if (validTags.length > 0) {
                                           addGenres(validTags, 'Last.fm Artist');
                                       }
@@ -6973,7 +7008,8 @@
                 
                 while (checkAttempts < 50) {
                     const overlayElement = container.querySelector('.main-trackInfo-overlay');
-                    if (!overlayElement || container.firstElementChild !== overlayElement) {
+                    
+                    if (!overlayElement) {
                         await new Promise(r => setTimeout(r, 50));
                         checkAttempts++;
                         continue;
@@ -7013,6 +7049,7 @@
                 wrapper.style.flexShrink = '0';
                 wrapper.style.whiteSpace = 'nowrap';
                 wrapper.style.cursor = 'pointer';
+                wrapper.style.order = '10';
                 wrapper.title = "Click to configure Sort-Play data";
                 wrapper.style.opacity = '0';
                 wrapper.style.transition = 'opacity 0.1s ease-in';
@@ -7268,6 +7305,8 @@
           "sortByLiked",
           "filterSingles",
           "filterAlbums",
+          "removeTrashed",
+          "excludeByPlaylist",
           "energyWave",
           "tempo",
           "energy",
@@ -13267,7 +13306,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function showChangeSourceModal(title, libraryItemsPromise, onSourceChanged, isMultiSelect = true) {
+  async function showChangeSourceModal(title, libraryItemsPromise, onSourceChanged, isMultiSelect = true, descriptionText = "Search for source, paste a link, or select from your library.", onCancel = null) {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-change-source-modal";
     overlay.className = "sort-play-font-scope";
@@ -13281,7 +13320,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container";
     modalContainer.style.cssText = `
-        width: 450px !important; display: flex; flex-direction: column;
+        width: 480px !important; display: flex; flex-direction: column;
         border-radius: 20px; background-color: #181818 !important; border: 1px solid #282828;
     `;
 
@@ -13402,7 +13441,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             <h1 class="main-trackCreditsModal-title" style="font-size: 20px; font-weight: 700; color: white;">${title}</h1>
         </div>
         <div class="main-trackCreditsModal-mainSection" style="padding: 16px 24px; scrollbar-width: none;">
-            <p style="color: #b3b3b3; font-size: 14px; margin: 0 0 12px;">Search for source, paste a link, or select from your library.</p>
+            <p style="color: #b3b3b3; font-size: 14px; margin: 0 0 12px;">${descriptionText}</p>
             <div style="position: relative;">
                 <input type="text" id="source-url-input" placeholder="Search or paste link..." style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 30px 8px 12px; color: white; box-sizing: border-box;">
                 <button id="source-clear-btn">&times;</button>
@@ -13563,20 +13602,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     window.addEventListener('resize', positionSuggestionsPanel);
     window.addEventListener('scroll', positionSuggestionsPanel, true);
 
-    const closeModal = () => {
+    const closeModal = (isConfirmed = false) => {
         document.removeEventListener('click', outsideClickListener, true);
         window.removeEventListener('resize', positionSuggestionsPanel);
         window.removeEventListener('scroll', positionSuggestionsPanel, true);
         suggestionsContainer.remove();
         overlay.remove();
+        if (!isConfirmed && onCancel) {
+            onCancel();
+        }
     };
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
             e.preventDefault();
             e.stopPropagation();
+            closeModal(false);
         }
     });
-    modalContainer.querySelector('#cancel-change-source').addEventListener('click', closeModal);
+    modalContainer.querySelector('#cancel-change-source').addEventListener('click', () => closeModal(false));
 
     const processUri = async (uri) => {
         const uriObj = Spicetify.URI.fromString(uri);
@@ -13712,7 +13755,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         try {
             const sourcesData = await Promise.all(Array.from(selectedSources).map(uri => processUri(uri)));
             onSourceChanged(sourcesData);
-            closeModal();
+            closeModal(true);
         } catch (error) {
             showNotification(error.message || "Invalid or unsupported Spotify link.", true);
             console.error("Error parsing source URL(s):", error);
@@ -21630,6 +21673,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
              },
              { backgroundColor: "transparent", color: "white", text: "Singles Only", sortType: "filterSingles" },
              { backgroundColor: "transparent", color: "white", text: "Albums Only", sortType: "filterAlbums", hasInnerButton: true },
+             ...( (localStorage.getItem("TrashSongList") || (Spicetify.LocalStorage && Spicetify.LocalStorage.get("TrashSongList"))) ? [
+                { type: "divider" },
+                { backgroundColor: "transparent", color: "white", text: "Remove Trashed", sortType: "removeTrashed" }
+             ] : []),
+             {
+                type: "divider",
+             },
+             { backgroundColor: "transparent", color: "white", text: "Exclude via Playlist...", sortType: "excludeByPlaylist" }
         ]
       },
       {
@@ -26885,7 +26936,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           sortType === "keepLiked" ||
           sortType === "sortByLiked" ||
           sortType === "filterSingles" ||
-          sortType === "filterAlbums"
+          sortType === "filterAlbums" ||
+          sortType === "removeTrashed" ||
+          sortType === "excludeByPlaylist"
         ) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
@@ -27170,6 +27223,83 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 
                 sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
             }
+          } else if (sortType === "removeTrashed") {
+            let trashSongs = {};
+            let trashArtists = {};
+            try {
+                const sList = Spicetify.LocalStorage.get("TrashSongList");
+                const aList = Spicetify.LocalStorage.get("TrashArtistList");
+                if (sList) trashSongs = JSON.parse(sList);
+                if (aList) trashArtists = JSON.parse(aList);
+            } catch(e) {
+                try {
+                    trashSongs = JSON.parse(localStorage.getItem("TrashSongList") || "{}");
+                    trashArtists = JSON.parse(localStorage.getItem("TrashArtistList") || "{}");
+                } catch(ex) {}
+            }
+
+            sortedTracks = uniqueTracks.filter(t => {
+                if (trashSongs[t.uri]) return false;
+                if (t.artistUris && t.artistUris.some(uri => trashArtists[uri])) return false;
+                return true;
+            });
+
+            if (sortedTracks.length === uniqueTracks.length) {
+                showNotification("No trashed songs found in this list.");
+                if (!isHeadless) resetButtons();
+                return;
+            }
+        } else if (sortType === "excludeByPlaylist") {
+            if (!isHeadless) mainButton.innerText = "Select...";
+            
+            let exclusionSource = null;
+            await new Promise(resolve => {
+                showChangeSourceModal(
+                    "Select Playlist to Exclude", 
+                    fetchUserLibrary(), 
+                    (sources) => {
+                        exclusionSource = sources ? sources[0] : null;
+                        resolve();
+                    }, 
+                    false, 
+                    "Tracks in the selected playlist will be removed from your current list.",
+                    () => resolve()
+                );
+            });
+
+            if (!exclusionSource) {
+                return;
+            }
+
+            if (!isHeadless) mainButton.innerText = "Fetching...";
+            
+            let exclusionUris = new Set();
+            try {
+                let exTracks = [];
+                if (URI.isPlaylistV1OrV2(exclusionSource.uri)) {
+                    exTracks = await getPlaylistTracks(exclusionSource.uri.split(":")[2]);
+                } else if (URI.isAlbum(exclusionSource.uri)) {
+                    exTracks = await getAlbumTracks(exclusionSource.uri.split(":")[2]);
+                } else if (isLikedSongsPage(exclusionSource.uri)) {
+                    exTracks = await getLikedSongs();
+                }
+                
+                exTracks.forEach(t => exclusionUris.add(t.uri));
+            } catch(e) {
+                showNotification("Failed to fetch exclusion playlist.", true);
+                if (!isHeadless) resetButtons();
+                return;
+            }
+
+            if (!isHeadless) mainButton.innerText = "Filtering...";
+            
+            sortedTracks = uniqueTracks.filter(t => !exclusionUris.has(t.uri));
+
+            if (sortedTracks.length === uniqueTracks.length) {
+                showNotification("No matches found in the excluded playlist.");
+                if (!isHeadless) resetButtons();
+                return;
+            }
           }
 
           if (!isHeadless) mainButton.innerText = "100%";
@@ -27417,6 +27547,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           sortByLiked: { fullName: "liked status", shortName: "Liked" },
           filterSingles: { fullName: "singles only", shortName: "Singles" },
           filterAlbums: { fullName: "albums only", shortName: "Albums" },
+          removeTrashed: { fullName: "removing trashed songs", shortName: "Clean" },
+          excludeByPlaylist: { fullName: "excluding playlist tracks", shortName: "Filtered" },
           energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
           tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
           energy: { fullName: "energy", shortName: "Energy" },
