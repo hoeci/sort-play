@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.49.0";
+  const SORT_PLAY_VERSION = "5.49.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -32625,25 +32625,61 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     const likeButton_addLikeButtonToRow = (row) => {
-        if (row.classList.contains("sort-play-like-button-injected")) return;
-        const actionButtonsContainer = Array.from(row.querySelectorAll('div[role="gridcell"]')).pop();
+        let targetRow = row;
+        if (row.getAttribute('role') === 'row' && row.hasAttribute('aria-rowindex')) {
+            const inner = row.querySelector('.main-trackList-trackListRow');
+            if (inner) targetRow = inner;
+        }
+        
+        if (targetRow.classList.contains("sort-play-like-button-injected")) return;
+        
+        if (!targetRow.closest('.main-trackList-indexable, div[data-testid="track-list"], div[aria-label*="search results"]')) return;
+        
+        const gridCells = targetRow.querySelectorAll(':scope > div[role="gridcell"]');
+        let actionButtonsContainer = gridCells.length > 0 ? gridCells[gridCells.length - 1] : null;
+        
+        if (!actionButtonsContainer) {
+            actionButtonsContainer = Array.from(targetRow.querySelectorAll('div[role="gridcell"]')).pop();
+        }
         if (!actionButtonsContainer) return;
+        
         if (actionButtonsContainer.querySelector(".likeControl-wrapper")) {
-            row.classList.add("sort-play-like-button-injected");
+            targetRow.classList.add("sort-play-like-button-injected");
             return;
         }
-        const entryPoint = actionButtonsContainer.querySelector("button:not(:last-of-type)");
+        
+        let entryPoint = actionButtonsContainer.querySelector('button[aria-label*="Add to playlist"], button[aria-label*="Liked Songs"]');
+        if (!entryPoint) {
+            entryPoint = actionButtonsContainer.querySelector("button:not(:last-of-type)");
+        }
         if (!entryPoint) return;
-        const reactPropsKey = Object.keys(row).find(key => key.startsWith("__reactProps$"));
-        if (!reactPropsKey) return;
-        const uri = likeButton_findVal(row[reactPropsKey], "uri");
+        
+        let uri = null;
+        const reactPropsKey = Object.keys(targetRow).find(key => key.startsWith("__reactProps$"));
+        if (reactPropsKey) {
+            const props = targetRow[reactPropsKey];
+            uri = props?.children?.props?.value?.item?.uri;
+            
+            if (!uri || !uri.startsWith("spotify:track:")) {
+                uri = likeButton_findVal(props, "uri");
+            }
+        }
+        
         if (!uri || !uri.startsWith("spotify:track:")) return;
-        row.classList.add("sort-play-like-button-injected");
+        
+        targetRow.classList.add("sort-play-like-button-injected");
+        
         const likeButtonWrapper = document.createElement("div");
         likeButtonWrapper.className = "likeControl-wrapper";
         likeButtonWrapper.style.display = "contents";
-        const likeButtonElement = entryPoint.parentElement.insertBefore(likeButtonWrapper, entryPoint);
-        Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.className }), likeButtonElement);
+        
+        try {
+            entryPoint.parentElement.insertBefore(likeButtonWrapper, entryPoint);
+            Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.className }), likeButtonWrapper);
+        } catch (e) {
+            console.error("[Sort-Play] Failed to render like button", e);
+            targetRow.classList.remove("sort-play-like-button-injected");
+        }
     };
 
     const likeButton_processTracklist = (mainView) => {
