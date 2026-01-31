@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.49.1";
+  const SORT_PLAY_VERSION = "5.49.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -22611,17 +22611,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const BATCH_SIZE = 100;
 
     const addInternal = async (uris) => {
-        for (let i = uris.length; i > 0; i -= BATCH_SIZE) {
-            const start = Math.max(0, i - BATCH_SIZE);
-            const batch = uris.slice(start, i);
-            await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { before: 0 });
+        for (let i = 0; i < uris.length; i += BATCH_SIZE) {
+            const batch = uris.slice(i, i + BATCH_SIZE);
+            await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { after: 'end' });
         }
     };
 
     if (hasLocalTracks || isFallbackActive()) {
-        for (let i = validUris.length; i > 0; i -= BATCH_SIZE) {
-            const start = Math.max(0, i - BATCH_SIZE);
-            const batch = validUris.slice(start, i);
+        for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
+            const batch = validUris.slice(i, i + BATCH_SIZE);
             
             let retries = 0;
             let success = false;
@@ -22629,10 +22627,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             while (!success && retries <= maxRetries) {
                 try {
-                    await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { before: 0 });
+                    await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { after: 'end' });
                     success = true;
                 } catch (error) {
-                    console.error(`[Sort-Play] Platform API Error adding batch to start (Attempt ${retries + 1}):`, error);
+                    console.error(`[Sort-Play] Platform API Error adding batch (Attempt ${retries + 1}):`, error);
                     if (retries === maxRetries) {
                         showNotification("Failed to add some tracks.", 'warning');
                         break;
