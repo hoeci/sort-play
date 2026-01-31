@@ -68,6 +68,8 @@ Apply instant filters to your current view without opening complex menus.
 *   **Exclude Liked Songs:** Instantly hide tracks you have already saved. Automatically detects and filters out alternate versions using ISRC matching.
 *   **Deduplicate:** Instantly identify and remove duplicate tracks from the current list.
 *   **Format Filtering:** Quickly isolate specific release types by keeping Only Singles or Only Albums.
+*   **Remove Trashed:** Instantly remove songs you've banned using the Trashbin extension.
+*   **Exclude via Playlist:** Filter out tracks that already exist in another playlist of your choice.
 
 ### ➕ Advanced Custom Filter
 A powerful modal to meticulously filter any playlist or discography.
