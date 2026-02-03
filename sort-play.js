@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.51.0";
+  const SORT_PLAY_VERSION = "5.51.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -19595,6 +19595,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     playcount: 0,
     popularity: 0,
     releaseDate: 0,
+    trackNumber: track.album?.trackNumber || track.trackNumber || 0,
     track: {
       album: {
         id: track.album.uri.split(":")[2]
@@ -19741,6 +19742,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 playCount: rawPlaycount > 0 ? rawPlaycount : "N/A",
                 popularity: null,
                 releaseDate: releaseDate,
+                trackNumber: parseInt(t.trackNumber, 10) || 0,
                 track: {
                     album: { 
                         id: albumId, 
@@ -19752,7 +19754,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     duration_ms: t.duration.totalMilliseconds, 
                     id: t.uri.split(':')[2],
                     artists: artists,
-                    external_ids: {}
+                    external_ids: {},
+                    trackNumber: parseInt(t.trackNumber, 10) || 0
                 }
             };
         });
@@ -19801,11 +19804,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         playCount: "N/A",
         popularity: null,
         releaseDate: null,
+        trackNumber: track.track_number,
         track: {
           album: { id: albumId, name: albumData.name },
           name: track.name,
           duration_ms: track.duration_ms,
           id: track.id,
+          track_number: track.track_number
         }
       }));
     } catch (error) {
@@ -20575,15 +20580,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (!inFlightAlbumReleaseDateRequests[albumId]) {
       inFlightAlbumReleaseDateRequests[albumId] = new Promise(async (resolve, reject) => {
-        if (albumTracksDataCache[albumId]) {
-          const releaseDate = albumTracksDataCache[albumId][0]?.releaseDate;
-          if (releaseDate) {
-            albumReleaseDateCache[albumId] = releaseDate;
-            resolve(releaseDate);
-            return;
-          }
-        }
-
         const { Locale, GraphQL } = Spicetify;
 
         for (let attempt = 1; attempt <= retries; attempt++) {
@@ -20606,10 +20602,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (tracks) {
               const albumTracks = tracks.map((item) => {
                 const track = item.track;
+                const tId = track.uri.split(":")[2];
+                const tNum = parseInt(track.trackNumber || track.track_number, 10) || 0;
+                
+                setCachedReleaseDate(tId, releaseDate, tNum).catch(() => {});
+
                 return {
                   uri: track.uri,
                   name: track.name,
-                  releaseDate: releaseDate, 
+                  releaseDate: releaseDate,
+                  trackNumber: tNum
                 };
               });
               albumTracksDataCache[albumId] = albumTracks;
@@ -21061,9 +21063,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return tracks.map(track => {
         const id = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
         const meta = cachedMetadata.get(id);
+        
+        let releaseDate = track.releaseDate;
+        let albumName = track.albumName;
+
+        if (meta && meta.album) {
+            if (meta.album.release_date) releaseDate = meta.album.release_date;
+            if (meta.album.name) albumName = meta.album.name;
+        }
+
         return {
             ...track,
-            popularity: meta ? meta.popularity : (track.popularity || null)
+            popularity: meta ? meta.popularity : (track.popularity || null),
+            releaseDate: releaseDate,
+            albumName: albumName
         };
     });
   }
@@ -21071,9 +21084,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function getTrackDetailsWithReleaseDate(track) {
     const trackId = track.uri.split(":")[2];
     
-    const cachedDate = await idb.get('releaseDates', trackId, CACHE_EXPIRE_RELEASE_DATE);
-    if (cachedDate) {
-        return { ...track, releaseDate: cachedDate };
+    const cached = await idb.get('releaseDates', trackId, CACHE_EXPIRE_RELEASE_DATE);
+    
+    if (cached && typeof cached === 'object' && cached.trackNumber !== undefined) {
+        return { ...track, releaseDate: cached.date, trackNumber: cached.trackNumber };
     }
 
     let albumId;
@@ -21083,27 +21097,32 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       albumId = track.albumUri.split(":")[2];
     } else {
       console.warn(`Could not determine album ID for track ${track.name}`);
-      return { ...track, releaseDate: null };
+      return { ...track, releaseDate: cached?.date || cached || null, trackNumber: cached?.trackNumber || 0 };
     }
 
     try {
       if (albumTracksDataCache[albumId]) {
         const trackData = albumTracksDataCache[albumId].find(t => t.uri === track.uri);
         if (trackData && trackData.releaseDate) {
-          await setCachedReleaseDate(trackId, trackData.releaseDate);
-          return { ...track, releaseDate: trackData.releaseDate };
+          setCachedReleaseDate(trackId, trackData.releaseDate, trackData.trackNumber).catch(() => {});
+          return { ...track, releaseDate: trackData.releaseDate, trackNumber: trackData.trackNumber };
         }
       }
 
       const releaseDate = await getReleaseDatesForAlbum(albumId);
-      if (releaseDate) {
-          await setCachedReleaseDate(trackId, releaseDate);
+      
+      let trackNumber = 0;
+      if (albumTracksDataCache[albumId]) {
+          const trackData = albumTracksDataCache[albumId].find(t => t.uri === track.uri);
+          if (trackData) {
+              trackNumber = trackData.trackNumber;
+          }
       }
 
-      return { ...track, releaseDate: releaseDate };
+      return { ...track, releaseDate: releaseDate, trackNumber: trackNumber };
     } catch (error) {
       console.error(`Error getting release date for track ${track.name} (album ${albumId}):`, error);
-      return { ...track, releaseDate: null };
+      return { ...track, releaseDate: cached?.date || cached || null, trackNumber: cached?.trackNumber || 0 };
     }
   }
 
@@ -30043,8 +30062,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
 
-  async function setCachedReleaseDate(trackId, rawReleaseDate) { 
-    await idb.set('releaseDates', trackId, rawReleaseDate);
+  async function setCachedReleaseDate(trackId, rawReleaseDate, trackNumber = 0) { 
+    await idb.set('releaseDates', trackId, { date: rawReleaseDate, trackNumber: trackNumber });
   }
   
   function formatReleaseDate(rawDate, format = 'YYYY-MM-DD') {
