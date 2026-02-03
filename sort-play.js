@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.51.1";
+  const SORT_PLAY_VERSION = "5.51.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -20595,7 +20595,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               throw new Error(`No albumUnion in response for album ID: ${albumId}`);
             }
 
-            const releaseDate = new Date(res.data.albumUnion.date.isoString).getTime();
+            const dateObj = res.data.albumUnion.date;
+            let releaseDate = 0;
+            if (dateObj) {
+                if (dateObj.isoString) {
+                    releaseDate = new Date(dateObj.isoString).getTime();
+                } else if (dateObj.year) {
+                    releaseDate = new Date(dateObj.year.toString()).getTime();
+                }
+            }
+            
             albumReleaseDateCache[albumId] = releaseDate;
 
             const tracks = res.data.albumUnion.tracksV2?.items || res.data.albumUnion.tracks?.items;
@@ -21121,6 +21130,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
       return { ...track, releaseDate: releaseDate, trackNumber: trackNumber };
     } catch (error) {
+      if (isFallbackActive()) {
+          try {
+              const meta = await fetchInternalTrackMetadata(trackId);
+              if (meta && meta.album && meta.album.release_date) {
+                  await setCachedReleaseDate(trackId, meta.album.release_date);
+                  return { ...track, releaseDate: meta.album.release_date, trackNumber: track.trackNumber || 0 };
+              }
+          } catch (e) {}
+      }
       console.error(`Error getting release date for track ${track.name} (album ${albumId}):`, error);
       return { ...track, releaseDate: cached?.date || cached || null, trackNumber: cached?.trackNumber || 0 };
     }
@@ -30067,6 +30085,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
   
   function formatReleaseDate(rawDate, format = 'YYYY-MM-DD') {
+    if (rawDate && typeof rawDate === 'object' && rawDate.date !== undefined) {
+        rawDate = rawDate.date;
+    }
+
     if (!rawDate || rawDate === "_" || rawDate === "―") {
         return "―";
     }
@@ -31059,7 +31081,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 let val = undefined;
                 if (config.type === 'playCount' && dataMap.playCounts) val = dataMap.playCounts.get(id);
-                else if (config.type === 'releaseDate' && dataMap.releaseDates) val = dataMap.releaseDates.get(id);
+                else if (config.type === 'releaseDate' && dataMap.releaseDates) {
+                    const cached = dataMap.releaseDates.get(id);
+                    val = (cached && typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
+                }
                 else if (config.type === 'scrobbles' && dataMap.scrobbles) val = dataMap.scrobbles.get(id);
                 else if (config.type === 'personalScrobbles' && dataMap.personal) {
                     const d = dataMap.personal.get(id);
