@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.51.2";
+  const SORT_PLAY_VERSION = "5.51.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -8736,7 +8736,7 @@ sendButton.addEventListener("click", async () => {
     }
   }
   
-  async function processArtistPageTracks(tracks, isHeadless = false) {
+  async function processArtistPageTracks(tracks, isHeadless = false, sortType = null) {
     if (!isHeadless) mainButton.innerText = "Correcting...";
     
     const refreshedTracks = await refreshTrackAlbumInfo(
@@ -8755,7 +8755,8 @@ sendButton.addEventListener("click", async () => {
         tracksWithPlayCounts, 
         true, 
         true,
-        (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+        (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; },
+        sortType
     );
     
     if (!isHeadless) mainButton.innerText = "Ready";
@@ -12858,7 +12859,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         tracksForProcessing, 
         false, 
         sources.some(s => URI.isArtist(s.uri)),
-        (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+        (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; },
+        sortType
     ) : { unique: tracksForProcessing, removed: [] };
 
     let sortedTracks;
@@ -20919,6 +20921,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     trackIds.forEach(id => {
         const meta = cachedMetadata.get(id);
         if (meta) {
+            const original = uniqueTracks.get(id);
+            const preservedAlbumType = original.album_type || original.albumType;
             const newTrack = {
                 uri: meta.uri,
                 name: meta.name,
@@ -20928,7 +20932,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 durationMs: meta.duration_ms,
                 popularity: meta.popularity,
                 releaseDate: meta.album.release_date,
-                albumType: meta.albumType,
+                albumType: preservedAlbumType || meta.albumType,
+                album_type: preservedAlbumType || meta.albumType,
                 trackId: meta.id,
                 albumId: meta.album.id,
                 track: {
@@ -23067,7 +23072,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           tracksWithPopularity, 
           false, 
           true,
-          (progress) => { mainButton.innerText = `Dedup ${progress}%`; }
+          (progress) => { mainButton.innerText = `Dedup ${progress}%`; },
+          'shuffle'
       );
       tracksToProcess = uniqueTracks;
     } else {
@@ -27013,8 +27019,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let tracksWithPopularity;
 
         if (isArtistPage) {
-            tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless);
-        } 
+            tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType);
+        }
         else if (playlistDeduplicate || sortType === 'deduplicateOnly') {
             if (!isHeadless) mainButton.innerText = "Enriching...";
             
@@ -27136,7 +27142,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               tracksForDeduplication, 
               sortType === "deduplicateOnly", 
               isArtistPage,
-              (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+              (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; },
+              sortType
           );
           uniqueTracks = deduplicationResult.unique;
           removedTracks = deduplicationResult.removed;
@@ -28897,7 +28904,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
   
 
-  async function deduplicateTracks(tracks, force = false, isArtistPageContext = false, updateProgress = () => {}) {
+  async function deduplicateTracks(tracks, force = false, isArtistPageContext = false, updateProgress = () => {}, sortType = null) {
     if (!force && !playlistDeduplicate && !isArtistPageContext) {
         return { unique: tracks, removed: [] };
     }
@@ -29092,6 +29099,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     };
 
     const sortedInputTracks = [...tracks].sort((a, b) => {
+        if (isArtistPageContext && sortType === 'releaseDate') {
+            const typeA = (a.album_type || a.albumType || 'album').toLowerCase();
+            const typeB = (b.album_type || b.albumType || 'album').toLowerCase();
+
+            const isAlbumA = typeA === 'album';
+            const isAlbumB = typeB === 'album';
+
+            if (isAlbumA && !isAlbumB) return -1;
+            if (!isAlbumA && isAlbumB) return 1;
+        }
+
         const popA = a.popularity || 0;
         const popB = b.popularity || 0;
         if (popB !== popA) {
@@ -29306,6 +29324,77 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         wordBuckets.set(token, []);
                     }
                     wordBuckets.get(token).push(candidateTrack);
+                }
+            }
+        }
+    }
+
+    if (isArtistPageContext) {
+        const albumGroups = new Map();
+        for (const track of finalUniqueTracks) {
+            if (!track.albumName) continue;
+            const normAlbumName = getNormalizedTitle(track.albumName);
+            const albumId = track.albumId || (track.track?.album?.id);
+            
+            if (!albumId) continue;
+            if (!albumGroups.has(normAlbumName)) albumGroups.set(normAlbumName, new Map());
+            const idMap = albumGroups.get(normAlbumName);
+            idMap.set(albumId, (idMap.get(albumId) || 0) + 1);
+        }
+
+        const albumsToConsolidate = new Map();
+        for (const [albumName, idMap] of albumGroups.entries()) {
+            if (idMap.size > 1) {
+                let bestId = null;
+                let maxCount = -1;
+                for (const [id, count] of idMap.entries()) {
+                    if (count > maxCount) {
+                        maxCount = count;
+                        bestId = id;
+                    }
+                }
+                if (bestId) albumsToConsolidate.set(albumName, bestId);
+            }
+        }
+
+        if (albumsToConsolidate.size > 0) {
+            const masterPool = new Map();
+            const allSourceTracks = [...finalUniqueTracks, ...finalRemovedTracks];
+            
+            for (const track of allSourceTracks) {
+                if (!track.albumName) continue;
+                const normAlbumName = getNormalizedTitle(track.albumName);
+                const masterId = albumsToConsolidate.get(normAlbumName);
+                const currentId = track.albumId || (track.track?.album?.id);
+
+                if (masterId && currentId === masterId) {
+                    if (!masterPool.has(normAlbumName)) masterPool.set(normAlbumName, []);
+                    masterPool.get(normAlbumName).push(track);
+                }
+            }
+
+            for (let i = 0; i < finalUniqueTracks.length; i++) {
+                const track = finalUniqueTracks[i];
+                if (!track.albumName) continue;
+                
+                const normAlbumName = getNormalizedTitle(track.albumName);
+                const masterId = albumsToConsolidate.get(normAlbumName);
+                const currentId = track.albumId || (track.track?.album?.id);
+                
+                if (masterId && currentId !== masterId) {
+                    const potentialReplacements = masterPool.get(normAlbumName);
+                    if (potentialReplacements) {
+                        const targetTitle = getNormalizedTitle(track.songTitle || track.name || "");
+                        
+                        const bestMatch = potentialReplacements.find(rep => {
+                            const repTitle = getNormalizedTitle(rep.songTitle || rep.name || "");
+                            return repTitle === targetTitle && Math.abs(track.durationMs - rep.durationMs) <= DURATION_THRESHOLD;
+                        });
+
+                        if (bestMatch) {
+                            finalUniqueTracks[i] = bestMatch;
+                        }
+                    }
                 }
             }
         }
