@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.51.3";
+  const SORT_PLAY_VERSION = "5.52.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -23083,22 +23083,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let finalSortedTracks;
     const fallbackActive = isFallbackActive();
 
-    if (useEnergyWaveShuffle && !containsLocalFiles && !fallbackActive && tracks.length <= energyWaveShuffleLimit) {
-        showNotification("Performing Randomized Energy Wave Shuffle...");
-        
+    if (useEnergyWaveShuffle && !containsLocalFiles && tracks.length <= energyWaveShuffleLimit) {
         const trackIds = tracksToProcess.map(t => t.trackId || t.uri.split(":")[2]);
         const allStats = await getBatchTrackStats(trackIds);
-        const tracksWithData = tracksToProcess.map(track => ({
-            ...track,
-            features: allStats[track.trackId || track.uri.split(":")[2]]
-        }));
-    
-        finalSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
+        
+        const tracksWithAudioFeatures = tracksToProcess.map(track => {
+            const stats = allStats[track.trackId || track.uri.split(":")[2]] || {};
+            return { ...track, ...stats, features: stats };
+        });
+
+        if (fallbackActive) {
+            showNotification("Creating Harmonic Mix (Fallback Mode)...");
+            
+            const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && (track.features.tempo !== null || track.features.key_raw !== -1));
+            const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || (track.features.tempo === null && track.features.key_raw === -1));
+            
+            const harmonicShuffled = await randomizedHarmonicShuffle(tracksWithData);
+            
+            finalSortedTracks = [...harmonicShuffled, ...shuffleArray(tracksWithoutData)];
+        } else {
+            showNotification("Performing Randomized Energy Wave Shuffle...");
+            const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+            const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+            
+            if (tracksWithData.length < 3) {
+                 finalSortedTracks = shuffleArray(tracksToProcess);
+            } else {
+                 const waveSorted = await randomizedEnergyWaveSort(tracksWithData);
+                 finalSortedTracks = [...waveSorted, ...shuffleArray(tracksWithoutData)];
+            }
+        }
     } else {
         if (useEnergyWaveShuffle) {
-            if (fallbackActive) {
-                showNotification("Web API unavailable. Reverting to standard shuffle.", 'warning');
-            } else if (containsLocalFiles) {
+            if (containsLocalFiles) {
                 showNotification("Local files detected. Reverting to standard shuffle.", 'warning');
             } else if (tracks.length > energyWaveShuffleLimit) {
                 showNotification(`Playlist too large (>${energyWaveShuffleLimit}). Reverting to standard shuffle.`, 'warning');
@@ -27441,14 +27458,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           if (!isHeadless) mainButton.innerText = "100%";
 
         } else if (sortType === "energyWave") {
-            if (isFallbackActive()) {
-                if (!isHeadless) resetButtons();
-                showNotification("Energy Wave is unavailable.", true);
-                return;
-            }
             if (!isHeadless) mainButton.innerText = "Analyzing...";
             const trackIds = tracksWithPopularity.map(t => t.trackId);
-            const allStats = await getBatchTrackStats(trackIds);
+            
+            const allStats = await getBatchTrackStats(trackIds, (progress) => {
+                if (!isHeadless && isFallbackActive()) mainButton.innerText = `BPM/Key ${Math.floor(progress * 0.5)}%`;
+            });
 
             const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
                 const stats = allStats[track.trackId] || {};
@@ -27463,12 +27478,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             );
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
-    
-            const tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-            const tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
-            missingDataCount = tracksWithoutData.length;
+            
+            let journeySortedTracks;
+            let tracksWithData, tracksWithoutData;
 
-            const journeySortedTracks = await energyWaveSort(tracksWithData);
+            if (isFallbackActive()) {
+                if (!isHeadless) showNotification("Web API down. Using Harmonic/Tempo Mix.", "warning");
+                
+                tracksWithData = uniqueTracks.filter(track => track.features && (track.features.tempo !== null || track.features.key_raw !== -1));
+                tracksWithoutData = uniqueTracks.filter(track => !track.features || (track.features.tempo === null && track.features.key_raw === -1));
+                
+                journeySortedTracks = await harmonicTempoSort(tracksWithData);
+            } else {
+                tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+                tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+                
+                journeySortedTracks = await energyWaveSort(tracksWithData);
+            }
+
+            missingDataCount = tracksWithoutData.length;
 
             if (sortOrderState.energyWave) {
                 journeySortedTracks.reverse();
@@ -27936,53 +27964,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
 
   function getHarmonicCompatibilityScore(camelotKey1, camelotKey2) {
-    if (!camelotKey1 || !camelotKey2) return 25;
+    if (!camelotKey1 || !camelotKey2) return 0;
 
     const num1 = parseInt(camelotKey1.slice(0, -1));
-    const mode1 = camelotKey1.slice(-1);
+    const mode1 = camelotKey1.slice(-1); 
     const num2 = parseInt(camelotKey2.slice(0, -1));
     const mode2 = camelotKey2.slice(-1);
 
-    if (isNaN(num1) || isNaN(num2)) return 25;
+    if (isNaN(num1) || isNaN(num2)) return 0;
 
-    const sameMode = mode1 === mode2;
-    
-    const clockwiseDiff = ((num2 - num1) % 12 + 12) % 12;
-    const counterClockwiseDiff = ((num1 - num2) % 12 + 12) % 12;
-    const diff = Math.min(clockwiseDiff, counterClockwiseDiff);
+    if (num1 === num2 && mode1 === mode2) return 100;
 
-    if (diff === 0 && sameMode) return 100;
-    
-    if (diff === 0 && !sameMode) return 85;
+    if (num1 === num2 && mode1 !== mode2) return 95;
 
-    if (diff === 1) {
-        if (sameMode) return 90;
-        return 75;
-    }
-    
-    if (diff === 2) {
-        if (sameMode) return 60;
-        return 45;
-    }
-    
-    if (diff === 7 || diff === 5) {
-        if (sameMode) return 55;
-        return 40;
-    }
-    
-    if (diff === 3) {
-        if (sameMode) return 40;
-        return 30;
-    }
-    
-    if (diff === 4) {
-        if (sameMode) return 25;
-        return 15;
-    }
-    
-    if (diff === 6) return 5;
-    
-    return 10;
+    const diff = Math.min(Math.abs(num1 - num2), 12 - Math.abs(num1 - num2));
+
+    if (diff === 1 && mode1 === mode2) return 80;
+
+    const isClockwise2 = ((num1 + 2 - 1) % 12 + 1) === num2;
+    if (isClockwise2 && mode1 === mode2) return 60;
+
+    if (diff === 1 && mode1 !== mode2) return 40;
+
+    if ((diff === 7 || diff === 5) && mode1 === mode2) return 30;
+
+    return 0;
   }
 
 
@@ -28132,58 +28138,75 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const tracksWithProfile = tracks.map(track => {
         const f = track.features || {};
-        
         let camelotKey = f.camelot;
         if (!camelotKey && (f.key_raw !== undefined && f.key_raw !== -1 && f.mode !== undefined)) {
-            const keyName = (f.key || "C").replace("m", ""); 
+            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+            const keyName = pitchClasses[f.key_raw];
             const modeSuffix = f.mode === 0 ? 'm' : '';
-            const lookup = keyName + modeSuffix;
-            camelotKey = KEY_TO_CAMELOT_MAP[lookup];
+            camelotKey = KEY_TO_CAMELOT_MAP[keyName + modeSuffix] || KEY_TO_CAMELOT_MAP[keyName];
         }
-
         return {
             ...track,
-            profile: {
-                tempo: f.tempo || 120,
-                camelotKey: camelotKey
-            }
+            profile: { tempo: f.tempo || 120, camelotKey: camelotKey }
         };
     });
 
-    const validTracks = tracksWithProfile.filter(t => t.profile.camelotKey);
-    const others = tracksWithProfile.filter(t => !t.profile.camelotKey);
+    const validTracks = tracksWithProfile.filter(t => t.profile.camelotKey && t.profile.tempo);
+    const others = tracksWithProfile.filter(t => !t.profile.camelotKey || !t.profile.tempo);
 
     if (validTracks.length === 0) return tracks;
 
-    const avgTempo = validTracks.reduce((sum, t) => sum + t.profile.tempo, 0) / validTracks.length;
-    
-    validTracks.sort((a, b) => Math.abs(a.profile.tempo - avgTempo) - Math.abs(b.profile.tempo - avgTempo));
+    validTracks.sort((a, b) => a.profile.tempo - b.profile.tempo);
     
     const sorted = [validTracks.shift()];
     let currentTrack = sorted[0];
 
+    const LOOK_AHEAD = 100;
+
     while (validTracks.length > 0) {
         let bestIdx = -1;
         let bestScore = -Infinity;
+        
+        const scanCount = Math.min(validTracks.length, LOOK_AHEAD);
 
-        for (let i = 0; i < validTracks.length; i++) {
+        for (let i = 0; i < scanCount; i++) {
             const candidate = validTracks[i];
             
-            const harmScore = getHarmonicCompatibilityScore(currentTrack.profile.camelotKey, candidate.profile.camelotKey);
+            const t1 = currentTrack.profile.tempo;
+            const t2 = candidate.profile.tempo;
             
-            const tempoDiff = Math.abs(currentTrack.profile.tempo - candidate.profile.tempo);
-            const doubleDiff = Math.abs(currentTrack.profile.tempo - (candidate.profile.tempo * 2));
-            const halfDiff = Math.abs(currentTrack.profile.tempo - (candidate.profile.tempo / 2));
-            
-            const effectiveTempoDiff = Math.min(tempoDiff, doubleDiff, halfDiff);
-            const tempoScore = 100 - (effectiveTempoDiff * 2);
+            const ratio = t2 / t1;
+            const isDoubleTime = ratio >= 1.9 && ratio <= 2.1;
+            const isHalfTime = ratio >= 0.45 && ratio <= 0.55;
+            const diff = Math.abs(t1 - t2);
+            const percentDiff = (diff / t1) * 100;
 
-            const totalScore = (harmScore * 1.5) + tempoScore + (Math.random() * 10);
+            let tempoScore = 0;
+            if (isDoubleTime || isHalfTime) tempoScore = 90;
+            else if (percentDiff <= 3) tempoScore = 100;
+            else if (percentDiff <= 6) tempoScore = 80;
+            else if (percentDiff <= 15) tempoScore = 40;
+            else tempoScore = -50;
+
+            if (t2 > t1 && percentDiff > 0 && percentDiff < 5) tempoScore += 10;
+
+            const harmScore = getHarmonicCompatibilityScore(currentTrack.profile.camelotKey, candidate.profile.camelotKey);
+            const totalScore = (harmScore * 2.5) + (tempoScore * 1.5);
 
             if (totalScore > bestScore) {
                 bestScore = totalScore;
                 bestIdx = i;
             }
+        }
+
+        if (bestScore < 0) {
+            let closestTempoIdx = 0;
+            let minTempoDiff = Infinity;
+            for(let k=0; k < scanCount; k++) {
+                const d = Math.abs(validTracks[k].profile.tempo - currentTrack.profile.tempo);
+                if(d < minTempoDiff) { minTempoDiff = d; closestTempoIdx = k; }
+            }
+            bestIdx = closestTempoIdx;
         }
 
         currentTrack = validTracks.splice(bestIdx, 1)[0];
@@ -28196,6 +28219,98 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
 
+  async function randomizedHarmonicShuffle(tracks) {
+    if (tracks.length < 3) return shuffleArray(tracks);
+    
+    await new Promise(r => setTimeout(r, 20));
+
+    const tracksWithProfile = tracks.map(track => {
+        const f = track.features || {};
+        let camelotKey = f.camelot;
+        if (!camelotKey && (f.key_raw !== undefined && f.key_raw !== -1 && f.mode !== undefined)) {
+            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+            const keyName = pitchClasses[f.key_raw];
+            const modeSuffix = f.mode === 0 ? 'm' : '';
+            camelotKey = KEY_TO_CAMELOT_MAP[keyName + modeSuffix] || KEY_TO_CAMELOT_MAP[keyName];
+        }
+
+        return {
+            ...track,
+            profile: { tempo: f.tempo || 120, camelotKey: camelotKey }
+        };
+    });
+
+    const validTracks = tracksWithProfile.filter(t => t.profile.camelotKey && t.profile.tempo);
+    const others = tracksWithProfile.filter(t => !t.profile.camelotKey || !t.profile.tempo);
+
+    if (validTracks.length === 0) return shuffleArray(tracks);
+
+    const sorted = [];
+    let pool = [...validTracks];
+    
+    const startIndex = Math.floor(Math.random() * pool.length);
+    sorted.push(pool.splice(startIndex, 1)[0]);
+    let currentTrack = sorted[0];
+
+    const CANDIDATE_POOL_SIZE = 200; 
+
+    while (pool.length > 0) {
+        if (sorted.length % 500 === 0) {
+            await new Promise(r => setTimeout(r, 0));
+        }
+
+        let candidateIndices = [];
+        if (pool.length <= CANDIDATE_POOL_SIZE) {
+            candidateIndices = pool.map((_, i) => i);
+        } else {
+            const indicesSet = new Set();
+            while (indicesSet.size < CANDIDATE_POOL_SIZE) {
+                indicesSet.add(Math.floor(Math.random() * pool.length));
+            }
+            candidateIndices = Array.from(indicesSet);
+        }
+
+        const candidates = candidateIndices.map(idx => {
+            const candidate = pool[idx];
+            const t1 = currentTrack.profile.tempo;
+            const t2 = candidate.profile.tempo;
+            
+            const ratio = t2 / t1;
+            const isDoubleTime = ratio >= 1.9 && ratio <= 2.1;
+            const isHalfTime = ratio >= 0.45 && ratio <= 0.55;
+            const diff = Math.abs(t1 - t2);
+            const percentDiff = (diff / t1) * 100;
+
+            let tempoScore = 0;
+            if (isDoubleTime || isHalfTime) tempoScore = 80;
+            else if (percentDiff <= 4) tempoScore = 100;
+            else if (percentDiff <= 8) tempoScore = 70;
+            else if (percentDiff <= 15) tempoScore = 40;
+            else tempoScore = -30;
+
+            const harmScore = getHarmonicCompatibilityScore(currentTrack.profile.camelotKey, candidate.profile.camelotKey);
+            
+            return { index: idx, score: (harmScore * 2) + (tempoScore * 1) + Math.random() * 5 };
+        });
+
+        candidates.sort((a, b) => b.score - a.score);
+        
+        const windowSize = Math.max(1, Math.ceil(candidates.length * 0.1));
+        const pickWrap = candidates[Math.floor(Math.random() * windowSize)];
+        
+        const selected = pool[pickWrap.index];
+        
+        sorted.push(selected);
+        currentTrack = selected;
+        pool.splice(pickWrap.index, 1);
+    }
+
+    return [...sorted, ...shuffleArray(others)].map(t => {
+        const { profile, ...rest } = t;
+        return rest;
+    });
+  }
+  
   async function energyWaveSort(tracks, persona = 'wave') {
     if (tracks.length < 3) {
         return tracks;
