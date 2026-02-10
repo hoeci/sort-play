@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.52.0";
+  const SORT_PLAY_VERSION = "5.53.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -849,7 +849,19 @@
     "\\(Danceability\\)",
     "\\(Valence\\)",
     "\\(Acousticness\\)",
-    "\\(Instrumentalness\\)"
+    "\\(Instrumentalness\\)",
+    "\\(Unliked\\)",
+    "\\(Liked Only\\)",
+    "\\(Liked\\)",
+    "\\(Singles & EPs\\)",
+    "\\(Singles\\)",
+    "\\(Albums & EPs\\)",
+    "\\(Albums\\)",
+    "\\(EPs\\)",
+    "\\(Compilations\\)",
+    "\\(Clean\\)",
+    "\\(Cleaned\\)",
+    "\\(Filtered\\)"
   ];
 
   const BASE_COVERS_URL = "https://cdn.jsdelivr.net/gh/hoeci/sort-play@b4c938cd63194151d6b46c403b5404f1bd5f3c52/assets/base-covers/";
@@ -1109,7 +1121,11 @@
     filterLiked: false,
     sortByLiked: false,
     filterSingles: false,
-    filterAlbums: false
+    filterAlbums: false,
+    filterAlbumsCompilations: false,
+    filterAlbumsEPsCompilations: false,
+    filterAlbumsEPsSingles: false,
+    filterAlbumsEPs: false
   };
 
   function loadSettings() {
@@ -7291,8 +7307,15 @@
           "filterLiked",
           "keepLiked",
           "sortByLiked",
+          "filterSinglesEPs",
           "filterSingles",
+          "filterEPs",
+          "filterAlbumsEPs",
+          "filterAlbumsCompilations",
+          "filterAlbumsEPsCompilations",
+          "filterAlbumsEPsSingles",
           "filterAlbums",
+          "filterCompilations",
           "removeTrashed",
           "excludeByPlaylist",
           "energyWave",
@@ -20838,6 +20861,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
 
+    const albumTypeCache = new Map();
+    const fetchInternalAlbumType = async (albumId) => {
+        if (!albumId) return 'album';
+        if (albumTypeCache.has(albumId)) return albumTypeCache.get(albumId);
+        
+        let type = 'album';
+        try {
+            const hexId = spotifyHex(albumId);
+            const token = Spicetify.Platform.Session.accessToken;
+            const url = `https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`;
+            const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            
+            if (res.ok) {
+                const body = await res.json();
+                if (body.album_type) type = body.album_type;
+                else if (body.type) type = body.type;
+                else if (body.group) type = body.group;
+            }
+        } catch(e) {
+            console.warn("Error fetching internal album type", e);
+        }
+        
+        type = type.toLowerCase();
+        albumTypeCache.set(albumId, type);
+        return type;
+    };
+
     const processRefreshInternal = async (id) => {
         const data = await fetchInternalTrackMetadata(id);
         if (data) {
@@ -20848,22 +20898,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     id: data.album.id,
                     uri: data.album.uri,
                     release_date: data.album.release_date,
-                    album_type: 'album'
+                    album_type: 'album' 
                 },
-                albumType: 'album',
-                artists: data.artists.map(a => ({
-                    id: a.id,
-                    name: a.name,
-                    uri: a.uri
-                })),
+                artists: data.artists.map(a => ({ id: a.id, name: a.name, uri: a.uri })),
                 duration_ms: data.duration_ms,
                 popularity: data.popularity,
                 external_ids: data.external_ids,
                 id: data.id,
-                uri: data.uri
+                uri: data.uri,
+                albumType: 'album'
             };
             cachedMetadata.set(data.id, cacheData);
-            idb.set('trackMetadata', data.id, cacheData);
         }
     };
 
@@ -20879,7 +20924,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (trackDetailsResponse && trackDetailsResponse.tracks) {
                     trackDetailsResponse.tracks.forEach(detailedTrack => {
                         if (!detailedTrack) return;
-                        
                         const cacheData = {
                             name: detailedTrack.name,
                             album: {
@@ -20889,21 +20933,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                 release_date: detailedTrack.album.release_date,
                                 album_type: detailedTrack.album.album_type
                             },
-                            albumType: detailedTrack.album.album_type,
-                            artists: detailedTrack.artists.map(a => ({
-                                id: a.id,
-                                name: a.name,
-                                uri: a.uri
-                            })),
+                            artists: detailedTrack.artists.map(a => ({ id: a.id, name: a.name, uri: a.uri })),
                             duration_ms: detailedTrack.duration_ms,
                             popularity: detailedTrack.popularity,
                             external_ids: detailedTrack.external_ids,
                             id: detailedTrack.id,
-                            uri: detailedTrack.uri
+                            uri: detailedTrack.uri,
+                            albumType: detailedTrack.album.album_type 
                         };
-                        
                         cachedMetadata.set(detailedTrack.id, cacheData);
-                        idb.set('trackMetadata', detailedTrack.id, cacheData);
                     });
                 }
             } catch (error) {
@@ -20918,11 +20956,46 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         updateProgress(progress);
     }
 
+    const albumsToCheck = new Set();
+    const tracksNeedingAlbumType = [];
+
     trackIds.forEach(id => {
         const meta = cachedMetadata.get(id);
         if (meta) {
-            const original = uniqueTracks.get(id);
-            const preservedAlbumType = original.album_type || original.albumType;
+            if (!meta.albumType || meta.albumType === 'album') { 
+                if (meta.album && meta.album.id) {
+                    albumsToCheck.add(meta.album.id);
+                    tracksNeedingAlbumType.push(meta);
+                }
+            }
+        }
+    });
+
+    if (albumsToCheck.size > 0) {
+        const albumIds = Array.from(albumsToCheck);
+        const ALBUM_BATCH = 20;
+        for (let i = 0; i < albumIds.length; i += ALBUM_BATCH) {
+            const batch = albumIds.slice(i, i + ALBUM_BATCH);
+            await Promise.all(batch.map(aid => fetchInternalAlbumType(aid)));
+        }
+
+        tracksNeedingAlbumType.forEach(meta => {
+            if (meta.album && meta.album.id) {
+                const type = albumTypeCache.get(meta.album.id);
+                if (type) {
+                    meta.albumType = type;
+                    meta.album.album_type = type;
+                    idb.set('trackMetadata', meta.id, meta);
+                }
+            }
+        });
+    }
+
+    trackIds.forEach(id => {
+        const meta = cachedMetadata.get(id);
+        if (meta) {
+            idb.set('trackMetadata', id, meta);
+
             const newTrack = {
                 uri: meta.uri,
                 name: meta.name,
@@ -20932,8 +21005,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 durationMs: meta.duration_ms,
                 popularity: meta.popularity,
                 releaseDate: meta.album.release_date,
-                albumType: preservedAlbumType || meta.albumType,
-                album_type: preservedAlbumType || meta.albumType,
+                albumType: meta.albumType || 'album',
+                album_type: meta.albumType || 'album',
                 trackId: meta.id,
                 albumId: meta.album.id,
                 track: {
@@ -20941,7 +21014,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     name: meta.name,
                     uri: meta.uri,
                     duration_ms: meta.duration_ms,
-                    album: meta.album,
+                    album: {
+                        ...meta.album,
+                        album_type: meta.albumType || 'album'
+                    },
                     artists: meta.artists,
                     external_ids: meta.external_ids
                 }
@@ -21551,7 +21627,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function createInnerButton(sortType, parentButton, svg) {
     const innerButton = document.createElement("button");
-    const isFilterAlbums = sortType === 'filterAlbums';
+    const isGroupingSort = sortType === 'filterAlbums' || sortType === 'filterAlbumsEPs' || sortType === 'filterAlbumsCompilations' || sortType === 'filterAlbumsEPsCompilations' || sortType === 'filterAlbumsEPsSingles';
     
     innerButton.removeAttribute("title");
     innerButton.appendChild(svg);
@@ -21565,8 +21641,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       display: flex;
       align-items: center;
       justify-content: center;
-      width: ${isFilterAlbums ? "35px" : "32px"};
-      height: ${isFilterAlbums ? "35px" : "32px"};
+      width: ${isGroupingSort ? "35px" : "32px"};
+      height: ${isGroupingSort ? "35px" : "32px"};
       margin-left: 10px;
       margin-right: -10px;
       flex-shrink: 0;
@@ -21593,13 +21669,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     };
 
     innerButton.addEventListener("mouseenter", (e) => {
-      if (isFilterAlbums) {
+      if (isGroupingSort) {
           svg.style.stroke = "#1ED760";
       } else {
           svg.style.fill = "#1ED760";
       }
       
-      const tooltipText = isFilterAlbums 
+      const tooltipText = isGroupingSort 
         ? (sortOrderState[sortType] ? "Ungroup Albums" : "Group by Album")
         : "Toggle Order (Ascending/Descending)";
 
@@ -21632,7 +21708,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     innerButton.addEventListener("mouseleave", () => {
-      if (isFilterAlbums) {
+      if (isGroupingSort) {
           svg.style.stroke = '#ffffffe6';
       } else {
           svg.style.fill = 'currentColor';
@@ -21652,7 +21728,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const path = svg.querySelector("path");
       if (path) {
           const isReverse = sortOrderState[sortType];
-          if (isFilterAlbums) {
+          if (isGroupingSort) {
               path.setAttribute("d", isReverse ? ICON_PATHS.groupAlbum : ICON_PATHS.ungroupList);
               
               if (innerButton._tooltip) {
@@ -21784,8 +21860,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
              {
                 type: "divider",
              },
-             { backgroundColor: "transparent", color: "white", text: "Singles Only", sortType: "filterSingles" },
-             { backgroundColor: "transparent", color: "white", text: "Albums Only", sortType: "filterAlbums", hasInnerButton: true },
+             {
+                type: "parent",
+                text: "Release Type",
+                sortType: "albumTypeFiltersParent",
+                children: [
+                    { backgroundColor: "transparent", color: "white", text: "Albums", sortType: "filterAlbums", hasInnerButton: true },
+                    { backgroundColor: "transparent", color: "white", text: "Albums & EPs", sortType: "filterAlbumsEPs", hasInnerButton: true },
+                    { backgroundColor: "transparent", color: "white", text: "Albums, EPs & Singles", sortType: "filterAlbumsEPsSingles", hasInnerButton: true },
+                    { backgroundColor: "transparent", color: "white", text: "Albums & Compilations", sortType: "filterAlbumsCompilations", hasInnerButton: true },
+                    { backgroundColor: "transparent", color: "white", text: "Albums, EPs & Compilations", sortType: "filterAlbumsEPsCompilations", hasInnerButton: true },
+                    { backgroundColor: "transparent", color: "white", text: "EPs", sortType: "filterEPs" },
+                    { backgroundColor: "transparent", color: "white", text: "Singles", sortType: "filterSingles" },
+                    { backgroundColor: "transparent", color: "white", text: "Singles & EPs", sortType: "filterSinglesEPs" },
+                    { backgroundColor: "transparent", color: "white", text: "Compilations", sortType: "filterCompilations" }
+                ]
+             },
              ...( (localStorage.getItem("TrashSongList") || (Spicetify.LocalStorage && Spicetify.LocalStorage.get("TrashSongList"))) ? [
                 { type: "divider" },
                 { backgroundColor: "transparent", color: "white", text: "Remove Trashed", sortType: "removeTrashed" }
@@ -22248,7 +22338,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (sortType) {
                     const style = itemConfigs.find(item => item.sortType === sortType);
                     if (style && style.type === 'parent' && style.children) {
-                        const width = style.sortType === 'quickFiltersParent' ? '170px' : '155px';
+                        let width = '155px';
+                        if (style.sortType === 'quickFiltersParent') width = '170px';
+                        else if (style.sortType === 'albumTypeFiltersParent') width = '185px';
+                        
                         const subMenu = createSubMenu(style.children, width);
                         document.body.appendChild(subMenu);
                         button._submenu = subMenu;
@@ -22495,7 +22588,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       });
   
       if (item.hasInnerButton) {
-        const svg = item.sortType === 'filterAlbums' 
+        const isGrouping = item.sortType === 'filterAlbums' || item.sortType === 'filterAlbumsEPs' || item.sortType === 'filterAlbumsCompilations' || item.sortType === 'filterAlbumsEPsCompilations' || item.sortType === 'filterAlbumsEPsSingles';
+        const svg = isGrouping
             ? getGroupingIconSvg(sortOrderState[item.sortType]) 
             : getSortArrowSvg(sortOrderState[item.sortType]);
             
@@ -27088,7 +27182,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           sortType === "keepLiked" ||
           sortType === "sortByLiked" ||
           sortType === "filterSingles" ||
+          sortType === "filterEPs" ||
+          sortType === "filterSinglesEPs" ||
+          sortType === "filterAlbumsEPs" ||
           sortType === "filterAlbums" ||
+          sortType === "filterAlbumsCompilations" ||
+          sortType === "filterAlbumsEPsCompilations" ||
+          sortType === "filterAlbumsEPsSingles" ||
+          sortType === "filterCompilations" ||
           sortType === "removeTrashed" ||
           sortType === "excludeByPlaylist"
         ) {
@@ -27146,7 +27247,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           } else {
             tracksForDeduplication = tracksWithPopularity;
           }
-          if (sortType === "filterSingles" || sortType === "filterAlbums") {
+          if (["filterSingles", "filterAlbums", "filterEPs", "filterSinglesEPs", "filterAlbumsEPs", "filterAlbumsCompilations", "filterAlbumsEPsCompilations", "filterAlbumsEPsSingles", "filterCompilations"].includes(sortType)) {
             if (!isHeadless) mainButton.innerText = "Checking...";
             if (!isArtistPage) {
                 tracksForDeduplication = await refreshTrackAlbumInfo(tracksForDeduplication, (progress) => {
@@ -27348,18 +27449,179 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             
             sortedTracks = uniqueTracks
                 .filter(track => {
-                    const type = track.albumType || track.track?.album?.album_type;
+                    const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
                     return type === 'single';
                 })
                 .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
 
+          } else if (sortType === "filterEPs") {
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+
+            sortedTracks = uniqueTracks
+                .filter(track => {
+                    const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                    const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
+                    return type === 'ep' || (type !== 'compilation' && /\bep\b/i.test(albumName));
+                })
+                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+
+          } else if (sortType === "filterSinglesEPs") {
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+
+            sortedTracks = uniqueTracks
+                .filter(track => {
+                    const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                    const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
+                    const isEP = type === 'ep' || (type !== 'compilation' && /\bep\b/i.test(albumName));
+                    return type === 'single' || isEP;
+                })
+                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+
+          } else if (sortType === "filterCompilations") {
+             const originalOrderMap = new Map();
+             tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+ 
+             sortedTracks = uniqueTracks
+                 .filter(track => {
+                     const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                     const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
+                     return type === 'compilation' || artist.includes('various artists');
+                 })
+                 .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+
           } else if (sortType === "filterAlbums") {
             const filteredTracks = uniqueTracks.filter(track => {
-                const type = track.albumType || track.track?.album?.album_type;
-                return type === 'album' || type === 'compilation';
+                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
+                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
+                
+                const isEP = type === 'ep' || /\bep\b/i.test(albumName);
+                const isCompilation = type === 'compilation' || artist.includes('various artists');
+                
+                return type === 'album' && !isEP && !isCompilation;
             });
 
             if (sortOrderState.filterAlbums) {
+                sortedTracks = filteredTracks.sort((a, b) => {
+                    const albumA = (a.albumName || "").toLowerCase();
+                    const albumB = (b.albumName || "").toLowerCase();
+                    const albumCompare = albumA.localeCompare(albumB);
+                    if (albumCompare !== 0) return albumCompare;
+                    
+                    const trackA = a.trackNumber || 0;
+                    const trackB = b.trackNumber || 0;
+                    return trackA - trackB;
+                });
+            } else {
+                const originalOrderMap = new Map();
+                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+                
+                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+            }
+
+          } else if (sortType === "filterAlbumsCompilations") {
+            const filteredTracks = uniqueTracks.filter(track => {
+                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
+                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
+                const isEP = /\bep\b/i.test(albumName);
+                const isCompilation = type === 'compilation' || artist.includes('various artists');
+                
+                return (type === 'album' || isCompilation) && !isEP;
+            });
+
+            if (sortOrderState.filterAlbumsCompilations) {
+                sortedTracks = filteredTracks.sort((a, b) => {
+                    const albumA = (a.albumName || "").toLowerCase();
+                    const albumB = (b.albumName || "").toLowerCase();
+                    const albumCompare = albumA.localeCompare(albumB);
+                    if (albumCompare !== 0) return albumCompare;
+                    
+                    const trackA = a.trackNumber || 0;
+                    const trackB = b.trackNumber || 0;
+                    return trackA - trackB;
+                });
+            } else {
+                const originalOrderMap = new Map();
+                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+                
+                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+            }
+
+          } else if (sortType === "filterAlbumsEPsCompilations") {
+            const filteredTracks = uniqueTracks.filter(track => {
+                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
+                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
+                
+                const isEP = type === 'ep' || ((type === 'single' || type === 'album') && /\bep\b/i.test(albumName));
+                const isCompilation = type === 'compilation' || artist.includes('various artists');
+                
+                return type === 'album' || isEP || isCompilation;
+            });
+
+            if (sortOrderState.filterAlbumsEPsCompilations) {
+                sortedTracks = filteredTracks.sort((a, b) => {
+                    const albumA = (a.albumName || "").toLowerCase();
+                    const albumB = (b.albumName || "").toLowerCase();
+                    const albumCompare = albumA.localeCompare(albumB);
+                    if (albumCompare !== 0) return albumCompare;
+                    
+                    const trackA = a.trackNumber || 0;
+                    const trackB = b.trackNumber || 0;
+                    return trackA - trackB;
+                });
+            } else {
+                const originalOrderMap = new Map();
+                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+                
+                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+            }
+
+          } else if (sortType === "filterAlbumsEPsSingles") {
+            const filteredTracks = uniqueTracks.filter(track => {
+                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
+                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
+                
+                const isEP = type === 'ep' || ((type === 'single' || type === 'album') && /\bep\b/i.test(albumName));
+                const isCompilation = type === 'compilation' || artist.includes('various artists');
+                
+                return (type === 'album' || type === 'single' || isEP) && !isCompilation;
+            });
+
+            if (sortOrderState.filterAlbumsEPsSingles) {
+                sortedTracks = filteredTracks.sort((a, b) => {
+                    const albumA = (a.albumName || "").toLowerCase();
+                    const albumB = (b.albumName || "").toLowerCase();
+                    const albumCompare = albumA.localeCompare(albumB);
+                    if (albumCompare !== 0) return albumCompare;
+                    
+                    const trackA = a.trackNumber || 0;
+                    const trackB = b.trackNumber || 0;
+                    return trackA - trackB;
+                });
+            } else {
+                const originalOrderMap = new Map();
+                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+                
+                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+            }
+
+          } else if (sortType === "filterAlbumsEPs") {
+            const filteredTracks = uniqueTracks.filter(track => {
+                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
+                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
+                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
+                const isEP = type === 'ep' || ((type === 'single' || type === 'album') && /\bep\b/i.test(albumName));
+                const isCompilation = type === 'compilation' || artist.includes('various artists');
+
+                return (type === 'album' || isEP) && !isCompilation;
+            });
+
+            if (sortOrderState.filterAlbumsEPs) {
                 sortedTracks = filteredTracks.sort((a, b) => {
                     const albumA = (a.albumName || "").toLowerCase();
                     const albumB = (b.albumName || "").toLowerCase();
@@ -27710,6 +27972,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           keepLiked: { fullName: "keeping only liked songs", shortName: "Liked Only" },
           sortByLiked: { fullName: "liked status", shortName: "Liked" },
           filterSingles: { fullName: "singles only", shortName: "Singles" },
+          filterEPs: { fullName: "EPs only", shortName: "EPs" },
+          filterSinglesEPs: { fullName: "singles & EPs only", shortName: "Singles & EPs" },
+          filterAlbumsEPs: { fullName: "albums & EPs only", shortName: "Albums & EPs" },
+          filterAlbumsCompilations: { fullName: "albums & compilations only", shortName: "Albums & Compilations" },
+          filterAlbumsEPsCompilations: { fullName: "albums, EPs & compilations only", shortName: "Albums, EPs & Compilations" },
+          filterAlbumsEPsSingles: { fullName: "albums, EPs & singles only", shortName: "Albums, EPs & Singles" },
+          filterCompilations: { fullName: "compilations only", shortName: "Compilations" },
           filterAlbums: { fullName: "albums only", shortName: "Albums" },
           removeTrashed: { fullName: "removing trashed songs", shortName: "Clean" },
           excludeByPlaylist: { fullName: "excluding playlist tracks", shortName: "Filtered" },
