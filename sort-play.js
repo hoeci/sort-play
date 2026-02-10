@@ -856,6 +856,9 @@
     "\\(Singles & EPs\\)",
     "\\(Singles\\)",
     "\\(Albums & EPs\\)",
+    "\\(Albums, EPs & Singles\\)",
+    "\\(Albums & Compilations\\)",
+    "\\(Albums, EPs & Compilations\\)",
     "\\(Albums\\)",
     "\\(EPs\\)",
     "\\(Compilations\\)",
@@ -22496,7 +22499,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           border: none;
           border-radius: 2px;
           margin: 0;
-          padding: 4px 10px 4px 9px;
+          padding: 4px 10px 4px 10px;
           font-weight: 400;
           font-size: 0.875rem;
           height: 39px;
