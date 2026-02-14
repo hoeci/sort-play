@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.53.0";
+  const SORT_PLAY_VERSION = "5.54.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -7327,7 +7327,10 @@
           "danceability",
           "valence",
           "acousticness",
-          "instrumentalness"
+          "instrumentalness",
+          "filterFollowedMain",
+          "filterFollowedAny",
+          "removeFollowed"
       ];
       return directSortTypes.includes(sortType);
   }
@@ -21865,6 +21868,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
              },
              {
                 type: "parent",
+                text: "Followed Artists",
+                sortType: "artistStatusParent",
+                children: [
+                    { backgroundColor: "transparent", color: "white", text: "Followed (Any)", sortType: "filterFollowedAny" },
+                    { backgroundColor: "transparent", color: "white", text: "Followed (Main)", sortType: "filterFollowedMain" },
+                    { backgroundColor: "transparent", color: "white", text: "Not Followed", sortType: "removeFollowed" }
+                ]
+             },
+             {
+                type: "divider",
+             },
+             {
+                type: "parent",
                 text: "Release Type",
                 sortType: "albumTypeFiltersParent",
                 children: [
@@ -24192,19 +24208,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (isFallbackActive()) {
         try {
             if (Spicetify.Platform?.LibraryAPI?.getContents) {
-                const res = await Spicetify.Platform.LibraryAPI.getContents({ limit: 50000, sort: { field: "NAME", order: "ASC" } });
+                const res = await Spicetify.Platform.LibraryAPI.getContents({ 
+                    limit: 50000, 
+                    sort: { field: "NAME", order: "ASC" } 
+                });
+                
                 const items = res.items || [];
                 const artists = items
                     .filter(item => item.type === 'artist' || (item.uri && item.uri.includes(':artist:')))
                     .map(a => ({ 
                         uri: a.uri, 
                         name: a.name, 
-                        id: a.uri.split(':')[2] 
-                    }));
-                return artists;
+                        id: a.uri ? a.uri.split(':')[2] : null 
+                    }))
+                    .filter(a => a.id);
+                
+                if (artists.length > 0) return artists;
             }
         } catch (e) {
-            console.warn("[Sort-Play] LibraryAPI.getContents fallback failed", e);
+            console.warn("[Sort-Play] LibraryAPI fallback failed", e);
         }
         return [];
     }
@@ -27194,7 +27216,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           sortType === "filterAlbumsEPsSingles" ||
           sortType === "filterCompilations" ||
           sortType === "removeTrashed" ||
-          sortType === "excludeByPlaylist"
+          sortType === "excludeByPlaylist" ||
+          sortType === "filterFollowedMain" ||
+          sortType === "filterFollowedAny" ||
+          sortType === "removeFollowed"
         ) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
@@ -27718,6 +27743,47 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (!isHeadless) resetButtons();
                 return;
             }
+          
+          } else if (['filterFollowedMain', 'filterFollowedAny', 'removeFollowed'].includes(sortType)) {
+            if (!isHeadless) mainButton.innerText = "Fetching...";
+            
+            let followedArtistIds = new Set();
+            try {
+                const followedArtists = await getAllFollowedArtists();
+                followedArtists.forEach(a => followedArtistIds.add(a.id));
+            } catch (e) {
+                console.error("Failed to fetch followed artists", e);
+                showNotification("Could not fetch followed artists list.", true);
+                if (!isHeadless) resetButtons();
+                return;
+            }
+
+            if (!isHeadless) mainButton.innerText = "Filtering...";
+
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+
+            sortedTracks = uniqueTracks.filter(track => {
+                let trackArtistIds = [];
+                
+                if (track.artistUris && Array.isArray(track.artistUris)) {
+                    trackArtistIds = track.artistUris.map(u => u.split(':')[2]);
+                } else if (track.artists && Array.isArray(track.artists)) {
+                    trackArtistIds = track.artists.map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)).filter(Boolean);
+                }
+
+                if (trackArtistIds.length === 0) return sortType === 'removeFollowed'; 
+
+                const mainArtistId = trackArtistIds[0];
+                const isMainFollowed = followedArtistIds.has(mainArtistId);
+                const isAnyFollowed = trackArtistIds.some(id => followedArtistIds.has(id));
+
+                if (sortType === 'filterFollowedMain') return isMainFollowed;
+                if (sortType === 'filterFollowedAny') return isAnyFollowed;
+                if (sortType === 'removeFollowed') return !isAnyFollowed;
+                
+                return true;
+            }).sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
           }
 
           if (!isHeadless) mainButton.innerText = "100%";
@@ -27985,6 +28051,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           filterAlbums: { fullName: "albums only", shortName: "Albums" },
           removeTrashed: { fullName: "removing trashed songs", shortName: "Clean" },
           excludeByPlaylist: { fullName: "excluding playlist tracks", shortName: "Filtered" },
+          filterFollowedMain: { fullName: "main followed artists", shortName: "Followed Main" },
+          filterFollowedAny: { fullName: "any followed artists", shortName: "Followed Any" },
+          removeFollowed: { fullName: "non-followed artists", shortName: "Unfollowed" },
           energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
           tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
           energy: { fullName: "energy", shortName: "Energy" },
