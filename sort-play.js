@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.54.1";
+  const SORT_PLAY_VERSION = "5.55.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -12683,6 +12683,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 sourceTracks = await getLikedSongs();
             } else if (URI.isAlbum(sourceUri)) {
                 sourceTracks = await getAlbumTracks(sourceUri.split(":")[2]);
+            } else if (source.type === 'folder' || sourceUri.includes('start-group') || sourceUri.includes(':folder:')) {
+                sourceTracks = await getTracksFromFolder(sourceUri);
             } else {
                 console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
                 return [];
@@ -13281,74 +13283,91 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     try {
         const rootlist = await Spicetify.Platform.RootlistAPI.getContents();
 
-        const playlistPromises = rootlist.items
-            .filter(item => item.type === 'playlist')
-            .map(async (item) => {
-                const images = item.images || [];
-                if (images.length > 0 || item.imageUrl) {
+        const enrichPlaylist = async (item) => {
+            const images = item.images || [];
+            if (images.length > 0 || item.imageUrl) {
+                return {
+                    uri: item.uri,
+                    name: item.name,
+                    info: 'Playlist',
+                    coverUrl: images.length ? (images[images.length - 1] || images[0]).url : item.imageUrl,
+                    type: 'playlist'
+                };
+            }
+
+            const fetchWithInternal = async () => {
+                try {
+                    const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(item.uri);
+                    const fetchedImages = meta.images || [];
+                    return {
+                        uri: item.uri,
+                        name: item.name || meta.name,
+                        info: 'Playlist',
+                        coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
+                        type: 'playlist'
+                    };
+                } catch (e) {
+                    console.warn(`Sort-Play: Could not fetch metadata for playlist ${item.name}`, e);
                     return {
                         uri: item.uri,
                         name: item.name,
                         info: 'Playlist',
-                        coverUrl: images.length ? (images[images.length - 1] || images[0]).url : item.imageUrl,
+                        coverUrl: null,
                         type: 'playlist'
                     };
-                } else {
-                    const fetchWithInternal = async () => {
-                        try {
-                            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(item.uri);
-                            const fetchedImages = meta.images || [];
-                            return {
-                                uri: item.uri,
-                                name: item.name || meta.name,
-                                info: 'Playlist',
-                                coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
-                                type: 'playlist'
-                            };
-                        } catch (e) {
-                            console.warn(`Sort-Play: Could not fetch metadata for playlist ${item.name}`, e);
-                            return {
-                                uri: item.uri,
-                                name: item.name,
-                                info: 'Playlist',
-                                coverUrl: null,
-                                type: 'playlist'
-                            };
-                        }
-                    };
-
-                    if (isFallbackActive()) {
-                        return await fetchWithInternal();
-                    }
-
-                    try {
-                        const playlistId = item.uri.split(':')[2];
-                        const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-                        const fetchedImages = playlistData.images || [];
-                        return {
-                            uri: item.uri,
-                            name: item.name,
-                            info: 'Playlist',
-                            coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
-                            type: 'playlist'
-                        };
-                    } catch (error) {
-                        if (registerWebApiFailure()) {
-                            return await fetchWithInternal();
-                        }
-                        console.warn(`Sort-Play: Could not fetch full details for playlist ${item.name}`, error);
-                        return {
-                            uri: item.uri,
-                            name: item.name,
-                            info: 'Playlist',
-                            coverUrl: null,
-                            type: 'playlist'
-                        };
-                    }
                 }
-            });
+            };
 
-        const resolvedPlaylists = await Promise.all(playlistPromises);
+            if (isFallbackActive()) {
+                return await fetchWithInternal();
+            }
+
+            try {
+                const playlistId = item.uri.split(':')[2];
+                const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
+                const fetchedImages = playlistData.images || [];
+                return {
+                    uri: item.uri,
+                    name: item.name,
+                    info: 'Playlist',
+                    coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
+                    type: 'playlist'
+                };
+            } catch (error) {
+                if (registerWebApiFailure()) {
+                    return await fetchWithInternal();
+                }
+                console.warn(`Sort-Play: Could not fetch full details for playlist ${item.name}`, error);
+                return {
+                    uri: item.uri,
+                    name: item.name,
+                    info: 'Playlist',
+                    coverUrl: null,
+                    type: 'playlist'
+                };
+            }
+        };
+
+        const processItem = async (item) => {
+            if (item.type === 'playlist') {
+                return await enrichPlaylist(item);
+            } else if (item.type === 'folder') {
+                const childrenPromises = (item.items || []).map(child => processItem(child));
+                const children = (await Promise.all(childrenPromises)).filter(Boolean);
+                
+                return {
+                    uri: item.uri,
+                    name: item.name,
+                    info: 'Folder',
+                    type: 'folder',
+                    children: children
+                };
+            }
+            return null;
+        };
+
+        const rootPromises = rootlist.items.map(item => processItem(item));
+        const hierarchy = (await Promise.all(rootPromises)).filter(Boolean);
 
         const fetchAlbumsInternal = async () => {
             const resolvedAlbumsInternal = [];
@@ -13400,7 +13419,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
         
-        return [...resolvedPlaylists, ...resolvedAlbums];
+        return [...hierarchy, ...resolvedAlbums];
 
     } catch (error) {
         console.error("Failed to fetch user library:", error);
@@ -13422,16 +13441,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container";
     modalContainer.style.cssText = `
-        width: 480px !important; display: flex; flex-direction: column;
+        width: 490px !important; display: flex; flex-direction: column;
         border-radius: 20px; background-color: #181818 !important; border: 1px solid #282828;
     `;
 
     let selectedSources = new Set();
+    let libraryData = [];
+    const sourceDataCache = new Map();
+    const manuallyAddedUris = new Set();
+
+    const folderIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="color: #b3b3b3;"><path d="M1 4a2 2 0 0 1 2-2h5.155a3 3 0 0 1 2.357 1.158L12.557 6H21a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V4z"></path></svg>`;
+    const caretIconSvg = `<svg class="caret-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #b3b3b3;"><path d="M9.75 6.01l7.68 5.67a.5.5 0 0 1 0 .82l-7.68 5.49A.5.5 0 0 1 9 17.59V6.41a.5.5 0 0 1 .75-.4z"></path></svg>`;
 
     modalContainer.innerHTML = `
         <style>
             #user-library-container {
-                margin-top: 16px;
+                margin-top: 8px;
                 background-color: #282828;
                 border-radius: 6px;
                 padding: 8px;
@@ -13444,11 +13469,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             #user-library-container::-webkit-scrollbar { width: 8px; }
             #user-library-container::-webkit-scrollbar-track { background: #282828; }
             #user-library-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+            
             .library-item {
                 display: flex;
                 align-items: center;
                 gap: 12px;
-                padding: 8px;
+                padding: 6px 8px;
                 border-radius: 4px;
                 cursor: pointer;
                 transition: background-color 0.2s ease, border 0.2s ease;
@@ -13460,95 +13486,104 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 border: 1px solid #1ed760;
             }
             .library-item-cover { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; }
-            .library-item-text { display: flex; flex-direction: column; overflow: hidden; }
+            .library-item-text { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
             .library-item-title { color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .library-item-info { color: #b3b3b3; font-size: 12px; }
+
+            .folder-container { margin-bottom: 2px; }
+            .folder-header { 
+                display: flex; align-items: center; gap: 12px; padding: 6px 8px; 
+                border-radius: 4px; cursor: pointer; transition: background-color 0.2s;
+                border: 1px solid transparent;
+            }
+            .folder-header:hover { background-color: #3e3e3e; }
+            .folder-header.selected { background-color: #3a4f3a; border: 1px solid #1ed760; }
+            .folder-children { margin-left: 24px; display: none; border-left: 1px solid #444; }
+            .folder-children.expanded { display: block; }
+            .caret-btn { 
+                background: none; border: none; cursor: pointer; 
+                display: flex; align-items: center; justify-content: center; margin-right: -5px;
+            }
+            .caret-icon { transition: transform 0.2s; }
+            .caret-icon.rotated { transform: rotate(90deg); }
+
             .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
             .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
             .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
             .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
-            #search-suggestions {
-                position: fixed;
-                background-color: #282828;
-                border: 1px solid #3e3e3e;
-                border-radius: 6px;
-                z-index: 2005;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-                display: flex;
-                max-height: 450px;
-                overflow: hidden;
-            }
-            .suggestions-column {
-                flex: 1;
-                overflow-y: auto;
-                padding: 4px;
-                scrollbar-width: thin;
-                scrollbar-color: #535353 #282828;
-            }
-            .suggestions-column::-webkit-scrollbar { width: 6px; }
-            .suggestions-column::-webkit-scrollbar-track { background: #282828; }
-            .suggestions-column::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 3px; }
-            .suggestions-column:first-child {
-                border-right: 1px solid #3e3e3e;
-            }
-            .suggestion-item {
-                display: flex;
-                align-items: center;
-                padding: 8px;
-                cursor: pointer;
-                border-radius: 4px;
-            }
-            .suggestion-item:hover {
+            
+            .input-wrapper { position: relative; }
+            #source-url-input {
+                width: 100%;
                 background-color: #3e3e3e;
-            }
-            .suggestion-cover {
-                width: 32px;
-                height: 32px;
-                margin-right: 8px;
+                border: 1px solid #3e3e3e;
                 border-radius: 4px;
-                object-fit: cover;
-                flex-shrink: 0;
-            }
-            .suggestion-text {
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                font-size: 14px;
+                padding: 8px 35px 8px 12px;
                 color: white;
+                box-sizing: border-box;
+                font-size: 14px;
+                transition: padding-right 0.2s ease;
             }
-            .suggestion-header {
-                font-size: 12px;
-                font-weight: bold;
-                color: #b3b3b3;
-                padding: 8px 8px 4px;
-                text-transform: uppercase;
-            }
+            #source-url-input:focus { border-color: #555; outline: none; }
+
             #source-clear-btn {
-                position: absolute;
-                right: 10px;
-                top: 50%;
-                transform: translateY(-50%);
-                background: none;
-                border: none;
-                color: #b3b3b3;
-                cursor: pointer;
-                font-size: 20px;
-                padding: 0 5px;
-                line-height: 1;
-                display: none;
+                position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+                background: none; border: none; color: #b3b3b3; cursor: pointer;
+                font-size: 20px; padding: 4px; line-height: 1; display: none;
+                transition: right 0.2s ease, color 0.2s;
             }
             #source-clear-btn:hover { color: white; }
+            
+            #source-add-btn {
+                position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+                background-color: #1ED760; border: 1px solid #1abc54; color: #000; cursor: pointer;
+                font-size: 20px; padding: 0; line-height: 1; display: none;
+                font-weight: 500;
+                width: 28px; height: 28px;
+                border-radius: 4px;
+                align-items: center; justify-content: center;
+                transition: background-color 0.2s;
+                z-index: 2;
+            }
+            #source-add-btn:hover { background-color: #3BE377; border-color: #3BE377; }
+            #source-add-btn svg { fill: currentColor; width: 20px; height: 20px; }
+            
+            #added-sources-list {
+                display: flex; flex-direction: column; gap: 4px; margin-top: 12px;
+                max-height: 140px; overflow-y: auto;
+                scrollbar-width: thin; scrollbar-color: #535353 transparent;
+            }
+            .library-item.manual-item {
+                background-color: #2a2a2a;
+                border-color: #333;
+                cursor: default;
+            }
+            .library-item.manual-item:hover {
+                background-color: #333;
+            }
+            .remove-manual-btn {
+                background: none; border: none; cursor: pointer; color: #b3b3b3;
+                padding: 4px; display: flex; align-items: center; justify-content: center;
+                transition: color 0.2s;
+            }
+            .remove-manual-btn:hover { color: #fff; }
         </style>
         <div class="main-trackCreditsModal-header" style="padding: 20px 24px 10px;">
             <h1 class="main-trackCreditsModal-title" style="font-size: 20px; font-weight: 700; color: white;">${title}</h1>
         </div>
         <div class="main-trackCreditsModal-mainSection" style="padding: 16px 24px; scrollbar-width: none;">
             <p style="color: #b3b3b3; font-size: 14px; margin: 0 0 12px;">${descriptionText}</p>
-            <div style="position: relative;">
-                <input type="text" id="source-url-input" placeholder="Search or paste link..." style="width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 30px 8px 12px; color: white; box-sizing: border-box;">
-                <button id="source-clear-btn">&times;</button>
+            
+            <div class="input-wrapper">
+                <input type="text" id="source-url-input" placeholder="Search library or paste link..." autocomplete="off">
+                <button id="source-clear-btn" title="Clear">&times;</button>
+                <button id="source-add-btn" title="Add Link">
+                    <svg viewBox="0 0 24 24"><path d="M11.75 3a.75.75 0 0 1 .75.75V11h7.25a.75.75 0 0 1 0 1.5h-7.25v7.25a.75.75 0 0 1-1.5 0V12.5H3.75a.75.75 0 0 1 0-1.5h7.25V3.75a.75.75 0 0 1 .75-.75z"></path></svg>
+                </button>
             </div>
-            <div id="source-change-error" style="color: #f15e6c; font-size: 12px; margin-top: 8px; display: none;"></div>
+
+            <div id="added-sources-list" style="display: none;"></div>
+
             <div id="user-library-container">
                 <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading Library...</div>
             </div>
@@ -13558,172 +13593,45 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             <button id="confirm-change-source" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none; color: black;">Confirm</button>
         </div>
     `;
-    
-    const suggestionsContainer = document.createElement('div');
-    suggestionsContainer.id = 'search-suggestions';
-    suggestionsContainer.style.display = 'none';
-    document.body.appendChild(suggestionsContainer);
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
 
     const searchInput = modalContainer.querySelector('#source-url-input');
     const clearButton = modalContainer.querySelector('#source-clear-btn');
+    const addButton = modalContainer.querySelector('#source-add-btn');
     const libraryContainer = modalContainer.querySelector('#user-library-container');
-
-    const positionSuggestionsPanel = () => {
-        if (suggestionsContainer.style.display === 'none') return;
-        const rect = searchInput.getBoundingClientRect();
-        suggestionsContainer.style.top = `${rect.bottom + 4}px`;
-        suggestionsContainer.style.left = `${rect.left}px`;
-        suggestionsContainer.style.width = `${rect.width}px`;
-    };
-
-    const hideSuggestions = () => {
-        suggestionsContainer.style.display = 'none';
-        suggestionsContainer.innerHTML = '';
-    };
-
-    const renderSuggestions = (playlists = [], artists = []) => {
-        if (playlists.length === 0 && artists.length === 0) {
-            hideSuggestions();
-            return;
-        }
-
-        suggestionsContainer.innerHTML = `
-            <div class="suggestions-column">
-                <div class="suggestion-header">Playlists</div>
-                ${playlists.map(item => `
-                    <div class="suggestion-item" data-uri="${item.uri}" data-url="${item.external_urls.spotify}">
-                        <img src="${item.images[0]?.url || ''}" class="suggestion-cover">
-                        <span class="suggestion-text" title="${item.name}">${item.name}</span>
-                    </div>
-                `).join('')}
-            </div>
-            <div class="suggestions-column">
-                <div class="suggestion-header">Artists</div>
-                ${artists.map(item => `
-                    <div class="suggestion-item" data-uri="${item.uri}" data-url="${item.external_urls.spotify}">
-                        <img src="${item.images[0]?.url || ''}" class="suggestion-cover">
-                        <span class="suggestion-text" title="${item.name}">${item.name}</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        suggestionsContainer.style.display = 'flex';
-        positionSuggestionsPanel();
-
-        suggestionsContainer.querySelectorAll('.suggestion-item').forEach(itemEl => {
-            itemEl.addEventListener('click', () => {
-                const uri = itemEl.dataset.uri;
-                const url = itemEl.dataset.url;
-                searchInput.value = url;
-                clearButton.style.display = 'block';
-                
-                selectedSources.add(uri);
-                hideSuggestions();
-                
-                const libraryItem = libraryContainer.querySelector(`.library-item[data-uri="${uri}"]`);
-                if (libraryItem) {
-                    libraryItem.classList.add('selected');
-                }
-            });
-        });
-    };
-
-    const performSearch = async () => {
-        const query = searchInput.value.trim();
-        if (query.length < 3 || query.startsWith('http')) {
-            hideSuggestions();
-            return;
-        }
-
-        const fetchFallback = async () => {
-            const token = await get_S_Client_Token();
-            if (!token) {
-                hideSuggestions();
-                return;
-            }
-            try {
-                const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist,artist&limit=8`, {
-                    headers: { "Authorization": `Bearer ${token}` }
-                });
-                
-                if (res.status === 429) {
-                    s_Access_Token = null; 
-                    throw new Error("Rate Limited");
-                }
-
-                const data = await res.json();
-                const playlists = data.playlists?.items?.filter(Boolean) || [];
-                const artists = data.artists?.items?.filter(Boolean) || [];
-                
-                renderSuggestions(playlists, artists);
-            } catch (e) {
-                console.error("Client Credentials Search failed:", e);
-                hideSuggestions();
-            }
-        };
-
-        if (isFallbackActive()) {
-            await fetchFallback();
-            return;
-        }
-
-        try {
-            const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=playlist,artist&limit=8`);
-            const playlists = res.playlists?.items?.filter(Boolean) || [];
-            const artists = res.artists?.items?.filter(Boolean) || [];
-            renderSuggestions(playlists, artists);
-        } catch (e) {
-            if (registerWebApiFailure()) {
-                await fetchFallback();
-            } else {
-                console.error("Search failed:", e);
-                hideSuggestions();
-            }
-        }
-    };
-
-    const debouncedSearch = debounce(performSearch, 300);
-    searchInput.addEventListener('input', () => {
-        clearButton.style.display = searchInput.value.length > 0 ? 'block' : 'none';
-        debouncedSearch();
-    });
-
-    clearButton.addEventListener('click', () => {
-        searchInput.value = '';
-        clearButton.style.display = 'none';
-        hideSuggestions();
-        searchInput.focus();
-    });
-
-    const outsideClickListener = (event) => {
-        if (!modalContainer.contains(event.target) && !suggestionsContainer.contains(event.target)) {
-            hideSuggestions();
-        }
-    };
-    document.addEventListener('click', outsideClickListener, true);
-    window.addEventListener('resize', positionSuggestionsPanel);
-    window.addEventListener('scroll', positionSuggestionsPanel, true);
-
-    const closeModal = (isConfirmed = false) => {
-        document.removeEventListener('click', outsideClickListener, true);
-        window.removeEventListener('resize', positionSuggestionsPanel);
-        window.removeEventListener('scroll', positionSuggestionsPanel, true);
-        suggestionsContainer.remove();
-        overlay.remove();
-        if (!isConfirmed && onCancel) {
-            onCancel();
-        }
-    };
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            e.preventDefault();
-            e.stopPropagation();
-            closeModal(false);
-        }
-    });
-    modalContainer.querySelector('#cancel-change-source').addEventListener('click', () => closeModal(false));
+    const addedSourcesList = modalContainer.querySelector('#added-sources-list');
 
     const processUri = async (uri) => {
+        if (sourceDataCache.has(uri)) return sourceDataCache.get(uri);
+
+        if (uri.includes('start-group') || uri.includes(':folder:')) {
+            const findFolder = (items) => {
+                for (const item of items) {
+                    if (item.uri === uri) return item;
+                    if (item.children) {
+                        const found = findFolder(item.children);
+                        if (found) return found;
+                    }
+                }
+                return null;
+            };
+            
+            const folderObj = findFolder(libraryData);
+            const data = {
+                uri: uri,
+                name: folderObj ? folderObj.name : "Folder",
+                info: "Folder",
+                coverUrl: null,
+                isStatic: true,
+                type: 'folder',
+                totalTracks: 'N/A'
+            };
+            sourceDataCache.set(uri, data);
+            return data;
+        }
+
         const uriObj = Spicetify.URI.fromString(uri);
         const newUri = uriObj.toURI();
         let newSourceData = { uri: newUri };
@@ -13826,24 +13734,318 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
                 }
             }
-        } else {
-            throw new Error("Unsupported link type. Please use a Playlist, Album, or Artist link.");
         }
+        
+        sourceDataCache.set(newUri, newSourceData);
         return newSourceData;
     };
+
+    const renderAddedSourcesList = () => {
+        addedSourcesList.innerHTML = '';
+        
+        const manualItems = Array.from(manuallyAddedUris);
+        
+        if (manualItems.length === 0) {
+            addedSourcesList.style.display = 'none';
+            return;
+        }
+
+        addedSourcesList.style.display = 'flex';
+        manualItems.forEach(uri => {
+            const data = sourceDataCache.get(uri);
+            if (!data || !data.name) return;
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'library-item manual-item';
+            
+            itemDiv.innerHTML = `
+                <img src="${data.coverUrl || ''}" class="library-item-cover" onerror="this.style.display='none'">
+                <div class="library-item-text">
+                    <span class="library-item-title">${data.name}</span>
+                    <span class="library-item-info">${data.info || 'Added via link'}</span>
+                </div>
+                <button class="remove-manual-btn" title="Remove">
+                    <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"></path></svg>
+                </button>
+            `;
+
+            itemDiv.querySelector('.remove-manual-btn').onclick = (e) => {
+                e.stopPropagation();
+                manuallyAddedUris.delete(uri);
+                selectedSources.delete(uri);
+                
+                const libEl = libraryContainer.querySelector(`[data-uri="${uri}"]`);
+                if (libEl) libEl.classList.remove('selected');
+                
+                renderAddedSourcesList();
+            };
+            
+            addedSourcesList.appendChild(itemDiv);
+        });
+    };
+
+    const getNestedUris = (item) => {
+        let uris = (item.type === 'folder') ? [] : [item.uri];
+        if (item.children) {
+            item.children.forEach(child => {
+                uris = uris.concat(getNestedUris(child));
+            });
+        }
+        return uris;
+    };
+
+    const toggleSelection = (item, element) => {
+        if (!isMultiSelect) {
+            if (item.type === 'folder') return;
+            selectedSources.clear();
+            manuallyAddedUris.clear();
+            renderAddedSourcesList();
+            libraryContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+            selectedSources.add(item.uri);
+            element.classList.add('selected');
+            return;
+        }
+        
+        const urisToToggle = getNestedUris(item);
+        if (urisToToggle.length === 0) return; 
+
+        const shouldSelect = !element.classList.contains('selected');
+
+        urisToToggle.forEach(u => {
+            if (shouldSelect) {
+                selectedSources.add(u);
+            } else {
+                selectedSources.delete(u);
+                if (manuallyAddedUris.has(u)) {
+                    manuallyAddedUris.delete(u);
+                    renderAddedSourcesList();
+                }
+            }
+            
+            const elements = libraryContainer.querySelectorAll(`[data-uri="${u}"]`);
+            elements.forEach(el => el.classList.toggle('selected', shouldSelect));
+        });
+
+        if (item.type === 'folder') {
+            element.classList.toggle('selected', shouldSelect);
+        }
+    };
+
+    const renderTree = (items, container, filterText = '') => {
+        container.innerHTML = '';
+        
+        if (items.length === 0) {
+             container.innerHTML = '<div style="text-align: center; color: #b3b3b3; font-size: 13px; padding: 10px;">No items found</div>';
+             return;
+        }
+
+        items.forEach(item => {
+            const matchesFilter = !filterText || item.name.toLowerCase().includes(filterText.toLowerCase());
+            
+            if (item.type === 'folder') {
+                const hasMatchingChild = (node) => {
+                    if (node.name.toLowerCase().includes(filterText.toLowerCase())) return true;
+                    if (node.children) return node.children.some(hasMatchingChild);
+                    return false;
+                };
+
+                if (filterText && !hasMatchingChild(item)) return;
+
+                const folderDiv = document.createElement('div');
+                folderDiv.className = 'folder-container';
+                
+                const header = document.createElement('div');
+                header.className = 'folder-header';
+                header.dataset.uri = item.uri;
+                if (selectedSources.has(item.uri)) header.classList.add('selected');
+
+                header.innerHTML = `
+                    <button class="caret-btn">${caretIconSvg}</button>
+                    ${folderIconSvg}
+                    <div class="library-item-text">
+                        <span class="library-item-title">${item.name}</span>
+                        <span class="library-item-info">Folder</span>
+                    </div>
+                `;
+
+                const childrenContainer = document.createElement('div');
+                childrenContainer.className = 'folder-children';
+
+                const caretBtn = header.querySelector('.caret-btn');
+                const caretIcon = caretBtn.querySelector('.caret-icon');
+                
+                const toggleExpand = (e) => {
+                    e.stopPropagation();
+                    const isExpanded = childrenContainer.classList.contains('expanded');
+                    if (isExpanded) {
+                        childrenContainer.classList.remove('expanded');
+                        caretIcon.classList.remove('rotated');
+                    } else {
+                        childrenContainer.classList.add('expanded');
+                        caretIcon.classList.add('rotated');
+                        if (!childrenContainer.hasChildNodes()) {
+                            renderTree(item.children, childrenContainer, filterText);
+                        }
+                    }
+                };
+
+                caretBtn.addEventListener('click', toggleExpand);
+
+                header.addEventListener('click', (e) => {
+                    if (e.target.closest('.caret-btn')) return;
+                    toggleSelection(item, header);
+                });
+                
+                if (filterText) {
+                    childrenContainer.classList.add('expanded');
+                    caretIcon.classList.add('rotated');
+                    renderTree(item.children, childrenContainer, filterText);
+                }
+
+                folderDiv.appendChild(header);
+                folderDiv.appendChild(childrenContainer);
+                container.appendChild(folderDiv);
+
+            } else {
+                if (!matchesFilter) return;
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'library-item';
+                itemDiv.dataset.uri = item.uri;
+                if (selectedSources.has(item.uri)) itemDiv.classList.add('selected');
+
+                itemDiv.innerHTML = `
+                    <img src="${item.coverUrl || ''}" class="library-item-cover" onerror="this.style.display='none'">
+                    <div class="library-item-text">
+                        <span class="library-item-title">${item.name}</span>
+                        <span class="library-item-info">${item.info}</span>
+                    </div>
+                `;
+
+                itemDiv.addEventListener('click', () => {
+                    toggleSelection(item, itemDiv);
+                });
+
+                container.appendChild(itemDiv);
+            }
+        });
+    };
+
+    searchInput.addEventListener('input', () => {
+        const text = searchInput.value.trim();
+        clearButton.style.display = text.length > 0 ? 'block' : 'none';
+        
+        const looksLikeLink = text.includes('spotify.com') || text.includes('spotify:') || text.includes('http');
+        
+        if (looksLikeLink) {
+            addButton.style.display = 'flex';
+            clearButton.style.right = '45px'; 
+            searchInput.style.paddingRight = '75px';
+        } else {
+            addButton.style.display = 'none';
+            clearButton.style.right = '10px';
+            searchInput.style.paddingRight = '35px';
+        }
+        
+        renderTree(libraryData, libraryContainer, text);
+    });
+
+    clearButton.addEventListener('click', () => {
+        searchInput.value = '';
+        clearButton.style.display = 'none';
+        addButton.style.display = 'none';
+        clearButton.style.right = '10px';
+        searchInput.style.paddingRight = '35px';
+        renderTree(libraryData, libraryContainer, '');
+        searchInput.focus();
+    });
+
+    addButton.addEventListener('click', async () => {
+        let url = searchInput.value.trim();
+        if (!url) return;
+
+        if (!url.startsWith('http') && !url.startsWith('spotify:') && url.includes('spotify.com')) {
+            url = 'https://' + url;
+        }
+        
+        try {
+            const uriObj = Spicetify.URI.fromString(url);
+            const uri = uriObj.toURI();
+
+            if (uri.includes('start-group') || uri.includes(':folder:')) {
+                showNotification("Cannot add folders via link. Please select it from the library list below.", 'warning');
+                return;
+            }
+            
+            if (selectedSources.has(uri)) {
+                 showNotification("Source already selected.", 'warning');
+                 searchInput.value = '';
+                 addButton.style.display = 'none';
+                 clearButton.style.display = 'none';
+                 clearButton.style.right = '10px';
+                 searchInput.style.paddingRight = '35px';
+                 renderTree(libraryData, libraryContainer, '');
+                 return;
+            }
+
+            addButton.disabled = true;
+            const originalText = addButton.innerHTML;
+            addButton.innerHTML = '<div class="loader" style="width:14px;height:14px;border-width:2px;"></div>';
+            
+            try {
+                const data = await processUri(uri);
+                
+                if (!data || !data.name) {
+                    throw new Error("Could not fetch valid source details.");
+                }
+
+                selectedSources.add(uri);
+                manuallyAddedUris.add(uri);
+                renderAddedSourcesList();
+                
+                const libEl = libraryContainer.querySelector(`[data-uri="${uri}"]`);
+                if (libEl) libEl.classList.add('selected');
+
+                searchInput.value = '';
+                addButton.style.display = 'none';
+                clearButton.style.display = 'none';
+                clearButton.style.right = '10px';
+                searchInput.style.paddingRight = '35px';
+                renderTree(libraryData, libraryContainer, '');
+            } catch (e) {
+                showNotification("Invalid source or fetch failed.", true);
+            } finally {
+                addButton.disabled = false;
+                addButton.innerHTML = originalText;
+            }
+        } catch (e) {
+             showNotification("Invalid Spotify link.", true);
+        }
+    });
+
+    const closeModal = (isConfirmed = false) => {
+        overlay.remove();
+        if (!isConfirmed && onCancel) onCancel();
+    };
+
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
+    modalContainer.querySelector('#cancel-change-source').addEventListener('click', () => closeModal(false));
 
     modalContainer.querySelector('#confirm-change-source').addEventListener('click', async (e) => {
         const confirmButton = e.currentTarget;
         const url = searchInput.value.trim();
         
-        if (url && url.startsWith('http')) {
+        if (url) {
             try {
                 const uriObj = Spicetify.URI.fromString(url);
                 selectedSources.add(uriObj.toURI());
-            } catch (err) {
-                showNotification("Invalid Spotify link pasted.", true);
-                return;
-            }
+            } catch (err) {}
         }
 
         if (selectedSources.size === 0) {
@@ -13859,7 +14061,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             onSourceChanged(sourcesData);
             closeModal(true);
         } catch (error) {
-            showNotification(error.message || "Invalid or unsupported Spotify link.", true);
+            showNotification(error.message || "Error processing selections.", true);
             console.error("Error parsing source URL(s):", error);
         } finally {
             confirmButton.disabled = false;
@@ -13867,42 +14069,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
 
-    document.body.appendChild(overlay);
-    overlay.appendChild(modalContainer);
-
-    const container = modalContainer.querySelector('#user-library-container');
     try {
-        const libraryItems = await libraryItemsPromise;
-        if (libraryItems && libraryItems.length > 0) {
-            container.innerHTML = libraryItems.map(item => `
-                <div class="library-item" data-uri="${item.uri}">
-                    <img src="${item.coverUrl || ''}" class="library-item-cover">
-                    <div class="library-item-text">
-                        <span class="library-item-title" title="${item.name}">${item.name}</span>
-                        <span class="library-item-info">${item.info}</span>
-                    </div>
-                </div>
-            `).join('');
-
-            container.querySelectorAll('.library-item').forEach(itemEl => {
-                itemEl.addEventListener('click', async () => {
-                    const uri = itemEl.dataset.uri;
-                    if (selectedSources.has(uri)) {
-                        selectedSources.delete(uri);
-                        itemEl.classList.remove('selected');
-                    } else {
-                        selectedSources.add(uri);
-                        itemEl.classList.add('selected');
-                    }
-                });
-            });
-            
+        libraryData = await libraryItemsPromise;
+        if (libraryData) {
+            renderTree(libraryData, libraryContainer);
         } else {
-            container.innerHTML = '<div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Could not load library.</div>';
+            libraryContainer.innerHTML = '<div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Could not load library.</div>';
         }
     } catch (error) {
         console.error("Failed to load library for modal:", error);
-        container.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>';
+        libraryContainer.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>';
     }
   }
 
@@ -19702,6 +19878,49 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   };
 
+  async function getTracksFromFolder(folderUri) {
+      try {
+          const rootlist = await Spicetify.Platform.RootlistAPI.getContents();
+          
+          const findFolderItems = (items, targetUri) => {
+              for (const item of items) {
+                  if (item.uri === targetUri) return item.items || [];
+                  if (item.type === 'folder' && item.items) {
+                      const found = findFolderItems(item.items, targetUri);
+                      if (found) return found;
+                  }
+              }
+              return null;
+          };
+
+          const folderItems = findFolderItems(rootlist.items, folderUri);
+          if (!folderItems) return [];
+
+          const allTracks = [];
+          
+          const traverseAndFetch = async (items) => {
+              for (const item of items) {
+                  if (item.type === 'playlist') {
+                      try {
+                          const tracks = await getPlaylistTracks(item.uri.split(':')[2]);
+                          if (tracks) allTracks.push(...tracks);
+                      } catch (e) {
+                          console.warn(`Failed to fetch tracks from playlist ${item.name} inside folder`, e);
+                      }
+                  } else if (item.type === 'folder' && item.items) {
+                      await traverseAndFetch(item.items);
+                  }
+              }
+          };
+
+          await traverseAndFetch(folderItems);
+          return allTracks;
+      } catch (e) {
+          console.error("Error getting tracks from folder:", e);
+          return [];
+      }
+  }
+
   async function getPlaylistTracks(playlistId) {
     try {
         if (!playlistId || typeof playlistId !== 'string') {
@@ -23047,7 +23266,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function isDefaultMosaicCover(url) {
     if (!url) return false;
-    return url.startsWith("spotify:mosaic:") || url.includes("mosaic.scdn.co");
+    return url.startsWith("spotify:mosaic:") || url.includes("mosaic.scdn.co") || url.includes("ab67616d");
   }
   
   async function generatePlaylistCover(titleText, subtitleText, userName, baseImageUrl, textColor) {
@@ -27708,51 +27927,79 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         } else if (sortType === "excludeByPlaylist") {
             if (!isHeadless) mainButton.innerText = "Select...";
             
-            let exclusionSource = null;
+            let exclusionSources = [];
             await new Promise(resolve => {
                 showChangeSourceModal(
-                    "Select Playlist to Exclude", 
+                    "Select Playlists to Exclude", 
                     fetchUserLibrary(), 
                     (sources) => {
-                        exclusionSource = sources ? sources[0] : null;
+                        exclusionSources = sources || [];
                         resolve();
                     }, 
-                    false, 
-                    "Tracks in the selected playlist will be removed from your current list.",
+                    true, 
+                    "Tracks in the selected playlists will be removed from your current list.",
                     () => resolve()
                 );
             });
 
-            if (!exclusionSource) {
+            if (exclusionSources.length === 0) {
+                if (!isHeadless) resetButtons();
                 return;
             }
 
             if (!isHeadless) mainButton.innerText = "Fetching...";
             
-            let exclusionUris = new Set();
+            let exTracks = [];
             try {
-                let exTracks = [];
-                if (URI.isPlaylistV1OrV2(exclusionSource.uri)) {
-                    exTracks = await getPlaylistTracks(exclusionSource.uri.split(":")[2]);
-                } else if (URI.isAlbum(exclusionSource.uri)) {
-                    exTracks = await getAlbumTracks(exclusionSource.uri.split(":")[2]);
-                } else if (isLikedSongsPage(exclusionSource.uri)) {
-                    exTracks = await getLikedSongs();
-                }
+                const fetchPromises = exclusionSources.map(async (source) => {
+                    if (URI.isPlaylistV1OrV2(source.uri)) {
+                        return await getPlaylistTracks(source.uri.split(":")[2]);
+                    } else if (URI.isAlbum(source.uri)) {
+                        return await getAlbumTracks(source.uri.split(":")[2]);
+                    } else if (isLikedSongsPage(source.uri)) {
+                        return await getLikedSongs();
+                    } else if (source.type === 'folder' || source.uri.includes('start-group') || source.uri.includes(':folder:')) {
+                        return await getTracksFromFolder(source.uri);
+                    }
+                    return [];
+                });
                 
-                exTracks.forEach(t => exclusionUris.add(t.uri));
+                const results = await Promise.all(fetchPromises);
+                exTracks = results.flat();
             } catch(e) {
-                showNotification("Failed to fetch exclusion playlist.", true);
+                showNotification("Failed to fetch exclusion playlists.", true);
                 if (!isHeadless) resetButtons();
                 return;
             }
 
-            if (!isHeadless) mainButton.innerText = "Filtering...";
+            if (!isHeadless) mainButton.innerText = "Processing...";
             
-            sortedTracks = uniqueTracks.filter(t => !exclusionUris.has(t.uri));
+            const preparedExTracks = await fetchPopularityForMultipleTracks(
+                exTracks, 
+                (progress) => { if (!isHeadless) mainButton.innerText = `Meta ${Math.floor(progress)}%`; }
+            );
+            
+            const markedExTracks = preparedExTracks.map(t => ({ 
+                ...t, 
+                _isExclusion: true,
+                popularity: 1000,
+                durationMs: t.durationMs || t.durationMilis || (t.track && t.track.duration_ms) || 0
+            }));
+            
+            const combinedTracks = [...markedExTracks, ...uniqueTracks];
+
+            const dedupeResult = await deduplicateTracks(
+                combinedTracks, 
+                true, 
+                false,
+                () => { if (!isHeadless) mainButton.innerText = "Comparing..."; },
+                'excludeByPlaylist'
+            );
+
+            sortedTracks = dedupeResult.unique.filter(t => !t._isExclusion);
 
             if (sortedTracks.length === uniqueTracks.length) {
-                showNotification("No matches found in the excluded playlist.");
+                showNotification("No matches found in the excluded playlists.");
                 if (!isHeadless) resetButtons();
                 return;
             }
