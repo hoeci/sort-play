@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.54.0";
+  const SORT_PLAY_VERSION = "5.54.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -25356,6 +25356,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (dateB !== dateA) {
                 return dateB - dateA;
             }
+
+            const artistA = (a.artists && a.artists[0] && a.artists[0].name) || '';
+            const artistB = (b.artists && b.artists[0] && b.artists[0].name) || '';
+            const artistCompare = artistA.localeCompare(artistB);
+            if (artistCompare !== 0) {
+                return artistCompare;
+            }
         
             const albumNameA = a.album.name || '';
             const albumNameB = b.album.name || '';
@@ -25363,8 +25370,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (albumCompare !== 0) {
                 return albumCompare; 
             }
+
+            const discA = a.disc_number || 1;
+            const discB = b.disc_number || 1;
+            if (discA !== discB) {
+                return discA - discB;
+            }
         
-            return a.track_number - b.track_number;
+            return (a.track_number || 0) - (b.track_number || 0);
         });
 
         const trackUris = genuinelyNewTracks.map(track => track.uri);
