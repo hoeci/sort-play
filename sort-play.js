@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.55.0";
+  const SORT_PLAY_VERSION = "5.55.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -89,7 +89,6 @@
   let showAlbumColumn = false;
   let showArtistColumn = false; 
   let removeDateAdded = false;
-  let playlistDeduplicate = false;
   let showRemovedDuplicates = false;
   let addToQueueEnabled = false; 
   let createPlaylistAfterSort = true; 
@@ -1142,7 +1141,6 @@
     selectedArtistColumnType = localStorage.getItem("sort-play-selected-artist-column-type") || "releaseDate"; 
     releaseDateFormat = localStorage.getItem("sort-play-release-date-format") || 'YYYY-MM-DD';
     removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
-    playlistDeduplicate = localStorage.getItem("sort-play-playlist-deduplicate-v2") === "true";
     showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
@@ -1237,7 +1235,6 @@
     localStorage.setItem("sort-play-selected-artist-column-type", selectedArtistColumnType);
     localStorage.setItem("sort-play-release-date-format", releaseDateFormat);
     localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
-    localStorage.setItem("sort-play-playlist-deduplicate-v2", playlistDeduplicate);
     localStorage.setItem("sort-play-show-removed-duplicates", showRemovedDuplicates);
     localStorage.setItem("sort-play-include-song-stats", includeSongStats);
     localStorage.setItem("sort-play-include-lyrics", includeLyrics);
@@ -2591,21 +2588,6 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
-    <div class="setting-row" id="playlistDeduplicate">
-        <label class="col description">
-            Remove Duplicate Tracks While Sorting
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">Can make sorting slower.<br><br>This setting won't affect artist pages or tracks with identical URLs</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" ${playlistDeduplicate ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
     <div class="setting-row" id="showRemovedDuplicates">
         <label class="col description">Show Removed Duplicates</label>
         <div class="col action">
@@ -2851,7 +2833,6 @@
     const albumKeyDropdownContainer = modalContainer.querySelector("#albumKeyDropdownContainer");
     const artistKeyDropdownContainer = modalContainer.querySelector("#artistKeyDropdownContainer");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
-    const playlistDeduplicateToggle = modalContainer.querySelector("#playlistDeduplicate input");
     const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
@@ -3490,11 +3471,6 @@
 
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
-    });
-
-    playlistDeduplicateToggle.addEventListener("change", () => {
-        playlistDeduplicate = playlistDeduplicateToggle.checked;
-        saveSettings();
     });
 
     showRemovedDuplicatesToggle.addEventListener("change", () => {
@@ -15483,7 +15459,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let jobFilters = isEditing ? (jobToEdit.filters || {}) : {};
         let sources = isEditing ? [...jobToEdit.sources] : [];
 
-        let currentDeduplicate = isEditing ? jobToEdit.deduplicate : playlistDeduplicate;
+        let currentDeduplicate = isEditing ? jobToEdit.deduplicate : false;
         let currentUpdateFromSource = isEditing ? jobToEdit.updateFromSource : (localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === null ? true : localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === 'true');
         
         const savedSortType = localStorage.getItem(STORAGE_KEY_DYNAMIC_SORT_TYPE) || 'playCount';
@@ -20991,7 +20967,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (uniqueAlbumIds.length > 0) {
         let processedAlbums = 0;
         const totalAlbums = uniqueAlbumIds.length;
-        const CONCURRENCY_LIMIT = 10;
+        
+        let CONCURRENCY_LIMIT = 6;
+        if (totalAlbums <= 50) {
+            CONCURRENCY_LIMIT = 15;
+        } else if (totalAlbums <= 400) {
+            CONCURRENCY_LIMIT = 10;
+        } else if (totalAlbums <= 1000) {
+            CONCURRENCY_LIMIT = 8;
+        }
 
         async function worker(queue) {
             while (queue.length > 0) {
@@ -27389,13 +27373,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (isArtistPage) {
             tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType);
         }
-        else if (playlistDeduplicate || sortType === 'deduplicateOnly') {
+        else if (sortType === 'deduplicateOnly') {
             if (!isHeadless) mainButton.innerText = "Enriching...";
             
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
               tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.40)}%`; }
             );
-
+    
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
               tracksWithPlayCounts, 
               (progress) => { if (!isHeadless) mainButton.innerText = `${40 + Math.floor(progress * 0.60)}%`; }
@@ -29621,7 +29605,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
 
   async function deduplicateTracks(tracks, force = false, isArtistPageContext = false, updateProgress = () => {}, sortType = null) {
-    if (!force && !playlistDeduplicate && !isArtistPageContext) {
+    if (!force && !isArtistPageContext) {
         return { unique: tracks, removed: [] };
     }
 
@@ -32025,7 +32009,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const isAlbum = Spicetify.URI.isAlbum(currentUri);
                     const albumIdFromUrl = isAlbum ? currentUri.split(':')[2] : null;
 
-                    await Promise.all(idsToFetchFromApi.map(async (id) => {
+                    const processItem = async (id) => {
                         let t = null;
                         const props = propsMap.get(id);
                         
@@ -32047,9 +32031,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             }
                         }
                         
-                        if (!t) t = await fetchInternalTrackMetadata(id);
+                        if (!t) {
+                            t = await fetchInternalTrackMetadata(id);
+                            if (t) {
+                                idb.set('trackMetadata', t.id, t);
+                            }
+                        }
                         await processTrackData(t);
-                    }));
+                    };
+
+                    const CONCURRENCY_LIMIT = 5;
+                    const queue = [...idsToFetchFromApi];
+                    const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
+                        while (queue.length > 0) {
+                            const id = queue.shift();
+                            if (id) await processItem(id);
+                        }
+                    });
+                    
+                    await Promise.all(workers);
                 };
 
                 if (isFallbackActive()) {
@@ -32058,7 +32058,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     try {
                         const resp = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${idsToFetchFromApi.join(',')}`);
                         if (resp?.tracks) {
-                            await Promise.all(resp.tracks.map(processTrackData));
+                            await Promise.all(resp.tracks.map(async (detailedTrack) => {
+                                if (detailedTrack) {
+                                    const cacheData = {
+                                        name: detailedTrack.name,
+                                        album: {
+                                            name: detailedTrack.album.name,
+                                            id: detailedTrack.album.id,
+                                            uri: detailedTrack.album.uri,
+                                            release_date: detailedTrack.album.release_date
+                                        },
+                                        artists: detailedTrack.artists.map(a => ({ id: a.id, name: a.name, uri: a.uri })),
+                                        duration_ms: detailedTrack.duration_ms,
+                                        popularity: detailedTrack.popularity,
+                                        external_ids: detailedTrack.external_ids,
+                                        id: detailedTrack.id,
+                                        uri: detailedTrack.uri
+                                    };
+                                    idb.set('trackMetadata', detailedTrack.id, cacheData);
+                                    await processTrackData(detailedTrack);
+                                }
+                            }));
                         }
                     } catch(e) {
                         if (registerWebApiFailure()) await fetchAndProcessInternal();
