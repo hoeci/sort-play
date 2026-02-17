@@ -32,7 +32,7 @@ Old Like Button returns the heart icon. Display Now Playing Data and Interactive
 Load complete collections from all releases with intelligent deduplication that keeps the most popular versions.
 
 ### ➕ Smart Shuffle & Flow
-Intelligent Shuffle prevents artist repeats. Vibe & Flow Shuffle if enabled creates dynamic listening journeys by arranging tracks harmonically based on Tempo and Key.
+Intelligent Shuffle prevents artist repeats. Vibe & Flow Shuffle, if enabled, creates dynamic listening journeys by arranging tracks harmonically based on Tempo and Key.
 
 ### ➕ Dedicated Playlist Creation
 Generate My Top Tracks, New Releases from Followed Artists, Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery), Genre Tree/Random Explorer, and Last.fm Generators (Infinite Vibe, Neighbors Mix) with automated updates and customizable limits.
