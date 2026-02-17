@@ -4,6 +4,8 @@
 
 # Sort-Play: The Ultimate Spotify Toolkit
 
+*A Spicetify extension that adds powerful sorting, filtering, and more to the Spotify desktop client.*
+
 <p>
   <a href="https://spicetify.app/docs/getting-started"><img src="https://img.shields.io/badge/Spicetify-Marketplace-1DB954?style=for-the-badge&logo=spotify" alt="Spicetify Marketplace"></a>
   <a href="https://github.com/hoeci/sort-play"><img src="https://img.shields.io/github/stars/hoeci/sort-play?style=for-the-badge&logo=github&color=eac54f" alt="GitHub Stars"></a>
@@ -15,43 +17,43 @@
 ## ⚡️ Features
 
 ### ➕ Comprehensive Sorting
-Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, Last.fm Scrobbles, My Scrobbles, Last Scrobbled, Energy Wave, Album Color, and audio features like Tempo, Energy, Danceability, Valence, Acousticness, and Instrumentalness.
+Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, Last.fm Scrobbles, My Scrobbles, Last Scrobbled, Album Color, and Tempo (BPM).
 
-### ➕ Flexible Output Options
-Save as new playlist, modify current playlist, add to queue. Configure playlist privacy and automatic titling.
+### ➕ Quick Filters
+Instantly apply filters. Deduplicate tracks, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
 
 ### ➕ Extra Data Columns
-Add up to two extra data columns to playlists and one to albums/artists. Display Play Count, Release Date, Scrobbles, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info with custom formatting.
+Add up to two extra data columns to playlists and one to albums/artists. Display Play Count, Release Date, Scrobbles, Key, BPM, Popularity, and DJ Info (Key + BPM) with custom formatting.
 
-### ➕ Smart Shuffle & Flow
-Intelligent Shuffle prevents artist repeats. Vibe & Flow Shuffle creates dynamic listening journeys based on energy and mood.
+### ➕ UI & Enhancements
+Old Like Button returns the heart icon. Display Now Playing Data and Interactive Genre Tags in the player bar.
 
 ### ➕ Full Artist Discography
 Load complete collections from all releases with intelligent deduplication that keeps the most popular versions.
 
-### ➕ Quick Filters
-Instantly apply filters without complex menus. Deduplicate tracks, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
-
-### ➕ Advanced Custom Filter
-Filter by keywords (track, album, artist) and range sliders (Release Date, Duration, Play Count, Popularity, Tempo, Energy, Danceability, Valence). View results in an interactive table with integrated mini-player. Save and load keyword sets.
-
-### ➕ Genre Filtering
-Filter by genre using combined Spotify, Deezer and Last.fm data with intelligent mapping. Browse with track counts, search, and "match all" option.
-
-### ➕ Dynamic Playlists
-Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies genre or keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
+### ➕ Smart Shuffle & Flow
+Intelligent Shuffle prevents artist repeats. Vibe & Flow Shuffle if enabled creates dynamic listening journeys by arranging tracks harmonically based on Tempo and Key.
 
 ### ➕ Dedicated Playlist Creation
 Generate My Top Tracks, New Releases from Followed Artists, Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery), Genre Tree/Random Explorer, and Last.fm Generators (Infinite Vibe, Neighbors Mix) with automated updates and customizable limits.
 
-### ➕ AI-Powered Playlists
-Generate playlists from natural language prompts using Google Gemini. Context-aware with customizable instructions, model selection, and data toggles. Use your own API key.
+### ➕ Dynamic Playlists
+Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies genre or keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
+
+### ➕ Advanced Custom Filter
+Filter by keywords (track, album, artist) and range sliders (Release Date, Duration, Play Count, Popularity, and Tempo). View results in an interactive table with integrated mini-player. Save and load keyword sets.
+
+### ➕ Genre Filtering
+Filter by genre using combined Spotify, Deezer and Last.fm data with intelligent mapping. Browse with track counts, search, and "match all" option.
+
+### ➕ AI Pick
+Use AI to select specific songs from your current list based on natural language prompts. Powered by Google Gemini with customizable instructions, model selection, and data toggles.
 
 ### ➕ Local File Integration
 Automatic conversion when sorting/filtering. Dedicated tool converts Local Files library to Spotify playlist with detailed export reports.
 
-### ➕ UI & Enhancements
-Old Like Button returns the heart icon. Display Now Playing Data and Interactive Genre Tags in the player bar. Automatic playlist organization into "Sort-Play Library" folder. Configurable sort order, auto-open after sorting, and deduplication reports.
+### ➕ Flexible Output Options
+Save as new playlist, modify current playlist, add to queue. Configure playlist privacy and automatic titling. Automatic playlist organization into "Sort-Play Library" folder.
 
 ## 📷 Screenshots 
 <table>
