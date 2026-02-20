@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.55.1";
+  const SORT_PLAY_VERSION = "5.55.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -30775,6 +30775,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   function getTracklistTrackUri(tracklistElement) {
+    const reactPropsKey = Object.keys(tracklistElement).find(key => key.startsWith("__reactProps$"));
+    if (reactPropsKey) {
+        const props = tracklistElement[reactPropsKey];
+        
+        const findUri = (obj, maxDepth = 10, visited = new Set()) => {
+            if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
+            visited.add(obj);
+            if (obj.hasOwnProperty('uri') && typeof obj.uri === 'string' && (obj.uri.startsWith('spotify:track:') || obj.uri.startsWith('spotify:local:'))) return obj.uri;
+            for (const k in obj) {
+                if (['children', 'props', 'value', 'item', 'track'].includes(k) || !isNaN(k)) {
+                    const res = findUri(obj[k], maxDepth - 1, visited);
+                    if (res) return res;
+                }
+            }
+            return null;
+        };
+        
+        const uri = findUri(props);
+        if (uri) return uri;
+    }
+
     let values = Object.values(tracklistElement);
     if (!values || !values[0]?.pendingProps) {
         return null;
@@ -30787,7 +30808,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             ?.uri ||
         values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
     );
-}
+  }
 
   const waitForElement = (selector) => {
     return new Promise((resolve) => {
@@ -31015,6 +31036,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const props = trackElement[reactPropsKey];
     if (!props) return null;
+
+    const findItem = (obj, maxDepth = 10, visited = new Set()) => {
+        if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
+        visited.add(obj);
+        if (obj.uri && obj.name && Array.isArray(obj.artists)) {
+            return obj;
+        }
+        if (obj.item && obj.item.uri && obj.item.name && Array.isArray(obj.item.artists)) {
+            return obj.item;
+        }
+        for (const k in obj) {
+            if (['children', 'props', 'value', 'item', 'track'].includes(k) || !isNaN(k)) {
+                const res = findItem(obj[k], maxDepth - 1, visited);
+                if (res) return res;
+            }
+        }
+        return null;
+    };
+
+    const trackData = findItem(props);
+    if (trackData) return trackData;
 
     const potentialPaths = [
         () => props.children?.props?.item,
@@ -32183,7 +32225,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     element.style.color = "var(--spice-subtext)";
   }
   
-  async function updateTracklist() {
+  function updateTracklist() {
     const currentUri = getCurrentUri();
     const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
 
@@ -32204,7 +32246,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       for (const tracklist_ of tracklists) {
         if (!tracklist_) continue;
   
-        await updateTracklistStructure(tracklist_);
+        updateTracklistStructure(tracklist_);
 
         requestAnimationFrame(() => {
           loadAdditionalColumnData(tracklist_);
@@ -32215,7 +32257,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       if (recommendationContainer) {
         const recTracklist = recommendationContainer.querySelector('.main-trackList-trackList');
         if (recTracklist && !recTracklist.classList.contains('main-trackList-indexable')) {
-          await updateRecommendationTracklistStructure(recTracklist);
+          updateRecommendationTracklistStructure(recTracklist);
           requestAnimationFrame(() => {
             loadAdditionalColumnData(recTracklist);
           });
@@ -32226,7 +32268,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
   
-  async function updateTracklistStructure(tracklist_) {
+  function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
     
@@ -32234,269 +32276,174 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     if (!isValidPlaylistPage && !isSearch) return;
 
-    await new Promise(resolve => requestAnimationFrame(resolve));
-
     const tracklistHeader = tracklist_.querySelector(".main-trackList-trackListHeaderRow");
-    if (!tracklistHeader) {
-      return;
-    }
+    if (!tracklistHeader) return;
 
     const currentPlaylistName = getCurrentPlaylistName();
     const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
     const shouldRemoveDateAdded = !isSearch && removeDateAdded && !isExcludedPlaylist;
-    const gridCss = getGridCss(shouldRemoveDateAdded);
+
+    const nativeHeaders = Array.from(tracklistHeader.querySelectorAll('[role="columnheader"]'))
+        .filter(el => !el.classList.contains('sort-play-column') && !el.classList.contains('sort-play-second-column'));
+    
+    if (nativeHeaders.length === 0) return;
+    
+    const endHeaderCell = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
+    const variableHeaders = nativeHeaders.filter(el => el.classList.contains('main-trackList-rowSectionVariable'));
+    
+    let dateAddedHeaderCell = null;
+    variableHeaders.forEach(el => {
+        if (el.innerText.includes('Date added') || el.innerText.includes('Date Added') || el.innerText.includes('Added')) {
+            dateAddedHeaderCell = el;
+        }
+    });
+    if (!dateAddedHeaderCell && variableHeaders.length > 0) {
+        dateAddedHeaderCell = variableHeaders[variableHeaders.length - 1];
+    }
+
+    const dateAddedIndexAttr = dateAddedHeaderCell ? dateAddedHeaderCell.getAttribute("aria-colindex") : null;
 
     const existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
     const headerTextSpan = existingHeaderColumn?.querySelector("span");
     const existingSecondHeaderColumn = tracklistHeader.querySelector(".sort-play-second-column");
     const secondHeaderTextSpan = existingSecondHeaderColumn?.querySelector("span");
 
-    let expectedHeaderText;
-    switch (selectedColumnType) {
-        case 'playCount': expectedHeaderText = "Plays"; break;
-        case 'popularity': expectedHeaderText = "Popularity"; break;
-        case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
-        case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
-        case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
-        case 'djInfo': expectedHeaderText = "DJ Info"; break;
-        case 'key': expectedHeaderText = "Key"; break;
-        case 'tempo': expectedHeaderText = "BPM"; break;
-        case 'energy': expectedHeaderText = "Energy"; break;
-        case 'danceability': expectedHeaderText = "Dance"; break;
-        case 'valence': expectedHeaderText = "Valence"; break;
-        default: expectedHeaderText = "Plays";
-    }
+    const expectedHeaderText = {
+        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date",
+        'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
+        'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
+        'danceability': "Dance", 'valence': "Valence"
+    }[selectedColumnType] || "Plays";
     const columnTypeChanged = existingHeaderColumn && headerTextSpan?.innerText !== expectedHeaderText;
 
-    let expectedSecondHeaderText;
-    switch (selectedSecondColumnType) {
-        case 'playCount': expectedSecondHeaderText = "Plays"; break;
-        case 'popularity': expectedSecondHeaderText = "Popularity"; break;
-        case 'releaseDate': expectedSecondHeaderText = "Rel. Date"; break;
-        case 'scrobbles': expectedSecondHeaderText = "Scrobbles"; break;
-        case 'personalScrobbles': expectedSecondHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
-        case 'djInfo': expectedSecondHeaderText = "DJ Info"; break;
-        case 'key': expectedSecondHeaderText = "Key"; break;
-        case 'tempo': expectedSecondHeaderText = "BPM"; break;
-        case 'energy': expectedSecondHeaderText = "Energy"; break;
-        case 'danceability': expectedSecondHeaderText = "Dance"; break;
-        case 'valence': expectedSecondHeaderText = "Valence"; break;
-        default: expectedSecondHeaderText = "Popularity";
-    }
+    const expectedSecondHeaderText = {
+        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date",
+        'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
+        'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
+        'danceability': "Dance", 'valence': "Valence"
+    }[selectedSecondColumnType] || "Popularity";
     const secondColumnTypeChanged = existingSecondHeaderColumn && secondHeaderTextSpan?.innerText !== expectedSecondHeaderText;
+
+    const getDynamicGridTemplate = (totalCols) => {
+        if (totalCols <= 4) return "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
+        if (totalCols === 5) return "[index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr)";
+        if (totalCols === 6) return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr)";
+        if (totalCols === 7) return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr)";
+        return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [var5] 2fr [last] minmax(120px,1fr)";
+    };
+
+    if (dateAddedHeaderCell) {
+        dateAddedHeaderCell.style.display = shouldRemoveDateAdded ? 'none' : '';
+    }
+
+    const createHeaderColumn = (className, headerText, contextType) => {
+        const headerColumn = document.createElement("div");
+        headerColumn.className = `main-trackList-rowSectionVariable ${className}`;
+        headerColumn.setAttribute("role", "columnheader");
+        headerColumn.style.cssText = "display: flex; justify-content: center;";
+        
+        const btn = document.createElement("button");
+        btn.className = "main-trackList-column main-trackList-sortable sort-play-column-header";
+        btn.onclick = (e) => showColumnSelector(e, contextType);
+        const title = document.createElement("span");
+        title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
+        title.innerText = headerText;
+        btn.appendChild(title);
+        headerColumn.appendChild(btn);
+        return headerColumn;
+    };
 
     if (showAdditionalColumn) {
         if (!existingHeaderColumn) {
-            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-            if (lastColumn) {
-                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
-                tracklistHeader.style.cssText = newGridTemplate;
-                tracklist_.setAttribute('aria-colcount', (colIndexInt + 1).toString());
-
-                const insertionPoint = shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn;
-                let headerColumn = document.createElement("div");
-                headerColumn.className = "main-trackList-rowSectionVariable sort-play-column";
-                headerColumn.setAttribute("role", "columnheader");
-                headerColumn.style.cssText = "display: flex; justify-content: center;";
-                headerColumn.setAttribute("aria-colindex", colIndexInt.toString());
-                
-                const btn = document.createElement("button");
-                btn.className = "main-trackList-column main-trackList-sortable sort-play-column-header";
-                btn.onclick = (e) => showColumnSelector(e, 'playlist1');
-                const title = document.createElement("span");
-                title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
-                title.innerText = expectedHeaderText;
-                btn.appendChild(title);
-                headerColumn.appendChild(btn);
-
-                if (insertionPoint) {
-                    tracklistHeader.insertBefore(headerColumn, insertionPoint);
-                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-                }
-            }
+            const headerColumn = createHeaderColumn('sort-play-column', expectedHeaderText, 'playlist1');
+            if (endHeaderCell) tracklistHeader.insertBefore(headerColumn, endHeaderCell);
+            else tracklistHeader.appendChild(headerColumn);
         } else if (columnTypeChanged) {
             if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
-            const allCells = tracklist_.querySelectorAll('.sort-play-data');
-            allCells.forEach(cell => {
-                cell.textContent = "";
-                delete cell.dataset.spProcessed;
-            });
+            tracklist_.querySelectorAll('.sort-play-data').forEach(cell => { cell.textContent = ""; delete cell.dataset.spProcessed; });
         }
-    } else { 
-        if (existingHeaderColumn) {
-            existingHeaderColumn.remove();
-            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-            if (lastColumn) {
-                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
-                tracklist_.setAttribute('aria-colcount', (colIndexInt - 1).toString());
-                switch (colIndexInt - 1) {
-                    case 4: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                    case 5: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                    case 6: tracklistHeader.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                }
-            }
-        }
+    } else if (existingHeaderColumn) {
+        existingHeaderColumn.remove();
     }
 
     if (showSecondAdditionalColumn) {
         if (!existingSecondHeaderColumn) {
-            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-            if (lastColumn) {
-                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                const newGridTemplate = colIndexInt === 5 ? gridCss.sixColumnGridCss_twoExtra : colIndexInt === 6 ? gridCss.sevenColumnGridCss_twoExtra : gridCss.sevenColumnGridCss_twoExtra;
-                tracklistHeader.style.cssText = newGridTemplate;
-                tracklist_.setAttribute('aria-colcount', (colIndexInt + 1).toString());
-
-                const firstColumnHeader = tracklistHeader.querySelector(".sort-play-column");
-                const insertionPoint = firstColumnHeader || (shouldRemoveDateAdded ? tracklistHeader.querySelector('[aria-colindex="4"]') : lastColumn);
-                
-                let headerColumn = document.createElement("div");
-                headerColumn.className = "main-trackList-rowSectionVariable sort-play-second-column";
-                headerColumn.setAttribute("role", "columnheader");
-                headerColumn.style.cssText = "display: flex; justify-content: center;";
-                headerColumn.setAttribute("aria-colindex", (colIndexInt - (showAdditionalColumn ? 1 : 0)).toString());
-                
-                const btn = document.createElement("button");
-                btn.className = "main-trackList-column main-trackList-sortable sort-play-column-header";
-                btn.onclick = (e) => showColumnSelector(e, 'playlist2');
-                const title = document.createElement("span");
-                title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
-                title.innerText = expectedSecondHeaderText;
-                btn.appendChild(title);
-                headerColumn.appendChild(btn);
-
-                if (insertionPoint) {
-                    tracklistHeader.insertBefore(headerColumn, insertionPoint);
-                    if (firstColumnHeader) firstColumnHeader.setAttribute("aria-colindex", colIndexInt.toString());
-                    lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-                }
-            }
+            const headerColumn = createHeaderColumn('sort-play-second-column', expectedSecondHeaderText, 'playlist2');
+            const firstExtra = tracklistHeader.querySelector(".sort-play-column");
+            const insertBeforeNode = firstExtra || endHeaderCell;
+            if (insertBeforeNode) tracklistHeader.insertBefore(headerColumn, insertBeforeNode);
+            else tracklistHeader.appendChild(headerColumn);
         } else if (secondColumnTypeChanged) {
             if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
-            const allCells = tracklist_.querySelectorAll('.sort-play-second-data');
-            allCells.forEach(cell => {
-                cell.textContent = "";
-                delete cell.dataset.spProcessed;
-            });
+            tracklist_.querySelectorAll('.sort-play-second-data').forEach(cell => { cell.textContent = ""; delete cell.dataset.spProcessed; });
         }
-    } else {
-        if (existingSecondHeaderColumn) {
-            existingSecondHeaderColumn.remove();
-            const lastColumn = tracklistHeader.querySelector(".main-trackList-rowSectionEnd");
-            if (lastColumn) {
-                const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
-                tracklist_.setAttribute('aria-colcount', (colIndexInt - 1).toString());
-                const newGridTemplate = colIndexInt - 1 === 4 ? gridCss.fiveColumnGridCss : colIndexInt - 1 === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
-                tracklistHeader.style.cssText = newGridTemplate;
-            }
-        }
+    } else if (existingSecondHeaderColumn) {
+        existingSecondHeaderColumn.remove();
     }
 
-    const dateAddedHeader = tracklistHeader.querySelector('[aria-colindex="4"]');
-    if (dateAddedHeader) {
-        dateAddedHeader.style.display = shouldRemoveDateAdded ? 'none' : '';
-    }
+    let currentHeaderCols = Array.from(tracklistHeader.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
+    currentHeaderCols.forEach((el, index) => el.setAttribute("aria-colindex", (index + 1).toString()));
+    tracklist_.setAttribute('aria-colcount', currentHeaderCols.length.toString());
+    tracklistHeader.style.setProperty('grid-template-columns', getDynamicGridTemplate(currentHeaderCols.length), 'important');
+
+    const createDataColumn = (className, dataClassName) => {
+        const dataColumn = document.createElement("div");
+        dataColumn.className = `main-trackList-rowSectionVariable ${className}`;
+        dataColumn.setAttribute("role", "gridcell");
+        dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
+        dataColumn.innerHTML = `<span class="${dataClassName}" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+        return dataColumn;
+    };
 
     const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
     for (const track of allRows) {
         const existingDataColumn = track.querySelector(".sort-play-data-column");
         const existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
+        const endCell = track.querySelector(".main-trackList-rowSectionEnd");
+        
+        const dateAddedCell = dateAddedIndexAttr ? track.querySelector(`[aria-colindex="${dateAddedIndexAttr}"]`) : null;
+        if (dateAddedCell && !dateAddedCell.classList.contains('sort-play-data-column') && !dateAddedCell.classList.contains('sort-play-second-data-column')) {
+            dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
+        }
 
         if (showAdditionalColumn) {
             if (!existingDataColumn) {
-                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-                if (lastColumn) {
-                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                    const newGridTemplate = colIndexInt === 4 ? gridCss.fiveColumnGridCss : colIndexInt === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
-                    track.style.cssText = newGridTemplate;
-
-                    let dataColumn = document.createElement("div");
-                    dataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
-                    dataColumn.setAttribute("aria-colindex", colIndexInt.toString());
-                    dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-                    dataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-
-                    const insertionPoint = shouldRemoveDateAdded ? track.querySelector('[aria-colindex="4"]') : lastColumn;
-                    if (insertionPoint) {
-                        track.insertBefore(dataColumn, insertionPoint);
-                        lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-                    }
-                }
+                const dataColumn = createDataColumn('sort-play-data-column sort-play-column', 'sort-play-data');
+                if (endCell) track.insertBefore(dataColumn, endCell);
+                else track.appendChild(dataColumn);
             } else if (columnTypeChanged) {
                 const dataSpan = existingDataColumn.querySelector('.sort-play-data');
                 if (dataSpan) dataSpan.textContent = "";
             }
-        } else { 
-            if (existingDataColumn) {
-                existingDataColumn.remove();
-                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-                if(lastColumn) {
-                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                    lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
-                    switch (colIndexInt - 1) {
-                         case 4: track.style.cssText = "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                         case 5: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                         case 6: track.style.cssText = "grid-template-columns: [index] 16px [first] 6fr [var1] 4fr [var2] 3fr [var3] minmax(120px,2fr) [var4] minmax(120px,1fr) [last] minmax(120px,1fr)"; break;
-                    }
-                }
-            }
+        } else if (existingDataColumn) {
+            existingDataColumn.remove();
         }
 
         if (showSecondAdditionalColumn) {
             if (!existingSecondDataColumn) {
-                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-                if (lastColumn) {
-                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                    const newGridTemplate = colIndexInt === 5 ? gridCss.sixColumnGridCss_twoExtra : colIndexInt === 6 ? gridCss.sevenColumnGridCss_twoExtra : gridCss.sevenColumnGridCss_twoExtra;
-                    track.style.cssText = newGridTemplate;
-
-                    let dataColumn = document.createElement("div");
-                    dataColumn.className = "main-trackList-rowSectionVariable sort-play-second-data-column sort-play-second-column";
-                    dataColumn.setAttribute("aria-colindex", (colIndexInt - (showAdditionalColumn ? 1 : 0)).toString());
-                    dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-                    dataColumn.innerHTML = `<span class="sort-play-second-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-
-                    const firstColumnCell = track.querySelector(".sort-play-data-column");
-                    const insertionPoint = firstColumnCell || (shouldRemoveDateAdded ? track.querySelector('[aria-colindex="4"]') : lastColumn);
-                    if (insertionPoint) {
-                        track.insertBefore(dataColumn, insertionPoint);
-                        if (firstColumnCell) firstColumnCell.setAttribute("aria-colindex", colIndexInt.toString());
-                        lastColumn.setAttribute("aria-colindex", (colIndexInt + 1).toString());
-                    }
-                }
+                const dataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
+                const firstColumnCell = track.querySelector(".sort-play-data-column");
+                const insertBeforeNode = firstColumnCell || endCell;
+                if (insertBeforeNode) track.insertBefore(dataColumn, insertBeforeNode);
+                else track.appendChild(dataColumn);
             } else if (secondColumnTypeChanged) {
                 const dataSpan = existingSecondDataColumn.querySelector('.sort-play-second-data');
                 if (dataSpan) dataSpan.textContent = "";
             }
-        } else {
-            if (existingSecondDataColumn) {
-                existingSecondDataColumn.remove();
-                const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-                if(lastColumn) {
-                    const colIndexInt = parseInt(lastColumn.getAttribute("aria-colindex"));
-                    lastColumn.setAttribute("aria-colindex", (colIndexInt - 1).toString());
-                    const newGridTemplate = colIndexInt - 1 === 4 ? gridCss.fiveColumnGridCss : colIndexInt - 1 === 5 ? gridCss.sixColumnGridCss : gridCss.sevenColumnGridCss;
-                    track.style.cssText = newGridTemplate;
-                }
-            }
+        } else if (existingSecondDataColumn) {
+            existingSecondDataColumn.remove();
         }
 
-        const dateAddedCell = track.querySelector('[aria-colindex="4"]');
-        if (dateAddedCell) {
-            dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
-        }
+        const currentCells = Array.from(track.querySelectorAll('[role="gridcell"]')).filter(el => el.style.display !== 'none');
+        currentCells.forEach((el, index) => el.setAttribute("aria-colindex", (index + 1).toString()));
+        track.style.setProperty('grid-template-columns', getDynamicGridTemplate(currentCells.length), 'important');
     }
   }
 
-  async function updateRecommendationTracklistStructure(tracklist_) {
+  function updateRecommendationTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
     if (!showAdditionalColumn && !showSecondAdditionalColumn) return;
-
-    await new Promise(resolve => requestAnimationFrame(resolve));
 
     const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
     
@@ -32538,36 +32485,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const hasOne = (showAdditionalColumn || existingDataColumn) || (showSecondAdditionalColumn || existingSecondDataColumn);
             
             if (hasTwo) {
-                template = "grid-template-columns: [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px, 1fr) !important";
+                template = "[first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px, 1fr)";
             } else if (hasOne) {
-                template = "grid-template-columns: [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px, 1fr) !important";
+                template = "[first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px, 1fr)";
             }
             
             if (template) {
-                track.style.cssText = template;
+                track.style.setProperty('grid-template-columns', template, 'important');
             }
         }
     }
   }
-  
-  const getGridCss = (removeDateAdded) => {
-    if (removeDateAdded) {
-      return {
-        fiveColumnGridCss: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr) !important",
-        sixColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
-        sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr) !important",
-        sixColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
-        sevenColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr) !important",
-      };
-    }
-    return {
-      fiveColumnGridCss: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr) !important",
-      sixColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
-      sevenColumnGridCss: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] minmax(120px,1fr) [var4] 2fr [last] minmax(120px,1fr) !important",
-      sixColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 4fr [var1] 2fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr) !important",
-      sevenColumnGridCss_twoExtra: "grid-template-columns: [index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr) !important",
-    };
-  };
 
   function updateAlbumTracklist() {
     const tracklistContainer = document.querySelector(".main-trackList-trackList.main-trackList-indexable");
@@ -32616,7 +32544,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const existingHeader = headerRow.querySelector('.sort-play-album-col-header');
 
     if (!existingHeader) {
-        headerRow.style.gridTemplateColumns = newGridTemplate;
+        headerRow.style.setProperty('grid-template-columns', newGridTemplate, 'important');
         tracklistContainer.setAttribute('aria-colcount', '5');
         const newHeaderCell = document.createElement('div');
         newHeaderCell.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
@@ -32647,7 +32575,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
     trackRows.forEach(row => {
         if (row.querySelector('.sort-play-album-col')) return;
-        row.style.gridTemplateColumns = newGridTemplate;
+        row.style.setProperty('grid-template-columns', newGridTemplate, 'important');
         const newCell = document.createElement('div');
         newCell.className = 'main-trackList-rowSectionVariable sort-play-album-col';
         newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
@@ -32743,7 +32671,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
     trackRows.forEach(row => {
         if (row.querySelector('.sort-play-artist-col')) return;
-        row.style.gridTemplateColumns = newGridTemplate;
+        row.style.setProperty('grid-template-columns', newGridTemplate, 'important');
         const newCell = document.createElement('div');
         newCell.className = 'main-trackList-rowSectionVariable sort-play-artist-col';
         newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
@@ -32770,37 +32698,40 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (!isSearch && (!currentUri || !(URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)))) return;
 
-    const tracklist = await waitForElement(".main-trackList-indexable");
-    if (!tracklist) return;
+    const mainView = document.querySelector("main");
+    if (!mainView) {
+        setTimeout(initializeTracklistObserver, 250);
+        return;
+    }
 
     updateTracklist();
 
     if (tracklistObserver) tracklistObserver.disconnect();
 
-    tracklistObserver = new MutationObserver(() => {
-        clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateTracklist, 150);
+    tracklistObserver = new MutationObserver((mutations) => {
+        let shouldUpdate = false;
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.classList && (node.classList.contains('main-trackList-trackListRow') || node.classList.contains('main-trackList-trackList'))) {
+                        shouldUpdate = true;
+                        break;
+                    }
+                    if (node.querySelector && (node.querySelector('.main-trackList-trackListRow') || node.querySelector('.main-trackList-trackList'))) {
+                        shouldUpdate = true;
+                        break;
+                    }
+                }
+            }
+            if (shouldUpdate) break;
+        }
+        if (shouldUpdate) {
+            clearTimeout(updateDebounceTimeout);
+            updateDebounceTimeout = setTimeout(updateTracklist, 15);
+        }
     });
     
-    const rowContainer = tracklist.querySelector(':scope > [role="presentation"]');
-    if (rowContainer) {
-        tracklistObserver.observe(rowContainer, { childList: true });
-    } else {
-        tracklistObserver.observe(tracklist, { childList: true, subtree: true });
-    }
-
-    const recommendationContainer = document.querySelector('[data-testid="recommended-track"]');
-    if (recommendationContainer) {
-        const recTracklist = recommendationContainer.querySelector('.main-trackList-trackList');
-        if (recTracklist) {
-            const recRowContainer = recTracklist.querySelector(':scope > [role="presentation"]');
-            if (recRowContainer) {
-                tracklistObserver.observe(recRowContainer, { childList: true });
-            } else {
-                tracklistObserver.observe(recTracklist, { childList: true, subtree: true });
-            }
-        }
-    }
+    tracklistObserver.observe(mainView, { childList: true, subtree: true });
   }
 
   async function initializeAlbumTracklistObserver() {
@@ -32816,7 +32747,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     albumTracklistObserver = new MutationObserver(() => {
         clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateAlbumTracklist, 150);
+        updateDebounceTimeout = setTimeout(updateAlbumTracklist, 15);
     });
     
     albumTracklistObserver.observe(tracklist, {
@@ -32838,7 +32769,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     artistTracklistObserver = new MutationObserver(() => {
         clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateArtistTracklist, 150);
+        updateDebounceTimeout = setTimeout(updateArtistTracklist, 15);
     });
     
     artistTracklistObserver.observe(tracklist, {
