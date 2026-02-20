@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.55.2";
+  const SORT_PLAY_VERSION = "5.55.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -32264,7 +32264,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
       }
     } finally {
-      isUpdatingTracklist = false;
+      setTimeout(() => { isUpdatingTracklist = false; }, 50);
     }
   }
   
@@ -32382,9 +32382,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     let currentHeaderCols = Array.from(tracklistHeader.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
-    currentHeaderCols.forEach((el, index) => el.setAttribute("aria-colindex", (index + 1).toString()));
-    tracklist_.setAttribute('aria-colcount', currentHeaderCols.length.toString());
-    tracklistHeader.style.setProperty('grid-template-columns', getDynamicGridTemplate(currentHeaderCols.length), 'important');
+    currentHeaderCols.forEach((el, index) => {
+        const newIndex = (index + 1).toString();
+        if (el.getAttribute("aria-colindex") !== newIndex) {
+            el.setAttribute("aria-colindex", newIndex);
+        }
+    });
+    
+    const expectedColCount = currentHeaderCols.length.toString();
+    if (tracklist_.getAttribute('aria-colcount') !== expectedColCount) {
+        tracklist_.setAttribute('aria-colcount', expectedColCount);
+    }
+    
+    const newHeaderTemplate = getDynamicGridTemplate(currentHeaderCols.length);
+    if (tracklistHeader.dataset.spGridTemplate !== newHeaderTemplate) {
+        tracklistHeader.style.setProperty('grid-template-columns', newHeaderTemplate, 'important');
+        tracklistHeader.dataset.spGridTemplate = newHeaderTemplate;
+    }
 
     const createDataColumn = (className, dataClassName) => {
         const dataColumn = document.createElement("div");
@@ -32435,8 +32449,18 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
 
         const currentCells = Array.from(track.querySelectorAll('[role="gridcell"]')).filter(el => el.style.display !== 'none');
-        currentCells.forEach((el, index) => el.setAttribute("aria-colindex", (index + 1).toString()));
-        track.style.setProperty('grid-template-columns', getDynamicGridTemplate(currentCells.length), 'important');
+        currentCells.forEach((el, index) => {
+            const newIndex = (index + 1).toString();
+            if (el.getAttribute("aria-colindex") !== newIndex) {
+                el.setAttribute("aria-colindex", newIndex);
+            }
+        });
+        
+        const newRowTemplate = getDynamicGridTemplate(currentCells.length);
+        if (track.dataset.spGridTemplate !== newRowTemplate) {
+            track.style.setProperty('grid-template-columns', newRowTemplate, 'important');
+            track.dataset.spGridTemplate = newRowTemplate;
+        }
     }
   }
 
@@ -32727,7 +32751,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
         if (shouldUpdate) {
             clearTimeout(updateDebounceTimeout);
-            updateDebounceTimeout = setTimeout(updateTracklist, 15);
+            updateDebounceTimeout = setTimeout(updateTracklist, 50);
         }
     });
     
@@ -32747,7 +32771,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     albumTracklistObserver = new MutationObserver(() => {
         clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateAlbumTracklist, 15);
+        updateDebounceTimeout = setTimeout(updateAlbumTracklist, 50);
     });
     
     albumTracklistObserver.observe(tracklist, {
@@ -32769,7 +32793,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     artistTracklistObserver = new MutationObserver(() => {
         clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateArtistTracklist, 15);
+        updateDebounceTimeout = setTimeout(updateArtistTracklist, 50);
     });
     
     artistTracklistObserver.observe(tracklist, {
