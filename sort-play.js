@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.55.4";
+  const SORT_PLAY_VERSION = "5.55.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -992,7 +992,7 @@
     {
         title: 'New Releases',
         cards: [
-            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'All new album & single tracks from your followed artists.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological, broken: false },
+            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'Every new track from the artists you follow.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological, broken: false },
         ]
     },
     {
@@ -1008,7 +1008,7 @@
     {
         title: 'Last.fm',
         cards: [
-            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'A continuous mood from your current song, recent obsessions, and deep cuts.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: false },
+            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'An endless mix of fresh tracks based on your recent obsessions and favorites.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: false },
             { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: false },
         ]
     },
@@ -29801,15 +29801,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     };
 
     const sortedInputTracks = [...tracks].sort((a, b) => {
-        if (isArtistPageContext && sortType === 'releaseDate') {
+        if (isArtistPageContext) {
             const typeA = (a.album_type || a.albumType || 'album').toLowerCase();
             const typeB = (b.album_type || b.albumType || 'album').toLowerCase();
 
-            const isAlbumA = typeA === 'album';
-            const isAlbumB = typeB === 'album';
+            const isCompA = typeA === 'compilation';
+            const isCompB = typeB === 'compilation';
 
-            if (isAlbumA && !isAlbumB) return -1;
-            if (!isAlbumA && isAlbumB) return 1;
+            if (isCompA && !isCompB) return 1;
+            if (!isCompA && isCompB) return -1;
+
+            if (sortType === 'releaseDate') {
+                const isAlbumA = typeA === 'album';
+                const isAlbumB = typeB === 'album';
+
+                if (isAlbumA && !isAlbumB) return -1;
+                if (!isAlbumA && isAlbumB) return 1;
+            }
         }
 
         const popA = a.popularity || 0;
