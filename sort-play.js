@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.55.5";
+  const SORT_PLAY_VERSION = "5.56.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -89,7 +89,6 @@
   let showAlbumColumn = false;
   let showArtistColumn = false; 
   let removeDateAdded = false;
-  let showRemovedDuplicates = false;
   let addToQueueEnabled = false; 
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
@@ -111,7 +110,6 @@
   let includeSongStats = true;
   let includeLyrics = false;
   let useLfmGateway = false;
-  let includeZeroScrobbles = true;
   let lastFmAutocorrect = false;
   let showLastFmContextMenu = false;
   let chatPanelVisible = false;
@@ -1143,7 +1141,6 @@
     selectedArtistColumnType = localStorage.getItem("sort-play-selected-artist-column-type") || "releaseDate"; 
     releaseDateFormat = localStorage.getItem("sort-play-release-date-format") || 'YYYY-MM-DD';
     removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
-    showRemovedDuplicates = localStorage.getItem("sort-play-show-removed-duplicates") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
     selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-flash-latest";
@@ -1204,7 +1201,6 @@
     selectedNowPlayingSeparator = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR) || '•';
     selectedNowPlayingScrobblesFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT) || 'raw';
     selectedNowPlayingPersonalScrobblesFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT) || 'raw';
-    includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
     lastFmAutocorrect = localStorage.getItem("sort-play-lastfm-autocorrect") === "true";
     showLastFmContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU) === "true";
     showGenreTags = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS) === "true";
@@ -1237,7 +1233,6 @@
     localStorage.setItem("sort-play-selected-artist-column-type", selectedArtistColumnType);
     localStorage.setItem("sort-play-release-date-format", releaseDateFormat);
     localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
-    localStorage.setItem("sort-play-show-removed-duplicates", showRemovedDuplicates);
     localStorage.setItem("sort-play-include-song-stats", includeSongStats);
     localStorage.setItem("sort-play-include-lyrics", includeLyrics);
     localStorage.setItem("sort-play-ai-model", selectedAiModel);
@@ -1278,7 +1273,6 @@
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR, selectedNowPlayingSeparator);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT, selectedNowPlayingScrobblesFormat);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT, selectedNowPlayingPersonalScrobblesFormat);
-    localStorage.setItem("sort-play-include-no-scrobbles", includeZeroScrobbles);
     localStorage.setItem("sort-play-lastfm-autocorrect", lastFmAutocorrect);
     localStorage.setItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, showLastFmContextMenu);
     updateLastFmContextMenu();
@@ -2072,7 +2066,7 @@
     .tooltip-container:hover .custom-tooltip { visibility: visible; }
     .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
     .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
-     .sort-play-settings .github-link-container {
+    .sort-play-settings .github-link-container {
       display: flex;
       justify-content: center;
       margin-top: 10px;
@@ -2511,23 +2505,13 @@
             Now Playing Extra Data
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Shows extra data like Release Date next to the title or artist in the Now Playing bar.</span>
+                <span class="custom-tooltip">Shows extra data like Release Date or Play Count next to the title or artist in the Now Playing bar.</span>
             </span>
         </label>
         <div class="col action">
             <button id="nowPlayingSettingsBtn" class="column-settings-button" title="Now Playing Data Settings">
                 ${settingsSvg}
             </button>
-            <select id="nowPlayingDataTypeSelect" class="column-type-select" ${!showNowPlayingData ? 'disabled' : ''}>
-                <option value="releaseDate" ${selectedNowPlayingDataType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
-                <option value="playCount" ${selectedNowPlayingDataType === 'playCount' ? 'selected' : ''}>Play Count</option>
-                <option value="popularity" ${selectedNowPlayingDataType === 'popularity' ? 'selected' : ''}>Popularity</option>
-                <option value="tempo" ${selectedNowPlayingDataType === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
-                <option value="energy" ${selectedNowPlayingDataType === 'energy' ? 'selected' : ''}>Energy</option>
-                <option value="danceability" ${selectedNowPlayingDataType === 'danceability' ? 'selected' : ''}>Danceability</option>
-                <option value="valence" ${selectedNowPlayingDataType === 'valence' ? 'selected' : ''}>Valence</option>
-                <option value="key" ${selectedNowPlayingDataType === 'key' ? 'selected' : ''}>Key</option>
-            </select>
             <label class="switch">
                 <input type="checkbox" id="showNowPlayingDataToggle" ${showNowPlayingData ? 'checked' : ''}>
                 <span class="sliderx"></span>
@@ -2580,21 +2564,6 @@
         <div class="col action">
             <label class="switch" id="changeTitleOnModifySwitchLabel">
                 <input type="checkbox" id="changeTitleOnModifyToggle" ${changeTitleOnModify ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
-    
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Duplicate Removal
-    </div>
-    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="showRemovedDuplicates">
-        <label class="col description">Show Removed Duplicates</label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" ${showRemovedDuplicates ? 'checked' : ''}>
                 <span class="sliderx"></span>
             </label>
         </div>
@@ -2702,22 +2671,6 @@
         Last.fm
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="includeZeroScrobblesSetting">
-        <label class="col description">
-            Include Tracks with No Scrobbles
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">When sorting by "My Scrobbles", include tracks with 0 scrobbles.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" id="includeZeroScrobblesToggle" ${includeZeroScrobbles ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
 
     <div class="setting-row" id="lastFmContextMenuSetting">
         <label class="col description">
@@ -2835,10 +2788,8 @@
     const albumKeyDropdownContainer = modalContainer.querySelector("#albumKeyDropdownContainer");
     const artistKeyDropdownContainer = modalContainer.querySelector("#artistKeyDropdownContainer");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
-    const showRemovedDuplicatesToggle = modalContainer.querySelector("#showRemovedDuplicates input");
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
-    const includeZeroScrobblesToggle = modalContainer.querySelector("#includeZeroScrobblesToggle");
     const lastFmAutocorrectToggle = modalContainer.querySelector("#lastFmAutocorrectToggle");
     const showLastFmContextMenuToggle = modalContainer.querySelector("#showLastFmContextMenuToggle");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
@@ -2873,7 +2824,6 @@
     const genreSourcesSettingsBtn = modalContainer.querySelector("#genreSourcesSettingsBtn");
     const useEnergyWaveShuffleToggle = modalContainer.querySelector("#useEnergyWaveShuffleToggle");
     const showNowPlayingDataToggle = modalContainer.querySelector("#showNowPlayingDataToggle");
-    const nowPlayingDataTypeSelect = modalContainer.querySelector("#nowPlayingDataTypeSelect");
     const nowPlayingSettingsBtn = modalContainer.querySelector("#nowPlayingSettingsBtn");
 
     showLikeButtonToggle.addEventListener("change", () => {
@@ -2933,16 +2883,37 @@
 
     showNowPlayingDataToggle.addEventListener("change", () => {
         showNowPlayingData = showNowPlayingDataToggle.checked;
-        nowPlayingDataTypeSelect.disabled = !showNowPlayingData;
         nowPlayingSettingsBtn.disabled = !showNowPlayingData;
+        
+        if (showNowPlayingData) {
+            if (!nowPlayingConfig.title.enabled && !nowPlayingConfig.artist.enabled) {
+                nowPlayingConfig.title.enabled = true;
+                if (nowPlayingConfig.title.items.length === 0) {
+                    nowPlayingConfig.title.items.push({
+                        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+                        type: 'releaseDate',
+                        format: 'YYYY',
+                        separator: '•'
+                    });
+                }
+            }
+        } else {
+            nowPlayingConfig.title.enabled = false;
+            nowPlayingConfig.artist.enabled = false;
+            document.querySelectorAll('.sort-play-np-container').forEach(el => el.remove());
+            document.querySelectorAll('.sort-play-modified-parent').forEach(el => {
+                el.style.display = '';
+                el.style.alignItems = '';
+                el.classList.remove('sort-play-modified-parent');
+            });
+        }
+        
+        localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
         saveSettings();
-        displayNowPlayingData();
-    });
-
-    nowPlayingDataTypeSelect.addEventListener("change", () => {
-        selectedNowPlayingDataType = nowPlayingDataTypeSelect.value;
-        saveSettings();
-        displayNowPlayingData();
+        
+        if (showNowPlayingData) {
+            displayNowPlayingData();
+        }
     });
 
     nowPlayingSettingsBtn.addEventListener("click", () => {
@@ -3063,11 +3034,6 @@
     });
     setLastFmUsernameButton.addEventListener("mouseleave", () => {
         setLastFmUsernameButton.style.backgroundColor = "#333333";
-    });
-
-    includeZeroScrobblesToggle.addEventListener("change", () => {
-        includeZeroScrobbles = includeZeroScrobblesToggle.checked;
-        saveSettings();
     });
 
     lastFmAutocorrectToggle.addEventListener("change", async () => {
@@ -3473,11 +3439,6 @@
 
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
-    });
-
-    showRemovedDuplicatesToggle.addEventListener("change", () => {
-        showRemovedDuplicates = showRemovedDuplicatesToggle.checked;
-        saveSettings();
     });
   }
 
@@ -3923,6 +3884,29 @@
 
     const performUpdate = (updateUI) => {
         nowPlayingConfig = JSON.parse(JSON.stringify(localConfig));
+        
+        if (!nowPlayingConfig.title.enabled && !nowPlayingConfig.artist.enabled) {
+            showNowPlayingData = false;
+            const mainToggle = document.getElementById("showNowPlayingDataToggle");
+            if (mainToggle) mainToggle.checked = false;
+            const settingsBtn = document.getElementById("nowPlayingSettingsBtn");
+            if (settingsBtn) settingsBtn.disabled = true;
+            
+            document.querySelectorAll('.sort-play-np-container').forEach(el => el.remove());
+            document.querySelectorAll('.sort-play-modified-parent').forEach(el => {
+                el.style.display = '';
+                el.style.alignItems = '';
+                el.classList.remove('sort-play-modified-parent');
+            });
+        } else {
+            showNowPlayingData = true;
+            const mainToggle = document.getElementById("showNowPlayingDataToggle");
+            if (mainToggle) mainToggle.checked = true;
+            const settingsBtn = document.getElementById("nowPlayingSettingsBtn");
+            if (settingsBtn) settingsBtn.disabled = false;
+        }
+        
+        localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
         saveSettings();
         
         if (updateUI) {
@@ -6314,26 +6298,39 @@
               fetchDisplayGenres(mockTrackObj).catch(() => {});
           }
 
-          if (showNowPlayingData) {
-              if (selectedNowPlayingDataType === 'releaseDate') {
+          const titleNeeded = nowPlayingConfig.title?.enabled;
+          const artistNeeded = nowPlayingConfig.artist?.enabled;
+
+          if (titleNeeded || artistNeeded) {
+              const allItems = [
+                  ...(titleNeeded ? nowPlayingConfig.title.items : []),
+                  ...(artistNeeded ? nowPlayingConfig.artist.items : [])
+              ];
+              const typesNeeded = new Set(allItems.map(item => item.type));
+
+              if (typesNeeded.has('releaseDate')) {
                   getTrackDetailsWithReleaseDate(mockTrackObj).catch(() => {});
-              } else if (selectedNowPlayingDataType === 'playCount' && albumId) {
+              } 
+              if (typesNeeded.has('playCount') && albumId) {
                   getTrackDetailsWithPlayCount(mockTrackObj).catch(() => {});
-              } else if (selectedNowPlayingDataType === 'popularity') {
+              } 
+              if (typesNeeded.has('popularity')) {
                   if (isFallbackActive()) {
                       fetchInternalTrackMetadata(trackId).catch(() => {});
                   } else {
                       Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`).catch(() => {});
                   }
-              } else if (selectedNowPlayingDataType === 'scrobbles') {
+              } 
+              if (typesNeeded.has('scrobbles')) {
                   getTrackDetailsWithScrobbles(mockTrackObj, true).catch(() => {});
-              } else if (selectedNowPlayingDataType === 'personalScrobbles') {
+              } 
+              if (typesNeeded.has('personalScrobbles')) {
                   getTrackDetailsWithPersonalScrobbles(mockTrackObj, true).catch(() => {});
-              } else {
-                  const audioFeatureTypes = ['tempo', 'energy', 'danceability', 'valence', 'key'];
-                  if (audioFeatureTypes.includes(selectedNowPlayingDataType)) {
-                      getBatchTrackStats([trackId]).catch(() => {});
-                  }
+              } 
+              
+              const audioFeatureTypes = ['tempo', 'energy', 'danceability', 'valence', 'key'];
+              if ([...typesNeeded].some(t => audioFeatureTypes.includes(t))) {
+                  getBatchTrackStats([trackId]).catch(() => {});
               }
           }
       } catch (e) {
@@ -9016,8 +9013,8 @@ sendButton.addEventListener("click", async () => {
 
     const foundSpotifyTracks = [];
     let unconvertedLocalCount = 0;
-    const BATCH_SIZE = 20;
-    const DELAY_BETWEEN_BATCHES = 2000;
+    const BATCH_SIZE = 50;
+    const DELAY_BETWEEN_BATCHES = 100;
     const MAX_RETRIES = 3;
     const RETRY_DELAYS = [1000, 2000, 4000];
     
@@ -9035,47 +9032,51 @@ sendButton.addEventListener("click", async () => {
     }
 
     async function searchTracks(query, limit = 5) {
-        if (isFallbackActive()) {
-            try {
-                const res = await Spicetify.Platform.SearchAPI.search({ query: query, types: ["track"], limit: limit });
-                const trackHits = res?.hits?.find(h => h.type === 'track')?.hits || [];
-                return {
-                    tracks: {
-                        items: trackHits.map(t => ({
-                            uri: t.uri,
-                            id: t.uri.split(':')[2],
-                            name: t.name,
-                            artists: t.artists.map(a => ({ name: a.name, uri: a.uri, id: a.uri?.split(':')[2] })),
-                            album: {
-                                name: t.album.name,
-                                uri: t.album.uri,
-                                id: t.album.uri?.split(':')[2],
-                                images: t.album.coverArt?.sources?.map(s => ({ url: s.url })) || []
-                            },
-                            duration_ms: t.duration?.totalMilliseconds
-                        }))
-                    }
-                };
-            } catch (e) {
-                const token = await get_S_Client_Token();
-                if (token) {
-                    const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`, {
-                        headers: { "Authorization": `Bearer ${token}` }
-                    });
-                    if (res.ok) return await res.json();
-                }
-                throw e;
-            }
-        } else {
-            try {
-                return await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    return searchTracks(query, limit);
-                }
-                throw e;
-            }
+        const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
+
+        const res = await Spicetify.GraphQL.Request({
+            name: "searchTracks",
+            operation: "query",
+            sha256Hash: SEARCH_HASH,
+            value: null
+        }, {
+            searchTerm: query,
+            offset: 0,
+            limit: limit,
+            numberOfTopResults: limit,
+            includePreReleases: false
+        });
+
+        if (res.errors && res.errors.length > 0) {
+            throw new Error(res.errors[0].message || "GraphQL search error");
         }
+
+        const rawItems = res.data?.searchV2?.tracksV2?.items || [];
+        
+        return {
+            tracks: {
+                items: rawItems.map(i => {
+                    const t = i.item.data;
+                    return {
+                        uri: t.uri,
+                        id: t.uri.split(':')[2],
+                        name: t.name,
+                        artists: t.artists.items.map(a => ({ 
+                            name: a.profile.name, 
+                            uri: a.uri, 
+                            id: a.uri ? a.uri.split(':')[2] : null 
+                        })),
+                        album: {
+                            name: t.albumOfTrack.name,
+                            uri: t.albumOfTrack.uri,
+                            id: t.albumOfTrack.uri.split(':')[2],
+                            images: t.albumOfTrack.coverArt?.sources?.map(s => ({ url: s.url })) || []
+                        },
+                        duration_ms: t.duration.totalMilliseconds
+                    };
+                })
+            }
+        };
     }
 
     for (let i = 0; i < localTracks.length; i += BATCH_SIZE) {
@@ -12906,14 +12907,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         case "personalScrobbles": {
             const tracksWithScrobbles = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
             if (sortType === 'personalScrobbles') {
-                const includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
                 sortedTracks = tracksWithScrobbles
-                    .filter(track => includeZeroScrobbles || (track.personalScrobbles != null && track.personalScrobbles > 0))
                     .sort((a, b) => (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
             } else {
-                const includeZeroScrobbles = localStorage.getItem("sort-play-include-zero-scrobbles") !== "false";
                 sortedTracks = tracksWithScrobbles
-                    .filter(track => includeZeroScrobbles || (track.scrobbles != null && track.scrobbles > 0))
                     .sort((a, b) => (b.scrobbles ?? 0) - (a.scrobbles ?? 0));
             }
             break;
@@ -18191,6 +18188,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   }
               );
 
+              if (sortType === 'personalScrobbles') {
+                  const hasAnyScrobbles = tracksWithScrobbles.some(t => typeof t.personalScrobbles === 'number' && t.personalScrobbles > 0);
+                  if (!hasAnyScrobbles) {
+                      throw new Error("No personal scrobbles found for any tracks in this list.");
+                  }
+              }
+
               sortedTracks = tracksWithScrobbles.sort((a, b) => {
                   const valA = a[sortType] || 0;
                   const valB = b[sortType] || 0;
@@ -22171,6 +22175,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         sortType: "convertToSpotify",
         onClick: async function(event) {
             event.stopPropagation();
+            menuButtons.forEach((btn) => {
+                if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                    btn.style.backgroundColor = "transparent";
+                }
+            });
             await convertLocalPlaylistToSpotify();
         }
       },
@@ -23482,8 +23491,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   ).register();
 
   async function convertLocalPlaylistToSpotify() {
-    const BATCH_SIZE = 20; 
-    const DELAY_BETWEEN_BATCHES = 2000;
+    const BATCH_SIZE = 50; 
+    const DELAY_BETWEEN_BATCHES = 100;
     const MAX_RETRIES = 3;
     const RETRY_DELAYS = [1000, 3000, 5000];
 
@@ -23537,47 +23546,51 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     async function searchTracks(query, limit = 5) {
-        if (isFallbackActive()) {
-            try {
-                const res = await Spicetify.Platform.SearchAPI.search({ query: query, types: ["track"], limit: limit });
-                const trackHits = res?.hits?.find(h => h.type === 'track')?.hits || [];
-                return {
-                    tracks: {
-                        items: trackHits.map(t => ({
-                            uri: t.uri,
-                            id: t.uri.split(':')[2],
-                            name: t.name,
-                            artists: t.artists.map(a => ({ name: a.name, uri: a.uri, id: a.uri?.split(':')[2] })),
-                            album: {
-                                name: t.album.name,
-                                uri: t.album.uri,
-                                id: t.album.uri?.split(':')[2],
-                                images: t.album.coverArt?.sources?.map(s => ({ url: s.url })) || []
-                            },
-                            duration_ms: t.duration?.totalMilliseconds
-                        }))
-                    }
-                };
-            } catch (e) {
-                const token = await get_S_Client_Token();
-                if (token) {
-                    const res = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`, {
-                        headers: { "Authorization": `Bearer ${token}` }
-                    });
-                    if (res.ok) return await res.json();
-                }
-                throw e;
-            }
-        } else {
-            try {
-                return await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`);
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    return searchTracks(query, limit);
-                }
-                throw e;
-            }
+        const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
+
+        const res = await Spicetify.GraphQL.Request({
+            name: "searchTracks",
+            operation: "query",
+            sha256Hash: SEARCH_HASH,
+            value: null
+        }, {
+            searchTerm: query,
+            offset: 0,
+            limit: limit,
+            numberOfTopResults: limit,
+            includePreReleases: false
+        });
+
+        if (res.errors && res.errors.length > 0) {
+            throw new Error(res.errors[0].message || "GraphQL search error");
         }
+
+        const rawItems = res.data?.searchV2?.tracksV2?.items || [];
+        
+        return {
+            tracks: {
+                items: rawItems.map(i => {
+                    const t = i.item.data;
+                    return {
+                        uri: t.uri,
+                        id: t.uri.split(':')[2],
+                        name: t.name,
+                        artists: t.artists.items.map(a => ({ 
+                            name: a.profile.name, 
+                            uri: a.uri, 
+                            id: a.uri ? a.uri.split(':')[2] : null 
+                        })),
+                        album: {
+                            name: t.albumOfTrack.name,
+                            uri: t.albumOfTrack.uri,
+                            id: t.albumOfTrack.uri.split(':')[2],
+                            images: t.albumOfTrack.coverArt?.sources?.map(s => ({ url: s.url })) || []
+                        },
+                        duration_ms: t.duration.totalMilliseconds
+                    };
+                })
+            }
+        };
     }
 
     let newPlaylist = null;
@@ -23855,9 +23868,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
         .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
         .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+        .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+        .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
       </style>
-      <div class="main-trackCreditsModal-header">
+      <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 27px 32px 12px !important;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Conversion Report</span></h1>
+          <button id="closeReportModalX" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+          </button>
       </div>
       <div class="main-trackCreditsModal-mainSection" style="padding: 22px 32px !important; overflow:auto">
         <div class="report-layout">
@@ -24016,6 +24034,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     };
     
     modalContainer.querySelector("#closeReportModal").addEventListener("click", closeModal);
+    modalContainer.querySelector("#closeReportModalX").addEventListener("click", () => overlay.remove());
+
     overlay.addEventListener("click", (e) => { 
         if (e.target === overlay) {
             e.preventDefault();
@@ -28141,13 +28161,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 removedTracks = deduplicationResult.removed;
 
                 if (sortType === 'personalScrobbles') {
-                    const includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
+                    const hasAnyScrobbles = uniqueTracks.some(t => typeof t.personalScrobbles === 'number' && t.personalScrobbles > 0);
+                    if (!hasAnyScrobbles) {
+                        throw new Error("No personal scrobbles found for any tracks in this list.");
+                    }
 
                     let tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
-
-                    if (!includeZeroScrobbles) {
-                        tracksToSort = tracksToSort.filter(t => t.personalScrobbles > 0);
-                    }
 
                     sortedTracks = tracksToSort.sort((a, b) => {
                         const getVal = (t) => (typeof t.personalScrobbles === 'number') ? t.personalScrobbles : -1;
@@ -28350,6 +28369,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const trackUris = sortedTracks.map((track) => track.uri);
                 await replacePlaylistTracks(playlistIdToModify, trackUris);
                 
+                if (removedTracks.length > 0 && !isArtistPage) {
+                    showRemovedTracksModal(removedTracks);
+                }
+                
                 showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
                 playlistUriForQueue = currentUriAtStart; 
                 playlistWasModifiedOrCreated = true; 
@@ -28365,7 +28388,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (sortCurrentPlaylistEnabled && URI.isPlaylistV1OrV2(currentUriAtStart) && (!currentPlaylistDetails || !currentPlaylistDetails.owner || currentPlaylistDetails.owner.id !== user.username)) {
             }
             try {
-              if (showRemovedDuplicates && removedTracks.length > 0 && !isArtistPage) {
+              if (removedTracks.length > 0 && !isArtistPage) {
                 showRemovedTracksModal(removedTracks);
               }
               let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
@@ -29530,81 +29553,304 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   function showRemovedTracksModal(removedTracks) {
-
-    const styleId = 'sort-play-global-modal-height-fix';
-    if (!document.getElementById(styleId)) {
-      const styleElement = document.createElement('style');
-      styleElement.id = styleId;
-      styleElement.innerHTML = `
-        .GenericModal > .main-embedWidgetGenerator-container {
-          height: auto !important;
-        }
-      `;
-      document.head.appendChild(styleElement);
-    }
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-removed-tracks-overlay";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+    `;
 
     const modalContainer = document.createElement("div");
-    modalContainer.style.width = "800px"; 
-    modalContainer.style.maxHeight = "auto";
-    modalContainer.style.overflowY = "auto";
-    modalContainer.style.display = "flex";  
-    modalContainer.style.flexDirection = "column";  
+    modalContainer.className = "main-embedWidgetGenerator-container";
+    modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 650px !important;
+        display: flex;
+        flex-direction: column;
+        border-radius: 30px;
+        background-color: #181818 !important;
+        border: 1px solid #282828;
+    `;
 
-    const textAreaContainer = document.createElement("div");
-    textAreaContainer.style.overflowY = "auto";
-    textAreaContainer.style.flexGrow = "1"; 
-  
-    const trackListTextArea = document.createElement("textarea");
-    trackListTextArea.style.width = "100%";
-    trackListTextArea.style.border = "1px solid #ccc";
-    trackListTextArea.style.padding = "10px";
-    trackListTextArea.style.boxSizing = "border-box";
-    trackListTextArea.style.resize = "none"; 
-    trackListTextArea.readOnly = true;
-    trackListTextArea.style.minHeight = "300px";
-  
-    let trackListText = "";
-    removedTracks.forEach((track, index) => {
-      trackListText += `${index + 1}. ${track.songTitle} - ${track.artistName} - ${track.albumName} - (${track.uri})\n`;
-    });
-  
-    trackListTextArea.value = trackListText;
+    const linkIconSVG = `<?xml version="1.0" encoding="utf-8"?>
+        <svg width="14px" height="14px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 7H16C18.7614 7 21 9.23858 21 12C21 14.7614 18.7614 17 16 17H14M10 7H8C5.23858 7 3 9.23858 3 12C3 14.7614 5.23858 17 8 17H10M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
 
-    textAreaContainer.appendChild(trackListTextArea);
+    const removedListHTML = removedTracks.map((track, index) => {
+        const title = track.songTitle || track.name || 'Unknown Title';
+        const artist = track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist';
+        const album = track.albumName || (track.album && track.album.name) || 'Unknown Album';
+        const uri = track.uri || 'N/A';
 
-    const copyButton = document.createElement("button");
-    copyButton.textContent = "Copy to Clipboard";
-    copyButton.style.marginTop = "10px";
-    copyButton.style.padding = "6px 12px";
-    copyButton.style.width = "250px"; 
-    copyButton.style.backgroundColor = "#1ED760";
-    copyButton.style.color = "black";
-    copyButton.style.border = "none";
-    copyButton.style.borderRadius = "20px";
-    copyButton.style.cursor = "pointer";
-  
-    copyButton.addEventListener("click", () => {
-      navigator.clipboard.writeText(trackListTextArea.value).then(
-        () => {
-          showNotification("Tracks copied to clipboard!");
-        },
-        (err) => {
-          console.error("Failed to copy:", err);
-          showNotification("Failed to copy tracks to clipboard.");
+        let trackLink = uri;
+        if (uri.startsWith('spotify:track:')) {
+            trackLink = uri.replace('spotify:track:', 'https://open.spotify.com/track/');
+        } else if (uri.startsWith('spotify:local:')) {
+            trackLink = 'Local File';
         }
-      );
+
+        let coverUrl = '/api/placeholder/40/40';
+        const images = track.track?.album?.images || track.album?.images || [];
+        if (images && images.length > 0) {
+            coverUrl = images[images.length - 1].url || images[0].url;
+        }
+
+        const needsCoverLoad = coverUrl === '/api/placeholder/40/40';
+
+        return `
+            <div class="conversion-row">
+                <div class="track-item local-track">
+                    <div class="track-text-wrapper" style="flex-direction: row; align-items: center; gap: 12px; min-width: 0;">
+                        <span style="color: #b3b3b3; font-variant-numeric: tabular-nums; width: 30px; text-align: right; font-size: 13px; flex-shrink: 0;">${index + 1}.</span>
+                        <img src="${coverUrl}" data-track-uri="${uri}" class="track-item-cover" style="opacity: ${needsCoverLoad ? '0' : '1'}; flex-shrink: 0;">
+                        <div style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; min-width: 0;">
+                            <span class="track-item-title" title="${title}">${title}</span>
+                            <div class="track-item-artist-wrapper" title="${artist} • ${album}">
+                                <span class="track-item-artist-names">${artist}</span>
+                                <span class="track-item-album-name"><span style="margin: 0 4px;">•</span>${album}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                        <button class="copy-track-button copy-uri" data-link="${trackLink}" title="Copy Spotify Link">
+                            ${linkIconSVG}
+                        </button>
+                        <button class="copy-track-button copy-text" data-title="${title}" data-artist="${artist}" title="Copy 'Track - Artist'">
+                            ${copyIconSVG}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    modalContainer.innerHTML = `
+      <style>
+        .summary-grid { display: grid; grid-template-columns: 1fr; background-color: #282828; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .summary-item { text-align: center; }
+        .summary-value { font-size: 24px; font-weight: bold; color: #f15e6c; }
+        .summary-label { font-size: 12px; color: #b3b3b3; text-transform: uppercase; margin-top: 4px; font-weight: 700; letter-spacing: 0.5px; }
+        .conversion-list-header { display: flex; justify-content: space-between; padding: 0 10px 8px; border-bottom: 1px solid #3e3e3e; margin-bottom: 8px; }
+        .column-title { color: white; font-size: 14px; font-weight: 500; }
+        .conversion-list-container { max-height: 400px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+        .conversion-list-container::-webkit-scrollbar { width: 8px; }
+        .conversion-list-container::-webkit-scrollbar-track { background: #282828; }
+        .conversion-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+        .conversion-row { display: flex; align-items: center; gap: 8px; }
+        .conversion-row:not(:last-child) { margin-bottom: 4px; }
+        .track-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 4px; flex: 1; min-width: 0; background-color: rgba(241, 94, 108, 0.08); border: 1px solid rgba(241, 94, 108, 0.15); transition: background-color 0.2s, border-color 0.2s; }
+        .track-item:hover { background-color: rgba(241, 94, 108, 0.15); border-color: rgba(241, 94, 108, 0.3); }
+        .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding-right: 12px;}
+        .track-item-cover { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; transition: opacity 0.3s ease; }
+        .track-item-title { color: #e0e0e0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+        .track-item-artist-wrapper { display: flex; font-size: 12px; color: #b3b3b3; min-width: 0; margin-top: 2px; }
+        .track-item-artist-names { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+        .track-item-album-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; max-width: 60%; }
+        .copy-track-button { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; color: #b3b3b3; padding: 8px 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 6px; transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
+        .copy-track-button:hover { color: white; background-color: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
+        .copy-track-button svg { width: 14px; height: 14px; }
+        .copy-track-button.copied { color: #1ED760; border-color: #1ED760; background-color: rgba(30, 215, 96, 0.1); }
+        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+        .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+        .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+        .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+        .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+        .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+      </style>
+      <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 27px 32px 12px !important;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Removed Duplicate Tracks</span></h1>
+          <button id="closeRemovedModalX" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+          </button>
+      </div>
+      <div class="main-trackCreditsModal-mainSection" style="padding: 16px 32px !important; overflow:auto">
+        <div class="summary-grid">
+            <div class="summary-item">
+                <div class="summary-value">${removedTracks.length}</div>
+                <div class="summary-label">Duplicate Tracks Removed</div>
+            </div>
+        </div>
+        <div class="conversion-list-header">
+            <div class="column-title">Track Details</div>
+        </div>
+        <div class="conversion-list-container">
+            ${removedListHTML}
+        </div>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="exportRemovedData" class="main-buttons-button main-button-secondary" 
+                    style="padding: 8px 24px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                Export JSON
+            </button>
+            <button id="copyAllRemoved" class="main-buttons-button main-button-secondary" 
+                    style="padding: 8px 24px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                Copy Text List
+            </button>
+            <button id="closeRemovedModal" class="main-buttons-button main-button-primary" 
+                    style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
+                Done
+            </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                if (img.style.opacity === '0') {
+                    const uri = img.dataset.trackUri;
+                    if (uri && uri.startsWith('spotify:track:')) {
+                        Spicetify.GraphQL.Request(
+                            Spicetify.GraphQL.Definitions.decorateContextTracks,
+                            { uris: [uri] }
+                        ).then(trackDetails => {
+                            const sources = trackDetails?.data?.tracks?.[0]?.albumOfTrack?.coverArt?.sources;
+                            if (sources?.length > 0) {
+                                let bestSource = sources[sources.length - 1];
+                                for (const source of sources) {
+                                    if (source.width >= 32 && source.height >= 32) {
+                                        if (!bestSource || source.width < bestSource.width) {
+                                            bestSource = source;
+                                        }
+                                    }
+                                }
+                                img.src = bestSource.url;
+                                img.style.opacity = '1';
+                            }
+                        }).catch(() => {});
+                    }
+                    observer.unobserve(img);
+                }
+            }
+        });
+    }, { root: modalContainer.querySelector('.conversion-list-container'), rootMargin: '200px' });
+
+    modalContainer.querySelectorAll('img[data-track-uri]').forEach(img => {
+        if (img.style.opacity === '0') {
+            observer.observe(img);
+        }
     });
 
-    modalContainer.appendChild(textAreaContainer);
-    modalContainer.appendChild(copyButton);
-  
-    Spicetify.PopupModal.display({
-      title: "Removed Duplicate Tracks",
-      content: modalContainer,
-      isLarge: true,
+    modalContainer.querySelectorAll('.copy-text').forEach(button => {
+        button.addEventListener('click', () => {
+            const textToCopy = `${button.dataset.title} - ${button.dataset.artist}`;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                button.classList.add('copied');
+                setTimeout(() => button.classList.remove('copied'), 1000);
+            });
+        });
+    });
+
+    modalContainer.querySelectorAll('.copy-uri').forEach(button => {
+        button.addEventListener('click', () => {
+            navigator.clipboard.writeText(button.dataset.link).then(() => {
+                button.classList.add('copied');
+                setTimeout(() => button.classList.remove('copied'), 1000);
+            });
+        });
+    });
+
+    modalContainer.querySelector("#copyAllRemoved").addEventListener("click", () => {
+        let trackListText = removedTracks.map((track, index) => {
+            const title = track.songTitle || track.name || 'Unknown Title';
+            const artist = track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist';
+            const album = track.albumName || (track.album && track.album.name) || 'Unknown Album';
+            
+            let trackLink = track.uri;
+            if (track.uri?.startsWith('spotify:track:')) {
+                trackLink = track.uri.replace('spotify:track:', 'https://open.spotify.com/track/');
+            } else if (track.uri?.startsWith('spotify:local:')) {
+                trackLink = 'Local File';
+            }
+
+            return `${index + 1}. ${title} - ${artist} - ${album} - (${trackLink})`;
+        }).join('\n');
+        
+        navigator.clipboard.writeText(trackListText).then(
+            () => showNotification("Tracks copied to clipboard!"),
+            (err) => {
+                console.error("Failed to copy:", err);
+                showNotification("Failed to copy tracks to clipboard.", true);
+            }
+        );
+    });
+
+    modalContainer.querySelector("#exportRemovedData").addEventListener("click", async () => {
+        const exportData = removedTracks.map(track => {
+            let trackLink = track.uri;
+            if (track.uri?.startsWith('spotify:track:')) {
+                trackLink = track.uri.replace('spotify:track:', 'https://open.spotify.com/track/');
+            } else if (track.uri?.startsWith('spotify:local:')) {
+                trackLink = 'Local File';
+            }
+
+            return {
+                title: track.songTitle || track.name || 'Unknown Title',
+                artist: track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist',
+                album: track.albumName || (track.album && track.album.name) || 'Unknown Album',
+                link: trackLink,
+                uri: track.uri,
+                durationMs: track.durationMs || track.durationMilis || 0,
+                playCount: track.playCount,
+                popularity: track.popularity
+            };
+        });
+
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: 'sort-play_removed_duplicates.json',
+                    types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Error saving file:', err);
+                    showNotification("Failed to export data.", true);
+                }
+            }
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sort-play_removed_duplicates.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    });
+
+    const closeModal = () => {
+        observer.disconnect();
+        overlay.remove();
+    };
+    
+    modalContainer.querySelector("#closeRemovedModal").addEventListener("click", closeModal);
+    modalContainer.querySelector("#closeRemovedModalX").addEventListener("click", closeModal);
+
+    overlay.addEventListener("click", (e) => { 
+        if (e.target === overlay) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
     });
   }
-  
 
   async function deduplicateTracks(tracks, force = false, isArtistPageContext = false, updateProgress = () => {}, sortType = null) {
     if (!force && !isArtistPageContext) {
@@ -30224,15 +30470,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       throw new Error('Last.fm username required for this sorting type');
     }
 
-    const includeZeroScrobbles = localStorage.getItem("sort-play-include-no-scrobbles") !== "false";
-
     updateProgress(0);
     const scrobblesMap = await fetchRecentScrobblesMap((progress) => {
         updateProgress(Math.floor(progress * 0.90));
     });
 
-    if (scrobblesMap.size === 0 && !includeZeroScrobbles) {
-        throw new Error("Could not fetch any recent scrobbles from Last.fm.");
+    if (scrobblesMap.size === 0) {
+        console.warn("Could not fetch any recent scrobbles from Last.fm.");
     }
 
     updateProgress(95);
@@ -30274,19 +30518,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return b.lastScrobbledTimestamp - a.lastScrobbledTimestamp;
     });
 
-    let sortedTracks;
-    if (includeZeroScrobbles) {
-        sortedTracks = [...sortedScrobbledTracks, ...unscrobbledTracks];
-    } else {
-        sortedTracks = sortedScrobbledTracks;
-    }
+    let sortedTracks = [...sortedScrobbledTracks, ...unscrobbledTracks];
 
     if (sortedTracks.length === 0) {
-        if (includeZeroScrobbles) {
-            throw new Error("No tracks found in this playlist.");
-        } else {
-            throw new Error("None of the tracks in this playlist appear in your recent Last.fm history.");
-        }
+        throw new Error("No tracks found in this playlist.");
     }
     
     updateProgress(100);
