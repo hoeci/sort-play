@@ -4,9 +4,9 @@
 
 # Sort-Play: The Ultimate Spotify Toolkit
 
-*A Spicetify extension that adds powerful sorting, filtering, and more to the Spotify desktop client.*
+*A Spicetify extension that adds powerful sorting, filtering, UI features, and more to the Spotify desktop client.*
 
-<p>
+<p style="margin-top: 5px;">
   <a href="https://spicetify.app/docs/getting-started"><img src="https://img.shields.io/badge/Spicetify-Marketplace-1DB954?style=for-the-badge&logo=spotify" alt="Spicetify Marketplace"></a>
   <a href="https://github.com/hoeci/sort-play"><img src="https://img.shields.io/github/stars/hoeci/sort-play?style=for-the-badge&logo=github&color=eac54f" alt="GitHub Stars"></a>
   <img src="https://img.shields.io/badge/Made%20with-%E2%9D%A4-F472B6?style=for-the-badge" alt="Made with Love">
