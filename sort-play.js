@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.56.0";
+  const SORT_PLAY_VERSION = "5.57.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -12921,16 +12921,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         case 'valence':
         case 'acousticness':
         case 'instrumentalness':
-            sortedTracks = uniqueTracks
-                .filter(track => track[sortType] !== null && track[sortType] !== undefined)
-                .sort((a, b) => {
-                    const valA = a[sortType] || 0;
-                    const valB = b[sortType] || 0;
-                    return valB - valA;
-                });
-            if (sortedTracks.length < uniqueTracks.length && (!isHeadless || sortedTracks.length === 0)) {
-                 const dropped = uniqueTracks.length - sortedTracks.length;
-                 showNotification(`Dropped ${dropped} tracks missing ${sortType} data.`, 'warning');
+            const validFeatureTracks = uniqueTracks.filter(track => track[sortType] !== null && track[sortType] !== undefined);
+            const invalidFeatureTracks = uniqueTracks.filter(track => track[sortType] === null || track[sortType] === undefined);
+            
+            validFeatureTracks.sort((a, b) => {
+                const valA = a[sortType] || 0;
+                const valB = b[sortType] || 0;
+                return valB - valA;
+            });
+            
+            sortedTracks = [...validFeatureTracks, ...invalidFeatureTracks];
+            
+            if (invalidFeatureTracks.length > 0 && !isHeadless) {
+                 showNotification(`${invalidFeatureTracks.length} tracks missing ${sortType} data.`, 'warning');
             }
             break;
         case "shuffle":
@@ -19253,85 +19256,123 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
 
-    if (trackIdsForFeatures.size > 0 && !isFallbackActive()) {
+    if (trackIdsForFeatures.size > 0) {
         updateProgress("Audio...");
         const ids = Array.from(trackIdsForFeatures);
-        const BATCH_SIZE = 100;
+        const BATCH_SIZE = 150;
 
         for (let i = 0; i < ids.length; i += BATCH_SIZE) {
             const batch = ids.slice(i, i + BATCH_SIZE);
-            try {
-                const response = await withRetry(
-                    () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batch.join(',')}`),
-                    CONFIG.spotify.retryAttempts,
-                    CONFIG.spotify.retryDelay
-                );
+            
+            const batchPromises = batch.map(async (id) => {
+                try {
+                    const features = await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/audio-attributes/v1/audio-features/${id}`);
+                    if (features && features.id) {
+                        return { id, features, success: true };
+                    }
+                } catch (e) {}
+                return { id, features: null, success: false };
+            });
 
-                if (response && response.audio_features) {
-                    response.audio_features.forEach((af, index) => {
-                        const uri = `spotify:track:${batch[index]}`;
-                        const genreData = finalGenresMap.get(uri);
+            const batchResults = await Promise.all(batchPromises);
+            const idsNeedingInternal = [];
 
-                        if (af) {
-                            const features = {
-                                danceability: safeVal(af.danceability),
-                                energy: safeVal(af.energy),
-                                valence: safeVal(af.valence),
-                                acousticness: safeVal(af.acousticness),
-                                instrumentalness: safeVal(af.instrumentalness),
-                                speechiness: safeVal(af.speechiness),
-                                liveness: safeVal(af.liveness),
-                                tempo: safeVal(af.tempo),
-                                key: safeVal(af.key),
-                                mode: safeVal(af.mode),
-                                time_signature: safeVal(af.time_signature),
-                                loudness: safeVal(af.loudness),
-                                duration_ms: safeVal(af.duration_ms)
+            batchResults.forEach(res => {
+                const uri = `spotify:track:${res.id}`;
+                const genreData = finalGenresMap.get(uri);
+                
+                if (res.success && res.features) {
+                    const af = res.features;
+                    const features = {
+                        danceability: safeVal(af.danceability),
+                        energy: safeVal(af.energy),
+                        valence: safeVal(af.valence),
+                        acousticness: safeVal(af.acousticness),
+                        instrumentalness: safeVal(af.instrumentalness),
+                        speechiness: safeVal(af.speechiness),
+                        liveness: safeVal(af.liveness),
+                        tempo: safeVal(af.tempo),
+                        key: safeVal(af.key),
+                        mode: safeVal(af.mode),
+                        time_signature: safeVal(af.time_signature),
+                        loudness: safeVal(af.loudness),
+                        duration_ms: safeVal(af.duration_ms)
+                    };
+
+                    if (genreData) {
+                        Object.assign(genreData, features);
+
+                        if (genreData.isrc) {
+                            const existing = itemsToSaveMap.get(uri);
+                            const updatedEntry = {
+                                ...(existing || {}),
+                                track_uri: uri,
+                                isrc: genreData.isrc,
+                                ...genreData,
+                                audio_features: features
                             };
+                            itemsToSaveMap.set(uri, updatedEntry);
+                        }
+                    }
+                    
+                    if (features.key === -1 || !features.tempo) {
+                        idsNeedingInternal.push(res.id);
+                    }
+                } else {
+                    idsNeedingInternal.push(res.id);
+                }
+            });
 
-                            if (genreData) {
-                                Object.assign(genreData, features);
-
-                                if (genreData.isrc) {
-                                    const existing = itemsToSaveMap.get(uri);
-                                    const updatedEntry = {
-                                        ...(existing || {}),
-                                        track_uri: uri,
-                                        isrc: genreData.isrc,
-                                        ...genreData,
-                                        audio_features: features
-                                    };
-                                    itemsToSaveMap.set(uri, updatedEntry);
-                                }
+            if (idsNeedingInternal.length > 0) {
+                try {
+                    const internalData = await fetchInternalAudioFeaturesBatch(idsNeedingInternal);
+                    idsNeedingInternal.forEach(id => {
+                        const uri = `spotify:track:${id}`;
+                        const genreData = finalGenresMap.get(uri);
+                        const int = internalData[id];
+                        
+                        if (genreData && int) {
+                            if (int.key_raw !== -1) {
+                                genreData.key = int.key_raw;
+                                genreData.mode = int.mode;
+                                genreData.camelot = int.camelot;
                             }
-                        } else {
-                            if (genreData) {
-                                const emptyFeatures = {
-                                    danceability: -1, energy: -1, valence: -1, acousticness: -1,
-                                    instrumentalness: -1, speechiness: -1, liveness: -1, tempo: -1,
-                                    key: -1, mode: -1, time_signature: -1, loudness: -1
-                                };
-                                Object.assign(genreData, emptyFeatures);
-                                
-                                if (genreData.isrc) {
-                                    const existing = itemsToSaveMap.get(uri);
-                                    const updatedEntry = {
-                                        ...(existing || {}),
-                                        track_uri: uri,
-                                        isrc: genreData.isrc,
-                                        ...genreData,
-                                        audio_features: emptyFeatures
-                                    };
-                                    itemsToSaveMap.set(uri, updatedEntry);
-                                }
+                            if (int.tempo) genreData.tempo = int.tempo;
+                            
+                            if (genreData.isrc) {
+                                const existing = itemsToSaveMap.get(uri) || {};
+                                existing.audio_features = existing.audio_features || {};
+                                existing.audio_features.key = genreData.key;
+                                existing.audio_features.mode = genreData.mode;
+                                existing.audio_features.tempo = genreData.tempo;
+                                itemsToSaveMap.set(uri, existing);
+                            }
+                        } else if (genreData && !int) {
+                             const emptyFeatures = {
+                                danceability: -1, energy: -1, valence: -1, acousticness: -1,
+                                instrumentalness: -1, speechiness: -1, liveness: -1, tempo: -1,
+                                key: -1, mode: -1, time_signature: -1, loudness: -1
+                            };
+                            Object.assign(genreData, emptyFeatures);
+                            if (genreData.isrc) {
+                                const existing = itemsToSaveMap.get(uri);
+                                itemsToSaveMap.set(uri, {
+                                    ...(existing || {}),
+                                    track_uri: uri,
+                                    isrc: genreData.isrc,
+                                    ...genreData,
+                                    audio_features: emptyFeatures
+                                });
                             }
                         }
                     });
+                } catch (e) {
+                    console.warn("Secondary internal fetch failed for audio features", e);
                 }
-            } catch (e) {
-                console.error("[Sort-Play] Error fetching batch audio features", e);
             }
+
             updateProgress(`Audio ${Math.round(((i + BATCH_SIZE) / ids.length) * 100)}%`);
+            await new Promise(r => setTimeout(r, 100));
         }
     }
 
@@ -20726,6 +20767,60 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
 
+  const getWebpackService = (id) => {
+    const req = window.webpackChunkclient_web.push([[Symbol()], {}, (r) => r]);
+    return Object.values(req.m).flatMap(m => {
+      try { return Object.values(req(Object.keys(req.m).find(k => req.m[k] === m))); } catch { return []; }
+    }).find(c => c?.SERVICE_ID === id);
+  };
+
+  const parseVarint = (obj) => {
+    const bytes = Object.values(obj);
+    let res = 0n;
+    let shift = 0n;
+    for (let i = 1; i < bytes.length; i++) {
+      res += BigInt(bytes[i] & 0x7f) << shift;
+      if (!(bytes[i] & 0x80)) break;
+      shift += 7n;
+    }
+    return Number(res);
+  };
+
+  let metadataServiceClient = null;
+  const getMetadataClient = () => {
+      if (metadataServiceClient) return metadataServiceClient;
+      try {
+          const MetadataService = getWebpackService("spotify.mdata_esperanto.proto.MetadataService");
+          const transport = Spicetify.Platform.ProductStateAPI.productStateApi.transport;
+          metadataServiceClient = new MetadataService(transport);
+      } catch (e) {
+          console.error("[Sort-Play] Failed to initialize MetadataService", e);
+      }
+      return metadataServiceClient;
+  };
+
+  async function fetchPlayCountsBatchNew(uris) {
+      const client = getMetadataClient();
+      if (!client) throw new Error("Metadata client not available");
+      
+      const validUris = uris.filter(uri => uri && uri.startsWith("spotify:track:"));
+      if (validUris.length === 0) return new Map();
+
+      const response = await client.fetch({
+        extensionQuery: [{ extensionKind: 185, entityUri: validUris }],
+      });
+
+      const results = new Map();
+      if (response.extension && response.extension[0] && response.extension[0].entityExtension) {
+          response.extension[0].entityExtension.forEach(item => {
+              if (item.extensionData && item.extensionData.value) {
+                  results.set(item.entityUri, parseVarint(item.extensionData.value));
+              }
+          });
+      }
+      return results;
+  }
+
   async function getPlayCountsForAlbum(albumId, retries = 10, retryDelay = 2000) {
     if (albumDataCache[albumId]) {
       return albumDataCache[albumId];
@@ -20884,48 +20979,67 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getTrackDetailsWithPlayCount(track, retries = 10, retryDelay = 1000) {
-    const trackId = track.track.id;
-    const albumId = track.track.album.id;
+    const trackId = track.trackId || track.id || track.track?.id;
+    const albumId = track.albumId || track.album?.id || track.track?.album?.id;
+
+    if (!trackId) return track;
 
     const cachedCount = await idb.get('playCounts', trackId, CACHE_EXPIRE_PLAYCOUNTS);
     
-    if (cachedCount !== null && cachedCount !== undefined) {
+    if (cachedCount !== null && cachedCount !== undefined && cachedCount !== "N/A") {
         return {
             ...track,
             playCount: cachedCount,
-            songTitle: track.name,
-            albumName: track.albumName || (track.album && track.album.name) || "Unknown Album",
+            songTitle: track.songTitle || track.name,
+            albumName: track.albumName || track.album?.name || track.track?.album?.name || "Unknown Album",
             trackId: trackId,
             albumId: albumId,
-            uri: `spotify:track:${trackId}`,
+            uri: track.uri || `spotify:track:${trackId}`,
             artistName: track.artistName,
             allArtists: track.allArtists
         };
     }
 
     try {
-      const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
       let playCount = "N/A";
-      const foundTrack = albumTracksWithPlayCounts.find(
-        (albumTrack) => albumTrack.uri === `spotify:track:${trackId}`
-      );
+      let trackNumber = track.trackNumber || track.track?.track_number || track.track?.trackNumber || 0;
 
-      if (foundTrack) {
-        playCount = foundTrack.playcount;
-        if (playCount !== "N/A") {
-            await idb.set('playCounts', trackId, playCount);
-        }
+      try {
+          const resMap = await fetchPlayCountsBatchNew([`spotify:track:${trackId}`]);
+          const pc = resMap.get(`spotify:track:${trackId}`);
+          if (pc !== undefined) {
+              playCount = pc;
+              await idb.set('playCounts', trackId, playCount);
+          }
+      } catch (e) {
+          console.warn("[Sort-Play] New playcount fetch failed for single track", e);
+      }
+
+      if (playCount === "N/A" && albumId) {
+          const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
+          const foundTrack = albumTracksWithPlayCounts.find(
+            (albumTrack) => albumTrack.uri === `spotify:track:${trackId}`
+          );
+
+          if (foundTrack) {
+            playCount = foundTrack.playcount;
+            trackNumber = foundTrack.trackNumber;
+            if (playCount !== "N/A") {
+                await idb.set('playCounts', trackId, playCount);
+            }
+          }
       }
 
       return {
-        trackNumber: foundTrack ? foundTrack.trackNumber : 0,
-        songTitle: track.name, 
-        albumName: track.albumName || (track.album && track.album.name) ||  "Unknown Album",
+        ...track,
+        trackNumber: trackNumber,
+        songTitle: track.songTitle || track.name, 
+        albumName: track.albumName || track.album?.name || track.track?.album?.name || "Unknown Album",
         trackId: trackId,
         albumId: albumId,
-        durationMs: track.track.duration_ms,
+        durationMs: track.durationMs || track.track?.duration_ms,
         playCount: playCount,
-        uri: `spotify:track:${trackId}`,
+        uri: track.uri || `spotify:track:${trackId}`,
         artistName: track.artistName,
         allArtists: track.allArtists,
       };
@@ -20935,92 +21049,132 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         await new Promise((resolve) => setTimeout(resolve, retryDelay));
         return getTrackDetailsWithPlayCount(track, retries - 1, retryDelay * 2);
       }
-      return null;
+      return { ...track, playCount: "N/A" };
     }
   }
 
   async function enrichTracksWithPlayCounts(tracks, updateProgress = () => {}) {
     const tracksWithIds = tracks.map(t => {
-        const id = t.trackId || t.id || (t.track && t.track.id);
-        const albumId = t.albumId || (t.album && t.album.id) || (t.track && t.track.album && t.track.album.id);
+        const id = t.trackId || t.id || t.track?.id || (t.uri ? t.uri.split(':')[2] : null);
+        const albumId = t.albumId || t.album?.id || t.track?.album?.id;
         return { ...t, _tempId: id, _tempAlbumId: albumId };
     });
 
     const trackIdsToCheck = tracksWithIds.map(t => t._tempId).filter(Boolean);
-
     const cachedPlayCounts = await idb.getMany('playCounts', trackIdsToCheck, CACHE_EXPIRE_PLAYCOUNTS);
 
-    const albumGroups = new Map();
     const playCountMap = new Map(); 
+    const missingUris = [];
+    const missingTracks = [];
 
     tracksWithIds.forEach(track => {
         if (!track._tempId) return;
-
         const cachedVal = cachedPlayCounts.get(track._tempId);
-        
-        if (cachedVal !== undefined && cachedVal !== null) {
+        if (cachedVal !== undefined && cachedVal !== null && cachedVal !== "N/A") {
             playCountMap.set(track._tempId, cachedVal);
-        } else if (track._tempAlbumId) {
-            if (!albumGroups.has(track._tempAlbumId)) {
-                albumGroups.set(track._tempAlbumId, []);
-            }
-            albumGroups.get(track._tempAlbumId).push(track);
+        } else {
+            missingUris.push(`spotify:track:${track._tempId}`);
+            missingTracks.push(track);
         }
     });
 
-    const uniqueAlbumIds = Array.from(albumGroups.keys());
-    
-    if (uniqueAlbumIds.length > 0) {
-        let processedAlbums = 0;
-        const totalAlbums = uniqueAlbumIds.length;
-        
-        let CONCURRENCY_LIMIT = 6;
-        if (totalAlbums <= 50) {
-            CONCURRENCY_LIMIT = 15;
-        } else if (totalAlbums <= 400) {
-            CONCURRENCY_LIMIT = 10;
-        } else if (totalAlbums <= 1000) {
-            CONCURRENCY_LIMIT = 8;
-        }
+    const uniqueMissingUris = [...new Set(missingUris)];
 
-        async function worker(queue) {
-            while (queue.length > 0) {
-                const albumId = queue.shift();
-                try {
-                    const albumTracks = await getPlayCountsForAlbum(albumId);
-                    
-                    albumTracks.forEach(t => {
-                        const tId = t.uri.split(":")[2];
-                        if (t.playcount !== undefined) {
-                            playCountMap.set(tId, t.playcount);
-                            idb.set('playCounts', tId, t.playcount); 
-                        }
-                    });
-                } catch (error) {
-                    console.error(`Failed to process album ${albumId}`, error);
-                } finally {
-                    processedAlbums++;
-                    if (totalAlbums > 0 && updateProgress) {
-                        updateProgress(Math.floor((processedAlbums / totalAlbums) * 100));
-                    }
+    if (uniqueMissingUris.length > 0) {
+        try {
+            const BATCH_SIZE = 500;
+            const DELAY = 100;
+            let processedTracks = 0;
+            
+            for (let i = 0; i < uniqueMissingUris.length; i += BATCH_SIZE) {
+                const batch = uniqueMissingUris.slice(i, i + BATCH_SIZE);
+                const batchResults = await fetchPlayCountsBatchNew(batch);
+                
+                for (const [uri, count] of batchResults.entries()) {
+                    const tId = uri.split(":")[2];
+                    playCountMap.set(tId, count);
+                    idb.set('playCounts', tId, count); 
+                }
+                
+                processedTracks += batch.length;
+                if (updateProgress) {
+                    updateProgress(Math.floor((processedTracks / uniqueMissingUris.length) * 100));
+                }
+                
+                if (i + BATCH_SIZE < uniqueMissingUris.length) {
+                    await new Promise(r => setTimeout(r, DELAY));
                 }
             }
+        } catch (e) {
+            console.warn("[Sort-Play] New playcount fetch method failed, falling back to album parsing", e);
         }
 
-        const queue = [...uniqueAlbumIds];
-        const workers = Array(Math.min(CONCURRENCY_LIMIT, uniqueAlbumIds.length)).fill(null).map(() => worker(queue));
-        await Promise.all(workers);
+        const stillMissingTracks = missingTracks.filter(track => !playCountMap.has(track._tempId));
+
+        if (stillMissingTracks.length > 0) {
+            const albumGroups = new Map();
+            stillMissingTracks.forEach(track => {
+                if (track._tempAlbumId) {
+                    if (!albumGroups.has(track._tempAlbumId)) {
+                        albumGroups.set(track._tempAlbumId, []);
+                    }
+                    albumGroups.get(track._tempAlbumId).push(track);
+                }
+            });
+
+            const uniqueAlbumIds = Array.from(albumGroups.keys());
+            if (uniqueAlbumIds.length > 0) {
+                let processedAlbums = 0;
+                const totalAlbums = uniqueAlbumIds.length;
+                
+                let CONCURRENCY_LIMIT = 6;
+                if (totalAlbums <= 50) {
+                    CONCURRENCY_LIMIT = 15;
+                } else if (totalAlbums <= 400) {
+                    CONCURRENCY_LIMIT = 10;
+                } else if (totalAlbums <= 1000) {
+                    CONCURRENCY_LIMIT = 8;
+                }
+
+                async function worker(queue) {
+                    while (queue.length > 0) {
+                        const albumId = queue.shift();
+                        try {
+                            const albumTracks = await getPlayCountsForAlbum(albumId);
+                            
+                            albumTracks.forEach(t => {
+                                const tId = t.uri.split(":")[2];
+                                if (t.playcount !== undefined && t.playcount !== "N/A") {
+                                    playCountMap.set(tId, t.playcount);
+                                    idb.set('playCounts', tId, t.playcount); 
+                                }
+                            });
+                        } catch (error) {
+                            console.error(`Failed to process album ${albumId}`, error);
+                        } finally {
+                            processedAlbums++;
+                            if (totalAlbums > 0 && updateProgress) {
+                                updateProgress(Math.floor((processedAlbums / totalAlbums) * 100));
+                            }
+                        }
+                    }
+                }
+
+                const queue = [...uniqueAlbumIds];
+                const workers = Array(Math.min(CONCURRENCY_LIMIT, uniqueAlbumIds.length)).fill(null).map(() => worker(queue));
+                await Promise.all(workers);
+            }
+        }
     } else {
         if (updateProgress) updateProgress(100);
     }
 
     const enrichedTracks = tracks.map(track => {
-        const albumId = track.albumId || (track.album && track.album.id) || (track.track && track.track.album && track.track.album.id) || track?.track?.album?.id;
-        const trackId = track.trackId || track.id || (track.track && track.track.id) || track?.track?.id;
+        const albumId = track.albumId || track.album?.id || track.track?.album?.id;
+        const trackId = track.trackId || track.id || track.track?.id || (track.uri ? track.uri.split(':')[2] : null);
+        const duration = track.durationMs || track.durationMilis || track.duration_ms || track.track?.duration_ms || 0;
 
-        const duration = track.durationMs || track.durationMilis || track.duration_ms || track?.track?.duration_ms || 0;
-
-        if (!albumId || !trackId) {
+        if (!trackId) {
             return { 
                 ...track, 
                 playCount: "N/A", 
@@ -21037,16 +21191,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const enrichedData = {
             trackNumber: track.trackNumber || track.track_number || 0,
-            songTitle: track.name || track.songTitle,
-            albumName: track.albumName || track.album?.name || track?.track?.album?.name || "Unknown Album",
+            songTitle: track.songTitle || track.name,
+            albumName: track.albumName || track.album?.name || track.track?.album?.name || "Unknown Album",
             trackId: trackId,
             albumId: albumId,
             durationMs: duration,
             playcount: playCount,
             playCount: playCount,
             uri: track.uri || `spotify:track:${trackId}`,
-            artistName: track.artistName || track?.artists?.[0]?.name,
-            allArtists: track.allArtists || track?.artists?.map(a => a.name).join(", "),
+            artistName: track.artistName || track.artists?.[0]?.name,
+            allArtists: track.allArtists || track.artists?.map(a => a.name).join(", "),
         };
         
         return { ...track, ...enrichedData };
@@ -23419,26 +23573,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return { ...track, ...stats, features: stats };
         });
 
-        if (fallbackActive) {
-            showNotification("Creating Harmonic Mix (Fallback Mode)...");
-            
-            const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && (track.features.tempo !== null || track.features.key_raw !== -1));
-            const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || (track.features.tempo === null && track.features.key_raw === -1));
-            
-            const harmonicShuffled = await randomizedHarmonicShuffle(tracksWithData);
-            
-            finalSortedTracks = [...harmonicShuffled, ...shuffleArray(tracksWithoutData)];
+        showNotification("Performing Randomized Energy Wave Shuffle...");
+        const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+        const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+        
+        if (tracksWithData.length < 3) {
+            finalSortedTracks = shuffleArray(tracksToProcess);
         } else {
-            showNotification("Performing Randomized Energy Wave Shuffle...");
-            const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-            const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
-            
-            if (tracksWithData.length < 3) {
-                 finalSortedTracks = shuffleArray(tracksToProcess);
-            } else {
-                 const waveSorted = await randomizedEnergyWaveSort(tracksWithData);
-                 finalSortedTracks = [...waveSorted, ...shuffleArray(tracksWithoutData)];
-            }
+            const waveSorted = await randomizedEnergyWaveSort(tracksWithData);
+            finalSortedTracks = [...waveSorted, ...shuffleArray(tracksWithoutData)];
         }
     } else {
         if (useEnergyWaveShuffle) {
@@ -23842,7 +23985,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .summary-label { font-size: 12px; color: #b3b3b3; text-transform: uppercase; margin-top: 4px; }
         .conversion-list-header { display: flex; justify-content: space-between; padding: 0 10px 8px; border-bottom: 1px solid #3e3e3e; margin-bottom: 8px; }
         .column-title { color: white; font-size: 14px; font-weight: 500; flex-basis: 45%; text-align: center; }
-        .conversion-list-container { max-height: 400px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+        .conversion-list-container { max-height: 400px; overflow-y: scroll; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
         .conversion-list-container::-webkit-scrollbar { width: 8px; }
         .conversion-list-container::-webkit-scrollbar-track { background: #282828; }
         .conversion-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
@@ -26008,11 +26151,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         cachedLikedMetadata.forEach(meta => {
             if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
         });
-        
-        likedTrackIds.forEach(id => {
-            const storedIsrc = localStorage.getItem("sort-play-like-" + id);
-            if (storedIsrc) likedIsrcs.add(storedIsrc);
-        });
 
         const candidatesForMeta = availableTracks.map(t => ({
             uri: t.uri,
@@ -26092,19 +26230,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         let finalTracks;
         
-        if (isFallbackActive()) {
-            const validForFlow = tracksWithFeatures.filter(t => t.features && t.features.tempo != null);
-            const others = tracksWithFeatures.filter(t => !t.features || t.features.tempo == null);
-            
-            const sorted = await harmonicTempoSort(validForFlow);
-            finalTracks = [...sorted, ...others];
-        } else {
-            const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-            const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
-    
-            const sorted = await energyWaveSort(validForWave, 'discovery');
-            finalTracks = [...sorted, ...others];
-        }
+        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+
+        const sorted = await energyWaveSort(validForWave, 'discovery');
+        finalTracks = [...sorted, ...others];
         
         const trackUris = finalTracks.map(t => t.uri);
 
@@ -26372,11 +26502,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
         });
 
-        likedTrackIds.forEach(id => {
-            const storedIsrc = localStorage.getItem("sort-play-like-" + id);
-            if (storedIsrc) likedIsrcs.add(storedIsrc);
-        });
-
         const candidatesForMeta = availableTracks.map(t => ({
             uri: t.uri,
             id: t.id || t.uri.split(':')[2],
@@ -26439,19 +26564,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         let finalTracks;
 
-        if (isFallbackActive()) {
-            const validForFlow = tracksWithFeatures.filter(t => t.features && t.features.tempo != null);
-            const others = tracksWithFeatures.filter(t => !t.features || t.features.tempo == null);
-            
-            const sorted = await harmonicTempoSort(validForFlow);
-            finalTracks = [...sorted, ...others];
-        } else {
-            const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-            const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
-    
-            const sorted = await energyWaveSort(validForWave);
-            finalTracks = [...sorted, ...others];
-        }
+        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+
+        const sorted = await energyWaveSort(validForWave);
+        finalTracks = [...sorted, ...others];
         
         const trackUris = finalTracks.map(t => t.uri);
 
@@ -27395,7 +27512,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (isArtistPage) {
             tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType);
         }
-        else if (sortType === 'deduplicateOnly') {
+        else if (sortType === 'deduplicateOnly' || sortType === 'excludeByPlaylist') {
             if (!isHeadless) mainButton.innerText = "Enriching...";
             
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
@@ -27659,11 +27776,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (meta && meta.external_ids && meta.external_ids.isrc) {
                     likedIsrcSet.add(meta.external_ids.isrc);
                 }
-            });
-            
-            likedTrackIds.forEach(id => {
-                const storedIsrc = localStorage.getItem("sort-play-like-" + id);
-                if (storedIsrc) likedIsrcSet.add(storedIsrc);
             });
 
             const originalOrderMap = new Map();
@@ -27980,8 +28092,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
             if (!isHeadless) mainButton.innerText = "Processing...";
             
-            const preparedExTracks = await fetchPopularityForMultipleTracks(
+            const exTracksWithPlaycounts = await enrichTracksWithPlayCounts(
                 exTracks, 
+                (progress) => { if (!isHeadless) mainButton.innerText = `Meta ${Math.floor(progress)}%`; }
+            );
+
+            const preparedExTracks = await fetchPopularityForMultipleTracks(
+                exTracksWithPlaycounts, 
                 (progress) => { if (!isHeadless) mainButton.innerText = `Meta ${Math.floor(progress)}%`; }
             );
             
@@ -28003,6 +28120,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             );
 
             sortedTracks = dedupeResult.unique.filter(t => !t._isExclusion);
+            removedTracks = dedupeResult.removed.filter(t => !t._isExclusion);
 
             if (sortedTracks.length === uniqueTracks.length) {
                 showNotification("No matches found in the excluded playlists.");
@@ -28079,18 +28197,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             let journeySortedTracks;
             let tracksWithData, tracksWithoutData;
 
-            if (isFallbackActive()) {
-                if (!isHeadless) showNotification("Web API down. Using Harmonic/Tempo Mix.", "warning");
-                
-                tracksWithData = uniqueTracks.filter(track => track.features && (track.features.tempo !== null || track.features.key_raw !== -1));
-                tracksWithoutData = uniqueTracks.filter(track => !track.features || (track.features.tempo === null && track.features.key_raw === -1));
-                
-                journeySortedTracks = await harmonicTempoSort(tracksWithData);
+            tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+            tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+            
+            if (tracksWithData.length < 3) {
+                 journeySortedTracks = [...tracksWithData];
             } else {
-                tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-                tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
-                
-                journeySortedTracks = await energyWaveSort(tracksWithData);
+                 journeySortedTracks = await energyWaveSort(tracksWithData);
             }
 
             missingDataCount = tracksWithoutData.length;
@@ -28099,11 +28212,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 journeySortedTracks.reverse();
             }
 
-            if (canModifyCurrentPlaylist) {
-                sortedTracks = [...journeySortedTracks, ...tracksWithoutData];
-            } else {
-                sortedTracks = journeySortedTracks;
-            }
+            sortedTracks = [...journeySortedTracks, ...tracksWithoutData];
             if (!isHeadless) mainButton.innerText = "100%";
 
         } else if (['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
@@ -28137,11 +28246,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return sortOrderState[sortType] ? valA - valB : valB - valA;
             });
 
-            if (canModifyCurrentPlaylist) {
-                sortedTracks = [...sortedTracksWithData, ...tracksWithoutData];
-            } else {
-                sortedTracks = sortedTracksWithData;
-            }
+            sortedTracks = [...sortedTracksWithData, ...tracksWithoutData];
 
         } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
             try {
@@ -28370,7 +28475,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await replacePlaylistTracks(playlistIdToModify, trackUris);
                 
                 if (removedTracks.length > 0 && !isArtistPage) {
-                    showRemovedTracksModal(removedTracks);
+                    showRemovedTracksModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
                 }
                 
                 showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
@@ -28389,7 +28494,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
             try {
               if (removedTracks.length > 0 && !isArtistPage) {
-                showRemovedTracksModal(removedTracks);
+                showRemovedTracksModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
               }
               let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
               if (isArtistPage) {
@@ -28990,7 +29095,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 speechiness: speechiness ?? 0.1,
                 liveness: liveness ?? 0.2,
                 popularity: track.popularity ?? 50,
-                durationMs: track.duration_ms || f.duration_ms || 200000
+                durationMs: track.duration_ms || f.duration_ms || 200000,
+                cleanTitle: getCleanTitle(track.songTitle || track.name)
             }
         };
     });
@@ -29134,13 +29240,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let lastTrack = firstTrack;
 
     while (remainingTracks.length > 0) {
+        if (sortedPlaylist.length % 75 === 0) {
+            await new Promise(r => setTimeout(r, 0));
+        }
+
         const currentPosition = sortedPlaylist.length;
         const currentJourneyStep = fullJourneyMap[currentPosition] || fullJourneyMap[fullJourneyMap.length - 1];
         const isNearEnd = currentPosition >= tracks.length - 4;
         const isFinalTrack = remainingTracks.length === 1;
         const isSecondToLast = remainingTracks.length === 2;
         
-        const lastTitle = getCleanTitle(lastTrack.songTitle || lastTrack.name);
+        const lastTitle = lastTrack.profile.cleanTitle;
 
         const scoredCandidates = remainingTracks.map(candidateTrack => {
             let score = 0;
@@ -29172,7 +29282,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (candProfile.tempo >= 80 && candProfile.tempo <= 130) score += 15;
             }
 
-            const candTitle = getCleanTitle(candidateTrack.songTitle || candidateTrack.name);
+            const candTitle = candProfile.cleanTitle;
             if (candTitle === lastTitle && candTitle.length > 0) {
                 score -= 1000; 
             }
@@ -29259,7 +29369,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 danceability: danceability ?? 0.5,
                 acousticness: acousticness ?? 0.5,
                 instrumentalness: instrumentalness ?? 0,
-                popularity: track.popularity ?? 50
+                popularity: track.popularity ?? 50,
+                cleanTitle: getCleanTitle(track.songTitle || track.name)
             }
         };
     });
@@ -29427,12 +29538,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let lastTrack = firstTrack;
 
     while (remainingTracks.length > 0) {
+        if (sortedPlaylist.length % 75 === 0) {
+            await new Promise(r => setTimeout(r, 0));
+        }
+
         const currentPosition = sortedPlaylist.length;
         const currentJourneyStep = fullJourneyMap[currentPosition] || fullJourneyMap[fullJourneyMap.length - 1];
         const isNearEnd = currentPosition >= tracks.length - 3;
         const isFinalTrack = remainingTracks.length === 1;
 
-        const lastTitle = getCleanTitle(lastTrack.songTitle || lastTrack.name);
+        const lastTitle = lastTrack.profile.cleanTitle;
 
         const scoredCandidates = remainingTracks.map(candidateTrack => {
             let score = 0;
@@ -29457,7 +29572,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (candProfile.energy < 0.65) score += 12;
             }
 
-            const candTitle = getCleanTitle(candidateTrack.songTitle || candidateTrack.name);
+            const candTitle = candProfile.cleanTitle;
             if (candTitle === lastTitle && candTitle.length > 0) {
                 score -= 500;
             }
@@ -29552,7 +29667,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return breakUpClusters(shuffled);
   }
 
-  function showRemovedTracksModal(removedTracks) {
+  function showRemovedTracksModal(removedTracks, totalOriginalCount, sortType = 'deduplicateOnly') {
+    const isExclusion = sortType === 'excludeByPlaylist';
+    const modalTitle = isExclusion ? "Excluded Tracks Report" : "Removed Duplicate Tracks";
+    const summaryLabel = isExclusion ? "Tracks Excluded" : "Duplicate Tracks Removed";
+    const fileName = isExclusion ? "sort-play_excluded_tracks.json" : "sort-play_removed_duplicates.json";
+
     const overlay = document.createElement("div");
     overlay.id = "sort-play-removed-tracks-overlay";
     overlay.className = "sort-play-font-scope";
@@ -29568,7 +29688,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     modalContainer.className = "main-embedWidgetGenerator-container";
     modalContainer.style.cssText = `
         z-index: 2003;
-        width: 650px !important;
+        width: 1000px !important;
+        max-width: 95vw !important;
         display: flex;
         flex-direction: column;
         border-radius: 30px;
@@ -29581,11 +29702,36 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         <path d="M14 7H16C18.7614 7 21 9.23858 21 12C21 14.7614 18.7614 17 16 17H14M10 7H8C5.23858 7 3 9.23858 3 12C3 14.7614 5.23858 17 8 17H10M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>`;
 
-    const removedListHTML = removedTracks.map((track, index) => {
+    const groups = new Map();
+    let unknownGroup = [];
+
+    removedTracks.forEach(track => {
+        if (track._keptTrack) {
+            const key = track._keptTrack.uri || track._keptTrack.id || Math.random().toString();
+            if (!groups.has(key)) {
+                groups.set(key, { keptTrack: track._keptTrack, removed: [] });
+            }
+            groups.get(key).removed.push(track);
+        } else {
+            unknownGroup.push(track);
+        }
+    });
+
+    const renderTrackRow = (track, type, indexText = "", isLast = false, isStandalone = false) => {
         const title = track.songTitle || track.name || 'Unknown Title';
         const artist = track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist';
         const album = track.albumName || (track.album && track.album.name) || 'Unknown Album';
         const uri = track.uri || 'N/A';
+        
+        const durationMs = track.durationMs || track.durationMilis || track.track?.duration_ms || 0;
+        const duration = formatDuration(durationMs);
+        
+        let playCount = track.playCount || track.playcount;
+        if (playCount === undefined || playCount === null || playCount === "N/A" || playCount === "") {
+            playCount = "N/A";
+        } else {
+            playCount = Number(playCount).toLocaleString();
+        }
 
         let trackLink = uri;
         if (uri.startsWith('spotify:track:')) {
@@ -29599,24 +29745,41 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (images && images.length > 0) {
             coverUrl = images[images.length - 1].url || images[0].url;
         }
-
         const needsCoverLoad = coverUrl === '/api/placeholder/40/40';
 
+        let typeClass = '';
+        let badgeHtml = '';
+        
+        if (type === 'kept') {
+            typeClass = 'kept-track';
+            const label = isExclusion ? 'Source' : 'Kept';
+            badgeHtml = `<span class="track-badge kept-badge">${label}</span>`;
+        } else {
+            typeClass = `removed-track ${isLast ? 'last-removed' : ''} ${isStandalone ? 'standalone' : ''}`;
+            const label = isExclusion ? 'Excluded' : 'Removed';
+            badgeHtml = `<span class="track-badge removed-badge">${label}</span>`;
+        }
+
         return `
-            <div class="conversion-row">
-                <div class="track-item local-track">
-                    <div class="track-text-wrapper" style="flex-direction: row; align-items: center; gap: 12px; min-width: 0;">
-                        <span style="color: #b3b3b3; font-variant-numeric: tabular-nums; width: 30px; text-align: right; font-size: 13px; flex-shrink: 0;">${index + 1}.</span>
-                        <img src="${coverUrl}" data-track-uri="${uri}" class="track-item-cover" style="opacity: ${needsCoverLoad ? '0' : '1'}; flex-shrink: 0;">
-                        <div style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; min-width: 0;">
-                            <span class="track-item-title" title="${title}">${title}</span>
-                            <div class="track-item-artist-wrapper" title="${artist} • ${album}">
-                                <span class="track-item-artist-names">${artist}</span>
-                                <span class="track-item-album-name"><span style="margin: 0 4px;">•</span>${album}</span>
-                            </div>
+            <div class="track-item ${typeClass}">
+                <div class="track-text-wrapper" style="flex-direction: row; align-items: center; gap: 12px; min-width: 0;">
+                    ${indexText ? `<span style="color: #b3b3b3; font-variant-numeric: tabular-nums; width: 24px; text-align: right; font-size: 13px; flex-shrink: 0;">${indexText}</span>` : ''}
+                    <img src="${coverUrl}" data-track-uri="${uri}" class="track-item-cover" style="opacity: ${needsCoverLoad ? '0' : '1'}; flex-shrink: 0;">
+                    <div style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; min-width: 0;">
+                        <span class="track-item-title" title="${title}">${title}</span>
+                        <div class="track-item-artist-wrapper" title="${artist} • ${album}">
+                            <span class="track-item-artist-names">${artist}</span>
+                            <span class="track-item-album-name"><span style="margin: 0 4px;">•</span>${album}</span>
                         </div>
                     </div>
-                    <div style="display: flex; gap: 6px; flex-shrink: 0;">
+                    <div style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; width: 115px; margin-left: 12px;">
+                        ${badgeHtml}
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0; padding-left: 16px;">
+                    <div title="Plays" style="width: 100px; text-align: center; color: #b3b3b3; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${playCount}</div>
+                    <div title="Duration" style="width: 50px; text-align: center; color: #b3b3b3; font-size: 13px; font-variant-numeric: tabular-nums;">${duration}</div>
+                    <div style="display: flex; gap: 6px; justify-content: flex-end; width: 72px;">
                         <button class="copy-track-button copy-uri" data-link="${trackLink}" title="Copy Spotify Link">
                             ${linkIconSVG}
                         </button>
@@ -29627,30 +29790,101 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 </div>
             </div>
         `;
-    }).join('');
+    };
+
+    let removedListHTML = '';
+    let groupIndex = 1;
+    
+    for (const [key, group] of groups.entries()) {
+        const keptHtml = renderTrackRow(group.keptTrack, 'kept', `${groupIndex}.`);
+        const removedHtml = group.removed.map((t, idx) => {
+            const isLast = idx === group.removed.length - 1;
+            return renderTrackRow(t, 'removed', "", isLast);
+        }).join('');
+        
+        removedListHTML += `
+            <div class="duplicate-group">
+                ${keptHtml}
+                <div class="removed-items-container">
+                    ${removedHtml}
+                </div>
+            </div>
+        `;
+        groupIndex++;
+    }
+
+    if (unknownGroup.length > 0) {
+        removedListHTML += unknownGroup.map((t, idx) => `
+            <div class="duplicate-group">
+                ${renderTrackRow(t, 'removed', `${groupIndex + idx}.`, false, true)}
+            </div>
+        `).join('');
+    }
 
     modalContainer.innerHTML = `
       <style>
-        .summary-grid { display: grid; grid-template-columns: 1fr; background-color: #282828; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; background-color: #282828; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
         .summary-item { text-align: center; }
         .summary-value { font-size: 24px; font-weight: bold; color: #f15e6c; }
         .summary-label { font-size: 12px; color: #b3b3b3; text-transform: uppercase; margin-top: 4px; font-weight: 700; letter-spacing: 0.5px; }
-        .conversion-list-header { display: flex; justify-content: space-between; padding: 0 10px 8px; border-bottom: 1px solid #3e3e3e; margin-bottom: 8px; }
         .column-title { color: white; font-size: 14px; font-weight: 500; }
-        .conversion-list-container { max-height: 400px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+        .conversion-list-container { max-height: 450px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
         .conversion-list-container::-webkit-scrollbar { width: 8px; }
         .conversion-list-container::-webkit-scrollbar-track { background: #282828; }
         .conversion-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
-        .conversion-row { display: flex; align-items: center; gap: 8px; }
-        .conversion-row:not(:last-child) { margin-bottom: 4px; }
-        .track-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-radius: 4px; flex: 1; min-width: 0; background-color: rgba(241, 94, 108, 0.08); border: 1px solid rgba(241, 94, 108, 0.15); transition: background-color 0.2s, border-color 0.2s; }
-        .track-item:hover { background-color: rgba(241, 94, 108, 0.15); border-color: rgba(241, 94, 108, 0.3); }
+        .duplicate-group { background-color: rgba(255,255,255,0.02); border: 1px solid #333; border-radius: 8px; margin-bottom: 8px; overflow: hidden; display: flex; flex-direction: column; }
+        .removed-items-container { background-color: rgba(0,0,0,0.15); display: flex; flex-direction: column; }
+        
+        .track-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; flex: 1; min-width: 0; transition: background-color 0.2s; }
+        .track-item.kept-track { background-color: rgba(30, 215, 96, 0.05); }
+        .track-item.kept-track:hover { background-color: rgba(30, 215, 96, 0.1); }
+        
+        .track-item.removed-track { background-color: transparent; border-bottom: 1px solid rgba(255,255,255,0.03); padding-left: 48px; position: relative; }
+        .track-item.removed-track:hover { background-color: rgba(241, 94, 108, 0.08); }
+        .track-item.removed-track:last-child { border-bottom: none; }
+        
+        .track-item.removed-track.standalone { padding-left: 12px; }
+        .track-item.removed-track.standalone::before, .track-item.removed-track.standalone::after { display: none !important; }
+
+        .track-item.removed-track::before {
+            content: '';
+            position: absolute;
+            left: 24px;
+            top: 0;
+            bottom: 0;
+            border-left: 2px solid #555;
+        }
+        .track-item.removed-track:first-child::before {
+            top: -8px; 
+        }
+        .track-item.removed-track::after {
+            content: '';
+            position: absolute;
+            left: 24px;
+            top: 50%;
+            width: 16px;
+            border-top: 2px solid #555;
+        }
+        .track-item.removed-track.last-removed::before {
+            bottom: 50%;
+            border-bottom-left-radius: 8px;
+            border-left: 2px solid #555;
+            border-bottom: 2px solid #555;
+            width: 16px;
+        }
+        .track-item.removed-track.last-removed::after {
+            display: none;
+        }
+
         .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding-right: 12px;}
-        .track-item-cover { width: 32px; height: 32px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; transition: opacity 0.3s ease; }
+        .track-item-cover { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; transition: opacity 0.3s ease; }
         .track-item-title { color: #e0e0e0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
         .track-item-artist-wrapper { display: flex; font-size: 12px; color: #b3b3b3; min-width: 0; margin-top: 2px; }
         .track-item-artist-names { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
         .track-item-album-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; max-width: 60%; }
+        .track-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 3px 0; border-radius: 4px; letter-spacing: 0.5px; margin-top: 1px; width: 80px; text-align: center; display: inline-block; }
+        .kept-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); }
+        .removed-badge { background-color: rgba(241, 94, 108, 0.15); color: #f15e6c; border: 1px solid rgba(241, 94, 108, 0.3); }
         .copy-track-button { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; color: #b3b3b3; padding: 8px 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 6px; transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
         .copy-track-button:hover { color: white; background-color: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
         .copy-track-button svg { width: 14px; height: 14px; }
@@ -29663,7 +29897,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
       </style>
       <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 27px 32px 12px !important;">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Removed Duplicate Tracks</span></h1>
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>${modalTitle}</span></h1>
           <button id="closeRemovedModalX" aria-label="Close" class="main-trackCreditsModal-closeBtn">
             <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
           </button>
@@ -29671,12 +29905,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       <div class="main-trackCreditsModal-mainSection" style="padding: 16px 32px !important; overflow:auto">
         <div class="summary-grid">
             <div class="summary-item">
-                <div class="summary-value">${removedTracks.length}</div>
-                <div class="summary-label">Duplicate Tracks Removed</div>
+                <div class="summary-value" style="color: white;">${totalOriginalCount}</div>
+                <div class="summary-label">Total Tracks</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" style="color: #f15e6c;">${removedTracks.length}</div>
+                <div class="summary-label">${summaryLabel}</div>
+            </div>
+            <div class="summary-item">
+                <div class="summary-value" style="color: #1ED760;">${totalOriginalCount - removedTracks.length}</div>
+                <div class="summary-label">Remaining Tracks</div>
             </div>
         </div>
-        <div class="conversion-list-header">
-            <div class="column-title">Track Details</div>
+        <div class="conversion-list-header" style="display: flex; justify-content: space-between; padding: 0 40px 8px 21px; border-bottom: 1px solid #3e3e3e; margin-bottom: 8px;">
+            <div class="column-title" style="flex-grow: 1;">Track Details</div>
+            <div style="display: flex; align-items: center; gap: 11px; flex-shrink: 0; padding-left: 16px;">
+                <div class="column-title" style="width: 100px; text-align: center; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Plays</div>
+                <div class="column-title" style="width: 50px; text-align: center; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Duration</div>
+                <div style="width: 72px;"></div>
+            </div>
         </div>
         <div class="conversion-list-container">
             ${removedListHTML}
@@ -29761,22 +30008,49 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     modalContainer.querySelector("#copyAllRemoved").addEventListener("click", () => {
-        let trackListText = removedTracks.map((track, index) => {
-            const title = track.songTitle || track.name || 'Unknown Title';
-            const artist = track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist';
-            const album = track.albumName || (track.album && track.album.name) || 'Unknown Album';
+        let trackListText = "";
+        let groupNum = 1;
+        for (const [key, group] of groups.entries()) {
+            const k = group.keptTrack;
+            const kTitle = k.songTitle || k.name || 'Unknown Title';
+            const kArtist = k.allArtists || k.artistName || (k.artists && k.artists.map(a=>a.name).join(', ')) || 'Unknown Artist';
+            const kAlbum = k.albumName || (k.album && k.album.name) || 'Unknown Album';
+            let kLink = k.uri;
+            if (kLink?.startsWith('spotify:track:')) kLink = kLink.replace('spotify:track:', 'https://open.spotify.com/track/');
             
-            let trackLink = track.uri;
-            if (track.uri?.startsWith('spotify:track:')) {
-                trackLink = track.uri.replace('spotify:track:', 'https://open.spotify.com/track/');
-            } else if (track.uri?.startsWith('spotify:local:')) {
-                trackLink = 'Local File';
-            }
-
-            return `${index + 1}. ${title} - ${artist} - ${album} - (${trackLink})`;
-        }).join('\n');
+            const label = isExclusion ? 'MATCHED SOURCE' : 'KEPT';
+            trackListText += `${groupNum}. [${label}] ${kTitle} - ${kArtist} - ${kAlbum} - (${kLink})\n`;
+            
+            group.removed.forEach((r, idx) => {
+                const isLast = idx === group.removed.length - 1;
+                const branch = isLast ? '└──' : '├──';
+                const rTitle = r.songTitle || r.name || 'Unknown Title';
+                const rArtist = r.allArtists || r.artistName || (r.artists && r.artists.map(a=>a.name).join(', ')) || 'Unknown Artist';
+                const rAlbum = r.albumName || (r.album && r.album.name) || 'Unknown Album';
+                let rLink = r.uri;
+                if (rLink?.startsWith('spotify:track:')) rLink = rLink.replace('spotify:track:', 'https://open.spotify.com/track/');
+                
+                const rLabel = isExclusion ? 'EXCLUDED' : 'REMOVED';
+                trackListText += `    ${branch} [${rLabel}] ${rTitle} - ${rArtist} - ${rAlbum} - (${rLink})\n`;
+            });
+            trackListText += '\n';
+            groupNum++;
+        }
         
-        navigator.clipboard.writeText(trackListText).then(
+        if (unknownGroup.length > 0) {
+            unknownGroup.forEach((r, idx) => {
+                const rTitle = r.songTitle || r.name || 'Unknown Title';
+                const rArtist = r.allArtists || r.artistName || (r.artists && r.artists.map(a=>a.name).join(', ')) || 'Unknown Artist';
+                const rAlbum = r.albumName || (r.album && r.album.name) || 'Unknown Album';
+                let rLink = r.uri;
+                if (rLink?.startsWith('spotify:track:')) rLink = rLink.replace('spotify:track:', 'https://open.spotify.com/track/');
+                
+                const rLabel = isExclusion ? 'EXCLUDED' : 'REMOVED';
+                trackListText += `${groupNum + idx}. [${rLabel}] ${rTitle} - ${rArtist} - ${rAlbum} - (${rLink})\n\n`;
+            });
+        }
+        
+        navigator.clipboard.writeText(trackListText.trim()).then(
             () => showNotification("Tracks copied to clipboard!"),
             (err) => {
                 console.error("Failed to copy:", err);
@@ -29786,25 +30060,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
 
     modalContainer.querySelector("#exportRemovedData").addEventListener("click", async () => {
-        const exportData = removedTracks.map(track => {
+        const formatTrackData = (track) => {
+            if (!track) return null;
             let trackLink = track.uri;
-            if (track.uri?.startsWith('spotify:track:')) {
-                trackLink = track.uri.replace('spotify:track:', 'https://open.spotify.com/track/');
-            } else if (track.uri?.startsWith('spotify:local:')) {
+            if (trackLink?.startsWith('spotify:track:')) {
+                trackLink = trackLink.replace('spotify:track:', 'https://open.spotify.com/track/');
+            } else if (trackLink?.startsWith('spotify:local:')) {
                 trackLink = 'Local File';
             }
-
             return {
                 title: track.songTitle || track.name || 'Unknown Title',
                 artist: track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist',
                 album: track.albumName || (track.album && track.album.name) || 'Unknown Album',
                 link: trackLink,
-                uri: track.uri,
                 durationMs: track.durationMs || track.durationMilis || 0,
-                playCount: track.playCount,
-                popularity: track.popularity
+                playCount: track.playCount
             };
-        });
+        };
+
+        const exportData = [];
+
+        for (const [key, group] of groups.entries()) {
+            exportData.push({
+                [isExclusion ? "matchedSourceTrack" : "keptTrack"]: formatTrackData(group.keptTrack),
+                [isExclusion ? "excludedTracks" : "removedTracks"]: group.removed.map(formatTrackData)
+            });
+        }
+
+        if (unknownGroup.length > 0) {
+            exportData.push({
+                [isExclusion ? "matchedSourceTrack" : "keptTrack"]: null,
+                [isExclusion ? "excludedTracks" : "removedTracks"]: unknownGroup.map(formatTrackData)
+            });
+        }
 
         const jsonString = JSON.stringify(exportData, null, 2);
         const blob = new Blob([jsonString], { type: 'application/json' });
@@ -29812,7 +30100,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (window.showSaveFilePicker) {
             try {
                 const handle = await window.showSaveFilePicker({
-                    suggestedName: 'sort-play_removed_duplicates.json',
+                    suggestedName: fileName,
                     types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
                 });
                 const writable = await handle.createWritable();
@@ -29828,7 +30116,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'sort-play_removed_duplicates.json';
+            a.download = fileName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -30088,7 +30376,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             tokens: getTokens(rawTitle),
             artistSet: new Set(normalizeAndSplitArtists(artist)),
             artist,
-            duration: track.durationMs,
+            duration: track.durationMs || track.durationMilis || (track.track && track.track.duration_ms) || 0,
             hasVersionKeyword: versionRegex.test(rawTitle)
         });
     }
@@ -30101,6 +30389,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         const candidateTrack = sortedInputTracks[i];
         let isConsideredDuplicateOfAnExistingUnique = false;
+        let matchedExistingTrack = null;
 
         const candData = trackCleanData.get(candidateTrack);
         const candidateDuration = candData.duration;
@@ -30194,15 +30483,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const normalizedExistingTitle = existData.normalizedTitle;
 
                 if (normalizedCandidateTitle === normalizedExistingTitle && artistsOverlap) {
-                    if (candidateDuration === existingDuration) {
+                    const durationDiff = Math.abs(candidateDuration - existingDuration);
+                    if (durationDiff <= DURATION_THRESHOLD) {
                         areDuplicatesByNewRules = true;
                     }
                 }
             }
 
             if (areDuplicatesByNewRules) {
-                isConsideredDuplicateOfAnExistingUnique = true;
-                break;
+                if (sortType === 'excludeByPlaylist' && !candidateTrack._isExclusion && !existingUniqueTrack._isExclusion) {
+                } else {
+                    isConsideredDuplicateOfAnExistingUnique = true;
+                    matchedExistingTrack = existingUniqueTrack;
+                    break;
+                }
             }
         }
 
@@ -30210,13 +30504,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const titleMatches = cleanTitleBuckets.get(candidateCleanTitle);
             
             if (titleMatches && titleMatches.length > 0) {
-                const titleMatch = titleMatches[0];
                 const cId = candidateTrack.uri.split(':')[2];
-                const eId = titleMatch.uri.split(':')[2];
-                if (cId && eId) {
-                    const [cIsrc, eIsrc] = await Promise.all([fetchIsrc(cId), fetchIsrc(eId)]);
-                    if (cIsrc && eIsrc && cIsrc === eIsrc) {
-                        isConsideredDuplicateOfAnExistingUnique = true;
+                if (cId) {
+                    const cIsrc = await fetchIsrc(cId);
+                    if (cIsrc) {
+                        for (const titleMatch of titleMatches) {
+                            if (sortType === 'excludeByPlaylist' && !candidateTrack._isExclusion && !titleMatch._isExclusion) {
+                                continue;
+                            }
+                            const eId = titleMatch.uri.split(':')[2];
+                            if (eId) {
+                                const eIsrc = await fetchIsrc(eId);
+                                if (eIsrc && cIsrc === eIsrc) {
+                                    isConsideredDuplicateOfAnExistingUnique = true;
+                                    matchedExistingTrack = titleMatch;
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -30227,6 +30532,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const matches = playCountBuckets.get(pc);
             if (matches && matches.length > 0) {
                 for (const existingMatch of matches) {
+                    if (sortType === 'excludeByPlaylist' && !candidateTrack._isExclusion && !existingMatch._isExclusion) {
+                        continue;
+                    }
                     const existDataForPC = trackCleanData.get(existingMatch);
                     let artistsOverlapPC = false;
                     if (candData.artist && existDataForPC.artist) {
@@ -30245,6 +30553,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             const [cIsrc, eIsrc] = await Promise.all([fetchIsrc(cId), fetchIsrc(eId)]);
                             if (cIsrc && eIsrc && cIsrc === eIsrc) {
                                 isConsideredDuplicateOfAnExistingUnique = true;
+                                matchedExistingTrack = existingMatch;
                                 break;
                             }
                         }
@@ -30254,6 +30563,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
 
         if (isConsideredDuplicateOfAnExistingUnique) {
+            candidateTrack._keptTrack = matchedExistingTrack;
             finalRemovedTracks.push(candidateTrack);
         } else {
             finalUniqueTracks.push(candidateTrack);
@@ -30890,7 +31200,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const cached = cachedDataMap.get(key);
         const stats = cached ? (cached.stats || cached) : null;
         
-        if (stats && stats.energy !== undefined && stats.key_raw !== undefined && stats.key_raw !== -1) {
+        if (stats && stats.energy !== undefined && stats.energy !== null && stats.key_raw !== undefined && stats.key_raw !== -1) {
             results[id] = stats;
         } else {
             missingIds.push(id);
@@ -30899,121 +31209,84 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (missingIds.length === 0) return results;
 
-    if (isFallbackActive()) {
-        try {
-            const internalStats = await fetchInternalAudioFeaturesBatch(missingIds);
-            for (const [id, stats] of Object.entries(internalStats)) {
-                results[id] = stats;
-                await setTrackCache(id, { stats: stats }, true, false, "stats-column");
-            }
-        } catch (e) {
-            console.error("Fallback audio features fetch failed", e);
-        }
-        return results;
-    }
-
-    const BATCH_SIZE = 100;
-    const MAX_RETRIES = 3;
-    const INITIAL_DELAY = 1000;
-    const CONCURRENCY_LIMIT = 10;
-
-    const batches = [];
-    for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
-        batches.push(missingIds.slice(i, i + BATCH_SIZE));
-    }
-
+    const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+    const BATCH_SIZE = 150;
     let tracksProcessed = 0;
 
-    const processBatch = async (batchIds) => {
-        let success = false;
-        let retries = 0;
-        let delay = INITIAL_DELAY;
-
-        while (!success && retries < MAX_RETRIES) {
+    for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
+        const batchIds = missingIds.slice(i, i + BATCH_SIZE);
+        
+        const batchPromises = batchIds.map(async (id) => {
             try {
-                const [audioFeaturesResponse, trackDetailsResponse] = await Promise.all([
-                    Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/audio-features?ids=${batchIds.join(',')}`),
-                    Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`)
-                ]);
-
-                if (!audioFeaturesResponse?.audio_features || !trackDetailsResponse?.tracks) {
-                    throw new Error('Incomplete data received from Spotify API for a batch.');
+                const features = await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/audio-attributes/v1/audio-features/${id}`);
+                if (features && features.id) {
+                    return { id, features, success: true };
                 }
+            } catch (e) {}
+            return { id, features: null, success: false };
+        });
 
-                const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-                const idsNeedingInternal = [];
-                const tempResults = {};
+        const batchResults = await Promise.all(batchPromises);
+        const idsNeedingInternal = [];
+
+        for (const res of batchResults) {
+            if (res.success && res.features) {
+                const features = res.features;
+                const stats = {
+                    danceability: (features.danceability !== null && features.danceability !== undefined) ? Math.round(100 * features.danceability) : null,
+                    energy: (features.energy !== null && features.energy !== undefined) ? Math.round(100 * features.energy) : null,
+                    key_raw: features.key ?? -1,
+                    mode: features.mode ?? -1,
+                    key: (features.key === -1 || features.key === undefined) ? "Undefined" : pitchClasses[features.key],
+                    loudness: features.loudness ?? null,
+                    speechiness: (features.speechiness !== null && features.speechiness !== undefined) ? Math.round(100 * features.speechiness) : null,
+                    acousticness: (features.acousticness !== null && features.acousticness !== undefined) ? Math.round(100 * features.acousticness) : null,
+                    instrumentalness: (features.instrumentalness !== null && features.instrumentalness !== undefined) ? Math.round(100 * features.instrumentalness) : null,
+                    liveness: (features.liveness !== null && features.liveness !== undefined) ? Math.round(100 * features.liveness) : null,
+                    valence: (features.valence !== null && features.valence !== undefined) ? Math.round(100 * features.valence) : null,
+                    tempo: features.tempo ? Math.round(features.tempo) : null,
+                    popularity: null,
+                    releaseDate: null
+                };
+                results[res.id] = stats;
                 
-                for (let i = 0; i < audioFeaturesResponse.audio_features.length; i++) {
-                    const features = audioFeaturesResponse.audio_features[i];
-                    const trackDetails = trackDetailsResponse.tracks[i];
-                    
-                    if (features && trackDetails) {
-                        const stats = {
-                            danceability: features.danceability ? Math.round(100 * features.danceability) : null,
-                            energy: features.energy ? Math.round(100 * features.energy) : null,
-                            key_raw: features.key,
-                            mode: features.mode,
-                            key: features.key === -1 ? "Undefined" : pitchClasses[features.key],
-                            loudness: features.loudness ?? null,
-                            speechiness: features.speechiness ? Math.round(100 * features.speechiness) : null,
-                            acousticness: features.acousticness ? Math.round(100 * features.acousticness) : null,
-                            instrumentalness: features.instrumentalness ? Math.round(100 * features.instrumentalness) : null,
-                            liveness: features.liveness ? Math.round(100 * features.liveness) : null,
-                            valence: features.valence ? Math.round(100 * features.valence) : null,
-                            tempo: features.tempo ? Math.round(features.tempo) : null,
-                            popularity: trackDetails.popularity ?? null,
-                            releaseDate: trackDetails.album?.release_date ?? null
-                        };
-                        
-                        tempResults[features.id] = stats;
-
-                        if (stats.key_raw === -1 || !stats.tempo) {
-                            idsNeedingInternal.push(features.id);
-                        }
-                    }
+                if (stats.key_raw === -1 || !stats.tempo) {
+                    idsNeedingInternal.push(res.id);
+                } else {
+                    setTrackCache(res.id, { stats }, true, false, "stats-column");
                 }
-
-                if (idsNeedingInternal.length > 0) {
-                    try {
-                        const internalData = await fetchInternalAudioFeaturesBatch(idsNeedingInternal);
-                        Object.keys(internalData).forEach(id => {
-                            if (tempResults[id]) {
-                                const int = internalData[id];
-                                if (int.key_raw !== -1) {
-                                    tempResults[id].key_raw = int.key_raw;
-                                    tempResults[id].mode = int.mode;
-                                    tempResults[id].key = int.key;
-                                    tempResults[id].camelot = int.camelot;
-                                }
-                                if (int.tempo) tempResults[id].tempo = int.tempo;
-                            }
-                        });
-                    } catch (e) {
-                        console.warn("Secondary internal fetch failed for audio features", e);
-                    }
-                }
-
-                Object.keys(tempResults).forEach(id => {
-                    results[id] = tempResults[id];
-                    setTrackCache(id, { stats: tempResults[id] }, true, false, "stats-column");
-                });
-
-                success = true;
-            } catch (error) {
-                retries++;
-                if (retries < MAX_RETRIES) await new Promise(resolve => setTimeout(resolve, delay *= 2));
-                else console.error(`[Sort-Play] Failed to fetch batch stats.`);
+            } else {
+                idsNeedingInternal.push(res.id);
             }
         }
+
+        if (idsNeedingInternal.length > 0) {
+            try {
+                const internalData = await fetchInternalAudioFeaturesBatch(idsNeedingInternal);
+                for (const id of idsNeedingInternal) {
+                    if (internalData[id]) {
+                        if (results[id]) {
+                            if (internalData[id].key_raw !== -1) {
+                                results[id].key_raw = internalData[id].key_raw;
+                                results[id].mode = internalData[id].mode;
+                                results[id].key = internalData[id].key;
+                                results[id].camelot = internalData[id].camelot;
+                            }
+                            if (internalData[id].tempo) results[id].tempo = internalData[id].tempo;
+                        } else {
+                            results[id] = internalData[id];
+                        }
+                        setTrackCache(id, { stats: results[id] }, true, false, "stats-column");
+                    }
+                }
+            } catch (e) {
+                console.warn("Secondary internal fetch failed for audio features", e);
+            }
+        }
+
         tracksProcessed += batchIds.length;
         if (updateProgress) updateProgress(Math.min(100, Math.floor((tracksProcessed / missingIds.length) * 100)));
-    };
-
-    const workers = [];
-    for (let i = 0; i < batches.length; i += CONCURRENCY_LIMIT) {
-        const concurrentBatch = batches.slice(i, i + CONCURRENCY_LIMIT);
-        await Promise.all(concurrentBatch.map(batch => processBatch(batch)));
+        await new Promise(r => setTimeout(r, 100)); 
     }
 
     return results;
@@ -31225,8 +31498,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  function cleanupLegacyGenreCache() {
-    if (localStorage.getItem('sort-play-idb-migration-cleanup-done') === 'true') {
+  function cleanupLegacyCache() {
+    if (localStorage.getItem('sort-play-idb-migration-cleanup-done-v2') === 'true') {
         return;
     }
 
@@ -31254,21 +31527,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const prefixes = [
         'sort-play-playlist-cache-v1-',
-        'sort-play-genre-cache-v2-'
+        'sort-play-genre-cache-v2-',
+        'sort-play-like-'
     ];
 
-    Object.keys(localStorage).forEach(key => {
+    const allKeys = Object.keys(localStorage);
+    for (let i = 0; i < allKeys.length; i++) {
+        const key = allKeys[i];
         if (prefixes.some(prefix => key.startsWith(prefix))) {
             localStorage.removeItem(key);
             removedCount++;
         }
-    });
+    }
     
     if (removedCount > 0) {
-        console.log(`[Sort-Play] Migrated to IndexedDB: Cleaned up ${removedCount} legacy localStorage items.`);
+        console.log(`[Sort-Play] Cleaned up ${removedCount} legacy localStorage items.`);
     }
 
-    localStorage.setItem('sort-play-idb-migration-cleanup-done', 'true');
+    localStorage.setItem('sort-play-idb-migration-cleanup-done-v2', 'true');
   }
 
   async function setCachedPlayCount(trackId, playCount) {
@@ -32088,6 +32364,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (spotifyTracksToProcess.length === 0) return;
 
+    if (columnConfigs.some(c => c.type === 'playCount')) {
+        const allSpotifyIds = spotifyTracksToProcess.map(item => item.id);
+        const cachedGlobalPC = await idb.getMany('playCounts', allSpotifyIds, CACHE_EXPIRE_PLAYCOUNTS);
+        const missingPCIds = allSpotifyIds.filter(id => {
+            const pc = cachedGlobalPC.get(id);
+            return pc === undefined || pc === null || pc === "N/A";
+        });
+
+        if (missingPCIds.length > 0) {
+            try {
+                const PC_BATCH_SIZE = 500;
+                for (let i = 0; i < missingPCIds.length; i += PC_BATCH_SIZE) {
+                    const batch = missingPCIds.slice(i, i + PC_BATCH_SIZE);
+                    const uris = batch.map(id => `spotify:track:${id}`);
+                    const pcResults = await fetchPlayCountsBatchNew(uris);
+                    
+                    for (const [uri, count] of pcResults.entries()) {
+                        const tId = uri.split(":")[2];
+                        await idb.set('playCounts', tId, count);
+                    }
+                }
+            } catch(e) {
+                console.warn("[Sort-Play] Global playcount prefetch failed", e);
+            }
+        }
+    }
+
     const BATCH_SIZE = 50; 
     
     for (let i = 0; i < spotifyTracksToProcess.length; i += BATCH_SIZE) {
@@ -32244,9 +32547,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         if (!dEl || dEl.dataset.spProcessed) continue;
 
                         if (c.type === 'playCount') {
-                            const r = await getTrackDetailsWithPlayCount({ track: { album: { id: t.album.id }, id: t.id } });
-                            updateDisplay(dEl, r?.playCount, c.type);
-                            if (r?.playCount !== "N/A") await setCachedPlayCount(t.id, r.playCount);
+                            let pc = dataMap.playCounts?.get(t.id);
+                            if (pc !== undefined && pc !== null) {
+                                updateDisplay(dEl, pc, c.type);
+                            } else {
+                                const trackObjForFetch = {
+                                    id: t.id,
+                                    trackId: t.id,
+                                    albumId: t.album?.id,
+                                    name: t.name,
+                                    uri: t.uri,
+                                    track: t
+                                };
+                                const r = await getTrackDetailsWithPlayCount(trackObjForFetch);
+                                updateDisplay(dEl, r?.playCount, c.type);
+                                if (r?.playCount !== "N/A" && r?.playCount !== undefined) {
+                                    await setCachedPlayCount(t.id, r.playCount);
+                                }
+                            }
                         } else if (c.type === 'releaseDate') {
                             updateDisplay(dEl, t.album.release_date, c.type);
                             if (t.album.release_date) await setCachedReleaseDate(t.id, t.album.release_date);
@@ -33272,16 +33590,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let newLikedTracksIdsISRCs = new Map();
         let likedTracksIdsWithUnknownISRCs = [];
 
+        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTracksIds, CACHE_EXPIRE_METADATA);
+
         likedTracksIds.forEach(trackId => {
-            const trackIsrc = localStorage.getItem("sort-play-like-" + trackId)
-            if (trackIsrc != null) {
-                newLikedTracksIdsISRCs.set(trackId, trackIsrc)
+            const meta = cachedLikedMetadata.get(trackId);
+            if (meta && meta.external_ids && meta.external_ids.isrc) {
+                newLikedTracksIdsISRCs.set(trackId, meta.external_ids.isrc);
             } else if (!trackId.startsWith("spotify:local:")) {
                 likedTracksIdsWithUnknownISRCs.push(trackId);
             }
         });
 
-        let promises = [];
         const processLikeInternal = async (id) => {
             const track = await fetchInternalTrackMetadata(id);
             if (track) {
@@ -33299,35 +33618,46 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 if (track.external_ids && track.external_ids.isrc) {
                     newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
-                    localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
                 }
             }
         };
 
-        if (isFallbackActive()) {
-            promises = likedTracksIdsWithUnknownISRCs.map(id => processLikeInternal(id));
-        } else {
-            for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 50) {
-                let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
-                promises.push(
-                    Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`).then(response => {
-                        if (response && response.tracks) {
-                            response.tracks.forEach(track => {
-                                if (track && track.external_ids && track.external_ids.isrc) {
-                                    newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
-                                    localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
-                                }
-                            });
-                        }
-                    }).catch(error => {
-                        if (registerWebApiFailure()) {
-                            return Promise.all(batch.map(id => processLikeInternal(id)));
-                        }
-                    })
-                );
+        for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 50) {
+            let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
+            
+            if (isFallbackActive()) {
+                await Promise.all(batch.map(id => processLikeInternal(id)));
+            } else {
+                try {
+                    const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`);
+                    if (response && response.tracks) {
+                        response.tracks.forEach(track => {
+                            if (track && track.external_ids && track.external_ids.isrc) {
+                                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+                                idb.set('trackMetadata', track.id, {
+                                    name: track.name,
+                                    album: track.album,
+                                    artists: track.artists,
+                                    duration_ms: track.duration_ms,
+                                    popularity: track.popularity,
+                                    external_ids: track.external_ids,
+                                    id: track.id,
+                                    uri: track.uri
+                                });
+                            }
+                        });
+                    }
+                } catch (error) {
+                    if (registerWebApiFailure()) {
+                        await Promise.all(batch.map(id => processLikeInternal(id)));
+                    }
+                }
+            }
+            
+            if (i + 50 < likedTracksIdsWithUnknownISRCs.length) {
+                await new Promise(resolve => setTimeout(resolve, 150));
             }
         }
-        await Promise.all(promises);
 
         likeButton_likedTracksIdsISRCs = newLikedTracksIdsISRCs;
         likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
@@ -33353,9 +33683,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16, dynamicSizeSelector = null }) {
         const trackId = uri.replace("spotify:track:", "");
         const [currentSize, setCurrentSize] = Spicetify.React.useState(size);
-        const [isrc, setISRC] = Spicetify.React.useState(localStorage.getItem("sort-play-like-" + trackId));
+        const [isrc, setISRC] = Spicetify.React.useState(null);
         const [isLiked, setIsLiked] = Spicetify.React.useState(likeButton_likedTracksIdsISRCs.has(trackId));
-        const [hasISRCLiked, setHasISRCLiked] = Spicetify.React.useState(likeButton_likedTracksISRCs.has(isrc));
+        const [hasISRCLiked, setHasISRCLiked] = Spicetify.React.useState(false);
         const [isHovered, setIsHovered] = Spicetify.React.useState(false);
         const buttonRef = Spicetify.React.useRef(null);
     
@@ -33441,7 +33771,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         Spicetify.React.useEffect(() => {
             async function initISRC() {
                 try {
-                    if (isrc == null && trackId) {
+                    let currentIsrc = null;
+                    const meta = await idb.get('trackMetadata', trackId);
+                    if (meta && meta.external_ids && meta.external_ids.isrc) {
+                        currentIsrc = meta.external_ids.isrc;
+                    } else if (trackId) {
                         let track = null;
                         if (isFallbackActive()) {
                             track = await fetchInternalTrackMetadata(trackId);
@@ -33456,12 +33790,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         }
 
                         if (track && track.external_ids && track.external_ids.isrc) {
-                            setISRC(track.external_ids.isrc);
-                            localStorage.setItem("sort-play-like-" + track.id, track.external_ids.isrc);
-                            setHasISRCLiked(likeButton_likedTracksISRCs.has(track.external_ids.isrc));
+                            currentIsrc = track.external_ids.isrc;
+                            idb.set('trackMetadata', trackId, {
+                                name: track.name,
+                                album: track.album,
+                                artists: track.artists,
+                                duration_ms: track.duration_ms,
+                                popularity: track.popularity,
+                                external_ids: track.external_ids,
+                                id: track.id,
+                                uri: track.uri
+                            });
                         }
-                    } else {
-                        setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
+                    }
+                    
+                    if (currentIsrc) {
+                        setISRC(currentIsrc);
+                        setHasISRCLiked(likeButton_likedTracksISRCs.has(currentIsrc));
                     }
                 } catch (error) {
                     console.error('[Sort-Play Like Button] Error fetching ISRC:', error);
@@ -33479,9 +33824,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         Spicetify.React.useEffect(() => {
             const handleLikedTracksChange = () => {
                 setIsLiked(likeButton_likedTracksIdsISRCs.has(trackId));
-                const currentISRC = localStorage.getItem("sort-play-like-" + trackId);
-                if (currentISRC) {
-                    setHasISRCLiked(likeButton_likedTracksISRCs.has(currentISRC));
+                if (isrc) {
+                    setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
                 }
             };
             
@@ -33489,7 +33833,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return () => {
                 document.removeEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
             };
-        }, [trackId]);
+        }, [trackId, isrc]);
     
         const handleClick = async function () {
             if (!Spicetify.Platform?.LibraryAPI?.add || !Spicetify.Platform?.LibraryAPI?.remove) {
@@ -34018,7 +34362,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   await migrateJobHistoryToIdb();
   loadSettings();
   fetchUserMarket();
-  cleanupLegacyGenreCache();
+  cleanupLegacyCache();
 
   if (showLikeButton) {
     initializeLikeButtonFeature();
