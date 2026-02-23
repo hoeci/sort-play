@@ -17,7 +17,7 @@
 ## ⚡️ Features
 
 ### ➕ Comprehensive Sorting
-Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, Last.fm Scrobbles, My Scrobbles, Last Scrobbled, Album Color, and Tempo (BPM).
+Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, Last.fm Scrobbles, My Scrobbles, Last Scrobbled, Energy Wave, Album Color, and audio features (Tempo, Energy, etc.).
 
 ### ➕ Quick Filters
 Instantly apply filters. Deduplicate tracks, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
