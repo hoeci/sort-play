@@ -37,6 +37,11 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 *   **Album Color:** The dominant color of the album artwork, with modes for perceptual grouping or a pure hue gradient.
 *   **Audio Features:**
     *   **Tempo (BPM):** The speed of the track measured in beats per minute.
+    *   **Energy:** The intensity and activity level of the track.
+    *   **Danceability:** How suitable a track is for dancing based on rhythm and beat strength.
+    *   **Valence:** The musical positivity conveyed by a track (happy vs. sad).
+    *   **Acousticness:** The likelihood that a track was recorded with acoustic instruments.
+    *   **Instrumentalness:** The amount of vocals present (higher values indicate more instrumental tracks).
 </details>
 
 <details>
@@ -144,7 +149,7 @@ Build powerful, self-updating playlists that manage themselves.
 
 A powerful modal to meticulously filter any playlist or discography.
 *   **Keyword Filtering:** Use keywords to filter by track title, album, and artist, with options to keep or exclude matches and match whole words.
-*   **Range Sliders:** Apply precise range sliders for attributes like Release Date, Duration, Play Count, Popularity, and Tempo.
+*   **Range Sliders:** Apply precise range sliders for attributes like Release Date, Duration, Play Count, Popularity, and Audio Features.
 *   **Interactive Table:** View, sort, and manually remove tracks from your filtered selection in a detailed table before creating the playlist.
 *   **Save & Load Keywords:** Save your favorite keyword sets into named groups and load them instantly for future use.
 *   **Integrated Mini-Player:** Preview and listen to tracks directly within the filter modal to help make your selections.
