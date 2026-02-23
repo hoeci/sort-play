@@ -63,7 +63,7 @@ Apply instant filters to your current view without opening complex menus.
 Enhance your music views with more information.
 *   **Playlist Columns:** Add up to **two** extra data columns to any playlist view.
 *   **Album & Artist Columns:** Add one extra data column to album and artist pages.
-*   **Data Types:** Display Play Count, Release Date, Scrobbles, My Scrobbles, Key, BPM, Popularity and DJ Info (Key + BPM).
+*   **Data Types:** Display Play Count, Release Date, Scrobbles, My Scrobbles, Key, BPM, Popularity, Energy, Danceability, Valence and  DJ Info (Key + BPM + Energy).
 *   **Custom Formatting:** Configure the format for release dates and how your personal scrobbles are displayed (number vs. checkmark).
 *   **Quick Column Switching:** Click the header of any extra column to instantly switch its data type.
 </details>
@@ -94,7 +94,7 @@ Apply any sort or filter option while on an Artist page to automatically fetch a
 
 Randomize your listening with advanced options.
 *   **Intelligent Shuffle:** Prevents multiple songs by the same artist from playing back-to-back for a more varied listening session.
-*   **Vibe & Flow Shuffle:** An optional mode that creates a dynamic listening journey by arranging shuffled tracks harmonically based on their Tempo and Key.
+*   **Vibe & Flow Shuffle:** An optional mode that creates a dynamic listening journey by arranging shuffled tracks based on their energy and mood.
 </details>
 
 <details>
