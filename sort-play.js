@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.60.0";
+  const SORT_PLAY_VERSION = "5.61.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -55,7 +55,6 @@
   const STORAGE_KEY_DYNAMIC_SORT_TYPE = "sort-play-dynamic-sort-type";
   const STORAGE_KEY_DYNAMIC_SCHEDULE = "sort-play-dynamic-schedule";
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
-  const STORAGE_KEY_USER_ADDED_GENRES = "sort-play-user-added-genres";
   const STORAGE_KEY_RANDOM_GENRE_HISTORY = "sort-play-random-genre-history";
   const STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE = "sort-play-use-energy-wave-shuffle";
   const STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT = "sort-play-energy-wave-shuffle-limit";
@@ -896,7 +895,6 @@
     'recommendRecentVibe': COVER_DISCOVERY,
     'recommendAllTime': COVER_DISCOVERY,
     'pureDiscovery': COVER_DISCOVERY,
-    'genreTreeExplorer': COVER_DISCOVERY,
     'randomGenreExplorer': COVER_DISCOVERY,
     'infiniteVibe': COVER_LASTFM,
     'neighborsMix': COVER_LASTFM,
@@ -1016,8 +1014,7 @@
             { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v2', broken: true },
             { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v2', broken: true },
             { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v2', broken: true },
-            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer, broken: true },
-            { id: 'genreTreeExplorer', name: 'Genre Tree Explorer', description: 'Explore music by diving into specific genre trees.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.genreTreeExplorer, broken: true },
+            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer, broken: false },
         ]
     },
     {
@@ -4585,7 +4582,7 @@
             const isBroken = !!card.broken;
             const behavior = dedicatedPlaylistBehavior[card.id] || 'createOnce';
             const badgeHtml = getBadgeHtml(behavior, card.id);
-            const allowSettings = card.id !== 'genreTreeExplorer' && card.id !== 'tastemakerProfile' && !isBroken;
+            const allowSettings = card.id !== 'tastemakerProfile' && !isBroken;
 
             const autoBtnContent = behavior === 'autoUpdate' 
                 ? `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}` 
@@ -5181,9 +5178,7 @@
             }
 
             closeModal();
-            if (cardId === 'genreTreeExplorer') {
-                showGenreTreeExplorerModal();
-            } else if (cardId === 'randomGenreExplorer') {
+            if (cardId === 'randomGenreExplorer') {
                 generateRandomGenrePlaylist();
             } else if (cardId === 'neighborsMix') {
                 generateNeighborsMix();
@@ -26015,24 +26010,68 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function discoverTracksViaGenreSearch(selectedGenres, numTracksNeeded, existingTracks = []) {
     const allSearchedTracks = new Map();
     const existingTrackUris = new Set(existingTracks.map(t => t.uri));
+    
+    const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
 
     for (const genre of selectedGenres) {
         const searchPromises = [];
-        for (let offset = 0; offset < 200; offset += 50) {
-            const params = new URLSearchParams({
-                q: `genre:"${genre}"`,
-                type: 'track',
+        for (let offset = 0; offset < 150; offset += 50) {
+             const variables = {
+                searchTerm: `genre:"${genre}"`,
+                offset: offset,
                 limit: 50,
-                offset: offset
-            });
-            searchPromises.push(Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/search?${params.toString()}`));
+                numberOfTopResults: 50,
+                includePreReleases: false
+            };
+
+            searchPromises.push(
+                Spicetify.GraphQL.Request({
+                    name: "searchTracks",
+                    operation: "query",
+                    sha256Hash: SEARCH_HASH,
+                    value: null
+                }, variables)
+                .catch(e => {
+                    console.warn("Internal search failed", e);
+                    return null;
+                })
+            );
         }
 
         const searchResults = await Promise.all(searchPromises);
+        
         for (const result of searchResults) { 
-            if (result.tracks?.items) {
-                const availabilityChecks = await Promise.all(result.tracks.items.map(track => isTrackAvailable(track)));
-                result.tracks.items.forEach((track, index) => {
+            const rawItems = result?.data?.searchV2?.tracksV2?.items;
+            
+            if (rawItems && rawItems.length > 0) {
+                const mappedTracks = rawItems.map(i => {
+                    const t = i.item.data;
+                    return {
+                        uri: t.uri,
+                        id: t.uri.split(':')[2],
+                        name: t.name,
+                        artists: t.artists.items.map(a => ({ 
+                            name: a.profile.name, 
+                            uri: a.uri, 
+                            id: a.uri ? a.uri.split(':')[2] : null 
+                        })),
+                        album: {
+                            name: t.albumOfTrack.name,
+                            uri: t.albumOfTrack.uri,
+                            id: t.albumOfTrack.uri.split(':')[2],
+                            images: t.albumOfTrack.coverArt?.sources?.map(s => ({ url: s.url })) || []
+                        },
+                        duration_ms: t.duration.totalMilliseconds,
+                        is_playable: t.playable
+                    };
+                });
+
+                const availabilityChecks = await Promise.all(mappedTracks.map(async (track) => {
+                    if (track.is_playable === true) return true;
+                    return await isTrackAvailable(track);
+                }));
+                
+                mappedTracks.forEach((track, index) => {
                     if (availabilityChecks[index] && !allSearchedTracks.has(track.uri)) {
                         allSearchedTracks.set(track.uri, track);
                     }
@@ -26055,68 +26094,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             searchTerm: selectedGenres.join(', ')
         }
     }));
-  }
-
-  async function discoverTracksViaMultiSeedRecommendation(playlistsToFetch, numTracksNeeded, existingTracks = []) {
-    const existingTrackUris = new Set(existingTracks.map(t => t.uri));
-    const recommendationPool = new Map();
-    let seedTrackPool = [];
-
-    for (const playlist of playlistsToFetch.values()) {
-        try {
-            const playlistTracks = await getPlaylistTracks(playlist.uri);
-            const availabilityChecks = await Promise.all(playlistTracks.map(track => isTrackAvailable(track)));
-            seedTrackPool.push(...playlistTracks.filter((_, index) => availabilityChecks[index]));
-        } catch (error) {
-            console.warn(`Could not fetch seed tracks from ${playlist.genre}:`, error);
-        }
-    }
-    
-    if (seedTrackPool.length < 5) {
-        console.warn("Not enough available seed tracks for multi-seed recommendation.");
-        return [];
-    }
-
-    seedTrackPool = shuffleArray(Array.from(new Map(seedTrackPool.map(t => [t.uri, t])).values()));
-
-    const NUM_RECOMMENDATION_CALLS = 4;
-    const recommendationPromises = [];
-
-    for (let i = 0; i < NUM_RECOMMENDATION_CALLS; i++) {
-        const seedTracks = seedTrackPool.slice(i * 5, (i * 5) + 5).map(t => t.uri.split(':')[2]);
-        if (seedTracks.length === 0) continue;
-
-        const params = new URLSearchParams({
-            limit: 50,
-            seed_tracks: seedTracks.join(',')
-        });
-        recommendationPromises.push(Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`));
-    }
-
-    const recommendationResults = await Promise.all(recommendationPromises);
-    for (const result of recommendationResults) { 
-        if (result.tracks) {
-            const availabilityChecks = await Promise.all(result.tracks.map(track => isTrackAvailable(track)));
-            result.tracks.forEach((track, index) => {
-                if (availabilityChecks[index] && !recommendationPool.has(track.uri)) {
-                    recommendationPool.set(track.uri, track);
-                }
-            });
-        }
-    }
-
-    const sourceDescription = `Seeded from ${playlistsToFetch.size} playlists like: ${Array.from(playlistsToFetch.values()).slice(0,3).map(p => p.genre).join(', ')}...`;
-    const recommendedTracks = Array.from(recommendationPool.values())
-        .filter(track => !existingTrackUris.has(track.uri))
-        .map(track => ({
-            ...track,
-            sourceInfo: {
-                method: 'Recommendation',
-                details: sourceDescription
-            }
-        }));
-
-    return shuffleArray(recommendedTracks).slice(0, numTracksNeeded);
   }
 
   async function generateInfiniteVibe(options = {}) {
@@ -27096,99 +27073,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
-  async function generateGenreTreePlaylist(selectedGenres) {
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    menuButtons.forEach((button) => (button.disabled = true));
-    toggleMenu();
-    closeAllMenus();
-
-    try {
-        mainButton.innerText = "Finding...";
-        if (!genrePlaylistsCache) {
-            genrePlaylistsCache = await getGenreMapping();
-        }
-
-        const playlistsToFetch = new Map();
-        const numPlaylistsPerGenre = Math.max(5, Math.floor(20 / selectedGenres.length));
-
-        for (const selectedGenre of selectedGenres) {
-            const isMainGenre = !!GENRE_MAPPINGS[selectedGenre];
-            const allGenreTerms = isMainGenre 
-                ? new Set([selectedGenre, ...(GENRE_MAPPINGS[selectedGenre] || [])])
-                : new Set([selectedGenre]);
-            
-            const matchingPlaylists = genrePlaylistsCache.filter(p => 
-                [...allGenreTerms].some(term => {
-                    const escapedTerm = escapeRegExp(term);
-                    const regex = new RegExp(`\\b${escapedTerm}\\b`, 'i');
-                    return regex.test(p.genre);
-                })
-            );
-
-            const shuffled = shuffleArray(matchingPlaylists);
-            shuffled.slice(0, numPlaylistsPerGenre).forEach(p => playlistsToFetch.set(p.uri, p));
-        }
-
-        if (playlistsToFetch.size === 0) {
-            throw new Error("Could not find any genre playlists for your selection.");
-        }
-
-        const tracksPerPart = Math.ceil(discoveryPlaylistSize / 3);
-
-        mainButton.innerText = "Fetching...";
-        const directTracks = await getDirectTracksFromGenrePlaylists(playlistsToFetch, tracksPerPart);
-
-        mainButton.innerText = "Discover...";
-        const [searchedTracks, recommendedTracks] = await Promise.all([
-            discoverTracksViaGenreSearch(selectedGenres, tracksPerPart, directTracks),
-            discoverTracksViaMultiSeedRecommendation(playlistsToFetch, tracksPerPart, directTracks)
-        ]);
-
-        mainButton.innerText = "Combining...";
-        const allTracks = [...directTracks, ...searchedTracks, ...recommendedTracks];
-
-        const uniqueFinalTracks = Array.from(new Map(allTracks.map(t => [t.uri, t])).values());
-        const finalSizedTracks = shuffleArray(uniqueFinalTracks).slice(0, discoveryPlaylistSize);
-
-        mainButton.innerText = "Sorting...";
-        const { trackGenreMap } = await fetchAllTrackGenres(finalSizedTracks);
-        const sortedTracks = interleaveSortByGenre(finalSizedTracks, trackGenreMap);
-
-        const trackUris = sortedTracks.map(t => t.uri);
-        const playlistName = `Genre Explorer: ${selectedGenres.slice(0, 3).join(', ')}${selectedGenres.length > 3 ? '...' : ''}`;
-        
-        let genreListString = selectedGenres.join(', ');
-        const maxGenreListLength = 240;
-        if (genreListString.length > maxGenreListLength) {
-            genreListString = genreListString.substring(0, maxGenreListLength) + "...";
-        }
-        const playlistDescription = `A playlist exploring the genres: ${genreListString}. Created by Sort-Play.`;
-
-        mainButton.innerText = "Creating...";
-        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('genreTreeExplorer', playlistName, playlistDescription);
-
-        mainButton.innerText = "Saving...";
-        if (wasUpdated) {
-            await replacePlaylistTracks(newPlaylist.id, trackUris);
-        } else {
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
-        }
-
-        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
-        await navigateToPlaylist(newPlaylist);
-
-    } catch (error) {
-        console.error("Error in Genre Tree Explorer:", error);
-        showNotification(error.message, true);
-    } finally {
-        resetButtons();
-    }
-  }
-
   async function generateRandomGenrePlaylist(options = {}) {
     const { isHeadless = false } = options;
     if (!isHeadless) {
@@ -27242,19 +27126,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             throw new Error("Could not find any genre playlists for the random selection.");
         }
 
-        const tracksPerPart = Math.ceil(discoveryPlaylistSize / 3);
+        const tracksPerPart = Math.ceil(discoveryPlaylistSize / 2);
 
         if (!isHeadless) mainButton.innerText = "Fetching...";
         const directTracks = await getDirectTracksFromGenrePlaylists(playlistsToFetch, tracksPerPart);
 
         if (!isHeadless) mainButton.innerText = "Discover...";
-        const [searchedTracks, recommendedTracks] = await Promise.all([
-            discoverTracksViaGenreSearch(selectedGenres, tracksPerPart, directTracks),
-            discoverTracksViaMultiSeedRecommendation(playlistsToFetch, tracksPerPart, directTracks)
-        ]);
+        const searchedTracks = await discoverTracksViaGenreSearch(selectedGenres, tracksPerPart, directTracks);
 
         if (!isHeadless) mainButton.innerText = "Combining...";
-        const allTracks = [...directTracks, ...searchedTracks, ...recommendedTracks];
+        const allTracks = [...directTracks, ...searchedTracks];
         
         const uniqueFinalTracks = Array.from(new Map(allTracks.map(t => [t.uri, t])).values());
         const finalSizedTracks = shuffleArray(uniqueFinalTracks).slice(0, discoveryPlaylistSize);
@@ -27367,327 +27248,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  async function showGenreTreeExplorerModal() {
-    const overlay = document.createElement("div");
-    overlay.id = "sort-play-genre-tree-overlay";
-    overlay.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.7);
-        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-        z-index: 2002;
-        display: flex; justify-content: center; align-items: center;
-    `;
-
-    const modalContainer = document.createElement("div");
-    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
-    modalContainer.style.cssText = `
-        z-index: 2003;
-        width: 620px !important;
-        display: flex;
-        flex-direction: column;
-        border-radius: 30px;
-    `;
-    const shadowRoot = modalContainer.attachShadow({ mode: 'open' });
-    modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
-    modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
-
-    if (!genrePlaylistsCache) {
-        try {
-            const response = await fetch(GENRE_PLAYLISTS_URL);
-            genrePlaylistsCache = await response.json();
-        } catch (e) {
-            console.error("Sort-Play: Failed to fetch genre database for sorting.", e);
-            showNotification("Could not fetch genre database.", true);
-            genrePlaylistsCache = []; 
-        }
-    }
-    
-    const genreRankMap = new Map();
-    genrePlaylistsCache.forEach((p, index) => {
-        const lowerGenre = p.genre.toLowerCase();
-        if (!genreRankMap.has(lowerGenre)) {
-            genreRankMap.set(lowerGenre, index);
-        }
-    });
-
-    const mainGenreList = Object.keys(GENRE_MAPPINGS);
-    const mainGenreRankCache = new Map();
-
-    const getMainGenreRank = (mainGenre) => {
-        if (mainGenreRankCache.has(mainGenre)) {
-            return mainGenreRankCache.get(mainGenre);
-        }
-
-        let rank = genreRankMap.get(mainGenre.toLowerCase());
-        if (rank !== undefined) {
-            mainGenreRankCache.set(mainGenre, rank);
-            return rank;
-        }
-
-        const subGenres = GENRE_MAPPINGS[mainGenre] || [];
-        let minRank = Infinity;
-        for (const subGenre of subGenres) {
-            const subGenreRank = genreRankMap.get(subGenre.toLowerCase());
-            if (subGenreRank !== undefined) {
-                minRank = Math.min(minRank, subGenreRank);
-            }
-        }
-
-        mainGenreRankCache.set(mainGenre, minRank);
-        return minRank;
-    };
-
-    const priorityGenres = ["pop", "rock", "hip hop", "rap", "jazz", "electronic", "r&b", "country", "classical", "metal", "folk", "blues", "reggae", "punk"];
-
-    mainGenreList.sort((a, b) => {
-        const aLower = a.toLowerCase();
-        const bLower = b.toLowerCase();
-        const isAPriority = priorityGenres.includes(aLower);
-        const isBPriority = priorityGenres.includes(bLower);
-
-        if (isAPriority && !isBPriority) return -1;
-        if (!isAPriority && isBPriority) return 1;
-        if (isAPriority && isBPriority) {
-            return priorityGenres.indexOf(aLower) - priorityGenres.indexOf(bLower);
-        }
-
-        const rankA = getMainGenreRank(a);
-        const rankB = getMainGenreRank(b);
-
-        if (rankA !== Infinity && rankB === Infinity) return -1;
-        if (rankA === Infinity && rankB !== Infinity) return 1;
-        
-        if (rankA !== rankB) {
-            return rankA - rankB;
-        }
-
-        return a.localeCompare(b);
-    });
-
-
-    let selectedMainGenres = [];
-    let userAddedGenres = new Set();
-    let selectedUserGenres = new Set();
-
-    const savedUserGenres = localStorage.getItem(STORAGE_KEY_USER_ADDED_GENRES);
-    if (savedUserGenres) {
-        try {
-            userAddedGenres = new Set(JSON.parse(savedUserGenres));
-        } catch (e) {
-            console.error("Sort-Play: Failed to parse user-added genres.", e);
-            userAddedGenres = new Set();
-        }
-    }
-
-    const saveUserGenres = () => {
-        localStorage.setItem(STORAGE_KEY_USER_ADDED_GENRES, JSON.stringify(Array.from(userAddedGenres)));
-    };
-
-    shadowRoot.innerHTML = `
-      <style>
-        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
-        *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-        h1 { margin: 0; line-height: normal; }
-        .genre-tree-modal .genre-container { max-height: 23vh; overflow-y: auto; background-color: #1e1e1e; border-radius: 20px; padding: 15px 10px; margin-top: 15px; scrollbar-width: thin; scrollbar-color: #3b3b3b transparent; }
-        .genre-tree-modal .genre-container::-webkit-scrollbar { width: 6px; }
-        .genre-tree-modal .genre-container::-webkit-scrollbar-track { background: transparent; }
-        .genre-tree-modal .genre-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 3px; }
-        .genre-tree-modal .user-added-container { margin-top: 0; max-height: 12vh; margin-bottom: 15px; margin-top: 15px; }
-        .genre-tree-modal .genre-button { display: inline-flex; align-items: center; padding: 6px 16px; margin: 4px; border-radius: 20px; border: none; cursor: pointer; background-color: #343434; color: white; font-weight: 500; font-size: 14px; transition: background-color 0.2s ease; }
-        .genre-tree-modal .genre-button.selected { background-color: #1ED760; color: black; }
-        .genre-tree-modal .user-genre-remove { margin-left: 8px; font-size: 16px; font-weight: bold; line-height: 1; opacity: 0.7; }
-        .genre-tree-modal .user-genre-remove:hover { opacity: 1; }
-        .genre-tree-modal .search-bar-wrapper { position: relative; display: flex; align-items: center; }
-        .genre-tree-modal .search-bar { width: 100%; padding: 10px 45px 10px 15px; border-radius: 20px; border: 1px solid #282828; background: #282828; color: white; }
-        .genre-tree-modal .add-genre-button { position: absolute; right: 5px; top: 5px; bottom: 5px; width: 50px; height: 30px; background-color: #1ED760; color: black; border: none; border-radius: 20px; font-size: 24px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
-        .genre-tree-modal .add-genre-button:hover { background-color: #3BE377; }
-        .genre-tree-modal #genre-add-error { color: #f15e6c; font-size: 13px; margin-top: 8px; text-align: center; display: none; }
-        .genre-tree-modal .main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
-        .genre-tree-modal .main-button-primary:hover { background-color: #3BE377; }
-        .genre-tree-modal .genre-section-header { color: #b3b3b3; font-size: 14px; font-weight: bold; margin-top: 15px; margin-bottom: -5px; padding-left: 10px; }
-        .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
-        .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
-        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
-        .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
-      </style>
-      <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center;">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Genre Tree Explorer</span></h1>
-          <button id="closeGenreTreeModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                <title>Close</title>
-                <path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path>
-            </svg>
-          </button>
-      </div>
-      <div class="main-trackCreditsModal-mainSection genre-tree-modal" style="padding: 22px 47px 20px !important; max-height: 70vh; flex-grow: 1;">
-        <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 15px;">Select genres or add your own to start exploring.</p>
-        <div class="search-bar-wrapper">
-            <input type="text" id="genre-search-bar" class="search-bar" placeholder="Search or add a new genre...">
-            <button id="add-genre-btn" class="add-genre-button" title="Add Genre">+</button>
-        </div>
-        <div id="genre-add-error"></div>
-        <div id="user-added-section" style="display: none;">
-            <div class="genre-section-header">Your Added Genres</div>
-            <div id="user-added-genres-container" class="genre-container user-added-container"></div>
-        </div>
-        <div class="genre-section-header">Main Genres</div>
-        <div id="genre-buttons-container" class="genre-container"></div>
-      </div>
-      <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
-        <div style="display: flex; justify-content: flex-end; align-items: center; gap: 15px;">
-            <div id="genre-selection-error" style="color: #f15e6c; font-size: 13px; display: none; flex-grow: 1; text-align: right;"></div>
-            <button id="createGenreTreePlaylist" class="main-buttons-button main-button-primary" 
-                    style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer;">
-                Create Playlist
-            </button>
-        </div>
-      </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    overlay.appendChild(modalContainer);
-
-    const userGenreSection = modalContainer.querySelector('#user-added-section');
-    const userGenreContainer = modalContainer.querySelector('#user-added-genres-container');
-    const mainGenreContainer = modalContainer.querySelector('#genre-buttons-container');
-    const searchBar = modalContainer.querySelector('#genre-search-bar');
-    const addBtn = modalContainer.querySelector('#add-genre-btn');
-    const errorDiv = modalContainer.querySelector('#genre-add-error');
-
-    const renderGenres = (filter = '') => {
-        mainGenreContainer.innerHTML = '';
-        const filteredGenres = mainGenreList.filter(g => g.toLowerCase().includes(filter.toLowerCase()));
-        filteredGenres.forEach(genre => {
-            const btn = document.createElement('button');
-            btn.className = 'genre-button';
-            btn.textContent = genre;
-            if (selectedMainGenres.includes(genre)) {
-                btn.classList.add('selected');
-            }
-            btn.onclick = () => {
-                if (selectedMainGenres.includes(genre)) {
-                    selectedMainGenres = selectedMainGenres.filter(g => g !== genre);
-                    btn.classList.remove('selected');
-                } else {
-                    selectedMainGenres.push(genre);
-                    btn.classList.add('selected');
-                }
-            };
-            mainGenreContainer.appendChild(btn);
-        });
-    };
-
-    const renderUserGenres = (filter = '') => {
-        userGenreContainer.innerHTML = '';
-        const filteredUserGenres = [...userAddedGenres].filter(g => g.toLowerCase().includes(filter.toLowerCase()));
-        
-        if (userAddedGenres.size === 0) {
-            userGenreSection.style.display = 'none';
-            return;
-        }
-        userGenreSection.style.display = 'block';
-
-        filteredUserGenres.forEach(genre => {
-            const btn = document.createElement('button');
-            btn.className = 'genre-button';
-            
-            const textSpan = document.createElement('span');
-            textSpan.textContent = genre;
-            btn.appendChild(textSpan);
-
-            const removeSpan = document.createElement('span');
-            removeSpan.className = 'user-genre-remove';
-            removeSpan.innerHTML = '&times;';
-            removeSpan.onclick = (e) => {
-                e.stopPropagation();
-                userAddedGenres.delete(genre);
-                selectedUserGenres.delete(genre);
-                saveUserGenres();
-                fullRender(searchBar.value);
-            };
-            btn.appendChild(removeSpan);
-
-            if (selectedUserGenres.has(genre)) {
-                btn.classList.add('selected');
-            }
-            btn.onclick = () => {
-                if (selectedUserGenres.has(genre)) {
-                    selectedUserGenres.delete(genre);
-                    btn.classList.remove('selected');
-                } else {
-                    selectedUserGenres.add(genre);
-                    btn.classList.add('selected');
-                }
-            };
-            userGenreContainer.appendChild(btn);
-        });
-    };
-
-    const fullRender = (filter = '') => {
-        renderUserGenres(filter);
-        renderGenres(filter);
-    };
-
-    searchBar.addEventListener('input', () => fullRender(searchBar.value));
-    
-    addBtn.addEventListener('click', async () => {
-        const newGenre = searchBar.value.trim().toLowerCase();
-
-        if (!newGenre) return;
-        if (mainGenreList.includes(newGenre) || userAddedGenres.has(newGenre)) {
-            showNotification(`"${newGenre}" already exists in the list.`, true);
-            return;
-        }
-
-        if (!genrePlaylistsCache) {
-            showNotification("Could not verify genre; genre database is unavailable.", true);
-            return;
-        }
-
-        const escapedGenre = escapeRegExp(newGenre);
-        const regex = new RegExp(`\\b${escapedGenre}\\b`, 'i');
-        const hasMatch = genrePlaylistsCache.some(p => regex.test(p.genre));
-
-        if (hasMatch) {
-            userAddedGenres.add(newGenre);
-            selectedUserGenres.add(newGenre);
-            saveUserGenres();
-            searchBar.value = '';
-            fullRender();
-        } else {
-            showNotification(`No genre found for "${newGenre}". Try a broader term.`, true);
-        }
-    });
-
-    fullRender();
-
-    const closeModal = () => overlay.remove();
-    
-    const createPlaylistBtn = modalContainer.querySelector('#createGenreTreePlaylist');
-
-    createPlaylistBtn.addEventListener('click', () => {
-        const allSelected = [...selectedMainGenres, ...selectedUserGenres];
-        if (allSelected.length === 0) {
-            showNotification("Please select at least one genre.", true);
-            return;
-        }
-        closeModal();
-        generateGenreTreePlaylist(allSelected);
-    });
-
-    const closeButton = modalContainer.querySelector("#closeGenreTreeModal");
-    if (closeButton) {
-        closeButton.addEventListener("click", closeModal);
-    }
-
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-    });
-  }
-
   async function handleSortAndCreatePlaylist(sortType, options = {}) {
     const { isHeadless = false } = options;
 
@@ -27703,9 +27263,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const recommendationSortTypes = ['recommendRecentVibe', 'recommendAllTime', 'pureDiscovery', 'followedReleasesChronological', 'genreTreeExplorer', 'infiniteVibe', 'neighborsMix'];
     if (recommendationSortTypes.includes(sortType)) {
-        if (sortType === 'genreTreeExplorer') {
-            showGenreTreeExplorerModal();
-        } else if (sortType === 'followedReleasesChronological') {
+        if (sortType === 'followedReleasesChronological') {
             await generateFollowedReleasesChronological(options);
         } else if (sortType === 'neighborsMix') {
             await generateNeighborsMix(options);
