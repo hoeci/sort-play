@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.59.1";
+  const SORT_PLAY_VERSION = "5.60.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -900,6 +900,7 @@
     'randomGenreExplorer': COVER_DISCOVERY,
     'infiniteVibe': COVER_LASTFM,
     'neighborsMix': COVER_LASTFM,
+    'tastemakerProfile': COVER_LASTFM,
     'default': COVER_TOP
   };
 
@@ -1023,6 +1024,7 @@
         title: 'Last.fm',
         cards: [
             { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'An endless mix of fresh tracks based on your recent obsessions and favorites.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: false },
+            { id: 'tastemakerProfile', name: 'Tastemaker Profile', description: 'Explore music through the top tracks of a specific Last.fm user.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.tastemakerProfile, broken: false },
             { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: false },
         ]
     },
@@ -1030,7 +1032,6 @@
         title: 'My Top Tracks',
         cards: [
             { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth, broken: false },
-            { id: 'topLast6Months', name: 'Top Tracks: Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months, broken: true },
             { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime, broken: false },
         ]
     }
@@ -4584,7 +4585,7 @@
             const isBroken = !!card.broken;
             const behavior = dedicatedPlaylistBehavior[card.id] || 'createOnce';
             const badgeHtml = getBadgeHtml(behavior, card.id);
-            const allowSettings = card.id !== 'genreTreeExplorer' && !isBroken;
+            const allowSettings = card.id !== 'genreTreeExplorer' && card.id !== 'tastemakerProfile' && !isBroken;
 
             const autoBtnContent = behavior === 'autoUpdate' 
                 ? `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}` 
@@ -5106,19 +5107,20 @@
         .then(res => res.json())
         .then(data => {
             localStorage.setItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS, JSON.stringify(data));
-            Object.entries(data).forEach(([key, count]) => {
-                const statEl = modalContainer.querySelector(`.global-stats[data-id="${key}"]`);
-                if (statEl) {
-                    const countEl = statEl.querySelector('.stats-count');
-                    const currentValStr = countEl.textContent.replace(/,/g, '');
-                    const currentVal = currentValStr ? parseInt(currentValStr, 10) : 0;
-                    
-                    if (statEl.style.opacity === '0' || statEl.style.opacity === '') {
-                        countEl.textContent = count.toLocaleString();
-                        statEl.style.opacity = '1';
-                    } else if (currentVal !== count) {
-                        animateValue(countEl, currentVal, count, 1250);
-                    }
+            const statElements = modalContainer.querySelectorAll('.global-stats');
+            statElements.forEach(statEl => {
+                const key = statEl.getAttribute('data-id');
+                const count = data[key] || 0;
+                
+                const countEl = statEl.querySelector('.stats-count');
+                const currentValStr = countEl.textContent.replace(/,/g, '');
+                const currentVal = currentValStr ? parseInt(currentValStr, 10) : 0;
+                
+                if (statEl.style.opacity === '0' || statEl.style.opacity === '') {
+                    countEl.textContent = count.toLocaleString();
+                    statEl.style.opacity = '1';
+                } else if (currentVal !== count) {
+                    animateValue(countEl, currentVal, count, 1250);
                 }
             });
         })
@@ -5168,6 +5170,14 @@
                     }
                     return;
                 }
+            }
+
+            if (cardId === 'tastemakerProfile') {
+                showTastemakerInputModal((targetUsername) => {
+                    closeModal();
+                    generateTastemakerProfile(targetUsername);
+                });
+                return;
             }
 
             closeModal();
@@ -22612,7 +22622,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     document.body.removeChild(tempBtn);
     
     if (!textColor || textColor === 'rgba(0, 0, 0, 0)' || textColor === 'transparent') {
-        textColor = '#b3b3b3'; // Spotify's default fallback
+        textColor = '#b3b3b3';
     }
     
     return rgbaToSolidRgb(textColor);
@@ -24297,8 +24307,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getOrCreateDedicatedPlaylist(sortType, name, description, maxRetries = 5, initialDelay = 1000) {
+    const actualSortType = sortType.startsWith('tastemakerProfile_') ? 'tastemakerProfile' : sortType;
     const dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
-    const behavior = dedicatedPlaylistBehavior[sortType] || 'createOnce';
+    const behavior = dedicatedPlaylistBehavior[actualSortType] || 'createOnce';
     const isUpdateEnabled = behavior === 'replace' || behavior === 'autoUpdate';
 
     let finalPlaylistName = name;
@@ -24327,6 +24338,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     }
 
+    if (sortType.startsWith('tastemakerProfile_')) {
+        const username = sortType.split('_')[1];
+        coverTitle = "Taste of";
+        coverSubtitle = username;
+    }
+
     const releasePlaylistColor = '#3798a5';
     const discoveryPlaylistColor = '#8f46d7';
     const lastFmPlaylistColor = '#D1170E';
@@ -24349,7 +24366,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         usernameColor = discoveryPlaylistColor;
     } else if (releasePlaylistTypes.includes(sortType)) {
         usernameColor = releasePlaylistColor;
-    } else if (lastFmPlaylistTypes.includes(sortType)) {
+    } else if (lastFmPlaylistTypes.includes(sortType) || sortType.startsWith('tastemakerProfile_')) {
         usernameColor = lastFmPlaylistColor;
     } else {
         usernameColor = defaultUsernameColor;
@@ -24377,7 +24394,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     (async () => {
                         try {
                             const user = await Spicetify.Platform.UserAPI.getUser();
-                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
                             const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
                             setPlaylistImage(playlistId, coverBase64);
                         } catch (coverError) {
@@ -24389,7 +24406,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 await movePlaylistToTop(playlistUri);
 
                 const minimalPlaylistData = { id: playlistId, uri: playlistUri, name: finalPlaylistName };
-                fetch(`${STATS_URL}/increment?key=${sortType}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
+                fetch(`${STATS_URL}/increment?key=${actualSortType}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
                 return { playlist: minimalPlaylistData, wasUpdated: true };
 
             } else {
@@ -24409,7 +24426,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             (async () => {
                 try {
                     const user = await Spicetify.Platform.UserAPI.getUser();
-                    const baseImageUrl = DEDICATED_PLAYLIST_COVERS[sortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                    const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
                     const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
                     setPlaylistImage(newPlaylist.id, coverBase64);
                 } catch (coverError) {
@@ -24426,7 +24443,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
         }
         
-        fetch(`${STATS_URL}/increment?key=${sortType}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
+        fetch(`${STATS_URL}/increment?key=${actualSortType}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
     }
 
     return { playlist: newPlaylist, wasUpdated: false };
@@ -26373,6 +26390,447 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
 
+  async function scrapeLastFmObsessions(username) {
+      try {
+          const gatewayUrlBase = LFM_GATEWAY_URL;
+          const baseUrl = `https://www.last.fm/user/${username}/obsessions`;
+          
+          const response = await fetch(`${gatewayUrlBase}${encodeURIComponent(baseUrl)}`);
+          if (!response.ok) return [];
+          
+          const html = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, "text/html");
+
+          const parseObsessionsFromDoc = (d) => {
+              const items = d.querySelectorAll('.obsession-history-item');
+              return Array.from(items).map(item => {
+                  const trackName = item.querySelector('.obsession-history-item-heading')?.textContent?.trim();
+                  const artistName = item.querySelector('.obsession-history-item-artist span a')?.textContent?.trim() || 
+                                     item.querySelector('.obsession-history-item-artist')?.textContent?.trim();
+                  
+                  if (trackName && artistName) {
+                      return { name: trackName, artist: { name: artistName } }; 
+                  }
+                  return null;
+              }).filter(Boolean);
+          };
+
+          let allTracks = parseObsessionsFromDoc(doc);
+
+          const paginationLinks = doc.querySelectorAll('.pagination-page a');
+          let totalPages = 1;
+          if (paginationLinks.length > 0) {
+              const lastPageText = paginationLinks[paginationLinks.length - 1].textContent.trim();
+              totalPages = parseInt(lastPageText) || 1;
+          }
+
+          if (totalPages > 1) {
+              const pagesToFetch = new Set();
+              const maxPagePool = Math.min(totalPages, 15);
+              
+              while (pagesToFetch.size < 3 && pagesToFetch.size < maxPagePool - 1) {
+                  const p = Math.floor(Math.random() * (maxPagePool - 1)) + 2; 
+                  pagesToFetch.add(p);
+              }
+
+              const pagePromises = Array.from(pagesToFetch).map(async (pageNum) => {
+                  const pageUrl = `${baseUrl}?page=${pageNum}`;
+                  try {
+                      const pRes = await fetch(`${gatewayUrlBase}${encodeURIComponent(pageUrl)}`);
+                      if (pRes.ok) {
+                          const pHtml = await pRes.text();
+                          const pDoc = new DOMParser().parseFromString(pHtml, "text/html");
+                          return parseObsessionsFromDoc(pDoc);
+                      }
+                  } catch (e) { return []; }
+                  return [];
+              });
+
+              const extraTracks = await Promise.all(pagePromises);
+              extraTracks.forEach(tracks => allTracks.push(...tracks));
+          }
+
+          return allTracks;
+
+      } catch (e) {
+          console.warn(`[Sort-Play] Failed to scrape obsessions for ${username}`, e);
+          return [];
+      }
+  }
+
+  async function scrapeLastFmTopTracks(username, pages = 5) {
+      try {
+          const gatewayUrlBase = LFM_GATEWAY_URL;
+          const baseUrl = `https://www.last.fm/user/${username}/library/tracks?date_preset=ALL`;
+          
+          const pagePromises = Array.from({ length: pages }, (_, i) => {
+              const pageNum = i + 1;
+              const pageUrl = `${baseUrl}&page=${pageNum}`;
+              return fetch(`${gatewayUrlBase}${encodeURIComponent(pageUrl)}`)
+                  .then(res => res.ok ? res.text() : "")
+                  .catch(() => "");
+          });
+
+          const htmlResults = await Promise.all(pagePromises);
+          const allTracks = [];
+
+          htmlResults.forEach(html => {
+              if (!html) return;
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(html, "text/html");
+              const rows = doc.querySelectorAll('.chartlist-row');
+              
+              rows.forEach(row => {
+                  const nameNode = row.querySelector('.chartlist-name a');
+                  const artistNode = row.querySelector('.chartlist-artist a');
+                  const lovedNode = row.querySelector('.chartlist-loved [data-toggle-button-current-state]');
+                  const statNode = row.querySelector('.chartlist-count-bar-slug');
+
+                  if (nameNode && artistNode) {
+                      const name = nameNode.textContent.trim();
+                      const artist = artistNode.textContent.trim();
+                      const isLoved = lovedNode ? lovedNode.getAttribute('data-toggle-button-current-state') === 'loved' : false;
+                      const playcount = statNode ? parseInt(statNode.getAttribute('data-stat-value'), 10) || 0 : 0;
+                      
+                      allTracks.push({ name, artist, isLoved, playcount });
+                  }
+              });
+          });
+
+          return allTracks;
+      } catch (e) {
+          console.warn(`[Sort-Play] Failed to scrape top tracks for ${username}`, e);
+          return [];
+      }
+  }
+
+  function showTastemakerInputModal(onConfirm) {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-tastemaker-modal-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2005;
+        display: flex; justify-content: center; align-items: center;
+        backdrop-filter: blur(5px);
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+    modalContainer.style.cssText = `
+        width: 420px !important;
+        border-radius: 30px;
+        overflow: hidden; 
+        background-color: #181818 !important;
+        border: 2px solid #282828;
+        display: flex;
+        flex-direction: column;
+    `;
+
+    modalContainer.innerHTML = `
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Tastemaker Profile</span></h1>
+      </div>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 25px 32px 20px 32px !important;">
+          <div style="display: flex; flex-direction: column; gap: 15px;">
+            <p style="color: #b3b3b3; font-size: 14px; margin: 0; line-height: 1.4;">Enter the Last.fm username of the person whose taste you want to clone into a playlist.</p>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              <input type="text" id="tastemakerUsername" value="" placeholder="Last.fm Username"
+                    style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
+              <button id="cancelTastemaker" class="main-buttons-button" 
+                      style="width: 83px; padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                Cancel
+              </button>
+              <button id="startTastemaker" class="main-buttons-button main-button-primary" 
+                      style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                Clone
+              </button>
+            </div>
+          </div>
+      </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+    
+    const inputField = document.getElementById("tastemakerUsername");
+    inputField.focus();
+
+    const closeModal = () => overlay.remove();
+
+    const startButton = document.getElementById("startTastemaker");
+    const cancelButton = document.getElementById("cancelTastemaker");
+
+    startButton.addEventListener("mouseenter", () => { startButton.style.backgroundColor = "#3BE377"; });
+    startButton.addEventListener("mouseleave", () => { startButton.style.backgroundColor = "#1ED760"; });
+    cancelButton.addEventListener("mouseenter", () => { cancelButton.style.backgroundColor = "#444444"; });
+    cancelButton.addEventListener("mouseleave", () => { cancelButton.style.backgroundColor = "#333333"; });
+
+    startButton.addEventListener("click", () => {
+      const username = inputField.value.trim();
+      if (!username) {
+        showNotification("Please enter a username.", true);
+        return;
+      }
+      closeModal();
+      onConfirm(username);
+    });
+
+    cancelButton.addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  }
+
+  async function generateTastemakerProfile(targetUsername, options = {}) {
+      const { isHeadless = false } = options;
+      if (!targetUsername) return;
+
+      if (!isHeadless) {
+          setButtonProcessing(true);
+          mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
+          mainButton.style.color = buttonStyles.main.disabledColor;
+          mainButton.style.cursor = "default";
+          svgElement.style.fill = buttonStyles.main.disabledColor;
+          menuButtons.forEach((button) => (button.disabled = true));
+          toggleMenu();
+          closeAllMenus();
+      }
+
+      const updateProgress = (msg) => {
+          if (!isHeadless) mainButton.innerText = msg;
+      };
+
+      try {
+          updateProgress("Fetching...");
+
+          const [lovedRes, topRes, rawObsessions] = await Promise.all([
+              fetchLfmWithGateway(new URLSearchParams({ method: 'user.getlovedtracks', user: targetUsername, limit: '400', format: 'json' })),
+              fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: targetUsername, period: 'overall', limit: '400', format: 'json' })),
+              scrapeLastFmObsessions(targetUsername)
+          ]);
+
+          const obsessions = rawObsessions.slice(0, 3);
+
+          const lovedData = lovedRes.ok ? await lovedRes.json() : {};
+          const lovedTracks = lovedData.lovedtracks?.track || [];
+
+          const topData = topRes.ok ? await topRes.json() : {};
+          const topTracks = topData.toptracks?.track || [];
+
+          const trackMap = new Map();
+          const getTrackKey = (artist, track) => `${artist.toLowerCase().trim()}|${track.toLowerCase().trim()}`;
+
+          lovedTracks.forEach(t => {
+              if (!t.name || !t.artist) return;
+              const artist = t.artist.name || t.artist['#text'];
+              if (!artist) return;
+              const key = getTrackKey(artist, t.name);
+              trackMap.set(key, { name: t.name, artist, isLoved: true, isObsession: false, playcount: 0 });
+          });
+
+          topTracks.forEach(t => {
+              if (!t.name || !t.artist) return;
+              const artist = t.artist.name || t.artist['#text'];
+              if (!artist) return;
+              const key = getTrackKey(artist, t.name);
+              const pc = parseInt(t.playcount, 10) || 0;
+              
+              if (trackMap.has(key)) {
+                  trackMap.get(key).playcount = pc;
+              } else {
+                  trackMap.set(key, { name: t.name, artist, isLoved: false, isObsession: false, playcount: pc });
+              }
+          });
+
+          obsessions.forEach(t => {
+              const artist = t.artist.name || t.artist['#text'];
+              if (!artist) return;
+              const key = getTrackKey(artist, t.name);
+              if (trackMap.has(key)) {
+                  trackMap.get(key).isObsession = true;
+              } else {
+                  trackMap.set(key, { name: t.name, artist, isLoved: false, isObsession: true, playcount: 0 });
+              }
+          });
+
+          const candidates = [];
+          trackMap.forEach((data, key) => {
+              let score = 0;
+              let isValid = false;
+
+              if (data.isObsession) {
+                  score += 10000000; 
+                  isValid = true;
+              }
+              
+              if (data.playcount > 0) {
+                  score += data.playcount;
+                  isValid = true;
+              }
+
+              if (data.isLoved) {
+                  if (data.playcount > 0) {
+                      score = score * 1.1;
+                  } else {
+                      score += 1;
+                  }
+                  isValid = true;
+              }
+
+              if (isValid) {
+                  candidates.push({ ...data, score });
+              }
+          });
+
+          candidates.sort((a, b) => b.score - a.score);
+          const topCandidates = candidates.slice(0, 350); 
+
+          if (topCandidates.length === 0) {
+              throw new Error(`Not enough valid listening data found for ${targetUsername}.`);
+          }
+
+          updateProgress("Resolving...");
+
+          const mockLocalTracks = topCandidates.map(c => ({
+              uri: "spotify:local:::::",
+              name: c.name,
+              artistName: c.artist
+          }));
+
+          const { convertedTracks } = await convertLocalTracksToSpotify(mockLocalTracks, updateProgress);
+
+          updateProgress("Filtering...");
+          const likedSongs = await getLikedSongs();
+          const likedUris = new Set(likedSongs.map(s => s.uri));
+          const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
+          const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+          const likedIsrcs = new Set();
+          cachedLikedMetadata.forEach(meta => {
+              if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
+          });
+
+          const candidatesForMeta = convertedTracks.map(t => ({
+              uri: t.uri,
+              id: t.id || t.uri.split(':')[2],
+              track: t.track || t, 
+              name: t.name,
+              artistName: t.artistName || (t.artists && t.artists[0]?.name) || "",
+              allArtists: t.allArtists || (t.artists && t.artists.map(a => a.name).join(", ")),
+              artists: t.artists
+          }));
+
+          const candidatesWithMeta = await refreshTrackAlbumInfo(candidatesForMeta, () => {});
+
+          updateProgress("Verifying...");
+          const availableTracks = [];
+          const seenUris = new Set();
+          const spotifyArtistCounts = new Map();
+          
+          for (const c of candidatesWithMeta) {
+              if (seenUris.has(c.uri)) continue;
+              
+              if (likedUris.has(c.uri)) continue;
+              const isrc = c.track?.external_ids?.isrc;
+              if (isrc && likedIsrcs.has(isrc)) continue;
+
+              if (!(await isTrackAvailable(c))) continue;
+
+              const trackArtists = c.artists || c.track?.artists || [];
+              if (trackArtists.length === 0 && !c.artistName) continue;
+
+              const primaryArtist = trackArtists[0];
+              const primaryArtistId = primaryArtist 
+                  ? (primaryArtist.id || (primaryArtist.uri ? primaryArtist.uri.split(':')[2] : null) || primaryArtist.name)
+                  : c.artistName;
+
+              if (!primaryArtistId) continue;
+              
+              const isCollab = trackArtists.length > 1;
+
+              if (!spotifyArtistCounts.has(primaryArtistId)) {
+                  spotifyArtistCounts.set(primaryArtistId, { total: 0, collab: 0 });
+              }
+              const counts = spotifyArtistCounts.get(primaryArtistId);
+
+              let allowed = false;
+
+              if (counts.total < 2) {
+                  allowed = true;
+              }
+              else if (counts.total < 3 && isCollab && counts.collab === 0) {
+                  allowed = true;
+              }
+
+              if (!allowed) continue;
+
+              counts.total++;
+              if (isCollab) counts.collab++;
+
+              availableTracks.push(c);
+              seenUris.add(c.uri);
+
+              if (availableTracks.length >= 150) break;
+          }
+
+          if (availableTracks.length === 0) {
+              throw new Error("No new tracks found. You might already like all of this user's top songs!");
+          }
+
+          updateProgress("Sorting...");
+          const trackIds = availableTracks.map(t => t.id || t.uri.split(':')[2]);
+          const stats = await getBatchTrackStats(trackIds);
+          
+          const tracksWithFeatures = availableTracks.map(t => {
+              const id = t.id || t.uri.split(':')[2];
+              return { ...t, features: stats[id] };
+          });
+
+          const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+          const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+
+          const sortedTracks = [];
+          const CHUNK_SIZE = 15;
+          
+          for (let i = 0; i < validForWave.length; i += CHUNK_SIZE) {
+              const chunk = validForWave.slice(i, i + CHUNK_SIZE);
+              if (chunk.length < 3) {
+                  sortedTracks.push(...chunk);
+              } else {
+                  const sortedChunk = await energyWaveSort(chunk);
+                  sortedTracks.push(...sortedChunk);
+              }
+          }
+
+          const finalTracks = [...sortedTracks, ...others];
+
+          const trackUris = finalTracks.map(t => t.uri);
+          const playlistName = `Taste of ${targetUsername}`;
+          const playlistDescription = `Exploring the musical taste of ${targetUsername}. Filtered to exclude your existing library. Created by Sort-Play.`;
+
+          updateProgress("Creating...");
+          
+          const uniqueSortType = `tastemakerProfile_${targetUsername}`;
+          const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(uniqueSortType, playlistName, playlistDescription);
+
+          updateProgress("Saving...");
+          if (wasUpdated) {
+              await replacePlaylistTracks(newPlaylist.id, trackUris);
+          } else {
+              await addTracksToPlaylist(newPlaylist.id, trackUris);
+          }
+
+          showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
+          await navigateToPlaylist(newPlaylist);
+
+      } catch (error) {
+          console.error("Error generating Tastemaker Profile:", error);
+          showNotification(error.message, true);
+      } finally {
+          if (!isHeadless) resetButtons();
+      }
+  }
+
   async function generateNeighborsMix(options = {}) {
     const { isHeadless = false } = options;
     
@@ -26395,75 +26853,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const updateProgress = (msg) => {
         if (!isHeadless) mainButton.innerText = msg;
-    };
-
-    const parseObsessionsFromDoc = (doc) => {
-        const items = doc.querySelectorAll('.obsession-history-item');
-        return Array.from(items).map(item => {
-            const trackName = item.querySelector('.obsession-history-item-heading')?.textContent?.trim();
-            const artistName = item.querySelector('.obsession-history-item-artist span a')?.textContent?.trim() || 
-                               item.querySelector('.obsession-history-item-artist')?.textContent?.trim();
-            
-            if (trackName && artistName) {
-                return { name: trackName, artist: { name: artistName } }; 
-            }
-            return null;
-        }).filter(Boolean);
-    };
-
-    const scrapeNeighborObsessions = async (neighborName) => {
-        try {
-            const gatewayUrlBase = LFM_GATEWAY_URL;
-            const baseUrl = `https://www.last.fm/user/${neighborName}/obsessions`;
-            
-            const response = await fetch(`${gatewayUrlBase}${encodeURIComponent(baseUrl)}`);
-            if (!response.ok) return [];
-            
-            const html = await response.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, "text/html");
-
-            let allTracks = parseObsessionsFromDoc(doc);
-
-            const paginationLinks = doc.querySelectorAll('.pagination-page a');
-            let totalPages = 1;
-            if (paginationLinks.length > 0) {
-                const lastPageText = paginationLinks[paginationLinks.length - 1].textContent.trim();
-                totalPages = parseInt(lastPageText) || 1;
-            }
-
-            if (totalPages > 1) {
-                const pagesToFetch = new Set();
-                const maxPagePool = Math.min(totalPages, 15);
-                
-                while (pagesToFetch.size < 3 && pagesToFetch.size < maxPagePool - 1) {
-                    const p = Math.floor(Math.random() * (maxPagePool - 1)) + 2; 
-                    pagesToFetch.add(p);
-                }
-
-                const pagePromises = Array.from(pagesToFetch).map(async (pageNum) => {
-                    const pageUrl = `${baseUrl}?page=${pageNum}`;
-                    try {
-                        const pRes = await fetch(`${gatewayUrlBase}${encodeURIComponent(pageUrl)}`);
-                        if (pRes.ok) {
-                            const pHtml = await pRes.text();
-                            const pDoc = new DOMParser().parseFromString(pHtml, "text/html");
-                            return parseObsessionsFromDoc(pDoc);
-                        }
-                    } catch (e) { return []; }
-                    return [];
-                });
-
-                const extraTracks = await Promise.all(pagePromises);
-                extraTracks.forEach(tracks => allTracks.push(...tracks));
-            }
-
-            return shuffleArray(allTracks).slice(0, 20);
-
-        } catch (e) {
-            console.warn(`[Sort-Play] Failed to scrape obsessions for ${neighborName}`, e);
-            return [];
-        }
     };
 
     try {
@@ -26533,7 +26922,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const p2 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: name, period: 'overall', limit: '20', format: 'json' }));
             const p3 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.getlovedtracks', user: name, limit: '20', format: 'json' }));
             
-            const p4 = scrapeNeighborObsessions(name);
+            const p4 = scrapeLastFmObsessions(name).then(res => shuffleArray(res).slice(0, 20));
 
             const [r1, r2, r3, obsessions] = await Promise.all([p1, p2, p3, p4]);
             
