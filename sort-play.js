@@ -33570,25 +33570,36 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   function getNativeMenuBackgroundColor() {
+    const primaryClass = 'main-contextMenu-menu';
+    const fallbackClass = 'wlb3dYO07PZuYfmNfmkS';
+    let tempContainer = null;
     try {
-      const wrapper = document.createElement('div');
-      wrapper.id = 'context-menu';
-      wrapper.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
-      
-      const tempContainer = document.createElement('ul');
-      tempContainer.className = 'encore-dark-theme encore-layout-themes main-contextMenu-menu';
-      wrapper.appendChild(tempContainer);
-      document.body.appendChild(wrapper);
+      tempContainer = document.createElement('div');
+      tempContainer.className = primaryClass;
+      tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+      document.body.appendChild(tempContainer);
 
       let bgColor = window.getComputedStyle(tempContainer).backgroundColor;
-      document.body.removeChild(wrapper);
 
       if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
         return bgColor;
       }
-    } catch (error) {}
+      
+      tempContainer.className = fallbackClass;
+      bgColor = window.getComputedStyle(tempContainer).backgroundColor;
 
-    return '#282828';
+      if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+        return bgColor;
+      }
+
+      return '#282828';
+    } catch (error) {
+      return '#282828';
+    } finally {
+      if (tempContainer) {
+        document.body.removeChild(tempContainer);
+      }
+    }
   }
   
   function applyCurrentThemeColors(elementToUpdate = null) {
@@ -33605,10 +33616,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         if (allMenus.length > 0) {
             const nativeMenuColor = getNativeMenuTextColor();
-            const nativeBgColor = getNativeMenuBackgroundColor();
 
             allMenus.forEach(menu => {
-                menu.style.backgroundColor = nativeBgColor;
                 const childButtons = menu.querySelectorAll('button');
                 childButtons.forEach(button => {
                     button.style.color = nativeMenuColor;
