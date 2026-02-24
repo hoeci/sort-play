@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.59.0";
+  const SORT_PLAY_VERSION = "5.59.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -22514,7 +22514,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   mainButton.addEventListener("mouseenter", () => {
     mainButton.style.cursor = "pointer";
-    if (!isProcessing) { 
+    if (!isProcessing && !isMenuOpen) { 
       mainButton.style.filter = "brightness(1.5)";
     }
   });
@@ -22522,76 +22522,100 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   mainButton.addEventListener("mouseleave", () => {
     mainButton.style.cursor = "pointer"; 
     if (!isProcessing) {  
-      if (!isButtonClicked) {
-        mainButton.style.filter = "brightness(1)";
-      }
+      mainButton.style.filter = "brightness(1)";
     }
   });
 
 
   function getNativeMenuTextColor() {
-    const primaryClass = 'niXChlbt7kxslMUdfwu9';
-    const fallbackClass = 'main-contextMenu-menuItemButton';
-    let tempContainer = null;
-
     try {
-      tempContainer = document.createElement('div');
-      tempContainer.className = 'main-contextMenu-menu';
-      tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+      const wrapper = document.createElement('div');
+      wrapper.id = 'context-menu';
+      wrapper.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+      
+      const tempContainer = document.createElement('ul');
+      tempContainer.className = 'encore-dark-theme encore-layout-themes main-contextMenu-menu';
       
       const tempButton = document.createElement('button');
       tempButton.className = 'main-contextMenu-menuItemButton';
-      tempContainer.appendChild(tempButton);
-      document.body.appendChild(tempContainer);
-
+      
       const tempSpan = document.createElement('span');
-      tempSpan.className = "e-91000-text encore-text-body-small ellipsis-one-line m1hZc7vcFunpAF8jgPq6";
-      tempSpan.innerText = "Add to queue";
+      tempSpan.className = "e-91000-text encore-text-body-small main-contextMenu-menuItemLabel";
+      tempSpan.innerText = "Test";
+      
       tempButton.appendChild(tempSpan);
+      tempContainer.appendChild(tempButton);
+      wrapper.appendChild(tempContainer);
+      document.body.appendChild(wrapper);
 
       let textColor = window.getComputedStyle(tempSpan).color;
-      tempButton.removeChild(tempSpan);
+      document.body.removeChild(wrapper);
 
       if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
         return textColor;
       }
+    } catch (error) {}
 
-      tempButton.className = primaryClass;
-      textColor = window.getComputedStyle(tempButton).color;
-
-      if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
-        return textColor;
-      }
-
-      tempButton.className = fallbackClass;
-      textColor = window.getComputedStyle(tempButton).color;
-
-      if (textColor && textColor !== 'rgba(0, 0, 0, 0)' && textColor !== 'transparent') {
-        return textColor;
-      }
-
-      return '#b3b3b3'; 
-
-    } catch (error) {
-      console.warn("Sort-Play: Error detecting native menu text color.", error);
-      return '#b3b3b3';
-    } finally {
-      if (tempContainer) {
-        document.body.removeChild(tempContainer);
-      }
-    }
+    return '#b3b3b3'; 
   }
 
   
   function getNativeTertiaryButtonColor() {
-    const targetClass = 'Button-sc-qlcn5g-0 Button-buttonTertiary-large-iconOnly-useBrowserDefaultFocusStyle-condensed';
-    const tempButton = document.createElement('button');
-    tempButton.className = targetClass;
-    tempButton.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
-    document.body.appendChild(tempButton);
-    const textColor = window.getComputedStyle(tempButton).color;
-    document.body.removeChild(tempButton);
-    return textColor;
+    const rgbaToSolidRgb = (colorStr) => {
+      const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (!match) return colorStr;
+      
+      const a = match[4] !== undefined ? parseFloat(match[4]) : 1;
+      if (a === 1) return colorStr;
+      
+      const r = parseInt(match[1], 10);
+      const g = parseInt(match[2], 10);
+      const b = parseInt(match[3], 10);
+      const bg = 24; 
+      
+      const newR = Math.round((1 - a) * bg + a * r);
+      const newG = Math.round((1 - a) * bg + a * g);
+      const newB = Math.round((1 - a) * bg + a * b);
+      
+      return `rgb(${newR}, ${newG}, ${newB})`;
+    };
+
+    const existingSortBtn = document.querySelector('.x-sortBox-sortDropdown');
+    if (existingSortBtn) {
+      let color = window.getComputedStyle(existingSortBtn).color;
+      const opacity = parseFloat(window.getComputedStyle(existingSortBtn).opacity || 1);
+      if (opacity < 1 && color.startsWith('rgb(')) {
+           const rgbVals = color.match(/\d+/g);
+           if (rgbVals && rgbVals.length >= 3) {
+               color = `rgba(${rgbVals[0]}, ${rgbVals[1]}, ${rgbVals[2]}, ${opacity})`;
+           }
+      }
+      if (color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+        return rgbaToSolidRgb(color);
+      }
+    }
+
+    const existingSearchIcon = document.querySelector('.x-filterBox-expandButton');
+    if (existingSearchIcon) {
+      let color = window.getComputedStyle(existingSearchIcon).color;
+      if (color && color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') {
+        return rgbaToSolidRgb(color);
+      }
+    }
+
+    const tempBtn = document.createElement('button');
+    tempBtn.className = 'x-sortBox-sortDropdown';
+    tempBtn.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden; color: var(--spice-subtext, #b3b3b3);';
+    document.body.appendChild(tempBtn);
+    
+    let textColor = window.getComputedStyle(tempBtn).color;
+    document.body.removeChild(tempBtn);
+    
+    if (!textColor || textColor === 'rgba(0, 0, 0, 0)' || textColor === 'transparent') {
+        textColor = '#b3b3b3'; // Spotify's default fallback
+    }
+    
+    return rgbaToSolidRgb(textColor);
   }
 
 
@@ -22606,8 +22630,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   menuContainer.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
   menuContainer.style.backgroundColor = getNativeMenuBackgroundColor();
   menuContainer.style.backdropFilter = "blur(8px)";
-  menuContainer.classList.add('main-contextMenu-menu');
-  menuContainer.classList.add('sort-play-font-scope');
+  menuContainer.classList.add('main-contextMenu-menu', 'encore-dark-theme', 'encore-layout-themes', 'sort-play-font-scope');
   
   const menuButtons = buttonStyles.menuItems.map((style) => {
     if (style.type === "divider") {
@@ -22683,7 +22706,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       parentButton.addEventListener("mouseenter", () => {
         if (!parentButton.disabled) {
           if (activeSubMenuParent && activeSubMenuParent !== parentButton) {
-            activeSubMenuParent.style.backgroundColor = "transparent";
+            hideSubMenuRecursive(activeSubMenuParent);
           }
           parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
           activeSubMenuParent = parentButton;
@@ -22724,10 +22747,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       button.addEventListener("mouseenter", () => {
         button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
         if (activeSubMenuParent) {
-          activeSubMenuParent.style.backgroundColor = "transparent";
+          hideSubMenuRecursive(activeSubMenuParent);
           activeSubMenuParent = null;
         }
-        hideAllSubMenus();
       });
     
       button.addEventListener("mouseleave", () => {
@@ -22871,6 +22893,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }, { signal });
 
       window.addEventListener('resize', closeAllMenus, { signal });
+      window.addEventListener('wheel', preventScroll, { passive: false, signal });
+      window.addEventListener('touchmove', preventScroll, { passive: false, signal });
       window.addEventListener('scroll', closeAllMenus, { signal, capture: true });
 
     } else {
@@ -22902,6 +22926,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   }
   
+  function hideSubMenuRecursive(parentBtn) {
+    if (parentBtn._submenu) {
+        parentBtn._submenu.style.display = 'none';
+        if (parentBtn._submenu._activeSubMenuParent) {
+            hideSubMenuRecursive(parentBtn._submenu._activeSubMenuParent);
+            parentBtn._submenu._activeSubMenuParent = null;
+        }
+    }
+    parentBtn.style.backgroundColor = "transparent";
+  }
+
+  function preventScroll(e) {
+    if (e.target.closest('.main-contextMenu-menu') || e.target.closest('#sort-play-column-selector')) {
+        return;
+    }
+    e.preventDefault();
+  }
+
   function hideAllSubMenus() {
     document.querySelectorAll('.submenu').forEach(sm => {
       sm.style.display = 'none';
@@ -22914,7 +22956,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function createSubMenu(items, width = "155px") {
     const subMenu = document.createElement("div");
-    subMenu.classList.add("submenu", "main-contextMenu-menu", "sort-play-font-scope");
+    subMenu.classList.add("submenu", "main-contextMenu-menu", "encore-dark-theme", "encore-layout-themes", "sort-play-font-scope");
     const bgColor = getNativeMenuBackgroundColor();
     subMenu.style.cssText = `
       position: fixed;
@@ -23006,7 +23048,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         parentButton.addEventListener("mouseenter", () => {
           if (!parentButton.disabled) {
             if (subMenu._activeSubMenuParent && subMenu._activeSubMenuParent !== parentButton) {
-              subMenu._activeSubMenuParent.style.backgroundColor = "transparent";
+              hideSubMenuRecursive(subMenu._activeSubMenuParent);
             }
             parentButton.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
             subMenu._activeSubMenuParent = parentButton;
@@ -23048,10 +23090,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         if (!button.disabled) {
           button.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
           if (subMenu._activeSubMenuParent) {
-            subMenu._activeSubMenuParent.style.backgroundColor = "transparent";
-            if (subMenu._activeSubMenuParent._submenu) {
-              subMenu._activeSubMenuParent._submenu.style.display = 'none';
-            }
+            hideSubMenuRecursive(subMenu._activeSubMenuParent);
             subMenu._activeSubMenuParent = null;
           }
         }
@@ -23091,9 +23130,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const parentMenu = parentButton.parentElement;
     if (parentMenu) {
         parentMenu.querySelectorAll('button[data-is-parent]').forEach(siblingParent => {
-            if (siblingParent !== parentButton && siblingParent._submenu) {
-                siblingParent._submenu.style.display = 'none';
-                siblingParent.style.backgroundColor = "transparent";
+            if (siblingParent !== parentButton) {
+                hideSubMenuRecursive(siblingParent);
             }
         });
     }
@@ -23157,9 +23195,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       mainButton.style.color = buttonStyles.main.disabledColor;
       svgElement.style.fill = buttonStyles.main.disabledColor;
     } else {
+      const nativeColor = getNativeTertiaryButtonColor();
       mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-      mainButton.style.color = buttonStyles.main.color;
-      svgElement.style.fill = buttonStyles.main.color;
+      mainButton.style.color = nativeColor;
+      svgElement.style.fill = nativeColor;
     }
   };
   
@@ -23186,9 +23225,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       return;
     }
   
-    isButtonClicked = !isMenuOpen; 
-    
     if (!isMenuOpen) {
+      mainButton.style.filter = "brightness(1)";
       toggleMenu();
     } else {
       closeAllMenus();
@@ -33034,9 +33072,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         tracklist_.setAttribute('data-sp-grid', 'playlist');
         const newHeaderTemplate = getDynamicGridTemplate(currentHeaderCols.length);
         const cssString = `
-            [data-sp-grid="playlist"] .main-trackList-trackListHeaderRow,
-            [data-sp-grid="playlist"] .main-trackList-trackListRow,
-            [data-sp-grid="playlist"] .main-trackList-trackListRowGrid {
+            html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListHeaderRow,
+            html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListRow,
+            html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListRowGrid {
                 grid-template-columns: ${newHeaderTemplate} !important;
             }
         `;
@@ -33255,9 +33293,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
       const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
       const cssString = `
-          [data-sp-grid="album"] .main-trackList-trackListHeaderRow,
-          [data-sp-grid="album"] .main-trackList-trackListRow,
-          [data-sp-grid="album"] .main-trackList-trackListRowGrid {
+          html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListHeaderRow,
+          html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRow,
+          html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRowGrid {
               grid-template-columns: ${newGridTemplate} !important;
           }
       `;
@@ -33394,9 +33432,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       
       const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
       const cssString = `
-          [data-sp-grid="artist"] .main-trackList-trackListHeaderRow,
-          [data-sp-grid="artist"] .main-trackList-trackListRow,
-          [data-sp-grid="artist"] .main-trackList-trackListRowGrid {
+          html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListHeaderRow,
+          html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRow,
+          html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRowGrid {
               grid-template-columns: ${newGridTemplate} !important;
           }
       `;
@@ -33689,42 +33727,36 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     }
 
+    if (containerFound) {
+        applyCurrentThemeColors();
+        setTimeout(applyCurrentThemeColors, 300);
+    }
+
     if (!containerFound && retry < 10) {
         setTimeout(() => insertButton(retry + 1), 200);
     }
   }
 
   function getNativeMenuBackgroundColor() {
-    const primaryClass = 'main-contextMenu-menu';
-    const fallbackClass = 'wlb3dYO07PZuYfmNfmkS';
-    let tempContainer = null;
     try {
-      tempContainer = document.createElement('div');
-      tempContainer.className = primaryClass;
-      tempContainer.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
-      document.body.appendChild(tempContainer);
+      const wrapper = document.createElement('div');
+      wrapper.id = 'context-menu';
+      wrapper.style.cssText = 'position: absolute; top: -9999px; left: -9999px; visibility: hidden;';
+      
+      const tempContainer = document.createElement('ul');
+      tempContainer.className = 'encore-dark-theme encore-layout-themes main-contextMenu-menu';
+      wrapper.appendChild(tempContainer);
+      document.body.appendChild(wrapper);
 
       let bgColor = window.getComputedStyle(tempContainer).backgroundColor;
+      document.body.removeChild(wrapper);
 
       if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
         return bgColor;
       }
-      
-      tempContainer.className = fallbackClass;
-      bgColor = window.getComputedStyle(tempContainer).backgroundColor;
+    } catch (error) {}
 
-      if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
-        return bgColor;
-      }
-
-      return '#282828';
-    } catch (error) {
-      return '#282828';
-    } finally {
-      if (tempContainer) {
-        document.body.removeChild(tempContainer);
-      }
-    }
+    return '#282828';
   }
   
   function applyCurrentThemeColors(elementToUpdate = null) {
@@ -33741,8 +33773,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         if (allMenus.length > 0) {
             const nativeMenuColor = getNativeMenuTextColor();
+            const nativeBgColor = getNativeMenuBackgroundColor();
 
             allMenus.forEach(menu => {
+                menu.style.backgroundColor = nativeBgColor;
                 const childButtons = menu.querySelectorAll('button');
                 childButtons.forEach(button => {
                     button.style.color = nativeMenuColor;
@@ -33758,6 +33792,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
   }
+  
   const LIKE_BUTTON_ICON_NOT_LIKED = `<path d="M1.69 2A4.582 4.582 0 018 2.023 4.583 4.583 0 0111.88.817h.002a4.618 4.618 0 013.782 3.65v.003a4.543 4.543 0 01-1.011 3.84L9.35 14.629a1.765 1.765 0 01-2.093.464 1.762 1.762 0 01-.605-.463L1.348 8.309A4.582 4.582 0 011.689 2zm3.158.252A3.082 3.082 0 002.49 7.337l.005.005L7.8 13.664a.264.264 0 00.311.069.262.262 0 00.09-.069l5.312-6.33a3.043 3.043 0 00.68-2.573 3.118 3.118 0 00-2.551-2.463 3.079 3.079 0 00-2.612.816l-.007.007a1.501 1.501 0 01-2.045 0l-.009-.008a3.082 3.082 0 00-2.121-.861z"></path>`;
   const LIKE_BUTTON_ICON_LIKED = `<path d="M15.724 4.22A4.313 4.313 0 0012.192.814a4.269 4.269 0 00-3.622 1.13.837.837 0 01-1.14 0 4.272 4.272 0 00-6.21 5.855l5.916 7.05a1.128 1.128 0 001.727 0l5.916-7.05a4.228 4.228 0 00.945-3.577z"></path>`;
   const LIKE_BUTTON_ICON_ISRC_LIKED = `<path d="m15.92,3.56h0c-.36-1.81-1.8-3.2-3.62-3.49-1.35-.22-2.72.21-3.71,1.16-.16.15-.37.23-.58.23s-.42-.08-.58-.23c-.85-.82-1.95-1.23-3.04-1.23S2.09.45,1.23,1.33c-1.57,1.63-1.65,4.18-.17,5.9l6.06,7.22c.23.27.56.41.89.41h0c.26,0,.53-.09.74-.27.05-.04.1-.09.14-.14l6.06-7.22c.87-1.01,1.23-2.36.97-3.66h0Zm-7.91,9.39h0L2.31,6.18h0s0-.01,0-.01c-.45-.52-.68-1.18-.66-1.86s.29-1.33.77-1.82c.52-.54,1.22-.83,1.97-.83s1.39.27,1.9.77h.01s.01.02.01.02c.46.43,1.07.67,1.7.67v9.86h0Z"></path>`;
@@ -34661,12 +34696,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     attributeFilter: ['class'],
   });
 
+  let startupColorRetries = 0;
   const startupInterval = setInterval(() => {
     if (Spicetify.Player?.data) {
-      clearInterval(startupInterval);
       applyCurrentThemeColors();
+      startupColorRetries++;
+      if (startupColorRetries > 10) {
+        clearInterval(startupInterval);
+      }
     }
-  }, 100);
+  }, 300);
 
   await idb.init();
   await idb.clear('personalScrobbles');
