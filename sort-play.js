@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.61.2";
+  const SORT_PLAY_VERSION = "5.61.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -33205,286 +33205,213 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (isUpdatingAlbumTracklist) return;
     isUpdatingAlbumTracklist = true;
 
-    try {
-      const tracklistContainer = document.querySelector(".main-trackList-trackList.main-trackList-indexable");
-      if (!tracklistContainer) return;
+    requestAnimationFrame(() => {
+      try {
+        const tracklistContainer = document.querySelector(".main-trackList-trackList.main-trackList-indexable");
+        if (!tracklistContainer) return;
 
-      const currentUri = getCurrentUri();
+        const currentUri = getCurrentUri();
 
-      let gridStyleEl = document.getElementById("sort-play-album-grid-style");
-      if (!gridStyleEl) {
-          gridStyleEl = document.createElement("style");
-          gridStyleEl.id = "sort-play-album-grid-style";
-          document.head.appendChild(gridStyleEl);
+        if (!showAlbumColumn || !currentUri || !URI.isAlbum(currentUri)) {
+            const existingHeader = tracklistContainer.querySelector('.sort-play-album-col-header');
+            if (existingHeader) {
+                const headerRow = existingHeader.parentElement;
+                const originalGridTemplate = "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
+                existingHeader.remove();
+                if(headerRow) headerRow.style.gridTemplateColumns = originalGridTemplate;
+                tracklistContainer.setAttribute('aria-colcount', '4');
+                const allRows = tracklistContainer.querySelectorAll('.main-trackList-trackList .main-trackList-trackListRow');
+                allRows.forEach(row => {
+                    const cell = row.querySelector('.sort-play-album-col');
+                    if (cell) cell.remove();
+                    row.style.gridTemplateColumns = originalGridTemplate;
+                });
+            }
+            return;
+        }
+
+        const headerRow = tracklistContainer.querySelector('.main-trackList-trackListHeaderRow');
+        if (!headerRow) return;
+
+        let expectedHeaderText;
+        switch (selectedAlbumColumnType) {
+            case 'playCount': expectedHeaderText = "Plays"; break;
+            case 'popularity': expectedHeaderText = "Popularity"; break;
+            case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
+            case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
+            case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+            case 'djInfo': expectedHeaderText = "DJ Info"; break;
+            case 'key': expectedHeaderText = "Key"; break;
+            case 'tempo': expectedHeaderText = "BPM"; break;
+            case 'energy': expectedHeaderText = "Energy"; break;
+            case 'danceability': expectedHeaderText = "Dance"; break;
+            case 'valence': expectedHeaderText = "Valence"; break;
+            default: expectedHeaderText = "Plays";
+        }
+
+        const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
+        const existingHeader = headerRow.querySelector('.sort-play-album-col-header');
+
+        if (!existingHeader) {
+            headerRow.style.setProperty('grid-template-columns', newGridTemplate, 'important');
+            tracklistContainer.setAttribute('aria-colcount', '5');
+            const newHeaderCell = document.createElement('div');
+            newHeaderCell.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
+            newHeaderCell.innerHTML = `<button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
+            newHeaderCell.setAttribute('role', 'columnheader');
+            newHeaderCell.firstChild.onclick = (e) => showColumnSelector(e, 'album');
+            newHeaderCell.setAttribute('aria-colindex', '4');
+            newHeaderCell.style.justifyContent = 'center';
+
+            const playsHeaderCell = headerRow.querySelector('[role="columnheader"][aria-colindex="3"]');
+            if (playsHeaderCell) {
+                playsHeaderCell.after(newHeaderCell);
+                const lastHeaderCell = headerRow.querySelector('.main-trackList-rowSectionEnd');
+                if (lastHeaderCell) lastHeaderCell.setAttribute('aria-colindex', '5');
+            }
+        } else {
+            const headerTextSpan = existingHeader.querySelector('span');
+            if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
+                headerTextSpan.innerText = expectedHeaderText;
+                const allCells = tracklistContainer.querySelectorAll('.sort-play-album-col .sort-play-data');
+                allCells.forEach(cell => {
+                    cell.textContent = "";
+                    delete cell.dataset.spProcessed;
+                });
+            }
+        }
+        
+        const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
+        trackRows.forEach(row => {
+            if (row.querySelector('.sort-play-album-col')) return;
+            row.style.setProperty('grid-template-columns', newGridTemplate, 'important');
+            const newCell = document.createElement('div');
+            newCell.className = 'main-trackList-rowSectionVariable sort-play-album-col';
+            newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
+            newCell.setAttribute('role', 'gridcell');
+            newCell.setAttribute('aria-colindex', '4');
+            newCell.style.display = 'flex';
+            newCell.style.alignItems = 'center';
+            newCell.style.justifyContent = 'center';
+
+            const playsCell = row.querySelector('[role="gridcell"][aria-colindex="3"]');
+            if (playsCell) {
+                playsCell.after(newCell);
+                const lastCell = row.querySelector('.main-trackList-rowSectionEnd');
+                if (lastCell) lastCell.setAttribute('aria-colindex', '5');
+            }
+        });
+
+        loadAdditionalColumnData(tracklistContainer);
+      } finally {
+        isUpdatingAlbumTracklist = false;
       }
-
-      if (!showAlbumColumn || !currentUri || !URI.isAlbum(currentUri)) {
-          tracklistContainer.removeAttribute('data-sp-grid');
-          const existingHeader = tracklistContainer.querySelector('.sort-play-album-col-header');
-          if (existingHeader) {
-              existingHeader.remove();
-              tracklistContainer.setAttribute('aria-colcount', '4');
-              gridStyleEl.innerHTML = "";
-          }
-          const allRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRowGrid');
-          allRows.forEach(row => {
-              const cell = row.querySelector('.sort-play-album-col');
-              if (cell) cell.remove();
-              const skelCell = row.querySelector('.sort-play-album-skeleton-col');
-              if (skelCell) skelCell.remove();
-          });
-          return;
-      }
-
-      tracklistContainer.querySelectorAll('.sort-play-column, .sort-play-second-column, .sort-play-artist-header-wrapper, .sort-play-artist-col').forEach(el => el.remove());
-
-      tracklistContainer.setAttribute('data-sp-grid', 'album');
-      const headerRow = tracklistContainer.querySelector('.main-trackList-trackListHeaderRow');
-      if (!headerRow) return;
-
-      let expectedHeaderText;
-      switch (selectedAlbumColumnType) {
-          case 'playCount': expectedHeaderText = "Plays"; break;
-          case 'popularity': expectedHeaderText = "Popularity"; break;
-          case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
-          case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
-          case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
-          case 'djInfo': expectedHeaderText = "DJ Info"; break;
-          case 'key': expectedHeaderText = "Key"; break;
-          case 'tempo': expectedHeaderText = "BPM"; break;
-          case 'energy': expectedHeaderText = "Energy"; break;
-          case 'danceability': expectedHeaderText = "Dance"; break;
-          case 'valence': expectedHeaderText = "Valence"; break;
-          default: expectedHeaderText = "Plays";
-      }
-
-      const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
-      const cssString = `
-          html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListHeaderRow,
-          html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRow,
-          html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRowGrid {
-              grid-template-columns: ${newGridTemplate} !important;
-          }
-      `;
-      if (gridStyleEl.innerHTML !== cssString) {
-          gridStyleEl.innerHTML = cssString;
-      }
-
-      const existingHeader = headerRow.querySelector('.sort-play-album-col-header');
-
-      if (!existingHeader) {
-          tracklistContainer.setAttribute('aria-colcount', '5');
-          const newHeaderCell = document.createElement('div');
-          newHeaderCell.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
-          newHeaderCell.innerHTML = `<button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
-          newHeaderCell.setAttribute('role', 'columnheader');
-          newHeaderCell.firstChild.onclick = (e) => showColumnSelector(e, 'album');
-          newHeaderCell.setAttribute('aria-colindex', '4');
-          newHeaderCell.style.justifyContent = 'center';
-
-          const playsHeaderCell = headerRow.querySelector('[role="columnheader"][aria-colindex="3"]');
-          if (playsHeaderCell) {
-              playsHeaderCell.after(newHeaderCell);
-              const lastHeaderCell = headerRow.querySelector('.main-trackList-rowSectionEnd');
-              if (lastHeaderCell) lastHeaderCell.setAttribute('aria-colindex', '5');
-          }
-      } else {
-          const headerTextSpan = existingHeader.querySelector('span');
-          if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
-              headerTextSpan.innerText = expectedHeaderText;
-              const allCells = tracklistContainer.querySelectorAll('.sort-play-album-col .sort-play-data');
-              allCells.forEach(cell => {
-                  cell.textContent = "";
-                  delete cell.dataset.spProcessed;
-              });
-          }
-      }
-      
-      const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
-      for (const skeleton of skeletonRows) {
-          const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
-          const existingExtra = skeleton.querySelector(".sort-play-album-skeleton-col");
-          if (showAlbumColumn) {
-              if (!existingExtra) {
-                  const skeletonCell = document.createElement("div");
-                  const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
-                  const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-                  skeletonCell.className = `${baseClass} sort-play-album-skeleton-col`;
-                  if (endCell) skeleton.insertBefore(skeletonCell, endCell);
-                  else skeleton.appendChild(skeletonCell);
-              }
-          } else if (existingExtra) {
-              existingExtra.remove();
-          }
-      }
-
-      const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
-      trackRows.forEach(row => {
-          if (row.querySelector('.sort-play-album-col')) return;
-          const newCell = document.createElement('div');
-          newCell.className = 'main-trackList-rowSectionVariable sort-play-album-col';
-          newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
-          newCell.setAttribute('role', 'gridcell');
-          newCell.setAttribute('aria-colindex', '4');
-          newCell.style.display = 'flex';
-          newCell.style.alignItems = 'center';
-          newCell.style.justifyContent = 'center';
-
-          const playsCell = row.querySelector('[role="gridcell"][aria-colindex="3"]');
-          if (playsCell) {
-              playsCell.after(newCell);
-              const lastCell = row.querySelector('.main-trackList-rowSectionEnd');
-              if (lastCell) lastCell.setAttribute('aria-colindex', '5');
-          }
-      });
-
-      loadAdditionalColumnData(tracklistContainer);
-    } finally {
-      isUpdatingAlbumTracklist = false;
-    }
+    });
   }
 
   function updateArtistTracklist() {
     if (isUpdatingArtistTracklist) return;
     isUpdatingArtistTracklist = true;
 
-    try {
-      const tracklistContainer = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks"]');
-      if (!tracklistContainer) return;
+    requestAnimationFrame(() => {
+      try {
+        const tracklistContainer = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks"]');
+        if (!tracklistContainer) return;
 
-      const currentUri = getCurrentUri();
+        const currentUri = getCurrentUri();
 
-      let gridStyleEl = document.getElementById("sort-play-artist-grid-style");
-      if (!gridStyleEl) {
-          gridStyleEl = document.createElement("style");
-          gridStyleEl.id = "sort-play-artist-grid-style";
-          document.head.appendChild(gridStyleEl);
+        if (!showArtistColumn || !currentUri || !URI.isArtist(currentUri)) {
+            const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
+            if (existingHeaderWrapper) {
+                const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
+                const originalGridTemplate = "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
+                existingHeaderWrapper.remove();
+                tracklistContainer.setAttribute('aria-colcount', '4');
+                trackRows.forEach(row => {
+                    const cell = row.querySelector('.sort-play-artist-col');
+                    if (cell) cell.remove();
+                    row.style.gridTemplateColumns = originalGridTemplate;
+                });
+            }
+            return;
+        }
+
+        let expectedHeaderText;
+        switch (selectedArtistColumnType) {
+            case 'playCount': expectedHeaderText = "Plays"; break;
+            case 'popularity': expectedHeaderText = "Popularity"; break;
+            case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
+            case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
+            case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+            case 'djInfo': expectedHeaderText = "DJ Info"; break;
+            case 'key': expectedHeaderText = "Key"; break;
+            case 'tempo': expectedHeaderText = "BPM"; break;
+            case 'energy': expectedHeaderText = "Energy"; break;
+            case 'danceability': expectedHeaderText = "Dance"; break;
+            case 'valence': expectedHeaderText = "Valence"; break;
+            default: expectedHeaderText = "Plays";
+        }
+        
+        const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
+        const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
+
+        if (!existingHeaderWrapper) {
+            tracklistContainer.setAttribute('aria-colcount', '5');
+            const headerWrapper = document.createElement('div');
+            headerWrapper.className = 'main-trackList-trackListHeader sort-play-artist-header-wrapper';
+            headerWrapper.innerHTML = `<div class="main-trackList-trackListHeaderRow main-trackList-trackListRowGrid" role="row" style="grid-template-columns: ${newGridTemplate};">
+                <div class="main-trackList-rowSectionIndex" role="columnheader" aria-colindex="1"><div>#</div></div>
+                <div class="main-trackList-rowSectionStart" role="columnheader" aria-colindex="2"><div class="main-trackList-column"><span class="encore-text-body-small">Title</span></div></div>
+                <div class="main-trackList-rowSectionVariable" role="columnheader" aria-colindex="3"><div><span class="encore-text-body-small">Plays</span></div></div>
+                <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="justify-content: center;"><button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button></div>
+                <div class="main-trackList-rowSectionEnd" role="columnheader" aria-colindex="5"><div aria-label="Duration" class="main-trackList-column main-trackList-durationHeader"><svg data-encore-id="icon" role="img" aria-hidden="true" viewBox="0 0 16 16" class="Svg-sc-ytk21e-0 Svg-img-icon-small"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg></div></div>
+            </div>`;
+            headerWrapper.style.cssText = 'position: sticky; top: 0px; z-index: 2;';
+            headerWrapper.querySelector('.sort-play-artist-col-header button').onclick = (e) => showColumnSelector(e, 'artist');
+            const rootlistWrapper = tracklistContainer.querySelector('.main-rootlist-wrapper');
+            if (rootlistWrapper) {
+                tracklistContainer.insertBefore(headerWrapper, rootlistWrapper);
+            } else {
+                tracklistContainer.prepend(headerWrapper);
+            }
+        } else {
+            const headerTextSpan = existingHeaderWrapper.querySelector('.sort-play-artist-col-header span');
+            if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
+                headerTextSpan.innerText = expectedHeaderText;
+                const allCells = tracklistContainer.querySelectorAll('.sort-play-artist-col .sort-play-data');
+                allCells.forEach(cell => {
+                    cell.textContent = "";
+                    delete cell.dataset.spProcessed;
+                });
+            }
+        }
+
+        const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
+        trackRows.forEach(row => {
+            if (row.querySelector('.sort-play-artist-col')) return;
+            row.style.setProperty('grid-template-columns', newGridTemplate, 'important');
+            const newCell = document.createElement('div');
+            newCell.className = 'main-trackList-rowSectionVariable sort-play-artist-col';
+            newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
+            newCell.setAttribute('role', 'gridcell');
+            newCell.setAttribute('aria-colindex', '4');
+            newCell.style.display = 'flex';
+            newCell.style.alignItems = 'center';
+            newCell.style.justifyContent = 'center';
+
+            const playsCell = row.querySelector('[role="gridcell"][aria-colindex="3"]');
+            if (playsCell) {
+                playsCell.after(newCell);
+                const endSection = row.querySelector('.main-trackList-rowSectionEnd');
+                if (endSection) endSection.setAttribute('aria-colindex', '5');
+            }
+        });
+
+        loadAdditionalColumnData(tracklistContainer);
+      } finally {
+        isUpdatingArtistTracklist = false;
       }
-
-      if (!showArtistColumn || !currentUri || !URI.isArtist(currentUri)) {
-          tracklistContainer.removeAttribute('data-sp-grid');
-          const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
-          if (existingHeaderWrapper) {
-              existingHeaderWrapper.remove();
-              tracklistContainer.setAttribute('aria-colcount', '4');
-              gridStyleEl.innerHTML = "";
-          }
-          const allRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRowGrid');
-          allRows.forEach(row => {
-              const cell = row.querySelector('.sort-play-artist-col');
-              if (cell) cell.remove();
-              const skelCell = row.querySelector('.sort-play-artist-skeleton-col');
-              if (skelCell) skelCell.remove();
-          });
-          return;
-      }
-
-      tracklistContainer.querySelectorAll('.sort-play-column, .sort-play-second-column, .sort-play-album-col-header, .sort-play-album-col').forEach(el => el.remove());
-
-      tracklistContainer.setAttribute('data-sp-grid', 'artist');
-
-      let expectedHeaderText;
-      switch (selectedArtistColumnType) {
-          case 'playCount': expectedHeaderText = "Plays"; break;
-          case 'popularity': expectedHeaderText = "Popularity"; break;
-          case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
-          case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
-          case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
-          case 'djInfo': expectedHeaderText = "DJ Info"; break;
-          case 'key': expectedHeaderText = "Key"; break;
-          case 'tempo': expectedHeaderText = "BPM"; break;
-          case 'energy': expectedHeaderText = "Energy"; break;
-          case 'danceability': expectedHeaderText = "Dance"; break;
-          case 'valence': expectedHeaderText = "Valence"; break;
-          default: expectedHeaderText = "Plays";
-      }
-      
-      const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
-      const cssString = `
-          html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListHeaderRow,
-          html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRow,
-          html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRowGrid {
-              grid-template-columns: ${newGridTemplate} !important;
-          }
-      `;
-      if (gridStyleEl.innerHTML !== cssString) {
-          gridStyleEl.innerHTML = cssString;
-      }
-
-      const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
-
-      if (!existingHeaderWrapper) {
-          tracklistContainer.setAttribute('aria-colcount', '5');
-          const headerWrapper = document.createElement('div');
-          headerWrapper.className = 'main-trackList-trackListHeader sort-play-artist-header-wrapper';
-          headerWrapper.innerHTML = `<div class="main-trackList-trackListHeaderRow main-trackList-trackListRowGrid" role="row">
-              <div class="main-trackList-rowSectionIndex" role="columnheader" aria-colindex="1"><div>#</div></div>
-              <div class="main-trackList-rowSectionStart" role="columnheader" aria-colindex="2"><div class="main-trackList-column"><span class="encore-text-body-small">Title</span></div></div>
-              <div class="main-trackList-rowSectionVariable" role="columnheader" aria-colindex="3"><div><span class="encore-text-body-small">Plays</span></div></div>
-              <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="justify-content: center;"><button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button></div>
-              <div class="main-trackList-rowSectionEnd" role="columnheader" aria-colindex="5"><div aria-label="Duration" class="main-trackList-column main-trackList-durationHeader"><svg data-encore-id="icon" role="img" aria-hidden="true" viewBox="0 0 16 16" class="Svg-sc-ytk21e-0 Svg-img-icon-small"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg></div></div>
-          </div>`;
-          headerWrapper.style.cssText = 'position: sticky; top: 0px; z-index: 2;';
-          headerWrapper.querySelector('.sort-play-artist-col-header button').onclick = (e) => showColumnSelector(e, 'artist');
-          const rootlistWrapper = tracklistContainer.querySelector('.main-rootlist-wrapper');
-          if (rootlistWrapper) {
-              tracklistContainer.insertBefore(headerWrapper, rootlistWrapper);
-          } else {
-              tracklistContainer.prepend(headerWrapper);
-          }
-      } else {
-          const headerTextSpan = existingHeaderWrapper.querySelector('.sort-play-artist-col-header span');
-          if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
-              headerTextSpan.innerText = expectedHeaderText;
-              const allCells = tracklistContainer.querySelectorAll('.sort-play-artist-col .sort-play-data');
-              allCells.forEach(cell => {
-                  cell.textContent = "";
-                  delete cell.dataset.spProcessed;
-              });
-          }
-      }
-      const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
-      for (const skeleton of skeletonRows) {
-          const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
-          const existingExtra = skeleton.querySelector(".sort-play-artist-skeleton-col");
-          if (showArtistColumn) {
-              if (!existingExtra) {
-                  const skeletonCell = document.createElement("div");
-                  const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
-                  const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-                  skeletonCell.className = `${baseClass} sort-play-artist-skeleton-col`;
-                  if (endCell) skeleton.insertBefore(skeletonCell, endCell);
-                  else skeleton.appendChild(skeletonCell);
-              }
-          } else if (existingExtra) {
-              existingExtra.remove();
-          }
-      }
-      
-      const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
-      trackRows.forEach(row => {
-          if (row.querySelector('.sort-play-artist-col')) return;
-          const newCell = document.createElement('div');
-          newCell.className = 'main-trackList-rowSectionVariable sort-play-artist-col';
-          newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
-          newCell.setAttribute('role', 'gridcell');
-          newCell.setAttribute('aria-colindex', '4');
-          newCell.style.display = 'flex';
-          newCell.style.alignItems = 'center';
-          newCell.style.justifyContent = 'center';
-
-          const playsCell = row.querySelector('[role="gridcell"][aria-colindex="3"]');
-          if (playsCell) {
-              playsCell.after(newCell);
-              const endSection = row.querySelector('.main-trackList-rowSectionEnd');
-              if (endSection) endSection.setAttribute('aria-colindex', '5');
-          }
-      });
-
-      loadAdditionalColumnData(tracklistContainer);
-    } finally {
-      isUpdatingArtistTracklist = false;
-    }
+    });
   }
   
   async function initializeTracklistObserver() {
@@ -33573,97 +33500,72 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     });
   }
     
-  function insertButton(retry = 0) {
+  function insertButton() {
     const currentUri = getCurrentUri(); 
     if (!currentUri) return;
   
-    let containerFound = false;
-
     if (URI.isPlaylistV1OrV2(currentUri)) {
       const playlistContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
-      if (playlistContainer) {
-        containerFound = true;
-        if (!playlistContainer.contains(mainButton)) {
-          mainButton.style.marginLeft = ""; 
-          mainButton.style.marginRight = "";
-          if (playlistContainer.firstChild) {
-            playlistContainer.insertBefore(mainButton, playlistContainer.firstChild);
-          } else {
-            playlistContainer.appendChild(mainButton);
-          }
+      if (playlistContainer && !playlistContainer.contains(mainButton)) {
+        mainButton.style.marginLeft = ""; 
+        mainButton.style.marginRight = "";
+        if (playlistContainer.firstChild) {
+          playlistContainer.insertBefore(mainButton, playlistContainer.firstChild);
+        } else {
+          playlistContainer.appendChild(mainButton);
         }
       }
     } else if (URI.isArtist(currentUri)) {
       const artistActionBar = document.querySelector(".main-actionBar-ActionBarRow");
-      if (artistActionBar) {
-        containerFound = true;
-        if (!artistActionBar.contains(mainButton)) {
-          mainButton.style.marginLeft = "auto"; 
-          mainButton.style.marginRight = "31px"; 
-          artistActionBar.appendChild(mainButton);
-        }
+      if (artistActionBar && !artistActionBar.contains(mainButton)) {
+        mainButton.style.marginLeft = "auto"; 
+        mainButton.style.marginRight = "31px"; 
+        artistActionBar.appendChild(mainButton);
       }
     } else if (isLikedSongsPage(currentUri)) {
       const likedSongsContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
-      if (likedSongsContainer) {
-        containerFound = true;
-        if (!likedSongsContainer.contains(mainButton)) {
-          mainButton.style.marginLeft = ""; 
-          mainButton.style.marginRight = "";
-          if (likedSongsContainer.firstChild) {
-            likedSongsContainer.insertBefore(mainButton, likedSongsContainer.firstChild);
-          } else {
-            likedSongsContainer.appendChild(mainButton);
-          }
+      if (likedSongsContainer && !likedSongsContainer.contains(mainButton)) {
+        mainButton.style.marginLeft = ""; 
+        mainButton.style.marginRight = "";
+        if (likedSongsContainer.firstChild) {
+          likedSongsContainer.insertBefore(mainButton, likedSongsContainer.firstChild);
+        } else {
+          likedSongsContainer.appendChild(mainButton);
         }
       }
-    } else if (isLocalFilesPage(currentUri)) {
-      const localFilesActionBar = document.querySelector(".main-actionBar-ActionBarRow");
-      if (localFilesActionBar) {
-          const controlsContainer = localFilesActionBar.querySelector("div:last-child");
-          if (controlsContainer) {
-              containerFound = true;
-              if (!controlsContainer.contains(mainButton)) {
-                  mainButton.style.marginLeft = ""; 
-                  mainButton.style.marginRight = "8px";
-                  if (controlsContainer.firstChild) {
-                      controlsContainer.insertBefore(mainButton, controlsContainer.firstChild);
-                  } else {
-                      controlsContainer.appendChild(mainButton);
-                  }
-              }
-          }
-      }
+      } else if (isLocalFilesPage(currentUri)) {
+        const localFilesActionBar = document.querySelector(".main-actionBar-ActionBarRow");
+        if (localFilesActionBar) {
+            const controlsContainer = localFilesActionBar.querySelector("div:last-child");
+            if (controlsContainer && !controlsContainer.contains(mainButton)) {
+                mainButton.style.marginLeft = ""; 
+                mainButton.style.marginRight = "8px";
+                if (controlsContainer.firstChild) {
+                    controlsContainer.insertBefore(mainButton, controlsContainer.firstChild);
+                } else {
+                    controlsContainer.appendChild(mainButton);
+                }
+            }
+        }
     } 
     else if (URI.isAlbum(currentUri)) {
         const listButton = document.querySelector(".x-sortBox-sortDropdown");
-        const albumActionBar = document.querySelector(".main-actionBar-ActionBarRow");
 
         if (listButton && listButton.parentElement) {
-            containerFound = true;
             const container = listButton.parentElement;
             if (!container.contains(mainButton)) {
                 mainButton.style.marginLeft = "";
                 mainButton.style.marginRight = "1px";
                 container.insertBefore(mainButton, listButton);
             }
-        } else if (albumActionBar) {
-            containerFound = true;
-            if (!albumActionBar.contains(mainButton)) {
+        } else {
+            const albumActionBar = document.querySelector(".main-actionBar-ActionBarRow");
+            if (albumActionBar && !albumActionBar.contains(mainButton)) {
                 mainButton.style.marginLeft = "auto"; 
                 mainButton.style.marginRight = "31px"; 
                 albumActionBar.appendChild(mainButton);
             }
         }
-    }
-
-    if (containerFound) {
-        applyCurrentThemeColors();
-        setTimeout(applyCurrentThemeColors, 300);
-    }
-
-    if (!containerFound && retry < 10) {
-        setTimeout(() => insertButton(retry + 1), 200);
     }
   }
 
@@ -34474,21 +34376,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         mountLikeButton();
         mountLikeButtonNowPlayingView();
     
-        let isLikeButtonGlobalCheckQueued = false;
         likeButton_tracklistObserver = new MutationObserver((mutations) => {
-            if (!isLikeButtonGlobalCheckQueued) {
-                isLikeButtonGlobalCheckQueued = true;
-                requestAnimationFrame(() => {
-                    isLikeButtonGlobalCheckQueued = false;
-                    if (document.querySelector(".main-nowPlayingWidget-nowPlaying") && !document.querySelector(".likeControl-wrapper")) {
-                        mountLikeButton();
-                    }
-                    
-                    const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
-                    if (nowPlayingView) {
-                        mountLikeButtonNowPlayingView();
-                    }
-                });
+            if (document.querySelector(".main-nowPlayingWidget-nowPlaying") && !document.querySelector(".likeControl-wrapper")) {
+                mountLikeButton();
+            }
+            
+            const nowPlayingView = document.querySelector(".main-nowPlayingView-contextItemInfo");
+            if (nowPlayingView) {
+                mountLikeButtonNowPlayingView();
             }
     
             for (const mutation of mutations) {
@@ -34516,11 +34411,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       };
   }
 
-  let lastObservedUri = null;
-  let lastObservedPath = null;
-  let lastObservedMainView = null;
-
   function onPageChange() {
+    if (tracklistObserver) tracklistObserver.disconnect();
+    if (albumTracklistObserver) albumTracklistObserver.disconnect();
+    if (artistTracklistObserver) artistTracklistObserver.disconnect();
+    
     insertButton();
     updateArtistPageGenres(); 
     const currentUri = getCurrentUri();
@@ -34533,80 +34428,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     likeButton_connectObserver();
 
-    const mainView = document.querySelector("main");
-
-    if (currentUri !== lastObservedUri || path !== lastObservedPath || mainView !== lastObservedMainView) {
-        lastObservedUri = currentUri;
-        lastObservedPath = path;
-        lastObservedMainView = mainView;
-
-        if (tracklistObserver) tracklistObserver.disconnect();
-        if (albumTracklistObserver) albumTracklistObserver.disconnect();
-        if (artistTracklistObserver) artistTracklistObserver.disconnect();
-        
-        if (currentUri) {
-            if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
-                initializeTracklistObserver();
-            } else if (URI.isAlbum(currentUri)) {
-                initializeAlbumTracklistObserver();
-            } else if (URI.isArtist(currentUri)) {
-                initializeArtistTracklistObserver();
-            }
-        }
-        
-        if (isSearchPage) {
+    if (currentUri) {
+        if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
             initializeTracklistObserver();
+        } else if (URI.isAlbum(currentUri)) {
+            initializeAlbumTracklistObserver();
+        } else if (URI.isArtist(currentUri)) {
+            initializeArtistTracklistObserver();
         }
-    } else {
-        if (currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isSearchPage)) {
-             updateTracklist();
-        } else if (currentUri && URI.isAlbum(currentUri)) {
-             updateAlbumTracklist();
-        } else if (currentUri && URI.isArtist(currentUri)) {
-             updateArtistTracklist();
-        }
+    }
+    
+    if (isSearchPage) {
+        initializeTracklistObserver();
     }
   }
 
-  const mainPageObserver = new MutationObserver((mutations) => {
-      let shouldTrigger = false;
-      for (const mutation of mutations) {
-          for (const node of mutation.addedNodes) {
-              if (node.nodeType === 1) {
-                  if (node.tagName === 'MAIN' || node.tagName === 'SECTION') {
-                      shouldTrigger = true;
-                      break;
-                  }
-                  
-                  if (typeof node.className === 'string') {
-                      if (
-                          node.className.includes('main-view-container') ||
-                          node.className.includes('main-trackList-indexable') ||
-                          node.className.includes('main-trackList-trackList') ||
-                          node.className.includes('main-actionBar-ActionBarRow') ||
-                          node.className.includes('playlist-playlist-searchBoxContainer') ||
-                          node.className.includes('x-sortBox-sortDropdown')
-                      ) {
-                          shouldTrigger = true;
-                          break;
-                      }
-                  }
-                  
-                  if (node.querySelector) {
-                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .x-sortBox-sortDropdown')) {
-                          shouldTrigger = true;
-                          break;
-                      }
-                  }
-              }
-          }
-          if (shouldTrigger) break;
-      }
-
-      if (shouldTrigger) {
-          onPageChange();
-      }
-  });
+  const mainPageObserver = new MutationObserver(onPageChange);
 
   mainPageObserver.observe(document.body, {
     childList: true,
@@ -34626,16 +34463,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     attributeFilter: ['class'],
   });
 
-  let startupColorRetries = 0;
   const startupInterval = setInterval(() => {
     if (Spicetify.Player?.data) {
+      clearInterval(startupInterval);
       applyCurrentThemeColors();
-      startupColorRetries++;
-      if (startupColorRetries > 10) {
-        clearInterval(startupInterval);
-      }
     }
-  }, 300);
+  }, 100);
 
   await idb.init();
   await idb.clear('personalScrobbles');
