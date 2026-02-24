@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.57.0";
+  const SORT_PLAY_VERSION = "5.58.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -694,45 +694,61 @@
       };
   }
 
-  const L_F_M_Key_Pool = [
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***"
-  ];
+  let L_F_M_Key_Pool = [];
+
+  async function fetchLastFmKeys() {
+    try {
+      const res = await fetch("https://lfm-token-proxy.niko2nio2.workers.dev/", {
+        headers: { "X-Sort-Play-Access": "sp-token-request-v1" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        L_F_M_Key_Pool = data.keys || [];
+      }
+    } catch (e) {
+      console.error("[Sort-Play] Failed to fetch Last.fm keys", e);
+    }
+  }
 
   function getNextLfmKey() {
+    if (L_F_M_Key_Pool.length === 0) return null;
     let validKeys = L_F_M_Key_Pool.filter(key => !revokedLfmKeys.has(key));
     if (validKeys.length === 0) {
       console.warn("[Sort-Play] All Last.fm keys revoked. Resetting pool to recover from potential transient errors.");
       revokedLfmKeys.clear();
       validKeys = L_F_M_Key_Pool;
     }
+    if (validKeys.length === 0) return null;
     const keyIndex = lfmKeyIndex % validKeys.length;
     const key = validKeys[keyIndex];
     lfmKeyIndex++;
     return key;
   }
 
-  const Ge_mini_Key_Pool = [
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***",
-    "***REMOVED***"
-  ];
+  let Ge_mini_Key_Pool = [];
+
+  async function fetchGeminiKeys() {
+    try {
+      const res = await fetch("https://gm-token-proxy.niko2nio2.workers.dev/", {
+        headers: { "X-Sort-Play-Access": "sp-token-request-v1" }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        Ge_mini_Key_Pool = data.keys || [];
+      }
+    } catch (e) {
+      console.error("[Sort-Play] Failed to fetch Gemini keys", e);
+    }
+  }
   
   function Ge_mini_Key() {
+    if (Ge_mini_Key_Pool.length === 0) return null;
     const randomIndex = Math.floor(Math.random() * Ge_mini_Key_Pool.length);
     return Ge_mini_Key_Pool[randomIndex];
   }
   
   async function fetchLfmWithGateway(params) {
+    if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
     while (true) {
         const apiKey = getNextLfmKey();
         if (!apiKey) {
@@ -1809,6 +1825,7 @@
   const arrowRightIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.2328 16.4569C12.9328 16.7426 12.9212 17.2173 13.2069 17.5172C13.4926 17.8172 13.9673 17.8288 14.2672 17.5431L13.2328 16.4569ZM19.5172 12.5431C19.8172 12.2574 19.8288 11.7827 19.5431 11.4828C19.2574 11.1828 18.7827 11.1712 18.4828 11.4569L19.5172 12.5431ZM18.4828 12.5431C18.7827 12.8288 19.2574 12.8172 19.5431 12.5172C19.8288 12.2173 19.8172 11.7426 19.5172 11.4569L18.4828 12.5431ZM14.2672 6.4569C13.9673 6.17123 13.4926 6.18281 13.2069 6.48276C12.9212 6.78271 12.9328 7.25744 13.2328 7.5431L14.2672 6.4569ZM19 12.75C19.4142 12.75 19.75 12.4142 19.75 12C19.75 11.5858 19.4142 11.25 19 11.25V12.75ZM5 11.25C4.58579 11.25 4.25 11.5858 4.25 12C4.25 12.4142 4.58579 12.75 5 12.75V11.25ZM14.2672 17.5431L19.5172 12.5431L18.4828 11.4569L13.2328 16.4569L14.2672 17.5431ZM19.5172 11.4569L14.2672 6.4569L13.2328 7.5431L18.4828 12.5431L19.5172 11.4569ZM19 11.25L5 11.25V12.75L19 12.75V11.25Z" fill="currentColor"/></svg>`;
 
   function showSettingsModal() {
+    const abortController = new AbortController();
     const overlay = document.createElement("div");
     overlay.id = "sort-play-settings-overlay";
     overlay.style.cssText = `
@@ -1837,6 +1854,7 @@
     `;
 
     const closeModal = () => {
+        abortController.abort();
         overlay.style.opacity = "0";
         setTimeout(() => overlay.remove(), 200);
     };
@@ -2757,7 +2775,7 @@
         modalContainerElement.style.zIndex = "2000";
     }
     
-    preventDragCloseModal();
+    preventDragCloseModal(abortController.signal);
 
     modalContainer.querySelector("#closeSettingsModal").addEventListener("click", closeModal);
 
@@ -3439,7 +3457,7 @@
 
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
-    });
+    }, { signal: abortController.signal });
   }
 
   function showGenreTagsSettingsModal() {
@@ -3778,6 +3796,7 @@
   }
 
   function showNowPlayingSettingsModal(fromSettings = false) {
+    const abortController = new AbortController();
     let localConfig = JSON.parse(JSON.stringify(nowPlayingConfig));
     if (!localConfig.title) localConfig.title = { enabled: false, items: [] };
     if (!localConfig.artist) localConfig.artist = { enabled: false, items: [] };
@@ -3923,6 +3942,7 @@
     };
 
     const onClose = () => {
+        abortController.abort();
         performUpdate(true);
         overlay.style.opacity = "0";
         setTimeout(() => overlay.remove(), 200);
@@ -4246,7 +4266,7 @@
                         document.removeEventListener('click', closeDropdown);
                     }
                 };
-                document.addEventListener('click', closeDropdown);
+                document.addEventListener('click', closeDropdown, { signal: abortController.signal });
             });
         });
 
@@ -7133,7 +7153,7 @@
     }
   }
 
-  function preventDragCloseModal() {
+  function preventDragCloseModal(signal) {
     let mouseDownInsideModal = false;
     let dragStarted = false;
     
@@ -7148,13 +7168,13 @@
       } else {
         mouseDownInsideModal = false;
       }
-    }, true);
+    }, { capture: true, signal });
     
     document.addEventListener('mousemove', (e) => {
       if (mouseDownInsideModal) {
         dragStarted = true;
       }
-    }, true);
+    }, { capture: true, signal });
     
     modalOverlay.addEventListener('mouseup', (e) => {
       if (mouseDownInsideModal || dragStarted) {
@@ -7163,7 +7183,7 @@
         setTimeout(() => { dragStarted = false; }, 10);
         return false;
       }
-    }, true);
+    }, { capture: true, signal });
     
     modalOverlay.addEventListener('click', (e) => {
       if (e.target === modalOverlay && (mouseDownInsideModal || dragStarted)) {
@@ -7174,20 +7194,20 @@
       if (e.target === modalOverlay && !mouseDownInsideModal && !dragStarted) {
         Spicetify.PopupModal.hide();
       }
-    }, true);
+    }, { capture: true, signal });
     
     document.addEventListener('mouseup', (e) => {
       setTimeout(() => {
         mouseDownInsideModal = false;
         setTimeout(() => { dragStarted = false; }, 10);
       }, 0);
-    }, true);
+    }, { capture: true, signal });
     
     const closeButton = document.querySelector('.main-trackCreditsModal-closeBtn');
     if (closeButton) {
       closeButton.addEventListener('click', (e) => {
         Spicetify.PopupModal.hide();
-      });
+      }, { signal });
     }
   }
 
@@ -7311,6 +7331,7 @@
   }
 
   async function showAiPickModal(tracks, currentUri) {
+    const abortController = new AbortController();
     const modalContainer = document.createElement("div");
     modalContainer.className = "ai-pick-modal";
     modalContainer.innerHTML = `
@@ -7800,8 +7821,15 @@
       modalContainerElement.style.zIndex = "2000";
     }
 
-    preventDragCloseModal();
+    preventDragCloseModal(abortController.signal);
 
+    const modalObserver = new MutationObserver((mutations, obs) => {
+      if (!document.querySelector('.GenericModal')) {
+        abortController.abort();
+        obs.disconnect();
+      }
+    });
+    modalObserver.observe(document.body, { childList: true, subtree: true });
 
     const songStatsToggle = modalContainer.querySelector("#includeSongStats input");
     const lyricsToggle = modalContainer.querySelector("#includeLyrics input");
@@ -7911,6 +7939,7 @@ sendButton.addEventListener("click", async () => {
             throw new Error('No tracks found to analyze after conversion');
         }
 
+        if (Ge_mini_Key_Pool.length === 0) await fetchGeminiKeys();
         const userApiKey = localStorage.getItem("sort-play-gemini-api-key") || Ge_mini_Key();
   
         selectedAiModel = modelSelect.value; 
@@ -8403,6 +8432,7 @@ sendButton.addEventListener("click", async () => {
 
             if (error.toString().includes('429')) {
                 console.log('[Sort-Play AI] Quota exceeded. Rotating to a new API key...');
+                if (Ge_mini_Key_Pool.length === 0) await fetchGeminiKeys();
                 let newKey;
                 if (usedKeys.size < Ge_mini_Key_Pool.length) {
                     do { newKey = Ge_mini_Key(); } while (usedKeys.has(newKey));
@@ -9228,7 +9258,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         tagsContainer.scrollTop = tagsContainer.scrollHeight;
     }
 
-    function setupKeywordInput(container, keywordSet, onUpdateCallback = () => {}) {
+    function setupKeywordInput(container, keywordSet, onUpdateCallback = () => {}, signal) {
       if(!container) return;
       const input = container.querySelector(".keyword-input");
       const clearButton = container.querySelector(".keyword-remove-all-button");
@@ -9540,7 +9570,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
             };
             setTimeout(() => {
-                document.addEventListener('click', removeDropdown);
+                document.addEventListener('click', removeDropdown, { signal });
             }, 0);
         });
       }
@@ -9567,6 +9597,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
   async function showCustomFilterModal(tracks, currentUri) {
+    const abortController = new AbortController();
     const modalContainer = document.createElement("div");
     modalContainer.className = "custom-filter-modal";
     const originalTracks = [...tracks];
@@ -10223,7 +10254,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         updatePlaylistStats();
     }
 
-    function setupDualRangesliderx(sliderxContainerId, minInputId, maxInputId) {
+    function setupDualRangesliderx(sliderxContainerId, minInputId, maxInputId, signal) {
         const sliderxContainer = modalContainer.querySelector(`#${sliderxContainerId}`);
         const sliderx1 = sliderxContainer.querySelector(`#${sliderxContainerId}-1`);
         const sliderx2 = sliderxContainer.querySelector(`#${sliderxContainerId}-2`);
@@ -10335,11 +10366,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             isDragging = true;
             handleTrackClick(e);
         });
-        document.addEventListener("mousemove", handleTrackMove);
+        document.addEventListener("mousemove", handleTrackMove, { signal });
 
         document.addEventListener("mouseup", () => {
             isDragging = false;
-        });
+        }, { signal });
 
         updateInputs();
         fillColor();
@@ -11818,7 +11849,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     tableBody = modalContainer.querySelector(".tracklist-table tbody");
     let activeRow = null;
-    setupTableEventListeners(tableBody, originalTracks);
+    setupTableEventListeners(tableBody, originalTracks, abortController.signal);
 
     settingsLeftWrapper = modalContainer.querySelector('.settings-left-wrapper');
     keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
@@ -11882,8 +11913,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     titleAlbumKeywords.forEach(keyword => createKeywordTag(keyword, titleAlbumContainer, titleAlbumKeywords, updateTrackFilters));
     artistKeywords.forEach(keyword => createKeywordTag(keyword, artistContainer, artistKeywords, updateTrackFilters));
 
-    setupKeywordInput(titleAlbumContainer, titleAlbumKeywords, updateTrackFilters);
-    setupKeywordInput(artistContainer, artistKeywords, updateTrackFilters);
+    setupKeywordInput(titleAlbumContainer, titleAlbumKeywords, updateTrackFilters, abortController.signal);
+    setupKeywordInput(artistContainer, artistKeywords, updateTrackFilters, abortController.signal);
 
     tableBody.addEventListener("click", (event) => {
         const row = event.target.closest("tr");
@@ -12016,7 +12047,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     document.addEventListener("mouseup", () => {
         isRemoveDragging = false;
         lastRemovedState = null;
-    });
+    }, { signal: abortController.signal });
 
     tableBody.addEventListener("click", (event) => {
         if (event.target.tagName === "svg" || event.target.tagName === "path") {
@@ -12136,7 +12167,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     document.addEventListener('mouseup', () => {
         isDragging = false;
-    });
+    }, { signal: abortController.signal });
 
     function updateProgress() {
         if (!isDragging) {
@@ -12169,8 +12200,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             closeButton.removeEventListener("click", cleanup);
         }
 
-
-        document.removeEventListener("mousemove", handleTrackMove);
+        abortController.abort();
         activeRow = null;
 
         Spicetify.PopupModal.hide();
@@ -12197,7 +12227,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             subtree: true
         });
     }
-    setupDualRangesliderx("rangesliderx", "rangeMin", "rangeMax");
+    setupDualRangesliderx("rangesliderx", "rangeMin", "rangeMax", abortController.signal);
     updateRangeUI(activeRangeFilter);
 
     rangeFilterTypeSelect.addEventListener("change", (e) => {
@@ -12261,7 +12291,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         selectedSortType = sortTypeSelect.value;
     });
 
-    function setupTableEventListeners(tableBody, originalTracks) {
+    function setupTableEventListeners(tableBody, originalTracks, signal) {
       if (!tableBody) return;
 
       let isRemoveDragging = false;
@@ -12314,7 +12344,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           isRemoveDragging = false;
           lastRemovedState = null;
           updatePlaylistStats();
-      });
+      }, { signal });
 
       tableBody.addEventListener("click", async (event) => {
         const row = event.target.closest("tr");
@@ -14061,6 +14091,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function showDynamicGenreFilterModal(sources, currentFilters, onScanComplete = null) {
+    if (!genrePlaylistsCache) {
+        genrePlaylistsCache = await getGenreMapping();
+    }
     return new Promise((resolve) => {
         const overlay = document.createElement("div");
         overlay.id = "dynamic-genre-filter-overlay";
@@ -14290,6 +14323,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             isMapped = mainGenres.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
                             if (!isMapped) {
                                 isMapped = countryKeys.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
+                            }
+                            if (!isMapped && genrePlaylistsCache) {
+                                const normalizedTag = normalizeGenre(genreName);
+                                isMapped = genrePlaylistsCache.some(p => normalizeGenre(p.genre) === normalizedTag);
                             }
                         }
 
@@ -14600,6 +14637,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
   async function showDynamicFilterModal(currentFilters) {
     return new Promise((resolve) => {
+        const abortController = new AbortController();
         const lastFmUsername = loadLastFmUsername();
         const isExcludeListenedDisabled = !lastFmUsername;
         let titleAlbumKeywords = new Set();
@@ -14835,6 +14873,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         overlay.appendChild(modalContainer);
 
         const closeModal = (data) => {
+            abortController.abort();
             overlay.remove();
             resolve(data);
         };
@@ -14890,8 +14929,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         titleAlbumKeywords.forEach(keyword => createKeywordTag(keyword, titleAlbumContainer, titleAlbumKeywords));
         artistKeywords.forEach(keyword => createKeywordTag(keyword, artistContainer, artistKeywords));
 
-        setupKeywordInput(titleAlbumContainer, titleAlbumKeywords);
-        setupKeywordInput(artistContainer, artistKeywords);
+        setupKeywordInput(titleAlbumContainer, titleAlbumKeywords, () => {}, abortController.signal);
+        setupKeywordInput(artistContainer, artistKeywords, () => {}, abortController.signal);
 
         keywordFilterToggle.addEventListener('change', (e) => keywordFilterWrapper.classList.toggle('disabled', !e.target.checked));
         filterModeRadios.forEach(radio => radio.addEventListener("change", (e) => keepMatchingMode = e.target.value === "keep"));
@@ -16837,6 +16876,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   const mainGenres = Object.keys(GENRE_MAPPINGS);
 
   async function showGenreFilterModal(tracks, initialTrackGenreMap, rawGenreData, sourceUri) {
+    const abortController = new AbortController();
+    if (!genrePlaylistsCache) {
+        genrePlaylistsCache = await getGenreMapping();
+    }
     let trackGenreMap = initialTrackGenreMap;
     let allGenres = new Set();
     let genreCounts = new Map();
@@ -16913,6 +16956,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     `;
 
     const closeModal = () => {
+        abortController.abort();
         overlay.style.opacity = "0";
         setTimeout(() => overlay.remove(), 200);
     };
@@ -17475,7 +17519,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     overlay.appendChild(modalContainer);
 
     modalContainer.querySelector('#closeGenreModalBtn').addEventListener('click', closeModal);
-    preventDragCloseModal();
+    preventDragCloseModal(abortController.signal);
 
     const matchAllGenresToggle = modalContainer.querySelector("#matchAllGenresToggle");
     const groupGenresToggle = modalContainer.querySelector("#groupGenresToggle");
@@ -17706,6 +17750,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         if (!isMapped) {
                              const countryKeys = Object.keys(COUNTRY_MAPPINGS);
                              isMapped = countryKeys.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
+                        }
+                        if (!isMapped && genrePlaylistsCache) {
+                            const normalizedTag = normalizeGenre(genreName);
+                            isMapped = genrePlaylistsCache.some(p => normalizeGenre(p.genre) === normalizedTag);
                         }
                     }
 
@@ -18238,7 +18286,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     concurrencyLimit: 20,
     batchDelay: 200,
     lastfm: {
-      apiKey: '***REMOVED***',
       baseUrl: 'https://ws.audioscrobbler.com/2.0/',
       retryAttempts: 3,
       retryDelay: 1000,
@@ -21880,6 +21927,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   function showDefaultApiKeyWarning() {
+    const abortController = new AbortController();
     const modalContainer = document.createElement("div");
     modalContainer.innerHTML = `
       <style>
@@ -21934,6 +21982,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       isLarge: true,
     });
     tagActiveModalWithFontScope();
+
+    preventDragCloseModal(abortController.signal);
+
+    const modalObserver = new MutationObserver((mutations, obs) => {
+      if (!document.querySelector('.GenericModal')) {
+        abortController.abort();
+        obs.disconnect();
+      }
+    });
+    modalObserver.observe(document.body, { childList: true, subtree: true });
   
     const continueButton = document.getElementById("continueAnyway");
     const addApiKeyButton = document.getElementById("addApiKey");
@@ -22300,6 +22358,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 sortType: "aiPick",
                 onClick: async function (event) {
                   event.stopPropagation();
+                  if (Ge_mini_Key_Pool.length === 0) await fetchGeminiKeys();
                   const userApiKey = localStorage.getItem("sort-play-gemini-api-key");
                   if (!userApiKey || Ge_mini_Key_Pool.includes(userApiKey)) {  
                     showDefaultApiKeyWarning();
@@ -22793,6 +22852,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         button.style.opacity = "1";
         button.style.transform = "translateY(0)";
       });
+
+      if (window.mainMenuAbortController) window.mainMenuAbortController.abort();
+      window.mainMenuAbortController = new AbortController();
+      const signal = window.mainMenuAbortController.signal;
+
+      document.addEventListener("click", (event) => {
+        if (isMenuOpen && !mainButton.contains(event.target) && !menuContainer.contains(event.target)) {
+          closeAllMenus(); 
+        }
+      }, { signal });
+
+      window.addEventListener('resize', closeAllMenus, { signal });
+      window.addEventListener('scroll', closeAllMenus, { signal, capture: true });
+
     } else {
       closeAllMenus();
     }
@@ -22813,6 +22886,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     isButtonClicked = false;
     mainButton.style.filter = "brightness(1)";
+
+    if (window.mainMenuAbortController) {
+      window.mainMenuAbortController.abort();
+      window.mainMenuAbortController = null;
+    }
   }
   
   function hideAllSubMenus() {
@@ -23060,10 +23138,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     subMenu.style.top = `${finalTop}px`;
     subMenu.style.visibility = 'visible';
   }
-  
-  window.addEventListener('resize', closeAllMenus);
-
-  window.addEventListener('scroll', closeAllMenus);
 
   let setButtonProcessing = (processing) => {
     isProcessing = processing;
@@ -23109,12 +23183,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       toggleMenu();
     } else {
       closeAllMenus();
-    }
-  });
-  
-  document.addEventListener("click", (event) => {
-    if (isMenuOpen && !mainButton.contains(event.target) && !menuContainer.contains(event.target)) {
-      closeAllMenus(); 
     }
   });
 
@@ -29828,7 +29896,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .summary-value { font-size: 24px; font-weight: bold; color: #f15e6c; }
         .summary-label { font-size: 12px; color: #b3b3b3; text-transform: uppercase; margin-top: 4px; font-weight: 700; letter-spacing: 0.5px; }
         .column-title { color: white; font-size: 14px; font-weight: 500; }
-        .conversion-list-container { max-height: 450px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+        .conversion-list-container { max-height: 416px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
         .conversion-list-container::-webkit-scrollbar { width: 8px; }
         .conversion-list-container::-webkit-scrollbar-track { background: #282828; }
         .conversion-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
@@ -30726,6 +30794,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (missingTracks.length > 0) {
         const fetchFunction = isPersonal ? getTrackDetailsWithPersonalScrobbles : getTrackDetailsWithScrobbles;
         
+        if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
         const safeConcurrencyPerKey = 5;
         const validKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
         const totalConcurrency = Math.min(50, Math.max(5, validKeys * safeConcurrencyPerKey));
@@ -32143,6 +32212,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   function showColumnSelector(event, contextType) {
     event.stopPropagation();
+    const abortController = new AbortController();
     const existing = document.getElementById('sort-play-column-selector');
     if (existing) existing.remove();
 
@@ -32255,10 +32325,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const closeMenu = (e) => {
         if (!menu.contains(e.target) && e.target !== event.currentTarget) {
             menu.remove();
-            document.removeEventListener('click', closeMenu);
+            abortController.abort();
         }
     };
-    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    
+    const menuObserver = new MutationObserver((mutations, obs) => {
+        if (!document.getElementById('sort-play-column-selector')) {
+            abortController.abort();
+            obs.disconnect();
+        }
+    });
+    menuObserver.observe(document.body, { childList: true });
+
+    setTimeout(() => document.addEventListener('click', closeMenu, { signal: abortController.signal }), 0);
   }
   
   async function loadAdditionalColumnData(tracklist_) {
@@ -34363,6 +34442,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   loadSettings();
   fetchUserMarket();
   cleanupLegacyCache();
+  fetchLastFmKeys();
+  fetchGeminiKeys();
 
   if (showLikeButton) {
     initializeLikeButtonFeature();
