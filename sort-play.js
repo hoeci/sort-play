@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.63.0";
+  const SORT_PLAY_VERSION = "5.64.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -204,6 +204,7 @@
   const CACHE_EXPIRE_GENRES = 7 * 24 * 60 * 60 * 1000;
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
+  const LFM_SHOUTBOX_GATEWAY_URL = "https://gateway3.niko2nio2.workers.dev/";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
   const DEEZER_GATEWAY_URL = "https://deezer-proxy.hunqo.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_2 = "https://deezer-proxy-2.hoeci.workers.dev/?url=";
@@ -32259,11 +32260,107 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       return results;
   }
 
+  async function fetchLastFmShoutbox(artistRaw, trackRaw, targetPage = 1) {
+      const params = new URLSearchParams({
+          artist: artistRaw,
+          track: trackRaw,
+          page: targetPage
+      });
+
+      try {
+          const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${params.toString()}`);
+          
+          if (!response.ok) {
+              return { page: targetPage, hasNextPage: false, comments: [] };
+          }
+
+          const html = await response.text();
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const rootList = doc.querySelector('.shoutbox > ul.shout-list, .shouts-container > ul.shout-list, ul.shout-list');
+
+          if (!rootList) {
+              return { page: targetPage, hasNextPage: false, comments: [] };
+          }
+
+          function parseCommentNode(li) {
+              if (!li || li.className.includes('ad') || li.className.includes('sponsor')) return null;
+
+              const container = li.querySelector(':scope > .shout-container') || li;
+
+              const usernameEl = container.querySelector('.shout-user a, [class*="user"] a');
+              if (!usernameEl) return null;
+
+              const username = usernameEl.textContent.trim();
+              const avatar = container.querySelector('.shout-user-avatar img')?.getAttribute('src') || null;
+              const body = container.querySelector('.shout-body')?.textContent.trim() || '';
+              
+              const timeEl = container.querySelector('.shout-timestamp time');
+              const dateIso = timeEl?.getAttribute('datetime') || null;
+              const dateText = timeEl?.textContent.trim() || null;
+
+              let likes = 0;
+              const voteBtn = container.querySelector('.vote-button-wrapper.initially-visible .vote-button');
+              
+              if (voteBtn) {
+                  const clone = voteBtn.cloneNode(true);
+                  const srOnly = clone.querySelector('.sr-only');
+                  if (srOnly) srOnly.remove();
+                  
+                  const digits = clone.textContent.replace(/[^\d]/g, '');
+                  if (digits) {
+                      likes = parseInt(digits, 10);
+                  }
+              }
+
+              const replies = [];
+              const repliesList = li.querySelector(':scope > ul.shout-list, :scope > .shout-list');
+              
+              if (repliesList) {
+                  const replyItems = repliesList.querySelectorAll(':scope > li.shout-list-item');
+                  replyItems.forEach(replyLi => {
+                      const parsedReply = parseCommentNode(replyLi);
+                      if (parsedReply) replies.push(parsedReply);
+                  });
+              }
+
+              return {
+                  username,
+                  avatar,
+                  dateIso,
+                  dateText,
+                  body,
+                  likes,
+                  replies
+              };
+          }
+
+          const commentsData = [];
+          const topLevelItems = rootList.querySelectorAll(':scope > li.shout-list-item');
+
+          topLevelItems.forEach(li => {
+              const parsed = parseCommentNode(li);
+              if (parsed) commentsData.push(parsed);
+          });
+
+          const hasNextPage = !!doc.querySelector('.pagination-next, [data-pagination-next-link], [rel="next"]');
+
+          return {
+              page: targetPage,
+              hasNextPage,
+              comments: commentsData
+          };
+
+      } catch (error) {
+          return { page: targetPage, hasNextPage: false, comments: [] };
+      }
+  }
+  
   function showLastFmTrackDetailsModal(trackInfo) {
       const existing = document.getElementById("sort-play-lfm-details-overlay");
       if (existing) existing.remove();
 
       const username = loadLastFmUsername();
+      const isCommentsCollapsedInitial = localStorage.getItem('sort-play-lfm-comments-collapsed') === 'true';
       
       const overlay = document.createElement("div");
       overlay.id = "sort-play-lfm-details-overlay";
@@ -32276,21 +32373,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
       const modalContainer = document.createElement("div");
       modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+      
       modalContainer.style.cssText = `
           z-index: 2003;
-          width: 640px !important;
+          width: ${isCommentsCollapsedInitial ? '640px' : '1040px'} !important;
           background-color: #181818 !important;
           border: 1px solid #282828 !important;
           border-radius: 30px !important;
           box-shadow: 0 10px 60px rgba(0,0,0,0.8) !important;
-          overflow: hidden;
           display: flex;
           flex-direction: column;
           position: relative;
+          overflow: hidden;
+          height: 700px;
+          transition: width 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+          will-change: width;
       `;
 
       modalContainer.innerHTML = `
-          <div style="height: 350px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 15px;">
+          <div style="height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 15px;">
               <div class="loader"></div>
               <span style="color: #b3b3b3 !important; font-size: 14px; font-weight: 500;">Fetching Last.fm Data...</span>
           </div>
@@ -32327,8 +32428,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           const aData = data.artist;
 
           if (!tData) {
+              modalContainer.style.width = '640px';
               modalContainer.innerHTML = `
-                  <div style="padding: 50px; text-align: center; color: #fff !important;">
+                  <div style="padding: 50px; text-align: center; color: #fff !important; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
                       <h3 style="margin-bottom: 20px; color: #fff !important;">Track not found on Last.fm</h3>
                       <button id="lfm-close-btn" class="main-buttons-button main-button-secondary" style="background-color: #333 !important; color: white !important;">Close</button>
                   </div>
@@ -32363,311 +32465,227 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           const trackTags = filterTags(tData.toptags?.tag).slice(0, 5);
           const artistTags = filterTags(aData?.tags?.tag).slice(0, 5);
           
-          const albumIcon = `
-          <svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3 !important; min-width: 16px !important; min-height: 16px !important;">
-            <path d="M4.00033 7H20.00033M5.00033 4H19.00033M6.89629 20H17.1044C18.1275 20 18.639 20 19.0447 19.8084C19.402 19.6396 19.7012 19.3687 19.9047 19.03C20.1358 18.6454 20.1867 18.1364 20.2885 17.1184L20.7365 12.6388C20.8279 11.7244 20.8736 11.2672 20.7236 10.9138C20.5918 10.6034 20.3593 10.3465 20.0635 10.1844C19.7268 10 19.2673 10 18.3484 10H5.6523C4.73336 10 4.27389 10 3.93718 10.1844C3.64141 10.3465 3.40887 10.6034 3.27708 10.9138C3.12706 11.2672 3.17278 11.7244 3.26422 12.6388L3.71218 17.1184C3.81398 18.1364 3.86488 18.6454 4.09593 19.03C4.29943 19.3687 4.59872 19.6396 4.95601 19.8084C5.36167 20 5.87321 20 6.89629 20ZM15.0003 15C15.0003 16.1046 13.6572 17 12.0003 17C10.3435 17 9.00033 16.1046 9.00033 15C9.00033 13.8954 10.3435 13 12.0003 13C13.6572 13 15.0003 13.8954 15.0003 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>`;
+          const barsIcon = `<svg width="18px" height="18px" viewBox="0 0 16 16" fill="currentColor"><path d="M12 2a1 1 0 011 1v10a1 1 0 11-2 0V3a1 1 0 011-1zM8 6a1 1 0 011 1v6a1 1 0 11-2 0V7a1 1 0 011-1zM5 10a1 1 0 00-2 0v3a1 1 0 102 0v-3z"/></svg>`;
+          const myPlaysIcon = `<svg viewBox="0 0 24 24" width="20px" height="20px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7C16 9.20914 14.2091 11 12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7Z"></path><path d="M12 14C8.13401 14 5 17.134 5 21H19C19 17.134 15.866 14 12 14Z"></path></svg>`;
+          const listenersIcon = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 20V18C13 15.2386 10.7614 13 8 13C5.23858 13 3 15.2386 3 18V20H13ZM13 20H21V19C21 16.0545 18.7614 14 16 14C14.5867 14 13.3103 14.6255 12.4009 15.6311M11 7C11 8.65685 9.65685 10 8 10C6.34315 10 5 8.65685 5 7C5 5.34315 6.34315 4 8 4C9.65685 4 11 5.34315 11 7ZM18 9C18 10.1046 17.1046 11 16 11C14.8954 11 14 10.1046 14 9C14 7.89543 14.8954 7 16 7C17.1046 7 18 7.89543 18 9Z"/></svg>`;
 
-          const barsIcon = `
-          <svg width="18px" height="18px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="none" style="color: #b3b3b3 !important; fill: #b3b3b3 !important; min-width: 18px !important; min-height: 18px !important;">
-            <g fill="currentColor">
-                <path d="M12 2a1 1 0 011 1v10a1 1 0 11-2 0V3a1 1 0 011-1zM8 6a1 1 0 011 1v6a1 1 0 11-2 0V7a1 1 0 011-1zM5 10a1 1 0 00-2 0v3a1 1 0 102 0v-3z"/>
-            </g>
-          </svg>`;
-
-          const myPlaysIcon = `
-          <svg viewBox="0 0 24 24" width="20px" height="20px" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3 !important; min-width: 20px !important; min-height: 20px !important;">
-            <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
-            <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
-            <g id="SVGRepo_iconCarrier"> 
-                <path d="M16 7C16 9.20914 14.2091 11 12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> 
-                <path d="M12 14C8.13401 14 5 17.134 5 21H19C19 17.134 15.866 14 12 14Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> 
-            </g>
-          </svg>`;
-
-          const listenersIcon = `
-          <svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #b3b3b3 !important; min-width: 20px !important; min-height: 20px !important;">
-            <path d="M13 20V18C13 15.2386 10.7614 13 8 13C5.23858 13 3 15.2386 3 18V20H13ZM13 20H21V19C21 16.0545 18.7614 14 16 14C14.5867 14 13.3103 14.6255 12.4009 15.6311M11 7C11 8.65685 9.65685 10 8 10C6.34315 10 5 8.65685 5 7C5 5.34315 6.34315 4 8 4C9.65685 4 11 5.34315 11 7ZM18 9C18 10.1046 17.1046 11 16 11C14.8954 11 14 10.1046 14 9C14 7.89543 14.8954 7 16 7C17.1046 7 18 7.89543 18 9Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>`;
+          let currentPage = 1;
+          let hasNextPage = true;
+          let isLoadingComments = false;
+          let commentsData = [];
 
           modalContainer.innerHTML = `
             <style>
-                #sort-play-lfm-details-overlay * {
-                    box-sizing: border-box;
+                #sort-play-lfm-details-overlay * { box-sizing: border-box; }
+                
+                .lfm-modal-layout { 
+                    display: flex; flex-direction: row; 
+                    width: 1040px; height: 100%; 
+                    flex: 1; min-height: 0; 
+                }
+                
+                .lfm-main-panel {
+                    width: 640px; flex-shrink: 0;
+                    display: flex; flex-direction: column;
+                    height: 100%; background-color: #181818;
                 }
                 .lfm-header {
-                    display: flex;
-                    padding: 30px 24px 24px;
+                    display: flex; padding: 30px 24px 24px;
                     background: linear-gradient(180deg, #222 0%, #181818 100%) !important;
-                    gap: 24px;
-                    align-items: flex-start;
+                    gap: 24px; align-items: flex-start; flex-shrink: 0;
                 }
                 .lfm-cover {
-                    width: 140px;
-                    height: 140px;
+                    width: 140px; height: 140px;
                     box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-                    border-radius: 4px;
-                    object-fit: cover;
-                    flex-shrink: 0;
+                    border-radius: 4px; object-fit: cover; flex-shrink: 0;
                 }
                 .lfm-info {
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    gap: 4px;
-                    overflow: hidden;
-                    height: 140px;
+                    display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px;
                 }
                 .lfm-title {
-                    font-size: 26px;
-                    font-weight: 800;
-                    color: white !important;
-                    white-space: nowrap; 
-                    overflow: hidden; 
-                    text-overflow: ellipsis;
-                    line-height: 1.2;
-                    margin-bottom: 2px;
+                    font-size: 26px; font-weight: 800; color: white !important;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; margin-bottom: 2px;
                 }
                 .lfm-artist {
-                    font-size: 18px;
-                    font-weight: 500;
-                    color: white !important;
-                    white-space: nowrap; 
-                    overflow: hidden; 
-                    text-overflow: ellipsis;
+                    font-size: 18px; font-weight: 500; color: white !important;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
                 }
-                .lfm-album {
-                    font-size: 14px;
-                    color: #b3b3b3 !important;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    margin-top: 8px;
-                    overflow: hidden;
-                }
-                .lfm-album span {
-                    white-space: nowrap; 
-                    overflow: hidden; 
-                    text-overflow: ellipsis;
-                    color: #b3b3b3 !important;
-                }
-                .lfm-album svg { flex-shrink: 0; }
                 
                 .lfm-body {
-                    padding: 0 24px 24px;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 20px;
-                    background-color: #181818 !important;
+                    padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px;
+                    background-color: #181818 !important; flex: 1; overflow-y: auto; min-height: 0;
+                    scrollbar-width: thin; scrollbar-color: #535353 transparent;
                 }
+                .lfm-body::-webkit-scrollbar { width: 8px; }
+                .lfm-body::-webkit-scrollbar-track { background: transparent; }
+                .lfm-body::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
 
-                .lfm-stats-grid {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 12px;
-                }
+                .lfm-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
                 .lfm-stat-box {
-                    background: #242424 !important;
-                    border-radius: 8px !important;
-                    padding: 16px 20px !important;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    gap: 6px;
-                    border: 1px solid #333 !important;
-                    transition: border-color 0.2s;
-                    min-height: 85px;
+                    background: #242424 !important; border-radius: 8px !important;
+                    padding: 16px 20px !important; display: flex; flex-direction: column; justify-content: center; gap: 6px;
+                    border: 1px solid #333 !important; transition: border-color 0.2s; min-height: 85px;
                 }
-                .lfm-stat-box:hover {
-                    border-color: #444 !important;
-                }
-                .lfm-stat-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 10px;
-                    margin-bottom: 2px;
-                }
-                .lfm-stat-label {
-                    font-size: 11px;
-                    color: #b3b3b3 !important;
-                    text-transform: uppercase;
-                    letter-spacing: 1px;
-                    font-weight: 700;
-                }
-                .lfm-stat-value {
-                    font-size: 22px;
-                    font-weight: 700;
-                    color: white !important;
-                    letter-spacing: -0.5px;
-                }
-                .lfm-stat-sub {
-                    font-size: 12px; 
-                    color:#888 !important; 
-                    margin-top: -2px;
-                }
+                .lfm-stat-box:hover { border-color: #444 !important; }
+                .lfm-stat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+                .lfm-stat-label { font-size: 11px; color: #b3b3b3 !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+                .lfm-stat-value { font-size: 22px; font-weight: 700; color: white !important; letter-spacing: -0.5px; }
+                .lfm-stat-sub { font-size: 12px; color:#888 !important; margin-top: -2px; }
 
-                .lfm-tags-container {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 12px;
-                }
-                .tag-section-header {
-                    font-size: 12px;
-                    color: #888 !important;
-                    text-transform: uppercase;
-                    font-weight: 700;
-                    margin-left: 4px;
-                }
-                .lfm-tags {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 8px;
-                }
+                .lfm-tags-container { display: flex; flex-direction: column; gap: 12px; }
+                .tag-section-header { font-size: 12px; color: #888 !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: 8px; }
+                .lfm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
                 .lfm-tag {
-                    background: #2a2a2a !important;
-                    color: #ddd !important;
-                    padding: 6px 14px !important;
-                    border-radius: 16px !important;
-                    font-size: 13px !important;
-                    font-weight: 500 !important;
-                    border: 1px solid transparent !important;
+                    background: #2a2a2a !important; color: #ddd !important;
+                    padding: 6px 14px !important; border-radius: 16px !important;
+                    font-size: 13px !important; font-weight: 500 !important; border: 1px solid transparent !important;
                 }
-                .lfm-tag:hover {
-                    background-color: #333 !important;
-                    border-color: #444 !important;
-                    color: white !important;
-                }
+                .lfm-tag:hover { background-color: #333 !important; border-color: #444 !important; color: white !important; }
 
                 .lfm-footer {
-                    padding: 20px 24px;
-                    border-top: 1px solid #282828 !important;
-                    display: flex;
-                    justify-content: flex-end;
-                    background: #181818 !important;
-                    margin-top: auto;
+                    padding: 20px 24px; border-top: 1px solid #282828 !important;
+                    display: flex; justify-content: space-between; align-items: center;
+                    background: #181818 !important; flex-shrink: 0;
                 }
                 .lfm-btn {
-                    background-color: #ba0000 !important;
-                    color: white !important;
-                    border: none !important;
-                    padding: 10px 24px !important;
-                    border-radius: 24px !important;
-                    font-weight: 700 !important;
-                    font-size: 14px !important;
-                    cursor: pointer !important;
-                    text-decoration: none !important;
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    transition: background-color 0.2s;
+                    background-color: #ba0000 !important; color: white !important; border: none !important;
+                    padding: 10px 24px !important; border-radius: 24px !important;
+                    font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important;
+                    display: flex; align-items: center; gap: 8px; transition: background-color 0.2s;
                 }
-                .lfm-btn:hover {
-                    background-color: #d60000 !important;
+                .lfm-btn:hover { background-color: #d60000 !important; }
+
+                .lfm-comments-panel {
+                    width: 400px; flex-shrink: 0; border-left: 1px solid #282828;
+                    display: flex; flex-direction: column; height: 100%;
+                    background-color: #121212; transition: opacity 0.3s; opacity: 1;
                 }
+                .lfm-comments-panel.collapsed { opacity: 0; pointer-events: none; }
+                
+                .lfm-comments-header {
+                    padding: 30px 24px 20px; border-bottom: 1px solid #282828; flex-shrink: 0; background-color: #181818;
+                }
+                .lfm-comments-body {
+                    flex: 1; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: #535353 transparent; min-height: 0;
+                }
+                .lfm-comments-body::-webkit-scrollbar { width: 6px; }
+                .lfm-comments-body::-webkit-scrollbar-thumb { background-color: #444; border-radius: 3px; }
+
+                .lfm-comment-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px; }
+                .comment-item { display: flex; flex-direction: column; position: relative; }
+                .comment-content { display: flex; gap: 10px; align-items: stretch; position: relative; z-index: 2; }
+                
+                .avatar-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; position: relative; }
+                .parent-drop-line { position: absolute; bottom: 0; width: 0; border-left: 2px solid #333; z-index: 1; }
+
+                .comment-thread-replies {
+                    list-style: none; margin: 0; padding-top: 12px; padding-bottom: 0; padding-right: 0;
+                    display: flex; flex-direction: column; gap: 16px;
+                }
+                .replies-level-0 { padding-left: 42px; }
+                .replies-level-deep { padding-left: 38px; }
+
+                .reply-item { position: relative; display: flex; flex-direction: column; }
+                
+                .reply-item::before {
+                    content: ''; position: absolute;
+                    top: -16px; left: -27px;
+                    width: 27px; height: 28px;
+                    border-left: 2px solid #333; border-bottom: 2px solid #333; 
+                    border-bottom-left-radius: 16px; /* You can now increase this up to 24px safely! */
+                    z-index: 1;
+                }
+                .reply-item:not(:last-child)::after {
+                    content: ''; position: absolute;
+                    top: 0px; left: -27px; bottom: -16px; border-left: 2px solid #333;
+                    z-index: 1;
+                }
+
                 .close-icon-btn {
-                    position: absolute;
-                    top: 20px;
-                    right: 20px;
-                    background: rgba(0,0,0,0.4) !important;
-                    border: none !important;
-                    border-radius: 50% !important;
-                    width: 32px !important;
-                    height: 32px !important;
-                    color: white !important;
-                    cursor: pointer !important;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: background 0.2s;
-                    z-index: 10;
+                    position: absolute; top: 20px; right: 20px;
+                    background: rgba(0,0,0,0.4) !important; border: none !important; border-radius: 50% !important;
+                    width: 32px !important; height: 32px !important; color: white !important;
+                    cursor: pointer !important; display: flex; align-items: center; justify-content: center;
+                    transition: background 0.2s; z-index: 10;
                 }
                 .close-icon-btn:hover { background: rgba(0,0,0,0.7) !important; }
-                .username-warning {
-                    font-size: 12px;
-                    color: #f15e6c !important;
-                    cursor: pointer !important;
-                    text-decoration: underline !important;
-                }
             </style>
 
             <button class="close-icon-btn" id="lfm-close-x">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>
             </button>
 
-            <div class="lfm-header">
-                <img src="${albumImage}" class="lfm-cover">
-                <div class="lfm-info">
-                    <div class="lfm-title" title="${tData.name}">${tData.name}</div>
-                    <div class="lfm-artist">${tData.artist.name}</div>
-                    <div class="lfm-album">
-                        ${albumIcon} 
-                        <span title="${tData.album?.title || "Unknown"}">${tData.album?.title || "Unknown Album"}</span>
+            <div class="lfm-modal-layout">
+                <div class="lfm-main-panel">
+                    <div class="lfm-header">
+                        <img src="${albumImage}" class="lfm-cover">
+                        <div class="lfm-info">
+                            <div class="lfm-title" title="${tData.name}">${tData.name}</div>
+                            <div class="lfm-artist">${tData.artist.name}</div>
+                        </div>
                     </div>
-                </div>
-            </div>
 
-            <div class="lfm-body">
-                <div class="lfm-stats-grid">
-                    <div class="lfm-stat-box">
-                        <div class="lfm-stat-header">
-                            ${listenersIcon} 
-                            <span class="lfm-stat-label">Total Listeners</span>
-                        </div>
-                        <div class="lfm-stat-value">${Number(totalListeners).toLocaleString()}</div>
-                    </div>
-                    <div class="lfm-stat-box">
-                        <div class="lfm-stat-header">
-                            ${barsIcon} 
-                            <span class="lfm-stat-label">Total Track Scrobbles</span>
-                        </div>
-                        <div class="lfm-stat-value">${Number(totalScrobbles).toLocaleString()}</div>
-                    </div>
-                    <div class="lfm-stat-box">
-                        <div class="lfm-stat-header">
-                            ${myPlaysIcon}
-                            <span class="lfm-stat-label">Your Track Scrobbles</span>
-                        </div>
-                        <div class="lfm-stat-value">
-                            ${username ? Number(userPlaycount).toLocaleString() : `<span style="color:#666 !important; font-size: 18px;">N/A</span>`}
-                        </div>
-                        ${!username ? `<div class="username-warning" id="set-user-btn">Set Last.fm Username</div>` : ''}
-                    </div>
-                    <div class="lfm-stat-box">
-                        <div class="lfm-stat-header">
-                            ${barsIcon}
-                            <span class="lfm-stat-label">Total Artist Scrobbles</span>
-                        </div>
-                        <div class="lfm-stat-value">${Number(artistTotal).toLocaleString()}</div>
-                        ${(username && userArtistCount !== undefined) ? `<div class="lfm-stat-sub">You: ${Number(userArtistCount).toLocaleString()}</div>` : ''}
-                    </div>
-                </div>
-
-                <div class="lfm-tags-container">
-                    ${trackTags.length > 0 ? `
-                        <div>
-                            <div class="tag-section-header" style="margin-bottom:8px;">Track Tags</div>
-                            <div class="lfm-tags">
-                                ${trackTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}
+                    <div class="lfm-body">
+                        <div class="lfm-stats-grid">
+                            <div class="lfm-stat-box">
+                                <div class="lfm-stat-header">${listenersIcon} <span class="lfm-stat-label">Total Listeners</span></div>
+                                <div class="lfm-stat-value">${Number(totalListeners).toLocaleString()}</div>
+                            </div>
+                            <div class="lfm-stat-box">
+                                <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Track Scrobbles</span></div>
+                                <div class="lfm-stat-value">${Number(totalScrobbles).toLocaleString()}</div>
+                            </div>
+                            <div class="lfm-stat-box">
+                                <div class="lfm-stat-header">${myPlaysIcon} <span class="lfm-stat-label">Your Track Scrobbles</span></div>
+                                <div class="lfm-stat-value">
+                                    ${username ? Number(userPlaycount).toLocaleString() : `<span style="color:#666 !important; font-size: 18px;">N/A</span>`}
+                                </div>
+                                ${!username ? `<div style="font-size: 12px; color: #f15e6c !important; cursor: pointer !important; text-decoration: underline !important;" id="set-user-btn">Set Last.fm Username</div>` : ''}
+                            </div>
+                            <div class="lfm-stat-box">
+                                <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Artist Scrobbles</span></div>
+                                <div class="lfm-stat-value">${Number(artistTotal).toLocaleString()}</div>
+                                ${(username && userArtistCount !== undefined) ? `<div class="lfm-stat-sub">You: ${Number(userArtistCount).toLocaleString()}</div>` : ''}
                             </div>
                         </div>
-                    ` : ''}
-                    
-                    ${artistTags.length > 0 ? `
-                        <div>
-                            <div class="tag-section-header" style="margin-bottom:8px;">Artist Tags</div>
-                            <div class="lfm-tags">
-                                ${artistTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}
-                            </div>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
 
-            <div class="lfm-footer">
-                <a href="${trackUrl}" target="_blank" class="lfm-btn">
-                    View on Last.fm 
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
-                </a>
+                        <div class="lfm-tags-container">
+                            ${trackTags.length > 0 ? `
+                                <div>
+                                    <div class="tag-section-header">Track Tags</div>
+                                    <div class="lfm-tags">${trackTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}</div>
+                                </div>
+                            ` : ''}
+                            
+                            ${artistTags.length > 0 ? `
+                                <div>
+                                    <div class="tag-section-header">Artist Tags</div>
+                                    <div class="lfm-tags">${artistTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="lfm-footer">
+                        <button id="lfm-comments-toggle-btn" class="main-buttons-button main-button-secondary" style="background: transparent; border: 1px solid #555; color: white; padding: 8px 16px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
+                            ${isCommentsCollapsedInitial ? 'Show Comments' : 'Hide Comments'}
+                        </button>
+                        <a href="${trackUrl}" target="_blank" class="lfm-btn">
+                            View on Last.fm 
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="lfm-comments-panel ${isCommentsCollapsedInitial ? 'collapsed' : ''}">
+                    <div class="lfm-comments-header">
+                        <h2 style="font-size: 18px; color: white; margin: 0; font-weight: 700;">Shoutbox</h2>
+                    </div>
+                    <div class="lfm-comments-body">
+                        <ul class="lfm-comment-list"></ul>
+                        <div class="lfm-comments-loader" style="display:none; padding:20px; justify-content:center;"><div class="loader"></div></div>
+                    </div>
+                </div>
             </div>
           `;
 
@@ -32681,8 +32699,116 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   showLastFmUsernameModal();
               };
           }
+
+          const toggleBtn = modalContainer.querySelector('#lfm-comments-toggle-btn');
+          const commentsPanel = modalContainer.querySelector('.lfm-comments-panel');
+          const commentsBody = modalContainer.querySelector('.lfm-comments-body');
+          const commentList = modalContainer.querySelector('.lfm-comment-list');
+          const commentsLoader = modalContainer.querySelector('.lfm-comments-loader');
+
+          const formatShoutDate = (dateText) => {
+              if (!dateText) return '';
+              const commaSplit = dateText.split(',');
+              if (commaSplit.length > 1) return commaSplit[0].trim();
+              return dateText.replace(/\s?\d{1,2}:\d{2}[ap]m/i, '').trim();
+          };
+
+          const buildCommentsHtml = (commentsArray, level = 0) => {
+              let html = '';
+              commentsArray.forEach(c => {
+                  const dateStr = formatShoutDate(c.dateText);
+                  const avatarStr = c.avatar || 'https://lastfm.freetls.fastly.net/i/u/avatar70s/818148bf682d429dc215c1705eb27b98.png';
+                  const isReply = level > 0;
+                  const avatarSize = isReply ? 24 : 32;
+                  const dropLineLeft = isReply ? 11 : 15;
+                  const hasReplies = c.replies && c.replies.length > 0;
+                  const repliesClass = level === 0 ? 'replies-level-0' : 'replies-level-deep';
+                  const userUrl = `https://www.last.fm/user/${encodeURIComponent(c.username)}`;
+                  
+                  html += `
+                      <li class="${isReply ? 'reply-item' : 'comment-item'}">
+                          <div class="comment-content">
+                              <div class="avatar-col" style="width: ${avatarSize}px;">
+                                  <a href="${userUrl}" target="_blank" style="display: flex; position: relative; z-index: 2;">
+                                      <img src="${avatarStr}" style="width: ${avatarSize}px; height: ${avatarSize}px; border-radius: 50%; object-fit: cover; background: #282828;">
+                                  </a>
+                                  ${hasReplies ? `<div class="parent-drop-line" style="top: ${avatarSize}px; left: ${dropLineLeft}px;"></div>` : ''}
+                              </div>
+                              <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; padding-bottom: 2px;">
+                                  <div style="display: flex; align-items: baseline; gap: 8px;">
+                                      <a href="${userUrl}" target="_blank" style="color: white; font-weight: 600; font-size: 13px; word-break: break-all; text-decoration: none;">${c.username}</a>
+                                      <span style="color: #888; font-size: 11px; white-space: nowrap;">${dateStr}</span>
+                                  </div>
+                                  <div style="color: #ddd; font-size: 13px; line-height: 1.4; margin-top: 2px; word-break: break-word;">
+                                      ${c.body}
+                                  </div>
+                                  <div style="display: flex; align-items: center; gap: 4px; margin-top: 6px;">
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                                      <span style="color: #888; font-size: 12px; font-weight: 500;">${c.likes || 0}</span>
+                                  </div>
+                              </div>
+                          </div>
+                          ${hasReplies ? `<ul class="comment-thread-replies ${repliesClass}">${buildCommentsHtml(c.replies, level + 1)}</ul>` : ''}
+                      </li>
+                  `;
+              });
+              return html;
+          };
+
+          const loadComments = async () => {
+              if (isLoadingComments || !hasNextPage) return;
+              isLoadingComments = true;
+              commentsLoader.style.display = 'flex';
+
+              const result = await fetchLastFmShoutbox(artistName, trackName, currentPage);
+              commentsData.push(...result.comments);
+              hasNextPage = result.hasNextPage;
+              currentPage++;
+
+              if (commentsData.length === 0) {
+                  commentList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px; font-size: 13px;">No shouts found for this track.</div>';
+              } else {
+                  commentList.insertAdjacentHTML('beforeend', buildCommentsHtml(result.comments));
+              }
+
+              commentsLoader.style.display = 'none';
+              isLoadingComments = false;
+          };
+
+          toggleBtn.addEventListener('click', () => {
+              const currentlyCollapsed = localStorage.getItem('sort-play-lfm-comments-collapsed') === 'true';
+              const willBeCollapsed = !currentlyCollapsed;
+              
+              localStorage.setItem('sort-play-lfm-comments-collapsed', willBeCollapsed);
+              
+              if (willBeCollapsed) {
+                  modalContainer.style.width = '640px';
+                  commentsPanel.classList.add('collapsed');
+                  toggleBtn.textContent = 'Show Comments';
+              } else {
+                  modalContainer.style.width = '1040px';
+                  commentsPanel.classList.remove('collapsed');
+                  toggleBtn.textContent = 'Hide Comments';
+                  
+                  if (commentsData.length === 0 && hasNextPage) {
+                      loadComments();
+                  }
+              }
+          });
+
+          commentsBody.addEventListener('scroll', () => {
+              if (commentsBody.scrollHeight - commentsBody.scrollTop - commentsBody.clientHeight < 300) {
+                  loadComments();
+              }
+          });
+
+          if (!isCommentsCollapsedInitial) {
+              loadComments();
+          }
+
       }).catch(err => {
           console.error(err);
+          modalContainer.style.width = '640px';
           modalContainer.innerHTML = `
             <div style="padding: 40px; text-align: center; color: #fff !important; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
                 <h3 style="margin-bottom: 20px; color: #fff !important;">Failed to load data</h3>
