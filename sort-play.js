@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.64.0";
+  const SORT_PLAY_VERSION = "5.64.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -699,16 +699,31 @@
       };
   }
 
+  const REMOTE_KEY_VERSION = "1";
+
   let L_F_M_Key_Pool = [];
 
   async function fetchLastFmKeys() {
     try {
+      const cachedVersion = localStorage.getItem("sort-play-lfm-key-version");
+      if (cachedVersion === REMOTE_KEY_VERSION) {
+        const cachedKeys = localStorage.getItem("sort-play-lfm-keys");
+        if (cachedKeys) {
+          L_F_M_Key_Pool = JSON.parse(cachedKeys);
+          if (L_F_M_Key_Pool.length > 0) return;
+        }
+      }
+
       const res = await fetch("https://lfm-token-proxy.niko2nio2.workers.dev/", {
         headers: { "X-Sort-Play-Access": "sp-token-request-v1" }
       });
       if (res.ok) {
         const data = await res.json();
         L_F_M_Key_Pool = data.keys || [];
+        if (L_F_M_Key_Pool.length > 0) {
+          localStorage.setItem("sort-play-lfm-keys", JSON.stringify(L_F_M_Key_Pool));
+          localStorage.setItem("sort-play-lfm-key-version", REMOTE_KEY_VERSION);
+        }
       }
     } catch (e) {
       console.error("[Sort-Play] Failed to fetch Last.fm keys", e);
@@ -734,12 +749,25 @@
 
   async function fetchGeminiKeys() {
     try {
+      const cachedVersion = localStorage.getItem("sort-play-gemini-key-version");
+      if (cachedVersion === REMOTE_KEY_VERSION) {
+        const cachedKeys = localStorage.getItem("sort-play-gemini-keys");
+        if (cachedKeys) {
+          Ge_mini_Key_Pool = JSON.parse(cachedKeys);
+          if (Ge_mini_Key_Pool.length > 0) return;
+        }
+      }
+
       const res = await fetch("https://gm-token-proxy.niko2nio2.workers.dev/", {
         headers: { "X-Sort-Play-Access": "sp-token-request-v1" }
       });
       if (res.ok) {
         const data = await res.json();
         Ge_mini_Key_Pool = data.keys || [];
+        if (Ge_mini_Key_Pool.length > 0) {
+          localStorage.setItem("sort-play-gemini-keys", JSON.stringify(Ge_mini_Key_Pool));
+          localStorage.setItem("sort-play-gemini-key-version", REMOTE_KEY_VERSION);
+        }
       }
     } catch (e) {
       console.error("[Sort-Play] Failed to fetch Gemini keys", e);
