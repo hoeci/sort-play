@@ -5972,14 +5972,14 @@
                   const targetHeight = existing.offsetHeight;
                   
                   existing.style.height = `${startHeight}px`;
-                  existing.offsetHeight;
+                  existing.offsetHeight; 
                   
                   existing.style.transition = 'height 0.3s cubic-bezier(0.2, 0, 0, 1)';
                   existing.style.height = `${targetHeight}px`;
                   
                   const onEnd = () => {
                       existing.style.height = 'auto';
-                      existing.style.overflow = ''; 
+                      existing.style.overflow = 'hidden';
                       existing.style.transition = 'none';
                       contentArea.style.overflow = ''; 
                       existing.removeEventListener('transitionend', onEnd);
