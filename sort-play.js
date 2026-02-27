@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.64.2";
+  const SORT_PLAY_VERSION = "5.65.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -28,6 +28,7 @@
   const STORAGE_KEY_GENRE_SOURCES_AP_SPOTIFY = "sort-play-genre-sources-ap-spotify";
   const STORAGE_KEY_GENRE_SOURCES_AP_LASTFM = "sort-play-genre-sources-ap-lastfm";
   const STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE = "sort-play-use-genre-playlist-database";
+  const STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL = "sort-play-auto-update-genre-modal";
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU = "sort-play-show-lastfm-context-menu";
@@ -144,6 +145,7 @@
   let genreSourcesNpDeezer = true;
   let genreSourcesApSpotify = true;
   let genreSourcesApLastfm = true;
+  let autoUpdateGenreModal = false;
   let isProcessing = false;
   let isMenuOpen = false;
   let areSubMenusCreated = false;
@@ -1268,6 +1270,7 @@
     genreSourcesApSpotify = localStorage.getItem(STORAGE_KEY_GENRE_SOURCES_AP_SPOTIFY) !== "false";
     genreSourcesApLastfm = localStorage.getItem(STORAGE_KEY_GENRE_SOURCES_AP_LASTFM) !== "false";
     useGenrePlaylistDatabase = localStorage.getItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE) !== "false";
+    autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -1344,6 +1347,7 @@
     localStorage.setItem(STORAGE_KEY_GENRE_SOURCES_AP_SPOTIFY, genreSourcesApSpotify);
     localStorage.setItem(STORAGE_KEY_GENRE_SOURCES_AP_LASTFM, genreSourcesApLastfm);
     localStorage.setItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE, useGenrePlaylistDatabase);
+    localStorage.setItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL, autoUpdateGenreModal);
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
 
     for (const sortType in sortOrderState) {
@@ -3621,6 +3625,19 @@
                           <span class="sliderx"></span>
                       </label>
                   </div>
+                  <div class="setting-row">
+                      <div style="display: flex; align-items: center;">
+                          <label class="setting-label" for="showGenresCtxToggle2">Track Context Menu</label>
+                          <span class="tooltip-container">
+                              ${infoIconSvg}
+                              <span class="custom-tooltip">Adds a "Show Genres" option to the track right-click menu.</span>
+                          </span>
+                      </div>
+                      <label class="switch">
+                          <input type="checkbox" id="showGenresCtxToggle2" ${showGenresContextMenu ? 'checked' : ''}>
+                          <span class="sliderx"></span>
+                      </label>
+                  </div>
               </div>
               
               <div style="display: flex; flex-direction: column; gap: 4px;">
@@ -3635,6 +3652,19 @@
                       </div>
                       <label class="switch">
                           <input type="checkbox" id="useGenreDbToggle" ${useGenrePlaylistDatabase ? 'checked' : ''}>
+                          <span class="sliderx"></span>
+                      </label>
+                  </div>
+                  <div class="setting-row">
+                      <div style="display: flex; align-items: center;">
+                          <label class="setting-label" for="autoUpdateModalToggle">Auto-Update Open Window</label>
+                          <span class="tooltip-container">
+                              ${infoIconSvg}
+                              <span class="custom-tooltip">If the Genre Details window is open, automatically update it when the song changes.</span>
+                          </span>
+                      </div>
+                      <label class="switch">
+                          <input type="checkbox" id="autoUpdateModalToggle" ${autoUpdateGenreModal ? 'checked' : ''}>
                           <span class="sliderx"></span>
                       </label>
                   </div>
@@ -3708,6 +3738,7 @@
 
     const showTagsNpToggle = modalContainer.querySelector("#showTagsNpToggle");
     const showTagsApToggle = modalContainer.querySelector("#showTagsApToggle");
+    const showGenresCtxToggle2 = modalContainer.querySelector("#showGenresCtxToggle2");
     const npSpotifyToggle = modalContainer.querySelector("#npSpotifyToggle");
     const npSpotifyTrackToggle = modalContainer.querySelector("#npSpotifyTrackToggle");
     const npLastfmToggle = modalContainer.querySelector("#npLastfmToggle");
@@ -3715,20 +3746,27 @@
     const apSpotifyToggle = modalContainer.querySelector("#apSpotifyToggle");
     const apLastfmToggle = modalContainer.querySelector("#apLastfmToggle");
     const useGenreDbToggle = modalContainer.querySelector("#useGenreDbToggle");
+    const autoUpdateModalToggle = modalContainer.querySelector("#autoUpdateModalToggle");
     const doneButton = modalContainer.querySelector("#doneGenreSources");
 
     const updateVarsAndSave = () => {
         showGenreTagsNowPlaying = showTagsNpToggle.checked;
         genreSourcesNpSpotifyTrack = npSpotifyTrackToggle.checked;
         showGenreTagsArtistPage = showTagsApToggle.checked;
+        showGenresContextMenu = showGenresCtxToggle2.checked;
         genreSourcesNpSpotify = npSpotifyToggle.checked;
         genreSourcesNpLastfm = npLastfmToggle.checked;
         genreSourcesNpDeezer = npDeezerToggle.checked;
         genreSourcesApSpotify = apSpotifyToggle.checked;
         genreSourcesApLastfm = apLastfmToggle.checked;
         useGenrePlaylistDatabase = useGenreDbToggle.checked;
+        autoUpdateGenreModal = autoUpdateModalToggle.checked;
         saveSettings();
         
+        updateGenresContextMenu();
+        const mainCtxMenuToggle = document.getElementById("showGenresContextMenuToggle");
+        if (mainCtxMenuToggle) mainCtxMenuToggle.checked = showGenresContextMenu;
+
         nowPlayingGenreCache.clear();
         artistPageGenreCache.clear();
         
@@ -3738,6 +3776,7 @@
     
     showTagsNpToggle.addEventListener("change", updateVarsAndSave);
     showTagsApToggle.addEventListener("change", updateVarsAndSave);
+    showGenresCtxToggle2.addEventListener("change", updateVarsAndSave);
     npSpotifyToggle.addEventListener("change", updateVarsAndSave);
     npSpotifyTrackToggle.addEventListener("change", updateVarsAndSave);
     npLastfmToggle.addEventListener("change", updateVarsAndSave);
@@ -3745,6 +3784,7 @@
     apSpotifyToggle.addEventListener("change", updateVarsAndSave);
     apLastfmToggle.addEventListener("change", updateVarsAndSave);
     useGenreDbToggle.addEventListener("change", updateVarsAndSave);
+    autoUpdateModalToggle.addEventListener("change", updateVarsAndSave);
 
     doneButton.addEventListener("click", closeModal);
     doneButton.addEventListener("mouseenter", () => { doneButton.style.backgroundColor = "#3BE377"; });
@@ -5840,8 +5880,154 @@
   }
 
   function showGenreDetailsModal(genreMapOrPromise, trackName, artistName, coverUrl) {
+      const trackIdKey = `${trackName}|${artistName}`;
       const existing = document.getElementById("sort-play-genre-details-window");
-      if (existing) existing.remove();
+
+      const enforceBoundaries = (element) => {
+          requestAnimationFrame(() => {
+              const vW = window.innerWidth;
+              const vH = window.innerHeight;
+              
+              let nL = parseFloat(element.style.left);
+              let nT = parseFloat(element.style.top);
+              let nB = parseFloat(element.style.bottom);
+              
+              const w = element.offsetWidth;
+              const h = element.offsetHeight;
+              
+              if (isNaN(nL)) nL = element.getBoundingClientRect().left;
+              
+              if (nL + w > vW - 10) nL = vW - w - 10;
+              if (nL < 10) nL = 10;
+              element.style.left = `${nL}px`;
+              
+              if (element.classList.contains('docked-bottom')) {
+                  if (isNaN(nB)) nB = vH - element.getBoundingClientRect().bottom;
+                  if (nB + h > vH - 70) nB = vH - h - 70;
+                  if (nB < 10) nB = 10;
+                  element.style.bottom = `${nB}px`;
+                  element.style.top = 'auto';
+              } else {
+                  if (isNaN(nT)) nT = element.getBoundingClientRect().top;
+                  if (nT + h > vH - 10) nT = vH - h - 10;
+                  if (nT < 70) nT = 70;
+                  element.style.top = `${nT}px`;
+                  element.style.bottom = 'auto';
+              }
+          });
+      };
+      
+      if (existing) {
+          if (existing.dataset.trackId === trackIdKey) {
+              if (existing.classList.contains('minimized')) {
+                  existing.querySelector('.minimize-btn').click();
+              }
+              return;
+          }
+          
+          existing.dataset.trackId = trackIdKey;
+          
+          let coverImg = existing.querySelector('.sp-genre-cover');
+          if (coverUrl) {
+              if (coverImg) {
+                  coverImg.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+                  requestAnimationFrame(() => {
+                      coverImg.src = coverUrl;
+                  });
+                  coverImg.style.display = '';
+              } else {
+                  const infoDiv = existing.querySelector('.sp-genre-info');
+                  if (infoDiv) {
+                      coverImg = document.createElement('img');
+                      coverImg.className = 'sp-genre-cover';
+                      coverImg.src = coverUrl;
+                      infoDiv.parentNode.insertBefore(coverImg, infoDiv);
+                  }
+              }
+          } else if (coverImg) {
+              coverImg.style.display = 'none';
+          }
+
+          const trackEl = existing.querySelector('.sp-genre-track');
+          if (trackEl) { trackEl.textContent = trackName; trackEl.title = trackName; }
+          
+          const artistEl = existing.querySelector('.sp-genre-artist');
+          if (artistEl) { artistEl.textContent = artistName; artistEl.title = artistName; }
+
+          const contentArea = existing.querySelector('#sp-genre-content-area');
+
+          const transitionToContent = (newHtml, callback) => {
+              const startHeight = existing.offsetHeight;
+              
+              existing.style.transition = 'none';
+              existing.style.height = `${startHeight}px`;
+              existing.style.overflow = 'hidden';
+              contentArea.style.overflow = 'hidden';
+              
+              contentArea.innerHTML = newHtml;
+              if (callback) callback();
+              
+              requestAnimationFrame(() => {
+                  existing.style.height = 'auto';
+                  const targetHeight = existing.offsetHeight;
+                  
+                  existing.style.height = `${startHeight}px`;
+                  existing.offsetHeight;
+                  
+                  existing.style.transition = 'height 0.3s cubic-bezier(0.2, 0, 0, 1)';
+                  existing.style.height = `${targetHeight}px`;
+                  
+                  const onEnd = () => {
+                      existing.style.height = 'auto';
+                      existing.style.overflow = ''; 
+                      existing.style.transition = 'none';
+                      contentArea.style.overflow = ''; 
+                      existing.removeEventListener('transitionend', onEnd);
+                      enforceBoundaries(existing);
+                  };
+                  
+                  existing.addEventListener('transitionend', onEnd, { once: true });
+              });
+          };
+
+          const showLoaderKeepingHeight = () => {
+              const currentHeight = existing.offsetHeight;
+              existing.style.transition = 'none';
+              existing.style.height = `${currentHeight}px`;
+              existing.style.overflow = 'hidden';
+              contentArea.style.overflow = 'hidden';
+              
+              contentArea.innerHTML = `
+                  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 100px; gap: 15px;">
+                      <div class="loader"></div>
+                      <span style="color: #b3b3b3; font-size: 14px; font-weight: 500;">Fetching Genres...</span>
+                  </div>
+              `;
+          };
+
+          if (genreMapOrPromise instanceof Promise) {
+              showLoaderKeepingHeight();
+              genreMapOrPromise.then(genreMap => {
+                  if (existing.dataset.trackId !== trackIdKey) return;
+                  transitionToContent(existing._renderContentHtml(genreMap, true), () => existing._bindEvents());
+              }).catch(err => {
+                  if (existing.dataset.trackId !== trackIdKey) return;
+                  console.error("[Sort-Play] Failed to fetch genres for modal", err);
+                  transitionToContent('<div style="color: #f15e6c; text-align: center; padding: 40px 20px;">Failed to load genres.</div>');
+              });
+          } else {
+              transitionToContent(existing._renderContentHtml(genreMapOrPromise, true), () => existing._bindEvents());
+          }
+          
+          if (existing.classList.contains('minimized')) {
+              existing.querySelector('.minimize-btn').click();
+          }
+          return;
+      }
+
+      function tryParseJSON(str) {
+          try { return JSON.parse(str); } catch (e) { return null; }
+      }
 
       const STORAGE_KEY_POS = "sort-play-genre-window-pos";
       const width = 550;
@@ -5860,6 +6046,7 @@
       const modalContainer = document.createElement("div");
       modalContainer.id = "sort-play-genre-details-window";
       modalContainer.className = "sort-play-floating-window sort-play-font-scope";
+      modalContainer.dataset.trackId = trackIdKey;
       
       modalContainer.style.cssText = `
           position: fixed;
@@ -5986,109 +6173,28 @@
           return contentHtml;
       };
 
+      modalContainer._renderContentHtml = renderContentHtml;
+
       modalContainer.innerHTML = `
           <style>
-            @keyframes sp-window-drop {
-                0% { opacity: 0; transform: translateY(-40px); }
-                100% { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes sp-tag-pop {
-                0% { opacity: 0; transform: scale(0.8) translateY(10px); }
-                100% { opacity: 1; transform: scale(1) translateY(0); }
-            }
-            .genre-detail-tag.animated {
-                animation: sp-tag-pop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
-                opacity: 0;
-            }
-            .sp-genre-header {
-                display: flex;
-                align-items: center;
-                padding: 16px 20px;
-                border-bottom: 1px solid #282828;
-                background-color: #181818;
-                cursor: move;
-                user-select: none;
-            }
-            .sp-genre-cover {
-                width: 56px;
-                height: 56px;
-                border-radius: 4px;
-                object-fit: cover;
-                margin-right: 16px;
-                background-color: #282828;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-            }
-            .sp-genre-info {
-                flex-grow: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-            .sp-genre-all-title {
-                font-size: 11px;
-                font-weight: 700;
-                color: #b3b3b3;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                margin-bottom: 4px;
-            }
-            .sp-genre-track {
-                font-size: 18px;
-                font-weight: 700;
-                color: white;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                line-height: 1.2;
-            }
-            .sp-genre-artist {
-                font-size: 14px;
-                color: #ddd;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            .sp-window-controls {
-                display: flex;
-                gap: 8px;
-                align-items: center;
-                padding-left: 12px;
-            }
-            .sp-control-btn {
-                background: none;
-                border: none;
-                color: #b3b3b3;
-                cursor: pointer;
-                padding: 4px;
-                border-radius: 4px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: color 0.2s, background-color 0.2s;
-            }
-            .sp-control-btn:hover {
-                color: white;
-                background-color: rgba(255,255,255,0.1);
-            }
-            .sp-window-content {
-                padding: 24px;
-                overflow-y: auto;
-                scrollbar-width: thin;
-                scrollbar-color: #555 transparent;
-                background-color: #181818;
-                flex-grow: 1;
-            }
-            .minimized .sp-window-content {
-                display: none;
-            }
-            .minimized .sp-genre-header {
-                border-bottom: none;
-            }
-            .minimized {
-                height: auto !important;
-                max-height: none !important;
-            }
+            @keyframes sp-window-drop { 0% { opacity: 0; transform: translateY(-40px); } 100% { opacity: 1; transform: translateY(0); } }
+            @keyframes sp-tag-pop { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+            .genre-detail-tag.animated { animation: sp-tag-pop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; opacity: 0; }
+            .docked-bottom { flex-direction: column-reverse !important; }
+            .docked-bottom .sp-genre-header { border-bottom: none !important; border-top: 1px solid #282828 !important; }
+            .sp-genre-header { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #282828; background-color: #181818; cursor: move; user-select: none; }
+            .sp-genre-cover { width: 56px; height: 56px; border-radius: 4px; object-fit: cover; margin-right: 16px; background-color: #282828; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+            .sp-genre-info { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+            .sp-genre-all-title { font-size: 11px; font-weight: 700; color: #b3b3b3; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+            .sp-genre-track { font-size: 18px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+            .sp-genre-artist { font-size: 14px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .sp-window-controls { display: flex; gap: 8px; align-items: center; padding-left: 12px; }
+            .sp-control-btn { background: none; border: none; color: #b3b3b3; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background-color 0.2s; }
+            .sp-control-btn:hover { color: white; background-color: rgba(255,255,255,0.1); }
+            .sp-window-content { padding: 24px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 transparent; background-color: #181818; flex-grow: 1; }
+            .minimized .sp-window-content { display: none; }
+            .minimized .sp-genre-header { border-bottom: none !important; border-top: none !important; }
+            .minimized { height: auto !important; max-height: none !important; }
             .sp-window-content::-webkit-scrollbar { width: 8px; }
             .sp-window-content::-webkit-scrollbar-track { background: transparent; }
             .sp-window-content::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
@@ -6102,7 +6208,10 @@
               </div>
               <div class="sp-window-controls">
                   <button class="sp-control-btn minimize-btn" title="Minimize">
-                      <svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      <svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                  <button class="sp-control-btn settings-btn" title="Genre Settings">
+                      ${settingsSvg.replace('<svg', '<svg width="19" height="19" fill="currentColor"')}
                   </button>
                   <button class="sp-control-btn close-btn" title="Close">
                       <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"/></svg>
@@ -6178,6 +6287,8 @@
           });
       };
 
+      modalContainer._bindEvents = bindEvents;
+
       if (genreMapOrPromise instanceof Promise) {
           contentArea.innerHTML = `
               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; gap: 15px; margin-top: 20px;">
@@ -6186,11 +6297,15 @@
               </div>
           `;
           genreMapOrPromise.then(genreMap => {
+              if (modalContainer.dataset.trackId !== trackIdKey) return;
               contentArea.innerHTML = renderContentHtml(genreMap, true);
               bindEvents();
+              enforceBoundaries(modalContainer);
           }).catch(err => {
+              if (modalContainer.dataset.trackId !== trackIdKey) return;
               console.error("[Sort-Play] Failed to fetch genres for modal", err);
               contentArea.innerHTML = '<div style="color: #f15e6c; text-align: center; padding: 40px 20px;">Failed to load genres.</div>';
+              enforceBoundaries(modalContainer);
           });
       } else {
           contentArea.innerHTML = renderContentHtml(genreMapOrPromise, false);
@@ -6202,36 +6317,95 @@
           let newLeft = rect.left;
           let newTop = rect.top;
           
-          const viewportWidth = window.innerWidth;
-          const viewportHeight = window.innerHeight;
+          const vW = window.innerWidth;
+          const vH = window.innerHeight;
           
+          if (newLeft + rect.width > vW - 10) newLeft = vW - rect.width - 10;
           if (newLeft < 10) newLeft = 10;
-          if (newLeft + rect.width > viewportWidth - 10) newLeft = viewportWidth - rect.width - 10;
           
+          if (newTop + rect.height > vH - 10) {
+              newTop = vH - rect.height - 10;
+          }
           if (newTop < 70) newTop = 70;
-          if (newTop + rect.height > viewportHeight - 10) newTop = viewportHeight - rect.height - 10;
           
-          if (newLeft !== rect.left || newTop !== rect.top) {
-              modalContainer.style.left = `${newLeft}px`;
-              modalContainer.style.top = `${newTop}px`;
+          modalContainer.style.left = `${newLeft}px`;
+          modalContainer.style.top = `${newTop}px`;
+
+          if (newTop + rect.height > vH - 150) {
+              const nB = Math.max(10, vH - (newTop + rect.height));
+              modalContainer.style.bottom = `${nB}px`;
+              modalContainer.style.top = 'auto';
+              modalContainer.classList.add('docked-bottom');
           }
       });
-
-      function tryParseJSON(str) {
-          try { return JSON.parse(str); } catch (e) { return null; }
-      }
 
       const closeModal = () => modalContainer.remove();
       
       const closeBtn = modalContainer.querySelector('.close-btn');
       closeBtn.addEventListener('click', closeModal);
+
+      const settingsBtn = modalContainer.querySelector('.settings-btn');
+      settingsBtn.addEventListener('click', () => {
+          showGenreTagsSettingsModal();
+      });
       
       const minimizeBtn = modalContainer.querySelector('.minimize-btn');
       let isMinimized = false;
       
       minimizeBtn.addEventListener('click', () => {
           isMinimized = !isMinimized;
-          modalContainer.classList.toggle('minimized', isMinimized);
+          
+          if (isMinimized) {
+              modalContainer.classList.add('minimized');
+          } else {
+              modalContainer.classList.remove('minimized');
+              
+              requestAnimationFrame(() => {
+                  const rect = modalContainer.getBoundingClientRect(); 
+                  const vH = window.innerHeight;
+                  const vW = window.innerWidth;
+                  
+                  if (!modalContainer.classList.contains('docked-bottom') && rect.bottom > vH - 10) {
+                      modalContainer.classList.add('docked-bottom');
+                      const headerHeight = modalContainer.querySelector('.sp-genre-header').offsetHeight;
+                      const targetBottom = vH - (rect.top + headerHeight);
+                      modalContainer.style.bottom = `${Math.max(10, targetBottom)}px`;
+                      modalContainer.style.top = 'auto';
+                  } 
+                  else if (modalContainer.classList.contains('docked-bottom') && rect.top < 70) {
+                      modalContainer.classList.remove('docked-bottom');
+                      const headerHeight = modalContainer.querySelector('.sp-genre-header').offsetHeight;
+                      const targetTop = vH - rect.bottom - headerHeight;
+                      modalContainer.style.top = `${Math.max(70, targetTop)}px`;
+                      modalContainer.style.bottom = 'auto';
+                  }
+                  
+                  requestAnimationFrame(() => {
+                      const finalRect = modalContainer.getBoundingClientRect();
+                      let nL = finalRect.left;
+                      let nT = finalRect.top;
+                      
+                      if (nL < 10) nL = 10;
+                      if (nL + finalRect.width > vW - 10) nL = vW - finalRect.width - 10;
+                      
+                      if (modalContainer.classList.contains('docked-bottom')) {
+                          let nB = vH - finalRect.bottom;
+                          if (nB < 10) nB = 10;
+                          if (nB + finalRect.height > vH - 70) nB = vH - finalRect.height - 70;
+                          modalContainer.style.bottom = `${nB}px`;
+                          modalContainer.style.left = `${nL}px`;
+                          modalContainer.style.top = 'auto';
+                      } else {
+                          if (nT < 70) nT = 70;
+                          if (nT + finalRect.height > vH - 10) nT = vH - finalRect.height - 10;
+                          modalContainer.style.top = `${nT}px`;
+                          modalContainer.style.left = `${nL}px`;
+                          modalContainer.style.bottom = 'auto';
+                      }
+                  });
+              });
+          }
+
           minimizeBtn.innerHTML = isMinimized 
               ? `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
               : `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`; 
@@ -6240,7 +6414,7 @@
 
       const header = modalContainer.querySelector('.sp-genre-header');
       let isDragging = false;
-      let startX, startY, startLeft, startTop;
+      let startX, startY, startLeft, startTop, startBottom;
 
       const onMouseDown = (e) => {
         if (e.target.closest('.sp-control-btn')) return;
@@ -6254,6 +6428,7 @@
         const rect = modalContainer.getBoundingClientRect();
         startLeft = rect.left;
         startTop = rect.top;
+        startBottom = window.innerHeight - rect.bottom;
         
         modalContainer.style.animation = 'none';
         modalContainer.style.opacity = '1';
@@ -6267,8 +6442,32 @@
           e.preventDefault();
           const dx = e.clientX - startX;
           const dy = e.clientY - startY;
-          modalContainer.style.left = `${startLeft + dx}px`;
-          modalContainer.style.top = `${startTop + dy}px`;
+          
+          let newLeft = startLeft + dx;
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const rect = modalContainer.getBoundingClientRect();
+          
+          if (newLeft < 10) newLeft = 10;
+          if (newLeft + rect.width > viewportWidth - 10) newLeft = viewportWidth - rect.width - 10;
+
+          if (modalContainer.classList.contains('docked-bottom')) {
+              let newBottom = startBottom - dy;
+              if (newBottom < 10) newBottom = 10;
+              if (newBottom + rect.height > viewportHeight - 70) newBottom = viewportHeight - rect.height - 70;
+              
+              modalContainer.style.top = 'auto';
+              modalContainer.style.left = `${newLeft}px`;
+              modalContainer.style.bottom = `${newBottom}px`;
+          } else {
+              let newTop = startTop + dy;
+              if (newTop < 70) newTop = 70;
+              if (newTop + rect.height > viewportHeight - 10) newTop = viewportHeight - rect.height - 10;
+              
+              modalContainer.style.bottom = 'auto';
+              modalContainer.style.left = `${newLeft}px`;
+              modalContainer.style.top = `${newTop}px`;
+          }
       };
 
       const onMouseUp = () => {
@@ -35233,6 +35432,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       await Promise.allSettled([p1, p2]);
       
       prefetchNextTrackData();
+
+      if (autoUpdateGenreModal) {
+          const existingModal = document.getElementById("sort-play-genre-details-window");
+          if (existingModal) {
+              const track = Spicetify.Player.data?.item;
+              if (track && track.uri && !Spicetify.URI.isLocalTrack(track.uri)) {
+                  const fetchPromise = fetchDisplayGenres(track);
+                  const artistName = track.metadata?.artist_name || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
+                  const trackName = track.metadata?.title || track.name || "Unknown Track";
+                  const images = track.metadata?.image_url ? null : (track.album?.images || []);
+                  const coverUrl = track.metadata?.image_url || (images && images.length > 0 ? (images[2]?.url || images[0]?.url) : "");
+                  
+                  showGenreDetailsModal(fetchPromise, trackName, artistName, coverUrl);
+              }
+          }
+      }
   });
 
   displayNowPlayingData();
