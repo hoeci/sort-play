@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.64.1";
+  const SORT_PLAY_VERSION = "5.64.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -709,8 +709,10 @@
       if (cachedVersion === REMOTE_KEY_VERSION) {
         const cachedKeys = localStorage.getItem("sort-play-lfm-keys");
         if (cachedKeys) {
-          L_F_M_Key_Pool = JSON.parse(cachedKeys);
-          if (L_F_M_Key_Pool.length > 0) return;
+          try {
+            L_F_M_Key_Pool = JSON.parse(cachedKeys);
+            if (L_F_M_Key_Pool.length > 0) return;
+          } catch(err) {}
         }
       }
 
@@ -733,11 +735,6 @@
   function getNextLfmKey() {
     if (L_F_M_Key_Pool.length === 0) return null;
     let validKeys = L_F_M_Key_Pool.filter(key => !revokedLfmKeys.has(key));
-    if (validKeys.length === 0) {
-      console.warn("[Sort-Play] All Last.fm keys revoked. Resetting pool to recover from potential transient errors.");
-      revokedLfmKeys.clear();
-      validKeys = L_F_M_Key_Pool;
-    }
     if (validKeys.length === 0) return null;
     const keyIndex = lfmKeyIndex % validKeys.length;
     const key = validKeys[keyIndex];
@@ -753,8 +750,10 @@
       if (cachedVersion === REMOTE_KEY_VERSION) {
         const cachedKeys = localStorage.getItem("sort-play-gemini-keys");
         if (cachedKeys) {
-          Ge_mini_Key_Pool = JSON.parse(cachedKeys);
-          if (Ge_mini_Key_Pool.length > 0) return;
+          try {
+            Ge_mini_Key_Pool = JSON.parse(cachedKeys);
+            if (Ge_mini_Key_Pool.length > 0) return;
+          } catch(err) {}
         }
       }
 
@@ -782,6 +781,7 @@
   
   async function fetchLfmWithGateway(params) {
     if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+    let networkErrorRetries = 0;
     while (true) {
         const apiKey = getNextLfmKey();
         if (!apiKey) {
@@ -801,9 +801,12 @@
                 }
                 return response;
             } catch (gatewayError) {
-                console.warn(`Last.fm gateway request failed with network error. Revoking key ...${apiKey.slice(-4)} and retrying.`);
-                revokedLfmKeys.add(apiKey);
-                continue;
+                if (networkErrorRetries < 2) {
+                    networkErrorRetries++;
+                    await new Promise(r => setTimeout(r, 1000));
+                    continue;
+                }
+                throw gatewayError;
             }
         } else {
             let response;
@@ -836,9 +839,12 @@
                 }
                 return response;
             } catch (gatewayError) {
-                console.warn(`Last.fm gateway request failed with network error. Revoking key ...${apiKey.slice(-4)} and retrying.`);
-                revokedLfmKeys.add(apiKey);
-                continue;
+                if (networkErrorRetries < 2) {
+                    networkErrorRetries++;
+                    await new Promise(r => setTimeout(r, 1000));
+                    continue;
+                }
+                throw gatewayError;
             }
         }
     }
@@ -23510,7 +23516,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
     hideAllSubMenus();
     
-    isButtonClicked = false;
     mainButton.style.filter = "brightness(1)";
 
     menuPositionObserver.disconnect();
@@ -27022,52 +27027,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
       } catch (e) {
           console.warn(`[Sort-Play] Failed to scrape obsessions for ${username}`, e);
-          return [];
-      }
-  }
-
-  async function scrapeLastFmTopTracks(username, pages = 5) {
-      try {
-          const gatewayUrlBase = LFM_GATEWAY_URL;
-          const baseUrl = `https://www.last.fm/user/${username}/library/tracks?date_preset=ALL`;
-          
-          const pagePromises = Array.from({ length: pages }, (_, i) => {
-              const pageNum = i + 1;
-              const pageUrl = `${baseUrl}&page=${pageNum}`;
-              return fetch(`${gatewayUrlBase}${encodeURIComponent(pageUrl)}`)
-                  .then(res => res.ok ? res.text() : "")
-                  .catch(() => "");
-          });
-
-          const htmlResults = await Promise.all(pagePromises);
-          const allTracks = [];
-
-          htmlResults.forEach(html => {
-              if (!html) return;
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(html, "text/html");
-              const rows = doc.querySelectorAll('.chartlist-row');
-              
-              rows.forEach(row => {
-                  const nameNode = row.querySelector('.chartlist-name a');
-                  const artistNode = row.querySelector('.chartlist-artist a');
-                  const lovedNode = row.querySelector('.chartlist-loved [data-toggle-button-current-state]');
-                  const statNode = row.querySelector('.chartlist-count-bar-slug');
-
-                  if (nameNode && artistNode) {
-                      const name = nameNode.textContent.trim();
-                      const artist = artistNode.textContent.trim();
-                      const isLoved = lovedNode ? lovedNode.getAttribute('data-toggle-button-current-state') === 'loved' : false;
-                      const playcount = statNode ? parseInt(statNode.getAttribute('data-stat-value'), 10) || 0 : 0;
-                      
-                      allTracks.push({ name, artist, isLoved, playcount });
-                  }
-              });
-          });
-
-          return allTracks;
-      } catch (e) {
-          console.warn(`[Sort-Play] Failed to scrape top tracks for ${username}`, e);
           return [];
       }
   }
@@ -31601,7 +31560,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     mainButton.style.cursor = "pointer";
     applyCurrentThemeColors(); 
     mainButton.style.filter = "brightness(1)";
-    isButtonClicked = false;
     menuButtons.forEach((button) => {
       button.disabled = false;
     });
@@ -35135,11 +35093,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       };
   }
 
+  let lastObservedUri = null;
+  let lastObservedPath = null;
+  let lastObservedMainView = null;
+
   function onPageChange() {
-    if (tracklistObserver) tracklistObserver.disconnect();
-    if (albumTracklistObserver) albumTracklistObserver.disconnect();
-    if (artistTracklistObserver) artistTracklistObserver.disconnect();
-    
     insertButton();
     updateArtistPageGenres(); 
     const currentUri = getCurrentUri();
@@ -35152,22 +35110,80 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     likeButton_connectObserver();
 
-    if (currentUri) {
-        if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
-            initializeTracklistObserver();
-        } else if (URI.isAlbum(currentUri)) {
-            initializeAlbumTracklistObserver();
-        } else if (URI.isArtist(currentUri)) {
-            initializeArtistTracklistObserver();
+    const mainView = document.querySelector("main");
+
+    if (currentUri !== lastObservedUri || path !== lastObservedPath || mainView !== lastObservedMainView) {
+        lastObservedUri = currentUri;
+        lastObservedPath = path;
+        lastObservedMainView = mainView;
+
+        if (tracklistObserver) tracklistObserver.disconnect();
+        if (albumTracklistObserver) albumTracklistObserver.disconnect();
+        if (artistTracklistObserver) artistTracklistObserver.disconnect();
+        
+        if (currentUri) {
+            if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+                initializeTracklistObserver();
+            } else if (URI.isAlbum(currentUri)) {
+                initializeAlbumTracklistObserver();
+            } else if (URI.isArtist(currentUri)) {
+                initializeArtistTracklistObserver();
+            }
         }
-    }
-    
-    if (isSearchPage) {
-        initializeTracklistObserver();
+        
+        if (isSearchPage) {
+            initializeTracklistObserver();
+        }
+    } else {
+        if (currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isSearchPage)) {
+             updateTracklist();
+        } else if (currentUri && URI.isAlbum(currentUri)) {
+             updateAlbumTracklist();
+        } else if (currentUri && URI.isArtist(currentUri)) {
+             updateArtistTracklist();
+        }
     }
   }
 
-  const mainPageObserver = new MutationObserver(onPageChange);
+  const mainPageObserver = new MutationObserver((mutations) => {
+      let shouldTrigger = false;
+      for (const mutation of mutations) {
+          for (const node of mutation.addedNodes) {
+              if (node.nodeType === 1) {
+                  if (node.tagName === 'MAIN' || node.tagName === 'SECTION') {
+                      shouldTrigger = true;
+                      break;
+                  }
+                  
+                  if (typeof node.className === 'string') {
+                      if (
+                          node.className.includes('main-view-container') ||
+                          node.className.includes('main-trackList-indexable') ||
+                          node.className.includes('main-trackList-trackList') ||
+                          node.className.includes('main-actionBar-ActionBarRow') ||
+                          node.className.includes('playlist-playlist-searchBoxContainer') ||
+                          node.className.includes('x-sortBox-sortDropdown')
+                      ) {
+                          shouldTrigger = true;
+                          break;
+                      }
+                  }
+                  
+                  if (node.querySelector) {
+                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .x-sortBox-sortDropdown')) {
+                          shouldTrigger = true;
+                          break;
+                      }
+                  }
+              }
+          }
+          if (shouldTrigger) break;
+      }
+
+      if (shouldTrigger) {
+          onPageChange();
+      }
+  });
 
   mainPageObserver.observe(document.body, {
     childList: true,
