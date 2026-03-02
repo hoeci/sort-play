@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.65.0";
+  const SORT_PLAY_VERSION = "5.65.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -1071,6 +1071,7 @@
         title: 'My Top Tracks',
         cards: [
             { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth, broken: false },
+            { id: 'topLast6Months', name: 'Top Tracks: Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months, broken: false },
             { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime, broken: false },
         ]
     }
@@ -5957,11 +5958,14 @@
           const contentArea = existing.querySelector('#sp-genre-content-area');
 
           const transitionToContent = (newHtml, callback) => {
-              const startHeight = existing.offsetHeight;
+              const rect = existing.getBoundingClientRect();
+              const startHeight = rect.height;
+              const vH = window.innerHeight;
+              const isDockedBottom = existing.classList.contains('docked-bottom');
               
               existing.style.transition = 'none';
               existing.style.height = `${startHeight}px`;
-              existing.style.overflow = 'hidden';
+              existing.style.overflow = 'hidden'; 
               contentArea.style.overflow = 'hidden';
               
               contentArea.innerHTML = newHtml;
@@ -5972,16 +5976,40 @@
                   const targetHeight = existing.offsetHeight;
                   
                   existing.style.height = `${startHeight}px`;
-                  existing.offsetHeight; 
+                  void existing.offsetHeight;
                   
-                  existing.style.transition = 'height 0.3s cubic-bezier(0.2, 0, 0, 1)';
+                  let targetTop = existing.style.top;
+                  let targetBottom = existing.style.bottom;
+                  
+                  if (isDockedBottom) {
+                      const currentBottom = parseFloat(existing.style.bottom) || (vH - rect.bottom);
+                      const projectedTop = vH - currentBottom - targetHeight;
+                      
+                      if (projectedTop < 70) {
+                          const newBottom = vH - 70 - targetHeight;
+                          targetBottom = `${Math.max(10, newBottom)}px`;
+                      }
+                  } else {
+                      const currentTop = parseFloat(existing.style.top) || rect.top;
+                      const projectedBottom = currentTop + targetHeight;
+                      
+                      if (projectedBottom > vH - 10) {
+                          const newTop = vH - 10 - targetHeight;
+                          targetTop = `${Math.max(70, newTop)}px`;
+                      }
+                  }
+                  
+                  existing.style.transition = 'height 0.3s cubic-bezier(0.2, 0, 0, 1), top 0.3s cubic-bezier(0.2, 0, 0, 1), bottom 0.3s cubic-bezier(0.2, 0, 0, 1)';
+                  
                   existing.style.height = `${targetHeight}px`;
+                  if (targetTop !== existing.style.top) existing.style.top = targetTop;
+                  if (targetBottom !== existing.style.bottom) existing.style.bottom = targetBottom;
                   
                   const onEnd = () => {
                       existing.style.height = 'auto';
                       existing.style.overflow = 'hidden';
                       existing.style.transition = 'none';
-                      contentArea.style.overflow = ''; 
+                      contentArea.style.overflow = '';
                       existing.removeEventListener('transitionend', onEnd);
                       enforceBoundaries(existing);
                   };
@@ -6791,30 +6819,17 @@
                       promises.push((async () => {
                           const fetchArtistGenres = async (artistId) => {
                               try {
-                                  const fetchWithClientToken = async () => {
-                                      const token = await get_S_Client_Token();
-                                      if (!token) throw new Error("No client token");
-                                      const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-                                          headers: { "Authorization": `Bearer ${token}` }
-                                      });
-                                      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                                      const data = await res.json();
-                                      return data.genres || [];
-                                  };
-
-                                  if (isFallbackActive()) {
-                                      return await fetchWithClientToken();
-                                  } else {
-                                      try {
-                                          const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artistId}`);
-                                          return res?.genres || [];
-                                      } catch (e) {
-                                          if (registerWebApiFailure()) {
-                                              return await fetchWithClientToken();
-                                          }
-                                          throw e;
+                                  const token = await get_S_Client_Token();
+                                  if (!token) throw new Error("No client token");
+                                  const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
+                                      headers: { 
+                                          "Authorization": `Bearer ${token}`,
+                                          "Accept-Language": "en,en-US;q=0.9"
                                       }
-                                  }
+                                  });
+                                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                                  const data = await res.json();
+                                  return data.genres || [];
                               } catch (e) { return []; }
                           };
 
@@ -7429,28 +7444,18 @@
                           return domArtistName;
                       }
 
-                      const fetchWithClientToken = async () => {
+                      try {
                           const token = await get_S_Client_Token();
                           if (!token) throw new Error("No client token");
                           const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-                              headers: { "Authorization": `Bearer ${token}` }
+                              headers: { 
+                                  "Authorization": `Bearer ${token}`,
+                                  "Accept-Language": "en,en-US;q=0.9"
+                              }
                           });
                           if (!res.ok) throw new Error(`HTTP ${res.status}`);
                           const data = await res.json();
-                          return data;
-                      };
-
-                      try {
-                          let data;
-                          if (isFallbackActive()) {
-                              data = await fetchWithClientToken();
-                          } else {
-                              try {
-                                  data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artistId}`);
-                              } catch (e) {
-                                  if (registerWebApiFailure()) data = await fetchWithClientToken();
-                              }
-                          }
+                          
                           if (data) {
                               if (data.genres) {
                                   artistGenreCache.set(artistId, data.genres);
@@ -19499,34 +19504,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
                 await Promise.all(artistBatches.map(async (batch) => {
                     try {
-                        let artistData;
-                        const fetchWithClientToken = async () => {
-                            const token = await get_S_Client_Token();
-                            if (!token) throw new Error("No client token available");
-                            const res = await fetch(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`, {
-                                headers: { "Authorization": `Bearer ${token}` }
-                            });
-                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                            return await res.json();
-                        };
-
-                        if (isFallbackActive()) {
-                            artistData = await fetchWithClientToken();
-                        } else {
-                            try {
-                                artistData = await withRetry(
-                                    () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`),
-                                    CONFIG.spotify.retryAttempts,
-                                    CONFIG.spotify.retryDelay
-                                );
-                            } catch (error) {
-                                if (registerWebApiFailure()) {
-                                    artistData = await fetchWithClientToken();
-                                } else {
-                                    throw error;
-                                }
+                        const token = await get_S_Client_Token();
+                        if (!token) throw new Error("No client token available");
+                        const res = await fetch(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`, {
+                            headers: { 
+                                "Authorization": `Bearer ${token}`,
+                                "Accept-Language": "en,en-US;q=0.9"
                             }
-                        }
+                        });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        let artistData = await res.json();
                         
                         if (artistData?.artists) {
                             artistData.artists.forEach(artist => {
@@ -19794,34 +19781,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                 const batch = artistIdsToFetch.slice(i, i + 50);
                 try {
-                    let artistData;
-                    const fetchWithClientToken = async () => {
-                        const token = await get_S_Client_Token();
-                        if (!token) throw new Error("No client token available");
-                        const res = await fetch(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`, {
-                            headers: { "Authorization": `Bearer ${token}` }
-                        });
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                        return await res.json();
-                    };
-
-                    if (isFallbackActive()) {
-                        artistData = await fetchWithClientToken();
-                    } else {
-                        try {
-                            artistData = await withRetry(
-                                () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`),
-                                CONFIG.spotify.retryAttempts,
-                                CONFIG.spotify.retryDelay
-                            );
-                        } catch (error) {
-                            if (registerWebApiFailure()) {
-                                artistData = await fetchWithClientToken();
-                            } else {
-                                throw error;
-                            }
+                    const token = await get_S_Client_Token();
+                    if (!token) throw new Error("No client token available");
+                    const res = await fetch(`https://api.spotify.com/v1/artists?ids=${batch.join(',')}&locale=en`, {
+                        headers: { 
+                            "Authorization": `Bearer ${token}`,
+                            "Accept-Language": "en,en-US;q=0.9"
                         }
-                    }
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    let artistData = await res.json();
 
                     if (artistData?.artists) {
                         artistData.artists.forEach(artist => {
@@ -25368,7 +25337,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const timeRangeMap = {
             'short_term': 'SHORT_TERM',
             'long_term': 'LONG_TERM',
-            'medium_term': null
+            'medium_term': 'MID_TERM'
         };
         const gqlTimeRange = timeRangeMap[time_range];
 
