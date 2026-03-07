@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.65.2";
+  const SORT_PLAY_VERSION = "5.65.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -32424,11 +32424,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       try {
           const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${params.toString()}`);
           
+          if (response.status === 401 || response.status === 403) {
+              return { page: targetPage, hasNextPage: false, comments: [], error: "session_expired" };
+          }
+
           if (!response.ok) {
               return { page: targetPage, hasNextPage: false, comments: [] };
           }
 
           const html = await response.text();
+          
+          if (html === "SESSION_EXPIRED") {
+              return { page: targetPage, hasNextPage: false, comments: [], error: "session_expired" };
+          }
+
           const doc = new DOMParser().parseFromString(html, "text/html");
           const rootList = doc.querySelector('.shoutbox > ul.shout-list, .shouts-container > ul.shout-list, ul.shout-list');
 
@@ -32915,13 +32924,22 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               commentsLoader.style.display = 'flex';
 
               const result = await fetchLastFmShoutbox(artistName, trackName, currentPage);
+              
+              if (result.error === "session_expired") {
+                  commentList.innerHTML = '<div style="color: #b3b3b3; text-align: center; padding: 20px; font-size: 13px; font-style: italic; line-height: 1.5;">Shoutbox connection expired.</div>';
+                  hasNextPage = false;
+                  commentsLoader.style.display = 'none';
+                  isLoadingComments = false;
+                  return;
+              }
+
               commentsData.push(...result.comments);
               hasNextPage = result.hasNextPage;
               currentPage++;
 
-              if (commentsData.length === 0) {
+              if (commentsData.length === 0 && currentPage === 2) {
                   commentList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px; font-size: 13px;">No shouts found for this track.</div>';
-              } else {
+              } else if (result.comments.length > 0) {
                   commentList.insertAdjacentHTML('beforeend', buildCommentsHtml(result.comments));
               }
 
