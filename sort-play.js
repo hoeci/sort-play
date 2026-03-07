@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.65.1";
+  const SORT_PLAY_VERSION = "5.65.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -206,7 +206,7 @@
   const CACHE_EXPIRE_GENRES = 7 * 24 * 60 * 60 * 1000;
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
-  const LFM_SHOUTBOX_GATEWAY_URL = "https://gateway3.niko2nio2.workers.dev/";
+  const LFM_SHOUTBOX_GATEWAY_URL = "https://shoutbox.niko2nio2.workers.dev/";
   const TURSO_GATEWAY_URL = "https://turso-genre-proxy.niko2nio2.workers.dev";
   const DEEZER_GATEWAY_URL = "https://deezer-proxy.hunqo.workers.dev/?url=";
   const DEEZER_GATEWAY_URL_2 = "https://deezer-proxy-2.hoeci.workers.dev/?url=";
