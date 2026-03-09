@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.65.3";
+  const SORT_PLAY_VERSION = "5.66.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -33,6 +33,9 @@
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU = "sort-play-show-lastfm-context-menu";
   const STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU = "sort-play-show-genres-context-menu";
+  const STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU = "sort-play-show-artist-discography-context-menu";
+  const STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU = "sort-play-show-shuffle-context-menu";
+  const STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE = "sort-play-artist-discography-sort-type";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2 = "sort-play-user-system-instruction-v2";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
@@ -177,6 +180,11 @@
   let lastFmContextMenuItem = null;
   let showGenresContextMenu = false;
   let genresContextMenuItem = null;
+  let showArtistDiscographyContextMenu = false;
+  let showShuffleContextMenu = true;
+  let artistDiscographySortType = 'releaseDate';
+  let artistDiscographyContextMenuItem = null;
+  let shuffleContextMenuItem = null;
   const revokedLfmKeys = new Set();
   const runningJobIds = new Set();
   const artistGenreCache = new Map();
@@ -1261,6 +1269,10 @@
     lastFmAutocorrect = localStorage.getItem("sort-play-lastfm-autocorrect") === "true";
     showLastFmContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU) === "true";
     showGenresContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU) === "true";
+    showArtistDiscographyContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU) === "true";
+    const showShuffleContextMenuStored = localStorage.getItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU);
+    showShuffleContextMenu = showShuffleContextMenuStored === null ? true : showShuffleContextMenuStored === "true";
+    artistDiscographySortType = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE) || 'releaseDate';
     showGenreTags = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS) === "true";
     showGenreTagsNowPlaying = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP) !== "false";
     showGenreTagsArtistPage = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP) !== "false";
@@ -1338,6 +1350,11 @@
     updateLastFmContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU, showGenresContextMenu);
     updateGenresContextMenu();
+    localStorage.setItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, showArtistDiscographyContextMenu);
+    localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, artistDiscographySortType);
+    updateArtistDiscographyContextMenu();
+    localStorage.setItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU, showShuffleContextMenu);
+    updateShuffleContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS, showGenreTags);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP, showGenreTagsNowPlaying);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP, showGenreTagsArtistPage);
@@ -2585,9 +2602,42 @@
         </div>
     </div>
 
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Context Menus
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="artistDiscographyContextMenuSetting">
+        <label class="col description">
+        Artist Menu: Create Discography
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Adds an option to the artist right-click menu to create a sorted discography playlist.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <select id="artistDiscographySortSelect" style="max-width: 140px; margin-right: 10px;">
+                <option value="playCount" ${artistDiscographySortType === 'playCount' ? 'selected' : ''}>Play Count</option>
+                <option value="popularity" ${artistDiscographySortType === 'popularity' ? 'selected' : ''}>Popularity</option>
+                <option value="releaseDate" ${artistDiscographySortType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                <option value="scrobbles" ${artistDiscographySortType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
+                <option value="personalScrobbles" ${artistDiscographySortType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
+                <option value="shuffle" ${artistDiscographySortType === 'shuffle' ? 'selected' : ''}>Shuffle</option>
+                <option value="tempo" ${artistDiscographySortType === 'tempo' ? 'selected' : ''}>Tempo</option>
+                <option value="energy" ${artistDiscographySortType === 'energy' ? 'selected' : ''}>Energy</option>
+                <option value="danceability" ${artistDiscographySortType === 'danceability' ? 'selected' : ''}>Danceability</option>
+                <option value="valence" ${artistDiscographySortType === 'valence' ? 'selected' : ''}>Valence</option>
+            </select>
+            <label class="switch">
+                <input type="checkbox" id="showArtistDiscographyContextMenuToggle" ${showArtistDiscographyContextMenu ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+    
     <div class="setting-row" id="showGenresContextMenuSetting">
         <label class="col description">
-            Add "Show Genres" to Track Menu
+            Track Menu: Show Genres
             <span class="tooltip-container">
                 ${infoIconSvg}
                 <span class="custom-tooltip">Adds a "Show Genres" option to the track right-click menu to view detailed genre tags in a popup window.</span>
@@ -2600,7 +2650,39 @@
             </label>
         </div>
     </div>
-    
+
+    <div class="setting-row" id="lastFmContextMenuSetting">
+        <label class="col description">
+        Track Menu: Last.fm Details
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Adds a "Last.fm Details" option to the track right-click menu to view details in a popup window.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="showLastFmContextMenuToggle" ${showLastFmContextMenu ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="shuffleContextMenuSetting">
+        <label class="col description">
+        All Menus: Shuffle & Play
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Adds a right-click option to artists, albums, and playlists that instantly shuffles and plays their tracks.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="showShuffleContextMenuToggle" ${showShuffleContextMenu ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Playlist Attributes
     </div>
@@ -2754,22 +2836,6 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
-    <div class="setting-row" id="lastFmContextMenuSetting">
-        <label class="col description">
-            Add "Last.fm Details" to Track Menu
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">Adds a "Last.fm Details" option to the track right-click menu to view details in a popup window.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" id="showLastFmContextMenuToggle" ${showLastFmContextMenu ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
-
     <div class="setting-row" id="lastFmAutocorrectSetting">
         <label class="col description">
             Last.fm Autocorrect
@@ -2874,6 +2940,9 @@
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
     const lastFmAutocorrectToggle = modalContainer.querySelector("#lastFmAutocorrectToggle");
     const showLastFmContextMenuToggle = modalContainer.querySelector("#showLastFmContextMenuToggle");
+    const showArtistDiscographyContextMenuToggle = modalContainer.querySelector("#showArtistDiscographyContextMenuToggle");
+    const showShuffleContextMenuToggle = modalContainer.querySelector("#showShuffleContextMenuToggle");
+    const artistDiscographySortSelect = modalContainer.querySelector("#artistDiscographySortSelect");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
     const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
     const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
@@ -3133,6 +3202,21 @@
 
     showLastFmContextMenuToggle.addEventListener("change", () => {
         showLastFmContextMenu = showLastFmContextMenuToggle.checked;
+        saveSettings();
+    });
+
+    showArtistDiscographyContextMenuToggle.addEventListener("change", () => {
+        showArtistDiscographyContextMenu = showArtistDiscographyContextMenuToggle.checked;
+        saveSettings();
+    });
+
+    showShuffleContextMenuToggle.addEventListener("change", () => {
+        showShuffleContextMenu = showShuffleContextMenuToggle.checked;
+        saveSettings();
+    });
+
+    artistDiscographySortSelect.addEventListener("change", () => {
+        artistDiscographySortType = artistDiscographySortSelect.value;
         saveSettings();
     });
 
@@ -24490,25 +24574,33 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return false;
   }
 
-  new Spicetify.ContextMenu.Item(
-    "Shuffle with Sort-Play",
-    async (uris) => {
-        setButtonProcessing(true);
-        mainButton.innerHTML = '<div class="loader"></div>';
-        closeAllMenus();
+  function updateShuffleContextMenu() {
+    if (showShuffleContextMenu && !shuffleContextMenuItem) {
+        shuffleContextMenuItem = new Spicetify.ContextMenu.Item(
+            "Shuffle & Play",
+            async (uris) => {
+                setButtonProcessing(true);
+                mainButton.innerHTML = '<div class="loader"></div>';
+                closeAllMenus();
 
-        try {
-            await executeShuffleAndPlay(uris[0]);
-        } catch (error) {
-            console.error("Error from context menu shuffle:", error);
-            showNotification(error.message, true);
-        } finally {
-            resetButtons();
-        }
-    },
-    shouldShowShufflePlayOption,
-    "shuffle"
-  ).register();
+                try {
+                    await executeShuffleAndPlay(uris[0]);
+                } catch (error) {
+                    console.error("Error from context menu shuffle:", error);
+                    showNotification(error.message, true);
+                } finally {
+                    resetButtons();
+                }
+            },
+            shouldShowShufflePlayOption,
+            "shuffle"
+        );
+        shuffleContextMenuItem.register();
+    } else if (!showShuffleContextMenu && shuffleContextMenuItem) {
+        shuffleContextMenuItem.deregister();
+        shuffleContextMenuItem = null;
+    }
+  }
 
   async function convertLocalPlaylistToSpotify() {
     const BATCH_SIZE = 50; 
@@ -28120,7 +28212,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const initialPagePath = Spicetify.Platform.History.location.pathname; 
 
     try {
-      const currentUriAtStart = getCurrentUri(); 
+      const currentUriAtStart = options.sourceUri || getCurrentUri(); 
       if (!currentUriAtStart) {
         if (!isHeadless) resetButtons();
         showNotification("Please select a playlist or artist first");
@@ -33057,6 +33149,38 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
   }
 
+  function updateArtistDiscographyContextMenu() {
+      if (showArtistDiscographyContextMenu && !artistDiscographyContextMenuItem) {
+          artistDiscographyContextMenuItem = new Spicetify.ContextMenu.Item(
+              "Create Discography",
+              async (uris) => {
+                  const artistUri = uris[0];
+                  
+                  menuButtons.forEach((btn) => {
+                      if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                          btn.style.backgroundColor = "transparent";
+                      }
+                  });
+                  closeAllMenus();
+                  
+                  await handleSortAndCreatePlaylist(artistDiscographySortType, { sourceUri: artistUri });
+              },
+              (uris) => {
+                  if (uris.length !== 1) return false;
+                  const uri = uris[0];
+                  return Spicetify.URI.isArtist(uri) || uri.startsWith("spotify:artist:");
+              },
+              "album"
+          );
+          artistDiscographyContextMenuItem.register();
+      } else if (!showArtistDiscographyContextMenu && artistDiscographyContextMenuItem) {
+          artistDiscographyContextMenuItem.deregister();
+          artistDiscographyContextMenuItem = null;
+      }
+  }
+
+
+  
   function showColumnSelector(event, contextType) {
     event.stopPropagation();
     const abortController = new AbortController();
@@ -35442,6 +35566,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   prefetchNextTrackData();
   updateLastFmContextMenu();
   updateGenresContextMenu();
+  updateArtistDiscographyContextMenu();
+  updateShuffleContextMenu();
   console.log(`Sort-Play loaded`);
   onPageChange();
   }
