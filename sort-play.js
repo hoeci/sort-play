@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.66.0";
+  const SORT_PLAY_VERSION = "5.67.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -10207,7 +10207,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     top: 50%;
                     left: 50%;
                     transform: translate(-50%, -50%);
-                    z-index: 1001;
+                    z-index: 3001;
                     width: 300px;
                 }
                 .save-keywords-title {
@@ -10250,7 +10250,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     right: 0;
                     bottom: 0;
                     background-color: rgba(0, 0, 0, 0.5);
-                    z-index: 1000;
+                    z-index: 3000;
                 }
                 </style>
                 <div class="save-keywords-title">Enter Keywords Group Name</div>
@@ -10271,10 +10271,31 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 overlay.remove();
             };
 
-            saveBtn.addEventListener("click", () => {
+            saveBtn.addEventListener("click", async () => {
                 const groupName = saveInput.value.trim();
                 if (groupName) {
                     let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                    
+                    if (savedKeywordGroups[groupName]) {
+                        const confirmPromise = showConfirmationModal({
+                            title: "Replace Keyword Group?",
+                            description: `A group named "${groupName}" already exists. Do you want to replace it?`,
+                            confirmText: "Replace",
+                            cancelText: "Cancel"
+                        });
+                        
+                        const confirmOverlay = document.getElementById("sort-play-confirmation-overlay");
+                        if (confirmOverlay) {
+                            confirmOverlay.style.zIndex = "4000";
+                            if (confirmOverlay.firstChild) confirmOverlay.firstChild.style.zIndex = "4001";
+                        }
+                        
+                        const confirmReplace = await confirmPromise;
+                        if (confirmReplace !== 'confirm') {
+                            return;
+                        }
+                    }
+
                     savedKeywordGroups[groupName] = [...keywordSet];
                     localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
                     showNotification(`Keywords saved as "${groupName}"`);
@@ -10310,7 +10331,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
                     position: absolute;
                     right: 0;
-                    z-index: 1002;
+                    z-index: 3002;
                     min-width: 180px;
                     max-width: 250px;
                     max-height: 200px;
@@ -10391,7 +10412,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 option.appendChild(optionContent);
                 option.appendChild(removeButton);
 
-                optionContent.addEventListener("click", (e) => {
+                option.addEventListener("click", (e) => {
                     const tagsContainer = container.querySelector(".keyword-tags-container");
                     tagsContainer.innerHTML = "";
                     keywordSet.clear();
@@ -13656,7 +13677,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
     }
 
-    if (scrobbleFilterMode !== 'all') {
+    if (scrobbleFilterMode !== 'all' || filters.minScrobbles || filters.maxScrobbles) {
         if (!isHeadless) mainButton.innerText = "Filtering History...";
         const lastFmUsername = loadLastFmUsername();
         if (lastFmUsername) {
@@ -13666,14 +13687,122 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             
             filteredTracks = tracksWithScrobbles.filter(t => {
                 const playCount = t.personalScrobbles || 0;
-                if (scrobbleFilterMode === 'exclude') return playCount === 0;
-                if (scrobbleFilterMode === 'require') return playCount > 0;
+                if (scrobbleFilterMode === 'exclude' && playCount > 0) return false;
+                if (scrobbleFilterMode === 'require' && playCount === 0) return false;
+                if (filters.minScrobbles && playCount < parseInt(filters.minScrobbles)) return false;
+                if (filters.maxScrobbles && playCount > parseInt(filters.maxScrobbles)) return false;
                 return true;
             });
         } else {
             console.warn("[Sort-Play Dynamic Filter] Cannot filter by history. Last.fm username not set.");
             if (!isHeadless) showNotification("Last.fm username not set, skipping history filter.", 'warning');
         }
+    }
+
+    if (filters.minPlayCount || (filters.maxPlayCount !== undefined && filters.maxPlayCount !== null && filters.maxPlayCount !== '')) {
+        if (!isHeadless) mainButton.innerText = "Filtering Plays...";
+        const tracksWithPlaycounts = await enrichTracksWithPlayCounts(filteredTracks);
+        filteredTracks = tracksWithPlaycounts.filter(t => {
+            const playCount = parseInt(t.playCount, 10);
+            if (isNaN(playCount)) return true;
+            if (filters.minPlayCount && playCount < parseInt(filters.minPlayCount)) return false;
+            if (filters.maxPlayCount && playCount > parseInt(filters.maxPlayCount)) return false;
+            return true;
+        });
+    }
+
+    if (filters.minGlobalScrobbles || (filters.maxGlobalScrobbles !== undefined && filters.maxGlobalScrobbles !== null && filters.maxGlobalScrobbles !== '')) {
+        if (!isHeadless) mainButton.innerText = "Filtering Gl. Scrobbles...";
+        const tracksWithGlobalScrobbles = await handleScrobblesSorting(filteredTracks, 'scrobbles', (p) => { if (!isHeadless) mainButton.innerText = `Gl. Scrobbles ${p}%`; });
+        filteredTracks = tracksWithGlobalScrobbles.filter(t => {
+            const scrobbles = parseInt(t.scrobbles, 10);
+            if (isNaN(scrobbles) || scrobbles === -1) return true;
+            if (filters.minGlobalScrobbles && scrobbles < parseInt(filters.minGlobalScrobbles)) return false;
+            if (filters.maxGlobalScrobbles && scrobbles > parseInt(filters.maxGlobalScrobbles)) return false;
+            return true;
+        });
+    }
+
+    const followedFilterMode = filters.followedFilter || 'all';
+    if (followedFilterMode !== 'all') {
+        if (!isHeadless) mainButton.innerText = "Filtering Followed...";
+        const followedArtists = await getAllFollowedArtists();
+        const followedArtistIds = new Set(followedArtists.map(a => a.id));
+        
+        filteredTracks = filteredTracks.filter(track => {
+            let trackArtistIds = [];
+            if (track.artistUris && Array.isArray(track.artistUris)) trackArtistIds = track.artistUris.map(u => u.split(':')[2]);
+            else if (track.artists && Array.isArray(track.artists)) trackArtistIds = track.artists.map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)).filter(Boolean);
+            
+            if (trackArtistIds.length === 0) return followedFilterMode === 'exclude';
+            
+            const isAnyFollowed = trackArtistIds.some(id => followedArtistIds.has(id));
+            if (followedFilterMode === 'require') return isAnyFollowed;
+            if (followedFilterMode === 'exclude') return !isAnyFollowed;
+            return true;
+        });
+    }
+
+    if (filters.minDuration || filters.maxDuration) {
+        filteredTracks = filteredTracks.filter(t => {
+            const durSec = (t.durationMs || t.durationMilis || t.track?.duration_ms || 0) / 1000;
+            if (filters.minDuration && durSec < parseInt(filters.minDuration)) return false;
+            if (filters.maxDuration && durSec > parseInt(filters.maxDuration)) return false;
+            return true;
+        });
+    }
+
+    if (filters.minPopularity || filters.maxPopularity || filters.minYear || filters.maxYear) {
+        if (!isHeadless) mainButton.innerText = "Filtering Meta...";
+        const tracksWithIds = await processBatchesWithDelay(filteredTracks, 50, 500, () => {}, collectTrackIdsForPopularity);
+        let metaTracks = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
+        
+        if (filters.minYear || filters.maxYear) {
+            metaTracks = await processBatchesWithDelay(metaTracks, 50, 500, () => {}, getTrackDetailsWithReleaseDate);
+        }
+        
+        filteredTracks = metaTracks.filter(t => {
+            if (filters.minPopularity || filters.maxPopularity) {
+                const pop = t.popularity || 0;
+                if (filters.minPopularity && pop < parseInt(filters.minPopularity)) return false;
+                if (filters.maxPopularity && pop > parseInt(filters.maxPopularity)) return false;
+            }
+            if (filters.minYear || filters.maxYear) {
+                if (!t.releaseDate) return false;
+                const year = new Date(t.releaseDate).getFullYear();
+                if (isNaN(year)) return false;
+                if (filters.minYear && year < parseInt(filters.minYear)) return false;
+                if (filters.maxYear && year > parseInt(filters.maxYear)) return false;
+            }
+            return true;
+        });
+    }
+
+    const hasAudioFilters = filters.minTempo || filters.maxTempo || filters.minEnergy || filters.maxEnergy || filters.minDanceability || filters.maxDanceability || filters.minValence || filters.maxValence;
+    if (hasAudioFilters) {
+        if (!isHeadless) mainButton.innerText = "Filtering Audio...";
+        const trackIds = filteredTracks.map(t => t.trackId || (t.uri ? t.uri.split(":")[2] : null)).filter(Boolean);
+        const allStats = await getBatchTrackStats(trackIds);
+        
+        filteredTracks = filteredTracks.filter(t => {
+            const tid = t.trackId || (t.uri ? t.uri.split(":")[2] : null);
+            const stats = allStats[tid];
+            if (!stats) return false;
+            
+            if (filters.minTempo && stats.tempo < parseInt(filters.minTempo)) return false;
+            if (filters.maxTempo && stats.tempo > parseInt(filters.maxTempo)) return false;
+            
+            if (filters.minEnergy && stats.energy < parseInt(filters.minEnergy)) return false;
+            if (filters.maxEnergy && stats.energy > parseInt(filters.maxEnergy)) return false;
+            
+            if (filters.minDanceability && stats.danceability < parseInt(filters.minDanceability)) return false;
+            if (filters.maxDanceability && stats.danceability > parseInt(filters.maxDanceability)) return false;
+            
+            if (filters.minValence && stats.valence < parseInt(filters.minValence)) return false;
+            if (filters.maxValence && stats.valence > parseInt(filters.maxValence)) return false;
+            
+            return true;
+        });
     }
 
     if (filters.maxPlayCount !== undefined && filters.maxPlayCount !== null && filters.maxPlayCount !== '') {
@@ -13693,20 +13822,25 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
         const { keepMatchingMode, filterTitle, filterAlbum, filterArtist, matchWholeWord, titleAlbumKeywords = [], artistKeywords = [] } = filters;
         
+        const effectiveTitleAlbumKeywords = (filterTitle || filterAlbum) ? titleAlbumKeywords : [];
+        const effectiveArtistKeywords = filterArtist ? artistKeywords : [];
+
         filteredTracks = filteredTracks.filter(track => {
             const trackTitle = track.songTitle || track.name || "";
             const trackAlbum = track.albumName || "";
             const trackArtists = track.allArtists || "";
     
-            const hasTitleAlbumKeywords = titleAlbumKeywords.length > 0;
-            const hasArtistKeywords = artistKeywords.length > 0;
+            const hasTitleAlbumKeywords = effectiveTitleAlbumKeywords.length > 0;
+            const hasArtistKeywords = effectiveArtistKeywords.length > 0;
+
+            if (!hasTitleAlbumKeywords && !hasArtistKeywords) return true;
     
-            const titleAlbumMatch = hasTitleAlbumKeywords && titleAlbumKeywords.some(keyword => {
+            const titleAlbumMatch = hasTitleAlbumKeywords && effectiveTitleAlbumKeywords.some(keyword => {
                 const regex = matchWholeWord ? new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'i') : new RegExp(escapeRegExp(keyword), 'i');
                 return (filterTitle && regex.test(trackTitle)) || (filterAlbum && regex.test(trackAlbum));
             });
     
-            const artistMatch = hasArtistKeywords && filterArtist && artistKeywords.some(keyword => {
+            const artistMatch = hasArtistKeywords && effectiveArtistKeywords.some(keyword => {
                 const regex = matchWholeWord ? new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'i') : new RegExp(escapeRegExp(keyword), 'i');
                 return regex.test(trackArtists);
             });
@@ -13716,7 +13850,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 const artistCondition = hasArtistKeywords ? artistMatch : true;
                 return titleAlbumCondition && artistCondition;
             } else {
-                return !(titleAlbumMatch || artistMatch);
+                const isExcluded = (hasTitleAlbumKeywords && titleAlbumMatch) || (hasArtistKeywords && artistMatch);
+                return !isExcluded;
             }
         });
     }
@@ -15521,6 +15656,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         let likedFilterMode = currentFilters.likedFilter || (currentFilters.excludeLiked ? 'exclude' : 'all');
         let scrobbleFilterMode = currentFilters.scrobbleFilter || (currentFilters.excludeListened ? 'exclude' : 'all');
+        let followedFilterMode = currentFilters.followedFilter || 'all';
 
         const overlay = document.createElement("div");
         overlay.id = "filter-overlay";
@@ -15534,7 +15670,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const modalContainer = document.createElement("div");
         modalContainer.className = "main-embedWidgetGenerator-container";
         modalContainer.style.zIndex = "2007";
-        modalContainer.style.width = "650px";
+        modalContainer.style.width = "1085px";
         modalContainer.style.backgroundColor = "#181818";
         modalContainer.style.borderRadius = "25px";
         modalContainer.style.border = "2px solid #282828";
@@ -15542,10 +15678,14 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         modalContainer.innerHTML = `
           <style>
             .main-trackCreditsModal-mainSection { padding: 20px 32px !important; overflow: hidden; }
-            #filter-overlay .settings-left-wrapper { background-color: #1c1c1c; border-radius: 20px; padding: 20px; position: relative; margin-top: 20px; }
-            #filter-overlay .settings-left-wrapper.disabled > *:not(.settings-title-wrapper) { opacity: 0.5; pointer-events: none; }
-            #filter-overlay .settings-left-wrapper.disabled .settings-title-wrapper { opacity: 1; pointer-events: all; }
-            #filter-overlay .settings-left-wrapper.disabled #keywordFilterToggle { pointer-events: all; }
+            #filter-overlay .filter-modal-layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 25px; max-height: 65vh; }
+            #filter-overlay .settings-column { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+            #filter-overlay .settings-column::-webkit-scrollbar { width: 6px; }
+            #filter-overlay .settings-column::-webkit-scrollbar-thumb { background-color: #444; border-radius: 3px; }
+            #filter-overlay .settings-wrapper { background-color: #1c1c1c; border-radius: 20px; padding: 20px; position: relative; }
+            #filter-overlay .settings-wrapper.disabled > *:not(.settings-title-wrapper) { opacity: 0.5; pointer-events: none; }
+            #filter-overlay .settings-wrapper.disabled .settings-title-wrapper { opacity: 1; pointer-events: all; }
+            #filter-overlay .settings-wrapper.disabled #keywordFilterToggle { pointer-events: all; }
             #filter-overlay .settings-title { color: white; font-weight: bold; font-size: 15px; margin-bottom: 5px; }
             #filter-overlay .settings-title-wrapper { display: flex; justify-content: space-between; width: 100%; margin-bottom: 8px; }
             #filter-overlay .filter-mode-radio-group { display: flex; align-items: center; gap: 16px; margin: 10px 0; }
@@ -15573,9 +15713,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             #filter-overlay .keyword-action-button svg { width: 14px; height: 14px; fill: #fff; display: block; margin: 0 auto; }
             #filter-overlay .keyword-tag { display: inline-flex; align-items: center; background: #383838; border-radius: 12px; padding: 2px 8px; color: white; font-size: 12px; white-space: nowrap; flex-shrink: 0; height: 24px; }
             #filter-overlay .keyword-tag-remove { margin-left: 4px; cursor: pointer; color: #ccc; font-size: 14px; }
-            #filter-overlay .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+            #filter-overlay .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
             #filter-overlay .setting-row .description { color: #c1c1c1; }
             #filter-overlay .setting-row.disabled .description { opacity: 0.5; }
+            #filter-overlay .range-input-group { display: flex; align-items: center; gap: 6px; }
+            #filter-overlay .range-input { width: 100px; padding: 6px; border-radius: 4px; border: 1px solid #444; background: #282828; color: white; text-align: center; font-size: 13px; }
+            #filter-overlay .range-input:focus { outline: none; border-color: #1ED760; }
             #filter-overlay .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
             #filter-overlay .custom-tooltip { visibility: hidden; position: absolute; z-index: 2008; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 280px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
             #filter-overlay .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
@@ -15586,161 +15729,216 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             #filter-overlay .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
             #filter-overlay input:checked + .sliderx { background-color: #1DB954; }
             #filter-overlay input:checked + .sliderx:before { transform: translateX(16px); }
-            #filter-overlay .switch.disabled .sliderx, #filter-overlay input:disabled + .sliderx { opacity: 0.5; cursor: not-allowed; }
             #filter-overlay .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
             #filter-overlay .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
             #filter-overlay .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
             #filter-overlay .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
-            
-            #filter-overlay .segmented-control { 
-                display: grid; 
-                grid-template-columns: 55px 1fr 1fr; 
-                background-color: #454545;
-                border-radius: 4px; 
-                padding: 1px;
-                width: 290px; 
-                gap: 1px;
-            }
-            
-            #filter-overlay .segment-btn { 
-                background: #282828; 
-                border: none; 
-                color: #b3b3b3; 
-                padding: 4px 2px; 
-                font-size: 12px; 
-                font-weight: 400; 
-                cursor: pointer; 
-                border-radius: 0;
-                transition: background-color 0.2s, color 0.2s;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                width: 100%;
-            }
-
-            #filter-overlay .segment-btn:first-child {
-                border-top-left-radius: 4px;
-                border-bottom-left-radius: 4px;
-            }
-
-            #filter-overlay .segment-btn:last-child {
-                border-top-right-radius: 4px;
-                border-bottom-right-radius: 4px;
-            }
-            
-            #filter-overlay .segment-btn:hover { 
-                color: white; 
-                background-color: #333; 
-            }
-            
-            #filter-overlay .segment-btn.active { 
-                background-color: #555; 
-                color: white; 
-                font-weight: 600; 
-            }
-            
-            #filter-overlay .segment-btn.active[data-value="require"],
-            #filter-overlay .segment-btn.active[data-value="exclude"] { 
-                background-color: #1ED760; 
-                color: black; 
-            }
-            
+            #filter-overlay .segmented-control { display: grid; grid-template-columns: 55px 1fr 1fr; background-color: #454545; border-radius: 4px; padding: 1px; width: 315px; gap: 1px; }
+            #filter-overlay .segment-btn { background: #282828; border: none; color: #b3b3b3; padding: 4px 2px; font-size: 11px; font-weight: 500; cursor: pointer; border-radius: 0; transition: background-color 0.2s, color 0.2s; display: flex; align-items: center; justify-content: center; width: 100%; text-transform: uppercase; }
+            #filter-overlay .segment-btn:first-child { border-top-left-radius: 4px; border-bottom-left-radius: 4px; }
+            #filter-overlay .segment-btn:last-child { border-top-right-radius: 4px; border-bottom-right-radius: 4px; }
+            #filter-overlay .segment-btn:hover { color: white; background-color: #333; }
+            #filter-overlay .segment-btn.active { background-color: #555; color: white; font-weight: 700; }
+            #filter-overlay .segment-btn.active[data-value="require"], #filter-overlay .segment-btn.active[data-value="exclude"] { background-color: #1ED760; color: black; }
             #filter-overlay .setting-row.disabled .segmented-control { opacity: 0.5; pointer-events: none; }
+            #filter-overlay .summary-container { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background-color: #242424; padding: 12px 16px; border-radius: 8px; border: 1px solid #333; margin-top: 20px; min-height: 44px; }
+            #filter-overlay .summary-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; }
+            #load-preset-btn, #save-preset-btn { transition: all 0.2s ease !important; }
+            #load-preset-btn:hover, #save-preset-btn:hover { background-color: #333 !important; border-color: #fff !important; }
           </style>
-          <div class="main-trackCreditsModal-header">
-              <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Track Filtering Options</span></h1>
+          <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 12px; border-bottom: 1px solid #282828;">
+              <h1 class="main-trackCreditsModal-title" style="margin: 0;"><span style='font-size: 25px;'>Track Filtering Options</span></h1>
+              <div class="preset-actions" style="display: flex; gap: 8px;">
+                  <button id="load-preset-btn" class="main-buttons-button main-button-secondary" style="padding: 6px 16px; border-radius: 20px; font-weight: 550; font-size: 12px; cursor: pointer; border: 1px solid #666; background: transparent; color: white;">Load Preset</button>
+                  <button id="save-preset-btn" class="main-buttons-button main-button-secondary" style="padding: 6px 16px; border-radius: 20px; font-weight: 550; font-size: 12px; cursor: pointer; border: 1px solid #666; background: transparent; color: white;">Save Preset</button>
+              </div>
           </div>
           <div class="main-trackCreditsModal-mainSection">
-              <div style="display: flex; flex-direction: column; gap: 16px;">
-                  <div class="setting-row">
-                      <span class="description">Liked Status</span>
-                      <div class="segmented-control" id="liked-filter-control">
-                          <button class="segment-btn ${likedFilterMode === 'all' ? 'active' : ''}" data-value="all" data-text="Any">Any</button>
-                          <button class="segment-btn ${likedFilterMode === 'exclude' ? 'active' : ''}" data-value="exclude" data-text="Exclude Liked">Exclude Liked</button>
-                          <button class="segment-btn ${likedFilterMode === 'require' ? 'active' : ''}" data-value="require" data-text="Only Liked">Only Liked</button>
-                      </div>
-                  </div>
-                  <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
-                      <span class="description">
-                          Scrobble History
-                          <span class="tooltip-container">
-                              ${infoIconSvg}
-                              <span class="custom-tooltip">Requires Last.fm. ${isExcludeListenedDisabled ? '(Set Last.fm username in settings)' : ''}</span>
-                          </span>
-                      </span>
-                      <div class="segmented-control" id="scrobble-filter-control">
-                          <button class="segment-btn ${scrobbleFilterMode === 'all' ? 'active' : ''}" data-value="all" data-text="Any">Any</button>
-                          <button class="segment-btn ${scrobbleFilterMode === 'exclude' ? 'active' : ''}" data-value="exclude" data-text="Exclude Played">Exclude Played</button>
-                          <button class="segment-btn ${scrobbleFilterMode === 'require' ? 'active' : ''}" data-value="require" data-text="Only Played">Only Played</button>
-                      </div>
-                  </div>
-                  <div class="setting-row">
-                      <span class="description">
-                          Max Play Count
-                          <span class="tooltip-container">
-                              ${infoIconSvg}
-                              <span class="custom-tooltip">Only include tracks with a play count less than or equal to this value. Leave blank to disable.</span>
-                          </span>
-                      </span>
-                      <input type="number" id="filter-max-playcount" placeholder="e.g., 10000" min="1000" step="1000" style="width: 150px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center;">
-                  </div>
-              </div>
-
-              <div class="settings-left-wrapper">
-                  <div class="settings-title-wrapper">
-                      <div class="settings-title">Keyword Filters</div>
-                      <label class="switch"><input type="checkbox" id="keywordFilterToggle"><span class="sliderx"></span></label>
-                  </div>
-                  <div class="filter-mode-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
-                      <div class="filter-mode-radio-group">
-                          <div class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-right: 8px;">Filter Mode:</div>
-                          <label class="radio-button-container"><span class="radio-button"><input type="radio" name="filterMode" value="exclude"><span class="radio-button-inner"></span></span><span class="radio-label">Exclude</span></label>
-                          <label class="radio-button-container"><span class="radio-button"><input type="radio" name="filterMode" value="keep"><span class="radio-button-inner"></span></span><span class="radio-label">Keep</span></label>
-                          <span class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-left: 14px;">Match Whole Word:</span>
-                      </div>
-                      <label class="switch"><input type="checkbox" id="matchWholeWordToggle"><span class="sliderx"></span></label>
-                  </div>
-                  <div class="keyword-filter-container">
-                      <div class="filter-group">
-                          <div class="filter-group-header">
-                              <span class="filter-group-title">Titles/Albums</span>
-                              <div class="toggle-group">
-                                  <span class="filter-mode-toggle-label">Title</span>
-                                  <label class="switch"><input type="checkbox" id="titleToggle" checked><span class="sliderx"></span></label>
-                                  <span class="filter-mode-toggle-label">Album</span>
-                                  <label class="switch"><input type="checkbox" id="albumToggle" checked><span class="sliderx"></span></label>
-                              </div>
+            <div class="filter-modal-layout">
+              <div class="settings-column">
+                  <div class="settings-wrapper">
+                      <div class="settings-title" style="margin-bottom: 12px;">Track Status</div>
+                      <div class="setting-row">
+                          <span class="description">Liked Status</span>
+                          <div class="segmented-control" id="liked-filter-control">
+                              <button class="segment-btn ${likedFilterMode === 'all' ? 'active' : ''}" data-value="all">Any</button>
+                              <button class="segment-btn ${likedFilterMode === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude Liked</button>
+                              <button class="segment-btn ${likedFilterMode === 'require' ? 'active' : ''}" data-value="require">Only Liked</button>
                           </div>
-                          <div class="keyword-input-container" id="titleAlbumKeywords">
-                              <div class="keyword-tags-container"></div>
-                              <div class="keyword-input-wrapper">
-                                  <input type="text" class="keyword-input" placeholder="Add keywords...">
-                                  <div class="keyword-actions-container">
-                                      <button class="keyword-action-button keyword-save-button" title="Save Keywords">${saveIconSVG}</button>
-                                      <button class="keyword-action-button keyword-load-button" title="Load Keywords">${loadIconSVG}</button>
-                                      <button class="keyword-action-button keyword-remove-all-button" title="Clear Keywords">${clearIconSVG}</button>
+                      </div>
+                      <div class="setting-row">
+                          <span class="description">Followed Artist</span>
+                          <div class="segmented-control" id="followed-filter-control">
+                              <button class="segment-btn ${followedFilterMode === 'all' ? 'active' : ''}" data-value="all">Any</button>
+                              <button class="segment-btn ${followedFilterMode === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude Followed</button>
+                              <button class="segment-btn ${followedFilterMode === 'require' ? 'active' : ''}" data-value="require">Only Followed</button>
+                          </div>
+                      </div>
+                      <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
+                          <span class="description">
+                              Scrobble History
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Requires Last.fm. ${isExcludeListenedDisabled ? '(Set Last.fm username in settings)' : ''}</span>
+                              </span>
+                          </span>
+                          <div class="segmented-control" id="scrobble-filter-control">
+                              <button class="segment-btn ${scrobbleFilterMode === 'all' ? 'active' : ''}" data-value="all">Any</button>
+                              <button class="segment-btn ${scrobbleFilterMode === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude Played</button>
+                              <button class="segment-btn ${scrobbleFilterMode === 'require' ? 'active' : ''}" data-value="require">Only Played</button>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div class="settings-wrapper">
+                      <div class="settings-title-wrapper">
+                          <div class="settings-title">Keyword Filters</div>
+                          <label class="switch"><input type="checkbox" id="keywordFilterToggle"><span class="sliderx"></span></label>
+                      </div>
+                      <div class="filter-mode-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
+                          <div class="filter-mode-radio-group">
+                              <div class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-right: 8px;">Mode:</div>
+                              <label class="radio-button-container"><span class="radio-button"><input type="radio" name="filterMode" value="exclude"><span class="radio-button-inner"></span></span><span class="radio-label">Exclude</span></label>
+                              <label class="radio-button-container"><span class="radio-button"><input type="radio" name="filterMode" value="keep"><span class="radio-button-inner"></span></span><span class="radio-label">Keep</span></label>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 8px;">
+                              <span class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500;">Match Whole Word:</span>
+                              <label class="switch"><input type="checkbox" id="matchWholeWordToggle"><span class="sliderx"></span></label>
+                          </div>
+                      </div>
+                      <div class="keyword-filter-container">
+                          <div class="filter-group">
+                              <div class="filter-group-header">
+                                  <span class="filter-group-title">T/A</span>
+                                  <div class="toggle-group">
+                                      <span class="filter-mode-toggle-label">Title</span>
+                                      <label class="switch"><input type="checkbox" id="titleToggle" checked><span class="sliderx"></span></label>
+                                      <span class="filter-mode-toggle-label" style="margin-left:4px;">Album</span>
+                                      <label class="switch"><input type="checkbox" id="albumToggle" checked><span class="sliderx"></span></label>
+                                  </div>
+                              </div>
+                              <div class="keyword-input-container" id="titleAlbumKeywords">
+                                  <div class="keyword-tags-container"></div>
+                                  <div class="keyword-input-wrapper">
+                                      <input type="text" class="keyword-input" placeholder="Add keywords...">
+                                      <div class="keyword-actions-container">
+                                          <button class="keyword-action-button keyword-save-button" title="Save Keywords">${saveIconSVG}</button>
+                                          <button class="keyword-action-button keyword-load-button" title="Load Keywords">${loadIconSVG}</button>
+                                          <button class="keyword-action-button keyword-remove-all-button" title="Clear Keywords">${clearIconSVG}</button>
+                                      </div>
                                   </div>
                               </div>
                           </div>
-                      </div>
-                      <div class="filter-group">
-                          <div class="filter-group-header">
-                              <span class="filter-group-title">Artists</span>
-                              <div class="toggle-group">
-                                  <label class="switch"><input type="checkbox" id="artistToggle" checked><span class="sliderx"></span></label>
+                          <div class="filter-group">
+                              <div class="filter-group-header">
+                                  <span class="filter-group-title">Artists</span>
+                                  <div class="toggle-group">
+                                      <label class="switch"><input type="checkbox" id="artistToggle" checked><span class="sliderx"></span></label>
+                                  </div>
                               </div>
-                          </div>
-                          <div class="keyword-input-container" id="artistKeywords">
-                              <div class="keyword-tags-container"></div>
-                              <div class="keyword-input-wrapper"><input type="text" class="keyword-input" placeholder="Add keywords..."></div>
+                              <div class="keyword-input-container" id="artistKeywords">
+                                  <div class="keyword-tags-container"></div>
+                                  <div class="keyword-input-wrapper"><input type="text" class="keyword-input" placeholder="Add keywords..."></div>
+                              </div>
                           </div>
                       </div>
                   </div>
               </div>
-              <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px;">
-                  <button id="cancel-filters" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
-                  <button id="save-filters" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Save</button>
+
+              <div class="settings-column">
+                  <div class="settings-wrapper">
+                      <div class="settings-title" style="margin-bottom: 12px;">Numeric Range Filters (Leave blank to ignore)</div>
+                      
+                      <div class="setting-row">
+                          <span class="description">Global Play Count</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-playcount" class="range-input" placeholder="Min" min="0" step="1000"> - 
+                              <input type="number" id="filter-max-playcount" class="range-input" placeholder="Max" min="0" step="1000">
+                          </div>
+                      </div>
+                      
+                      <div class="setting-row">
+                          <span class="description">Global Scrobbles</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-global-scrobbles" class="range-input" placeholder="Min" min="0" step="1000"> - 
+                              <input type="number" id="filter-max-global-scrobbles" class="range-input" placeholder="Max" min="0" step="1000">
+                          </div>
+                      </div>
+                      
+                      <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
+                          <span class="description">Personal Scrobbles</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-scrobbles" class="range-input" placeholder="Min" min="0"> - 
+                              <input type="number" id="filter-max-scrobbles" class="range-input" placeholder="Max" min="0">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">Track Duration (Seconds)</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-duration" class="range-input" placeholder="Min" min="0"> - 
+                              <input type="number" id="filter-max-duration" class="range-input" placeholder="Max" min="0">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">Release Year</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-year" class="range-input" placeholder="Min" min="1900" max="2100"> - 
+                              <input type="number" id="filter-max-year" class="range-input" placeholder="Max" min="1900" max="2100">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">Spotify Popularity (0-100)</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-popularity" class="range-input" placeholder="Min" min="0" max="100"> - 
+                              <input type="number" id="filter-max-popularity" class="range-input" placeholder="Max" min="0" max="100">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">Tempo / BPM</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-tempo" class="range-input" placeholder="Min" min="0" max="300"> - 
+                              <input type="number" id="filter-max-tempo" class="range-input" placeholder="Max" min="0" max="300">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">Energy (0-100%)</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-energy" class="range-input" placeholder="Min" min="0" max="100"> - 
+                              <input type="number" id="filter-max-energy" class="range-input" placeholder="Max" min="0" max="100">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">Danceability (0-100%)</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-danceability" class="range-input" placeholder="Min" min="0" max="100"> - 
+                              <input type="number" id="filter-max-danceability" class="range-input" placeholder="Max" min="0" max="100">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">Valence (0-100%)</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-min-valence" class="range-input" placeholder="Min" min="0" max="100"> - 
+                              <input type="number" id="filter-max-valence" class="range-input" placeholder="Max" min="0" max="100">
+                          </div>
+                      </div>
+
+                  </div>
               </div>
+            </div>
+
+            <div id="filter-summary-wrapper" class="summary-container"></div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px;">
+                <button id="cancel-filters" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
+                <button id="save-filters" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Save</button>
+            </div>
           </div>
         `;
         
@@ -15753,7 +15951,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             resolve(data);
         };
 
-        const keywordFilterWrapper = modalContainer.querySelector('.settings-left-wrapper');
+        const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
         const keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
         const filterModeRadios = modalContainer.querySelectorAll('input[name="filterMode"]');
         const titleToggle = modalContainer.querySelector("#titleToggle");
@@ -15763,6 +15961,274 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const titleAlbumContainer = modalContainer.querySelector("#titleAlbumKeywords");
         const artistContainer = modalContainer.querySelector("#artistKeywords");
 
+        const setSegmentedControl = (controlId, val) => {
+            const control = modalContainer.querySelector(`#${controlId}`);
+            if (!control) return;
+            control.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = control.querySelector(`.segment-btn[data-value="${val}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+        };
+
+        modalContainer.querySelector('#save-preset-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const saveModal = document.createElement("div");
+            saveModal.className = "save-preset-modal";
+            saveModal.innerHTML = `
+                <style>
+                .save-preset-modal { background-color: #282828; border-radius: 8px; padding: 16px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3001; width: 300px; }
+                .save-preset-title { color: #fff; font-size: 14px; font-weight: bold; margin-bottom: 12px; }
+                .save-preset-input { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #434343; background: #121212; color: white; margin-bottom: 12px; box-sizing: border-box; }
+                .save-preset-button { background-color: #1db954; border: none; color: black; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; display: block; width: auto; margin: 0 auto; }
+                .save-preset-button:hover { background-color: #1ed760; }
+                .save-preset-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 3000; }
+                </style>
+                <div class="save-preset-title">Enter Preset Name</div>
+                <input type="text" class="save-preset-input" placeholder="Preset Name">
+                <button class="save-preset-button">Save</button>
+            `;
+
+            const overlayBg = document.createElement("div");
+            overlayBg.className = "save-preset-overlay";
+
+            document.body.appendChild(overlayBg);
+            document.body.appendChild(saveModal);
+
+            const saveInput = saveModal.querySelector(".save-preset-input");
+            const saveBtn = saveModal.querySelector(".save-preset-button");
+            saveInput.focus();
+
+            const closeSaveModal = () => {
+                saveModal.remove();
+                overlayBg.remove();
+            };
+
+            saveBtn.addEventListener("click", async () => {
+                const presetName = saveInput.value.trim();
+                if (presetName) {
+                    let savedPresets = JSON.parse(localStorage.getItem("sort-play-filter-presets") || "{}");
+                    
+                    if (savedPresets[presetName]) {
+                        const confirmPromise = showConfirmationModal({
+                            title: "Replace Preset?",
+                            description: `A preset named "${presetName}" already exists. Do you want to replace it?`,
+                            confirmText: "Replace",
+                            cancelText: "Cancel"
+                        });
+                        
+                        const confirmOverlay = document.getElementById("sort-play-confirmation-overlay");
+                        if (confirmOverlay) {
+                            confirmOverlay.style.zIndex = "4000";
+                            if (confirmOverlay.firstChild) confirmOverlay.firstChild.style.zIndex = "4001";
+                        }
+                        
+                        const confirmReplace = await confirmPromise;
+                        if (confirmReplace !== 'confirm') {
+                            return;
+                        }
+                    }
+
+                    const getVal = (id) => document.getElementById(id).value;
+                    const state = {
+                        likedFilter: likedFilterMode,
+                        scrobblesFilter: scrobbleFilterMode,
+                        followedFilter: followedFilterMode,
+                        minPlayCount: getVal('filter-min-playcount'),
+                        maxPlayCount: getVal('filter-max-playcount'),
+                        minGlobalScrobbles: getVal('filter-min-global-scrobbles'),
+                        maxGlobalScrobbles: getVal('filter-max-global-scrobbles'),
+                        minScrobbles: getVal('filter-min-scrobbles'),
+                        maxScrobbles: getVal('filter-max-scrobbles'),
+                        minDuration: getVal('filter-min-duration'),
+                        maxDuration: getVal('filter-max-duration'),
+                        minYear: getVal('filter-min-year'),
+                        maxYear: getVal('filter-max-year'),
+                        minPopularity: getVal('filter-min-popularity'),
+                        maxPopularity: getVal('filter-max-popularity'),
+                        minTempo: getVal('filter-min-tempo'),
+                        maxTempo: getVal('filter-max-tempo'),
+                        minEnergy: getVal('filter-min-energy'),
+                        maxEnergy: getVal('filter-max-energy'),
+                        minDanceability: getVal('filter-min-danceability'),
+                        maxDanceability: getVal('filter-max-danceability'),
+                        minValence: getVal('filter-min-valence'),
+                        maxValence: getVal('filter-max-valence'),
+                        keywordFilterEnabled: modalContainer.querySelector('#keywordFilterToggle').checked,
+                        keepMatchingMode,
+                        filterTitle,
+                        filterAlbum,
+                        filterArtist,
+                        matchWholeWord,
+                        titleAlbumKeywords: Array.from(titleAlbumKeywords),
+                        artistKeywords: Array.from(artistKeywords),
+                    };
+
+                    savedPresets[presetName] = state;
+                    localStorage.setItem("sort-play-filter-presets", JSON.stringify(savedPresets));
+                    showNotification(`Preset saved as "${presetName}"`);
+                    closeSaveModal();
+                } else {
+                    showNotification("Please enter a preset name.");
+                }
+            });
+            overlayBg.addEventListener("click", closeSaveModal);
+        });
+
+        modalContainer.querySelector('#load-preset-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const loadBtn = e.currentTarget;
+            let savedPresets = JSON.parse(localStorage.getItem("sort-play-filter-presets") || "{}");
+            const presetNames = Object.keys(savedPresets).reverse();
+
+            if (presetNames.length === 0) {
+                showNotification("No saved presets found.");
+                return;
+            }
+
+            const existingDropdown = document.querySelector('.load-preset-dropdown');
+            if (existingDropdown) existingDropdown.remove();
+
+            const dropdown = document.createElement("div");
+            dropdown.className = "load-preset-dropdown";
+            dropdown.innerHTML = `
+                <style>
+                .load-preset-dropdown { background-color: #282828; border-radius: 4px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); position: absolute; z-index: 3002; min-width: 180px; max-width: 250px; max-height: 200px; overflow-y: auto; }
+                .load-preset-dropdown::-webkit-scrollbar { width: 8px; }
+                .load-preset-dropdown::-webkit-scrollbar-track { background: transparent; }
+                .load-preset-dropdown::-webkit-scrollbar-thumb { background-color: #4d4d4d; border-radius: 4px; }
+                .load-preset-option { color: #fff; padding: 8px 5px 8px 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; align-items: center; }
+                .load-preset-option:hover { background-color: #383838; }
+                .load-preset-option .remove-button { opacity: 0; transition: opacity 0.2s; cursor: pointer; padding: 4px; display: flex; align-items: center; max-width: 30px; }
+                .load-preset-option:hover .remove-button { opacity: 1; }
+                .load-preset-option-text { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+                .remove-icon { width: 12px; height: 12px; fill: currentColor; }
+                </style>
+            `;
+
+            presetNames.forEach(presetName => {
+                const option = document.createElement("div");
+                option.className = "load-preset-option";
+
+                const optionContent = document.createElement("span");
+                optionContent.className = "load-preset-option-text";
+                optionContent.textContent = presetName.length > 30 ? presetName.substring(0, 30) + "..." : presetName;
+
+                const removeButton = document.createElement("div");
+                removeButton.className = "remove-button";
+                removeButton.innerHTML = removeIconSVG; 
+
+                option.appendChild(optionContent);
+                option.appendChild(removeButton);
+
+                option.addEventListener("click", () => {
+                    const state = savedPresets[presetName];
+                    
+                    likedFilterMode = state.likedFilter || 'all';
+                    scrobbleFilterMode = state.scrobblesFilter || 'all';
+                    followedFilterMode = state.followedFilter || 'all';
+                    
+                    setSegmentedControl('liked-filter-control', likedFilterMode);
+                    setSegmentedControl('scrobble-filter-control', scrobbleFilterMode);
+                    setSegmentedControl('followed-filter-control', followedFilterMode);
+
+                    const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+                    setVal('filter-min-playcount', state.minPlayCount);
+                    setVal('filter-max-playcount', state.maxPlayCount);
+                    setVal('filter-min-global-scrobbles', state.minGlobalScrobbles);
+                    setVal('filter-max-global-scrobbles', state.maxGlobalScrobbles);
+                    setVal('filter-min-scrobbles', state.minScrobbles);
+                    setVal('filter-max-scrobbles', state.maxScrobbles);
+                    setVal('filter-min-duration', state.minDuration);
+                    setVal('filter-max-duration', state.maxDuration);
+                    setVal('filter-min-year', state.minYear);
+                    setVal('filter-max-year', state.maxYear);
+                    setVal('filter-min-popularity', state.minPopularity);
+                    setVal('filter-max-popularity', state.maxPopularity);
+                    setVal('filter-min-tempo', state.minTempo);
+                    setVal('filter-max-tempo', state.maxTempo);
+                    setVal('filter-min-energy', state.minEnergy);
+                    setVal('filter-max-energy', state.maxEnergy);
+                    setVal('filter-min-danceability', state.minDanceability);
+                    setVal('filter-max-danceability', state.maxDanceability);
+                    setVal('filter-min-valence', state.minValence);
+                    setVal('filter-max-valence', state.maxValence);
+
+                    const kwToggle = modalContainer.querySelector('#keywordFilterToggle');
+                    if (kwToggle) {
+                        kwToggle.checked = state.keywordFilterEnabled || false;
+                        const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
+                        if (keywordFilterWrapper) keywordFilterWrapper.classList.toggle('disabled', !kwToggle.checked);
+                    }
+
+                    keepMatchingMode = state.keepMatchingMode ?? false;
+                    filterTitle = state.filterTitle ?? true;
+                    filterAlbum = state.filterAlbum ?? true;
+                    filterArtist = state.filterArtist ?? true;
+                    matchWholeWord = state.matchWholeWord ?? false;
+
+                    const filterModeRadiosLocal = modalContainer.querySelectorAll('input[name="filterMode"]');
+                    filterModeRadiosLocal.forEach(radio => radio.checked = (keepMatchingMode && radio.value === "keep") || (!keepMatchingMode && radio.value === "exclude"));
+                    if (titleToggle) titleToggle.checked = filterTitle;
+                    if (albumToggle) albumToggle.checked = filterAlbum;
+                    if (artistToggle) artistToggle.checked = filterArtist;
+                    if (matchWholeWordToggle) matchWholeWordToggle.checked = matchWholeWord;
+
+                    titleAlbumKeywords.clear();
+                    const titleAlbumContainerLocal = modalContainer.querySelector("#titleAlbumKeywords");
+                    if (titleAlbumContainerLocal) titleAlbumContainerLocal.querySelector(".keyword-tags-container").innerHTML = "";
+                    if (state.titleAlbumKeywords) {
+                        state.titleAlbumKeywords.forEach(kw => {
+                            titleAlbumKeywords.add(kw);
+                            createKeywordTag(kw, titleAlbumContainerLocal, titleAlbumKeywords, updateSummary);
+                        });
+                    }
+
+                    artistKeywords.clear();
+                    const artistContainerLocal = modalContainer.querySelector("#artistKeywords");
+                    if (artistContainerLocal) artistContainerLocal.querySelector(".keyword-tags-container").innerHTML = "";
+                    if (state.artistKeywords) {
+                        state.artistKeywords.forEach(kw => {
+                            artistKeywords.add(kw);
+                            createKeywordTag(kw, artistContainerLocal, artistKeywords, updateSummary);
+                        });
+                    }
+
+                    updateSummary();
+                    showNotification(`Loaded preset "${presetName}"`);
+                    dropdown.remove();
+                });
+
+                removeButton.addEventListener("click", (evt) => {
+                    evt.stopPropagation();
+                    delete savedPresets[presetName];
+                    localStorage.setItem("sort-play-filter-presets", JSON.stringify(savedPresets));
+                    option.remove();
+                    showNotification(`Removed preset "${presetName}"`);
+                    if (Object.keys(savedPresets).length === 0) {
+                        dropdown.remove();
+                    }
+                });
+
+                dropdown.appendChild(option);
+            });
+
+            document.body.appendChild(dropdown);
+            const buttonRect = loadBtn.getBoundingClientRect();
+            dropdown.style.top = `${buttonRect.bottom + 4}px`;
+            dropdown.style.left = `${buttonRect.left}px`;
+
+            const removeDropdown = (evt) => {
+                if (!dropdown.contains(evt.target)) {
+                    dropdown.remove();
+                    document.removeEventListener('click', removeDropdown);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', removeDropdown, { signal: abortController.signal }), 0);
+        });
+
         const setupSegmentedControl = (controlId, updateVar) => {
             const control = modalContainer.querySelector(`#${controlId}`);
             if (!control) return;
@@ -15771,14 +16237,103 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     control.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     updateVar(btn.dataset.value);
+                    updateSummary();
                 });
             });
         };
 
+        const updateSummary = () => {
+            const summaryWrapper = modalContainer.querySelector('#filter-summary-wrapper');
+            if (!summaryWrapper) return;
+            const badges = [];
+
+            if (likedFilterMode === 'require') badges.push('Only Liked');
+            else if (likedFilterMode === 'exclude') badges.push('Exclude Liked');
+
+            if (followedFilterMode === 'require') badges.push('Only Followed');
+            else if (followedFilterMode === 'exclude') badges.push('Exclude Followed');
+
+            if (scrobbleFilterMode === 'require') badges.push('Only Played');
+            else if (scrobbleFilterMode === 'exclude') badges.push('Exclude Played');
+
+            const getVal = (id) => modalContainer.querySelector(`#${id}`).value;
+            const checkRange = (idMin, idMax, label, suffix = '') => {
+                const min = getVal(idMin);
+                const max = getVal(idMax);
+                if (min && max) badges.push(`${label}: ${min} to ${max}${suffix}`);
+                else if (min) badges.push(`${label}: > ${min}${suffix}`);
+                else if (max) badges.push(`${label}: < ${max}${suffix}`);
+            };
+
+            checkRange('filter-min-playcount', 'filter-max-playcount', 'Plays');
+            checkRange('filter-min-global-scrobbles', 'filter-max-global-scrobbles', 'Global Scrobbles');
+            checkRange('filter-min-scrobbles', 'filter-max-scrobbles', 'Scrobbles');
+            checkRange('filter-min-duration', 'filter-max-duration', 'Duration', 's');
+            checkRange('filter-min-year', 'filter-max-year', 'Year');
+            checkRange('filter-min-popularity', 'filter-max-popularity', 'Pop');
+            checkRange('filter-min-tempo', 'filter-max-tempo', 'Tempo', ' BPM');
+            checkRange('filter-min-energy', 'filter-max-energy', 'Energy', '%');
+            checkRange('filter-min-danceability', 'filter-max-danceability', 'Dance', '%');
+            checkRange('filter-min-valence', 'filter-max-valence', 'Valence', '%');
+
+            const keywordFilterEnabled = modalContainer.querySelector('#keywordFilterToggle').checked;
+            if (keywordFilterEnabled) {
+                const mode = keepMatchingMode ? 'Keep' : 'Exclude';
+                
+                const taKeywordsCount = titleAlbumKeywords.size;
+                if (taKeywordsCount > 0) {
+                    const titleOn = titleToggle.checked;
+                    const albumOn = albumToggle.checked;
+                    
+                    let target = "";
+                    if (titleOn && albumOn) target = "Title/Album";
+                    else if (titleOn) target = "Title";
+                    else if (albumOn) target = "Album";
+                    
+                    if (target) {
+                        badges.push(`${mode} ${taKeywordsCount} ${target} keyword(s)`);
+                    }
+                }
+                
+                const artistKeywordsCount = artistKeywords.size;
+                if (artistKeywordsCount > 0 && artistToggle.checked) {
+                    badges.push(`${mode} ${artistKeywordsCount} Artist keyword(s)`);
+                }
+            }
+
+            if (badges.length === 0) {
+                summaryWrapper.innerHTML = `<span style="color: #888; font-style: italic; font-size: 13px;">No active filters. All source tracks will be included.</span>`;
+            } else {
+                summaryWrapper.innerHTML = `<span style="color: #fff; font-size: 13px; font-weight: bold; margin-right: 4px;">Active Filters:</span>` + 
+                    badges.map(b => `<span class="summary-badge">${b}</span>`).join('');
+            }
+        };
+
         setupSegmentedControl('liked-filter-control', (val) => { likedFilterMode = val; });
         setupSegmentedControl('scrobble-filter-control', (val) => { scrobbleFilterMode = val; });
+        setupSegmentedControl('followed-filter-control', (val) => { followedFilterMode = val; });
 
+        document.getElementById('filter-min-playcount').value = currentFilters.minPlayCount || '';
         document.getElementById('filter-max-playcount').value = currentFilters.maxPlayCount || '';
+        document.getElementById('filter-min-global-scrobbles').value = currentFilters.minGlobalScrobbles || '';
+        document.getElementById('filter-max-global-scrobbles').value = currentFilters.maxGlobalScrobbles || '';
+        document.getElementById('filter-min-scrobbles').value = currentFilters.minScrobbles || '';
+        document.getElementById('filter-max-scrobbles').value = currentFilters.maxScrobbles || '';
+        document.getElementById('filter-min-duration').value = currentFilters.minDuration || '';
+        document.getElementById('filter-max-duration').value = currentFilters.maxDuration || '';
+        document.getElementById('filter-min-year').value = currentFilters.minYear || '';
+        document.getElementById('filter-max-year').value = currentFilters.maxYear || '';
+        document.getElementById('filter-min-popularity').value = currentFilters.minPopularity || '';
+        document.getElementById('filter-max-popularity').value = currentFilters.maxPopularity || '';
+        document.getElementById('filter-min-tempo').value = currentFilters.minTempo || '';
+        document.getElementById('filter-max-tempo').value = currentFilters.maxTempo || '';
+        document.getElementById('filter-min-energy').value = currentFilters.minEnergy || '';
+        document.getElementById('filter-max-energy').value = currentFilters.maxEnergy || '';
+        document.getElementById('filter-min-danceability').value = currentFilters.minDanceability || '';
+        document.getElementById('filter-max-danceability').value = currentFilters.maxDanceability || '';
+        document.getElementById('filter-min-valence').value = currentFilters.minValence || '';
+        document.getElementById('filter-max-valence').value = currentFilters.maxValence || '';
+
         keywordFilterToggle.checked = currentFilters.keywordFilterEnabled || false;
         keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
 
@@ -15804,15 +16359,50 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         titleAlbumKeywords.forEach(keyword => createKeywordTag(keyword, titleAlbumContainer, titleAlbumKeywords));
         artistKeywords.forEach(keyword => createKeywordTag(keyword, artistContainer, artistKeywords));
 
-        setupKeywordInput(titleAlbumContainer, titleAlbumKeywords, () => {}, abortController.signal);
-        setupKeywordInput(artistContainer, artistKeywords, () => {}, abortController.signal);
+        setupKeywordInput(titleAlbumContainer, titleAlbumKeywords, () => { updateSummary(); }, abortController.signal);
+        setupKeywordInput(artistContainer, artistKeywords, () => { updateSummary(); }, abortController.signal);
 
-        keywordFilterToggle.addEventListener('change', (e) => keywordFilterWrapper.classList.toggle('disabled', !e.target.checked));
-        filterModeRadios.forEach(radio => radio.addEventListener("change", (e) => keepMatchingMode = e.target.value === "keep"));
-        titleToggle.addEventListener('change', e => filterTitle = e.target.checked);
-        albumToggle.addEventListener('change', e => filterAlbum = e.target.checked);
-        artistToggle.addEventListener('change', e => filterArtist = e.target.checked);
-        matchWholeWordToggle.addEventListener('change', e => matchWholeWord = e.target.checked);
+        keywordFilterToggle.addEventListener('change', (e) => { keywordFilterWrapper.classList.toggle('disabled', !e.target.checked); updateSummary(); });
+        filterModeRadios.forEach(radio => radio.addEventListener("change", (e) => { keepMatchingMode = e.target.value === "keep"; updateSummary(); }));
+        titleToggle.addEventListener('change', e => { filterTitle = e.target.checked; updateSummary(); });
+        albumToggle.addEventListener('change', e => { filterAlbum = e.target.checked; updateSummary(); });
+        artistToggle.addEventListener('change', e => { filterArtist = e.target.checked; updateSummary(); });
+        matchWholeWordToggle.addEventListener('change', e => { matchWholeWord = e.target.checked; updateSummary(); });
+        
+        modalContainer.querySelectorAll('.range-input').forEach(input => {
+            input.addEventListener('input', updateSummary);
+        });
+
+        const enforceRangeLogic = (minId, maxId) => {
+            const minEl = document.getElementById(minId);
+            const maxEl = document.getElementById(maxId);
+            if (!minEl || !maxEl) return;
+            
+            const validate = (e) => {
+                const minVal = parseFloat(minEl.value);
+                const maxVal = parseFloat(maxEl.value);
+                
+                if (!isNaN(minVal) && !isNaN(maxVal)) {
+                    if (e.target === minEl && minVal > maxVal) {
+                        maxEl.value = minEl.value; 
+                    } else if (e.target === maxEl && maxVal < minVal) {
+                        minEl.value = maxEl.value; 
+                    }
+                }
+                updateSummary();
+            };
+
+            minEl.addEventListener('change', validate);
+            maxEl.addEventListener('change', validate);
+        };
+
+        const rangeKeys = [
+            'playcount', 'global-scrobbles', 'scrobbles', 'duration', 
+            'year', 'popularity', 'tempo', 'energy', 'danceability', 'valence'
+        ];
+        rangeKeys.forEach(key => enforceRangeLogic(`filter-min-${key}`, `filter-max-${key}`));
+
+        updateSummary();
         
         modalContainer.querySelector('#save-filters').addEventListener('click', () => {
             saveKeywords(titleAlbumKeywords, artistKeywords);
@@ -15821,10 +16411,32 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             localStorage.setItem("sort-play-filter-artist", filterArtist);
             localStorage.setItem("sort-play-match-whole-word", matchWholeWord);
 
+            const getVal = (id) => document.getElementById(id).value;
+
             const newFilters = {
                 likedFilter: likedFilterMode,
-                scrobbleFilter: scrobbleFilterMode,
-                maxPlayCount: modalContainer.querySelector('#filter-max-playcount').value,
+                scrobblesFilter: scrobbleFilterMode,
+                followedFilter: followedFilterMode,
+                minPlayCount: getVal('filter-min-playcount'),
+                maxPlayCount: getVal('filter-max-playcount'),
+                minGlobalScrobbles: getVal('filter-min-global-scrobbles'),
+                maxGlobalScrobbles: getVal('filter-max-global-scrobbles'),
+                minScrobbles: getVal('filter-min-scrobbles'),
+                maxScrobbles: getVal('filter-max-scrobbles'),
+                minDuration: getVal('filter-min-duration'),
+                maxDuration: getVal('filter-max-duration'),
+                minYear: getVal('filter-min-year'),
+                maxYear: getVal('filter-max-year'),
+                minPopularity: getVal('filter-min-popularity'),
+                maxPopularity: getVal('filter-max-popularity'),
+                minTempo: getVal('filter-min-tempo'),
+                maxTempo: getVal('filter-max-tempo'),
+                minEnergy: getVal('filter-min-energy'),
+                maxEnergy: getVal('filter-max-energy'),
+                minDanceability: getVal('filter-min-danceability'),
+                maxDanceability: getVal('filter-max-danceability'),
+                minValence: getVal('filter-min-valence'),
+                maxValence: getVal('filter-max-valence'),
                 keywordFilterEnabled: modalContainer.querySelector('#keywordFilterToggle').checked,
                 keepMatchingMode,
                 filterTitle,
@@ -15840,7 +16452,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         modalContainer.querySelector('#cancel-filters').addEventListener('click', () => closeModal(null));
         overlay.addEventListener("click", (e) => { 
             if (e.target === overlay) {
-                closeModal(null);
+                e.preventDefault();
+                e.stopPropagation();
             }
         });
     });
@@ -19116,7 +19729,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
               if (sortType === 'personalScrobbles') {
                   const hasAnyScrobbles = tracksWithScrobbles.some(t => typeof t.personalScrobbles === 'number' && t.personalScrobbles > 0);
-                  if (!hasAnyScrobbles) {
+                  if (!hasAnyScrobbles && tracksWithScrobbles.length > 0) {
                       throw new Error("No personal scrobbles found for any tracks in this list.");
                   }
               }
@@ -29132,7 +29745,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 if (sortType === 'personalScrobbles') {
                     const hasAnyScrobbles = uniqueTracks.some(t => typeof t.personalScrobbles === 'number' && t.personalScrobbles > 0);
-                    if (!hasAnyScrobbles) {
+                    if (!hasAnyScrobbles && uniqueTracks.length > 0) {
                         throw new Error("No personal scrobbles found for any tracks in this list.");
                     }
 
@@ -31535,6 +32148,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function handleScrobblesSorting(tracks, sortType, updateProgress) {
+    if (!tracks || tracks.length === 0) return [];
     if (sortType !== 'scrobbles' && sortType !== 'personalScrobbles') {
       throw new Error('Invalid sort type for scrobbles sorting');
     }
@@ -31633,10 +32247,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         updateProgress(100);
     }
 
-    if (results.length === 0) {
-      throw new Error(`No tracks found with ${isPersonal ? 'personal ' : ''}Last.fm data to sort.`);
-    }
-
     return results;
   }
 
@@ -31645,6 +32255,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     if (!lastFmUsername) {
       throw new Error('Last.fm username required for this sorting type');
     }
+
+    if (!tracks || tracks.length === 0) return { sortedTracks: [], removedTracks: [] };
 
     updateProgress(0);
     const scrobblesMap = await fetchRecentScrobblesMap((progress) => {
@@ -31696,10 +32308,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     let sortedTracks = [...sortedScrobbledTracks, ...unscrobbledTracks];
 
-    if (sortedTracks.length === 0) {
-        throw new Error("No tracks found in this playlist.");
-    }
-    
     updateProgress(100);
     return { sortedTracks, removedTracks };
   }
@@ -32847,7 +33455,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     top: -16px; left: -27px;
                     width: 27px; height: 28px;
                     border-left: 2px solid #333; border-bottom: 2px solid #333; 
-                    border-bottom-left-radius: 16px; /* You can now increase this up to 24px safely! */
+                    border-bottom-left-radius: 16px;
                     z-index: 1;
                 }
                 .reply-item:not(:last-child)::after {
