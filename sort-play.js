@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.67.0";
+  const SORT_PLAY_VERSION = "5.68.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -183,6 +183,7 @@
   let showArtistDiscographyContextMenu = false;
   let showShuffleContextMenu = true;
   let artistDiscographySortType = 'releaseDate';
+  let artistDiscographyDeduplicationMode = 'default';
   let artistDiscographyContextMenuItem = null;
   let shuffleContextMenuItem = null;
   const revokedLfmKeys = new Set();
@@ -1273,6 +1274,7 @@
     const showShuffleContextMenuStored = localStorage.getItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU);
     showShuffleContextMenu = showShuffleContextMenuStored === null ? true : showShuffleContextMenuStored === "true";
     artistDiscographySortType = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE) || 'releaseDate';
+    artistDiscographyDeduplicationMode = localStorage.getItem("sort-play-artist-discography-dedup-mode") || 'default';
     showGenreTags = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS) === "true";
     showGenreTagsNowPlaying = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP) !== "false";
     showGenreTagsArtistPage = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP) !== "false";
@@ -1352,6 +1354,7 @@
     updateGenresContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, showArtistDiscographyContextMenu);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, artistDiscographySortType);
+    localStorage.setItem("sort-play-artist-discography-dedup-mode", artistDiscographyDeduplicationMode);
     updateArtistDiscographyContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU, showShuffleContextMenu);
     updateShuffleContextMenu();
@@ -2734,6 +2737,29 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Discography
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="discographyDeduplicationSetting">
+        <label class="col description">
+            Intelligent Deduplication
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Controls how duplicate songs are handled when creating an Artist Discography.<br><br>• <strong>Default</strong>: Keeps the most popular version (prefers Album versions if sorting by Release Date).<br>• <strong>Keep Single & Album</strong>: Retains both the single/EP version AND album version.<br>• <strong>One Per Release</strong>: Retains one track per uniquely named release<br>• <strong>Don't Remove</strong>: Keeps all duplicates for a 100% complete collection.<br><br><em>Note: Compilations are always removed if an original version exists.</em></span>
+            </span>
+        </label>
+        <div class="col action">
+            <select id="artistDiscographyDedupModeSelect" style="max-width: 185px;">
+                <option value="default" ${artistDiscographyDeduplicationMode === 'default' ? 'selected' : ''}>Default (Remove Dups)</option>
+                <option value="single_and_album" ${artistDiscographyDeduplicationMode === 'single_and_album' ? 'selected' : ''}>Keep Single & Album</option>
+                <option value="one_per_album" ${artistDiscographyDeduplicationMode === 'one_per_album' ? 'selected' : ''}>One Per Release</option>
+                <option value="none" ${artistDiscographyDeduplicationMode === 'none' ? 'selected' : ''}>Don't Remove</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Dedicated Playlist Creation
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
@@ -2943,6 +2969,7 @@
     const showArtistDiscographyContextMenuToggle = modalContainer.querySelector("#showArtistDiscographyContextMenuToggle");
     const showShuffleContextMenuToggle = modalContainer.querySelector("#showShuffleContextMenuToggle");
     const artistDiscographySortSelect = modalContainer.querySelector("#artistDiscographySortSelect");
+    const artistDiscographyDedupModeSelect = modalContainer.querySelector("#artistDiscographyDedupModeSelect");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
     const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
     const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
@@ -3217,6 +3244,11 @@
 
     artistDiscographySortSelect.addEventListener("change", () => {
         artistDiscographySortType = artistDiscographySortSelect.value;
+        saveSettings();
+    });
+
+    artistDiscographyDedupModeSelect.addEventListener("change", () => {
+        artistDiscographyDeduplicationMode = artistDiscographyDedupModeSelect.value;
         saveSettings();
     });
 
@@ -31721,6 +31753,35 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const finalUniqueTracks = [];
     const finalRemovedTracks = [];
 
+    const shouldMarkAsDuplicate = (candidate, existing) => {
+        if (sortType === 'excludeByPlaylist' && !candidate._isExclusion && !existing._isExclusion) {
+            return false;
+        }
+        if (isArtistPageContext) {
+            const candType = (candidate.album_type || candidate.albumType || 'album').toLowerCase();
+            const existType = (existing.album_type || existing.albumType || 'album').toLowerCase();
+            const isCandComp = candType === 'compilation' || (candidate.allArtists || '').toLowerCase().includes('various artists');
+            const isExistComp = existType === 'compilation' || (existing.allArtists || '').toLowerCase().includes('various artists');
+            
+            if (artistDiscographyDeduplicationMode === 'none') {
+                if (!isCandComp && !isExistComp) return false;
+            } else if (artistDiscographyDeduplicationMode === 'one_per_album') {
+                if (!isCandComp && !isExistComp) {
+                    const candAlbum = (candidate.albumName || candidate.track?.album?.name || "").toLowerCase().trim();
+                    const existAlbum = (existing.albumName || existing.track?.album?.name || "").toLowerCase().trim();
+                    if (candAlbum !== existAlbum) return false;
+                }
+            } else if (artistDiscographyDeduplicationMode === 'single_and_album') {
+                if (!isCandComp && !isExistComp) {
+                    const isCandAlbum = candType === 'album';
+                    const isExistAlbum = existType === 'album';
+                    if (isCandAlbum !== isExistAlbum) return false;
+                }
+            }
+        }
+        return true;
+    };
+
     const fetchIsrc = async (id) => {
         if (!id) return null;
         
@@ -31969,8 +32030,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
 
             if (areDuplicatesByNewRules) {
-                if (sortType === 'excludeByPlaylist' && !candidateTrack._isExclusion && !existingUniqueTrack._isExclusion) {
-                } else {
+                if (shouldMarkAsDuplicate(candidateTrack, existingUniqueTrack)) {
                     isConsideredDuplicateOfAnExistingUnique = true;
                     matchedExistingTrack = existingUniqueTrack;
                     break;
@@ -31987,16 +32047,15 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     const cIsrc = await fetchIsrc(cId);
                     if (cIsrc) {
                         for (const titleMatch of titleMatches) {
-                            if (sortType === 'excludeByPlaylist' && !candidateTrack._isExclusion && !titleMatch._isExclusion) {
-                                continue;
-                            }
                             const eId = titleMatch.uri.split(':')[2];
                             if (eId) {
                                 const eIsrc = await fetchIsrc(eId);
                                 if (eIsrc && cIsrc === eIsrc) {
-                                    isConsideredDuplicateOfAnExistingUnique = true;
-                                    matchedExistingTrack = titleMatch;
-                                    break;
+                                    if (shouldMarkAsDuplicate(candidateTrack, titleMatch)) {
+                                        isConsideredDuplicateOfAnExistingUnique = true;
+                                        matchedExistingTrack = titleMatch;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -32010,9 +32069,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const matches = playCountBuckets.get(pc);
             if (matches && matches.length > 0) {
                 for (const existingMatch of matches) {
-                    if (sortType === 'excludeByPlaylist' && !candidateTrack._isExclusion && !existingMatch._isExclusion) {
-                        continue;
-                    }
                     const existDataForPC = trackCleanData.get(existingMatch);
                     let artistsOverlapPC = false;
                     if (candData.artist && existDataForPC.artist) {
@@ -32030,9 +32086,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         if (cId && eId) {
                             const [cIsrc, eIsrc] = await Promise.all([fetchIsrc(cId), fetchIsrc(eId)]);
                             if (cIsrc && eIsrc && cIsrc === eIsrc) {
-                                isConsideredDuplicateOfAnExistingUnique = true;
-                                matchedExistingTrack = existingMatch;
-                                break;
+                                if (shouldMarkAsDuplicate(candidateTrack, existingMatch)) {
+                                    isConsideredDuplicateOfAnExistingUnique = true;
+                                    matchedExistingTrack = existingMatch;
+                                    break;
+                                }
                             }
                         }
                     }
