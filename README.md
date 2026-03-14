@@ -89,7 +89,12 @@ Enhance your music views with more information.
 
 Apply any sort or filter option while on an Artist page to automatically fetch and process their complete discography.
 *   **Complete Collection:** Instantly gathers tracks from all albums, singles, compilations, and "Appears On" releases during the sort process.
-*   **Intelligent Deduplication:** Automatically removes duplicate tracks, keeping the most popular version to create a clean, comprehensive discography playlist.
+*   **Intelligent Deduplication:** Automatically cleans up duplicate tracks with customizable modes in Settings:
+    *   **Default:** Keeps the most popular version (or the Album version if sorting by Release Date).
+    *   **Keep Single & Album:** Retains both the single/EP version and the album version of a song.
+    *   **One Per Release:** Retains one track per uniquely named release.
+    *   **Don't Remove:** Keeps all duplicates for a 100% complete collection.
+    *(Note: Compilation versions are always removed if an original version exists, keeping your list clean).*
 </details>
 
 
