@@ -94,7 +94,8 @@ Apply any sort or filter option while on an Artist page to automatically fetch a
     *   **Keep Single & Album:** Retains both the single/EP version and the album version of a song.
     *   **One Per Release:** Retains one track per uniquely named release.
     *   **Don't Remove:** Keeps all duplicates for a 100% complete collection.
-    *(Note: Compilation versions are always removed if an original version exists, keeping your list clean).*
+
+*(Note: Compilation versions are always removed if an original version exists, keeping your list clean).*
 </details>
 
 
