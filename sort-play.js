@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.68.0";
+  const SORT_PLAY_VERSION = "5.68.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -9938,7 +9938,7 @@ sendButton.addEventListener("click", async () => {
     }
   }
 
-  async function convertLocalTracksToSpotify(tracks, updateProgress = () => {}) {
+  async function convertLocalTracksToSpotify(tracks, updateProgress = () => {}, keepUnconverted = false) {
     const localTracks = tracks.filter(track => Spicetify.URI.isLocal(track.uri));
     const spotifyTracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
     
@@ -10081,7 +10081,7 @@ sendButton.addEventListener("click", async () => {
             if (res.success && res.result.tracks && res.result.tracks.items.length > 0) {
                 const spotifyTrack = res.result.tracks.items[0];
                 foundSpotifyTracks.push({
-                    uri: spotifyTrack.uri, uid: null, name: spotifyTrack.name,
+                    uri: spotifyTrack.uri, uid: res.originalTrack.uid, name: spotifyTrack.name,
                     albumUri: spotifyTrack.album.uri, albumName: spotifyTrack.album.name,
                     artistUris: spotifyTrack.artists.map(a => a.uri),
                     allArtists: spotifyTrack.artists.map(a => a.name).join(", "),
@@ -10095,6 +10095,9 @@ sendButton.addEventListener("click", async () => {
                 });
             } else {
                 unconvertedLocalCount++;
+                if (keepUnconverted) {
+                    foundSpotifyTracks.push(res.originalTrack);
+                }
             }
         });
 
@@ -28940,6 +28943,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           return;
       }
 
+      let originalTracksForRemoval = [...tracks];
       let unconvertedLocalCount = 0;
       const directSortsToConvertLocalTracks = [
         'playCount', 'popularity', 'releaseDate', 'averageColor', 
@@ -28980,7 +28984,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       if (directSortsToConvertLocalTracks.includes(sortType)) {
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks,
-            (progress) => { if (!isHeadless) mainButton.innerText = progress; }
+            (progress) => { if (!isHeadless) mainButton.innerText = progress; },
+            true
         );
         tracks = convertedTracks;
         unconvertedLocalCount = unconvertedCount;
@@ -29629,7 +29634,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 'excludeByPlaylist'
             );
 
-            sortedTracks = dedupeResult.unique.filter(t => !t._isExclusion);
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+
+            sortedTracks = dedupeResult.unique
+                .filter(t => !t._isExclusion)
+                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
             removedTracks = dedupeResult.removed.filter(t => !t._isExclusion);
 
             if (sortedTracks.length === uniqueTracks.length) {
@@ -29981,8 +29991,34 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
 
                 if (!isHeadless) mainButton.innerText = "Saving...";
-                const trackUris = sortedTracks.map((track) => track.uri);
-                await replacePlaylistTracks(playlistIdToModify, trackUris);
+
+                const filterOnlyTypes = [
+                    'deduplicateOnly', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
+                    'filterSinglesEPs', 'filterAlbumsEPs', 'filterAlbums', 'filterAlbumsCompilations', 
+                    'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles', 'filterCompilations', 
+                    'removeTrashed', 'excludeByPlaylist', 'filterFollowedMain', 'filterFollowedAny', 
+                    'removeFollowed'
+                ];
+
+                const isGroupingSort = ['filterAlbums', 'filterAlbumsEPs', 'filterAlbumsCompilations', 'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles'].includes(sortType);
+                const isOrderChanged = isGroupingSort && sortOrderState[sortType];
+
+                if (filterOnlyTypes.includes(sortType) && !isOrderChanged) {
+                    const keptUids = new Set(sortedTracks.map(t => t.uid));
+                    const toRemove = originalTracksForRemoval
+                        .filter(t => !keptUids.has(t.uid))
+                        .map(t => ({ uri: t.uri, uid: t.uid }));
+
+                    const playlistUri = `spotify:playlist:${playlistIdToModify}`;
+                    if (toRemove.length > 0) {
+                        for (let i = 0; i < toRemove.length; i += 100) {
+                            await Spicetify.Platform.PlaylistAPI.remove(playlistUri, toRemove.slice(i, i + 100));
+                        }
+                    }
+                } else {
+                    const trackUris = sortedTracks.map((track) => track.uri);
+                    await replacePlaylistTracks(playlistIdToModify, trackUris);
+                }
                 
                 if (removedTracks.length > 0 && !isArtistPage) {
                     showRemovedTracksModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
