@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.68.1";
+  const SORT_PLAY_VERSION = "5.69.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -82,6 +82,14 @@
   const STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS = "sort-play-global-playlist-counts";
   const STORAGE_KEY_FALLBACK_MODE = "sort-play-use-internal-fallback";
   const STORAGE_KEY_WEB_API_FAILURES = "sort-play-web-api-failures";
+
+  const AI_MODELS = [
+    { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
+    { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", requiresCustomKey: false },
+    { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3 Flash-Lite", requiresCustomKey: false }
+  ];
+  const DEFAULT_AI_MODEL = AI_MODELS[1].id;
+
   let showAdditionalColumn = false;
   let showSecondAdditionalColumn = false;
   let selectedColumnType = 'playCount';
@@ -104,7 +112,7 @@
   let changeTitleOnCreate = false;
   let changeTitleOnModify = false;
   let setDedicatedPlaylistCovers = true;
-  let selectedAiModel = "gemini-flash-latest";
+  let selectedAiModel = DEFAULT_AI_MODEL;
   let topTracksLimit = 100;
   let discoveryPlaylistSize = 50;
   let newReleasesDaysLimit = 'release-2';
@@ -222,7 +230,7 @@
   const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
   const STATS_URL = "https://sp-stats.niko2nio2.workers.dev";
   const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
-
+  
   async function get_S_Client_Token() {
       if (s_Access_Token && Date.now() < s_Token_Exp) {
           return s_Access_Token;
@@ -1209,7 +1217,7 @@
     removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
     includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
     includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
-    selectedAiModel = localStorage.getItem("sort-play-ai-model") || "gemini-flash-latest";
+    selectedAiModel = localStorage.getItem("sort-play-ai-model") || DEFAULT_AI_MODEL;
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
     matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
     const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
@@ -1891,6 +1899,19 @@
   const copyIconSVG = `<svg width="16px" height="16px" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v9a2 2 0 002 2h2v2a2 2 0 002 2h9a2 2 0 002-2V8a2 2 0 00-2-2h-2V4a2 2 0 00-2-2H4zm9 4V4H4v9h2V8a2 2 0 012-2h5zM8 8h9v9H8V8z"/></svg>`;
 
   const arrowRightIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.2328 16.4569C12.9328 16.7426 12.9212 17.2173 13.2069 17.5172C13.4926 17.8172 13.9673 17.8288 14.2672 17.5431L13.2328 16.4569ZM19.5172 12.5431C19.8172 12.2574 19.8288 11.7827 19.5431 11.4828C19.2574 11.1828 18.7827 11.1712 18.4828 11.4569L19.5172 12.5431ZM18.4828 12.5431C18.7827 12.8288 19.2574 12.8172 19.5431 12.5172C19.8288 12.2173 19.8172 11.7426 19.5172 11.4569L18.4828 12.5431ZM14.2672 6.4569C13.9673 6.17123 13.4926 6.18281 13.2069 6.48276C12.9212 6.78271 12.9328 7.25744 13.2328 7.5431L14.2672 6.4569ZM19 12.75C19.4142 12.75 19.75 12.4142 19.75 12C19.75 11.5858 19.4142 11.25 19 11.25V12.75ZM5 11.25C4.58579 11.25 4.25 11.5858 4.25 12C4.25 12.4142 4.58579 12.75 5 12.75V11.25ZM14.2672 17.5431L19.5172 12.5431L18.4828 11.4569L13.2328 16.4569L14.2672 17.5431ZM19.5172 11.4569L14.2672 6.4569L13.2328 7.5431L18.4828 12.5431L19.5172 11.4569ZM19 11.25L5 11.25V12.75L19 12.75V11.25Z" fill="currentColor"/></svg>`;
+
+  const libraryIconSVG = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>`;
+  const trashIconSVG = `<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
+
+  const penIconSvg = `<svg width="16px" height="16px" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M2.25,12.9378906 L2.25,15.75 L5.06210943,15.75 L13.3559575,7.45615192 L10.5438481,4.64404249 L2.25,12.9378906 L2.25,12.9378906 L2.25,12.9378906 Z M15.5306555,5.28145396 C15.8231148,4.98899458 15.8231148,4.5165602 15.5306555,4.22410082 L13.7758992,2.46934454 C13.4834398,2.17688515 13.0110054,2.17688515 12.718546,2.46934454 L11.3462366,3.84165394 L14.1583461,6.65376337 L15.5306555,5.28145396 L15.5306555,5.28145396 L15.5306555,5.28145396 Z"></path></svg>`;
+  
+  const DEFAULT_PROMPT_PRESETS = [
+    { id: '1', title: "Upbeat Workout", prompt: "High energy, fast tempo tracks perfect for a heavy workout session." },
+    { id: '2', title: "Late Night Drive", prompt: "Atmospheric, chill, and moody tracks for driving at night." },
+    { id: '3', title: "Focus & Study", prompt: "Instrumental, calm tracks to help with concentration and studying." },
+    { id: '4', title: "Party Starters", prompt: "Catchy, popular, and danceable tracks to get a party going." },
+    { id: '5', title: "Sad Vibes", prompt: "Melancholic, slow, and emotional tracks for when you're feeling down." }
+  ];
 
   function showSettingsModal() {
     const abortController = new AbortController();
@@ -8239,6 +8260,24 @@
 
   async function showAiPickModal(tracks, currentUri) {
     const abortController = new AbortController();
+    
+    const userApiKey = (localStorage.getItem("sort-play-gemini-api-key") || "").trim();
+    const isPaidKey = localStorage.getItem("sort-play-gemini-is-paid") === "true";
+    const hasCustomKey = userApiKey.length > 0;
+    
+    const currentModelConfig = AI_MODELS.find(m => m.id === selectedAiModel);
+    if ((!hasCustomKey || !isPaidKey) && currentModelConfig && currentModelConfig.requiresCustomKey) {
+        selectedAiModel = DEFAULT_AI_MODEL;
+        saveSettings();
+    }
+
+    const aiModelOptionsHtml = AI_MODELS.map(model => {
+        const isSelected = selectedAiModel === model.id ? "selected" : "";
+        const isDisabled = (!isPaidKey && model.requiresCustomKey) ? "disabled" : "";
+        const labelSuffix = (!isPaidKey && model.requiresCustomKey) ? " (Paid Key Req.)" : "";
+        return `<option value="${model.id}" ${isSelected} ${isDisabled}>${model.label}${labelSuffix}</option>`;
+    }).join('');
+
     const modalContainer = document.createElement("div");
     modalContainer.className = "ai-pick-modal";
     modalContainer.innerHTML = `
@@ -8305,7 +8344,7 @@
         }
         .ai-pick-modal button {
           padding: 8px 18px;
-          border-radius: 20px;
+          border-radius: 14px;
           border: none;
           cursor: pointer;
           background-color: #1ED760;
@@ -8313,6 +8352,19 @@
           font-weight: 600;
           font-size: 14px;
           transition: all 0.04s ease;
+        }
+
+        .ai-pick-modal #sendAiRequest {
+          transition: transform 0.1s ease, background-color 0.2s ease;
+        }
+
+        .ai-pick-modal #sendAiRequest:hover {
+          background-color: #3BE377;
+          transform: scale(1.04);
+        }
+
+        .ai-pick-modal #sendAiRequest:active {
+          transform: scale(1);
         }
 
         .ai-pick-modal .secondary-button {
@@ -8328,6 +8380,7 @@
 
         .ai-pick-modal .secondary-button:hover {
           border: 1px solid #939393;
+          background-color: #333333;
         }
 
         .ai-pick-modal .secondary-button:disabled {
@@ -8453,8 +8506,8 @@
           display: flex;
           align-items: flex-start;
           border: 1px solid #282828;
-          border-radius: 40px;
-          padding: 5px;
+          border-radius: 20px;
+          padding: 10px;
           margin-bottom: 0px;
           background-color: #282828;
           align-items: center;
@@ -8497,8 +8550,29 @@
         }
 
         .ai-pick-modal .prompt-wrapper .button-container {
+          display: flex;
+          gap: 8px;
+          align-items: center;
           white-space: nowrap;  
           padding: 5px;
+        }
+        .ai-pick-modal .icon-only-btn {
+          background: transparent;
+          border: none;
+          color: #b3b3b3;
+          cursor: pointer;
+          padding: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          transition: color 0.2s, background-color 0.2s;
+          height: 32px;
+          width: 32px;
+        }
+        .ai-pick-modal .icon-only-btn:hover {
+          color: #fff;
+          background-color: rgba(255, 255, 255, 0.1);
         }
         .ai-pick-modal .prompt-wrapper button {
         }
@@ -8635,6 +8709,7 @@
               <textarea id="aiPrompt" class="sort-play-ai-prompt" placeholder="Enter your request for the AI..."></textarea>
           </div>
           <div class="button-container">
+            <button id="promptLibraryBtn" class="icon-only-btn" title="Prompt Library & History">${libraryIconSVG}</button>
             <button id="sendAiRequest">Send</button>
           </div>
         </div>
@@ -8647,7 +8722,7 @@
             Song Statistics
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Includes popularity, play count, release date, danceability, energy, valence, tempo, key, loudness, speechiness, acousticness, liveness, and instrumentalness.</span>
+                <span class="custom-tooltip">Includes popularity, play count, release date, danceability, energy, valence, and tempo.</span>
             </span>
         </label>
               <div class="action">
@@ -8659,7 +8734,13 @@
             </div>
             
             <div class="setting-row" id="includeLyrics">
-              <label class="description">Song Lyrics</label>
+              <label class="description">
+                Song Lyrics
+                <span class="tooltip-container">
+                    ${infoIconSvg}
+                    <span class="custom-tooltip">Retrieving lyrics slows down the process and is not recommended for big playlists.</span>
+                </span>
+              </label>
               <div class="action">
                 <label class="switch">
                   <input type="checkbox" ${includeLyrics ? 'checked' : ''}>
@@ -8673,15 +8754,14 @@
             <div class="model-row">
               <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:</label>
               <select id="aiModel">
-                <option value="gemini-2.5-pro" ${selectedAiModel === "gemini-2.5-pro" ? "selected" : ""}>Gemini 2.5 Pro</option>
-                <option value="gemini-flash-latest" ${selectedAiModel === "gemini-flash-latest" ? "selected" : ""}>Gemini 2.5 Flash</option>
-                <option value="gemini-flash-lite-latest" ${selectedAiModel === "gemini-flash-lite-latest" ? "selected" : ""}>Gemini 2.5 Flash-Lite</option>
+                ${aiModelOptionsHtml}
               </select>
             </div>
             <div class="button-row">
               <button id="editSystemInstruction" class="secondary-button">Edit System Instruction</button>
             </div>
           </div>
+        </div>
         
         <div class="system-instruction" id="systemInstructionEditor">
           <label class="instruction-label">User System Instruction:</label>
@@ -8812,13 +8892,24 @@
       editButton.disabled = false;
     });
   
+    const promptLibraryBtn = document.getElementById("promptLibraryBtn");
+    promptLibraryBtn.addEventListener("click", () => {
+      showPromptLibraryModal(aiPromptTextarea);
+    });
+
     const sendButton = document.getElementById("sendAiRequest");
-sendButton.addEventListener("click", async () => {
-      const userPrompt = document.getElementById("aiPrompt").value;
+    sendButton.addEventListener("click", async () => {
+      const userPrompt = document.getElementById("aiPrompt").value.trim();
       if (!userPrompt) {
         showNotification("Please enter a request.", true);
         return;
       }
+      
+      let history = JSON.parse(localStorage.getItem('sort-play-ai-prompt-history') || '[]');
+      history = history.filter(p => p !== userPrompt);
+      history.unshift(userPrompt);
+      if (history.length > 50) history.length = 50;
+      localStorage.setItem('sort-play-ai-prompt-history', JSON.stringify(history));
   
       Spicetify.PopupModal.hide();
   
@@ -9042,10 +9133,243 @@ sendButton.addEventListener("click", async () => {
           "An error occurred while processing the AI request.",
           true
         );
-      } finally {
+    } finally {
         resetButtons();
       }
     });
+  }
+
+  function showPromptLibraryModal(textAreaElement) {
+      const overlay = document.createElement("div");
+      overlay.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background-color: rgba(0, 0, 0, 0.7); z-index: 3000;
+          display: flex; justify-content: center; align-items: center;
+          backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+      `;
+
+      const modalContainer = document.createElement("div");
+      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+      modalContainer.style.cssText = `
+          width: 500px !important;
+          border-radius: 20px;
+          overflow: hidden; 
+          background-color: #181818 !important;
+          border: 1px solid #282828;
+          display: flex;
+          flex-direction: column;
+          max-height: 70vh;
+      `;
+
+      let activeTab = 'presets';
+      let editingPreset = null;
+      
+      let presets = JSON.parse(localStorage.getItem('sort-play-ai-prompt-presets'));
+      if (!presets || presets.length === 0) presets = [...DEFAULT_PROMPT_PRESETS];
+      
+      let history = JSON.parse(localStorage.getItem('sort-play-ai-prompt-history') || '[]');
+
+      const savePresets = () => {
+          localStorage.setItem('sort-play-ai-prompt-presets', JSON.stringify(presets));
+      };
+
+      const render = () => {
+          if (editingPreset) {
+              modalContainer.innerHTML = `
+                  <div style="padding: 24px;">
+                      <h2 style="color: white; margin: 0 0 20px 0; font-size: 20px;">${editingPreset.id === 'new' ? 'New Preset' : 'Edit Preset'}</h2>
+                      <div style="display: flex; flex-direction: column; gap: 16px;">
+                          <div>
+                              <label style="color: #b3b3b3; font-size: 13px; margin-bottom: 6px; display: block;">Title</label>
+                              <input type="text" id="presetTitleInput" value="${editingPreset.title || ''}" placeholder="E.g., Chill Vibes" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #282828; color: white; font-family: inherit;">
+                          </div>
+                          <div>
+                              <label style="color: #b3b3b3; font-size: 13px; margin-bottom: 6px; display: block;">Prompt</label>
+                              <textarea id="presetPromptInput" placeholder="Enter your prompt here..." style="width: 100%; height: 100px; padding: 10px; border-radius: 6px; border: 1px solid #444; background: #282828; color: white; font-family: inherit; resize: none;">${editingPreset.prompt || ''}</textarea>
+                          </div>
+                          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px;">
+                              <button id="cancelEditBtn" style="padding: 8px 20px; border-radius: 20px; border: none; background: #333; color: white; cursor: pointer; font-weight: bold; transition: background 0.2s;">Cancel</button>
+                              <button id="saveEditBtn" style="padding: 8px 20px; border-radius: 20px; border: none; background: #1ED760; color: black; cursor: pointer; font-weight: bold; transition: background 0.2s;">Save</button>
+                          </div>
+                      </div>
+                  </div>
+              `;
+              
+              modalContainer.querySelector('#cancelEditBtn').onclick = () => {
+                  editingPreset = null;
+                  render();
+              };
+              
+              modalContainer.querySelector('#cancelEditBtn').onmouseover = (e) => e.target.style.background = '#444';
+              modalContainer.querySelector('#cancelEditBtn').onmouseout = (e) => e.target.style.background = '#333';
+              
+              modalContainer.querySelector('#saveEditBtn').onclick = () => {
+                  const title = modalContainer.querySelector('#presetTitleInput').value.trim();
+                  const prompt = modalContainer.querySelector('#presetPromptInput').value.trim();
+                  if (!title || !prompt) return;
+                  
+                  if (editingPreset.id === 'new') {
+                      presets.push({ id: Date.now().toString(), title, prompt });
+                  } else {
+                      const idx = presets.findIndex(p => p.id === editingPreset.id);
+                      if (idx !== -1) {
+                          presets[idx].title = title;
+                          presets[idx].prompt = prompt;
+                      }
+                  }
+                  savePresets();
+                  editingPreset = null;
+                  render();
+              };
+              
+              modalContainer.querySelector('#saveEditBtn').onmouseover = (e) => e.target.style.background = '#3BE377';
+              modalContainer.querySelector('#saveEditBtn').onmouseout = (e) => e.target.style.background = '#1ED760';
+
+              return;
+          }
+
+          const presetsHtml = presets.map(p => `
+              <div class="preset-item" data-id="${p.id}">
+                  <div class="preset-info">
+                      <div class="preset-title">${p.title}</div>
+                      <div class="preset-prompt">${p.prompt}</div>
+                  </div>
+                  <div class="preset-actions">
+                      <button class="preset-action-btn edit-btn" data-id="${p.id}" title="Edit">${penIconSvg}</button>
+                      <button class="preset-action-btn delete-btn" data-id="${p.id}" title="Delete">${trashIconSVG}</button>
+                  </div>
+              </div>
+          `).join('');
+
+          const historyHtml = history.map((h, i) => `
+              <div class="history-item" data-index="${i}">
+                  <div class="history-text">${h}</div>
+                  <button class="preset-action-btn save-history-btn" data-index="${i}" title="Save as Preset">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  </button>
+              </div>
+          `).join('');
+
+          modalContainer.innerHTML = `
+              <style>
+                  .pl-tabs { display: flex; border-bottom: 1px solid #333; }
+                  .pl-tab { flex: 1; padding: 16px; text-align: center; background: transparent; border: none; color: #888; font-weight: bold; cursor: pointer; font-size: 14px; transition: color 0.2s, box-shadow 0.2s; }
+                  .pl-tab:hover { color: #fff; }
+                  .pl-tab.active { color: #1ED760; box-shadow: inset 0 -2px 0 #1ED760; }
+                  .pl-content { padding: 16px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: #555 transparent; min-height: 200px; }
+                  .pl-content::-webkit-scrollbar { width: 6px; }
+                  .pl-content::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+                  .preset-item, .history-item { display: flex; justify-content: space-between; align-items: center; background: #242424; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s; border: 1px solid transparent; }
+                  .preset-item:hover, .history-item:hover { background: #2a2a2a; border-color: #444; }
+                  .preset-info { display: flex; flex-direction: column; overflow: hidden; flex: 1; margin-right: 12px; }
+                  .preset-title { font-size: 14px; color: #fff; font-weight: bold; margin-bottom: 4px; }
+                  .preset-prompt, .history-text { font-size: 13px; color: #b3b3b3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+                  .history-text { flex: 1; margin-right: 12px; }
+                  .preset-actions { display: flex; gap: 4px; }
+                  .preset-action-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; transition: color 0.2s, background 0.2s; }
+                  .preset-action-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+                  .preset-action-btn.delete-btn:hover { color: #f15e6c; background: rgba(241, 94, 108, 0.1); }
+                  .pl-empty { text-align: center; color: #888; padding: 30px 0; font-size: 14px; font-style: italic; }
+                  .pl-footer { padding: 16px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+              </style>
+              <div class="pl-tabs">
+                  <button class="pl-tab ${activeTab === 'presets' ? 'active' : ''}" data-tab="presets">Presets</button>
+                  <button class="pl-tab ${activeTab === 'history' ? 'active' : ''}" data-tab="history">History</button>
+              </div>
+              <div class="pl-content">
+                  ${activeTab === 'presets' ? (presets.length ? presetsHtml : '<div class="pl-empty">No presets saved.</div>') : ''}
+                  ${activeTab === 'history' ? (history.length ? historyHtml : '<div class="pl-empty">No prompt history found.</div>') : ''}
+              </div>
+              <div class="pl-footer">
+                  ${activeTab === 'presets' ? '<button id="createNewPresetBtn" style="background: transparent; border: 1px solid #666; color: white; padding: 6px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 13px; transition: border-color 0.2s;">+ New Preset</button>' : '<div></div>'}
+                  <button id="closePlModalBtn" style="background: #333; border: none; color: white; padding: 6px 16px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s;">Close</button>
+              </div>
+          `;
+
+          modalContainer.querySelectorAll('.pl-tab').forEach(btn => {
+              btn.onclick = (e) => {
+                  activeTab = e.target.dataset.tab;
+                  render();
+              };
+          });
+
+          modalContainer.querySelector('#closePlModalBtn').onclick = () => overlay.remove();
+          
+          const createBtn = modalContainer.querySelector('#createNewPresetBtn');
+          if (createBtn) {
+              createBtn.onclick = () => {
+                  editingPreset = { id: 'new', title: '', prompt: '' };
+                  render();
+              };
+              createBtn.onmouseover = (e) => e.target.style.borderColor = 'white';
+              createBtn.onmouseout = (e) => e.target.style.borderColor = '#666';
+          }
+
+          modalContainer.querySelectorAll('.preset-item').forEach(item => {
+              item.onclick = (e) => {
+                  if (e.target.closest('.preset-action-btn')) return; 
+                  const pId = item.dataset.id;
+                  const preset = presets.find(p => p.id === pId);
+                  if (preset) {
+                      textAreaElement.value = preset.prompt;
+                      textAreaElement.dispatchEvent(new Event('input'));
+                      overlay.remove();
+                  }
+              };
+          });
+
+          modalContainer.querySelectorAll('.history-item').forEach(item => {
+              item.onclick = (e) => {
+                  if (e.target.closest('.preset-action-btn')) return;
+                  const hIndex = item.dataset.index;
+                  const prompt = history[hIndex];
+                  if (prompt) {
+                      textAreaElement.value = prompt;
+                      textAreaElement.dispatchEvent(new Event('input'));
+                      overlay.remove();
+                  }
+              };
+          });
+
+          modalContainer.querySelectorAll('.edit-btn').forEach(btn => {
+              btn.onclick = (e) => {
+                  e.stopPropagation();
+                  const pId = btn.dataset.id;
+                  editingPreset = presets.find(p => p.id === pId);
+                  render();
+              };
+          });
+
+          modalContainer.querySelectorAll('.delete-btn').forEach(btn => {
+              btn.onclick = (e) => {
+                  e.stopPropagation();
+                  const pId = btn.dataset.id;
+                  presets = presets.filter(p => p.id !== pId);
+                  savePresets();
+                  render();
+              };
+          });
+
+          modalContainer.querySelectorAll('.save-history-btn').forEach(btn => {
+              btn.onclick = (e) => {
+                  e.stopPropagation();
+                  const hIndex = btn.dataset.index;
+                  const prompt = history[hIndex];
+                  editingPreset = { id: 'new', title: 'Saved from History', prompt: prompt };
+                  render();
+              };
+          });
+      };
+
+      render();
+      overlay.appendChild(modalContainer);
+      document.body.appendChild(overlay);
+
+      overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) {
+              overlay.remove();
+          }
+      });
   }
 
   const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -9209,29 +9533,23 @@ sendButton.addEventListener("click", async () => {
     try {
         if (tracksToProcess.length > 0) {
             let allBatchStats = {};
+            let tracksWithPlays = tracksToProcess;
+            
             if (includeSongStats) {
+                tracksWithPlays = await enrichTracksWithPlayCounts(tracksToProcess);
+                
                 const trackIdsToFetch = tracksToProcess.map(t => t.uri.split(":")[2]);
                 allBatchStats = await getBatchTrackStats(trackIdsToFetch);
             }
 
             const processedTracks = await processBatchWithRateLimit(
-                tracksToProcess, 20, 700,
+                tracksWithPlays, 20, 700,
                 async track => {
                     const trackId = track.uri.split(":")[2];
                     let stats = includeSongStats ? allBatchStats[trackId] : null;
-                    stats = stats || { danceability: null, energy: null, key: "Undefined", loudness: null, speechiness: null, acousticness: null, instrumentalness: null, liveness: null, valence: null, tempo: null, popularity: null, releaseDate: null };
+                    stats = stats || { danceability: null, energy: null, valence: null, tempo: null, popularity: null, releaseDate: null };
                     
-                    let playCount = "N/A";
-                    if (includeSongStats) {
-                        try {
-                            const albumId = track.albumId || track.track?.album?.id;
-                            if (albumId) {
-                                const albumTracksWithPlayCounts = await getPlayCountsForAlbum(albumId);
-                                const foundTrack = albumTracksWithPlayCounts.find(t => t.uri === track.uri);
-                                playCount = foundTrack ? foundTrack.playcount : "N/A";
-                            }
-                        } catch (error) { playCount = "N/A"; }
-                    }
+                    let playCount = includeSongStats ? (track.playCount || "N/A") : "N/A";
                     
                     let lyrics = "Not included";
                     if (includeLyrics) {
@@ -9247,7 +9565,7 @@ sendButton.addEventListener("click", async () => {
                     };
         
                     if (includeSongStats) {
-                        enrichedTrack.stats = { popularity: stats.popularity, playCount: playCount, releaseDate: stats.releaseDate, danceability: stats.danceability, energy: stats.energy, valence: stats.valence, tempo: stats.tempo, key: stats.key, loudness: stats.loudness, speechiness: stats.speechiness, acousticness: stats.acousticness, liveness: stats.liveness, instrumentalness: stats.instrumentalness };
+                        enrichedTrack.stats = { popularity: stats.popularity, playCount: playCount, releaseDate: stats.releaseDate, danceability: stats.danceability, energy: stats.energy, valence: stats.valence, tempo: stats.tempo };
                     }
         
                     const trackDataForCache = { ...enrichedTrack };
@@ -9431,13 +9749,32 @@ sendButton.addEventListener("click", async () => {
 
       saveButton.disabled = true;
       saveButton.style.backgroundColor = "#FFFFFFB3";
-      saveButton.textContent = "Saving...";
+      saveButton.textContent = "Verifying...";
 
       if (apiKey) {
-        localStorage.setItem("sort-play-gemini-api-key", apiKey);
-        showNotification("Gemini API key saved successfully!");
+        try {
+          const proModelId = AI_MODELS.find(m => m.requiresCustomKey)?.id;
+          if (proModelId) {
+            const GoogleGenAI = await loadGoogleAI();
+            const ai = new GoogleGenAI({ apiKey: apiKey });
+            await ai.models.generateContent({
+              model: proModelId,
+              contents: "1"
+            });
+          }
+          
+          localStorage.setItem("sort-play-gemini-api-key", apiKey);
+          localStorage.setItem("sort-play-gemini-is-paid", "true");
+          showNotification("Paid Gemini API key verified and saved!");
+        } catch (error) {
+          console.warn("[Sort-Play] Pro model check failed, assuming free tier key:", error);
+          localStorage.setItem("sort-play-gemini-api-key", apiKey);
+          localStorage.setItem("sort-play-gemini-is-paid", "false");
+          showNotification("Free Gemini API key saved. (Pro models disabled)");
+        }
       } else {
         localStorage.removeItem("sort-play-gemini-api-key");
+        localStorage.removeItem("sort-play-gemini-is-paid");
         showNotification("Gemini API key cleared.");
       }
 
@@ -16532,7 +16869,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
 
-    const penIconSvg = `<svg width="16px" height="16px" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M2.25,12.9378906 L2.25,15.75 L5.06210943,15.75 L13.3559575,7.45615192 L10.5438481,4.64404249 L2.25,12.9378906 L2.25,12.9378906 L2.25,12.9378906 Z M15.5306555,5.28145396 C15.8231148,4.98899458 15.8231148,4.5165602 15.5306555,4.22410082 L13.7758992,2.46934454 C13.4834398,2.17688515 13.0110054,2.17688515 12.718546,2.46934454 L11.3462366,3.84165394 L14.1583461,6.65376337 L15.5306555,5.28145396 L15.5306555,5.28145396 L15.5306555,5.28145396 Z"></path></svg>`;
+    
 
     const formatTimeAgo = (timestamp) => {
         if (!timestamp) return 'Never';
@@ -34901,17 +35238,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const existingHeader = tracklistContainer.querySelector('.sort-play-album-col-header');
             if (existingHeader) {
                 const headerRow = existingHeader.parentElement;
-                const originalGridTemplate = "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
                 existingHeader.remove();
-                if(headerRow) headerRow.style.gridTemplateColumns = originalGridTemplate;
+                if(headerRow) headerRow.style.gridTemplateColumns = "";
                 tracklistContainer.setAttribute('aria-colcount', '4');
                 const allRows = tracklistContainer.querySelectorAll('.main-trackList-trackList .main-trackList-trackListRow');
                 allRows.forEach(row => {
                     const cell = row.querySelector('.sort-play-album-col');
                     if (cell) cell.remove();
-                    row.style.gridTemplateColumns = originalGridTemplate;
+                    row.style.gridTemplateColumns = "";
                 });
             }
+            tracklistContainer.removeAttribute('data-sp-grid');
+            let gridStyleEl = document.getElementById("sort-play-album-grid-style");
+            if (gridStyleEl) gridStyleEl.innerHTML = "";
             return;
         }
 
@@ -34935,10 +35274,28 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
 
         const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
+        
+        let gridStyleEl = document.getElementById("sort-play-album-grid-style");
+        if (!gridStyleEl) {
+            gridStyleEl = document.createElement("style");
+            gridStyleEl.id = "sort-play-album-grid-style";
+            document.head.appendChild(gridStyleEl);
+        }
+        tracklistContainer.setAttribute('data-sp-grid', 'album');
+        const cssString = `
+            html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListHeaderRow,
+            html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRow,
+            html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRowGrid {
+                grid-template-columns: ${newGridTemplate} !important;
+            }
+        `;
+        if (gridStyleEl.innerHTML !== cssString) {
+            gridStyleEl.innerHTML = cssString;
+        }
+
         const existingHeader = headerRow.querySelector('.sort-play-album-col-header');
 
         if (!existingHeader) {
-            headerRow.style.setProperty('grid-template-columns', newGridTemplate, 'important');
             tracklistContainer.setAttribute('aria-colcount', '5');
             const newHeaderCell = document.createElement('div');
             newHeaderCell.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
@@ -34966,10 +35323,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
         
+        const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
+        for (const skeleton of skeletonRows) {
+            if (skeleton.querySelector('.sort-play-album-skeleton-col')) continue;
+            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
+            const skeletonCell = document.createElement("div");
+            const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
+            const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
+            skeletonCell.className = `${baseClass} sort-play-album-skeleton-col`;
+            
+            if (endCell) skeleton.insertBefore(skeletonCell, endCell);
+            else skeleton.appendChild(skeletonCell);
+        }
+
         const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
         trackRows.forEach(row => {
+            row.style.gridTemplateColumns = ""; 
             if (row.querySelector('.sort-play-album-col')) return;
-            row.style.setProperty('grid-template-columns', newGridTemplate, 'important');
             const newCell = document.createElement('div');
             newCell.className = 'main-trackList-rowSectionVariable sort-play-album-col';
             newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
@@ -35009,15 +35379,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
             if (existingHeaderWrapper) {
                 const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
-                const originalGridTemplate = "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
                 existingHeaderWrapper.remove();
                 tracklistContainer.setAttribute('aria-colcount', '4');
                 trackRows.forEach(row => {
                     const cell = row.querySelector('.sort-play-artist-col');
                     if (cell) cell.remove();
-                    row.style.gridTemplateColumns = originalGridTemplate;
+                    row.style.gridTemplateColumns = "";
                 });
             }
+            tracklistContainer.removeAttribute('data-sp-grid');
+            let gridStyleEl = document.getElementById("sort-play-artist-grid-style");
+            if (gridStyleEl) gridStyleEl.innerHTML = "";
             return;
         }
 
@@ -35038,13 +35410,32 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
         
         const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
+        
+        let gridStyleEl = document.getElementById("sort-play-artist-grid-style");
+        if (!gridStyleEl) {
+            gridStyleEl = document.createElement("style");
+            gridStyleEl.id = "sort-play-artist-grid-style";
+            document.head.appendChild(gridStyleEl);
+        }
+        tracklistContainer.setAttribute('data-sp-grid', 'artist');
+        const cssString = `
+            html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListHeaderRow,
+            html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRow,
+            html body div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRowGrid {
+                grid-template-columns: ${newGridTemplate} !important;
+            }
+        `;
+        if (gridStyleEl.innerHTML !== cssString) {
+            gridStyleEl.innerHTML = cssString;
+        }
+
         const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
 
         if (!existingHeaderWrapper) {
             tracklistContainer.setAttribute('aria-colcount', '5');
             const headerWrapper = document.createElement('div');
             headerWrapper.className = 'main-trackList-trackListHeader sort-play-artist-header-wrapper';
-            headerWrapper.innerHTML = `<div class="main-trackList-trackListHeaderRow main-trackList-trackListRowGrid" role="row" style="grid-template-columns: ${newGridTemplate};">
+            headerWrapper.innerHTML = `<div class="main-trackList-trackListHeaderRow main-trackList-trackListRowGrid" role="row">
                 <div class="main-trackList-rowSectionIndex" role="columnheader" aria-colindex="1"><div>#</div></div>
                 <div class="main-trackList-rowSectionStart" role="columnheader" aria-colindex="2"><div class="main-trackList-column"><span class="encore-text-body-small">Title</span></div></div>
                 <div class="main-trackList-rowSectionVariable" role="columnheader" aria-colindex="3"><div><span class="encore-text-body-small">Plays</span></div></div>
@@ -35071,10 +35462,23 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
 
+        const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
+        for (const skeleton of skeletonRows) {
+            if (skeleton.querySelector('.sort-play-artist-skeleton-col')) continue;
+            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
+            const skeletonCell = document.createElement("div");
+            const varCell = skeleton.querySelector(".main-trackList-rowSectionVariable");
+            const baseClass = varCell ? varCell.className.split(' ').filter(c => !c.includes('sort-play')).join(' ') : "ojrBmBNrA3EfuQlTYybV main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
+            skeletonCell.className = `${baseClass} sort-play-artist-skeleton-col`;
+            
+            if (endCell) skeleton.insertBefore(skeletonCell, endCell);
+            else skeleton.appendChild(skeletonCell);
+        }
+
         const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
         trackRows.forEach(row => {
+            row.style.gridTemplateColumns = "";
             if (row.querySelector('.sort-play-artist-col')) return;
-            row.style.setProperty('grid-template-columns', newGridTemplate, 'important');
             const newCell = document.createElement('div');
             newCell.className = 'main-trackList-rowSectionVariable sort-play-artist-col';
             newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
@@ -35145,44 +35549,80 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const currentUri = getCurrentUri();
     if (!currentUri || !URI.isAlbum(currentUri)) return;
 
-    const tracklist = await waitForElement(".main-trackList-trackList.main-trackList-indexable");
-    if (!tracklist) return;
+    const mainView = document.querySelector("main");
+    if (!mainView) {
+        setTimeout(initializeAlbumTracklistObserver, 250);
+        return;
+    }
 
     updateAlbumTracklist();
 
     if (albumTracklistObserver) albumTracklistObserver.disconnect();
 
-    albumTracklistObserver = new MutationObserver(() => {
-        clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateAlbumTracklist, 15);
+    albumTracklistObserver = new MutationObserver((mutations) => {
+        let shouldUpdate = false;
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.classList && (node.classList.contains('main-trackList-trackListRow') || node.classList.contains('main-trackList-trackList') || node.classList.contains('main-trackList-trackListRowGrid'))) {
+                        shouldUpdate = true;
+                        break;
+                    }
+                    if (node.querySelector && (node.querySelector('.main-trackList-trackListRow') || node.querySelector('.main-trackList-trackList') || node.querySelector('.main-trackList-trackListRowGrid'))) {
+                        shouldUpdate = true;
+                        break;
+                    }
+                }
+            }
+            if (shouldUpdate) break;
+        }
+        if (shouldUpdate) {
+            clearTimeout(updateDebounceTimeout);
+            updateDebounceTimeout = setTimeout(updateAlbumTracklist, 15);
+        }
     });
     
-    albumTracklistObserver.observe(tracklist, {
-      childList: true,
-      subtree: true,
-    });
+    albumTracklistObserver.observe(mainView, { childList: true, subtree: true });
   }
 
   async function initializeArtistTracklistObserver() {
     const currentUri = getCurrentUri();
     if (!currentUri || !URI.isArtist(currentUri)) return;
 
-    const tracklist = await waitForElement('div.main-trackList-trackList[aria-label="popular tracks"]');
-    if (!tracklist) return;
+    const mainView = document.querySelector("main");
+    if (!mainView) {
+        setTimeout(initializeArtistTracklistObserver, 250);
+        return;
+    }
 
     updateArtistTracklist();
 
     if (artistTracklistObserver) artistTracklistObserver.disconnect();
 
-    artistTracklistObserver = new MutationObserver(() => {
-        clearTimeout(updateDebounceTimeout);
-        updateDebounceTimeout = setTimeout(updateArtistTracklist, 15);
+    artistTracklistObserver = new MutationObserver((mutations) => {
+        let shouldUpdate = false;
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.classList && (node.classList.contains('main-trackList-trackListRow') || node.classList.contains('main-trackList-trackList') || node.classList.contains('main-trackList-trackListRowGrid'))) {
+                        shouldUpdate = true;
+                        break;
+                    }
+                    if (node.querySelector && (node.querySelector('.main-trackList-trackListRow') || node.querySelector('.main-trackList-trackList') || node.querySelector('.main-trackList-trackListRowGrid'))) {
+                        shouldUpdate = true;
+                        break;
+                    }
+                }
+            }
+            if (shouldUpdate) break;
+        }
+        if (shouldUpdate) {
+            clearTimeout(updateDebounceTimeout);
+            updateDebounceTimeout = setTimeout(updateArtistTracklist, 15);
+        }
     });
     
-    artistTracklistObserver.observe(tracklist, {
-      childList: true,
-      subtree: true,
-    });
+    artistTracklistObserver.observe(mainView, { childList: true, subtree: true });
   }
     
   function insertButton() {
