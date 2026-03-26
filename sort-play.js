@@ -12,12 +12,11 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.69.0";
+  const SORT_PLAY_VERSION = "5.70.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
   const RANDOM_GENRE_SELECTION_SIZE = 20;
-  const spotifyApiLimits = { maxRequestsPerSecond: 20, requests: [] };
   const STORAGE_KEY_SHOW_GENRE_TAGS = "sort-play-show-genre-tags";
   const STORAGE_KEY_SHOW_GENRE_TAGS_NP = "sort-play-show-genre-tags-np";
   const STORAGE_KEY_SHOW_GENRE_TAGS_AP = "sort-play-show-genre-tags-ap";
@@ -80,8 +79,96 @@
   const STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT = "sort-play-now-playing-scrobbles-format";
   const STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT = "sort-play-now-playing-personal-scrobbles-format";
   const STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS = "sort-play-global-playlist-counts";
-  const STORAGE_KEY_FALLBACK_MODE = "sort-play-use-internal-fallback";
-  const STORAGE_KEY_WEB_API_FAILURES = "sort-play-web-api-failures";
+  const STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP = "sort-play-artist-discography-map";
+  const STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL = "sort-play-artist-discography-show-dup-modal";
+  const STORAGE_KEY_SHOW_ADDITIONAL_COLUMN = "sort-play-show-additional-column";
+  const STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN = "sort-play-show-second-additional-column";
+  const STORAGE_KEY_SHOW_ALBUM_COLUMN = "sort-play-show-album-column";
+  const STORAGE_KEY_SHOW_ARTIST_COLUMN = "sort-play-show-artist-column";
+  const STORAGE_KEY_SELECTED_COLUMN_TYPE = "sort-play-selected-column-type";
+  const STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE = "sort-play-selected-second-column-type";
+  const STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE = "sort-play-selected-album-column-type";
+  const STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE = "sort-play-selected-artist-column-type";
+  const STORAGE_KEY_RELEASE_DATE_FORMAT = "sort-play-release-date-format";
+  const STORAGE_KEY_REMOVE_DATE_ADDED = "sort-play-remove-date-added";
+  const STORAGE_KEY_INCLUDE_SONG_STATS = "sort-play-include-song-stats";
+  const STORAGE_KEY_INCLUDE_LYRICS = "sort-play-include-lyrics";
+  const STORAGE_KEY_AI_MODEL = "sort-play-ai-model";
+  const STORAGE_KEY_MATCH_ALL_GENRES = "sort-play-match-all-genres";
+  const STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE = "sort-play-my-scrobbles-display-mode";
+  const STORAGE_KEY_KEY_DISPLAY_MODE = "sort-play-key-display-mode";
+  const STORAGE_KEY_SHOW_LIKE_BUTTON = "sort-play-show-like-button";
+  const STORAGE_KEY_LASTFM_AUTOCORRECT = "sort-play-lastfm-autocorrect";
+  const STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE = "sort-play-artist-discography-dedup-mode";
+  const STORAGE_KEY_LFM_OVERRIDES = "sort-play-lfm-overrides";
+  const STORAGE_KEY_LFM_COMMENTS_COLLAPSED = "sort-play-lfm-comments-collapsed";
+  const STORAGE_KEY_GEMINI_API_KEY = "sort-play-gemini-api-key";
+  const STORAGE_KEY_GEMINI_IS_PAID = "sort-play-gemini-is-paid";
+  const STORAGE_KEY_AI_PROMPT_HISTORY = "sort-play-ai-prompt-history";
+  const STORAGE_KEY_AI_PROMPT_PRESETS = "sort-play-ai-prompt-presets";
+  const STORAGE_KEY_FILTER_PRESETS = "sort-play-filter-presets";
+  const STORAGE_KEY_KEYWORD_GROUPS = "sort-play-keyword-groups";
+  const STORAGE_KEY_TITLE_ALBUM_KEYWORDS = "sort-play-title-album-keywords";
+  const STORAGE_KEY_ARTIST_KEYWORDS = "sort-play-artist-keywords";
+  const STORAGE_KEY_GENRE_WINDOW_POS = "sort-play-genre-window-pos";
+  const STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE = "sort-play-page-size";
+  const STORAGE_KEY_ACTIVE_RANGE_FILTER = "sort-play-active-range-filter";
+  const STORAGE_KEY_FILTER_TITLE = "sort-play-filter-title";
+  const STORAGE_KEY_FILTER_ALBUM = "sort-play-filter-album";
+  const STORAGE_KEY_FILTER_ARTIST = "sort-play-filter-artist";
+  const STORAGE_KEY_MATCH_WHOLE_WORD = "sort-play-match-whole-word";
+  const STORAGE_KEY_CHAT_CUSTOM_NAME = "sp-chat-custom-name";
+
+  const SYNCABLE_SETTINGS_KEYS = [
+    STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
+    STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY, STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY_TRACK,
+    STORAGE_KEY_GENRE_SOURCES_NP_LASTFM, STORAGE_KEY_GENRE_SOURCES_NP_DEEZER,
+    STORAGE_KEY_GENRE_SOURCES_AP_SPOTIFY, STORAGE_KEY_GENRE_SOURCES_AP_LASTFM,
+    STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE, STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL,
+    STORAGE_KEY_CHAT_PANEL_VISIBLE, STORAGE_KEY_LASTFM_USERNAME,
+    STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU,
+    STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU,
+    STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, STORAGE_KEY_GENRE_FILTER_SORT,
+    STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2, STORAGE_KEY_ADD_TO_QUEUE,
+    STORAGE_KEY_CREATE_PLAYLIST, STORAGE_KEY_SORT_CURRENT_PLAYLIST,
+    STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT,
+    STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, STORAGE_KEY_SORT_PLAY_FOLDER_NAME,
+    STORAGE_KEY_CHANGE_TITLE_ON_CREATE, STORAGE_KEY_CHANGE_TITLE_ON_MODIFY,
+    STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, STORAGE_KEY_DEDICATED_PLAYLIST_MAP,
+    STORAGE_KEY_COLOR_SORT_MODE, STORAGE_KEY_TOP_TRACKS_LIMIT,
+    STORAGE_KEY_NEW_RELEASES_LIMIT, STORAGE_KEY_FOLLOWED_RELEASES_LIMIT,
+    STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS,
+    STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS, STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES,
+    STORAGE_KEY_DEDICATED_PLAYLIST_JOBS, STORAGE_KEY_DYNAMIC_SORT_TYPE,
+    STORAGE_KEY_DYNAMIC_SCHEDULE, STORAGE_KEY_DYNAMIC_UPDATE_SOURCE,
+    STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE, STORAGE_KEY_CHAT_CUSTOM_NAME,
+    STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT, STORAGE_KEY_SHOW_NOW_PLAYING_DATA,
+    STORAGE_KEY_NP_CONFIG, STORAGE_KEY_NOW_PLAYING_DATA_TYPE,
+    STORAGE_KEY_NOW_PLAYING_DATA_POSITION, STORAGE_KEY_NOW_PLAYING_DATA_FORMAT,
+    STORAGE_KEY_NOW_PLAYING_PLAY_COUNT_FORMAT, STORAGE_KEY_NOW_PLAYING_TEMPO_FORMAT,
+    STORAGE_KEY_NOW_PLAYING_ENERGY_FORMAT, STORAGE_KEY_NOW_PLAYING_DANCEABILITY_FORMAT,
+    STORAGE_KEY_NOW_PLAYING_VALENCE_FORMAT, STORAGE_KEY_NOW_PLAYING_KEY_FORMAT,
+    STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT, STORAGE_KEY_NOW_PLAYING_SEPARATOR,
+    STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT, STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT,
+    STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP, STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL,
+    STORAGE_KEY_SHOW_ADDITIONAL_COLUMN, STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN,
+    STORAGE_KEY_SHOW_ALBUM_COLUMN, STORAGE_KEY_SHOW_ARTIST_COLUMN,
+    STORAGE_KEY_SELECTED_COLUMN_TYPE, STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE,
+    STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE, STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE,
+    STORAGE_KEY_RELEASE_DATE_FORMAT, STORAGE_KEY_REMOVE_DATE_ADDED,
+    STORAGE_KEY_INCLUDE_SONG_STATS, STORAGE_KEY_INCLUDE_LYRICS,
+    STORAGE_KEY_AI_MODEL, STORAGE_KEY_MATCH_ALL_GENRES,
+    STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE, STORAGE_KEY_KEY_DISPLAY_MODE,
+    STORAGE_KEY_SHOW_LIKE_BUTTON, STORAGE_KEY_LASTFM_AUTOCORRECT,
+    STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE, STORAGE_KEY_LFM_OVERRIDES, 
+    STORAGE_KEY_LFM_COMMENTS_COLLAPSED, STORAGE_KEY_GEMINI_API_KEY, 
+    STORAGE_KEY_GEMINI_IS_PAID, STORAGE_KEY_AI_PROMPT_HISTORY, 
+    STORAGE_KEY_AI_PROMPT_PRESETS, STORAGE_KEY_FILTER_PRESETS, 
+    STORAGE_KEY_KEYWORD_GROUPS, STORAGE_KEY_TITLE_ALBUM_KEYWORDS, 
+    STORAGE_KEY_ARTIST_KEYWORDS, STORAGE_KEY_MATCH_WHOLE_WORD,
+    STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE, STORAGE_KEY_ACTIVE_RANGE_FILTER, 
+    STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST
+  ];
 
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
@@ -192,8 +279,10 @@
   let showShuffleContextMenu = true;
   let artistDiscographySortType = 'releaseDate';
   let artistDiscographyDeduplicationMode = 'default';
+  let showArtistDiscographyDuplicateWarning = true;
   let artistDiscographyContextMenuItem = null;
   let shuffleContextMenuItem = null;
+  let metadataServiceClient = null;
   const revokedLfmKeys = new Set();
   const runningJobIds = new Set();
   const artistGenreCache = new Map();
@@ -230,6 +319,7 @@
   const DEEZER_GATEWAY_URL_3 = "https://deezer-proxy-3.spaceman-0e6.workers.dev/?url=";
   const STATS_URL = "https://sp-stats.niko2nio2.workers.dev";
   const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
+  const CHAT_API_URL = "https://sort-play-chat.niko2nio2.workers.dev";
   
   async function get_S_Client_Token() {
       if (s_Access_Token && Date.now() < s_Token_Exp) {
@@ -259,6 +349,112 @@
           return null;
       }
   }
+
+  const settingsSvg = `<svg viewBox="0 0 256 256"><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></svg>`;
+  const sortIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const quickFiltersIconSvg = `<svg width="22px" height="21px" viewBox="0 0 24 24" fill="none"><path d="M21 6H19M21 12H16M21 18H16M7 20V13.5612C7 13.3532 7 13.2492 6.97958 13.1497C6.96147 13.0615 6.93151 12.9761 6.89052 12.8958C6.84431 12.8054 6.77934 12.7242 6.64939 12.5617L3.35061 8.43826C3.22066 8.27583 3.15569 8.19461 3.10948 8.10417C3.06849 8.02393 3.03853 7.93852 3.02042 7.85026C3 7.75078 3 7.64677 3 7.43875V5.6C3 5.03995 3 4.75992 3.10899 4.54601C3.20487 4.35785 3.35785 4.20487 3.54601 4.10899C3.75992 4 4.03995 4 4.6 4H13.4C13.9601 4 14.2401 4 14.454 4.10899C14.6422 4.20487 14.7951 4.35785 14.891 4.54601C15 4.75992 15 5.03995 15 5.6V7.43875C15 7.64677 15 7.75078 14.9796 7.85026C14.9615 7.93852 14.9315 8.02393 14.8905 8.10417C14.8443 8.19461 14.7793 8.27583 14.6494 8.43826L11.3506 12.5617C11.2207 12.7242 11.1557 12.8054 11.1095 12.8958C11.0685 12.9761 11.0385 13.0615 11.0204 13.1497C11 13.2492 11 13.3532 11 13.5612V17L7 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
+  const createPlaylistIconSvg = `<svg width="22px" height="21px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M16 5V18M16 18C16 19.1046 14.6569 20 13 20C11.3431 20 10 19.1046 10 18C10 16.8954 11.3431 16 13 16C14.6569 16 16 16.8954 16 18ZM4 5H12M4 9H12M4 13H8M16 4L20 3V7L16 8V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dynamicPlaylistIconSvg = `<svg width="22px" height="21px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const genreFilterIconSvg = `<svg width="22px" height="21px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M20 20L18.2678 18.2678M18.2678 18.2678C18.7202 17.8154 19 17.1904 19 16.5C19 15.1193 17.8807 14 16.5 14C15.1193 14 14 15.1193 14 16.5C14 17.8807 15.1193 19 16.5 19C17.1904 19 17.8154 18.7202 18.2678 18.2678ZM15.6 10H18.4C18.9601 10 19.2401 10 19.454 9.89101C19.6422 9.79513 19.7951 9.64215 19.891 9.45399C20 9.24008 20 8.96005 20 8.4V5.6C20 5.03995 20 4.75992 19.891 4.54601C19.7951 4.35785 19.6422 4.20487 19.454 4.10899C19.2401 4 18.9601 4 18.4 4H15.6C15.0399 4 14.7599 4 14.546 4.10899C14.3578 4.20487 14.2049 4.35785 14.109 4.54601C14 4.75992 14 5.03995 14 5.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM5.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V5.6C10 5.03995 10 4.75992 9.89101 4.54601C9.79513 4.35785 9.64215 4.20487 9.45399 4.10899C9.24008 4 8.96005 4 8.4 4H5.6C5.03995 4 4.75992 4 4.54601 4.10899C4.35785 4.20487 4.20487 4.35785 4.10899 4.54601C4 4.75992 4 5.03995 4 5.6V8.4C4 8.96005 4 9.24008 4.10899 9.45399C4.20487 9.64215 4.35785 9.79513 4.54601 9.89101C4.75992 10 5.03995 10 5.6 10ZM5.6 20H8.4C8.96005 20 9.24008 20 9.45399 19.891C9.64215 19.7951 9.79513 19.6422 9.89101 19.454C10 19.2401 10 18.9601 10 18.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H5.6C5.03995 14 4.75992 14 4.54601 14.109C4.35785 14.2049 4.20487 14.3578 4.10899 14.546C4 14.7599 4 15.0399 4 15.6V18.4C4 18.9601 4 19.2401 4.10899 19.454C4.20487 19.6422 4.35785 19.7951 4.54601 19.891C4.75992 20 5.03995 20 5.6 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const customFilterIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M7 9H17M7 15H17M15 13V17M9 7V11M7.2 20H16.8C17.9201 20 18.4802 20 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H7.2C6.0799 4 5.51984 4 5.09202 4.21799C4.71569 4.40973 4.40973 4.71569 4.21799 5.09202C4 5.51984 4 6.07989 4 7.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.07989 20 7.2 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const aiPickIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M12 3L14.0357 8.16153C14.2236 8.63799 14.3175 8.87622 14.4614 9.0771C14.5889 9.25516 14.7448 9.41106 14.9229 9.53859C15.1238 9.68245 15.362 9.77641 15.8385 9.96432L21 12L15.8385 14.0357C15.362 14.2236 15.1238 14.3175 14.9229 14.4614C14.7448 14.5889 14.5889 14.7448 14.4614 14.9229C14.3175 15.1238 14.2236 15.362 14.0357 15.8385L12 21L9.96432 15.8385C9.77641 15.362 9.68245 15.1238 9.53859 14.9229C9.41106 14.7448 9.25516 14.5889 9.0771 14.4614C8.87622 14.3175 8.63799 14.2236 8.16153 14.0357L3 12L8.16153 9.96432C8.63799 9.77641 8.87622 9.68245 9.0771 9.53859C9.25516 9.41106 9.41106 9.25516 9.53859 9.0771C9.68245 8.87622 9.77641 8.63799 9.96432 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const shuffleIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M18 4L21 7M21 7L18 10M21 7H17C16.0707 7 15.606 7 15.2196 7.07686C13.6329 7.39249 12.3925 8.63288 12.0769 10.2196C12 10.606 12 11.0707 12 12C12 12.9293 12 13.394 11.9231 13.7804C11.6075 15.3671 10.3671 16.6075 8.78036 16.9231C8.39397 17 7.92931 17 7 17H3M18 20L21 17M21 17L18 14M21 17H17C16.0707 17 15.606 17 15.2196 16.9231C15.1457 16.9084 15.0724 16.8917 15 16.873M3 7H7C7.92931 7 8.39397 7 8.78036 7.07686C8.85435 7.09158 8.92758 7.1083 9 7.12698" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const convertToSpotifyIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M12 9.5V15.5M9 12.5H15M8.4 19C5.41766 19 3 16.6044 3 13.6493C3 11.2001 4.8 8.9375 7.5 8.5C8.34694 6.48637 10.3514 5 12.6893 5C15.684 5 18.1317 7.32251 18.3 10.25C19.8893 10.9449 21 12.6503 21 14.4969C21 16.9839 18.9853 19 16.5 19L8.4 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const settingsIconSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM12.9 3.06C12.7 3 12.47 3 12 3s-.7 0-.9.06c-.31.09-.57.27-.77.52-.13.16-.21.38-.39.81-.25.62-.94.94-1.57.73l-.57-.19c-.4-.14-.6-.2-.8-.22-.29-.02-.58.05-.83.2-.18.1-.33.25-.63.55-.32.32-.48.48-.58.66-.15.27-.21.58-.18.89.02.21.1.42.27.84.27.66 0 1.41-.6 1.77l-.28.17c-.42.25-.63.38-.79.55-.14.16-.24.34-.3.54-.07.22-.07.47-.07.97 0 .59 0 .89.09 1.14.09.22.22.42.4.58.2.18.47.29 1.02.51.55.22.84.83.65 1.4l-.22.65c-.15.44-.22.67-.23.89-.01.26.05.52.18.75.1.2.27.36.6.7.33.33.5.5.69.6.23.13.49.19.76.18.22-.01.44-.08.89-.23l.52-.17c.64-.21 1.33.11 1.58.73.17.43.26.65.39.81.2.25.46.43.77.52.2.06.43.06.9.06s.7 0 .9-.06c.31-.09.57-.27.77-.52.13-.16.21-.38.39-.81.25-.62.94-.94 1.57-.73l.53.17c.44.15.67.22.89.23.26.01.52-.05.75-.18.2-.1.37-.27.7-.6.33-.33.5-.5.6-.7.13-.23.19-.49.18-.76-.01-.22-.08-.44-.23-.89l-.21-.65c-.19-.57.09-1.18.65-1.4.55-.22.82-.33 1.02-.51.18-.16.31-.36.4-.58.09-.25.09-.55.09-1.14 0-.5 0-.75-.07-.97-.06-.2-.17-.38-.3-.54-.16-.17-.37-.3-.79-.55l-.28-.17c-.6-.36-.86-1.11-.59-1.77.17-.42.25-.63.27-.84.03-.31-.03-.62-.18-.89-.1-.18-.26-.34-.58-.66-.3-.3-.45-.45-.63-.55-.25-.15-.54-.22-.83-.2-.2.01-.4.08-.8.22l-.57.19c-.63.21-1.32-.11-1.57-.73-.18-.43-.26-.65-.39-.81-.2-.25-.46-.43-.77-.52-.21-.06-.44-.06-.91-.06Z"/></svg>`;
+  const infoIconSvg = `<svg width="14px" height="14px" viewBox="0 0 24 24" fill="none" style="margin-left: 2px; margin-bottom: 4px; vertical-align: middle; cursor: help; color: #888; opacity: 0.8;"><path d="M12 8H12.01M12 11V16M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const liveChatIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none"><path d="M19.4003 18C19.7837 17.2499 20 16.4002 20 15.5C20 12.4624 17.5376 10 14.5 10C11.4624 10 9 12.4624 9 15.5C9 18.5376 11.4624 21 14.5 21L21 21C21 21 20 20 19.4143 18.0292M18.85 12C18.9484 11.5153 19 11.0137 19 10.5C19 6.35786 15.6421 3 11.5 3C7.35786 3 4 6.35786 4 10.5C4 11.3766 4.15039 12.2181 4.42676 13C5.50098 16.0117 3 18 3 18H9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const coffeeIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none"><path d="M18.5 7H19C19.4647 7 19.697 7 19.8902 7.03843C20.6836 7.19624 21.3038 7.81644 21.4616 8.60982C21.5 8.80302 21.5 9.03535 21.5 9.5C21.5 9.96465 21.5 10.197 21.4616 10.3902C21.3038 11.1836 20.6836 11.8038 19.8902 11.9616C19.697 12 19.4647 12 19 12H18.5M3 20H21M12 17C10.6055 17 9.90821 17 9.33277 16.8619C7.50453 16.4229 6.07707 14.9955 5.63815 13.1672C5.5 12.5918 5.5 11.8945 5.5 10.5L5.5 7.2C5.5 6.0799 5.5 5.51984 5.71799 5.09202C5.90973 4.7157 6.21569 4.40974 6.59202 4.21799C7.01984 4 7.57989 4 8.7 4L15.3 4C16.4201 4 16.9802 4 17.408 4.21799C17.7843 4.40973 18.0903 4.71569 18.282 5.09202C18.5 5.51984 18.5 6.07989 18.5 7.2V10.5C18.5 11.8945 18.5 12.5918 18.3619 13.1672C17.9229 14.9955 16.4955 16.4229 14.6672 16.8619C14.0918 17 13.3945 17 12 17Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const copyIconSVG = `<svg width="16px" height="16px" viewBox="0 0 20 20" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v9a2 2 0 002 2h2v2a2 2 0 002 2h9a2 2 0 002-2V8a2 2 0 00-2-2h-2V4a2 2 0 00-2-2H4zm9 4V4H4v9h2V8a2 2 0 012-2h5zM8 8h9v9H8V8z"/></svg>`;
+  const arrowRightIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none"><path d="M13.2328 16.4569C12.9328 16.7426 12.9212 17.2173 13.2069 17.5172C13.4926 17.8172 13.9673 17.8288 14.2672 17.5431L13.2328 16.4569ZM19.5172 12.5431C19.8172 12.2574 19.8288 11.7827 19.5431 11.4828C19.2574 11.1828 18.7827 11.1712 18.4828 11.4569L19.5172 12.5431ZM18.4828 12.5431C18.7827 12.8288 19.2574 12.8172 19.5431 12.5172C19.8288 12.2173 19.8172 11.7426 19.5172 11.4569L18.4828 12.5431ZM14.2672 6.4569C13.9673 6.17123 13.4926 6.18281 13.2069 6.48276C12.9212 6.78271 12.9328 7.25744 13.2328 7.5431L14.2672 6.4569ZM19 12.75C19.4142 12.75 19.75 12.4142 19.75 12C19.75 11.5858 19.4142 11.25 19 11.25V12.75ZM5 11.25C4.58579 11.25 4.25 11.5858 4.25 12C4.25 12.4142 4.58579 12.75 5 12.75V11.25ZM14.2672 17.5431L19.5172 12.5431L18.4828 11.4569L13.2328 16.4569L14.2672 17.5431ZM19.5172 11.4569L14.2672 6.4569L13.2328 7.5431L18.4828 12.5431L19.5172 11.4569ZM19 11.25L5 11.25V12.75L19 12.75V11.25Z" fill="currentColor"/></svg>`;
+  const libraryIconSVG = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>`;
+  const trashIconSVG = `<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
+  const penIconSvg = `<svg width="16px" height="16px" viewBox="0 0 18 18" fill="currentColor"><path d="M2.25,12.9378906 L2.25,15.75 L5.06210943,15.75 L13.3559575,7.45615192 L10.5438481,4.64404249 L2.25,12.9378906 L2.25,12.9378906 L2.25,12.9378906 Z M15.5306555,5.28145396 C15.8231148,4.98899458 15.8231148,4.5165602 15.5306555,4.22410082 L13.7758992,2.46934454 C13.4834398,2.17688515 13.0110054,2.17688515 12.718546,2.46934454 L11.3462366,3.84165394 L14.1583461,6.65376337 L15.5306555,5.28145396 L15.5306555,5.28145396 L15.5306555,5.28145396 Z"></path></svg>`;
+  const removeIconSVG = `<svg class="remove-icon" viewBox="0 0 1024 1024"><path d="M982.032787 847.737705L637.901639 503.606557l327.344263-327.344262c33.57377-33.57377 33.57377-83.934426 0-117.508197s-83.934426-33.57377-117.508197 0L520.393443 386.098361 176.262295 50.360656C142.688525 16.786885 92.327869 16.786885 58.754098 50.360656 25.180328 83.934426 25.180328 134.295082 58.754098 167.868852l344.131148 335.737705-335.737705 335.737705c-33.57377 33.57377-33.57377 83.934426 0 117.508197 16.786885 16.786885 41.967213 25.180328 58.754098 25.180328s41.967213-8.393443 58.754099-25.180328l335.737705-335.737705 344.131147 344.131148c16.786885 16.786885 33.57377 25.180328 58.754099 25.180328 25.180328 0 41.967213-8.393443 58.754098-25.180328 33.57377-33.57377 33.57377-83.934426 0-117.508197z"/></svg>`;
+  const restoreIconSVG = `<svg viewBox="5.9844 5.9844 36 36.0312" width="14px" height="14px" preserveAspectRatio="none" class="remove-icon"><path d="M 24 42 C 23.211 42 22.462 41.934 21.752 41.846 C 20.221 41.685 19.438 39.926 20.343 38.681 C 20.78 38.08 21.513 37.77 22.248 37.877 C 22.852 37.952 23.431 38 24 38 C 31.756 38 38 31.756 38 24 C 38 16.244 31.756 10 24 10 C 16.244 10 10 16.244 10 24 C 10 26.635 10.739 29.081 12 31.178 L 12 31 C 11.978 29.46 13.631 28.475 14.976 29.226 C 15.617 29.584 16.01 30.265 16 31 L 16 36.488 L 16 37 C 16 38.105 15.105 39 14 39 L 8 39 C 6.46 39.022 5.475 37.369 6.226 36.024 C 6.584 35.383 7.265 34.99 8 35 L 9.77 35 C 7.412 31.956 6 28.138 6 24 C 6 14.082 14.082 6 24 6 C 33.918 6 42 14.082 42 24 C 42 33.918 33.918 42 24 42 Z" style="transform-origin: 23.9844px 24px;" transform="matrix(0, 1, -1, 0, -0.000001907349, 0.00000100024)"/></svg>`;
+  const saveIconSVG = `<svg fill="#ffffff" viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>`;  
+  const loadIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none"><path d="M3 6V16.8C3 17.9201 3 18.4798 3.21799 18.9076C3.40973 19.2839 3.71547 19.5905 4.0918 19.7822C4.5192 20 5.07899 20 6.19691 20H17.8031C18.921 20 19.48 20 19.9074 19.7822C20.2837 19.5905 20.5905 19.2841 20.7822 18.9078C21.0002 18.48 21.0002 17.9199 21.0002 16.7998L21.0002 9.19978C21.0002 8.07967 21.0002 7.51962 20.7822 7.0918C20.5905 6.71547 20.2839 6.40973 19.9076 6.21799C19.4798 6 18.9201 6 17.8 6H12M3 6H12M3 6C3 4.89543 3.89543 4 5 4H8.67452C9.1637 4 9.40886 4 9.63904 4.05526C9.84311 4.10425 10.0379 4.18526 10.2168 4.29492C10.4186 4.41857 10.5918 4.59182 10.9375 4.9375L12 6" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const clearIconSVG = `<svg viewBox="16 15 43 43"><path fill="#ffffff" fill-opacity="1" stroke-width="0.2" stroke-linejoin="round" d="M 18.0147,41.5355C 16.0621,39.5829 16.0621,36.4171 18.0147,34.4645L 26.9646,25.5149C 28.0683,24.4113 29,24 31,24L 52,24C 54.7614,24 57,26.2386 57,29L 57,47C 57,49.7614 54.7614,52 52,52L 31,52C 29,52 28.0683,51.589 26.9646,50.4854L 18.0147,41.5355 Z M 47.5281,42.9497L 42.5784,37.9999L 47.5281,33.0502L 44.9497,30.4717L 40,35.4215L 35.0502,30.4717L 32.4718,33.0502L 37.4215,37.9999L 32.4718,42.9497L 35.0502,45.5281L 40,40.5783L 44.9497,45.5281L 47.5281,42.9497 Z "/></svg>`;
+  const folderIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="color: #b3b3b3;"><path d="M1 4a2 2 0 0 1 2-2h5.155a3 3 0 0 1 2.357 1.158L12.557 6H21a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V4z"></path></svg>`;
+  const caretIconSvg = `<svg class="caret-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #b3b3b3;"><path d="M9.75 6.01l7.68 5.67a.5.5 0 0 1 0 .82l-7.68 5.49A.5.5 0 0 1 9 17.59V6.41a.5.5 0 0 1 .75-.4z"></path></svg>`;
+  const clockIconsvg = `<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8V12L14.5 14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  const threeDotsSvg = `<svg width="15px" height="15px" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 14a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/></svg>`;
+  const PLACEHOLDER_SVG_DATA_URI = `url("data:image/svg+xml,%3csvg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.5 8.89001V18.5M12.5 8.89001V5.57656C12.5 5.36922 12.5 5.26554 12.5347 5.17733C12.5653 5.09943 12.615 5.03047 12.6792 4.97678C12.752 4.91597 12.8503 4.88318 13.047 4.81761L17.447 3.35095C17.8025 3.23245 17.9803 3.17319 18.1218 3.20872C18.2456 3.23982 18.3529 3.31713 18.4216 3.42479C18.5 3.54779 18.5 3.73516 18.5 4.10989V7.42335C18.5 7.63069 18.5 7.73436 18.4653 7.82258C18.4347 7.90048 18.385 7.96943 18.3208 8.02313C18.248 8.08394 18.1497 8.11672 17.953 8.18229L13.553 9.64896C13.1975 9.76746 13.0197 9.82671 12.8782 9.79119C12.7544 9.76009 12.6471 9.68278 12.5784 9.57512C12.5 9.45212 12.5 9.26475 12.5 8.89001ZM12.5 18.5C12.5 19.8807 10.933 21 9 21C7.067 21 5.5 19.8807 5.5 18.5C5.5 17.1192 7.067 16 9 16C10.933 16 12.5 17.1192 12.5 18.5Z' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`;
+  const LIKE_BUTTON_ICON_NOT_LIKED = `<path d="M1.69 2A4.582 4.582 0 018 2.023 4.583 4.583 0 0111.88.817h.002a4.618 4.618 0 013.782 3.65v.003a4.543 4.543 0 01-1.011 3.84L9.35 14.629a1.765 1.765 0 01-2.093.464 1.762 1.762 0 01-.605-.463L1.348 8.309A4.582 4.582 0 011.689 2zm3.158.252A3.082 3.082 0 002.49 7.337l.005.005L7.8 13.664a.264.264 0 00.311.069.262.262 0 00.09-.069l5.312-6.33a3.043 3.043 0 00.68-2.573 3.118 3.118 0 00-2.551-2.463 3.079 3.079 0 00-2.612.816l-.007.007a1.501 1.501 0 01-2.045 0l-.009-.008a3.082 3.082 0 00-2.121-.861z"></path>`;
+  const LIKE_BUTTON_ICON_LIKED = `<path d="M15.724 4.22A4.313 4.313 0 0012.192.814a4.269 4.269 0 00-3.622 1.13.837.837 0 01-1.14 0 4.272 4.272 0 00-6.21 5.855l5.916 7.05a1.128 1.128 0 001.727 0l5.916-7.05a4.228 4.228 0 00.945-3.577z"></path>`;
+  const LIKE_BUTTON_ICON_ISRC_LIKED = `<path d="m15.92,3.56h0c-.36-1.81-1.8-3.2-3.62-3.49-1.35-.22-2.72.21-3.71,1.16-.16.15-.37.23-.58.23s-.42-.08-.58-.23c-.85-.82-1.95-1.23-3.04-1.23S2.09.45,1.23,1.33c-1.57,1.63-1.65,4.18-.17,5.9l6.06,7.22c.23.27.56.41.89.41h0c.26,0,.53-.09.74-.27.05-.04.1-.09.14-.14l6.06-7.22c.87-1.01,1.23-2.36.97-3.66h0Zm-7.91,9.39h0L2.31,6.18h0s0-.01,0-.01c-.45-.52-.68-1.18-.66-1.86s.29-1.33.77-1.82c.52-.54,1.22-.83,1.97-.83s1.39.27,1.9.77h.01s.01.02.01.02c.46.43,1.07.67,1.7.67v9.86h0Z"></path>`;    
+  const barsIcon = `<svg width="18px" height="18px" viewBox="0 0 16 16" fill="currentColor"><path d="M12 2a1 1 0 011 1v10a1 1 0 11-2 0V3a1 1 0 011-1zM8 6a1 1 0 011 1v6a1 1 0 11-2 0V7a1 1 0 011-1zM5 10a1 1 0 00-2 0v3a1 1 0 102 0v-3z"/></svg>`;  
+  const myPlaysIcon = `<svg viewBox="0 0 24 24" width="20px" height="20px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7C16 9.20914 14.2091 11 12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7Z"></path><path d="M12 14C8.13401 14 5 17.134 5 21H19C19 17.134 15.866 14 12 14Z"></path></svg>`;
+  const listenersIcon = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 20V18C13 15.2386 10.7614 13 8 13C5.23858 13 3 15.2386 3 18V20H13ZM13 20H21V19C21 16.0545 18.7614 14 16 14C14.5867 14 13.3103 14.6255 12.4009 15.6311M11 7C11 8.65685 9.65685 10 8 10C6.34315 10 5 8.65685 5 7C5 5.34315 6.34315 4 8 4C9.65685 4 11 5.34315 11 7ZM18 9C18 10.1046 17.1046 11 16 11C14.8954 11 14 10.1046 14 9C14 7.89543 14.8954 7 16 7C17.1046 7 18 7.89543 18 9Z"/></svg>`;
+  const innerPlayPlusIconSvg = `<svg width="17px" height="17px" viewBox="0 0 24 24" fill="none"><path d="M6 12H18M12 6V18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const closeModalIcon20Svg = `<svg width="20" height="20" viewBox="0 0 32 32"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>`;
+  const closeModalIcon18Svg = `<svg width="18" height="18" viewBox="0 0 32 32"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>`;
+  const chatSendIconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M11.5 12H5.419M5.246 12.797L4.242 15.799C3.691 17.442 3.416 18.264 3.614 18.77C3.785 19.21 4.153 19.543 4.608 19.67C5.131 19.816 5.922 19.46 7.502 18.749L17.637 14.189C19.18 13.494 19.951 13.147 20.19 12.665C20.397 12.246 20.397 11.754 20.19 11.335C19.951 10.853 19.18 10.506 17.637 9.811L7.485 5.243C5.909 4.534 5.121 4.179 4.598 4.325C4.144 4.451 3.776 4.783 3.604 5.222C3.406 5.727 3.678 6.547 4.222 8.188L5.248 11.279C5.342 11.561 5.389 11.702 5.407 11.846C5.423 11.974 5.423 12.103 5.407 12.231C5.388 12.375 5.341 12.516 5.246 12.797Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const chatUploadIconSvg = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
+  const chatDotsIconSvg = `<svg viewBox="0 0 24 24"><path d="M12 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 7zm0 2a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 9zm0 6a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 15z"/></svg>`;
+  const closeIcon24Svg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
+  const addPillIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2H9v6a1 1 0 1 1-2 0V9H1a1 1 0 0 1 0-2h6V1a1 1 0 0 1 1-1z"/></svg>`;
+  const minimizeIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const restoreWindowIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const closeIcon16Svg = `<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"/></svg>`;
+  const globalCreationsIconSvg = `<svg width="10" height="10" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>`;
+  const addLinkIconSvg = `<svg viewBox="0 0 24 24"><path d="M11.75 3a.75.75 0 0 1 .75.75V11h7.25a.75.75 0 0 1 0 1.5h-7.25v7.25a.75.75 0 0 1-1.5 0V12.5H3.75a.75.75 0 0 1 0-1.5h7.25V3.75a.75.75 0 0 1 .75-.75z"></path></svg>`;
+  const removeManualIconSvg = `<svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"></path></svg>`;
+  const deleteJobIconSvg = `<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z"></path></svg>`;
+  const spinnerUpIconSvg = `<svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>`;
+  const spinnerDownIconSvg = `<svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg>`;
+  const externalLinkIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>`;
+  const closeIconSmall2Svg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>`;
+  const thumbsUpIconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>`;
+  const playIconSvg = `<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>`;
+  const pauseIconSvg = `<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>`;
+  const selectAllIconSvg = `<svg viewBox="0 0 24 24" width="18px" height="18px"><path d="M 4 2 C 2.895 2 2 2.895 2 4 L 2 16 C 2 17.105 2.895 18 4 18 L 16 18 C 17.105 18 18 17.105 18 16 L 18 4 C 18 2.895 17.105 2 16 2 L 4 2 z M 4 4 L 16 4 L 16 16 L 4 16 L 4 4 z M 20 6 L 20 20 L 6 20 L 6 22 L 20 22 C 21.105 22 22 21.105 22 20 L 22 6 L 20 6 z M 13.292969 6.2929688 L 9 10.585938 L 6.7070312 8.2929688 L 5.2929688 9.7070312 L 9 13.414062 L 14.707031 7.7070312 L 13.292969 6.2929688 z"/></svg>`;
+  const searchIconSvg = `<svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M 7 1.75 a 5.25 5.25 0 1 0 0 10.5 a 5.25 5.25 0 0 0 0 -10.5 M 0.25 7 a 6.75 6.75 0 1 1 12.096 4.12 l 3.184 3.185 a 0.75 0.75 0 1 1 -1.06 1.06 L 11.304 12.2 A 6.75 6.75 0 0 1 0.25 7"></path></svg>`;
+  const plusIcon16Svg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+  const durationIconSvg = `<svg data-encore-id="icon" role="img" aria-hidden="true" viewBox="0 0 16 16" class="Svg-sc-ytk21e-0 Svg-img-icon-small"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg>`;
+  const linkIconSVG = `<svg width="14px" height="14px" viewBox="0 0 24 24" fill="none"><path d="M14 7H16C18.7614 7 21 9.23858 21 12C21 14.7614 18.7614 17 16 17H14M10 7H8C5.23858 7 3 9.23858 3 12C3 14.7614 5.23858 17 8 17H10M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const genreTagIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M22 3v13a4 4 0 1 1-8 0 4 4 0 0 1 6-3.46V4.18l-10 1.67V18a4 4 0 1 1-8 0 4 4 0 0 1 6-3.46V5c0-.5.4-.9.8-1l12-2c.6-.1 1.2.3 1.2 1ZM20 16a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM8 18a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z"/></svg>`;
+  const lastFmIconSvg = `<svg width="18" height="18" viewBox="1 0 24 24" fill="currentColor"><path d="M7,13v6a1,1,0,0,1-2,0V13a1,1,0,0,1,2,0Zm11,7a1,1,0,0,0,1-1V5a1,1,0,0,0-2,0V19A1,1,0,0,0,18,20Zm-6,0a1,1,0,0,0,1-1V9a1,1,0,0,0-2,0V19A1,1,0,0,0,12,20Z"/></svg>`;
+  const selectDropdownIconSvgDataUri = "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e";
+  const spSpinnerLoaderStyle = `.sp-spinner-loader { border: 2px solid rgba(255, 255, 255, 0.2); border-top: 2px solid #1db954; border-radius: 50%; width: 24px; height: 24px; animation: spSpinnerSpin 1s linear infinite; box-sizing: border-box; display: block; } @keyframes spSpinnerSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+
+  const ICON_PATHS = {
+    sortAsc: "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z",
+    sortDesc: "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z",
+    groupAlbum: "M4 6.1c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4.5 5.04 4.5 5.6 4.5h2.8c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C10 5.26 10 5.54 10 6.1v2.8c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H5.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C4 9.74 4 9.46 4 8.9V6.1zm9-.1c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541C20 5.301 20 5.534 20 6s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 6.699 13 6.466 13 6zm0 6c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541c.076.184.076.417.076.883s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 12.699 13 12.466 13 12zm0 6c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541c.076.184.076.417.076.883s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 18.699 13 18.466 13 18zm-9-2.9c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 13.5 5.04 13.5 5.6 13.5h2.8c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C10 14.26 10 14.54 10 15.1v2.8c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H5.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C4 18.74 4 18.46 4 17.9v-2.8z",
+    ungroupList: "M8 6L21 6.00078M8 12L21 12.0008M8 18L21 18.0007M3 6.5H4V5.5H3V6.5ZM3 12.5H4V11.5H3V12.5ZM3 18.5H4V17.5H3V18.5Z"
+  };
+  
+  function getSortArrowSvg(reverse) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 16 16");
+    svg.setAttribute("width", "50%");
+    svg.setAttribute("height", "50%");
+    svg.style.fill = '#ffffffe6'; 
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", reverse ? ICON_PATHS.sortAsc : ICON_PATHS.sortDesc);
+
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function getGroupingIconSvg(isGrouped) {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "19px");
+    svg.setAttribute("height", "19px");
+    svg.style.fill = 'none';
+    svg.style.stroke = '#ffffffe6';
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("fill", "none");
+    path.setAttribute("d", isGrouped ? ICON_PATHS.groupAlbum : ICON_PATHS.ungroupList);
+    svg.appendChild(path);
+    return svg;
+  }
+
   function spotifyHex(base62) {
     const INVALID = "00000000000000000000000000000000";
     if (!base62 || base62.length > 22) return INVALID;
@@ -282,31 +478,528 @@
     }
     return base62.padStart(22, "0");
   };
+    
+  function debounce(func, delay) {
+      let timeout;
+      return function(...args) {
+          const context = this;
+          clearTimeout(timeout);
+          timeout = setTimeout(() => func.apply(context, args), delay);
+      };
+  }
+
+  function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function formatTrackCacheData(trackData) {
+      return {
+          name: trackData.name,
+          album: {
+              name: trackData.album?.name,
+              id: trackData.album?.id,
+              uri: trackData.album?.uri || (trackData.album?.id ? `spotify:album:${trackData.album.id}` : null),
+              release_date: trackData.album?.release_date,
+              album_type: trackData.album?.album_type || trackData.albumType || 'album'
+          },
+          artists: (trackData.artists || []).map(a => ({
+              id: a.id,
+              name: a.name,
+              uri: a.uri || (a.id ? `spotify:artist:${a.id}` : null)
+          })),
+          duration_ms: trackData.duration_ms,
+          popularity: trackData.popularity,
+          external_ids: trackData.external_ids || {},
+          id: trackData.id,
+          uri: trackData.uri || `spotify:track:${trackData.id}`,
+          albumType: trackData.album?.album_type || trackData.albumType || 'album'
+      };
+  }
+
+  function getPrimaryArtistName(track) {
+      let artistName = track.artistName;
+      if (!artistName && track.artists && track.artists.length > 0) {
+          artistName = track.artists[0]?.name;
+      }
+      if (!artistName && track.allArtists) {
+          artistName = track.allArtists.split(',')[0].trim();
+      }
+      if (artistName && artistName.includes(';')) {
+          artistName = artistName.split(';')[0].trim();
+      }
+      return artistName ? artistName.trim() : null;
+  }
+
+  function normalizeArtistNames(artists) {
+    if (!artists || artists.length === 0) return "Unknown Artist";
+    
+    const firstArtistName = artists[0].name || "";
+    
+    if (firstArtistName.includes(';')) {
+        const uniqueArtists = [...new Set(firstArtistName.split(';').map(a => a.trim()))];
+        return uniqueArtists.join(', ');
+    }
+
+    return artists.map(artist => artist.name).join(", ");
+  }
+
+  function formatPlayCount(count, format) {
+    if (count === null || count === undefined || isNaN(count) || count === "N/A" || count === "_" || count === "―" || Number(count) === 0) {
+        return 'N/A';
+    }
+
+    const num = Number(count);
+
+    if (format === 'abbreviated') {
+        if (num >= 1_000_000_000) {
+            return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+        }
+        if (num >= 1_000_000) {
+            return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+        }
+        if (num >= 1_000) {
+            return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+        }
+        return num.toString();
+    } else if (format === 'rounded_abbreviated') {
+        if (num >= 1_000_000_000) {
+            return Math.round(num / 1_000_000_000) + 'B';
+        }
+        if (num >= 1_000_000) {
+            return Math.round(num / 1_000_000) + 'M';
+        }
+        if (num >= 1_000) {
+            return Math.round(num / 1_000) + 'K';
+        }
+        return num.toString();
+    }
+
+    return new Intl.NumberFormat('en-US').format(num);
+  }
+
+  function formatReleaseDate(rawDate, format = 'YYYY-MM-DD') {
+    if (rawDate && typeof rawDate === 'object' && rawDate.date !== undefined) {
+        rawDate = rawDate.date;
+    }
+
+    if (!rawDate || rawDate === "_" || rawDate === "―") {
+        return "―";
+    }
+
+    let dateObj;
+    let yearOnly = false;
+    let monthYearOnly = false;
+
+    if (typeof rawDate === 'number') { 
+        dateObj = new Date(rawDate);
+    } else if (typeof rawDate === 'string') {
+        let dateStrToParse = rawDate;
+        if (rawDate.length === 4) { 
+             yearOnly = true;
+             dateStrToParse = `${rawDate}-01-01`;
+        } else if (rawDate.length === 7) {
+             monthYearOnly = true;
+             dateStrToParse = `${rawDate}-01`; 
+        }
+        dateObj = new Date(dateStrToParse);
+    } else {
+        return "―";
+    }
+
+    if (isNaN(dateObj.getTime())) {
+        return "―";
+    }
+
+    const year = dateObj.getFullYear();
+    const monthNumeric = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+    const dayNumeric = dateObj.getDate().toString().padStart(2, '0');
+    const monthShort = dateObj.toLocaleString('default', { month: 'short' });
+
+    if (yearOnly) {
+        switch (format) {
+            case 'YYYY': return year.toString();
+            case 'MM-YYYY': return `??-${year}`;
+            case 'YYYY-MM': return `${year}-??`;
+            case 'MMM D, YYYY': return `???, ${year}`; 
+            case 'D MMM, YYYY': return `???, ${year}`; 
+            case 'YYYY, MMM D': return `${year}, ???`;
+            default: return year.toString();
+        }
+    }
+
+    if (monthYearOnly) {
+        switch (format) {
+            case 'YYYY': return year.toString();
+            case 'MM-YYYY': return `${monthNumeric}-${year}`;
+            case 'YYYY-MM': return `${year}-${monthNumeric}`;
+            case 'MMM D, YYYY': return `${monthShort}, ${year}`; 
+            case 'D MMM, YYYY': return `${monthShort}, ${year}`; 
+            case 'YYYY, MMM D': return `${year}, ${monthShort}`;
+            default: return `${year}-${monthNumeric}`;
+        }
+    }
+
+    switch (format) {
+        case 'YYYY-MM-DD':
+            return `${year}-${monthNumeric}-${dayNumeric}`;
+        case 'DD-MM-YYYY':
+            return `${dayNumeric}-${monthNumeric}-${year}`;
+        case 'MM-DD-YYYY':
+            return `${monthNumeric}-${dayNumeric}-${year}`;
+        case 'YYYY':
+            return year.toString();
+        case 'YYYY-MM':
+            return `${year}-${monthNumeric}`;
+        case 'MM-YYYY':
+            return `${monthNumeric}-${year}`;
+        case 'MMM D, YYYY':
+            return `${monthShort} ${dateObj.getDate()}, ${year}`;
+        case 'D MMM, YYYY':
+            return `${dateObj.getDate()} ${monthShort}, ${year}`;
+        case 'YYYY, MMM D':
+            return `${year}, ${monthShort} ${dateObj.getDate()}`;
+        default:
+            return `${year}-${monthNumeric}-${dayNumeric}`;
+    }
+  }
+
+  function formatDuration(ms) {
+    if (ms === null || ms === undefined || isNaN(ms)) {
+        return "N/A";
+    }
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  function formatTempo(value, format) {
+    if (value === null || isNaN(value)) return '―';
+    const rounded = Math.round(value);
+    if (format === 'raw') {
+        return rounded.toString();
+    }
+    return `${rounded} BPM`;
+  }
+
+  function formatAudioFeature(value, format, unitName = '') {
+    if (value === null || isNaN(value)) return '―';
+    
+    const roundedValue = Math.round(value);
+
+    if (format === 'raw') {
+        return roundedValue.toString();
+    } else if (format === 'decimal') {
+        return (value / 100).toFixed(2);
+    } else if (format === 'tier') {
+        if (value <= 20) return 'Very Low';
+        if (value <= 40) return 'Low';
+        if (value <= 60) return 'Medium';
+        if (value <= 80) return 'High';
+        return 'Very High';
+    } else if (format === 'with_unit') {
+        return `${roundedValue} ${unitName}`;
+    }
+    return `${roundedValue}%`;
+  }
+
+  function formatKey(key, mode, format, rawCamelot) {
+    if (format === 'camelot' && rawCamelot) return rawCamelot;
+    if (key === null || key === -1 || isNaN(key) || mode === null || isNaN(mode)) return '―';
+
+    const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+    
+    const camelotMap = [
+        { major: '8B', minor: '5A' }, { major: '3B', minor: '12A' }, { major: '10B', minor: '7A' },
+        { major: '5B', minor: '2A' }, { major: '12B', minor: '9A' }, { major: '7B', minor: '4A' },
+        { major: '2B', minor: '11A' }, { major: '9B', minor: '6A' }, { major: '4B', minor: '1A' },
+        { major: '11B', minor: '8A' }, { major: '6B', minor: '3A' }, { major: '1B', minor: '10A' }
+    ];
+
+    const openKeyMap = [
+        { major: '1d', minor: '10m' }, { major: '8d', minor: '5m' }, { major: '3d', minor: '12m' },
+        { major: '10d', minor: '7m' }, { major: '5d', minor: '2m' }, { major: '12d', minor: '9m' },
+        { major: '7d', minor: '4m' }, { major: '2d', minor: '11m' }, { major: '9d', minor: '6m' },
+        { major: '4d', minor: '1m' }, { major: '11d', minor: '8m' }, { major: '6d', minor: '3m' }
+    ];
+
+    const standardKey = mode === 0 ? `${pitchClasses[key]}m` : pitchClasses[key];
+    const camelotKey = rawCamelot || (mode === 1 ? camelotMap[key].major : camelotMap[key].minor);
+
+    switch (format) {
+        case 'camelot':
+            return camelotKey;
+        case 'openkey':
+            return mode === 1 ? openKeyMap[key].major : openKeyMap[key].minor;
+        case 'full_name':
+            return `${pitchClasses[key]} ${mode === 1 ? 'Major' : 'Minor'}`;
+        case 'standard_camelot':
+             return `${standardKey} (${camelotKey})`;
+        case 'standard':
+        default:
+            return standardKey;
+    }
+  }
+
+  function formatPopularity(value, format) {
+    if (value === null || isNaN(value)) return '―';
+    const num = Math.round(value);
+
+    switch (format) {
+        case 'with_label':
+            return `Pop: ${num}`;
+        case 'percentage':
+            return `${num}%`;
+        case 'tier':
+            if (num >= 90) return 'Global Hit';
+            if (num >= 75) return 'Major Hit';
+            if (num >= 55) return 'Popular';
+            if (num >= 30) return 'Niche';
+            return 'Underground';
+        case 'raw':
+        default:
+            return num.toString();
+    }
+  }
   
-  const MANUAL_FALLBACK_OVERRIDE = true;
+  function formatScrobbles(count, format) {
+      if (count === null || isNaN(count)) return '―';
+      const num = Number(count);
+      
+      let val = new Intl.NumberFormat('en-US').format(num);
+      let shortVal = val;
+      
+      if (num >= 1000000) shortVal = (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      else if (num >= 1000) shortVal = (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
 
-  function isFallbackActive() {
-      if (MANUAL_FALLBACK_OVERRIDE) return true;
-
-      const fallbackTs = localStorage.getItem(STORAGE_KEY_FALLBACK_MODE);
-      if (fallbackTs && (Date.now() - parseInt(fallbackTs)) < 24 * 60 * 60 * 1000) {
-          return true;
+      switch (format) {
+          case 'abbreviated': return shortVal;
+          case 'with_label': return `LFM: ${shortVal}`;
+          case 'raw': default: return val;
       }
-      return false;
   }
 
-  function registerWebApiFailure() {
-      let count = parseInt(localStorage.getItem(STORAGE_KEY_WEB_API_FAILURES) || "0");
-      count++;
-      localStorage.setItem(STORAGE_KEY_WEB_API_FAILURES, count);
-      if (count >= 5) {
-          localStorage.setItem(STORAGE_KEY_FALLBACK_MODE, Date.now().toString());
-          console.warn("[Sort-Play] Web API unstable. Switched to Internal Fallback mode for 24h.");
-          return true;
+  function formatPersonalScrobbles(count, format) {
+      if (count === null || isNaN(count)) return '―';
+      const num = Number(count);
+      const val = new Intl.NumberFormat('en-US').format(num);
+
+      switch (format) {
+          case 'with_label': return `Me: ${val}`;
+          case 'with_suffix': return `${val} scrobbles`;
+          case 'raw': default: return val;
       }
-      return false;
   }
 
+  function addHoverEffect(element, defaultColor, hoverColor) {
+      if (!element) return;
+      element.addEventListener("mouseenter", () => { element.style.backgroundColor = hoverColor; });
+      element.addEventListener("mouseleave", () => { element.style.backgroundColor = defaultColor; });
+  }
+
+  function tagActiveModalWithFontScope() {
+    setTimeout(() => {
+      const modalContainer = document.querySelector(".main-popupModal-container");
+      if (modalContainer) {
+        modalContainer.classList.add('sort-play-font-scope');
+      }
+    }, 50);
+  }
+
+  
+  function preventDragCloseModal(signal) {
+    let mouseDownInsideModal = false;
+    let dragStarted = false;
+    
+    const modal = document.querySelector('.GenericModal');
+    const modalOverlay = document.querySelector('.GenericModal__overlay');
+    
+    if (!modal || !modalOverlay) return;
+    
+    document.addEventListener('mousedown', (e) => {
+      if (modal.contains(e.target)) {
+        mouseDownInsideModal = true;
+      } else {
+        mouseDownInsideModal = false;
+      }
+    }, { capture: true, signal });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (mouseDownInsideModal) {
+        dragStarted = true;
+      }
+    }, { capture: true, signal });
+    
+    modalOverlay.addEventListener('mouseup', (e) => {
+      if (mouseDownInsideModal || dragStarted) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        setTimeout(() => { dragStarted = false; }, 10);
+        return false;
+      }
+    }, { capture: true, signal });
+    
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay && (mouseDownInsideModal || dragStarted)) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return false;
+      }
+      if (e.target === modalOverlay && !mouseDownInsideModal && !dragStarted) {
+        Spicetify.PopupModal.hide();
+      }
+    }, { capture: true, signal });
+    
+    document.addEventListener('mouseup', (e) => {
+      setTimeout(() => {
+        mouseDownInsideModal = false;
+        setTimeout(() => { dragStarted = false; }, 10);
+      }, 0);
+    }, { capture: true, signal });
+    
+    const closeButton = document.querySelector('.main-trackCreditsModal-closeBtn');
+    if (closeButton) {
+      closeButton.addEventListener('click', (e) => {
+        Spicetify.PopupModal.hide();
+      }, { signal });
+    }
+  }
+  
+  
+  const getWebpackService = (id) => {
+    const req = window.webpackChunkclient_web.push([[Symbol()], {}, (r) => r]);
+    return Object.values(req.m).flatMap(m => {
+      try { return Object.values(req(Object.keys(req.m).find(k => req.m[k] === m))); } catch { return []; }
+    }).find(c => c?.SERVICE_ID === id);
+  };
+  
+  const parseVarint = (obj) => {
+    const bytes = Object.values(obj);
+    let res = 0n;
+    let shift = 0n;
+    for (let i = 1; i < bytes.length; i++) {
+      res += BigInt(bytes[i] & 0x7f) << shift;
+      if (!(bytes[i] & 0x80)) break;
+      shift += 7n;
+    }
+    return Number(res);
+  };
+
+  const getMetadataClient = () => {
+      if (metadataServiceClient) return metadataServiceClient;
+      try {
+          const MetadataService = getWebpackService("spotify.mdata_esperanto.proto.MetadataService");
+          const transport = Spicetify.Platform.ProductStateAPI.productStateApi.transport;
+          metadataServiceClient = new MetadataService(transport);
+      } catch (e) {
+          console.error("[Sort-Play] Failed to initialize MetadataService", e);
+      }
+      return metadataServiceClient;
+  };
+
+  async function fetchPlayCountsBatchNew(uris) {
+      const client = getMetadataClient();
+      if (!client) throw new Error("Metadata client not available");
+      
+      const validUris = uris.filter(uri => uri && uri.startsWith("spotify:track:"));
+      if (validUris.length === 0) return new Map();
+
+      const response = await client.fetch({
+        extensionQuery: [{ extensionKind: 185, entityUri: validUris }],
+      });
+
+      const results = new Map();
+      if (response.extension && response.extension[0] && response.extension[0].entityExtension) {
+          response.extension[0].entityExtension.forEach(item => {
+              if (item.extensionData && item.extensionData.value) {
+                  results.set(item.entityUri, parseVarint(item.extensionData.value));
+              }
+          });
+      }
+      return results;
+  }
+  
+  const extendedMetadataJsonDescriptor = {
+    nested: {
+        Message: {
+            fields: {
+                header: { type: "Header", id: 1 },
+                request: { type: "Request", id: 2, rule: "repeated" }
+            }
+        },
+        Header: {
+            fields: {
+                country: { type: "string", id: 1 },
+                catalogue: { type: "string", id: 2 },
+                task_id: { type: "bytes", id: 3 }
+            }
+        },
+        Request: {
+            fields: {
+                entity_uri: { type: "string", id: 1 },
+                query: { type: "Query", id: 2 }
+            }
+        },
+        Query: {
+            fields: {
+                extension_kind: { type: "uint32", id: 1 }
+            }
+        }
+    }
+  };
+
+  const audioFeaturesJsonDescriptor = {
+    nested: {
+        Message: {
+            fields: {
+                header: { type: "Header", id: 1 },
+                extension_kind: { type: "uint32", id: 2 },
+                response: { type: "Response", id: 3, rule: "repeated" }
+            }
+        },
+        Header: {
+            fields: { status: { type: "uint32", id: 1 } }
+        },
+        Response: {
+            fields: {
+                info: { type: "ResponseInfo", id: 1 },
+                track: { type: "string", id: 2 },
+                attributes: { type: "AudioAttributesWrapper", id: 3, rule: "optional" }
+            }
+        },
+        ResponseInfo: {
+            fields: { status: { type: "uint32", id: 1 } }
+        },
+        AudioAttributesWrapper: {
+            fields: {
+                typestr: { type: "string", id: 1 },
+                attributes: { type: "AudioAttributes", id: 2 }
+            }
+        },
+        AudioAttributes: {
+            fields: {
+                bpm: { type: "double", id: 1 },
+                key: { type: "Key", id: 2 },
+                danceability: { type: "double", id: 3 },
+                energy: { type: "double", id: 4 }
+            }
+        },
+        Key: {
+            fields: {
+                key: { type: "string", id: 1 },
+                majorMinor: { type: "uint32", id: 2 },
+                camelot: { type: "CamelotKey", id: 3 }
+            }
+        },
+        CamelotKey: {
+            fields: {
+                key: { type: "string", id: 1 },
+                backgroundColor: { type: "string", id: 2 }
+            }
+        }
+    }
+  };
+  
   async function fetchInternalTrackMetadata(trackId) {
       const maxRetries = 3;
       let attempt = 0;
@@ -402,7 +1095,7 @@
     db: null,
     mem: {},
     init: () => new Promise((resolve, reject) => {
-        const request = indexedDB.open("SortPlayDB", 8);
+        const request = indexedDB.open("SortPlayDB", 9);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
             ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres'].forEach(store => {
@@ -540,91 +1233,109 @@
         console.error("[Sort-Play] Migration failed:", e);
     }
   }
+  
+    
+  async function setCachedScrobbles(trackId, scrobbleCount) {
+    await idb.set('scrobbles', trackId, scrobbleCount);
+  }
+  
+  async function setCachedReleaseDate(trackId, rawReleaseDate, trackNumber = 0) { 
+    await idb.set('releaseDates', trackId, { date: rawReleaseDate, trackNumber: trackNumber });
+  }
 
+  async function setCachedPlayCount(trackId, playCount) {
+    await idb.set('playCounts', trackId, playCount);
+  }
+
+  async function getCachedPersonalScrobbles(trackId) {
+    return await idb.get('personalScrobbles', trackId, CACHE_EXPIRE_PERSONAL_SCROBBLES);
+  }
+  async function setCachedPersonalScrobbles(trackId, scrobbleCount, isPending) {
+    await idb.set('personalScrobbles', trackId, { count: scrobbleCount, pendingUpdate: isPending });
+  }
+
+  async function getCachedPaletteAnalysis(albumId) {
+      return await idb.get('palettes', albumId, CACHE_EXPIRE_PALETTE);
+  }
+  async function setCachedPaletteAnalysis(albumId, analysisData) {
+      await idb.set('palettes', albumId, analysisData);
+  }
+  
+  async function flagCachedPersonalScrobbleForUpdate(trackId) {
+    try {
+      const cached = await idb.get('personalScrobbles', trackId);
+      
+      if (cached) {
+        cached.pendingUpdate = true;
+        await idb.set('personalScrobbles', trackId, cached);
+      }
+    } catch (error) {
+      console.error('Error flagging personal scrobble cache:', error);
+    }
+  }
+  
+  function cleanupLegacyCache() {
+    if (localStorage.getItem('sort-play-idb-migration-cleanup-done-v2') === 'true') {
+        return;
+    }
+
+    const keysToRemove = [
+        'spotify-play-count-cache2', 
+        'spotify-play-count-cache-timestamp2',
+        'spotify-release-date-cache2', 
+        'spotify-release-date-cache-timestamp2',
+        'spotify-scrobbles-cache3', 
+        'spotify-scrobbles-cache-timestamp3',
+        'sort-play-personal-scrobbles-cache', 
+        'sort-play-personal-scrobbles-cache-timestamp',
+        'spotify-palette-analysis-cache',
+        'spotify-palette-analysis-cache-timestamp'
+    ];
+
+    let removedCount = 0;
+
+    keysToRemove.forEach(key => {
+        if (localStorage.getItem(key)) {
+            localStorage.removeItem(key);
+            removedCount++;
+        }
+    });
+
+    const prefixes = [
+        'sort-play-playlist-cache-v1-',
+        'sort-play-genre-cache-v2-',
+        'sort-play-like-'
+    ];
+
+    const allKeys = Object.keys(localStorage);
+    for (let i = 0; i < allKeys.length; i++) {
+        const key = allKeys[i];
+        if (prefixes.some(prefix => key.startsWith(prefix))) {
+            localStorage.removeItem(key);
+            removedCount++;
+        }
+    }
+    
+    if (removedCount > 0) {
+        console.log(`[Sort-Play] Cleaned up ${removedCount} legacy localStorage items.`);
+    }
+
+    localStorage.setItem('sort-play-idb-migration-cleanup-done-v2', 'true');
+  }
+  
   const notificationStyles = document.createElement('style');
   notificationStyles.innerHTML = `
-      #sort-play-notifications-wrapper {
-          position: fixed;
-          bottom: 108px;
-          left: 0;
-          z-index: 2147483647;
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 0;
-          pointer-events: none;
-          max-height: 80vh;
-      }
-      .sp-notification-section {
-          display: flex;
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 10px;
-          width: 100%;
-          transition: margin-top 0.2s ease;
-      }
-      .sp-notification-divider {
-          height: 1px;
-          background: rgba(255, 255, 255, 0.15);
-          width: 100%;
-          margin: 10px 0;
-          display: none;
-          max-width: 450px;
-      }
-      .sp-notification-divider.visible {
-          display: block;
-      }
-      .sort-play-notification-toast {
-          background-color: #fff;
-          color: #000;
-          padding: 14px 24px 14px 20px;
-          border-radius: 0 8px 8px 0;
-          box-shadow: 4px 4px 12px rgba(0,0,0,0.3);
-          font-family: 'SpotifyMixUI', sans-serif;
-          font-size: 16px;
-          font-weight: 500;
-          opacity: 0;
-          transform: translateX(-100%);
-          transition: 
-              opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), 
-              transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1),
-              margin-bottom 0.25s ease,
-              max-height 0.25s ease;
-          pointer-events: auto;
-          cursor: pointer;
-          max-width: 450px;
-          text-align: left;
-          border-left: 10px solid #1db954;
-          word-wrap: break-word;
-      }
-      .sort-play-notification-toast:hover {
-          filter: brightness(0.95);
-      }
-      .sort-play-notification-toast.visible {
-          opacity: 1;
-          transform: translateX(0);
-      }
-      .sort-play-notification-toast.sp-error {
-          background-color: #e91429;
-          color: white;
-          border-left: 10px solid #8a0c18;
-      }
-      .sort-play-notification-toast.sp-warning {
-          background-color: #FFC107;
-          color: #000;
-          border-left: 10px solid #ff7600;
-      }
-      .sort-play-notification-toast.sp-sticky {
-          background-color: #2e77d0;
-          color: white;
-          border-left: 10px solid #16457a;
-      }
-      .sort-play-notification-toast.hiding {
-          opacity: 0;
-          transform: translateX(-100%);
-          pointer-events: none;
-          transition: transform 0.35s ease, opacity 0.3s ease;
-      }
+      #sort-play-notifications-wrapper { position: fixed; bottom: 108px; left: 0; z-index: 2147483647; display: flex; flex-direction: column; align-items: flex-start; gap: 0; pointer-events: none; max-height: 80vh; }
+      .sp-notification-section { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; transition: margin-top 0.2s ease; }
+      .sp-notification-divider { height: 1px; background: rgba(255, 255, 255, 0.15); width: 100%; margin: 10px 0; display: none; max-width: 450px; }
+      .sp-notification-divider.visible { display: block; }
+      .sort-play-notification-toast { background-color: #fff; color: #000; padding: 14px 24px 14px 20px; border-radius: 0 8px 8px 0; box-shadow: 4px 4px 12px rgba(0,0,0,0.3); font-family: 'SpotifyMixUI', sans-serif; font-size: 16px; font-weight: 500; opacity: 0; transform: translateX(-100%); transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1), margin-bottom 0.25s ease, max-height 0.25s ease; pointer-events: auto; cursor: pointer; max-width: 450px; text-align: left; border-left: 10px solid #1db954; word-wrap: break-word; }
+      .sort-play-notification-toast:hover { filter: brightness(0.95); }
+      .sort-play-notification-toast.visible { opacity: 1; transform: translateX(0); }
+      .sort-play-notification-toast.sp-error { background-color: #e91429; color: white; border-left: 10px solid #8a0c18; }
+      .sort-play-notification-toast.sp-warning { background-color: #FFC107; color: #000; border-left: 10px solid #ff7600; }
+      .sort-play-notification-toast.sp-sticky { background-color: #2e77d0; color: white; border-left: 10px solid #16457a; }
+      .sort-play-notification-toast.hiding { opacity: 0; transform: translateX(-100%); pointer-events: none; transition: transform 0.35s ease, opacity 0.3s ease; }
   `;
 
   document.head.appendChild(notificationStyles);
@@ -984,82 +1695,6 @@
     return { ...jobConfig, lastRun: Date.now() };
   }
 
-  async function checkAndRunDedicatedJobs() {
-    const jobs = getDedicatedJobs();
-    const now = Date.now();
-
-    const brokenTypes = new Set();
-    playlistCardsData.forEach(section => {
-        section.cards.forEach(card => {
-            if (card.broken) brokenTypes.add(card.id);
-        });
-    });
-
-    const isJobDue = (job, currentTime) => {
-        if (brokenTypes.has(job.dedicatedType)) return false;
-
-        const lastRun = job.lastRun || 0;
-        const schedule = job.schedule;
-
-        if (schedule === 'manual') return false;
-
-        if (typeof schedule === 'number') {
-            return currentTime > lastRun + schedule;
-        }
-
-        if (typeof schedule === 'string' && schedule.startsWith('release-')) {
-            const nowDate = new Date(currentTime);
-            const lastRunDate = new Date(lastRun);
-
-            if (nowDate.getDay() !== 5) return false;
-            if (lastRunDate.toDateString() === nowDate.toDateString()) return false;
-
-            const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
-
-            switch (schedule) {
-                case 'release-weekly': return daysSinceLastRun > 6;
-                case 'release-every-two-weeks': return daysSinceLastRun > 13;
-                case 'release-monthly': return daysSinceLastRun > 27;
-                default: return false;
-            }
-        }
-        return false;
-    };
-
-    const jobsToRun = jobs.filter(job => isJobDue(job, now));
-    const totalJobs = jobsToRun.length;
-
-    if (totalJobs > 0) {
-        const stickyNotification = showNotification(`Starting Dedicated Updates (0/${totalJobs})...`, 'sticky');
-
-        try {
-            for (let i = 0; i < totalJobs; i++) {
-                const job = jobsToRun[i];
-                const currentStep = i + 1;
-                
-                stickyNotification.update(`Updating Dedicated Playlists (${currentStep}/${totalJobs}): ${job.targetPlaylistName}`);
-
-                try {
-                    const updatedJob = await runDedicatedJob(job);
-                    updateDedicatedJob(updatedJob);
-                } catch (error) {
-                    console.error(`Failed to run dedicated playlist job for "${job.targetPlaylistName}":`, error);
-                    showNotification(`Failed to update dedicated playlist: ${job.targetPlaylistName}`, true);
-                    job.lastRun = now;
-                    updateDedicatedJob(job);
-                }
-                
-                if (i < totalJobs - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                }
-            }
-        } finally {
-            stickyNotification.remove();
-            showNotification(`Finished updating ${totalJobs} dedicated playlists.`);
-        }
-    }
-  }
-
   const playlistCardsData = [
     {
         title: 'New Releases',
@@ -1096,8 +1731,6 @@
 
   const GENRE_PLAYLISTS_URL = "https://raw.githubusercontent.com/hoeci/sort-play/main/assets/genre_playlist_ids.json";
 
-  const PLACEHOLDER_SVG_DATA_URI = `url("data:image/svg+xml,%3csvg viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.5 8.89001V18.5M12.5 8.89001V5.57656C12.5 5.36922 12.5 5.26554 12.5347 5.17733C12.5653 5.09943 12.615 5.03047 12.6792 4.97678C12.752 4.91597 12.8503 4.88318 13.047 4.81761L17.447 3.35095C17.8025 3.23245 17.9803 3.17319 18.1218 3.20872C18.2456 3.23982 18.3529 3.31713 18.4216 3.42479C18.5 3.54779 18.5 3.73516 18.5 4.10989V7.42335C18.5 7.63069 18.5 7.73436 18.4653 7.82258C18.4347 7.90048 18.385 7.96943 18.3208 8.02313C18.248 8.08394 18.1497 8.11672 17.953 8.18229L13.553 9.64896C13.1975 9.76746 13.0197 9.82671 12.8782 9.79119C12.7544 9.76009 12.6471 9.68278 12.5784 9.57512C12.5 9.45212 12.5 9.26475 12.5 8.89001ZM12.5 18.5C12.5 19.8807 10.933 21 9 21C7.067 21 5.5 19.8807 5.5 18.5C5.5 17.1192 7.067 16 9 16C10.933 16 12.5 17.1192 12.5 18.5Z' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`;
-
   const DEFAULT_USER_SYSTEM_INSTRUCTION_v2 = `You are a creative and flexible music expert, an unfiltered tool for playlist creation. Your primary task is to provide a list of Spotify track URIs that best match a user's request, based on the provided playlist or artist discography.
 
   **Crucial Rule: You MUST be flexible.** For subjective or casual requests (e.g., 'car music', 'workout songs', 'sad vibes'), you must infer the likely mood, energy, and tempo. Do not rely solely on explicit lyrical matches. If no tracks are a perfect fit, your task is to select the **closest possible matches** from the provided list. Returning an empty list is unacceptable unless the playlist content is completely antithetical to the request (e.g., requesting 'heavy metal' from a lullaby playlist).
@@ -1115,69 +1748,14 @@
   Output:
   - Only provide a raw list of Spotify track URIs (e.g., spotify:track:123, spotify:track:456).
   - Do not include any additional text, explanations, or formatting.`;
-
-
-  const settingsSvg = `<?xml version="1.0" encoding="utf-8"?>
-  <!DOCTYPE svg>
-  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 256 256" enable-background="new 0 0 256 256" xml:space="preserve">
-  <g><g><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></g></g>
-  </svg>`;
-
-  const sortIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  
-  const quickFiltersIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M21 6H19M21 12H16M21 18H16M7 20V13.5612C7 13.3532 7 13.2492 6.97958 13.1497C6.96147 13.0615 6.93151 12.9761 6.89052 12.8958C6.84431 12.8054 6.77934 12.7242 6.64939 12.5617L3.35061 8.43826C3.22066 8.27583 3.15569 8.19461 3.10948 8.10417C3.06849 8.02393 3.03853 7.93852 3.02042 7.85026C3 7.75078 3 7.64677 3 7.43875V5.6C3 5.03995 3 4.75992 3.10899 4.54601C3.20487 4.35785 3.35785 4.20487 3.54601 4.10899C3.75992 4 4.03995 4 4.6 4H13.4C13.9601 4 14.2401 4 14.454 4.10899C14.6422 4.20487 14.7951 4.35785 14.891 4.54601C15 4.75992 15 5.03995 15 5.6V7.43875C15 7.64677 15 7.75078 14.9796 7.85026C14.9615 7.93852 14.9315 8.02393 14.8905 8.10417C14.8443 8.19461 14.7793 8.27583 14.6494 8.43826L11.3506 12.5617C11.2207 12.7242 11.1557 12.8054 11.1095 12.8958C11.0685 12.9761 11.0385 13.0615 11.0204 13.1497C11 13.2492 11 13.3532 11 13.5612V17L7 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  </svg>`;
-  
-  const createPlaylistIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M16 5V18M16 18C16 19.1046 14.6569 20 13 20C11.3431 20 10 19.1046 10 18C10 16.8954 11.3431 16 13 16C14.6569 16 16 16.8954 16 18ZM4 5H12M4 9H12M4 13H8M16 4L20 3V7L16 8V4Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const dynamicPlaylistIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M5.06152 12C5.55362 8.05369 8.92001 5 12.9996 5C17.4179 5 20.9996 8.58172 20.9996 13C20.9996 17.4183 17.4179 21 12.9996 21H8M13 13V9M11 3H15M3 15H8M5 18H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const genreFilterIconSvg = `
-  <svg width="22px" height="21px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M20 20L18.2678 18.2678M18.2678 18.2678C18.7202 17.8154 19 17.1904 19 16.5C19 15.1193 17.8807 14 16.5 14C15.1193 14 14 15.1193 14 16.5C14 17.8807 15.1193 19 16.5 19C17.1904 19 17.8154 18.7202 18.2678 18.2678ZM15.6 10H18.4C18.9601 10 19.2401 10 19.454 9.89101C19.6422 9.79513 19.7951 9.64215 19.891 9.45399C20 9.24008 20 8.96005 20 8.4V5.6C20 5.03995 20 4.75992 19.891 4.54601C19.7951 4.35785 19.6422 4.20487 19.454 4.10899C19.2401 4 18.9601 4 18.4 4H15.6C15.0399 4 14.7599 4 14.546 4.10899C14.3578 4.20487 14.2049 4.35785 14.109 4.54601C14 4.75992 14 5.03995 14 5.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM5.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V5.6C10 5.03995 10 4.75992 9.89101 4.54601C9.79513 4.35785 9.64215 4.20487 9.45399 4.10899C9.24008 4 8.96005 4 8.4 4H5.6C5.03995 4 4.75992 4 4.54601 4.10899C4.35785 4.20487 4.20487 4.35785 4.10899 4.54601C4 4.75992 4 5.03995 4 5.6V8.4C4 8.96005 4 9.24008 4.10899 9.45399C4.20487 9.64215 4.35785 9.79513 4.54601 9.89101C4.75992 10 5.03995 10 5.6 10ZM5.6 20H8.4C8.96005 20 9.24008 20 9.45399 19.891C9.64215 19.7951 9.79513 19.6422 9.89101 19.454C10 19.2401 10 18.9601 10 18.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H5.6C5.03995 14 4.75992 14 4.54601 14.109C4.35785 14.2049 4.20487 14.3578 4.10899 14.546C4 14.7599 4 15.0399 4 15.6V18.4C4 18.9601 4 19.2401 4.10899 19.454C4.20487 19.6422 4.35785 19.7951 4.54601 19.891C4.75992 20 5.03995 20 5.6 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  
-  const customFilterIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M7 9H17M7 15H17M15 13V17M9 7V11M7.2 20H16.8C17.9201 20 18.4802 20 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H7.2C6.0799 4 5.51984 4 5.09202 4.21799C4.71569 4.40973 4.40973 4.71569 4.21799 5.09202C4 5.51984 4 6.07989 4 7.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.07989 20 7.2 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const aiPickIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M12 3L14.0357 8.16153C14.2236 8.63799 14.3175 8.87622 14.4614 9.0771C14.5889 9.25516 14.7448 9.41106 14.9229 9.53859C15.1238 9.68245 15.362 9.77641 15.8385 9.96432L21 12L15.8385 14.0357C15.362 14.2236 15.1238 14.3175 14.9229 14.4614C14.7448 14.5889 14.5889 14.7448 14.4614 14.9229C14.3175 15.1238 14.2236 15.362 14.0357 15.8385L12 21L9.96432 15.8385C9.77641 15.362 9.68245 15.1238 9.53859 14.9229C9.41106 14.7448 9.25516 14.5889 9.0771 14.4614C8.87622 14.3175 8.63799 14.2236 8.16153 14.0357L3 12L8.16153 9.96432C8.63799 9.77641 8.87622 9.68245 9.0771 9.53859C9.25516 9.41106 9.41106 9.25516 9.53859 9.0771C9.68245 8.87622 9.77641 8.63799 9.96432 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const shuffleIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M18 4L21 7M21 7L18 10M21 7H17C16.0707 7 15.606 7 15.2196 7.07686C13.6329 7.39249 12.3925 8.63288 12.0769 10.2196C12 10.606 12 11.0707 12 12C12 12.9293 12 13.394 11.9231 13.7804C11.6075 15.3671 10.3671 16.6075 8.78036 16.9231C8.39397 17 7.92931 17 7 17H3M18 20L21 17M21 17L18 14M21 17H17C16.0707 17 15.606 17 15.2196 16.9231C15.1457 16.9084 15.0724 16.8917 15 16.873M3 7H7C7.92931 7 8.39397 7 8.78036 7.07686C8.85435 7.09158 8.92758 7.1083 9 7.12698" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const convertToSpotifyIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M12 9.5V15.5M9 12.5H15M8.4 19C5.41766 19 3 16.6044 3 13.6493C3 11.2001 4.8 8.9375 7.5 8.5C8.34694 6.48637 10.3514 5 12.6893 5C15.684 5 18.1317 7.32251 18.3 10.25C19.8893 10.9449 21 12.6503 21 14.4969C21 16.9839 18.9853 19 16.5 19L8.4 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const settingsIconSvg = `
-  <svg width="22px" height="22px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path fill="none" d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path fill="none" d="M12.9046 3.06005C12.6988 3 12.4659 3 12 3C11.5341 3 11.3012 3 11.0954 3.06005C10.7942 3.14794 10.5281 3.32808 10.3346 3.57511C10.2024 3.74388 10.1159 3.96016 9.94291 4.39272C9.69419 5.01452 9.00393 5.33471 8.36857 5.123L7.79779 4.93281C7.3929 4.79785 7.19045 4.73036 6.99196 4.7188C6.70039 4.70181 6.4102 4.77032 6.15701 4.9159C5.98465 5.01501 5.83376 5.16591 5.53197 5.4677C5.21122 5.78845 5.05084 5.94882 4.94896 6.13189C4.79927 6.40084 4.73595 6.70934 4.76759 7.01551C4.78912 7.2239 4.87335 7.43449 5.04182 7.85566C5.30565 8.51523 5.05184 9.26878 4.44272 9.63433L4.16521 9.80087C3.74031 10.0558 3.52786 10.1833 3.37354 10.3588C3.23698 10.5141 3.13401 10.696 3.07109 10.893C3 11.1156 3 11.3658 3 11.8663C3 12.4589 3 12.7551 3.09462 13.0088C3.17823 13.2329 3.31422 13.4337 3.49124 13.5946C3.69158 13.7766 3.96395 13.8856 4.50866 14.1035C5.06534 14.3261 5.35196 14.9441 5.16236 15.5129L4.94721 16.1584C4.79819 16.6054 4.72367 16.829 4.7169 17.0486C4.70875 17.3127 4.77049 17.5742 4.89587 17.8067C5.00015 18.0002 5.16678 18.1668 5.5 18.5C5.83323 18.8332 5.99985 18.9998 6.19325 19.1041C6.4258 19.2295 6.68733 19.2913 6.9514 19.2831C7.17102 19.2763 7.39456 19.2018 7.84164 19.0528L8.36862 18.8771C9.00393 18.6654 9.6942 18.9855 9.94291 19.6073C10.1159 20.0398 10.2024 20.2561 10.3346 20.4249C10.5281 20.6719 10.7942 20.8521 11.0954 20.94C11.3012 21 11.5341 21 12 21C12.4659 21 12.6988 21 12.9046 20.94C13.2058 20.8521 13.4719 20.6719 13.6654 20.4249C13.7976 20.2561 13.8841 20.0398 14.0571 19.6073C14.3058 18.9855 14.9961 18.6654 15.6313 18.8773L16.1579 19.0529C16.605 19.2019 16.8286 19.2764 17.0482 19.2832C17.3123 19.2913 17.5738 19.2296 17.8063 19.1042C17.9997 18.9999 18.1664 18.8333 18.4996 18.5001C18.8328 18.1669 18.9994 18.0002 19.1037 17.8068C19.2291 17.5743 19.2908 17.3127 19.2827 17.0487C19.2759 16.8291 19.2014 16.6055 19.0524 16.1584L18.8374 15.5134C18.6477 14.9444 18.9344 14.3262 19.4913 14.1035C20.036 13.8856 20.3084 13.7766 20.5088 13.5946C20.6858 13.4337 20.8218 13.2329 20.9054 13.0088C21 12.7551 21 12.4589 21 11.8663C21 11.3658 21 11.1156 20.9289 10.893C20.866 10.696 20.763 10.5141 20.6265 10.3588C20.4721 10.1833 20.2597 10.0558 19.8348 9.80087L19.5569 9.63416C18.9478 9.26867 18.6939 8.51514 18.9578 7.85558C19.1262 7.43443 19.2105 7.22383 19.232 7.01543C19.2636 6.70926 19.2003 6.40077 19.0506 6.13181C18.9487 5.94875 18.7884 5.78837 18.4676 5.46762C18.1658 5.16584 18.0149 5.01494 17.8426 4.91583C17.5894 4.77024 17.2992 4.70174 17.0076 4.71872C16.8091 4.73029 16.6067 4.79777 16.2018 4.93273L15.6314 5.12287C14.9961 5.33464 14.3058 5.0145 14.0571 4.39272C13.8841 3.96016 13.7976 3.74388 13.6654 3.57511C13.4719 3.32808 13.2058 3.14794 12.9046 3.06005Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-  
-  const infoIconSvg = `
-  <svg width="14px" height="14px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-left: 2px; margin-bottom: 4px; vertical-align: middle; cursor: help; color: #888; opacity: 0.8;">
-  <path d="M12 8H12.01M12 11V16M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
+    
+  const DEFAULT_PROMPT_PRESETS = [
+    { id: '1', title: "Upbeat Workout", prompt: "High energy, fast tempo tracks perfect for a heavy workout session." },
+    { id: '2', title: "Late Night Drive", prompt: "Atmospheric, chill, and moody tracks for driving at night." },
+    { id: '3', title: "Focus & Study", prompt: "Instrumental, calm tracks to help with concentration and studying." },
+    { id: '4', title: "Party Starters", prompt: "Catchy, popular, and danceable tracks to get a party going." },
+    { id: '5', title: "Sad Vibes", prompt: "Melancholic, slow, and emotional tracks for when you're feeling down." }
+  ];
 
   let sortOrderState = {
     playCount: false,
@@ -1205,21 +1783,21 @@
   };
 
   function loadSettings() {
-    showAdditionalColumn = localStorage.getItem("sort-play-show-additional-column") === "true";
-    showSecondAdditionalColumn = localStorage.getItem("sort-play-show-second-additional-column") === "true";
-    showAlbumColumn = localStorage.getItem("sort-play-show-album-column") === "true";
-    showArtistColumn = localStorage.getItem("sort-play-show-artist-column") === "true";
-    selectedColumnType = localStorage.getItem("sort-play-selected-column-type") || "playCount";
-    selectedSecondColumnType = localStorage.getItem("sort-play-selected-second-column-type") || "releaseDate";
-    selectedAlbumColumnType = localStorage.getItem("sort-play-selected-album-column-type") || "releaseDate";
-    selectedArtistColumnType = localStorage.getItem("sort-play-selected-artist-column-type") || "releaseDate"; 
-    releaseDateFormat = localStorage.getItem("sort-play-release-date-format") || 'YYYY-MM-DD';
-    removeDateAdded = localStorage.getItem("sort-play-remove-date-added") === "true";
-    includeSongStats = localStorage.getItem("sort-play-include-song-stats") !== "false";
-    includeLyrics = localStorage.getItem("sort-play-include-lyrics") === "true";
-    selectedAiModel = localStorage.getItem("sort-play-ai-model") || DEFAULT_AI_MODEL;
+    showAdditionalColumn = localStorage.getItem(STORAGE_KEY_SHOW_ADDITIONAL_COLUMN) === "true";
+    showSecondAdditionalColumn = localStorage.getItem(STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN) === "true";
+    showAlbumColumn = localStorage.getItem(STORAGE_KEY_SHOW_ALBUM_COLUMN) === "true";
+    showArtistColumn = localStorage.getItem(STORAGE_KEY_SHOW_ARTIST_COLUMN) === "true";
+    selectedColumnType = localStorage.getItem(STORAGE_KEY_SELECTED_COLUMN_TYPE) || "playCount";
+    selectedSecondColumnType = localStorage.getItem(STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE) || "releaseDate";
+    selectedAlbumColumnType = localStorage.getItem(STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE) || "releaseDate";
+    selectedArtistColumnType = localStorage.getItem(STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE) || "releaseDate"; 
+    releaseDateFormat = localStorage.getItem(STORAGE_KEY_RELEASE_DATE_FORMAT) || 'YYYY-MM-DD';
+    removeDateAdded = localStorage.getItem(STORAGE_KEY_REMOVE_DATE_ADDED) === "true";
+    includeSongStats = localStorage.getItem(STORAGE_KEY_INCLUDE_SONG_STATS) !== "false";
+    includeLyrics = localStorage.getItem(STORAGE_KEY_INCLUDE_LYRICS) === "true";
+    selectedAiModel = localStorage.getItem(STORAGE_KEY_AI_MODEL) || DEFAULT_AI_MODEL;
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
-    matchAllGenres = localStorage.getItem("sort-play-match-all-genres") === "true";
+    matchAllGenres = localStorage.getItem(STORAGE_KEY_MATCH_ALL_GENRES) === "true";
     const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
     addToQueueEnabled = addToQueueStored === null ? false : addToQueueStored === "true";
     createPlaylistAfterSort = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST) !== "false";
@@ -1229,8 +1807,8 @@
     createPlaylistPrivate = createPlaylistPrivateStored === null ? true : createPlaylistPrivateStored === "true";
     const openPlaylistStored = localStorage.getItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT);
     openPlaylistAfterSortEnabled = openPlaylistStored === null ? false : openPlaylistStored === "true";
-    myScrobblesDisplayMode = localStorage.getItem("sort-play-my-scrobbles-display-mode") || 'number';
-    keyDisplayMode = localStorage.getItem("sort-play-key-display-mode") || 'standard';
+    myScrobblesDisplayMode = localStorage.getItem(STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE) || 'number';
+    keyDisplayMode = localStorage.getItem(STORAGE_KEY_KEY_DISPLAY_MODE) || 'standard';
     colorSortMode = localStorage.getItem(STORAGE_KEY_COLOR_SORT_MODE) || 'perceptual';
     topTracksLimit = parseInt(localStorage.getItem(STORAGE_KEY_TOP_TRACKS_LIMIT), 10) || 100;
     const storedNewReleases = localStorage.getItem(STORAGE_KEY_NEW_RELEASES_LIMIT);
@@ -1258,7 +1836,7 @@
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
-    showLikeButton = localStorage.getItem("sort-play-show-like-button") === "true";
+    showLikeButton = localStorage.getItem(STORAGE_KEY_SHOW_LIKE_BUTTON) === "true";
     useEnergyWaveShuffle = localStorage.getItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE) === "true";
     energyWaveShuffleLimit = parseInt(localStorage.getItem(STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT), 10) || 6000;
     showNowPlayingData = localStorage.getItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA) === "true";
@@ -1275,14 +1853,16 @@
     selectedNowPlayingSeparator = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR) || '•';
     selectedNowPlayingScrobblesFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT) || 'raw';
     selectedNowPlayingPersonalScrobblesFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT) || 'raw';
-    lastFmAutocorrect = localStorage.getItem("sort-play-lastfm-autocorrect") === "true";
+    lastFmAutocorrect = localStorage.getItem(STORAGE_KEY_LASTFM_AUTOCORRECT) === "true";
     showLastFmContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU) === "true";
     showGenresContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU) === "true";
     showArtistDiscographyContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU) === "true";
     const showShuffleContextMenuStored = localStorage.getItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU);
     showShuffleContextMenu = showShuffleContextMenuStored === null ? true : showShuffleContextMenuStored === "true";
     artistDiscographySortType = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE) || 'releaseDate';
-    artistDiscographyDeduplicationMode = localStorage.getItem("sort-play-artist-discography-dedup-mode") || 'default';
+    artistDiscographyDeduplicationMode = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE) || 'default';
+    const showDupWarningStored = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL);
+    showArtistDiscographyDuplicateWarning = showDupWarningStored === null ? true : showDupWarningStored === "true";
     showGenreTags = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS) === "true";
     showGenreTagsNowPlaying = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP) !== "false";
     showGenreTagsArtistPage = localStorage.getItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP) !== "false";
@@ -1305,28 +1885,28 @@
   }
   
   function saveSettings() {
-    localStorage.setItem("sort-play-show-additional-column", showAdditionalColumn); 
-    localStorage.setItem("sort-play-show-second-additional-column", showSecondAdditionalColumn);
-    localStorage.setItem("sort-play-show-album-column", showAlbumColumn);
-    localStorage.setItem("sort-play-show-artist-column", showArtistColumn); 
-    localStorage.setItem("sort-play-selected-column-type", selectedColumnType);
-    localStorage.setItem("sort-play-selected-second-column-type", selectedSecondColumnType);
-    localStorage.setItem("sort-play-selected-album-column-type", selectedAlbumColumnType);
-    localStorage.setItem("sort-play-selected-artist-column-type", selectedArtistColumnType);
-    localStorage.setItem("sort-play-release-date-format", releaseDateFormat);
-    localStorage.setItem("sort-play-remove-date-added", removeDateAdded);
-    localStorage.setItem("sort-play-include-song-stats", includeSongStats);
-    localStorage.setItem("sort-play-include-lyrics", includeLyrics);
-    localStorage.setItem("sort-play-ai-model", selectedAiModel);
+    localStorage.setItem(STORAGE_KEY_SHOW_ADDITIONAL_COLUMN, showAdditionalColumn); 
+    localStorage.setItem(STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN, showSecondAdditionalColumn);
+    localStorage.setItem(STORAGE_KEY_SHOW_ALBUM_COLUMN, showAlbumColumn);
+    localStorage.setItem(STORAGE_KEY_SHOW_ARTIST_COLUMN, showArtistColumn); 
+    localStorage.setItem(STORAGE_KEY_SELECTED_COLUMN_TYPE, selectedColumnType);
+    localStorage.setItem(STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE, selectedSecondColumnType);
+    localStorage.setItem(STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE, selectedAlbumColumnType);
+    localStorage.setItem(STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE, selectedArtistColumnType);
+    localStorage.setItem(STORAGE_KEY_RELEASE_DATE_FORMAT, releaseDateFormat);
+    localStorage.setItem(STORAGE_KEY_REMOVE_DATE_ADDED, removeDateAdded);
+    localStorage.setItem(STORAGE_KEY_INCLUDE_SONG_STATS, includeSongStats);
+    localStorage.setItem(STORAGE_KEY_INCLUDE_LYRICS, includeLyrics);
+    localStorage.setItem(STORAGE_KEY_AI_MODEL, selectedAiModel);
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2, userSystemInstruction);
-    localStorage.setItem("sort-play-match-all-genres", matchAllGenres);
+    localStorage.setItem(STORAGE_KEY_MATCH_ALL_GENRES, matchAllGenres);
     localStorage.setItem(STORAGE_KEY_ADD_TO_QUEUE, addToQueueEnabled);
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST, createPlaylistAfterSort);
     localStorage.setItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST, sortCurrentPlaylistEnabled);
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, createPlaylistPrivate);
     localStorage.setItem(STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT, openPlaylistAfterSortEnabled);
-    localStorage.setItem("sort-play-my-scrobbles-display-mode", myScrobblesDisplayMode);
-    localStorage.setItem("sort-play-key-display-mode", keyDisplayMode);
+    localStorage.setItem(STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE, myScrobblesDisplayMode);
+    localStorage.setItem(STORAGE_KEY_KEY_DISPLAY_MODE, keyDisplayMode);
     localStorage.setItem(STORAGE_KEY_COLOR_SORT_MODE, colorSortMode);
     localStorage.setItem(STORAGE_KEY_TOP_TRACKS_LIMIT, topTracksLimit);
     localStorage.setItem(STORAGE_KEY_NEW_RELEASES_LIMIT, newReleasesDaysLimit);
@@ -1338,7 +1918,7 @@
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY, changeTitleOnModify);
     localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
-    localStorage.setItem("sort-play-show-like-button", showLikeButton);
+    localStorage.setItem(STORAGE_KEY_SHOW_LIKE_BUTTON, showLikeButton);
     localStorage.setItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE, useEnergyWaveShuffle);
     localStorage.setItem(STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT, energyWaveShuffleLimit);
     localStorage.setItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA, showNowPlayingData);
@@ -1355,14 +1935,15 @@
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR, selectedNowPlayingSeparator);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT, selectedNowPlayingScrobblesFormat);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT, selectedNowPlayingPersonalScrobblesFormat);
-    localStorage.setItem("sort-play-lastfm-autocorrect", lastFmAutocorrect);
+    localStorage.setItem(STORAGE_KEY_LASTFM_AUTOCORRECT, lastFmAutocorrect);
     localStorage.setItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, showLastFmContextMenu);
     updateLastFmContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU, showGenresContextMenu);
     updateGenresContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, showArtistDiscographyContextMenu);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, artistDiscographySortType);
-    localStorage.setItem("sort-play-artist-discography-dedup-mode", artistDiscographyDeduplicationMode);
+    localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE, artistDiscographyDeduplicationMode);
+    localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL, showArtistDiscographyDuplicateWarning);
     updateArtistDiscographyContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU, showShuffleContextMenu);
     updateShuffleContextMenu();
@@ -1383,6 +1964,168 @@
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
     }
   }
+
+  window.SortPlaySyncUtils = {
+    exportAllSettings: () => {
+      const payload = {
+        version: 1,
+        timestamp: Date.now(),
+        settings: {}
+      };
+
+      const isDefaultValue = (key, value) => {
+        const DEFAULT_SETTINGS = {
+          [STORAGE_KEY_SHOW_GENRE_TAGS]: "false",
+          [STORAGE_KEY_SHOW_GENRE_TAGS_NP]: "true",
+          [STORAGE_KEY_SHOW_GENRE_TAGS_AP]: "true",
+          [STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY]: "true",
+          [STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY_TRACK]: "true",
+          [STORAGE_KEY_GENRE_SOURCES_NP_LASTFM]: "true",
+          [STORAGE_KEY_GENRE_SOURCES_NP_DEEZER]: "true",
+          [STORAGE_KEY_GENRE_SOURCES_AP_SPOTIFY]: "true",
+          [STORAGE_KEY_GENRE_SOURCES_AP_LASTFM]: "true",
+          [STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE]: "true",
+          [STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL]: "false",
+          [STORAGE_KEY_CHAT_PANEL_VISIBLE]: "false",
+          [STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU]: "false",
+          [STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU]: "false",
+          [STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU]: "false",
+          [STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU]: "true",
+          [STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE]: "releaseDate",
+          [STORAGE_KEY_GENRE_FILTER_SORT]: "default",
+          [STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2]: DEFAULT_USER_SYSTEM_INSTRUCTION_v2,
+          [STORAGE_KEY_ADD_TO_QUEUE]: "false",
+          [STORAGE_KEY_CREATE_PLAYLIST]: "true",
+          [STORAGE_KEY_SORT_CURRENT_PLAYLIST]: "false",
+          [STORAGE_KEY_CREATE_PLAYLIST_PRIVATE]: "true",
+          [STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT]: "false",
+          [STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER]: "false",
+          [STORAGE_KEY_SORT_PLAY_FOLDER_NAME]: "Sort-Play Library",
+          [STORAGE_KEY_CHANGE_TITLE_ON_CREATE]: "false",
+          [STORAGE_KEY_CHANGE_TITLE_ON_MODIFY]: "false",
+          [STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR]: "{}",
+          [STORAGE_KEY_DEDICATED_PLAYLIST_MAP]: "{}",
+          [STORAGE_KEY_COLOR_SORT_MODE]: "perceptual",
+          [STORAGE_KEY_TOP_TRACKS_LIMIT]: "100",
+          [STORAGE_KEY_NEW_RELEASES_LIMIT]: "release-2",
+          [STORAGE_KEY_FOLLOWED_RELEASES_LIMIT]: "all",
+          [STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE]: "50",
+          [STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS]: "true",
+          [STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS]: "[]",
+          [STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES]: "[]",
+          [STORAGE_KEY_DEDICATED_PLAYLIST_JOBS]: "[]",
+          [STORAGE_KEY_DYNAMIC_SORT_TYPE]: "playCount",
+          [STORAGE_KEY_DYNAMIC_SCHEDULE]: "86400000",
+          [STORAGE_KEY_DYNAMIC_UPDATE_SOURCE]: "true",
+          [STORAGE_KEY_RANDOM_GENRE_HISTORY]: "[]",
+          [STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE]: "false",
+          [STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT]: "6000",
+          [STORAGE_KEY_SHOW_NOW_PLAYING_DATA]: "false",
+          [STORAGE_KEY_NOW_PLAYING_DATA_TYPE]: "releaseDate",
+          [STORAGE_KEY_NOW_PLAYING_DATA_POSITION]: ".main-trackInfo-name",
+          [STORAGE_KEY_NOW_PLAYING_DATA_FORMAT]: "YYYY",
+          [STORAGE_KEY_NOW_PLAYING_PLAY_COUNT_FORMAT]: "raw",
+          [STORAGE_KEY_NOW_PLAYING_TEMPO_FORMAT]: "with_unit",
+          [STORAGE_KEY_NOW_PLAYING_ENERGY_FORMAT]: "percentage",
+          [STORAGE_KEY_NOW_PLAYING_DANCEABILITY_FORMAT]: "percentage",
+          [STORAGE_KEY_NOW_PLAYING_VALENCE_FORMAT]: "percentage",
+          [STORAGE_KEY_NOW_PLAYING_KEY_FORMAT]: "standard",
+          [STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT]: "raw",
+          [STORAGE_KEY_NOW_PLAYING_SEPARATOR]: "•",
+          [STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT]: "raw",
+          [STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT]: "raw",
+          [STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP]: "{}",
+          [STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL]: "true",
+          [STORAGE_KEY_SHOW_ADDITIONAL_COLUMN]: "false",
+          [STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN]: "false",
+          [STORAGE_KEY_SHOW_ALBUM_COLUMN]: "false",
+          [STORAGE_KEY_SHOW_ARTIST_COLUMN]: "false",
+          [STORAGE_KEY_SELECTED_COLUMN_TYPE]: "playCount",
+          [STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE]: "releaseDate",
+          [STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE]: "releaseDate",
+          [STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE]: "releaseDate",
+          [STORAGE_KEY_RELEASE_DATE_FORMAT]: "YYYY-MM-DD",
+          [STORAGE_KEY_REMOVE_DATE_ADDED]: "false",
+          [STORAGE_KEY_INCLUDE_SONG_STATS]: "true",
+          [STORAGE_KEY_INCLUDE_LYRICS]: "false",
+          [STORAGE_KEY_AI_MODEL]: DEFAULT_AI_MODEL,
+          [STORAGE_KEY_MATCH_ALL_GENRES]: "false",
+          [STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE]: "number",
+          [STORAGE_KEY_KEY_DISPLAY_MODE]: "standard",
+          [STORAGE_KEY_SHOW_LIKE_BUTTON]: "false",
+          [STORAGE_KEY_LASTFM_AUTOCORRECT]: "false",
+          [STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE]: "default",
+          [STORAGE_KEY_LFM_OVERRIDES]: "{}",
+          [STORAGE_KEY_LFM_COMMENTS_COLLAPSED]: "false",
+          [STORAGE_KEY_AI_PROMPT_HISTORY]: "[]",
+          [STORAGE_KEY_AI_PROMPT_PRESETS]: JSON.stringify(DEFAULT_PROMPT_PRESETS),
+          [STORAGE_KEY_FILTER_PRESETS]: "{}",
+          [STORAGE_KEY_KEYWORD_GROUPS]: "{}",
+          [STORAGE_KEY_TITLE_ALBUM_KEYWORDS]: "[]",
+          [STORAGE_KEY_ARTIST_KEYWORDS]: "[]",
+          [STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE]: "100",
+          [STORAGE_KEY_ACTIVE_RANGE_FILTER]: "releaseDate",
+          [STORAGE_KEY_FILTER_TITLE]: "true",
+          [STORAGE_KEY_FILTER_ALBUM]: "true",
+          [STORAGE_KEY_FILTER_ARTIST]: "true",
+          [STORAGE_KEY_MATCH_WHOLE_WORD]: "false"
+        };
+    
+        if (key === STORAGE_KEY_NP_CONFIG) {
+            try {
+                const parsed = JSON.parse(value);
+                if (parsed && !parsed.title?.enabled && !parsed.artist?.enabled && parsed.title?.items?.length === 1 && parsed.title.items[0].type === 'releaseDate') {
+                    return true;
+                }
+            } catch(e) {}
+            return false;
+        }
+        
+        if (key.startsWith('sort-play-') && key.endsWith('-reverse')) {
+            return value === "false"; 
+        }
+    
+        return value === DEFAULT_SETTINGS[key];
+      };
+      
+      SYNCABLE_SETTINGS_KEYS.forEach(key => {
+        const val = localStorage.getItem(key);
+        if (val !== null && !isDefaultValue(key, val)) payload.settings[key] = val;
+      });
+      
+      for (const sortType in sortOrderState) {
+        const key = `sort-play-${sortType}-reverse`;
+        const val = localStorage.getItem(key);
+        if (val !== null && !isDefaultValue(key, val)) payload.settings[key] = val;
+      }
+      
+      return payload;
+    },
+    importAllSettings: async (payload) => {
+      if (!payload || typeof payload !== 'object') return;
+      
+      const settingsData = payload.settings || payload.localStorage || payload;
+      
+      for (const [key, value] of Object.entries(settingsData)) {
+        if (SYNCABLE_SETTINGS_KEYS.includes(key) || (key.startsWith('sort-play-') && key.endsWith('-reverse'))) {
+          localStorage.setItem(key, value);
+        }
+      }
+      
+      loadSettings();
+
+      const confirmed = await showConfirmationModal({
+        title: "Settings Synced",
+        description: "Settings have been successfully imported from the cloud. Spicetify needs to reload to apply all interface and behavior changes properly. Reload now?",
+        confirmText: "Reload",
+        cancelText: "Later"
+      });
+
+      if (confirmed === 'confirm') {
+        location.reload();
+      }
+    }
+  };
 
   function migrateLegacyNpSettings() {
     const storedConfig = localStorage.getItem(STORAGE_KEY_NP_CONFIG);
@@ -1430,7 +2173,7 @@
         };
     }
     
-    if (localStorage.getItem("sort-play-show-now-playing-data") === null && !storedConfig) {
+    if (localStorage.getItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA) === null && !storedConfig) {
          nowPlayingConfig = {
             title: { enabled: false, items: [{ id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(), type: 'releaseDate', format: 'YYYY', separator: '•' }] },
             artist: { enabled: false, items: [] }
@@ -1440,64 +2183,13 @@
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
   }
 
-  function tagActiveModalWithFontScope() {
-    setTimeout(() => {
-      const modalContainer = document.querySelector(".main-popupModal-container");
-      if (modalContainer) {
-        modalContainer.classList.add('sort-play-font-scope');
-      }
-    }, 50);
-  }
-  
-  async function loadColorThief() {
-    if (colorThiefLib) {
-        return colorThiefLib;
-    }
-    try {
-        const response = await fetch("https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js");
-        const scriptText = await response.text();
-        const getLibrary = new Function('exports', 'module', `(function(exports, module) { ${scriptText} }).call(this, exports, module); return module.exports || this.ColorThief;`);
-        colorThiefLib = getLibrary({}, {});
-        if (!colorThiefLib) {
-            throw new Error('ColorThief constructor not found in loaded script');
-        }
-        return colorThiefLib;
-    } catch (error) {
-        console.error('Error loading ColorThief library:', error);
-        throw error;
-    }
-  }
-
-  try {
-    await loadColorThief();
-  } catch (error) {
-      console.error("Failed to load Color Thief library, color sorting will not be available.", error);
-  }
-
-  function normalizeArtistNames(artists) {
-    if (!artists || artists.length === 0) return "Unknown Artist";
-    
-    const firstArtistName = artists[0].name || "";
-    
-    if (firstArtistName.includes(';')) {
-        const uniqueArtists = [...new Set(firstArtistName.split(';').map(a => a.trim()))];
-        return uniqueArtists.join(', ');
-    }
-
-    return artists.map(artist => artist.name).join(", ");
-  }
-
   const AI_DATA_CACHE_VERSION = '1';
   const AI_DATA_CACHE_KEY_PREFIX = `sort-play-playlist-cache-v${AI_DATA_CACHE_VERSION}-`;
   
   function getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel) {
     return `${AI_DATA_CACHE_KEY_PREFIX}${trackId}-stats${includeSongStats}-lyrics${includeLyrics}-model${selectedAiModel}`;
   }
-  
-  async function getTrackCache(trackId, includeSongStats, includeLyrics, selectedAiModel) {
-    const cacheKey = getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel);
-    return await idb.get('aiData', cacheKey, CACHE_EXPIRE_AI_DATA);
-  }
+
   async function setTrackCache(trackId, trackData, includeSongStats, includeLyrics, selectedAiModel) {
     const cacheKey = getCacheKey(trackId, includeSongStats, includeLyrics, selectedAiModel);
     await idb.set('aiData', cacheKey, trackData);
@@ -1530,6 +2222,42 @@
   }
 
   
+  async function loadColorThief() {
+    if (colorThiefLib) {
+        return colorThiefLib;
+    }
+    try {
+        const response = await fetch("https://cdnjs.cloudflare.com/ajax/libs/color-thief/2.3.0/color-thief.umd.js");
+        const scriptText = await response.text();
+        const getLibrary = new Function('exports', 'module', `(function(exports, module) { ${scriptText} }).call(this, exports, module); return module.exports || this.ColorThief;`);
+        colorThiefLib = getLibrary({}, {});
+        if (!colorThiefLib) {
+            throw new Error('ColorThief constructor not found in loaded script');
+        }
+        return colorThiefLib;
+    } catch (error) {
+        console.error('Error loading ColorThief library:', error);
+        throw error;
+    }
+  }
+
+  try {
+    await loadColorThief();
+  } catch (error) {
+      console.error("Failed to load Color Thief library, color sorting will not be available.", error);
+  }
+
+  async function loadProtobuf() {
+    if (typeof protobuf !== 'undefined') return protobuf;
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/protobufjs@7.2.5/dist/protobuf.min.js';
+        script.onload = () => resolve(window.protobuf);
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+  }
+
   function saveLastFmUsername(username) {
     localStorage.setItem(STORAGE_KEY_LASTFM_USERNAME, username);
   }
@@ -1596,10 +2324,8 @@
     const saveButton = document.getElementById("saveLastFm");
     const cancelButton = document.getElementById("cancelLastFm");
 
-    saveButton.addEventListener("mouseenter", () => { saveButton.style.backgroundColor = "#3BE377"; });
-    saveButton.addEventListener("mouseleave", () => { saveButton.style.backgroundColor = "#1ED760"; });
-    cancelButton.addEventListener("mouseenter", () => { cancelButton.style.backgroundColor = "#444444"; });
-    cancelButton.addEventListener("mouseleave", () => { cancelButton.style.backgroundColor = "#333333"; });
+    addHoverEffect(saveButton, "#1ED760", "#3BE377");
+    addHoverEffect(cancelButton, "#333333", "#444444");
 
     function resetMenuButtonStyles() {
       const myScrobblesButton = menuButtons.find(
@@ -1637,222 +2363,30 @@
     cancelButton.addEventListener("click", closeModal);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
-
-  function createAndInitializeChatPanel() {
-    let chatPanel = document.getElementById('sort-play-chat-panel');
-    if (chatPanel) {
-        return chatPanel;
-    }
-
-    chatPanel = document.createElement('div');
-    chatPanel.id = 'sort-play-chat-panel';
-
-    const iframe = document.createElement('iframe');
-    iframe.id = 'chattable';
-    iframe.src = 'https://iframe.chat/embed/alternate/?chat=sortplay';
-    iframe.frameBorder = 'none';
-
-    const customChatCSS = `
-        body {
-           background-color: #181818;
-           background-size: 100% 100%;
-           color: #1db954;
-        }
-        .msgWrapper {
-           display: flex;
-           flex-wrap: wrap;
-           width: 100%;
-           align-items: center;
-        }
-        .msgWrapper:has(.received) {
-           justify-content: flex-start;
-        }
-        .msgWrapper:has(.sent) {
-           justify-content: flex-end;
-        }
-        .allMessages {
-           font-family: Helvetica, sans-serif;
-           font-size: 10pt;
-           margin: 5px;
-           display: inline-block;
-           position: relative;
-           min-width: 25vw;
-           max-width: 80vw;
-           backdrop-filter: blur(7px);
-           -webkit-backdrop-filter: blur(7px);
-        }
-        .allMessages:hover {
-           color: #1db954;
-        }
-        #background:lastChild {
-          margin-bottom: 20px;
-        }
-        .sent {
-           border-radius: 20px 20px 0 20px;
-           background-color: rgba(35,35, 35, 0.3);
-           color: #a0e0b8;
-        }
-        .recieved {
-           border-radius: 10px 10px 10px 0;
-           background-color: rgba(30, 215, 96, 0.15);
-           color: #a0e0b8;
-        }
-        blockquote {
-           background-color: #333;
-           color: #FFF;
-           opacity: 0.75;
-           border-right: solid 2px #AAA;
-        }
-        #background {
-           scrollbar-color: #1db954 transparent;
-           padding-top: 10px;
-           height: calc(100% - 108px)
-        }
-        #input, #nameEntry {
-           background-color: rgba(0, 0, 0, 0.5);
-           color: #1db954;
-           min-height: 25px;
-           backdrop-filter: blur(7px);
-           -webkit-backdrop-filter: blur(7px);
-        }
-        #input:empty::before {
-          color: #1a6333;
-        }
-        .owner, .mod {
-           background-color: transparent;
-           border: 1px solid #1db954;
-           background-size: 100% 100%;
-           border-radius: 50%;
-        }
-        #top_banner {
-          background: #1db954;
-          text-align: center;
-        }
-        #top_banner a {
-            font-size: 0;
-            text-decoration: none;
-        }
-        #top_banner a::after {
-            content: 'Sort Play Chat';
-            font-size: 14pt;
-            color: #181818;
-            font-family: sans-serif;
-            font-weight: 700;
-        }
-        #loadMore {
-          color: #1db954;
-          font-size: 10pt;
-          font-family: Verdana;
-        }
-        #loadMore:hover {
-          font-size: 12pt;
-        }
-        #settingsWrapper {
-          background-color: #1db954;
-        }
-        .ctxMenuOption {
-          background-color: transparent !important;
-          color: #1db954;
-        }
-        .ctxMenuOption:hover {
-          background-color: rgba(255, 255, 255, 0.25) !important;
-        }
-        #ctxMenu {
-          backdrop-filter: blur(7px);
-          -webkit-backdrop-filter: blur(7px);
-          background-color: rgba(0, 0, 0, 0.5) !important;
-        }
-        #timestamp {
-          display: flex;
-          align-items: center;
-          width: calc(100% - 10px);
-          font-size: 8pt;
-        }
-        .sent + #timestamp {
-          justify-content: flex-end;
-          padding-right: 10px;
-        }
-        .recieved + #timestamp {
-          justify-content: flex-start;
-          padding-left: 10px;
-        }
-        .msgBody {
-          padding: 5px 7px 7px 7px;
-        }
-        .msgBody a {
-          color: #1db954 !important;
-        }
-        :where(#emojiTrayToggle) {
-          background-color: #1db954;
-        }
-        #emojiTray {
-          background-color: rgba(30, 215, 96, 0.5);
-          color: #000;
-          border-color: #1db954;
-          backdrop-filter: blur(5px);
-        }
-        #settingsMenu hr {
-          height: 1px;
-          width: 100%;
-          border: none;
-          background: #1db954;
-        }
-        #settingsMenu input[type=text] {
-          border: none;
-          outline: none !important;
-          border-bottom: solid 1px #1db954;
-          color: #1db954;
-          background-color: rgba(0, 0, 0, 0.3);
-          backdrop-filter: blur(10px);
-          padding: 3px;
-        }
-        #save {
-          border: solid 1px #1db954;
-          background-color: transparent;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: #1db954;
-          padding: 10px;
-          font-size: 12pt;
-          backdrop-filter: blur(10px);
-          cursor: pointer;
-          border-radius: 3px;
-        }
-        #is_typing {
-          background-color: transparent;
-          height: 15px;
-          border: solid 1px #1db954;
-          border-radius: 8px;
-          backdrop-filter: blur(2px);
-        }
-        #is_typing > span {
-          background-color: #1db954;
-        }
-    `;
-
-    iframe.onload = () => {
-        iframe.contentWindow.postMessage(customChatCSS, "*");
-    };
-
-    chatPanel.appendChild(iframe);
-    document.body.appendChild(chatPanel);
-
-    return chatPanel;
-  }
-
+  
   function toggleChatPanel() {
     const liveChatBtn = document.querySelector("#liveChatBtn");
     chatPanelVisible = !chatPanelVisible;
+    localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
 
     if (chatPanelVisible) {
         const chatPanel = createAndInitializeChatPanel();
         positionChatPanel(chatPanel);
-        setTimeout(() => chatPanel.classList.add('visible'), 10);
+        
+        chatPanel.style.transition = "";
+        chatPanel.style.opacity = "";
+        chatPanel.style.pointerEvents = "";
+        
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                chatPanel.classList.add('visible');
+            });
+        });
         if (liveChatBtn) liveChatBtn.classList.add('active');
     } else {
         let chatPanel = document.getElementById('sort-play-chat-panel');
         if (chatPanel) {
+            if (typeof chatPanel.cleanup === 'function') chatPanel.cleanup();
             chatPanel.classList.remove('visible');
             setTimeout(() => {
                 if (chatPanel) chatPanel.remove();
@@ -1872,7 +2406,7 @@
     const panelWidth = chatPanel.offsetWidth;
     const gap = 10;
 
-    let top = modalRect.bottom - panelHeight - 2;
+    let top = modalRect.bottom - panelHeight;
     let left = modalRect.right + gap;
 
     if (left + panelWidth > window.innerWidth - gap) {
@@ -1885,33 +2419,6 @@
     chatPanel.style.top = `${top}px`;
     chatPanel.style.left = `${left}px`;
   }
-
-  const liveChatIconSVG = `
-  <svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M19.4003 18C19.7837 17.2499 20 16.4002 20 15.5C20 12.4624 17.5376 10 14.5 10C11.4624 10 9 12.4624 9 15.5C9 18.5376 11.4624 21 14.5 21L21 21C21 21 20 20 19.4143 18.0292M18.85 12C18.9484 11.5153 19 11.0137 19 10.5C19 6.35786 15.6421 3 11.5 3C7.35786 3 4 6.35786 4 10.5C4 11.3766 4.15039 12.2181 4.42676 13C5.50098 16.0117 3 18 3 18H9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const coffeeIconSVG = `
-  <svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M18.5 7H19C19.4647 7 19.697 7 19.8902 7.03843C20.6836 7.19624 21.3038 7.81644 21.4616 8.60982C21.5 8.80302 21.5 9.03535 21.5 9.5C21.5 9.96465 21.5 10.197 21.4616 10.3902C21.3038 11.1836 20.6836 11.8038 19.8902 11.9616C19.697 12 19.4647 12 19 12H18.5M3 20H21M12 17C10.6055 17 9.90821 17 9.33277 16.8619C7.50453 16.4229 6.07707 14.9955 5.63815 13.1672C5.5 12.5918 5.5 11.8945 5.5 10.5L5.5 7.2C5.5 6.0799 5.5 5.51984 5.71799 5.09202C5.90973 4.7157 6.21569 4.40974 6.59202 4.21799C7.01984 4 7.57989 4 8.7 4L15.3 4C16.4201 4 16.9802 4 17.408 4.21799C17.7843 4.40973 18.0903 4.71569 18.282 5.09202C18.5 5.51984 18.5 6.07989 18.5 7.2V10.5C18.5 11.8945 18.5 12.5918 18.3619 13.1672C17.9229 14.9955 16.4955 16.4229 14.6672 16.8619C14.0918 17 13.3945 17 12 17Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </svg>`;
-
-  const copyIconSVG = `<svg width="16px" height="16px" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v9a2 2 0 002 2h2v2a2 2 0 002 2h9a2 2 0 002-2V8a2 2 0 00-2-2h-2V4a2 2 0 00-2-2H4zm9 4V4H4v9h2V8a2 2 0 012-2h5zM8 8h9v9H8V8z"/></svg>`;
-
-  const arrowRightIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13.2328 16.4569C12.9328 16.7426 12.9212 17.2173 13.2069 17.5172C13.4926 17.8172 13.9673 17.8288 14.2672 17.5431L13.2328 16.4569ZM19.5172 12.5431C19.8172 12.2574 19.8288 11.7827 19.5431 11.4828C19.2574 11.1828 18.7827 11.1712 18.4828 11.4569L19.5172 12.5431ZM18.4828 12.5431C18.7827 12.8288 19.2574 12.8172 19.5431 12.5172C19.8288 12.2173 19.8172 11.7426 19.5172 11.4569L18.4828 12.5431ZM14.2672 6.4569C13.9673 6.17123 13.4926 6.18281 13.2069 6.48276C12.9212 6.78271 12.9328 7.25744 13.2328 7.5431L14.2672 6.4569ZM19 12.75C19.4142 12.75 19.75 12.4142 19.75 12C19.75 11.5858 19.4142 11.25 19 11.25V12.75ZM5 11.25C4.58579 11.25 4.25 11.5858 4.25 12C4.25 12.4142 4.58579 12.75 5 12.75V11.25ZM14.2672 17.5431L19.5172 12.5431L18.4828 11.4569L13.2328 16.4569L14.2672 17.5431ZM19.5172 11.4569L14.2672 6.4569L13.2328 7.5431L18.4828 12.5431L19.5172 11.4569ZM19 11.25L5 11.25V12.75L19 12.75V11.25Z" fill="currentColor"/></svg>`;
-
-  const libraryIconSVG = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>`;
-  const trashIconSVG = `<svg width="16px" height="16px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>`;
-
-  const penIconSvg = `<svg width="16px" height="16px" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M2.25,12.9378906 L2.25,15.75 L5.06210943,15.75 L13.3559575,7.45615192 L10.5438481,4.64404249 L2.25,12.9378906 L2.25,12.9378906 L2.25,12.9378906 Z M15.5306555,5.28145396 C15.8231148,4.98899458 15.8231148,4.5165602 15.5306555,4.22410082 L13.7758992,2.46934454 C13.4834398,2.17688515 13.0110054,2.17688515 12.718546,2.46934454 L11.3462366,3.84165394 L14.1583461,6.65376337 L15.5306555,5.28145396 L15.5306555,5.28145396 L15.5306555,5.28145396 Z"></path></svg>`;
-  
-  const DEFAULT_PROMPT_PRESETS = [
-    { id: '1', title: "Upbeat Workout", prompt: "High energy, fast tempo tracks perfect for a heavy workout session." },
-    { id: '2', title: "Late Night Drive", prompt: "Atmospheric, chill, and moody tracks for driving at night." },
-    { id: '3', title: "Focus & Study", prompt: "Instrumental, calm tracks to help with concentration and studying." },
-    { id: '4', title: "Party Starters", prompt: "Catchy, popular, and danceable tracks to get a party going." },
-    { id: '5', title: "Sad Vibes", prompt: "Melancholic, slow, and emotional tracks for when you're feeling down." }
-  ];
 
   function showSettingsModal() {
     const abortController = new AbortController();
@@ -1945,7 +2452,22 @@
     const closeModal = () => {
         abortController.abort();
         overlay.style.opacity = "0";
-        setTimeout(() => overlay.remove(), 200);
+        
+        const chatPanel = document.getElementById('sort-play-chat-panel');
+        if (chatPanel) {
+            if (typeof chatPanel.cleanup === 'function') chatPanel.cleanup();
+            chatPanel.style.transition = "opacity 0.2s ease";
+            chatPanel.style.opacity = "0";
+            chatPanel.style.pointerEvents = "none";
+            chatPanel.classList.remove('visible');
+        }
+        
+        setTimeout(() => {
+            overlay.remove();
+            if (chatPanel) {
+                chatPanel.remove();
+            }
+        }, 200);
     };
 
     overlay.addEventListener("click", (e) => {
@@ -1956,237 +2478,64 @@
       <div class="main-trackCreditsModal-header" style="padding: 29px 32px 19px 32px !important; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 30px; color: white;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span></h1>
           <button class="main-trackCreditsModal-closeBtn" id="closeSettingsModal" aria-label="Close" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center;">
-            <svg width="20" height="20" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+            ${closeModalIcon20Svg}
           </button>
       </div>
     `;
 
     modalContainer.innerHTML = `
     <style>
-    .main-trackCreditsModal-mainSection {
-      overflow-y: auto !important; 
-      padding: 16px 45px 16px 45px;
-      flex-grow: 1; 
-       scrollbar-width: thin;
-       scrollbar-color: #333333 #181818;
-    }
-    .main-trackCreditsModal-mainSection::-webkit-scrollbar {
-        width: 8px;
-    }
-    .main-trackCreditsModal-mainSection::-webkit-scrollbar-track {
-        background: #282828;
-        border-radius: 4px;
-    }
-    .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb {
-        background-color: #5a5a5a;
-        border-radius: 4px;
-    }
-    .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb:hover {
-        background-color: #7a7a7a;
-    }
-    .sort-play-settings-footer {
-        flex-shrink: 0;
-        padding: 10px 25px 12px 25px; 
-        background-color: #181818; 
-        border-top: 1px solid #282828;
-        display: flex;
-        justify-content: center; 
-        align-items: center;
-        position: relative;
-    }
-    .sort-play-settings-footer .live-chat-button {
-        position: absolute;
-        right: 25px;
-    }
-    .sort-play-settings-footer .support-me-button {
-        position: absolute;
-        left: 25px;
-    }
-    .sort-play-settings-footer .github-link-container a {
-        color: #1ED760;
-        font-size: 14px;
-        text-decoration: none;
-    }
-    .footer-icon-button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 0;
-        color: white;
-        display: flex;
-        align-items: center;
-        transition: color 0.1s ease-in-out;
-    }
-    .footer-icon-button.active {
-        color: #1ED760;
-    }
-    .footer-icon-button:hover {
-        color: #1ED760;
-    }
-    #sort-play-chat-panel {
-        position: fixed;
-        width: 380px;
-        height: 60vh;
-        max-height: 600px;
-        background-color: #181818;
-        border: 2px solid #282828;
-        border-radius: 15px;
-        z-index: 9999;
-        opacity: 0;
-        transform: translateY(20px);
-        transition: transform 0.2s ease-in-out, opacity 0.05s ease-in-out;
-        display: flex;
-        flex-direction: column;
-        box-shadow: 0 16px 24px rgba(0,0,0,.3), 0 6px 8px rgba(0,0,0,.2);
-        pointer-events: none;
-    }
-    #sort-play-chat-panel.visible {
-        opacity: 1;
-        transform: translateY(0);
-        pointer-events: auto;
-    }
-    #sort-play-chat-panel iframe {
-        width: 100%;
-        height: 100%;
-        border: none;
-        border-radius: 13px;
-    }
-    .sort-play-settings .col {
-        padding: 0;
-    }
-    .sort-play-settings .setting-row::after {
-        content: "";
-        display: table;
-        clear: both;
-    }
-    .sort-play-settings .setting-row {
-        padding: 5px 0;
-        align-items: center;
-    }
-    .sort-play-settings .setting-row .col.description {
-        float: left;
-        padding-right: 15px;
-        width: auto;
-        color: #c1c1c1;
-        font-family: 'SpotifyMixUI' !important;
-    }
-    .sort-play-settings .setting-row .col.action {
-      display: flex;  
-      float: right;
-      align-items: center;
-      justify-content: flex-end;
-      text-align: right;
-      gap: 8px;
-      position: relative;
-    }
-    .sort-play-settings select {
-        padding: 2px 8px;
-        border-radius: 15px;
-        border: 1px solid #434343;
-        background: #282828;
-        color: white;
-        cursor: pointer;
-        font-size: 13px;
-        max-width: 120px;
-    }
-    .sort-play-settings select.column-type-select {
-        flex-grow: 1;
-        margin-right: 10px;
-        width: 120px;
-    }
-    .sort-play-settings select:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
-    .column-settings-button {
-        background: none; border: none; margin: 0; cursor: pointer; display: flex;
-        align-items: center; justify-content: center; width: 24px; height: 24px;
-        opacity: 0.7; transition: opacity 0.2s;
-    }
-    .column-settings-button:hover { opacity: 1; }
-    .column-settings-button svg { width: 16px; height: 16px; fill: #b3b3b3; }
-    .column-settings-button:hover svg { fill: #ffffff; }
-    .column-settings-button:disabled { opacity: 0.3; cursor: not-allowed; }
-    .column-settings-dropdown {
-        display: none; position: absolute; background-color: #282828; min-width: 140px;
-        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px;
-        padding: 4px 0; left: -55px;
-        overflow-y: auto;
-        scrollbar-width: thin; 
-        scrollbar-color: #555 #282828;
-    }
-    .column-settings-dropdown::-webkit-scrollbar { width: 8px; }
-    .column-settings-dropdown::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
-    .column-settings-dropdown::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #282828; }
-    .column-settings-dropdown::-webkit-scrollbar-thumb:hover { background-color: #777; }
-    .column-settings-dropdown button {
-        color: #b3b3b3; padding: 6px 12px; text-decoration: none; display: block;
-        width: 100%; text-align: left; background: none; border: none; cursor: pointer;
-        font-size: 13px;
-    }
-    .column-settings-dropdown button:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
-    .column-settings-dropdown button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
-
-    .sort-play-settings .setting-row#githubLink {
-        display: flex;
-        justify-content: center;
-        margin-top: 5px;
-    }
-
-    .sort-play-settings .setting-row#githubLink .col.description {
-        float: none;
-        text-align: center;
-        width: auto;
-        padding: 0;
-    }
-
-    .sort-play-settings .switch {
-        position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0;
-    }
-    .sort-play-settings .switch input { opacity: 0; width: 0; height: 0; }
-    .sort-play-settings .sliderx {
-        position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-        background-color: #484848; border-radius: 24px; transition: .2s;
-    }
-    .sort-play-settings .sliderx:before {
-        position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
-        background-color: white; border-radius: 50%; transition: .2s;
-    }
-    .sort-play-settings input:checked + .sliderx { background-color: #1DB954; }
-    .sort-play-settings input:checked + .sliderx:before { transform: translateX(16px); }
-    .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
-
-    .tooltip-container { position: relative; display: inline-block; vertical-align: middle;}
-
-    .custom-tooltip {
-        visibility: hidden; position: absolute; z-index: 1; background-color: #373737;
-        color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px;
-        max-width: 240px; width: max-content; bottom: 100%; left: 50%;
-        transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        line-height: 1.4; word-wrap: break-word;
-    }
-    .custom-tooltip::after {
-        content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
-        border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent;
-    }
-    .tooltip-container:hover .custom-tooltip { visibility: visible; }
-    .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
-    .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
-    .sort-play-settings .github-link-container {
-      display: flex;
-      justify-content: center;
-      margin-top: 10px;
-      padding-bottom: 10px;
-    }
-    .sort-play-settings .github-link-container a {
-        color: #1ED760;
-        font-size: 14px;
-        text-decoration: none;
-    }
-    .main-trackCreditsModal-closeBtn:hover { 
-        color: #ffffff; 
-    }
+      .main-trackCreditsModal-mainSection { overflow-y: auto !important; padding: 16px 45px 16px 45px; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #333333 #181818; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar { width: 8px; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar-track { background: #282828; border-radius: 4px; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb { background-color: #5a5a5a; border-radius: 4px; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb:hover { background-color: #7a7a7a; }
+      .sort-play-settings-footer { flex-shrink: 0; padding: 10px 25px 12px 25px; background-color: #181818; border-top: 1px solid #282828; display: flex; justify-content: center; align-items: center; position: relative; }
+      .sort-play-settings-footer .live-chat-button { position: absolute; right: 25px; }
+      .sort-play-settings-footer .support-me-button { position: absolute; left: 25px; }
+      .sort-play-settings-footer .github-link-container a { color: #1ED760; font-size: 14px; text-decoration: none; }
+      .footer-icon-button { background: none; border: none; cursor: pointer; padding: 0; color: white; display: flex; align-items: center; transition: color 0.1s ease-in-out; }
+      .footer-icon-button.active { color: #1ED760; }
+      .footer-icon-button:hover { color: #1ED760; }
+      .sort-play-settings .col { padding: 0; }
+      .sort-play-settings .setting-row::after { content: ""; display: table; clear: both; }
+      .sort-play-settings .setting-row { padding: 5px 0; align-items: center; }
+      .sort-play-settings .setting-row .col.description { float: left; padding-right: 15px; width: auto; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
+      .sort-play-settings .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
+      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 120px; }
+      .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 10px; width: 120px; }
+      .sort-play-settings select:disabled { opacity: 0.5; cursor: not-allowed; }
+      .column-settings-button { background: none; border: none; margin: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; opacity: 0.7; transition: opacity 0.2s; }
+      .column-settings-button:hover { opacity: 1; }
+      .column-settings-button svg { width: 16px; height: 16px; fill: #b3b3b3; }
+      .column-settings-button:hover svg { fill: #ffffff; }
+      .column-settings-button:disabled { opacity: 0.3; cursor: not-allowed; }
+      .column-settings-dropdown { display: none; position: absolute; background-color: #282828; min-width: 140px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2); z-index: 1001; border-radius: 4px; padding: 4px 0; left: -55px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 #282828; }
+      .column-settings-dropdown::-webkit-scrollbar { width: 8px; }
+      .column-settings-dropdown::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
+      .column-settings-dropdown::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #282828; }
+      .column-settings-dropdown::-webkit-scrollbar-thumb:hover { background-color: #777; }
+      .column-settings-dropdown button { color: #b3b3b3; padding: 6px 12px; text-decoration: none; display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-size: 13px; }
+      .column-settings-dropdown button:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
+      .column-settings-dropdown button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
+      .sort-play-settings .setting-row#githubLink { display: flex; justify-content: center; margin-top: 5px; }
+      .sort-play-settings .setting-row#githubLink .col.description { float: none; text-align: center; width: auto; padding: 0; }
+      .sort-play-settings .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+      .sort-play-settings .switch input { opacity: 0; width: 0; height: 0; }
+      .sort-play-settings .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+      .sort-play-settings .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+      .sort-play-settings input:checked + .sliderx { background-color: #1DB954; }
+      .sort-play-settings input:checked + .sliderx:before { transform: translateX(16px); }
+      .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
+      .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
+      .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
+      .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+      .tooltip-container:hover .custom-tooltip { visibility: visible; }
+      .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
+      .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
+      .sort-play-settings .github-link-container { display: flex; justify-content: center; margin-top: 10px; padding-bottom: 10px; }
+      .sort-play-settings .github-link-container a { color: #1ED760; font-size: 14px; text-decoration: none; }
+      .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
     </style>
     ${headerHtml}
     <div class="main-trackCreditsModal-mainSection">
@@ -2330,7 +2679,7 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Column Settings
+        Extra Column Settings
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
@@ -2780,6 +3129,22 @@
         </div>
     </div>
 
+    <div class="setting-row" id="discographyWarningSetting">
+        <label class="col description">
+            Check for Existing Artist Playlists
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Warns you if a playlist for this artist already exists in your library. If disabled, a new playlist will always be created.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="showArtistDiscographyDuplicateWarningToggle" ${showArtistDiscographyDuplicateWarning ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Dedicated Playlist Creation
     </div>
@@ -2883,6 +3248,19 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
+    <div class="setting-row" id="manageLfmOverridesSetting" style="display: flex; align-items: center; width: 100%; justify-content: space-between; padding: 5px 0;">
+        <label class="col description" style="float: none; flex: 1; display: flex; align-items: center; margin: 0; padding-right: 15px;">
+            Manage Track Overrides
+            <span class="tooltip-container" style="display: inline-flex; align-items: center; margin-left: 4px;">
+                ${infoIconSvg.replace('margin-bottom: 4px;', 'margin-bottom: -2px;')}
+                <span class="custom-tooltip">View, export, or clear manually fixed Last.fm track links.</span>
+            </span>
+        </label>
+        <div class="col action" style="float: none; margin-left: auto; display: flex; align-items: center;">
+            <button id="manageLfmOverridesBtn" class="main-buttons-button main-button-secondary" style="padding: 5px 15px; border-radius: 20px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; background-color: transparent; transition: background-color 0.2s;">Manage</button>
+        </div>
+    </div>
+    
     <div class="setting-row" id="lastFmAutocorrectSetting">
         <label class="col description">
             Last.fm Autocorrect
@@ -2898,6 +3276,8 @@
             </label>
         </div>
     </div>
+
+    
     </div>
     </div>
     <div class="sort-play-settings-footer">
@@ -2916,12 +3296,6 @@
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
 
-    requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-            overlay.style.opacity = "1";
-        });
-    });
-
     const liveChatBtn = modalContainer.querySelector("#liveChatBtn");
     const supportMeBtn = modalContainer.querySelector("#supportMeBtn");
 
@@ -2932,12 +3306,16 @@
     if (chatPanelVisible) {
         const chatPanel = createAndInitializeChatPanel();
         positionChatPanel(chatPanel);
-        setTimeout(() => {
-            const panel = document.getElementById('sort-play-chat-panel');
-            if (panel) panel.classList.add('visible');
-        }, 10);
         liveChatBtn.classList.add('active');
     }
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+            const chatPanel = document.getElementById('sort-play-chat-panel');
+            if (chatPanel) chatPanel.classList.add('visible');
+        });
+    });
 
     liveChatBtn.addEventListener("click", () => {
         toggleChatPanel();
@@ -2986,11 +3364,13 @@
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
     const lastFmAutocorrectToggle = modalContainer.querySelector("#lastFmAutocorrectToggle");
+    const manageLfmOverridesBtn = modalContainer.querySelector("#manageLfmOverridesBtn");
     const showLastFmContextMenuToggle = modalContainer.querySelector("#showLastFmContextMenuToggle");
     const showArtistDiscographyContextMenuToggle = modalContainer.querySelector("#showArtistDiscographyContextMenuToggle");
     const showShuffleContextMenuToggle = modalContainer.querySelector("#showShuffleContextMenuToggle");
     const artistDiscographySortSelect = modalContainer.querySelector("#artistDiscographySortSelect");
     const artistDiscographyDedupModeSelect = modalContainer.querySelector("#artistDiscographyDedupModeSelect");
+    const showArtistDiscographyDuplicateWarningToggle = modalContainer.querySelector("#showArtistDiscographyDuplicateWarningToggle");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
     const createPlaylistToggle = modalContainer.querySelector("#createPlaylistToggle");
     const createPlaylistSwitchLabel = modalContainer.querySelector("#createPlaylistSwitchLabel");
@@ -3026,6 +3406,12 @@
     const showNowPlayingDataToggle = modalContainer.querySelector("#showNowPlayingDataToggle");
     const nowPlayingSettingsBtn = modalContainer.querySelector("#nowPlayingSettingsBtn");
 
+    manageLfmOverridesBtn.addEventListener("click", () => {
+        showLfmOverridesManagerModal();
+    });
+    manageLfmOverridesBtn.addEventListener("mouseenter", () => manageLfmOverridesBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)");
+    manageLfmOverridesBtn.addEventListener("mouseleave", () => manageLfmOverridesBtn.style.backgroundColor = "transparent");
+    
     showLikeButtonToggle.addEventListener("change", () => {
         showLikeButton = showLikeButtonToggle.checked;
         saveSettings();
@@ -3228,18 +3614,8 @@
         showLastFmUsernameModal();
     });
 
-    setGeminiApiKeyButton.addEventListener("mouseenter", () => {
-        setGeminiApiKeyButton.style.backgroundColor = "#444444";
-    });
-    setGeminiApiKeyButton.addEventListener("mouseleave", () => {
-        setGeminiApiKeyButton.style.backgroundColor = "#333333";
-    });
-    setLastFmUsernameButton.addEventListener("mouseenter", () => {
-        setLastFmUsernameButton.style.backgroundColor = "#444444";
-    });
-    setLastFmUsernameButton.addEventListener("mouseleave", () => {
-        setLastFmUsernameButton.style.backgroundColor = "#333333";
-    });
+    addHoverEffect(setGeminiApiKeyButton, "#333333", "#444444");
+    addHoverEffect(setLastFmUsernameButton, "#333333", "#444444");
 
     lastFmAutocorrectToggle.addEventListener("change", async () => {
         lastFmAutocorrect = lastFmAutocorrectToggle.checked;
@@ -3273,6 +3649,11 @@
         saveSettings();
     });
 
+    showArtistDiscographyDuplicateWarningToggle.addEventListener("change", () => {
+        showArtistDiscographyDuplicateWarning = showArtistDiscographyDuplicateWarningToggle.checked;
+        saveSettings();
+    });
+    
     addToQueueToggle.addEventListener("change", () => {
         addToQueueEnabled = addToQueueToggle.checked;
         updateCreatePlaylistToggleState();
@@ -3667,6 +4048,2131 @@
     }, { signal: abortController.signal });
   }
 
+  function createAndInitializeChatPanel() {
+    let chatPanel = document.getElementById('sort-play-chat-panel');
+    if (chatPanel) {
+        return chatPanel;
+    }
+
+    chatPanel = document.createElement('div');
+    const chatPanelAbortController = new AbortController();
+    chatPanel.id = 'sort-play-chat-panel';
+    chatPanel.className = 'sort-play-font-scope';
+
+    chatPanel.innerHTML = `
+        <style>
+          #sort-play-chat-panel { display: flex; flex-direction: column; background-color: #181818; border: 2px solid #282828; border-radius: 30px; overflow: hidden; position: fixed; width: 380px; height: 75vh; max-height: 675px; z-index: 2004; box-shadow: 0 16px 24px rgba(0,0,0,.3), 0 6px 8px rgba(0,0,0,.2); opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
+          #sort-play-chat-panel.visible { opacity: 1; pointer-events: auto; }
+          .sp-chat-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #282828; background: #181818; }
+          .sp-chat-title-link { display: flex; align-items: center; gap: 6px; text-decoration: none !important; cursor: pointer; outline: none; }
+          .sp-chat-title-link:focus, .sp-chat-title-link:active { outline: none; }
+          .sp-chat-title-link:hover .sp-chat-title { text-decoration: underline !important; }
+          .sp-chat-title { color: white; font-weight: 700; font-size: 16px; text-decoration: none !important; pointer-events: none; }
+          .sp-chat-ext-icon { display: flex; align-items: center; color: #b3b3b3; width: 12px; height: 12px; }
+          .sp-chat-ext-icon svg { width: 100%; height: 100%; }
+          .sp-chat-header-btn { background: transparent; border: 1px solid #282828; color: #b3b3b3; border-radius: 12px; padding: 4px 10px; font-size: 11px; cursor: pointer; transition: background-color 0.2s, color 0.2s; font-weight: 600; }
+          .sp-chat-header-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+          #sp-chat-name-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; }
+          #sp-chat-name-box { background: #282828; border: 1px solid #3e3e3e; border-radius: 25px; padding: 20px; display: flex; flex-direction: column; gap: 12px; width: 260px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+          #sp-chat-name-input { background: #181818; border: 1px solid #555; color: white; padding: 8px 12px; border-radius: 6px; outline: none; font-size: 13px; font-family: inherit; }
+          #sp-chat-name-input:focus { border-color: #1db954; }
+          .sp-chat-messages-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #333333 transparent; min-height: 0; display: block; }
+          .sp-chat-messages { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; padding: 15px 12px 2px; box-sizing: border-box; }
+          .sp-chat-msg { position: relative; display: flex; flex-direction: row; width: 100%; padding-bottom: 12px; gap: 8px; align-items: flex-start; }
+          .sp-chat-msg:not(.sp-chat-msg-continued)::before { content: ''; position: absolute; top: 0; left: -8px; width: 9px; height: 12px; background-color: #282828; -webkit-mask-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M 9 0 L 0 0 C 4 0 9 8 9 12 Z'/%3E%3C/svg%3E"); -webkit-mask-repeat: no-repeat; mask-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M 9 0 L 0 0 C 4 0 9 8 9 12 Z'/%3E%3C/svg%3E"); mask-repeat: no-repeat; }
+          .sp-chat-msg.sp-chat-msg-me:not(.sp-chat-msg-continued)::before { background-color: #193222; }
+          .sp-chat-msg:hover, .sp-chat-msg:has(.sp-chat-actions.active) { z-index: 50; }
+          .sp-chat-msg.sp-chat-msg-group { padding-bottom: 4px; }
+          .sp-chat-msg.sp-chat-msg-group .sp-chat-bubble { border-bottom-left-radius: 6px; }
+          .sp-chat-msg.sp-chat-msg-continued .sp-chat-bubble { border-top-left-radius: 6px; }
+          .sp-chat-msg:not(.sp-chat-msg-continued) .sp-chat-bubble { border-top-left-radius: 0; }
+          .sp-chat-bubble { background: #282828; color: white; padding: 6px 10px; border-radius: 14px; font-size: 13px; line-height: 1.5; word-break: break-word; min-width: 60px; max-width: 85%; display: block; overflow: hidden; user-select: text; -webkit-user-select: text; }
+          .sp-chat-msg.sp-chat-msg-me .sp-chat-bubble { background: #193222; }
+          .sp-chat-author { font-size: 12px; color: #1db954; font-weight: 700; margin-bottom: 2px; line-height: 1.2; }
+          .sp-chat-reply-ref { border-left: 3px solid; padding: 4px 8px; border-radius: 5px; margin-bottom: 4px; display: flex; flex-direction: row; gap: 8px; align-items: center; overflow: hidden; }
+          .sp-chat-reply-content { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+          .sp-chat-reply-img-wrapper { position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e; flex-shrink: 0; margin-left: -2px; }
+          .sp-chat-reply-img { position: relative; z-index: 1; }
+          .sp-chat-reply-author { font-size: 11px; color: #1db954; font-weight: 700; margin-bottom: 1px; line-height: 1.2; }
+          .sp-chat-reply-text { font-size: 12px; color: #b3b3b3; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+          .sp-chat-text { margin-bottom: 0; display: block; }
+          .sp-chat-meta { float: right; display: inline-flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 5px; margin-left: 10px; }
+          .sp-chat-msg.image-only-msg .sp-chat-meta { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 2px 6px; margin: 0 -2px -2px 0; opacity: 0; transition: opacity 0.1s ease; pointer-events: none; z-index: 5; }
+          .sp-chat-msg.image-only-msg:hover .sp-chat-meta { opacity: 1; }
+          .sp-chat-msg.image-only-msg .sp-chat-meta .sp-chat-time, .sp-chat-msg.image-only-msg .sp-chat-meta .sp-chat-edited { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+          .sp-chat-msg.image-only-msg .sp-chat-status-icon svg { stroke: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+          .sp-chat-edited { font-size: 10px; color: rgba(255,255,255,0.4); }
+          .sp-chat-time { font-size: 10px; color: #888; }
+          .sp-chat-status-icon { display: flex; align-items: center; justify-content: center; }
+          .sp-chat-status-icon svg { width: 10px; height: 10px; stroke: #888; opacity: 0.8; display: block; margin-bottom: 2px; }
+          .sp-chat-msg:has(.sp-chat-actions.active) { z-index: 2000; }
+          .sp-chat-actions { position: relative; opacity: 0; transition: opacity 0.1s ease-in-out; flex-shrink: 0; margin-top: 2px; margin-left: -4px; z-index: 1; }
+          .sp-chat-msg:hover .sp-chat-actions { opacity: 1; z-index: 10; }
+          .sp-chat-actions.active { opacity: 1; z-index: 1000; }
+          .sp-chat-dots-btn { background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 5px 2px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s, color 0.2s; }
+          .sp-chat-dots-btn:hover { color: white; background: rgba(255,255,255,0.1); }
+          .sp-chat-dots-btn svg { width: 16px; height: 16px; fill: currentColor; }
+          @keyframes spChatMenuFadeIn { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
+          .sp-chat-menu { display: none; position: absolute; right: 0; background: #282828; border: 1px solid #3e3e3e; border-radius: 6px; flex-direction: column; padding: 4px; gap: 2px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 100; min-width: 90px; }
+          .sp-chat-menu.show { display: flex; animation: spChatMenuFadeIn 0.1s ease forwards; pointer-events: auto; }
+          .sp-chat-menu.open-down { top: 100%; margin-top: 4px; transform-origin: top right; }
+          .sp-chat-menu.open-up { bottom: 100%; margin-bottom: 4px; transform-origin: bottom right; }
+          .sp-chat-action-btn { background: transparent; border: none; color: #b3b3b3; font-size: 12px; font-weight: 500; cursor: pointer; padding: 6px 10px; border-radius: 4px; transition: color 0.2s, background-color 0.2s; text-align: left; width: 100%; white-space: nowrap; }
+          .sp-chat-action-btn:hover { color: white; background-color: rgba(255,255,255,0.1); }
+          .sp-chat-action-btn.del-btn:hover { color: #e53935; background-color: rgba(229,57,53,0.1); }
+          .sp-chat-date-separator { display: flex; justify-content: center; margin: 4px 0 11px 0; width: 100%; }
+          .sp-chat-date-separator span { background: rgba(255,255,255,0.1); color: #b3b3b3; font-size: 11px; font-weight: 500; padding: 4px 10px; border-radius: 12px; }
+          .sp-chat-input-container { padding: 10px 12px; border-top: 1px solid #282828; background: #181818; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+          #sp-chat-reply-banner { display: flex; justify-content: space-between; align-items: center; background: #282828; padding: 8px 14px; border-radius: 8px; font-size: 12px; color: #1db954; font-weight: 500; }
+          #sp-chat-reply-cancel { background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 18px; line-height: 1; }
+          #sp-chat-reply-cancel:hover { color: white; }
+          .sp-chat-input-row { display: flex; gap: 5px; align-items: flex-end; position: relative; }
+          #sp-chat-input { flex: 1; background: #282828; border: 1px solid #333; border-radius: 20px; padding: 10px 16px 10px 42px; color: white; font-size: 13px; outline: none; transition: border-color 0.2s; resize: none; overflow-y: hidden; height: 40px; min-height: 40px; max-height: 120px; font-family: inherit; line-height: 1.4; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: #333333 transparent; }
+          #sp-chat-upload-btn { position: absolute; left: 6px; bottom: 4px; background: transparent; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #b3b3b3; transition: color 0.2s, background-color 0.2s; }
+          #sp-chat-upload-btn:hover { color: white; background: rgba(255, 255, 255, 0.1); }
+          #sp-chat-upload-btn svg { width: 18px; height: 18px; }
+          .sp-chat-attachment { width: calc(100% + 21px); max-width: calc(100% + 21px); height: auto; max-height: 275px; display: block; border-radius: 0; margin-top: 2px; margin-bottom: 6px; margin-left: -11px; margin-right: -10px; object-fit: contain; cursor: pointer; }
+          .sp-chat-attachment, .sp-chat-attachment-bg, .sp-chat-reply-img, .sp-chat-preview-img { user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
+          .sp-chat-attachment.lazy-attachment { filter: blur(16px); }
+          .sp-chat-reply-img.lazy-attachment { filter: blur(4px); }
+          #sp-chat-input:focus { border-color: #555; }
+          #sp-chat-send-btn { background: transparent; border: none; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0; transition: background-color 0.2s; margin-bottom: 1px; }
+          #sp-chat-send-btn:hover { background: rgba(255, 255, 255, 0.1); }
+          #sp-chat-send-btn:active { background: rgba(255, 255, 255, 0.15); }
+          #sp-chat-send-btn:disabled { background: transparent; cursor: not-allowed; opacity: 0.5; }
+          #sp-chat-send-btn:disabled svg path { stroke: #888; }
+          #sp-chat-send-btn svg { margin-right: -2px; }
+          #sp-chat-del-overlay { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #282828; border: 1px solid #3e3e3e; border-radius: 25px; z-index: 1000; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 20px; box-shadow: 0 5px 15px 0px rgb(0 0 0 / 40%); }
+          .sp-chat-del-title { color: white; font-size: 14px; font-weight: 600; }
+          .sp-chat-del-btns { display: flex; gap: 10px; }
+          .sp-chat-del-btn-yes { background: #e53935; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 13px; }
+          .sp-chat-del-btn-yes:hover { background: #f44336; }
+          .sp-chat-del-btn-no { background: #444; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 13px; }
+          .sp-chat-del-btn-no:hover { background: #555; }
+          #sp-chat-upload-overlay-backdrop { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center; }
+          #sp-chat-upload-overlay-box { background: #1e1e1e; border: 2px dashed #3e3e3e; border-radius: 25px; padding: 30px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: 320px; box-sizing: border-box; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.5); transition: border-color 0.2s, background-color 0.2s; }
+          #sp-chat-upload-overlay-box.drag-over { border-color: #1db954; background: rgba(29, 185, 84, 0.1); }
+          .sp-chat-upload-icon-wrapper { display: flex; align-items: center; justify-content: center; color: #b3b3b3; margin-bottom: 4px; }
+          .sp-chat-upload-icon-wrapper svg { width: 42px; height: 42px; }
+          .sp-chat-upload-title { color: white; font-size: 15px; font-weight: 600; }
+          .sp-chat-upload-desc { color: #b3b3b3; font-size: 13px; margin-bottom: 8px; line-height: 1.4; text-align: center; }
+          .sp-chat-upload-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+          .sp-chat-upload-btn-browse { background: #1db954; color: black; border: none; padding: 8px 20px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 13px; transition: background-color 0.2s; }
+          .sp-chat-upload-btn-browse:hover { background: #1ed760; }
+          .sp-chat-upload-btn-paste { background: #333; color: white; border: none; padding: 8px 20px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 13px; transition: background-color 0.2s; }
+          .sp-chat-upload-btn-paste:hover { background: #444; }
+          .sp-chat-upload-btn-cancel { background: transparent; color: white; border: 1px solid #727272; padding: 7px 19px; border-radius: 20px; font-weight: 700; cursor: pointer; font-size: 13px; transition: background-color 0.2s, border-color 0.2s; }
+          .sp-chat-upload-btn-cancel:hover { background: rgba(255,255,255,0.1); border-color: white; }
+          #sp-chat-scroll-bottom-btn { position: absolute; bottom: 14px; right: 16px; width: 38px; height: 38px; border-radius: 50%; background-color: #282828; border: 1px solid #3e3e3e; color: #b3b3b3; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.2s ease, background-color 0.2s; }
+          #sp-chat-scroll-bottom-btn.show { opacity: 1; pointer-events: auto; }
+          #sp-chat-scroll-bottom-btn:hover { background-color: #3e3e3e; color: #fff; }
+          #sp-chat-scroll-bottom-btn svg { width: 24px; height: 24px; fill: currentColor; }
+          .sp-chat-reply-ref { cursor: pointer; }
+          @keyframes highlightFade { 0% { background-color: rgba(255, 255, 255, 0.15); } 100% { background-color: transparent; } }
+          .sp-chat-msg-highlight { z-index: 1; }
+          .sp-chat-msg-highlight::after { content: ''; position: absolute; top: 0; left: -12px; right: -12px; bottom: 12px; z-index: -1; pointer-events: none; animation: highlightFade 1.5s ease-out forwards; }
+          .sp-chat-msg-highlight.sp-chat-msg-group::after { bottom: 4px; }
+          @keyframes bubbleBgHighlightDefault { 0% { background-color: #555; } 100% { background-color: #282828; } }
+          @keyframes bubbleBgHighlightMe { 0% { background-color: #3b6b4b; } 100% { background-color: #193222; } }
+          .sp-chat-msg-highlight:not(.sp-chat-msg-me) .sp-chat-bubble, .sp-chat-msg-highlight:not(.sp-chat-msg-me)::before { animation: bubbleBgHighlightDefault 1.5s ease-out forwards; }
+          .sp-chat-msg-highlight.sp-chat-msg-me .sp-chat-bubble, .sp-chat-msg-highlight.sp-chat-msg-me::before { animation: bubbleBgHighlightMe 1.5s ease-out forwards; }
+          .sp-chat-msg-mentioned { z-index: 1; }
+          .sp-chat-msg-mentioned::after { content: ''; position: absolute; top: 0; left: -12px; right: -12px; bottom: 12px; z-index: -1; pointer-events: none; background-color: rgba(29, 185, 84, 0.05); }
+          .sp-chat-msg-mentioned.sp-chat-msg-group::after { bottom: 4px; }
+          @keyframes highlightFadeMentioned { 0% { background-color: rgba(255, 255, 255, 0.3); } 100% { background-color: rgba(255, 215, 0, 0.15); } }
+          .sp-chat-msg-highlight.sp-chat-msg-mentioned::after { animation: highlightFadeMentioned 1.5s ease-out forwards; }
+          .sp-chat-msg-gallery { display: grid; gap: 4px; width: calc(100% + 21px); margin-left: -11px; margin-right: -10px; overflow: hidden; }
+          .sp-chat-msg-gallery.count-2 > div, .sp-chat-msg-gallery.count-3 > div, .sp-chat-msg-gallery.count-4 > div, .sp-chat-msg-gallery.count-5 > div, .sp-chat-msg-gallery.count-6 > div { aspect-ratio: 1 / 1; width: 100%; height: 100%; }
+          .sp-chat-msg-gallery.count-3 > div:first-child, .sp-chat-msg-gallery.count-5 > div:first-child { grid-column: 1 / -1; aspect-ratio: 2 / 1; }
+          .sp-chat-msg-gallery.count-2, .sp-chat-msg-gallery.count-3, .sp-chat-msg-gallery.count-4, .sp-chat-msg-gallery.count-5, .sp-chat-msg-gallery.count-6 { grid-template-columns: 1fr 1fr; }
+          #sp-chat-attach-preview-list::-webkit-scrollbar { height: 4px; }
+          #sp-chat-attach-preview-list::-webkit-scrollbar-track { background: transparent; }
+          #sp-chat-attach-preview-list::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+        </style>
+
+        <div class="sp-chat-header">
+            <a href="https://sort-play-chat.pages.dev/" target="_blank" class="sp-chat-title-link" title="Open Web Version">
+                <span class="sp-chat-title">Sort-PLay Chat Room</span>
+                <span class="sp-chat-ext-icon">${externalLinkIconSvg}</span>
+            </a>
+            <button id="sp-chat-name-btn" class="sp-chat-header-btn">Change Name</button>
+        </div>
+        <div style="position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0;">
+            <div class="sp-chat-messages-scroll" id="sp-chat-scroll-container">
+                <div class="sp-chat-messages" id="sp-chat-msg-list">
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 15px;">
+                        <div class="sp-spinner-loader" style="width: 36px; height: 36px; border-width: 3px;"></div>
+                        <span style="color: #b3b3b3; font-size: 14px; font-weight: 500;">Connecting to chat...</span>
+                    </div>
+                </div>
+            </div>
+            <button id="sp-chat-scroll-bottom-btn" title="Scroll to bottom">
+                ${spinnerDownIconSvg}
+            </button>
+            <div id="sp-chat-upload-overlay-backdrop">
+                <div id="sp-chat-upload-overlay-box">
+                    <div class="sp-chat-upload-icon-wrapper">${chatUploadIconSvg}</div>
+                    <div class="sp-chat-upload-title">Attach an Image</div>
+                    <div class="sp-chat-upload-desc">Drag and drop an image here,<br>browse from your computer, or paste.</div>
+                    <div class="sp-chat-upload-btns">
+                        <button class="sp-chat-upload-btn-browse" id="sp-chat-upload-browse">Browse</button>
+                        <button class="sp-chat-upload-btn-paste" id="sp-chat-upload-paste">Paste</button>
+                        <button class="sp-chat-upload-btn-cancel" id="sp-chat-upload-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="sp-chat-input-container">
+            <div id="sp-chat-attach-banner" style="display:none; justify-content: space-between; align-items: center; background: #282828; padding: 8px 14px; border-radius: 8px; font-size: 12px; color: #1db954; font-weight: 500;">
+                <div id="sp-chat-attach-preview-list" style="display: flex; align-items: center; gap: 6px; overflow-x: auto; flex: 1; padding-bottom: 4px; margin-bottom: -4px;"></div>
+                <button id="sp-chat-attach-cancel" style="background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 18px; line-height: 1; flex-shrink: 0; margin-left: 12px;">&times;</button>
+            </div>
+            <div id="sp-chat-reply-banner" style="display:none;">
+                <div id="sp-chat-reply-text" style="flex: 1; overflow: hidden; display: flex; align-items: center;"></div>
+                <button id="sp-chat-reply-cancel" style="flex-shrink: 0; margin-left: 8px;">&times;</button>
+            </div>
+            <div class="sp-chat-input-row">
+                <button id="sp-chat-upload-btn" title="Attach Image">
+                    ${chatUploadIconSvg}
+                </button>
+                <textarea id="sp-chat-input" rows="1" placeholder="Messaging..." autocomplete="off" maxlength="2000"></textarea>
+                <button id="sp-chat-send-btn" title="Send">
+                    ${chatSendIconSvg}
+                </button>
+            </div>
+        </div>
+        <input type="file" id="sp-chat-file-input" accept="image/*" multiple style="display:none;">
+        
+        <div id="sp-chat-del-overlay">
+            <div class="sp-chat-del-title">Remove this message?</div>
+            <div class="sp-chat-del-btns">
+                <button class="sp-chat-del-btn-yes" id="sp-chat-del-yes">Delete</button>
+                <button class="sp-chat-del-btn-no" id="sp-chat-del-no">Cancel</button>
+            </div>
+        </div>
+
+        <div id="sp-chat-name-overlay">
+            <div id="sp-chat-name-box">
+                <div style="color: white; font-weight: 600; font-size: 14px;">Change Display Name</div>
+                <input type="text" id="sp-chat-name-input" placeholder="Enter new name..." maxlength="30" autocomplete="off">
+                <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+                    <button class="sp-chat-upload-btn-cancel" id="sp-chat-name-cancel" style="padding: 6px 14px;">Cancel</button>
+                    <button class="sp-chat-upload-btn-browse" id="sp-chat-name-save" style="padding: 6px 14px;">Save</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="sp-chat-drop-overlay" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(29, 185, 84, 0.15); border: 2px dashed #1db954; border-radius: 28px; z-index: 3000; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; margin: 4px;">
+            <span style="color: white; font-weight: bold; font-size: 18px; background: #282828; padding: 10px 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">Drop image to attach</span>
+        </div>
+    `;
+
+    document.body.appendChild(chatPanel);
+
+    document.addEventListener('click', (e) => {
+        const chatPanelRef = document.getElementById('sort-play-chat-panel');
+        if (!chatPanelRef) return;
+        chatPanelRef.querySelectorAll('.sp-chat-menu.show').forEach(m => {
+            if (!e.target.closest('.sp-chat-dots-btn')) {
+                m.classList.remove('show');
+                m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
+                m.closest('.sp-chat-actions').classList.remove('active');
+            }
+        });
+    }, { signal: chatPanelAbortController.signal });
+
+    document.addEventListener('contextmenu', (e) => {
+        const chatPanelRef = document.getElementById('sort-play-chat-panel');
+        if (!chatPanelRef) return;
+        if (!e.target.closest('.sp-chat-bubble')) {
+            chatPanelRef.querySelectorAll('.sp-chat-menu.show').forEach(m => {
+                m.classList.remove('show');
+                m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
+                m.closest('.sp-chat-actions').classList.remove('active');
+            });
+        }
+    }, { signal: chatPanelAbortController.signal });
+    
+    let deviceId = localStorage.getItem('sp-chat-device-id');
+    if (!deviceId) {
+        deviceId = 'dev-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem('sp-chat-device-id', deviceId);
+    }
+
+    let spotifyName = "Spotify User";
+    let spotifyUri = "spotify:user:unknown";
+    let customName = localStorage.getItem(STORAGE_KEY_CHAT_CUSTOM_NAME) || "";
+    let adminToken = localStorage.getItem('sp-chat-admin-token') || null;
+    let isAdmin = !!adminToken;
+    let replyingTo = null;
+    let editingId = null;
+    let serverMessages = [];
+    let currentETag = null;
+    let hasMoreMessages = true;
+    let isFetchingOlder = false;
+    let jumpBackId = null;
+    let jumpBackTimer = null;
+
+    const updateScrollBtnState = () => {
+        const btn = chatPanel.querySelector('#sp-chat-scroll-bottom-btn');
+        if (!btn) return;
+        const dist = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
+        
+        if (jumpBackId) {
+            const sourceEl = scrollContainer.querySelector(`.sp-chat-msg[data-id="${jumpBackId}"]`);
+            if (sourceEl) {
+                const rect = sourceEl.getBoundingClientRect();
+                const containerRect = scrollContainer.getBoundingClientRect();
+                if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) {
+                    jumpBackId = null;
+                    if (jumpBackTimer) clearTimeout(jumpBackTimer);
+                }
+            }
+        }
+        
+        if (dist < 10) {
+            jumpBackId = null;
+            if (jumpBackTimer) clearTimeout(jumpBackTimer);
+        }
+        
+        if (jumpBackId) {
+            btn.classList.add('show');
+        } else {
+            if (dist > 200) btn.classList.add('show');
+            else btn.classList.remove('show');
+        }
+    };
+
+    let anonId = localStorage.getItem('sp-chat-anon-id');
+    if (!anonId) {
+        anonId = Math.floor(1000 + Math.random() * 9000);
+        localStorage.setItem('sp-chat-anon-id', anonId);
+    }
+
+    const input = chatPanel.querySelector('#sp-chat-input');
+    let isChatLoaded = false;
+    let queuedMessages = [];
+
+    const updatePlaceholder = () => {
+        input.placeholder = `Messaging as ${getCurrentName()}...`;
+    };
+
+    Spicetify.Platform.UserAPI.getUser().then(user => {
+        if (user.displayName || user.username) spotifyName = user.displayName || user.username;
+        spotifyUri = user.uri || user.username || "unknown";
+        updatePlaceholder();
+    }).catch(() => updatePlaceholder());
+
+    const getCurrentName = () => customName || spotifyName || `anonymous`;
+    const getCurrentAuthorId = () => spotifyUri && spotifyUri !== "unknown" ? spotifyUri : `anon-${anonId}`;
+
+    const stringToColor = (str, alpha = 1, isAdmin = false) => {
+        if (isAdmin) return alpha === 1 ? '#1db954' : `rgba(29, 185, 84, ${alpha})`;
+        if (!str) return alpha === 1 ? '#1db954' : `rgba(29, 185, 84, ${alpha})`;
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        const hue = Math.abs(hash) % 360;
+        return `hsla(${hue}, 70%, 65%, ${alpha})`; 
+    };
+
+    const getDiscriminator = (str) => {
+        if (!str) return '0000';
+        if (str.startsWith('anon-')) return str.split('-')[1].padStart(4, '0').substring(0, 4);
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0;
+        }
+        return Math.abs(hash).toString().substring(0, 4).padStart(4, '0');
+    };
+    
+    const fetchWithRetry = async (url, options, maxRetries = 6) => {
+        let delay = 1000;
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const res = await fetch(url, options);
+                if (res.ok || (res.status >= 400 && res.status < 500)) return res;
+            } catch (err) {
+                if (i === maxRetries - 1) throw err;
+            }
+            await new Promise(r => setTimeout(r, delay));
+            delay = Math.min(delay * 1.5, 10000);
+        }
+        throw new Error("Max retries reached");
+    };
+
+    const isSameDate = (ts1, ts2) => {
+        const d1 = new Date(ts1);
+        const d2 = new Date(ts2);
+        return d1.getFullYear() === d2.getFullYear() &&
+               d1.getMonth() === d2.getMonth() &&
+               d1.getDate() === d2.getDate();
+    };
+    
+    const scrollContainer = chatPanel.querySelector('#sp-chat-scroll-container');
+    const msgList = chatPanel.querySelector('#sp-chat-msg-list');
+
+    const imageCache = new Map();
+    const fetchingCache = new Set();
+    const attachmentQueue = [];
+    let attachmentTimer = null;
+
+    const processAttachmentQueue = async () => {
+        if (attachmentQueue.length === 0) return;
+        const idsToFetch = attachmentQueue.splice(0, 30);
+        
+        try {
+            const res = await fetch(`${CHAT_API_URL}/attachments?ids=${idsToFetch.join(',')}`);
+            if (res.ok) {
+                const map = await res.json();
+                for (const id of idsToFetch) {
+                    if (map[id]) {
+                        const urls = Array.isArray(map[id]) ? map[id] : [map[id]];
+                        imageCache.set(id, urls);
+                        
+                        urls.forEach((url, idx) => {
+                            const img = new Image();
+                            img.src = url;
+                            
+                            const applyImages = () => {
+                                msgList.querySelectorAll(`img[data-id="${id}"][data-index="${idx}"]`).forEach(imgEl => {
+                                    if (imgEl.classList.contains('sp-chat-attachment') || imgEl.classList.contains('sp-chat-reply-img')) {
+                                        imgEl.style.transition = 'filter 0.4s ease-out';
+                                        imgEl.src = url;
+                                        imgEl.classList.remove('lazy-attachment');
+                                        setTimeout(() => { imgEl.style.transition = ''; }, 400);
+                                    } else {
+                                        imgEl.src = url;
+                                        imgEl.classList.remove('lazy-attachment');
+                                    }
+                                });
+                            };
+
+                            if ('decode' in img) {
+                                img.decode().then(applyImages).catch(() => applyImages());
+                            } else {
+                                img.onload = applyImages;
+                            }
+                        });
+                    }
+                    fetchingCache.delete(id);
+                }
+            } else {
+                idsToFetch.forEach(id => fetchingCache.delete(id));
+            }
+        } catch(e) {
+            idsToFetch.forEach(id => fetchingCache.delete(id));
+        }
+        
+        if (attachmentQueue.length > 0) {
+            attachmentTimer = setTimeout(processAttachmentQueue, 100);
+        }
+    };
+
+    const attachmentObserver = new IntersectionObserver((entries) => {
+        let triggered = false;
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const id = entry.target.dataset.id;
+                if (id && !imageCache.has(id) && !fetchingCache.has(id)) {
+                    fetchingCache.add(id);
+                    attachmentQueue.push(id);
+                    triggered = true;
+                }
+                attachmentObserver.unobserve(entry.target);
+            }
+        });
+        if (triggered) {
+            if (attachmentTimer) clearTimeout(attachmentTimer);
+            attachmentTimer = setTimeout(processAttachmentQueue, 100);
+        }
+    }, { root: scrollContainer, rootMargin: "300px" });
+    
+    const msgListResizeObserver = new ResizeObserver(() => {
+        if (!chatPanel.classList.contains('visible') || isFetchingOlder) return;
+        if (scrollContainer && scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 350) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+    });
+    msgListResizeObserver.observe(msgList);
+
+    function showImageViewer(imageSource, startIndex = 0) {
+        const images = Array.isArray(imageSource) ? imageSource : [imageSource];
+        let currentIndex = startIndex;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'sp-chat-image-viewer-overlay';
+        overlay.className = 'sort-play-font-scope';
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+            z-index: 20000; display: flex; justify-content: center; align-items: center;
+            opacity: 0; transition: opacity 0.2s ease;
+        `;
+
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            width: 65vw; height: 90vh; max-width: 80vw; max-height: 90vh;
+            background: #181818; border-radius: 30px; border: 2px solid #282828;
+            display: flex; flex-direction: column; overflow: hidden; position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        `;
+
+        modal.innerHTML = `
+            <style>
+                #sp-chat-iv-body { flex: 1; overflow: hidden; background: #0e0e0e; display: flex; justify-content: center; align-items: center; position: relative; }
+                #sp-chat-iv-img { max-width: 100%; max-height: 100%; object-fit: contain; cursor: zoom-in; transition: transform 0.2s ease; user-select: none; -webkit-user-drag: none; }
+                #sp-chat-iv-img.zoomed { cursor: grab; transition: none; }
+                #sp-chat-iv-img.zoomed:active { cursor: grabbing; }
+                .sp-chat-iv-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.5); border: none; color: white; font-size: 20px; font-weight: bold; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 10; transition: background 0.2s; user-select: none; }
+                .sp-chat-iv-nav:hover:not(:disabled) { background: rgba(0,0,0,0.8); }
+                .sp-chat-iv-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+                #sp-chat-iv-prev { left: 16px; }
+                #sp-chat-iv-next { right: 16px; }
+            </style>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid #282828; background: #181818; flex-shrink: 0; z-index: 2;">
+                <span style="color: white; font-weight: 700; font-size: 16px;">Image Preview</span>
+                <button id="sp-chat-iv-close" style="background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.2s ease;">
+                    ${closeIcon24Svg}
+                </button>
+            </div>
+            <div id="sp-chat-iv-body">
+                <button id="sp-chat-iv-prev" class="sp-chat-iv-nav">&lt;</button>
+                <img id="sp-chat-iv-img">
+                <button id="sp-chat-iv-next" class="sp-chat-iv-nav">&gt;</button>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+        
+        const closeBtn = modal.querySelector('#sp-chat-iv-close');
+        const img = modal.querySelector('#sp-chat-iv-img');
+        const body = modal.querySelector('#sp-chat-iv-body');
+        const prevBtn = modal.querySelector('#sp-chat-iv-prev');
+        const nextBtn = modal.querySelector('#sp-chat-iv-next');
+
+        requestAnimationFrame(() => {
+            overlay.style.opacity = '1';
+        });
+
+        const closeViewer = () => {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.remove(), 200);
+        };
+
+        closeBtn.addEventListener('click', closeViewer);
+        closeBtn.addEventListener('mouseenter', () => closeBtn.style.color = '#fff');
+        closeBtn.addEventListener('mouseleave', () => closeBtn.style.color = '#b3b3b3');
+        
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) closeViewer();
+        });
+
+        let isZoomed = false;
+        let scale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let lastTranslateX = 0;
+        let lastTranslateY = 0;
+        let isDragging = false;
+        let startX, startY;
+
+        const updateTransform = (animate = false) => {
+            img.style.transition = animate ? 'transform 0.2s ease' : 'none';
+            img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        };
+
+        const updateNav = () => {
+            img.src = images[currentIndex];
+            if (isZoomed) {
+                isZoomed = false;
+                img.classList.remove('zoomed');
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+                updateTransform(false);
+            }
+            if (images.length > 1) {
+                prevBtn.style.display = 'flex';
+                nextBtn.style.display = 'flex';
+                prevBtn.disabled = currentIndex === 0;
+                nextBtn.disabled = currentIndex === images.length - 1;
+            } else {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+            }
+        };
+
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateNav();
+            }
+        });
+
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (currentIndex < images.length - 1) {
+                currentIndex++;
+                updateNav();
+            }
+        });
+
+        updateNav();
+
+        img.addEventListener('click', (e) => {
+            if (isDragging) return;
+
+            isZoomed = !isZoomed;
+            if (isZoomed) {
+                img.classList.add('zoomed');
+                scale = 2.5;
+                
+                const rect = body.getBoundingClientRect();
+                const mx = e.clientX - rect.left - rect.width / 2;
+                const my = e.clientY - rect.top - rect.height / 2;
+                
+                translateX = -mx * (scale - 1);
+                translateY = -my * (scale - 1);
+            } else {
+                img.classList.remove('zoomed');
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+            }
+            lastTranslateX = translateX;
+            lastTranslateY = translateY;
+            updateTransform(true);
+        });
+
+        img.addEventListener('mousedown', (e) => {
+            if (!isZoomed) return;
+            e.preventDefault();
+            isDragging = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            const onMouseMove = (moveEvent) => {
+                const dx = moveEvent.clientX - startX;
+                const dy = moveEvent.clientY - startY;
+                
+                if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+                    isDragging = true;
+                }
+                
+                if (isDragging) {
+                    translateX = lastTranslateX + dx;
+                    translateY = lastTranslateY + dy;
+                    updateTransform(false);
+                }
+            };
+
+            const onMouseUp = () => {
+                lastTranslateX = translateX;
+                lastTranslateY = translateY;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                
+                if (isDragging) {
+                    setTimeout(() => isDragging = false, 0);
+                }
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    }
+
+    msgList.addEventListener('click', async (e) => {
+        const replyRef = e.target.closest('.sp-chat-reply-ref');
+        if (replyRef) {
+            if (replyRef.dataset.isDeleted === "true") return;
+            const targetId = replyRef.dataset.replyId;
+            if (!targetId) return;
+
+            const msgEl = e.target.closest('.sp-chat-msg');
+            const sourceId = msgEl ? msgEl.dataset.id : null;
+            
+            if (sourceId) {
+                jumpBackId = sourceId;
+                if (jumpBackTimer) clearTimeout(jumpBackTimer);
+                jumpBackTimer = setTimeout(() => {
+                    jumpBackId = null;
+                    if (typeof updateScrollBtnState === 'function') updateScrollBtnState();
+                }, 60000);
+            }
+            if (typeof updateScrollBtnState === 'function') updateScrollBtnState();
+            
+            const scrollToMessageAndHighlight = (id) => {
+                const el = scrollContainer.querySelector(`.sp-chat-msg[data-id="${id}"]`);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    el.classList.remove('sp-chat-msg-highlight');
+                    void el.offsetWidth;
+                    el.classList.add('sp-chat-msg-highlight');
+                }
+            };
+
+            if (serverMessages.some(m => m.id === targetId)) {
+                scrollToMessageAndHighlight(targetId);
+            } else {
+                document.body.style.cursor = 'wait';
+                const loadMoreEl = msgList.querySelector('#sp-chat-load-more');
+                if (loadMoreEl) loadMoreEl.style.display = 'flex';
+                
+                try {
+                    const res = await fetch(`${CHAT_API_URL}/jump?id=${targetId}`);
+                    if (res.ok) {
+                        const jumpedMsgs = await res.json();
+                        if (jumpedMsgs.length > 0) {
+                            const newMsgs = jumpedMsgs.filter(jm => !serverMessages.some(sm => sm.id === jm.id));
+                            serverMessages = [...newMsgs, ...serverMessages].sort((a, b) => a.timestamp - b.timestamp);
+                        }
+                    }
+                } catch(err) { console.error("Failed to jump to message", err); }
+                
+                document.body.style.cursor = '';
+                
+                const currentScrollTop = scrollContainer.scrollTop;
+                const currentScrollHeight = scrollContainer.scrollHeight;
+                renderMessages(true);
+                
+                if (serverMessages.some(m => m.id === targetId)) {
+                    setTimeout(() => {
+                        scrollToMessageAndHighlight(targetId);
+                        if (typeof updateScrollBtnState === 'function') updateScrollBtnState();
+                    }, 50);
+                } else {
+                    scrollContainer.scrollTop = currentScrollTop + (scrollContainer.scrollHeight - currentScrollHeight);
+                    jumpBackId = null;
+                    if (jumpBackTimer) clearTimeout(jumpBackTimer);
+                    if (typeof updateScrollBtnState === 'function') updateScrollBtnState();
+                }
+            }
+            return;
+        }
+
+        if ((e.target.classList.contains('sp-chat-attachment') || e.target.classList.contains('sp-chat-attachment-bg')) && !e.target.classList.contains('lazy-attachment')) {
+            const msgEl = e.target.closest('.sp-chat-msg');
+            const msgId = msgEl ? msgEl.dataset.id : null;
+            let images = [];
+            if (msgId && imageCache.has(msgId)) {
+                const cached = imageCache.get(msgId);
+                images = Array.isArray(cached) ? cached : [cached];
+            } else if (msgEl) {
+                const imgEls = Array.from(msgEl.querySelectorAll('.sp-chat-attachment'));
+                images = imgEls.map(img => img.src);
+            } else {
+                images = [e.target.src];
+            }
+            const startIndex = parseInt(e.target.dataset.index || "0", 10);
+            showImageViewer(images, startIndex);
+        }
+    });
+
+    msgList.addEventListener('contextmenu', (e) => {
+        const bubble = e.target.closest('.sp-chat-bubble');
+        if (!bubble) return;
+        
+        const selection = window.getSelection();
+        if (selection.toString().length > 0) return;
+
+        e.preventDefault();
+        
+        const msgEl = bubble.closest('.sp-chat-msg');
+        if (!msgEl) return;
+        const menu = msgEl.querySelector('.sp-chat-menu');
+        if (!menu) return;
+
+        const chatPanelRef = document.getElementById('sort-play-chat-panel');
+        if (chatPanelRef) {
+            chatPanelRef.querySelectorAll('.sp-chat-menu.show').forEach(m => {
+                m.classList.remove('show');
+                m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
+                const actions = m.closest('.sp-chat-actions');
+                if (actions) actions.classList.remove('active');
+            });
+        }
+
+        const imgTarget = e.target.closest('.sp-chat-attachment, .sp-chat-attachment-bg');
+        const copyImgBtn = menu.querySelector('.copy-img-btn');
+        const dlImgBtn = menu.querySelector('.dl-img-btn');
+        
+        if (copyImgBtn && dlImgBtn) {
+            const gallery = msgEl.querySelector('.sp-chat-msg-gallery');
+            if (imgTarget) {
+                const idx = imgTarget.dataset.index || "0";
+                copyImgBtn.style.display = 'block';
+                copyImgBtn.dataset.index = idx;
+                dlImgBtn.style.display = 'block';
+                dlImgBtn.dataset.index = idx;
+            } else {
+                if (gallery) {
+                    copyImgBtn.style.display = 'none';
+                    dlImgBtn.style.display = 'none';
+                } else {
+                    copyImgBtn.style.display = 'block';
+                    copyImgBtn.dataset.index = "0";
+                    dlImgBtn.style.display = 'block';
+                    dlImgBtn.dataset.index = "0";
+                }
+            }
+        }
+
+        menu.style.position = 'fixed';
+        menu.style.visibility = 'hidden';
+        menu.classList.add('show');
+        const menuRect = menu.getBoundingClientRect();
+        menu.style.visibility = '';
+        
+        let left = e.clientX;
+        let top = e.clientY;
+        
+        if (left + menuRect.width > window.innerWidth) left = e.clientX - menuRect.width;
+        if (top + menuRect.height > window.innerHeight) {
+            top = e.clientY - menuRect.height;
+            menu.classList.add('open-up');
+            menu.classList.remove('open-down');
+        } else {
+            menu.classList.add('open-down');
+            menu.classList.remove('open-up');
+        }
+        
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+        menu.style.right = 'auto';
+        menu.style.bottom = 'auto';
+        
+        msgEl.querySelector('.sp-chat-actions').classList.add('active');
+    });
+
+    const sendBtn = chatPanel.querySelector('#sp-chat-send-btn');
+    const replyBanner = chatPanel.querySelector('#sp-chat-reply-banner');
+    const replyText = chatPanel.querySelector('#sp-chat-reply-text');
+    const replyCancel = chatPanel.querySelector('#sp-chat-reply-cancel');
+
+    const delOverlay = chatPanel.querySelector('#sp-chat-del-overlay');
+    const delYes = chatPanel.querySelector('#sp-chat-del-yes');
+    const delNo = chatPanel.querySelector('#sp-chat-del-no');
+    let messageToDelete = null;
+
+    const nameBtn = chatPanel.querySelector('#sp-chat-name-btn');
+    const nameOverlay = chatPanel.querySelector('#sp-chat-name-overlay');
+    const nameInput = chatPanel.querySelector('#sp-chat-name-input');
+    const nameSave = chatPanel.querySelector('#sp-chat-name-save');
+    const nameCancel = chatPanel.querySelector('#sp-chat-name-cancel');
+
+    let pendingAttachments = [];
+    const fileInput = chatPanel.querySelector('#sp-chat-file-input');
+    const uploadBtn = chatPanel.querySelector('#sp-chat-upload-btn');
+    const attachBanner = chatPanel.querySelector('#sp-chat-attach-banner');
+    const attachPreviewList = chatPanel.querySelector('#sp-chat-attach-preview-list');
+    const attachCancel = chatPanel.querySelector('#sp-chat-attach-cancel');
+
+    const uploadOverlayBackdrop = chatPanel.querySelector('#sp-chat-upload-overlay-backdrop');
+    const uploadOverlayBox = chatPanel.querySelector('#sp-chat-upload-overlay-box');
+    const uploadBrowse = chatPanel.querySelector('#sp-chat-upload-browse');
+    const uploadPaste = chatPanel.querySelector('#sp-chat-upload-paste');
+    const uploadCancel = chatPanel.querySelector('#sp-chat-upload-cancel');
+
+    nameBtn.addEventListener('click', () => {
+        nameInput.value = customName || spotifyName || "";
+        nameOverlay.style.display = 'flex';
+        nameInput.focus();
+    });
+
+    nameCancel.addEventListener('click', () => {
+        nameOverlay.style.display = 'none';
+    });
+
+    nameSave.addEventListener('click', async () => {
+        const newName = nameInput.value.trim();
+        
+        if (newName.startsWith('7')) {
+            try {
+                nameSave.disabled = true;
+                const res = await fetch(`${CHAT_API_URL}/auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: newName })
+                });
+                nameSave.disabled = false;
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        adminToken = newName;
+                        isAdmin = true;
+                        localStorage.setItem('sp-chat-admin-token', adminToken);
+                        
+                        customName = data.adminName;
+                        localStorage.setItem(STORAGE_KEY_CHAT_CUSTOM_NAME, customName);
+                        
+                        updatePlaceholder();
+                        nameOverlay.style.display = 'none';
+                        renderMessages();
+                        return;
+                    }
+                }
+            } catch(e) {
+                nameSave.disabled = false;
+            }
+        }
+
+        if (newName) {
+            customName = newName;
+            localStorage.setItem(STORAGE_KEY_CHAT_CUSTOM_NAME, customName);
+        } else {
+            customName = "";
+            localStorage.removeItem(STORAGE_KEY_CHAT_CUSTOM_NAME);
+        }
+        
+        adminToken = null;
+        isAdmin = false;
+        localStorage.removeItem('sp-chat-admin-token');
+        
+        updatePlaceholder();
+        nameOverlay.style.display = 'none';
+        renderMessages();
+    });
+
+    nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') nameSave.click();
+        if (e.key === 'Escape') nameCancel.click();
+    });
+
+    uploadBtn.addEventListener('click', () => {
+        uploadOverlayBackdrop.style.display = 'flex';
+    });
+
+    uploadPaste.addEventListener('click', async () => {
+        try {
+            const clipboardItems = await navigator.clipboard.read();
+            let files = [];
+            for (const clipboardItem of clipboardItems) {
+                const imageTypes = clipboardItem.types.filter(type => type.startsWith('image/'));
+                for (const type of imageTypes) {
+                    files.push(await clipboardItem.getType(type));
+                }
+            }
+            if (files.length > 0) {
+                await handleImageFiles(files);
+                uploadOverlayBackdrop.style.display = 'none';
+            } else {
+                alert("No image found in clipboard.");
+            }
+        } catch (err) {
+            console.error("Failed to read clipboard:", err);
+            alert("Unable to read clipboard. Please try using Ctrl+V or Cmd+V while focusing the chat.");
+        }
+    });
+
+    uploadCancel.addEventListener('click', () => {
+        uploadOverlayBackdrop.style.display = 'none';
+    });
+
+    uploadBrowse.addEventListener('click', () => {
+        uploadOverlayBackdrop.style.display = 'none';
+        fileInput.click();
+    });
+
+    const updateAttachBannerUI = () => {
+        if (pendingAttachments.length === 0) {
+            attachBanner.style.display = 'none';
+            return;
+        }
+        
+        attachPreviewList.innerHTML = '';
+        pendingAttachments.forEach((att, index) => {
+            const item = document.createElement('div');
+            
+            let imgRatio = (att.width && att.height) ? (att.width / att.height) : 1;
+            let sizingStyle = imgRatio > 1 
+                ? "height: 100%; width: auto; max-width: none;" 
+                : "width: 100%; height: auto; max-height: none;";
+                
+            item.style.cssText = 'position: relative; width: 44px; height: 44px; border-radius: 6px; overflow: hidden; flex-shrink: 0; border: 1px solid #3e3e3e; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e;';
+            item.innerHTML = `
+                <img src="${att.url}" class="sp-chat-preview-img" style="${sizingStyle} cursor: pointer; position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset;" />
+                <button class="remove-attach-btn" data-index="${index}" style="position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background-color 0.2s; z-index: 2;">&times;</button>
+            `;
+            attachPreviewList.appendChild(item);
+        });
+        
+        attachBanner.style.display = 'flex';
+    };
+
+    attachBanner.addEventListener('click', (e) => {
+        const btn = e.target.closest('.remove-attach-btn');
+        if (btn) {
+            const idx = parseInt(btn.dataset.index, 10);
+            pendingAttachments.splice(idx, 1);
+            updateAttachBannerUI();
+            return;
+        }
+        const img = e.target.closest('.sp-chat-preview-img');
+        if (img && img.src) {
+            const allImgs = Array.from(attachPreviewList.querySelectorAll('.sp-chat-preview-img')).map(el => el.src);
+            const startIndex = allImgs.indexOf(img.src);
+            showImageViewer(allImgs, startIndex !== -1 ? startIndex : 0);
+        }
+    });
+
+    const handleImageFiles = async (files) => {
+        const validFiles = Array.from(files).filter(f => f && f.type.startsWith('image/'));
+        if (!validFiles.length) return;
+        
+        const remainingSlots = 6 - pendingAttachments.length;
+        if (remainingSlots <= 0) {
+            showNotification("Maximum of 6 images allowed per message.", true);
+            return;
+        }
+        
+        if (validFiles.length > remainingSlots) {
+            showNotification("Maximum of 6 images allowed per message.", true);
+        }
+        
+        const filesToProcess = validFiles.slice(0, remainingSlots);
+        
+        for (const file of filesToProcess) {
+            await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let { width, height } = img;
+                        const MAX_DIM = 2500;
+                        if (width > MAX_DIM || height > MAX_DIM) {
+                            const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+                            width = Math.round(width * ratio);
+                            height = Math.round(height * ratio);
+                        }
+
+                        const getCompressUrl = (w, h, q) => {
+                            canvas.width = w;
+                            canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, w, h);
+                            return canvas.toDataURL('image/jpeg', q);
+                        };
+
+                        let currentWidth = width, currentHeight = height, quality = 0.95;
+                        let dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
+
+                        while (dataUrl.length > 512 * 1024 && quality > 0.6) {
+                            quality -= 0.1;
+                            dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
+                        }
+
+                        while (dataUrl.length > 512 * 1024 && currentWidth > 200 && currentHeight > 200) {
+                            currentWidth = Math.round(currentWidth * 0.9);
+                            currentHeight = Math.round(currentHeight * 0.9);
+                            dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
+                        }
+
+                        if (dataUrl.length > 512 * 1024) {
+                            alert("One of the images is too large to compress under 512KB.");
+                        } else {
+                            const PREVIEW_MAX = 16;
+                            let pRatio = Math.min(PREVIEW_MAX / currentWidth, PREVIEW_MAX / currentHeight);
+                            let pWidth = Math.max(1, Math.round(currentWidth * pRatio));
+                            let pHeight = Math.max(1, Math.round(currentHeight * pRatio));
+                            let previewDataUrl = getCompressUrl(pWidth, pHeight, 0.3);
+
+                            pendingAttachments.push({ url: dataUrl, width: currentWidth, height: currentHeight, preview: previewDataUrl });
+                        }
+                        resolve();
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        updateAttachBannerUI();
+        fileInput.value = "";
+        input.focus();
+    };
+
+    fileInput.addEventListener('change', (e) => handleImageFiles(e.target.files));
+
+    input.addEventListener('paste', (e) => {
+        const clipboard = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+        if (!clipboard) return;
+        const files = [];
+        for (let index in clipboard.items) {
+            const item = clipboard.items[index];
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                files.push(item.getAsFile());
+            }
+        }
+        if (files.length > 0) {
+            e.preventDefault();
+            handleImageFiles(files);
+        }
+    });
+
+    const dropOverlay = chatPanel.querySelector('#sp-chat-drop-overlay');
+    let dragCounter = 0;
+
+    chatPanel.addEventListener('dragenter', (e) => {
+        e.preventDefault();
+        dragCounter++;
+        const hasFiles = e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files');
+        if (hasFiles) {
+            if (uploadOverlayBackdrop.style.display === 'flex') {
+                uploadOverlayBox.classList.add('drag-over');
+            } else {
+                dropOverlay.style.display = 'flex';
+            }
+        }
+    });
+
+    chatPanel.addEventListener('dragover', (e) => { e.preventDefault(); });
+
+    chatPanel.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        dragCounter--;
+        if (dragCounter <= 0) {
+            dragCounter = 0;
+            dropOverlay.style.display = 'none';
+            uploadOverlayBox.classList.remove('drag-over');
+        }
+    });
+
+    chatPanel.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dragCounter = 0;
+        dropOverlay.style.display = 'none';
+        uploadOverlayBox.classList.remove('drag-over');
+        uploadOverlayBackdrop.style.display = 'none';
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleImageFiles(e.dataTransfer.files);
+        }
+    });
+
+    attachCancel.addEventListener('click', () => {
+        pendingAttachments = [];
+        updateAttachBannerUI();
+    });
+
+    input.addEventListener('input', function() {
+        this.style.height = '40px';
+        let newHeight = this.scrollHeight;
+        if (newHeight > 120) {
+            this.style.height = '120px';
+            this.style.overflowY = 'auto';
+        } else if (newHeight > 40) {
+            this.style.height = newHeight + 'px';
+            this.style.overflowY = 'hidden';
+        } else {
+            this.style.height = '40px';
+            this.style.overflowY = 'hidden';
+        }
+    });
+
+    const escapeHTML = (str) => {
+        if (!str) return "";
+        return str.replace(/[&<>'"]/g, 
+            tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+        );
+    };
+
+    const renderMessages = (preserveScroll = false) => {
+        const isAtBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop <= scrollContainer.clientHeight + 80;
+        const prevScrollTop = scrollContainer.scrollTop;
+        
+        if (serverMessages.length === 0) {
+            if (!isChatLoaded) {
+                msgList.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 15px;">
+                        <div class="sp-spinner-loader" style="width: 36px; height: 36px; border-width: 3px;"></div>
+                        <span style="color: #b3b3b3; font-size: 14px; font-weight: 500;">Connecting to chat...</span>
+                    </div>
+                `;
+            } else {
+                msgList.innerHTML = `<div style="color: #888; text-align: center; margin-top: auto; margin-bottom: auto; font-size: 13px; font-style: italic;">No messages yet. Be the first!</div>`;
+            }
+            return;
+        }
+
+        const loadMoreHTML = `<div id="sp-chat-load-more" style="display: ${isFetchingOlder ? 'flex' : 'none'}; justify-content: center; align-items: center; padding: 10px; flex-shrink: 0; width: 100%; height: 50px;">
+            <div style="transform: scale(0.8);"><div class="sp-spinner-loader"></div></div>
+        </div>`;
+
+        let lastTimestamp = null;
+
+        const messagesHTML = serverMessages.map((m, index) => {
+            const isMe = m.deviceId === deviceId || (m.authorId && m.authorId === getCurrentAuthorId()) || (isAdmin && m.isAdmin);
+            const canEdit = m.deviceId === deviceId || isAdmin;
+            const formatTooltipDate = (d) => {
+                return `${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
+            };
+
+            const dateObj = new Date(m.timestamp);
+            const shortTime = dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const rawTime = formatTooltipDate(dateObj);
+            
+            let tooltipText = rawTime;
+            if (m.edited && m.editedAt) {
+                const editedDateObj = new Date(m.editedAt);
+                tooltipText = `Sent: ${rawTime}\nEdited: ${formatTooltipDate(editedDateObj)}`;
+            } else if (m.edited) {
+                tooltipText = `Sent: ${rawTime}\n(edited)`;
+            }
+            
+            let dateSeparatorHTML = '';
+            let dateChanged = false;
+
+            if (!lastTimestamp || !isSameDate(lastTimestamp, m.timestamp)) {
+                dateChanged = true;
+                const dateOpts = { month: 'long', day: 'numeric' };
+                if (dateObj.getFullYear() !== new Date().getFullYear()) {
+                    dateOpts.year = 'numeric';
+                }
+                dateSeparatorHTML = `
+                    <div class="sp-chat-date-separator">
+                        <span>${dateObj.toLocaleDateString(undefined, dateOpts)}</span>
+                    </div>
+                `;
+            }
+            lastTimestamp = m.timestamp;
+            
+            let showAuthor = true;
+            if (index > 0 && !dateChanged) {
+                const prev = serverMessages[index - 1];
+                if (prev.user === m.user && prev.authorId === m.authorId && (m.timestamp - prev.timestamp < 900000)) {
+                    showAuthor = false;
+                }
+            }
+            
+            let groupWithNext = false;
+            if (index < serverMessages.length - 1) {
+                const nxt = serverMessages[index + 1];
+                if (nxt.user === m.user && nxt.authorId === m.authorId && (nxt.timestamp - m.timestamp < 900000) && isSameDate(m.timestamp, nxt.timestamp)) {
+                    groupWithNext = true;
+                }
+            }
+            
+            const safeText = escapeHTML(m.text).replace(/\n/g, '<br>');
+            
+            let parsedAttachments = [];
+            if (m.attachment) {
+                try {
+                    const parsed = JSON.parse(m.attachment);
+                    parsedAttachments = Array.isArray(parsed) ? parsed : [parsed];
+                } catch(e) {}
+            }
+            
+            const count = parsedAttachments.length;
+            const isImageOnly = count > 0 && !safeText;
+            let safeReply = null;
+            if (m.replyTo) {
+                try {
+                    const parsed = JSON.parse(m.replyTo);
+                    safeReply = { 
+                        user: escapeHTML(parsed.user), 
+                        text: escapeHTML(parsed.text),
+                        authorId: parsed.authorId,
+                        isAdmin: parsed.isAdmin,
+                        hasAttachment: !!parsed.hasAttachment,
+                        attachmentId: parsed.attachmentId,
+                        messageId: parsed.messageId,
+                        preview: parsed.preview,
+                        width: parsed.width,
+                        height: parsed.height,
+                        isDeleted: parsed.isDeleted
+                    };
+                } catch(e) {
+                    safeReply = { user: escapeHTML(m.replyTo), text: "..." };
+                }
+            }
+
+            const isReplyToMe = !isMe && safeReply && (
+                (isAdmin && safeReply.isAdmin) || 
+                (safeReply.authorId && safeReply.authorId === getCurrentAuthorId()) || 
+                (!safeReply.authorId && safeReply.user === getCurrentName())
+            );
+
+            let statusIconHTML = '';
+            if (isMe && m.status === 'sending') {
+                statusIconHTML = `<div class="sp-chat-status-icon">${clockIconsvg}</div>`;
+            }
+            
+            const metaHTML = `
+                <span class="sp-chat-meta">
+                    ${m.edited ? `<span class="sp-chat-edited" title="${escapeHTML(tooltipText)}">(edited)</span>` : ''}
+                    ${statusIconHTML}
+                    <span class="sp-chat-time" title="${escapeHTML(tooltipText)}">${shortTime}</span>
+                </span>
+            `;
+
+            const authorColor = stringToColor(m.authorId, 1, m.isAdmin);
+            const authorTag = getDiscriminator(m.authorId);
+
+            let attachmentHTML = '';
+            if (count > 0) {
+                const hasHeader = showAuthor || safeReply;
+                const attMarginTop = hasHeader ? '4px' : '-6px';
+                const attMarginBottom = safeText ? '4px' : '-6px';
+                const isSendingAttachment = isMe && m.status === 'sending';
+
+                const cachedUrls = imageCache.get(m.id) || [];
+                
+                if (count === 1) {
+                    const parsed = parsedAttachments[0];
+                    let wrapperWidthStyle = 'calc(100% + 21px)';
+                    let inlineStyle = '';
+                    if (parsed.width && parsed.height) {
+                        let rw = parsed.width;
+                        let rh = parsed.height;
+                        if (rh > 275) rw = rw * (275 / rh);
+                        wrapperWidthStyle = rw + 'px';
+                        inlineStyle = `aspect-ratio: ${parsed.width} / ${parsed.height};`;
+                    }
+                    
+                    let imgSrc = parsed.hasImage ? (cachedUrls[0] || parsed.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${parsed.width||800} ${parsed.height||600}' width='${parsed.width||800}' height='${parsed.height||600}' style='background:%231e1e1e;'%3E%3C/svg%3E`) : parsed.url;
+                    let isLazy = parsed.hasImage && !cachedUrls[0];
+                    
+                    attachmentHTML = `
+                        <div style="position: relative; width: ${wrapperWidthStyle}; max-width: calc(100% + 21px); margin-top: ${attMarginTop}; margin-bottom: ${attMarginBottom}; margin-left: -11px; margin-right: -10px; display: flex; justify-content: center; align-items: center; overflow: hidden; background-color: #1e1e1e;">
+                            <img src="${imgSrc}" class="sp-chat-attachment-bg ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="0"` : `data-index="0"`} style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(0.6); transform: scale(1.1); cursor: pointer; z-index: 0;" aria-hidden="true" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                            <img src="${imgSrc}" class="sp-chat-attachment ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="0"` : `data-index="0"`} alt="Attached Image" style="${inlineStyle} position: relative; z-index: 1; margin: 0; width: 100%; max-width: 100%; max-height: 275px; object-fit: contain; ${isSendingAttachment ? 'filter: blur(4px);' : ''}" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                            ${isSendingAttachment ? `
+                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 2; pointer-events: none;">
+                                <div style="background: rgba(0,0,0,0.6); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+                                    <div class="sp-spinner-loader" style="transform: scale(0.9); margin: 0;"></div>
+                                </div>
+                            </div>
+                            ` : ''}
+                            ${isImageOnly ? metaHTML : ''}
+                        </div>
+                    `;
+                } else {
+                    let innerGalleryHTML = parsedAttachments.map((parsed, idx) => {
+                        let imgSrc = parsed.hasImage ? (cachedUrls[idx] || parsed.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${parsed.width||800} ${parsed.height||600}' width='${parsed.width||800}' height='${parsed.height||600}' style='background:%231e1e1e;'%3E%3C/svg%3E`) : parsed.url;
+                        let isLazy = parsed.hasImage && !cachedUrls[idx];
+                        
+                        let boxRatio = ((count === 3 || count === 5) && idx === 0) ? 2 : 1;
+                        let imgRatio = (parsed.width && parsed.height) ? (parsed.width / parsed.height) : 1;
+                        let sizingStyle = imgRatio > boxRatio 
+                            ? "height: 100%; width: auto; max-width: none;" 
+                            : "width: 100%; height: auto; max-height: none;";
+                        
+                        return `
+                            <div style="position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; background-color: #1e1e1e; width: 100%; height: 100%;">
+                                <img src="${imgSrc}" class="sp-chat-attachment-bg ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${idx}"` : `data-index="${idx}"`} style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(0.6); transform: scale(1.1); cursor: pointer; z-index: 0;" aria-hidden="true" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                                <img src="${imgSrc}" class="sp-chat-attachment ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${idx}"` : `data-index="${idx}"`} alt="Attached Image" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset; ${isSendingAttachment ? 'filter: blur(4px);' : ''}" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                            </div>
+                        `;
+                    }).join('');
+
+                    attachmentHTML = `
+                        <div class="sp-chat-msg-gallery count-${count}" style="position: relative; width: 300px; margin-left: -11px; margin-right: -10px; margin-top: ${attMarginTop}; margin-bottom: ${attMarginBottom};">
+                            ${innerGalleryHTML}
+                            ${isSendingAttachment ? `
+                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 2; pointer-events: none;">
+                                <div style="background: rgba(0,0,0,0.6); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
+                                    <div class="sp-spinner-loader" style="transform: scale(0.9); margin: 0;"></div>
+                                </div>
+                            </div>
+                            ` : ''}
+                            ${isImageOnly ? metaHTML : ''}
+                        </div>
+                    `;
+                }
+            }
+
+            return `
+               ${dateSeparatorHTML}
+               <div class="sp-chat-msg ${groupWithNext ? 'sp-chat-msg-group' : ''} ${!showAuthor ? 'sp-chat-msg-continued' : ''} ${isMe ? 'sp-chat-msg-me' : ''} ${isImageOnly ? 'image-only-msg' : ''} ${isReplyToMe ? 'sp-chat-msg-mentioned' : ''}" data-id="${m.id}" style="${m.status === 'deleting' ? 'opacity: 0.4; pointer-events: none;' : ''}">
+                  <div class="sp-chat-bubble">
+                     ${showAuthor ? `<div class="sp-chat-author" style="color: ${authorColor};">${escapeHTML(m.user)}${m.isAdmin ? '' : `<span style="opacity: 0.5; font-size: 0.85em; font-weight: 500; margin-left: 2px;">#${authorTag}</span>`}</div>` : ''}
+                     ${(() => {
+                         if (!safeReply) return '';
+                         let replyImgHTML = '';
+                         if (safeReply.hasAttachment && safeReply.attachmentId) {
+                             let replyImgSrc = '';
+                             let replyImgLazy = false;
+                             if (imageCache.has(safeReply.attachmentId)) {
+                                 const cached = imageCache.get(safeReply.attachmentId);
+                                 replyImgSrc = Array.isArray(cached) ? cached[0] : cached;
+                             } else {
+                                 replyImgSrc = safeReply.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30' width='30' height='30' style='background:%231e1e1e;'%3E%3C/svg%3E`;
+                                 replyImgLazy = true;
+                             }
+                             
+                             let imgRatio = (safeReply.width && safeReply.height) ? (safeReply.width / safeReply.height) : 1;
+                             let sizingStyle = imgRatio > 1 
+                                 ? "height: 100%; width: auto; max-width: none;" 
+                                 : "width: 100%; height: auto; max-height: none;";
+                                 
+                             replyImgHTML = `
+                                 <div class="sp-chat-reply-img-wrapper">
+                                     <img src="${replyImgSrc}" class="sp-chat-reply-img ${replyImgLazy ? 'lazy-attachment' : ''}" ${replyImgLazy ? `data-id="${safeReply.attachmentId}" data-index="0"` : ''} alt="" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset;" loading="${replyImgLazy ? 'eager' : 'lazy'}" decoding="async" />
+                                 </div>
+                             `;
+                         }
+                         
+                         let replyTextContent = (safeReply.text || '').trim();
+                         if (!replyTextContent && safeReply.hasAttachment) {
+                             replyTextContent = "Photo";
+                         }
+                         if (safeReply.isDeleted) {
+                             replyTextContent = `<span style="font-style: italic;">Deleted message</span>`;
+                         }
+                         
+                         const replyBaseColor = safeReply.isDeleted ? '#888' : stringToColor(safeReply.authorId, 1, safeReply.isAdmin);
+                         const replyBgColor = safeReply.isDeleted ? 'rgba(136, 136, 136, 0.15)' : stringToColor(safeReply.authorId, 0.15, safeReply.isAdmin);
+                         
+                         return `
+                             <div class="sp-chat-reply-ref" data-reply-id="${safeReply.messageId || safeReply.attachmentId}" data-is-deleted="${safeReply.isDeleted ? 'true' : 'false'}" style="border-left-color: ${replyBaseColor}; background-color: ${replyBgColor}; cursor: ${safeReply.isDeleted ? 'default' : 'pointer'};" title="${safeReply.isDeleted ? '' : 'Go to message'}">
+                                 ${replyImgHTML}
+                                 <div class="sp-chat-reply-content">
+                                     <div class="sp-chat-reply-author" style="color: ${replyBaseColor};">${safeReply.user}${safeReply.isAdmin || safeReply.isDeleted ? '' : (safeReply.authorId ? `<span style="opacity: 0.5; font-size: 0.85em; font-weight: 500; margin-left: 2px;">#${getDiscriminator(safeReply.authorId)}</span>` : '')}</div>
+                                     <div class="sp-chat-reply-text">${replyTextContent}</div>
+                                 </div>
+                             </div>
+                         `;
+                     })()}
+                     ${attachmentHTML}
+                     ${safeText ? `<div class="sp-chat-text">${safeText}${!isImageOnly ? metaHTML : ''}</div>` : (!isImageOnly ? metaHTML : '')}
+                  </div>
+                  <div class="sp-chat-actions">
+                      <button class="sp-chat-dots-btn" title="More options">
+                          ${chatDotsIconSvg}
+                      </button>
+                      <div class="sp-chat-menu">
+                          <button class="sp-chat-action-btn reply-btn" data-id="${m.id}">Reply</button>
+                          ${canEdit && m.status !== 'sending' ? `
+                              <button class="sp-chat-action-btn edit-btn" data-id="${m.id}" data-text="${escapeHTML(m.text)}">Edit</button>
+                          ` : ''}
+                          ${canEdit ? `
+                              <button class="sp-chat-action-btn del-btn" data-id="${m.id}">Delete</button>
+                          ` : ''}
+                          ${safeText ? `
+                              <button class="sp-chat-action-btn copy-btn" data-id="${m.id}">Copy text</button>
+                          ` : ''}
+                          ${m.attachment ? `
+                              <button class="sp-chat-action-btn copy-img-btn" data-id="${m.id}" data-index="0" style="${count > 1 ? 'display:none;' : ''}">Copy image</button>
+                              <button class="sp-chat-action-btn dl-img-btn" data-id="${m.id}" data-index="0" style="${count > 1 ? 'display:none;' : ''}">Download image</button>
+                          ` : ''}
+                      </div>
+                  </div>
+               </div>
+            `;
+        }).join('');
+        
+        msgList.innerHTML = loadMoreHTML + messagesHTML;
+
+        msgList.querySelectorAll('.lazy-attachment').forEach(img => {
+            attachmentObserver.observe(img);
+        });
+
+        if (preserveScroll) {
+            scrollContainer.scrollTop = prevScrollTop;
+        } else if (isAtBottom) {
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            requestAnimationFrame(() => {
+                if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            });
+        }
+
+        msgList.querySelectorAll('.reply-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const msg = serverMessages.find(m => m.id === btn.dataset.id);
+                if (msg) {
+                    let previewData = null;
+                    let attWidth = null;
+                    let attHeight = null;
+                    if (msg.attachment) {
+                        try {
+                            let parsed = JSON.parse(msg.attachment);
+                            if (Array.isArray(parsed)) parsed = parsed[0];
+                            previewData = parsed.preview;
+                            attWidth = parsed.width;
+                            attHeight = parsed.height;
+                        } catch(e) {}
+                    }
+                    replyingTo = { 
+                        user: msg.user, 
+                        text: msg.text, 
+                        authorId: msg.authorId, 
+                        isAdmin: msg.isAdmin,
+                        hasAttachment: !!msg.attachment,
+                        attachmentId: msg.id,
+                        messageId: msg.id,
+                        preview: previewData,
+                        width: attWidth,
+                        height: attHeight
+                    };
+                    editingId = null;
+                    
+                    let replyImgHTML = '';
+                    if (msg.attachment) {
+                        let cachedUrl = imageCache.has(msg.id) ? imageCache.get(msg.id)[0] : null;
+                        let isLazy = !cachedUrl;
+                        let replyImgSrc = cachedUrl || (previewData || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30' width='30' height='30' style='background:%231e1e1e;'%3E%3C/svg%3E`);
+                        
+                        let imgRatio = (attWidth && attHeight) ? (attWidth / attHeight) : 1;
+                        let sizingStyle = imgRatio > 1 
+                            ? "height: 100%; width: auto; max-width: none;" 
+                            : "width: 100%; height: auto; max-height: none;";
+                            
+                        replyImgHTML = `
+                            <div style="position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e; flex-shrink: 0; margin-right: 8px;">
+                                <img src="${replyImgSrc}" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset; ${isLazy ? 'filter: blur(4px);' : ''}" />
+                            </div>
+                        `;
+                    }
+                    
+                    let replyTextContent = (msg.text || '').trim();
+                    if (!replyTextContent && msg.attachment) replyTextContent = "Photo";
+                    
+                    replyText.innerHTML = `
+                        <div style="display: flex; flex-direction: row; align-items: center; overflow: hidden; width: 100%;">
+                            ${replyImgHTML}
+                            <div style="display: flex; flex-direction: column; overflow: hidden; flex: 1;">
+                                <div style="font-size: 11px; color: #1db954; font-weight: 700; margin-bottom: 1px; line-height: 1.2;">Replying to ${escapeHTML(msg.user)}${msg.isAdmin ? '' : `<span style="opacity: 0.5; font-size: 0.85em; font-weight: 500; margin-left: 2px;">#${getDiscriminator(msg.authorId)}</span>`}</div>
+                                <div style="font-size: 12px; color: #b3b3b3; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(replyTextContent)}</div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    replyBanner.style.display = 'flex';
+                    input.focus();
+                    
+                    const menu = btn.closest('.sp-chat-menu');
+                    if (menu) {
+                        menu.classList.remove('show');
+                        menu.closest('.sp-chat-actions').classList.remove('active');
+                    }
+                }
+            });
+        });
+
+        msgList.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                editingId = btn.dataset.id;
+                replyingTo = null;
+                input.value = btn.dataset.text;
+                input.style.height = '40px';
+                let newHeight = input.scrollHeight;
+                input.style.height = (newHeight > 40 ? newHeight : 40) + 'px';
+                replyText.innerHTML = `<div style="font-weight: 600;">Editing message</div>`;
+                replyBanner.style.display = 'flex';
+                input.focus();
+            });
+        });
+
+        msgList.querySelectorAll('.del-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const msg = serverMessages.find(m => m.id === btn.dataset.id);
+                if (msg && msg.status === 'sending') {
+                    msg.status = 'cancelled';
+                    serverMessages = serverMessages.filter(m => m.id !== msg.id);
+                    renderMessages(true);
+                    return;
+                }
+                messageToDelete = btn.dataset.id;
+                delOverlay.style.display = 'flex';
+            });
+        });
+
+        msgList.querySelectorAll('.sp-chat-dots-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const menu = btn.nextElementSibling;
+                const isShowing = menu.classList.contains('show');
+                
+                msgList.querySelectorAll('.sp-chat-menu.show').forEach(m => {
+                    m.classList.remove('show');
+                    m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
+                    m.closest('.sp-chat-actions').classList.remove('active');
+                });
+                
+                if (!isShowing) {
+                    const copyImgBtn = menu.querySelector('.copy-img-btn');
+                    const dlImgBtn = menu.querySelector('.dl-img-btn');
+                    if (copyImgBtn && dlImgBtn) {
+                        const msgEl = btn.closest('.sp-chat-msg');
+                        const gallery = msgEl.querySelector('.sp-chat-msg-gallery');
+                        if (gallery) {
+                            copyImgBtn.style.display = 'none';
+                            dlImgBtn.style.display = 'none';
+                        } else {
+                            copyImgBtn.style.display = 'block';
+                            copyImgBtn.dataset.index = "0";
+                            dlImgBtn.style.display = 'block';
+                            dlImgBtn.dataset.index = "0";
+                        }
+                    }
+
+                    menu.style.position = 'fixed';
+                    menu.style.visibility = 'hidden';
+                    menu.classList.add('show');
+                    
+                    const menuRect = menu.getBoundingClientRect();
+                    const btnRect = btn.getBoundingClientRect();
+                    menu.style.visibility = '';
+                    
+                    let top = btnRect.bottom + 4;
+                    let left = btnRect.right - menuRect.width;
+                    
+                    if (top + menuRect.height > window.innerHeight) {
+                        top = btnRect.top - menuRect.height - 4;
+                        menu.classList.add('open-up');
+                        menu.classList.remove('open-down');
+                    } else {
+                        menu.classList.remove('open-up');
+                        menu.classList.add('open-down');
+                    }
+                    
+                    menu.style.left = left + 'px';
+                    menu.style.top = top + 'px';
+                    menu.style.right = 'auto';
+                    menu.style.bottom = 'auto';
+
+                    btn.closest('.sp-chat-actions').classList.add('active');
+                }
+            });
+        });
+
+        msgList.querySelectorAll('.copy-img-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const msg = serverMessages.find(m => m.id === btn.dataset.id);
+                if (msg && msg.attachment) {
+                    let imgSrc = msg.attachment;
+                    const idx = parseInt(btn.dataset.index || "0", 10);
+                    if (msg.attachment.startsWith('[') || msg.attachment.startsWith('{')) {
+                        try {
+                            const parsed = JSON.parse(msg.attachment);
+                            const item = Array.isArray(parsed) ? parsed[idx] : parsed;
+                            imgSrc = item.hasImage ? (imageCache.has(msg.id) ? imageCache.get(msg.id)[idx] : '') : item.url;
+                        } catch(err) {}
+                    }
+                    if (imgSrc) {
+                        const img = new Image();
+                        img.crossOrigin = 'anonymous';
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            canvas.getContext('2d').drawImage(img, 0, 0);
+                            canvas.toBlob(async (blob) => {
+                                if (blob) {
+                                    try {
+                                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                                    } catch(err) {}
+                                }
+                            }, 'image/png');
+                        };
+                        img.src = imgSrc;
+                    }
+                    const menu = btn.closest('.sp-chat-menu');
+                    if (menu) {
+                        menu.classList.remove('show');
+                        menu.closest('.sp-chat-actions').classList.remove('active');
+                    }
+                }
+            });
+        });
+
+        msgList.querySelectorAll('.dl-img-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                
+                const menu = btn.closest('.sp-chat-menu');
+                if (menu) {
+                    menu.classList.remove('show');
+                    menu.closest('.sp-chat-actions').classList.remove('active');
+                }
+
+                const msg = serverMessages.find(m => m.id === btn.dataset.id);
+                if (msg && msg.attachment) {
+                    let imgSrc = msg.attachment;
+                    const idx = parseInt(btn.dataset.index || "0", 10);
+                    if (msg.attachment.startsWith('[') || msg.attachment.startsWith('{')) {
+                        try {
+                            const parsed = JSON.parse(msg.attachment);
+                            const item = Array.isArray(parsed) ? parsed[idx] : parsed;
+                            imgSrc = item.hasImage ? (imageCache.has(msg.id) ? imageCache.get(msg.id)[idx] : '') : item.url;
+                        } catch(err) {}
+                    }
+                    
+                    if (imgSrc) {
+                        try {
+                            if (window.showSaveFilePicker) {
+                                const response = await fetch(imgSrc);
+                                const blob = await response.blob();
+                                const fileHandle = await window.showSaveFilePicker({
+                                    suggestedName: `attachment-${msg.id}-${idx}.png`,
+                                    types: [{ description: 'Image', accept: { 'image/png': ['.png'], 'image/jpeg': ['.jpg', '.jpeg'], 'image/webp': ['.webp'] } }]
+                                });
+                                const writable = await fileHandle.createWritable();
+                                await writable.write(blob);
+                                await writable.close();
+                            } else {
+                                const a = document.createElement('a');
+                                a.href = imgSrc;
+                                a.download = `attachment-${msg.id}-${idx}.png`;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                            }
+                        } catch(err) {
+                            if (err.name !== 'AbortError') console.error("Download failed:", err);
+                        }
+                    }
+                }
+            });
+        });
+    };
+
+    delNo.addEventListener('click', () => {
+        messageToDelete = null;
+        delOverlay.style.display = 'none';
+    });
+
+    delYes.addEventListener('click', async () => {
+        if (!messageToDelete) return;
+        const id = messageToDelete;
+        delOverlay.style.display = 'none';
+        messageToDelete = null;
+
+        const msg = serverMessages.find(m => m.id === id);
+        if (msg) {
+            msg.status = 'deleting';
+            renderMessages(true);
+        }
+
+        try {
+            const res = await fetchWithRetry(`${CHAT_API_URL}/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, deviceId, adminToken, authorId: getCurrentAuthorId() })
+            });
+            
+            if (res.ok) {
+                serverMessages = serverMessages.filter(m => m.id !== id);
+                serverMessages.forEach(m => {
+                    if (m.replyTo) {
+                        try {
+                            const parsed = JSON.parse(m.replyTo);
+                            if (parsed.messageId === id) {
+                                parsed.user = "Deleted";
+                                parsed.text = "Deleted message";
+                                parsed.hasAttachment = false;
+                                parsed.attachmentId = null;
+                                parsed.preview = null;
+                                parsed.isDeleted = true;
+                                m.replyTo = JSON.stringify(parsed);
+                            }
+                        } catch(e){}
+                    }
+                });
+                renderMessages(true);
+            } else {
+                if (msg) delete msg.status;
+                renderMessages(true);
+            }
+        } catch(e) { 
+            console.error("Failed to delete", e); 
+            if (msg) delete msg.status;
+            renderMessages(true);
+        }
+    });
+
+    let pollTimer = null;
+    let currentPollInterval = 10000;
+    const MAX_POLL_INTERVAL = 60000;
+
+    const scheduleNextPoll = () => {
+        if (pollTimer) clearTimeout(pollTimer);
+        pollTimer = setTimeout(fetchMessages, currentPollInterval);
+    };
+
+    const resetPollInterval = () => {
+        if (currentPollInterval > 10000) {
+            currentPollInterval = 10000;
+            scheduleNextPoll();
+        }
+    };
+
+    const fetchMessages = async () => {
+        if (!document.body.contains(chatPanel)) {
+            if (pollTimer) clearTimeout(pollTimer);
+            return;
+        }
+
+        if (document.hidden || (!chatPanel.classList.contains('visible') && isChatLoaded)) {
+            currentPollInterval = MAX_POLL_INTERVAL;
+            scheduleNextPoll();
+            return;
+        }
+
+        try {
+            const headers = {};
+            if (currentETag) {
+                headers['If-None-Match'] = currentETag;
+            }
+
+            const res = await fetch(`${CHAT_API_URL}/messages`, { headers });
+                        
+            if (res.status === 304) {
+                currentPollInterval = 10000;
+                if (!isChatLoaded) isChatLoaded = true;
+                return; 
+            }
+            
+            if (!res.ok) return;
+
+            const newETag = res.headers.get('ETag');
+            if (newETag) currentETag = newETag;
+
+            const msgs = await res.json();
+            if (!Array.isArray(msgs)) return;
+
+            const oldestInLatest = msgs.length > 0 ? msgs[0].timestamp : 0;
+            const validIds = new Set(msgs.map(m => m.id));
+            let changed = false;
+
+            const newServerMessages = serverMessages.filter(m => {
+                if (m.status === 'sending') return true;
+                if (m.deviceId === deviceId && (Date.now() - m.timestamp < 120000)) return true;
+                if (m.timestamp >= oldestInLatest && !validIds.has(m.id)) {
+                    changed = true;
+                    return false; 
+                }
+                return true;
+            });
+
+            msgs.forEach(inMsg => {
+                const idx = newServerMessages.findIndex(m => m.id === inMsg.id);
+                if (idx > -1) {
+                    const oldMsg = newServerMessages[idx];
+                    if (oldMsg.text !== inMsg.text || oldMsg.edited !== inMsg.edited || oldMsg.attachment !== inMsg.attachment || oldMsg.replyTo !== inMsg.replyTo) {
+                        newServerMessages[idx] = inMsg;
+                        changed = true;
+                    } else if (oldMsg.status === 'sent' || oldMsg.deviceId) {
+                        newServerMessages[idx] = inMsg;
+                        changed = true;
+                    }
+                } else {
+                    newServerMessages.push(inMsg);
+                    changed = true;
+                }
+            });
+
+            const isFirstLoad = serverMessages.length === 0;
+            if (changed || (isFirstLoad && msgs.length > 0)) {
+                newServerMessages.sort((a, b) => a.timestamp - b.timestamp);
+                serverMessages = newServerMessages;
+                renderMessages(!isFirstLoad);
+                currentPollInterval = 10000;
+            } else {
+                currentPollInterval = Math.min(currentPollInterval + 10000, MAX_POLL_INTERVAL);
+            }
+
+            if (!isChatLoaded) {
+                isChatLoaded = true;
+                if (serverMessages.length === 0) renderMessages();
+                if (queuedMessages.length > 0) {
+                    queuedMessages.forEach(q => performSend(q.tempMsg, q.text, q.replyPayload, q.attachmentPayload));
+                    queuedMessages = [];
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to fetch chat", e);
+            currentPollInterval = Math.min(currentPollInterval + 10000, MAX_POLL_INTERVAL);
+        } finally {
+            scheduleNextPoll();
+        }
+    };
+
+    fetchMessages();
+
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            if (mutation.attributeName === 'class' && chatPanel.classList.contains('visible')) {
+                currentPollInterval = 10000;
+                fetchMessages();
+                
+                let start = performance.now();
+                const forceBottom = (time) => {
+                    if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                    if (time - start < 300) {
+                        requestAnimationFrame(forceBottom);
+                    }
+                };
+                requestAnimationFrame(forceBottom);
+            }
+        });
+    });
+    observer.observe(chatPanel, { attributes: true });
+
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && chatPanel.classList.contains('visible')) {
+            currentPollInterval = 10000;
+            fetchMessages(); 
+        }
+    }, { signal: chatPanelAbortController.signal });
+
+    chatPanel.cleanup = () => {
+        if (pollTimer) clearTimeout(pollTimer);
+        if (attachmentTimer) clearTimeout(attachmentTimer);
+        observer.disconnect();
+        if (typeof msgListResizeObserver !== 'undefined') msgListResizeObserver.disconnect();
+        if (typeof attachmentObserver !== 'undefined') attachmentObserver.disconnect();
+        chatPanelAbortController.abort();
+    };
+
+    chatPanel.addEventListener('mouseenter', resetPollInterval);
+    input.addEventListener('focus', resetPollInterval);
+
+    const scrollBottomBtn = chatPanel.querySelector('#sp-chat-scroll-bottom-btn');
+    scrollBottomBtn.addEventListener('click', () => {
+        if (jumpBackId) {
+            const el = scrollContainer.querySelector(`.sp-chat-msg[data-id="${jumpBackId}"]`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.remove('sp-chat-msg-highlight');
+                void el.offsetWidth;
+                el.classList.add('sp-chat-msg-highlight');
+            }
+            jumpBackId = null;
+            if (jumpBackTimer) clearTimeout(jumpBackTimer);
+            updateScrollBtnState();
+        } else {
+            scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'smooth' });
+        }
+    });
+
+    scrollContainer.addEventListener('scroll', async () => {
+        updateScrollBtnState();
+
+        if (scrollContainer.scrollTop < 10 && hasMoreMessages && !isFetchingOlder && serverMessages.length > 0) {
+            isFetchingOlder = true;
+            
+            let currentScrollTop = scrollContainer.scrollTop;
+            let currentScrollHeight = scrollContainer.scrollHeight;
+            renderMessages(true);
+            scrollContainer.scrollTop = currentScrollTop + (scrollContainer.scrollHeight - currentScrollHeight);
+            
+            const oldest = serverMessages[0].timestamp;
+            
+            try {
+                const res = await fetch(`${CHAT_API_URL}/messages?before=${oldest}`);
+                if (res.ok) {
+                    const olderMsgs = await res.json();
+                    if (olderMsgs.length < 40) hasMoreMessages = false;
+                    
+                    if (olderMsgs.length > 0) {
+                        const newOlder = olderMsgs.filter(om => !serverMessages.some(sm => sm.id === om.id));
+                        serverMessages = [...newOlder, ...serverMessages];
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load older messages", e);
+            }
+            
+            isFetchingOlder = false;
+            
+            currentScrollTop = scrollContainer.scrollTop;
+            currentScrollHeight = scrollContainer.scrollHeight;
+            renderMessages(true);
+            scrollContainer.scrollTop = currentScrollTop + (scrollContainer.scrollHeight - currentScrollHeight);
+        }
+    });
+    
+    const performSend = async (tempMsg, text, replyPayload, attachmentPayload) => {
+        let delay = 1000;
+        let attempts = 0;
+        
+        while (attempts < 50) {
+            if (tempMsg.status === 'cancelled') return;
+            attempts++;
+            try {
+                const res = await fetch(`${CHAT_API_URL}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        id: tempMsg.id,
+                        text, 
+                        user: tempMsg.user, 
+                        authorId: tempMsg.authorId, 
+                        replyTo: replyPayload, 
+                        attachment: attachmentPayload, 
+                        deviceId 
+                    })
+                });
+                
+                if (res.ok) {
+                    tempMsg.status = 'sent';
+                    
+                    if (attachmentPayload) {
+                        try {
+                            const parsedArray = JSON.parse(attachmentPayload);
+                            const finalArray = parsedArray.map(p => {
+                                if (p.url) return { width: p.width, height: p.height, preview: p.preview, hasImage: true };
+                                return p;
+                            });
+                            tempMsg.attachment = JSON.stringify(finalArray);
+                        } catch(e) {}
+                    }
+                    
+                    renderMessages(true);
+                    return;
+                }
+                
+                if (res.status >= 400 && res.status < 500) {
+                    if (res.status === 429) {
+                        showNotification("Rate limit exceeded. Please slow down.", true);
+                        if (!input.value && text) {
+                            input.value = text;
+                            input.dispatchEvent(new Event('input'));
+                        }
+                        if (attachmentPayload && !pendingAttachment) {
+                            pendingAttachment = attachmentPayload;
+                            try {
+                                const parsed = JSON.parse(attachmentPayload);
+                                attachPreview.src = parsed.url;
+                                if (attachPreviewBg) attachPreviewBg.src = parsed.url;
+                                attachBanner.style.display = 'flex';
+                            } catch(e) {}
+                        }
+                    } else {
+                        console.error("Server rejected the message:", res.status);
+                    }
+                    break;
+                }
+            } catch (e) { 
+                console.warn(`Send attempt ${attempts} failed due to network issue, retrying in background...`, e); 
+            }
+            
+            await new Promise(r => setTimeout(r, delay));
+            delay = Math.min(delay * 1.5, 10000);
+        }
+        
+        console.error("Message send failed permanently.");
+        const idx = serverMessages.findIndex(m => m.id === tempMsg.id);
+        if (idx > -1) {
+            serverMessages.splice(idx, 1);
+            renderMessages(true);
+        }
+    };
+
+    const handleSend = async () => {
+        const text = input.value.trim();
+        const msgToEdit = editingId ? serverMessages.find(m => m.id === editingId) : null;
+        if (!text && pendingAttachments.length === 0 && !(msgToEdit && msgToEdit.attachment)) return;
+        
+        input.value = "";
+        input.style.height = "40px";
+        input.style.overflowY = "hidden";
+        sendBtn.disabled = true;
+
+        if (editingId) {
+            const msgToEdit = serverMessages.find(m => m.id === editingId);
+            let oldText = "";
+            if (msgToEdit) {
+                oldText = msgToEdit.text;
+                msgToEdit.text = text;
+                msgToEdit.status = 'sending';
+                msgToEdit.edited = true;
+                msgToEdit.editedAt = Date.now();
+                renderMessages(true);
+            }
+
+            fetchWithRetry(`${CHAT_API_URL}/edit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: editingId, text, deviceId, adminToken, authorId: getCurrentAuthorId() })
+            }).then(async res => {
+                if (res.ok && msgToEdit) {
+                    msgToEdit.status = 'sent';
+                    try {
+                        const data = await res.json();
+                        if (data.editedAt) msgToEdit.editedAt = data.editedAt;
+                    } catch(err) {}
+                } else if (msgToEdit) {
+                    msgToEdit.text = oldText;
+                    msgToEdit.status = 'sent';
+                }
+                renderMessages(true);
+            }).catch(e => {
+                console.error("Edit failed", e);
+                if (msgToEdit) {
+                    msgToEdit.text = oldText;
+                    msgToEdit.status = 'sent';
+                    renderMessages(true);
+                }
+            });
+
+            editingId = null;
+            replyBanner.style.display = 'none';
+        } else {
+            const replyPayload = replyingTo ? JSON.stringify(replyingTo) : null;
+            const attachmentPayload = pendingAttachments.length > 0 ? JSON.stringify(pendingAttachments) : null;
+            const realId = crypto.randomUUID();
+            
+            if (attachmentPayload) {
+                try {
+                    const parsedArray = JSON.parse(attachmentPayload);
+                    imageCache.set(realId, parsedArray.map(p => p.url).filter(Boolean));
+                } catch(e) {}
+            }
+
+            const tempMsg = {
+                id: realId,
+                text, user: getCurrentName(), authorId: getCurrentAuthorId(),
+                replyTo: replyPayload, attachment: attachmentPayload, timestamp: Date.now(),
+                deviceId, status: 'sending', isAdmin
+            };
+            
+            serverMessages.push(tempMsg);
+            renderMessages();
+            setTimeout(() => { scrollContainer.scrollTop = scrollContainer.scrollHeight; }, 50);
+
+            if (isChatLoaded) {
+                performSend(tempMsg, text, replyPayload, attachmentPayload);
+            } else {
+                queuedMessages.push({ tempMsg, text, replyPayload, attachmentPayload });
+            }
+        }
+        
+        replyingTo = null;
+        pendingAttachments = [];
+        updateAttachBannerUI();
+        replyBanner.style.display = 'none';
+        sendBtn.disabled = false;
+        input.focus();
+    };
+
+    sendBtn.addEventListener('click', handleSend);
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
+    });
+
+    replyCancel.addEventListener('click', () => {
+        replyingTo = null;
+        editingId = null;
+        replyBanner.style.display = 'none';
+        input.value = "";
+        input.style.height = "40px";
+    });
+
+    return chatPanel;
+  }
+
   function showGenreTagsSettingsModal() {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-genre-sources-overlay";
@@ -3690,54 +6196,17 @@
 
     modalContainer.innerHTML = `
       <style>
-        .setting-row {
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-            padding: 5px 0;
-        }
-        .setting-label {
-            color: #c1c1c1;
-            font-size: 16px;
-            font-weight: 500;
-        }
-        .section-header {
-            font-weight: bold; 
-            font-size: 16px; 
-            color: white; 
-            border-bottom: 1px solid #333; 
-            padding-bottom: 8px;
-            margin-bottom: 4px;
-        }
-        .switch {
-            position: relative; 
-            display: inline-block; 
-            width: 40px; 
-            height: 24px; 
-            flex-shrink: 0;
-        }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
+        .setting-label { color: #c1c1c1; font-size: 16px; font-weight: 500; }
+        .section-header { font-weight: bold; font-size: 16px; color: white; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 4px; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
         .switch input { opacity: 0; width: 0; height: 0; }
-        .sliderx {
-            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #484848; border-radius: 24px; transition: .2s;
-        }
-        .sliderx:before {
-            position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
-            background-color: white; border-radius: 50%; transition: .2s;
-        }
+        .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+        .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
         input:checked + .sliderx { background-color: #1DB954; }
         input:checked + .sliderx:before { transform: translateX(16px); }
-        .custom-tooltip {
-            visibility: hidden; position: absolute; z-index: 1000; background-color: #373737;
-            color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px;
-            max-width: 240px; width: max-content; bottom: 100%; left: 50%;
-            transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            line-height: 1.4; word-wrap: break-word; text-align: left;
-        }
-        .custom-tooltip::after {
-            content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
-            border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent;
-        }
+        .custom-tooltip { visibility: hidden; position: absolute; z-index: 1000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
+        .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
         .tooltip-container { position: relative; display: inline-block; vertical-align: middle; margin-left: 6px; }
         .tooltip-container:hover .custom-tooltip { visibility: visible; }
       </style>
@@ -3925,8 +6394,7 @@
     autoUpdateModalToggle.addEventListener("change", updateVarsAndSave);
 
     doneButton.addEventListener("click", closeModal);
-    doneButton.addEventListener("mouseenter", () => { doneButton.style.backgroundColor = "#3BE377"; });
-    doneButton.addEventListener("mouseleave", () => { doneButton.style.backgroundColor = "#1ED760"; });
+    addHoverEffect(doneButton, "#1ED760", "#3BE377");
 
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
@@ -3999,13 +6467,13 @@
     overlay.id = "sort-play-folder-name-overlay";
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.7); z-index: 2002;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2005;
         display: flex; justify-content: center; align-items: center;
     `;
 
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
-    modalContainer.style.zIndex = "2003";
+    modalContainer.style.zIndex = "2006";
     modalContainer.innerHTML = `
       <div class="main-trackCreditsModal-header">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Customize Folder Name</span></h1>
@@ -4205,131 +6673,58 @@
         const shouldAnimate = editingState.section !== lastEditingState.section || editingState.index !== lastEditingState.index;
         modalContainer.innerHTML = `
             <style>
-                .np-modal-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
-                .np-modal-title { font-size: 24px; font-weight: 700; color: white; margin: 0; }
-                .np-close-btn { background: none; border: none; color: #b3b3b3; cursor: pointer; padding: 4px; display: flex; transition: color 0.2s; }
-                .np-close-btn:hover { color: white; }
-                
-                .np-modal-body { padding: 24px 32px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 32px; }
-                
-                .config-section { display: flex; flex-direction: column; gap: 16px; }
-                .section-header { display: flex; align-items: center; justify-content: space-between; }
-                .section-title { font-size: 16px; font-weight: 700; color: white; }
-                
-                .pills-container { 
-                    display: flex; flex-wrap: wrap; gap: 8px; 
-                    background: #242424; padding: 12px; border-radius: 8px; border: 1px solid #333;
-                    min-height: 56px; align-items: center;
-                }
-                .config-section.disabled .pills-container { opacity: 0.5; pointer-events: none; }
-                
-                .np-pill {
-                    background: #3e3e3e; color: #eee; border-radius: 16px; padding: 6px 12px;
-                    font-size: 13px; font-weight: 500; cursor: pointer; user-select: none;
-                    display: flex; align-items: center; gap: 6px; border: 1px solid transparent;
-                    transition: all 0.2s ease;
-                }
-                .np-pill:hover { background: #4e4e4e; border-color: #666; }
-                .np-pill.active { background: #1ED760; color: black; border-color: #1ED760; }
-                
-                .add-pill-btn {
-                    width: 32px; height: 32px; border-radius: 50%; border: 1px solid #555;
-                    background: transparent; color: #aaa; cursor: pointer; display: flex;
-                    align-items: center; justify-content: center; transition: all 0.2s;
-                }
-                .add-pill-btn:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
-
-                .item-settings-panel {
-                    background: #2a2a2a; border: 1px solid #3e3e3e; border-radius: 8px;
-                    padding: 16px; margin-top: 4px; display: grid; grid-template-columns: 1.2fr 1.2fr 0.6fr; gap: 12px;
-                }
-                .item-settings-panel.animate {
-                    animation: slideDown 0.2s ease;
-                }
-                .item-settings-panel.exiting {
-                    animation: slideUp 0.2s ease forwards;
-                    pointer-events: none;
-                }
-                @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-                @keyframes slideUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-5px); } }
-                
-                .setting-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-                .setting-label { font-size: 11px; color: #b3b3b3; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-                
-                .np-select, .np-input {
-                    background: #181818; border: 1px solid #444; color: white; padding: 8px;
-                    border-radius: 4px; font-family: inherit; font-size: 13px; width: 100%;
-                }
-                .np-select:focus, .np-input:focus { border-color: #888; outline: none; }
-
-                .separator-container { position: relative; display: flex; gap: 6px; }
-                .toggle-sep-menu-btn {
-                    background: #333; border: 1px solid #444; color: #ccc; border-radius: 4px;
-                    width: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-                    flex-shrink: 0;
-                }
-                .toggle-sep-menu-btn:hover { background: #444; color: white; }
-                
-                .separator-dropdown {
-                    display: none;
-                    position: absolute;
-                    background-color: #282828;
-                    border: 1px solid #444;
-                    border-radius: 4px;
-                    padding: 8px;
-                    width: 250px;
-                    z-index: 100;
-                    top: 100%;
-                    right: 0;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-                    grid-template-columns: repeat(7, 1fr);
-                    gap: 4px;
-                    margin-top: 4px;
-                }
-                .separator-dropdown.visible { display: grid; }
-                
-                .separator-option {
-                    background: #3e3e3e;
-                    border: none;
-                    color: #eee;
-                    border-radius: 4px;
-                    padding: 6px 0;
-                    cursor: pointer;
-                    font-size: 14px;
-                    text-align: center;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .separator-option:hover { background: #555; color: white; }
-
-                .panel-actions {
-                    grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;
-                    margin-top: 8px; padding-top: 16px; border-top: 1px solid #3e3e3e;
-                }
-                .move-btn { background: transparent; border: 1px solid #555; color: #ccc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-                .move-btn:hover { border-color: #fff; color: #fff; }
-                .move-btn:disabled { opacity: 0.3; cursor: default; border-color: #555; color: #ccc; }
-                
-                .delete-btn { background: rgba(220, 53, 69, 0.2); border: 1px solid rgba(220, 53, 69, 0.5); color: #ff6b6b; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; }
-                .delete-btn:hover { background: rgba(220, 53, 69, 0.4); color: white; }
-
-                .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
-                .switch input { opacity: 0; width: 0; height: 0; }
-                .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
-                .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
-                input:checked + .sliderx { background-color: #1DB954; }
-                input:checked + .sliderx:before { transform: translateX(16px); }
-                .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
-
-                .np-modal-footer { padding: 20px 32px; border-top: 1px solid #282828; display: flex; justify-content: flex-end; }
-                .save-btn { background: #1ED760; color: black; border: none; padding: 10px 24px; border-radius: 24px; font-weight: 700; cursor: pointer; font-size: 14px; }
-                .save-btn:hover { background: #3BE377; }
+              .np-modal-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
+              .np-modal-title { font-size: 24px; font-weight: 700; color: white; margin: 0; }
+              .np-close-btn { background: none; border: none; color: #b3b3b3; cursor: pointer; padding: 4px; display: flex; transition: color 0.2s; }
+              .np-close-btn:hover { color: white; }
+              .np-modal-body { padding: 24px 32px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 32px; }
+              .config-section { display: flex; flex-direction: column; gap: 16px; }
+              .section-header { display: flex; align-items: center; justify-content: space-between; }
+              .section-title { font-size: 16px; font-weight: 700; color: white; }
+              .pills-container { display: flex; flex-wrap: wrap; gap: 8px; background: #242424; padding: 12px; border-radius: 8px; border: 1px solid #333; min-height: 56px; align-items: center; }
+              .config-section.disabled .pills-container { opacity: 0.5; pointer-events: none; }
+              .np-pill { background: #3e3e3e; color: #eee; border-radius: 16px; padding: 6px 12px; font-size: 13px; font-weight: 500; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; border: 1px solid transparent; transition: all 0.2s ease; }
+              .np-pill:hover { background: #4e4e4e; border-color: #666; }
+              .np-pill.active { background: #1ED760; color: black; border-color: #1ED760; }
+              .add-pill-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #555; background: transparent; color: #aaa; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+              .add-pill-btn:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
+              .item-settings-panel { background: #2a2a2a; border: 1px solid #3e3e3e; border-radius: 8px; padding: 16px; margin-top: 4px; display: grid; grid-template-columns: 1.2fr 1.2fr 0.6fr; gap: 12px; }
+              .item-settings-panel.animate { animation: slideDown 0.2s ease; }
+              .item-settings-panel.exiting { animation: slideUp 0.2s ease forwards; pointer-events: none; }
+              @keyframes slideDown { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+              @keyframes slideUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-5px); } }
+              .setting-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+              .setting-label { font-size: 11px; color: #b3b3b3; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+              .np-select, .np-input { background: #181818; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; font-family: inherit; font-size: 13px; width: 100%; }
+              .np-select:focus, .np-input:focus { border-color: #888; outline: none; }
+              .separator-container { position: relative; display: flex; gap: 6px; }
+              .toggle-sep-menu-btn { background: #333; border: 1px solid #444; color: #ccc; border-radius: 4px; width: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+              .toggle-sep-menu-btn:hover { background: #444; color: white; }
+              .separator-dropdown { display: none; position: absolute; background-color: #282828; border: 1px solid #444; border-radius: 4px; padding: 8px; width: 250px; z-index: 100; top: 100%; right: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5); grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 4px; }
+              .separator-dropdown.visible { display: grid; }
+              .separator-option { background: #3e3e3e; border: none; color: #eee; border-radius: 4px; padding: 6px 0; cursor: pointer; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; }
+              .separator-option:hover { background: #555; color: white; }
+              .panel-actions { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 16px; border-top: 1px solid #3e3e3e; }
+              .move-btn { background: transparent; border: 1px solid #555; color: #ccc; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+              .move-btn:hover { border-color: #fff; color: #fff; }
+              .move-btn:disabled { opacity: 0.3; cursor: default; border-color: #555; color: #ccc; }
+              .delete-btn { background: rgba(220, 53, 69, 0.2); border: 1px solid rgba(220, 53, 69, 0.5); color: #ff6b6b; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600; }
+              .delete-btn:hover { background: rgba(220, 53, 69, 0.4); color: white; }
+              .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+              .switch input { opacity: 0; width: 0; height: 0; }
+              .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+              .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+              input:checked + .sliderx { background-color: #1DB954; }
+              input:checked + .sliderx:before { transform: translateX(16px); }
+              .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
+              .np-modal-footer { padding: 20px 32px; border-top: 1px solid #282828; display: flex; justify-content: flex-end; }
+              .save-btn { background: #1ED760; color: black; border: none; padding: 10px 24px; border-radius: 24px; font-weight: 700; cursor: pointer; font-size: 14px; }
+              .save-btn:hover { background: #3BE377; }
             </style>
             
             <div class="np-modal-header">
                 <h2 class="np-modal-title">Now Playing Data</h2>
-                <button class="np-close-btn" id="np-close-x"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+                <button class="np-close-btn" id="np-close-x">${closeIcon24Svg}</button>
             </div>
             <div class="np-modal-body">
                 ${renderSection('title', 'Next to Track Title', shouldAnimate)}
@@ -4373,7 +6768,7 @@
                 <div class="pills-container">
                     ${pillsHtml}
                     <button class="add-pill-btn" data-section="${sectionKey}" title="Add Data Point">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2H9v6a1 1 0 1 1-2 0V9H1a1 1 0 0 1 0-2h6V1a1 1 0 0 1 1-1z"/></svg>
+                        ${addPillIconSvg}
                     </button>
                 </div>
                 ${settingsPanelHtml}
@@ -4608,17 +7003,18 @@
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
         background-color: rgba(0, 0, 0, 0.7);
-        z-index: 2002;
+        z-index: 2005;
         display: flex; justify-content: center; align-items: center;
     `;
 
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
     modalContainer.style.cssText = `
-        z-index: 2003;
+        z-index: 2006;
         width: 500px !important;
         display: flex;
         flex-direction: column;
+        border-radius: 30px;
     `;
 
     const wallets = [
@@ -4645,42 +7041,11 @@
         .wallet-entry { display: flex; flex-direction: column; gap: 6px; }
         .wallet-label { color: #c1c1c1; font-size: 14px; font-weight: 500; }
         .wallet-address-container { display: flex; align-items: center; gap: 8px; }
-        .wallet-address { 
-            flex-grow: 1; 
-            background-color: #121212; 
-            border: 1px solid #333; 
-            border-radius: 4px; 
-            padding: 8px 12px; 
-            color: #fff; 
-            font-family: monospace; 
-            font-size: 11px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .copy-button { 
-            flex-shrink: 0;
-            background-color: #333; 
-            border: 1px solid #555;
-            color: #fff; 
-            padding: 6px 6px; 
-            border-radius: 4px; 
-            cursor: pointer; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background-color 0.2s ease;
-            width: 32px;
-            height: 32px;
-        }
+        .wallet-address { flex-grow: 1; background-color: #121212; border: 1px solid #333; border-radius: 4px; padding: 8px 12px; color: #fff; font-family: monospace; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .copy-button { flex-shrink: 0; background-color: #333; border: 1px solid #555; color: #fff; padding: 6px 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; width: 32px; height: 32px; }
         .copy-button:hover { background-color: #444; }
-        .copy-button.copied {
-            background-color: #1ED760;
-            color: black;
-        }
-        .copy-button.copied:hover {
-            background-color: #1ED760;
-        }
+        .copy-button.copied { background-color: #1ED760; color: black; }
+        .copy-button.copied:hover { background-color: #1ED760; }
         .copy-button svg { width: 16px; height: 16px; }
       </style>
       <div class="main-trackCreditsModal-header">
@@ -4726,13 +7091,7 @@
     const doneButton = modalContainer.querySelector("#closeSupportModal");
     if (doneButton) {
         doneButton.addEventListener("click", closeModal);
-        
-        doneButton.addEventListener("mouseenter", () => {
-            doneButton.style.backgroundColor = "#3BE377";
-        });
-        doneButton.addEventListener("mouseleave", () => {
-            doneButton.style.backgroundColor = "#1ED760";
-        });
+        addHoverEffect(doneButton, "#1ED760", "#3BE377");
     }
 
     overlay.addEventListener("click", (e) => {
@@ -4865,7 +7224,7 @@
                     </div>
 
                     <div class="global-stats" data-id="${card.id}" style="position: absolute; bottom: 6px; left: 12px; z-index: 3; display: flex; align-items: center; gap: 4px; opacity: ${opacityStyle}; transition: opacity 0.5s ease;">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                        ${globalCreationsIconSvg}
                         <span class="stats-count" style="font-size: 10px; font-weight: 700; color: #1ed760; letter-spacing: 0.5px; font-variant-numeric: tabular-nums;">${countText}</span>
                         <span style="font-size: 10px; color: #888;">global creations</span>
                     </div>
@@ -4955,370 +7314,62 @@
 
     shadowRoot.innerHTML = `
       <style>
-        :host {
-            font-family: 'SpotifyMixUI', sans-serif !important;
-            color: #fff;
-        }
+        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
         *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
         h1 { margin: 0; line-height: normal; }
-        .create-playlist-modal-body {
-            flex-grow: 1;
-            overflow-y: auto; 
-            padding: 30px 30px;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .columns-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 25px;
-            height: 100%;
-        }
-
-        .category-column {
-            display: flex;
-            flex-direction: column;
-            gap: 66px;
-            min-width: 0;
-            overflow-y: auto;
-            scrollbar-width: none;
-        }
-
-        .category-section {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .category-header {
-            font-size: 13px;
-            font-weight: 700;
-            color: #b3b3b3;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #333;
-        }
-
-        .cards-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .slim-card {
-            position: relative;
-            height: 85px;
-            background-color: #252525;
-            border-radius: 12px;
-            overflow: hidden;
-            cursor: pointer;
-            border: 1px solid transparent;
-            user-select: none;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            transform: translateZ(0);
-            transition: border-color 0.1s;
-        }
-
-        .slim-card:hover {
-            z-index: 2;
-        }
-        
-        .slim-card:has(.settings-overlay-panel.active) {
-            border-color: transparent;
-            z-index: 2;
-        }
-
-        .card-bg {
-            position: absolute;
-            top: 0; left: -4px; width: 102%; height: 102%;
-            background-size: 100% auto;
-            background-position: top center;
-            filter: grayscale(0.2) brightness(0.7);
-            
-            transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            will-change: transform;
-            transform-origin: center center;
-        }
-
-        .slim-card:hover .card-bg, .slim-card:has(.settings-overlay-panel.active) .card-bg {
-            transform: scale(1.03);
-        }
-
-        .card-overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 1;
-            pointer-events: none;
-        }
-        
-        .card-overlay::before,
-        .card-overlay::after {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            transition: opacity 0.25s ease;
-        }
-
-        .card-overlay::before {
-            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.07) 0%, rgba(0,0,0,0.2) 100%);
-            opacity: 1;
-        }
-
-        .card-overlay::after {
-            background: linear-gradient(90deg, rgba(var(--overlay-color), 0.18) 0%, rgba(var(--overlay-color), 0.03) 100%);
-            opacity: 0;
-        }
-
-        .slim-card:hover .card-overlay::before,
-        .slim-card:has(.settings-overlay-panel.active) .card-overlay::before {
-            opacity: 0;
-        }
-
-        .slim-card:hover .card-overlay::after,
-        .slim-card:has(.settings-overlay-panel.active) .card-overlay::after {
-            opacity: 1;
-        }
-
-        .card-content-wrapper {
-            position: relative;
-            z-index: 2;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            padding: 0 40px 0 12px;
-        }
-
-        .card-text {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            width: 100%;
-        }
-
-        .card-title-row {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .card-title {
-            color: #fff;
-            font-weight: 700;
-            font-size: 15px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-        }
-
-        .card-version-tag {
-            font-size: 9px;
-            font-weight: 700;
-            color: #b3b3b3;
-            background-color: rgb(255 255 255 / 9%);
-            padding: 1px 4px;
-            border-radius: 4px;
-            margin-top: 4px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .badge-container {
-            display: flex;
-            align-items: center;
-            transition: opacity 0.2s ease;
-        }
-
-        .mode-badge {
-            font-size: 10px;
-            font-weight: 800;
-            padding: 2px 5px;
-            border-radius: 3px;
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
-            display: inline-block;
-            line-height: 1.1;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .mode-badge.replace {
-            background-color: #3e2a0f; 
-            color: #ffaa00; 
-            border: 1px solid #5e431d;
-        }
-        
-        .mode-badge.auto {
-            background-color: #0f3318; 
-            color: #1ed760;
-            border: 1px solid #184f25;
-        }
-
-        .card-desc {
-            color: #ddd;
-            font-size: 12px;
-            opacity: 0.8;
-            margin-top: 3px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-            white-space: normal;
-            line-height: 1.2;
-        }
-
-        .settings-trigger {
-            position: absolute;
-            top: 0;
-            right: 0;
-            height: 100%;
-            width: 30px;
-            z-index: 10;
-            background: transparent;
-            border: none;
-            border-left: 1px solid transparent;
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            opacity: 0;
-            transition: opacity 0.2s, background-color 0.2s, border-color 0.2s;
-            cursor: pointer;
-        }
-        .slim-card:hover .settings-trigger {
-            opacity: 1;
-        }
-        .settings-trigger:hover {
-            background-color: rgba(255,255,255,0.1);
-            border-left-color: rgba(255,255,255,0.1);
-        }
-
-        .settings-overlay-panel {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgb(255 255 255 / 10%);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            z-index: 20;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 30px 0 10px;
-            opacity: 0;
-            visibility: hidden;
-            pointer-events: none;
-            transition: opacity 0.2s ease, visibility 0.2s ease;
-        }
-        .settings-overlay-panel.active {
-            opacity: 1;
-            visibility: visible;
-            pointer-events: auto;
-        }
-
-        .settings-options {
-            display: flex;
-            gap: 4px;
-            background: #181818;
-            padding: 3px;
-            border-radius: 4px;
-        }
-
-        .mode-btn {
-            background: transparent;
-            border: none;
-            color: #888;
-            font-size: 11px;
-            font-weight: 600;
-            padding: 6px 12px;
-            border-radius: 3px;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .create-playlist-modal-body { flex-grow: 1; overflow-y: auto; padding: 30px 30px; display: flex; flex-direction: column; }
+        .columns-container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px; height: 100%; }
+        .category-column { display: flex; flex-direction: column; gap: 66px; min-width: 0; overflow-y: auto; scrollbar-width: none; }
+        .category-section { display: flex; flex-direction: column; gap: 12px; }
+        .category-header { font-size: 13px; font-weight: 700; color: #b3b3b3; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 1px solid #333; }
+        .cards-stack { display: flex; flex-direction: column; gap: 10px; }
+        .slim-card { position: relative; height: 85px; background-color: #252525; border-radius: 12px; overflow: hidden; cursor: pointer; border: 1px solid transparent; user-select: none; -webkit-backface-visibility: hidden; backface-visibility: hidden; transform: translateZ(0); transition: border-color 0.1s; }
+        .slim-card:hover { z-index: 2; }
+        .slim-card:has(.settings-overlay-panel.active) { border-color: transparent; z-index: 2; }
+        .card-bg { position: absolute; top: 0; left: -4px; width: 102%; height: 102%; background-size: 100% auto; background-position: top center; filter: grayscale(0.2) brightness(0.7); transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94); will-change: transform; transform-origin: center center; }
+        .slim-card:hover .card-bg, .slim-card:has(.settings-overlay-panel.active) .card-bg { transform: scale(1.03); }
+        .card-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .card-overlay::before, .card-overlay::after { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.25s ease; }
+        .card-overlay::before { background: linear-gradient(90deg, rgba(var(--overlay-color), 0.07) 0%, rgba(0,0,0,0.2) 100%); opacity: 1; }
+        .card-overlay::after { background: linear-gradient(90deg, rgba(var(--overlay-color), 0.18) 0%, rgba(var(--overlay-color), 0.03) 100%); opacity: 0; }
+        .slim-card:hover .card-overlay::before, .slim-card:has(.settings-overlay-panel.active) .card-overlay::before { opacity: 0; }
+        .slim-card:hover .card-overlay::after, .slim-card:has(.settings-overlay-panel.active) .card-overlay::after { opacity: 1; }
+        .card-content-wrapper { position: relative; z-index: 2; height: 100%; display: flex; align-items: center; padding: 0 40px 0 12px; }
+        .card-text { display: flex; flex-direction: column; justify-content: center; width: 100%; }
+        .card-title-row { display: flex; align-items: center; gap: 5px; }
+        .card-title { color: #fff; font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+        .card-version-tag { font-size: 9px; font-weight: 700; color: #b3b3b3; background-color: rgb(255 255 255 / 9%); padding: 1px 4px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .badge-container { display: flex; align-items: center; transition: opacity 0.2s ease; }
+        .mode-badge { font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 3px; letter-spacing: 0.3px; text-transform: uppercase; display: inline-block; line-height: 1.1; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .mode-badge.replace { background-color: #3e2a0f; color: #ffaa00; border: 1px solid #5e431d; }
+        .mode-badge.auto { background-color: #0f3318; color: #1ed760; border: 1px solid #184f25; }
+        .card-desc { color: #ddd; font-size: 12px; opacity: 0.8; margin-top: 3px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2; }
+        .settings-trigger { position: absolute; top: 0; right: 0; height: 100%; width: 30px; z-index: 10; background: transparent; border: none; border-left: 1px solid transparent; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s, background-color 0.2s, border-color 0.2s; cursor: pointer; }
+        .slim-card:hover .settings-trigger { opacity: 1; }
+        .settings-trigger:hover { background-color: rgba(255,255,255,0.1); border-left-color: rgba(255,255,255,0.1); }
+        .settings-overlay-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgb(255 255 255 / 10%); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 20; display: flex; align-items: center; justify-content: center; padding: 0 30px 0 10px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease, visibility 0.2s ease; }
+        .settings-overlay-panel.active { opacity: 1; visibility: visible; pointer-events: auto; }
+        .settings-options { display: flex; gap: 4px; background: #181818; padding: 3px; border-radius: 4px; }
+        .mode-btn { background: transparent; border: none; color: #888; font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 3px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
         .mode-btn:hover { color: #fff; background: #333; }
-        .mode-btn.active {
-            background: #1ED760;
-            color: #000;
-        }
-        .mode-btn.active[data-val="autoUpdate"]:hover {
-            background-color: #3BE377;
-        }
-        
-        .close-settings {
-            position: absolute;
-            right: 0; top: 0; height: 100%; width: 30px;
-            background: transparent; border: none;
-            color: #888; font-size: 18px; cursor: pointer;
-        }
+        .mode-btn.active { background: #1ED760; color: #000; }
+        .mode-btn.active[data-val="autoUpdate"]:hover { background-color: #3BE377; }
+        .close-settings { position: absolute; right: 0; top: 0; height: 100%; width: 30px; background: transparent; border: none; color: #888; font-size: 18px; cursor: pointer; }
         .close-settings:hover, .close-settings.hover { color: #fff; background: rgba(255,255,255,0.1); }
-
         .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
-
-        .broken-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(12, 12, 12, 0.85);
-            z-index: 15;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            backdrop-filter: blur(0.8px);
-            opacity: 1;
-        }
-
-        .broken-overlay span {
-            color: #ff5c5c;
-            font-weight: 800;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            padding: 6px 14px;
-            border-radius: 5px;
-            background: rgba(255, 92, 92, 0.1);
-            border: 1px solid rgba(255, 92, 92, 0.25);
-            box-shadow: 0 0 15px rgba(255, 92, 92, 0.1);
-            transition: all 0.2s ease;
-        }
-
-        .slim-card.broken-card {
-            cursor: not-allowed;
-            border-color: transparent !important;
-            box-shadow: none !important;
-            opacity: 0.7;
-            transition: opacity 0.3s ease;
-        }
-
-        .slim-card.broken-card:hover {
-            transform: none !important;
-            opacity: 1;
-            z-index: 1 !important;
-        }
-        
-        .slim-card.broken-card .card-bg {
-            filter: grayscale(100%) contrast(120%) brightness(40%) !important;
-            transform: none !important;
-        }
-        
-        .slim-card.broken-card .card-overlay::before, 
-        .slim-card.broken-card .card-overlay::after {
-            display: none !important;
-        }
-        
+        .broken-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(12, 12, 12, 0.85); z-index: 15; display: flex; align-items: center; justify-content: center; pointer-events: none; backdrop-filter: blur(0.8px); opacity: 1; }
+        .broken-overlay span { color: #ff5c5c; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; padding: 6px 14px; border-radius: 5px; background: rgba(255, 92, 92, 0.1); border: 1px solid rgba(255, 92, 92, 0.25); box-shadow: 0 0 15px rgba(255, 92, 92, 0.1); transition: all 0.2s ease; }
+        .slim-card.broken-card { cursor: not-allowed; border-color: transparent !important; box-shadow: none !important; opacity: 0.7; transition: opacity 0.3s ease; }
+        .slim-card.broken-card:hover { transform: none !important; opacity: 1; z-index: 1 !important; }
+        .slim-card.broken-card .card-bg { filter: grayscale(100%) contrast(120%) brightness(40%) !important; transform: none !important; }
+        .slim-card.broken-card .card-overlay::before, .slim-card.broken-card .card-overlay::after { display: none !important; }
         .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
       </style>
 
       <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 26px; font-weight: 700; color: white;'>Dedicated Playlist Creation</span></h1>
           <button id="closeCreatePlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            <svg width="20" height="20" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+            ${closeModalIcon20Svg}
           </button>
       </div>
       <div class="create-playlist-modal-body">
@@ -5582,19 +7633,13 @@
 
         modalContainer.innerHTML = `
           <style>
-            .form-select {
-                width: 100%; background: #282828; color: white; border: 1px solid #666;
-                border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 13px; cursor: pointer;
-                -webkit-appearance: none; -moz-appearance: none; appearance: none;
-                background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-                background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
-            }
+            .form-select { width: 100%; background: #282828; color: white; border: 1px solid #666; border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 13px; cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("${selectDropdownIconSvgDataUri}"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; }
             .custom-schedule-container { display: none; align-items: center; gap: 8px; margin-top: 16px; padding: 10px; background-color: #3e3e3e; border-radius: 8px; }
             .custom-schedule-container.visible { display: flex; }
             .custom-schedule-container input[type="number"] { width: 60px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center; }
             .custom-schedule-container label { font-size: 12px; color: #b3b3b3; }
             .custom-schedule-ok-btn { padding: 6px 12px; border-radius: 15px; border: none; background-color: #1ed760; color: black; font-weight: bold; cursor: pointer; }
-            .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+            .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
             .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
             .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
             .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
@@ -5766,7 +7811,7 @@
       overlay.style.cssText = `
           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
           background-color: rgba(0, 0, 0, 0.7);
-          z-index: 2002;
+          z-index: 99999;
           display: flex; justify-content: center; align-items: center;
       `;
 
@@ -5788,32 +7833,11 @@
 
       modalContainer.innerHTML = `
         <style>
-            .sp-confirm-btn {
-                width: auto;
-                padding: 8px 18px;
-                border-radius: 20px;
-                border: none;
-                cursor: pointer;
-                font-weight: 550;
-                font-size: 13px;
-                text-transform: uppercase;
-                transition: background-color 0.2s ease;
-            }
-            .sp-confirm-btn-primary {
-                background-color: #1ED760;
-                color: black;
-            }
-            .sp-confirm-btn-primary:hover {
-                background-color: #3BE377;
-            }
-            .sp-confirm-btn-secondary {
-                background-color: #333333;
-                color: white;
-                 padding: 8px 16px;
-            }
-            .sp-confirm-btn-secondary:hover {
-                background-color: #444444;
-            }
+          .sp-confirm-btn { width: auto; padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: background-color 0.2s ease; }
+          .sp-confirm-btn-primary { background-color: #1ED760; color: black; }
+          .sp-confirm-btn-primary:hover { background-color: #3BE377; }
+          .sp-confirm-btn-secondary { background-color: #333333; color: white; padding: 8px 16px; }
+          .sp-confirm-btn-secondary:hover { background-color: #444444; }
         </style>
         <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
             <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>${title}</span></h1>
@@ -5863,158 +7887,6 @@
     const errorMessage = `${context}: ${error.message}\n${location}`;
     showNotification(errorMessage, true, 8000);
     console.error(`[Sort-Play] ${context}:`, error);
-  }
-
-  function formatPlayCount(count, format) {
-    if (count === null || count === undefined || isNaN(count) || count === "N/A" || count === "_" || count === "―" || Number(count) === 0) {
-        return 'N/A';
-    }
-
-    const num = Number(count);
-
-    if (format === 'abbreviated') {
-        if (num >= 1_000_000_000) {
-            return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
-        }
-        if (num >= 1_000_000) {
-            return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-        }
-        if (num >= 1_000) {
-            return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
-        }
-        return num.toString();
-    } else if (format === 'rounded_abbreviated') {
-        if (num >= 1_000_000_000) {
-            return Math.round(num / 1_000_000_000) + 'B';
-        }
-        if (num >= 1_000_000) {
-            return Math.round(num / 1_000_000) + 'M';
-        }
-        if (num >= 1_000) {
-            return Math.round(num / 1_000) + 'K';
-        }
-        return num.toString();
-    }
-
-    return new Intl.NumberFormat('en-US').format(num);
-  }
-
-  function formatTempo(value, format) {
-    if (value === null || isNaN(value)) return '―';
-    const rounded = Math.round(value);
-    if (format === 'raw') {
-        return rounded.toString();
-    }
-    return `${rounded} BPM`;
-  }
-
-  function formatAudioFeature(value, format, unitName = '') {
-    if (value === null || isNaN(value)) return '―';
-    
-    const roundedValue = Math.round(value);
-
-    if (format === 'raw') {
-        return roundedValue.toString();
-    } else if (format === 'decimal') {
-        return (value / 100).toFixed(2);
-    } else if (format === 'tier') {
-        if (value <= 20) return 'Very Low';
-        if (value <= 40) return 'Low';
-        if (value <= 60) return 'Medium';
-        if (value <= 80) return 'High';
-        return 'Very High';
-    } else if (format === 'with_unit') {
-        return `${roundedValue} ${unitName}`;
-    }
-    return `${roundedValue}%`;
-  }
-
-  function formatKey(key, mode, format, rawCamelot) {
-    if (format === 'camelot' && rawCamelot) return rawCamelot;
-    if (key === null || key === -1 || isNaN(key) || mode === null || isNaN(mode)) return '―';
-
-    const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-    
-    const camelotMap = [
-        { major: '8B', minor: '5A' }, { major: '3B', minor: '12A' }, { major: '10B', minor: '7A' },
-        { major: '5B', minor: '2A' }, { major: '12B', minor: '9A' }, { major: '7B', minor: '4A' },
-        { major: '2B', minor: '11A' }, { major: '9B', minor: '6A' }, { major: '4B', minor: '1A' },
-        { major: '11B', minor: '8A' }, { major: '6B', minor: '3A' }, { major: '1B', minor: '10A' }
-    ];
-
-    const openKeyMap = [
-        { major: '1d', minor: '10m' }, { major: '8d', minor: '5m' }, { major: '3d', minor: '12m' },
-        { major: '10d', minor: '7m' }, { major: '5d', minor: '2m' }, { major: '12d', minor: '9m' },
-        { major: '7d', minor: '4m' }, { major: '2d', minor: '11m' }, { major: '9d', minor: '6m' },
-        { major: '4d', minor: '1m' }, { major: '11d', minor: '8m' }, { major: '6d', minor: '3m' }
-    ];
-
-    const standardKey = mode === 0 ? `${pitchClasses[key]}m` : pitchClasses[key];
-    const camelotKey = rawCamelot || (mode === 1 ? camelotMap[key].major : camelotMap[key].minor);
-
-    switch (format) {
-        case 'camelot':
-            return camelotKey;
-        case 'openkey':
-            return mode === 1 ? openKeyMap[key].major : openKeyMap[key].minor;
-        case 'full_name':
-            return `${pitchClasses[key]} ${mode === 1 ? 'Major' : 'Minor'}`;
-        case 'standard_camelot':
-             return `${standardKey} (${camelotKey})`;
-        case 'standard':
-        default:
-            return standardKey;
-    }
-  }
-
-  function formatPopularity(value, format) {
-    if (value === null || isNaN(value)) return '―';
-    const num = Math.round(value);
-
-    switch (format) {
-        case 'with_label':
-            return `Pop: ${num}`;
-        case 'percentage':
-            return `${num}%`;
-        case 'tier':
-            if (num >= 90) return 'Global Hit';
-            if (num >= 75) return 'Major Hit';
-            if (num >= 55) return 'Popular';
-            if (num >= 30) return 'Niche';
-            return 'Underground';
-        case 'raw':
-        default:
-            return num.toString();
-    }
-  }
-  
-  function formatScrobbles(count, format) {
-      if (count === null || isNaN(count)) return '―';
-      const num = Number(count);
-      
-      let val = new Intl.NumberFormat('en-US').format(num);
-      let shortVal = val;
-      
-      if (num >= 1000000) shortVal = (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-      else if (num >= 1000) shortVal = (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-
-      switch (format) {
-          case 'abbreviated': return shortVal;
-          case 'with_label': return `LFM: ${shortVal}`;
-          case 'raw': default: return val;
-      }
-  }
-
-  function formatPersonalScrobbles(count, format) {
-      if (count === null || isNaN(count)) return '―';
-      const num = Number(count);
-      const val = new Intl.NumberFormat('en-US').format(num);
-
-      switch (format) {
-          case 'with_label': return `Me: ${val}`;
-          case 'with_suffix': return `${val} scrobbles`;
-          case 'raw': default: return val;
-      }
   }
 
   function showGenreDetailsModal(genreMapOrPromise, trackName, artistName, coverUrl) {
@@ -6194,7 +8066,7 @@
           try { return JSON.parse(str); } catch (e) { return null; }
       }
 
-      const STORAGE_KEY_POS = "sort-play-genre-window-pos";
+      const STORAGE_KEY_POS = STORAGE_KEY_GENRE_WINDOW_POS;
       const width = 550;
       
       let left, top;
@@ -6373,13 +8245,13 @@
               </div>
               <div class="sp-window-controls">
                   <button class="sp-control-btn minimize-btn" title="Minimize">
-                      <svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      ${minimizeIconSvg}
                   </button>
                   <button class="sp-control-btn settings-btn" title="Genre Settings">
                       ${settingsSvg.replace('<svg', '<svg width="19" height="19" fill="currentColor"')}
                   </button>
                   <button class="sp-control-btn close-btn" title="Close">
-                      <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"/></svg>
+                      ${closeIcon16Svg}
                   </button>
               </div>
           </div>
@@ -6572,8 +8444,8 @@
           }
 
           minimizeBtn.innerHTML = isMinimized 
-              ? `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-              : `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`; 
+              ? `${restoreWindowIconSvg}`
+              : `${minimizeIconSvg}`; 
           minimizeBtn.title = isMinimized ? "Restore" : "Minimize";
       });
 
@@ -6653,7 +8525,7 @@
   function updateGenresContextMenu() {
       if (showGenresContextMenu && !genresContextMenuItem) {
           if (!Spicetify.SVGIcons["genre-tag"]) {
-              Spicetify.SVGIcons["genre-tag"] = `<svg width="16" height="16" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" fill-rule="evenodd" d="M22 3v13a4 4 0 1 1-8 0 4 4 0 0 1 6-3.46V4.18l-10 1.67V18a4 4 0 1 1-8 0 4 4 0 0 1 6-3.46V5c0-.5.4-.9.8-1l12-2c.6-.1 1.2.3 1.2 1ZM20 16a2 2 0 1 0-4 0 2 2 0 0 0 4 0ZM8 18a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z"/></svg>`;
+              Spicetify.SVGIcons["genre-tag"] = genreTagIconSvg;
           }
 
           genresContextMenuItem = new Spicetify.ContextMenu.Item(
@@ -7088,13 +8960,8 @@
                           isrc = track.external_ids.isrc;
                       } else {
                           try {
-                              if (isFallbackActive()) {
-                                  const meta = await fetchInternalTrackMetadata(trackId);
-                                  isrc = meta?.external_ids?.isrc;
-                              } else {
-                                  const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                                  isrc = data?.external_ids?.isrc;
-                              }
+                              const meta = await fetchInternalTrackMetadata(trackId);
+                              isrc = meta?.external_ids?.isrc;
                           } catch(e) {}
                       }
 
@@ -7190,11 +9057,7 @@
                   getTrackDetailsWithPlayCount(mockTrackObj).catch(() => {});
               } 
               if (typesNeeded.has('popularity')) {
-                  if (isFallbackActive()) {
-                      fetchInternalTrackMetadata(trackId).catch(() => {});
-                  } else {
-                      Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`).catch(() => {});
-                  }
+                  fetchInternalTrackMetadata(trackId).catch(() => {});
               } 
               if (typesNeeded.has('scrobbles')) {
                   getTrackDetailsWithScrobbles(mockTrackObj, true).catch(() => {});
@@ -7862,20 +9725,8 @@
             if (typesNeeded.has('popularity')) {
                 const fetchPop = async () => {
                     let val = null;
-                    if (isFallbackActive()) {
-                        const meta = await fetchInternalTrackMetadata(trackId);
-                        if (meta) val = meta.popularity;
-                    } else {
-                        try {
-                            const details = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                            val = details.popularity;
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                const meta = await fetchInternalTrackMetadata(trackId);
-                                if (meta) val = meta.popularity;
-                            }
-                        }
-                    }
+                    const meta = await fetchInternalTrackMetadata(trackId);
+                    if (meta) val = meta.popularity;
                     dataContext.popularity = { popularity: val };
                 };
                 promises.push(fetchPop());
@@ -8081,64 +9932,6 @@
     }
   }
 
-  function preventDragCloseModal(signal) {
-    let mouseDownInsideModal = false;
-    let dragStarted = false;
-    
-    const modal = document.querySelector('.GenericModal');
-    const modalOverlay = document.querySelector('.GenericModal__overlay');
-    
-    if (!modal || !modalOverlay) return;
-    
-    document.addEventListener('mousedown', (e) => {
-      if (modal.contains(e.target)) {
-        mouseDownInsideModal = true;
-      } else {
-        mouseDownInsideModal = false;
-      }
-    }, { capture: true, signal });
-    
-    document.addEventListener('mousemove', (e) => {
-      if (mouseDownInsideModal) {
-        dragStarted = true;
-      }
-    }, { capture: true, signal });
-    
-    modalOverlay.addEventListener('mouseup', (e) => {
-      if (mouseDownInsideModal || dragStarted) {
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        setTimeout(() => { dragStarted = false; }, 10);
-        return false;
-      }
-    }, { capture: true, signal });
-    
-    modalOverlay.addEventListener('click', (e) => {
-      if (e.target === modalOverlay && (mouseDownInsideModal || dragStarted)) {
-        e.stopImmediatePropagation();
-        e.preventDefault();
-        return false;
-      }
-      if (e.target === modalOverlay && !mouseDownInsideModal && !dragStarted) {
-        Spicetify.PopupModal.hide();
-      }
-    }, { capture: true, signal });
-    
-    document.addEventListener('mouseup', (e) => {
-      setTimeout(() => {
-        mouseDownInsideModal = false;
-        setTimeout(() => { dragStarted = false; }, 10);
-      }, 0);
-    }, { capture: true, signal });
-    
-    const closeButton = document.querySelector('.main-trackCreditsModal-closeBtn');
-    if (closeButton) {
-      closeButton.addEventListener('click', (e) => {
-        Spicetify.PopupModal.hide();
-      }, { signal });
-    }
-  }
-
   async function setQueueFromTracks(tracks, contextUri, source = 'default') {
     const { PlayerAPI } = Spicetify.Platform;
 
@@ -8258,11 +10051,91 @@
       return directSortTypes.includes(sortType);
   }
 
+  function getSortTypeInfo(sortType) {
+      const infoMap = {
+          playCount: { fullName: "play count", shortName: "PlayCount" },
+          popularity: { fullName: "popularity", shortName: "Popularity" },
+          releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
+          scrobbles: { fullName: "Last.fm global scrobbles", shortName: "Scrobbles" },
+          personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
+          lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
+          shuffle: { fullName: useEnergyWaveShuffle ? "random order with Vibe & Flow" : "random order", shortName: "Shuffle" },
+          averageColor: { fullName: "album color", shortName: "Color" },
+          deduplicateOnly: { fullName: "removing duplicates", shortName: "Deduplicated" },
+          filterLiked: { fullName: "excluding Liked Songs", shortName: "Unliked" },
+          keepLiked: { fullName: "keeping only Liked Songs", shortName: "Liked Only" },
+          sortByLiked: { fullName: "liked status", shortName: "Liked" },
+          filterSingles: { fullName: "keeping only singles", shortName: "Singles" },
+          filterEPs: { fullName: "keeping only EPs", shortName: "EPs" },
+          filterSinglesEPs: { fullName: "keeping only singles & EPs", shortName: "Singles & EPs" },
+          filterAlbumsEPs: { fullName: "keeping only albums & EPs", shortName: "Albums & EPs" },
+          filterAlbumsCompilations: { fullName: "keeping only albums & compilations", shortName: "Albums & Compilations" },
+          filterAlbumsEPsCompilations: { fullName: "keeping only albums, EPs & compilations", shortName: "Albums, EPs & Compilations" },
+          filterAlbumsEPsSingles: { fullName: "keeping only albums, EPs & singles", shortName: "Albums, EPs & Singles" },
+          filterCompilations: { fullName: "keeping only compilations", shortName: "Compilations" },
+          filterAlbums: { fullName: "keeping only albums", shortName: "Albums" },
+          removeTrashed: { fullName: "removing trashed songs", shortName: "Clean" },
+          excludeByPlaylist: { fullName: "excluding playlist tracks", shortName: "Filtered" },
+          filterFollowedMain: { fullName: "keeping only main followed artists", shortName: "Followed Main" },
+          filterFollowedAny: { fullName: "keeping only followed artists", shortName: "Followed Any" },
+          removeFollowed: { fullName: "excluding unfollowed artists", shortName: "Unfollowed" },
+          energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
+          tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
+          energy: { fullName: "energy", shortName: "Energy" },
+          danceability: { fullName: "danceability", shortName: "Danceability" },
+          valence: { fullName: "valence", shortName: "Valence" },
+          acousticness: { fullName: "acousticness", shortName: "Acousticness" },
+          instrumentalness: { fullName: "instrumentalness", shortName: "Instrumentalness" },
+          aiPick: { fullName: "AI recommendation", shortName: "AI Pick" },
+          default: { fullName: "default order", shortName: "Default" },
+          current: { fullName: "current order", shortName: "Current" }
+      };
+      
+      return infoMap[sortType] || { fullName: sortType, shortName: sortType };
+  }
+  
+  async function fetchSourceNameAndArtist(uri) {
+    let sourceName = "Source";
+    let artistName = "Unknown Artist";
+    if (!uri) return { sourceName, artistName };
+
+    try {
+        if (Spicetify.URI.isArtist(uri)) {
+            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri, locale: "en", includePrerelease: false });
+            sourceName = res.data?.artistUnion?.profile?.name || "Unknown Artist";
+        } else if (isLikedSongsPage(uri)) {
+            sourceName = "Liked Songs";
+        } else if (isLocalFilesPage(uri)) {
+            sourceName = "Local Files";
+        } else if (Spicetify.URI.isAlbum(uri)) {
+            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri, locale: "en", offset: 0, limit: 1 });
+            sourceName = res.data?.albumUnion?.name || "Unknown Album";
+            artistName = res.data?.albumUnion?.artists?.items?.[0]?.profile?.name || "Unknown Artist";
+        } else if (Spicetify.URI.isPlaylistV1OrV2(uri)) {
+            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+            sourceName = meta?.name || "Unknown Playlist";
+        }
+    } catch (e) {
+        console.warn("Failed to fetch source name and artist for:", uri, e);
+    }
+
+    return { sourceName, artistName };
+  }
+
+  async function fetchCleanSourceNameAndArtist(uri) {
+    let { sourceName, artistName } = await fetchSourceNameAndArtist(uri);
+    let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
+    while (suffixPattern.test(sourceName)) {
+        sourceName = sourceName.replace(suffixPattern, "");
+    }
+    return { sourceName, artistName };
+  }
+
   async function showAiPickModal(tracks, currentUri) {
     const abortController = new AbortController();
     
-    const userApiKey = (localStorage.getItem("sort-play-gemini-api-key") || "").trim();
-    const isPaidKey = localStorage.getItem("sort-play-gemini-is-paid") === "true";
+    const userApiKey = (localStorage.getItem(STORAGE_KEY_GEMINI_API_KEY) || "").trim();
+    const isPaidKey = localStorage.getItem(STORAGE_KEY_GEMINI_IS_PAID) === "true";
     const hasCustomKey = userApiKey.length > 0;
     
     const currentModelConfig = AI_MODELS.find(m => m.id === selectedAiModel);
@@ -8282,421 +10155,70 @@
     modalContainer.className = "ai-pick-modal";
     modalContainer.innerHTML = `
       <style>
-        .main-popupModal-container .main-embedWidgetGenerator-container,
-        .ai-pick-modal .main-embedWidgetGenerator-container,
-        div.main-embedWidgetGenerator-container {
-          width: 620px !important;
-          max-width: 620px !important;
-          border-radius: 30px;
-          overflow: hidden; 
-          background-color: #181818 !important;
-          border: 2px solid #282828;
-        }
-        .GenericModal > .main-embedWidgetGenerator-container {
-          height: auto !important;
-        }        
-        .GenericModal__overlay .GenericModal {
-          border-radius: 30px;
-          overflow: hidden;
-        }
-        .main-trackCreditsModal-mainSection {
-          overflow-y: hidden !important;
-          padding: 16px 32px 9px 32px;
-        }
-        .main-trackCreditsModal-header {
-          padding: 27px 32px 12px !important;
-        }
-        .main-trackCreditsModal-originalCredits{
-          padding-bottom: 20px !important;
-        }
-        .ai-pick-modal .setting-row::after {
-          content: "";
-          display: table;
-          clear: both;
-        }
-        .ai-pick-modal .setting-row {
-          display: flex;
-          padding: 5px 0;
-          align-items: center;
-        }
-        .ai-pick-modal .setting-row .col.description {
-          float: left;
-          padding-right: 15px;
-          width: auto;
-          color: white;
-        }
-        .ai-pick-modal .setting-row .col.action {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          text-align: right;
-        }
-        .ai-pick-modal .main-popupModal-content {
-          overflow-y: auto;
-        }
-        .ai-pick-modal textarea {
-          width: 100%;
-          height: 150px;
-          border-radius: 4px;
-          border: 1px solid #282828;
-          background: #282828;
-          color: white;
-        }
-        .ai-pick-modal button {
-          padding: 8px 18px;
-          border-radius: 14px;
-          border: none;
-          cursor: pointer;
-          background-color: #1ED760;
-          color: black;
-          font-weight: 600;
-          font-size: 14px;
-          transition: all 0.04s ease;
-        }
-
-        .ai-pick-modal #sendAiRequest {
-          transition: transform 0.1s ease, background-color 0.2s ease;
-        }
-
-        .ai-pick-modal #sendAiRequest:hover {
-          background-color: #3BE377;
-          transform: scale(1.04);
-        }
-
-        .ai-pick-modal #sendAiRequest:active {
-          transform: scale(1);
-        }
-
-        .ai-pick-modal .secondary-button {
-          background-color: #282828;
-          color: white;
-          padding: 7px 35px;
-          border: 1px solid #666;
-          font-weight: 500;
-          white-space: nowrap;
-          min-width: 160px;
-          text-align: center;
-        }
-
-        .ai-pick-modal .secondary-button:hover {
-          border: 1px solid #939393;
-          background-color: #333333;
-        }
-
-        .ai-pick-modal .secondary-button:disabled {
-          color: #666;
-          border-color: #666;
-          cursor: not-allowed;
-        }
-        
-        .ai-pick-modal .secondary-button:disabled:hover {
-          border-color: #666;
-        }
-        .ai-pick-modal .switch {
-          position: relative;
-          display: inline-block;
-          width: 40px;
-          height: 24px;
-        }
-        .ai-pick-modal .switch input {
-          opacity: 0;
-          width: 0;
-          height: 0;
-        }
-        .ai-pick-modal .sliderx {
-          position: absolute;
-          cursor: pointer;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: #484848;
-          border-radius: 24px;
-          transition: .2s;
-        }
-        .ai-pick-modal .sliderx:before {
-          position: absolute;
-          content: "";
-          height: 18px;
-          width: 18px;
-          left: 3px;
-          bottom: 3px;
-          background-color: white;
-          border-radius: 50%;
-          transition: .2s;
-        }
-        .ai-pick-modal input:checked + .sliderx {
-          background-color: #1DB954;
-        }
-        .ai-pick-modal input:checked + .sliderx:before {
-          transform: translateX(16px);
-        }
-        .ai-pick-modal select {
-          padding: 8px;
-          border-radius: 4px;
-          border: 1px solid #666;
-          background: #282828;
-          color: white;
-          width: 217px;
-          cursor: pointer;
-        }
-        .ai-pick-modal select:hover {
-          border: 1px solid #939393;
-        }
-        .ai-pick-modal select:focus {
-          outline: none;
-          border-color: #c7c7c7;
-        }
-        .ai-pick-modal .model-row {
-          margin-bottom: 5px;
-        }
-        .ai-pick-modal .system-instruction {
-          display: none;
-        }
-        .ai-pick-modal .system-instruction.visible {
-          display: block;
-        }
-        .ai-pick-modal .system-instruction textarea {
-          height: 150px; 
-          font-size: 14px;  
-          white-space: pre-wrap;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          max-width: 100%;
-          padding: 15px;
-          border-radius: 20px;
-        }
-        .ai-pick-modal .system-instruction textarea:focus {
-          background: #323232;
-        }
-        .ai-pick-modal .button-row {
-          display: flex;
-          gap: 10px;
-          margin-top: 16px;
-        }
-        .loader {
-          border: 2px solid #f3f3f3;
-          border-top: 2px solid #3498db;
-          border-radius: 50%;
-          width: 20px;
-          height: 20px;
-          animation: spin 1s linear infinite;
-          margin: 0 auto;
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        .ai-pick-modal .system-instruction textarea.fixed {
-          background-color: #1a1a1a;
-          color: #888;
-          cursor: not-allowed;
-          height: 87px; 
-          font-size: 13px; 
-        }
-        
-        .ai-pick-modal .system-instruction .instruction-label {
-          color: white;
-          display: block;
-          margin-bottom: 12px;
-          margin-top: 15px;
-          font-weight: bold;
-        }
-        .ai-pick-modal .prompt-wrapper {
-          display: flex;
-          align-items: flex-start;
-          border: 1px solid #282828;
-          border-radius: 20px;
-          padding: 10px;
-          margin-bottom: 0px;
-          background-color: #282828;
-          align-items: center;
-        }
-        .ai-pick-modal .prompt-wrapper .textarea-container {
-          flex-grow: 1;
-          margin-right: 6px; 
-          padding: 3px;
-          display: flex;
-          align-items: center; 
-        }
-        .ai-pick-modal .prompt-wrapper textarea {
-          width: 100%;
-          height: 20px;
-          max-height: 136px;
-          overflow-y: hidden;
-          padding-left: 10px;   
-          padding-top: 0px;   
-          padding-bottom: 0px; 
-          padding-right: 10px;
-          line-height: 20px;
-          border-radius: 20px;
-          resize: none;
-          font-size: 15px;
-          background-color: #282828;
-          color: white;
-          display: flex;
-          align-items: center;
-          border: none;
-          margin-bottom: 0px;
-        }
-
-        .ai-pick-modal .prompt-wrapper textarea:focus {
-          outline: none;
-          background-color: #323232;
-        }
-        
-        .ai-pick-modal .prompt-wrapper:has(textarea:focus) {
-          background-color: #323232;
-        }
-
-        .ai-pick-modal .prompt-wrapper .button-container {
-          display: flex;
-          gap: 8px;
-          align-items: center;
-          white-space: nowrap;  
-          padding: 5px;
-        }
-        .ai-pick-modal .icon-only-btn {
-          background: transparent;
-          border: none;
-          color: #b3b3b3;
-          cursor: pointer;
-          padding: 6px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          transition: color 0.2s, background-color 0.2s;
-          height: 32px;
-          width: 32px;
-        }
-        .ai-pick-modal .icon-only-btn:hover {
-          color: #fff;
-          background-color: rgba(255, 255, 255, 0.1);
-        }
-        .ai-pick-modal .prompt-wrapper button {
-        }
-        .ai-pick-modal .prompt-wrapper textarea:focus {
-          outline: none;
-        }
-        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar {
-          width: 6px;
-        }
-        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar-track {
-          background: #282828;
-          border-radius: 20px;
-        }
-        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar-thumb {
-          background-color: #1DB954;
-          border-radius: 20px;
-          border: 2px solid #282828;
-        }
-
-        .ai-pick-modal .settings-container {
-          display: flex;
-          gap: 15px; 
-          flex-direction: row-reverse;
-        }
-      
-        .ai-pick-modal .settings-right-wrapper,
-        .ai-pick-modal .settings-left-wrapper {
-          flex: 1;
-          background-color: #282828;
-          border-radius: 20px;
-          padding: 25px;
-          height: 170px;
-        }
-      
-        .ai-pick-modal .settings-right-wrapper {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-      
-        .ai-pick-modal .settings-left-wrapper {
-          display: flex;
-          flex-direction: column;
-          gap: 0px;
-        }
-      
-        .ai-pick-modal .settings-title {
-          color: white;
-          font-weight: bold;
-          font-size: 14px;
-          margin-bottom: 3px;
-        }
-
-        .ai-pick-modal .setting-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 5px 0;
-          width: auto; 
-        }
-      
-        .ai-pick-modal .setting-row .description {
-          color: white;
-          width: auto;
-          flex-grow: 1; 
-          font-size: 15px;
-        }
-      
-        .ai-pick-modal .setting-row .action {
-          flex-shrink: 0;
-        }
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.25);
-          backdrop-filter: blur(5px);
-          -webkit-backdrop-filter: blur(5px);
-          z-index: 999;
-        }
-
-        .GenericModal {
-          position: relative;
-          z-index: 1000;
-        }
-        .tooltip-container {
-          position: relative; 
-          display: inline-block;
-        }
-        .custom-tooltip {
-          visibility: hidden;
-          position: absolute;
-          z-index: 1;
-          background-color: #373737;
-          color: white;
-          padding: 8px 12px;
-          border-radius: 4px;
-          font-size: 14px;
-          max-width: 240px;
-          width: max-content;
-          bottom: 100%;   
-          left: 50%;       
-          transform: translateX(-50%);  
-          margin-bottom: 5px;   
-          box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-          line-height: 1.4;
-          word-wrap: break-word;
-      }
-      .custom-tooltip::after {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          margin-left: -5px;
-          border-width: 5px;
-          border-style: solid;
-          border-color: #373737 transparent transparent transparent;
-      }
-      
-      .tooltip-container:hover .custom-tooltip {
-          visibility: visible;
-      }
+        .main-popupModal-container .main-embedWidgetGenerator-container, .ai-pick-modal .main-embedWidgetGenerator-container, div.main-embedWidgetGenerator-container { width: 620px !important; max-width: 620px !important; border-radius: 30px; overflow: hidden; background-color: #181818 !important; border: 2px solid #282828; }
+        .GenericModal > .main-embedWidgetGenerator-container { height: auto !important; }
+        .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
+        .main-trackCreditsModal-mainSection { overflow-y: hidden !important; padding: 16px 32px 9px 32px; }
+        .main-trackCreditsModal-header { padding: 27px 32px 12px !important; }
+        .main-trackCreditsModal-originalCredits { padding-bottom: 20px !important; }
+        .ai-pick-modal .setting-row::after { content: ""; display: table; clear: both; }
+        .ai-pick-modal .setting-row { display: flex; padding: 5px 0; align-items: center; }
+        .ai-pick-modal .setting-row .col.description { float: left; padding-right: 15px; width: auto; color: white; }
+        .ai-pick-modal .setting-row .col.action { display: flex; align-items: center; justify-content: flex-end; text-align: right; }
+        .ai-pick-modal .main-popupModal-content { overflow-y: auto; }
+        .ai-pick-modal textarea { width: 100%; height: 150px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; }
+        .ai-pick-modal button { padding: 8px 18px; border-radius: 14px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 600; font-size: 14px; transition: all 0.04s ease; }
+        .ai-pick-modal #sendAiRequest { transition: transform 0.1s ease, background-color 0.2s ease; }
+        .ai-pick-modal #sendAiRequest:hover { background-color: #3BE377; transform: scale(1.04); }
+        .ai-pick-modal #sendAiRequest:active { transform: scale(1); }
+        .ai-pick-modal .secondary-button { background-color: #282828; color: white; padding: 7px 35px; border: 1px solid #666; font-weight: 500; white-space: nowrap; min-width: 160px; text-align: center; }
+        .ai-pick-modal .secondary-button:hover { border: 1px solid #939393; background-color: #333333; }
+        .ai-pick-modal .secondary-button:disabled { color: #666; border-color: #666; cursor: not-allowed; }
+        .ai-pick-modal .secondary-button:disabled:hover { border-color: #666; }
+        .ai-pick-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; }
+        .ai-pick-modal .switch input { opacity: 0; width: 0; height: 0; }
+        .ai-pick-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+        .ai-pick-modal .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+        .ai-pick-modal input:checked + .sliderx { background-color: #1DB954; }
+        .ai-pick-modal input:checked + .sliderx:before { transform: translateX(16px); }
+        .ai-pick-modal select { padding: 8px; border-radius: 4px; border: 1px solid #666; background: #282828; color: white; width: 217px; cursor: pointer; }
+        .ai-pick-modal select:hover { border: 1px solid #939393; }
+        .ai-pick-modal select:focus { outline: none; border-color: #c7c7c7; }
+        .ai-pick-modal .model-row { margin-bottom: 5px; }
+        .ai-pick-modal .system-instruction { display: none; }
+        .ai-pick-modal .system-instruction.visible { display: block; }
+        .ai-pick-modal .system-instruction textarea { height: 150px; font-size: 14px; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; padding: 15px; border-radius: 20px; }
+        .ai-pick-modal .system-instruction textarea:focus { background: #323232; }
+        .ai-pick-modal .button-row { display: flex; gap: 10px; margin-top: 16px; }
+        .loader { border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin: 0 auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .ai-pick-modal .system-instruction textarea.fixed { background-color: #1a1a1a; color: #888; cursor: not-allowed; height: 87px; font-size: 13px; }
+        .ai-pick-modal .system-instruction .instruction-label { color: white; display: block; margin-bottom: 12px; margin-top: 15px; font-weight: bold; }
+        .ai-pick-modal .prompt-wrapper { display: flex; align-items: flex-start; border: 1px solid #282828; border-radius: 20px; padding: 10px; margin-bottom: 0px; background-color: #282828; align-items: center; }
+        .ai-pick-modal .prompt-wrapper .textarea-container { flex-grow: 1; margin-right: 6px; padding: 3px; display: flex; align-items: center; }
+        .ai-pick-modal .prompt-wrapper textarea { width: 100%; height: 20px; max-height: 136px; overflow-y: hidden; padding-left: 10px; padding-top: 0px; padding-bottom: 0px; padding-right: 10px; line-height: 20px; border-radius: 20px; resize: none; font-size: 15px; background-color: #282828; color: white; display: flex; align-items: center; border: none; margin-bottom: 0px; }
+        .ai-pick-modal .prompt-wrapper textarea:focus { outline: none; background-color: #323232; }
+        .ai-pick-modal .prompt-wrapper:has(textarea:focus) { background-color: #323232; }
+        .ai-pick-modal .prompt-wrapper .button-container { display: flex; gap: 8px; align-items: center; white-space: nowrap; padding: 5px; }
+        .ai-pick-modal .icon-only-btn { background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 6px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: color 0.2s, background-color 0.2s; height: 32px; width: 32px; }
+        .ai-pick-modal .icon-only-btn:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
+        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar { width: 6px; }
+        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar-track { background: #282828; border-radius: 20px; }
+        .ai-pick-modal .prompt-wrapper textarea::-webkit-scrollbar-thumb { background-color: #1DB954; border-radius: 20px; border: 2px solid #282828; }
+        .ai-pick-modal .settings-container { display: flex; gap: 15px; flex-direction: row-reverse; }
+        .ai-pick-modal .settings-right-wrapper, .ai-pick-modal .settings-left-wrapper { flex: 1; background-color: #282828; border-radius: 20px; padding: 25px; height: 170px; }
+        .ai-pick-modal .settings-right-wrapper { display: flex; flex-direction: column; gap: 16px; }
+        .ai-pick-modal .settings-left-wrapper { display: flex; flex-direction: column; gap: 0px; }
+        .ai-pick-modal .settings-title { color: white; font-weight: bold; font-size: 14px; margin-bottom: 3px; }
+        .ai-pick-modal .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; width: auto; }
+        .ai-pick-modal .setting-row .description { color: white; width: auto; flex-grow: 1; font-size: 15px; }
+        .ai-pick-modal .setting-row .action { flex-shrink: 0; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 999; }
+        .GenericModal { position: relative; z-index: 1000; }
+        .tooltip-container { position: relative; display: inline-block; }
+        .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
+        .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+        .tooltip-container:hover .custom-tooltip { visibility: visible; }
       </style>
 
       <div style="display: flex; flex-direction: column; gap: 15px;">
@@ -8905,20 +10427,15 @@
         return;
       }
       
-      let history = JSON.parse(localStorage.getItem('sort-play-ai-prompt-history') || '[]');
+      let history = JSON.parse(localStorage.getItem(STORAGE_KEY_AI_PROMPT_HISTORY) || '[]');
       history = history.filter(p => p !== userPrompt);
       history.unshift(userPrompt);
       if (history.length > 50) history.length = 50;
-      localStorage.setItem('sort-play-ai-prompt-history', JSON.stringify(history));
+      localStorage.setItem(STORAGE_KEY_AI_PROMPT_HISTORY, JSON.stringify(history));
   
       Spicetify.PopupModal.hide();
   
       setButtonProcessing(true);
-      mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-      mainButton.style.color = buttonStyles.main.disabledColor;
-      mainButton.style.cursor = "default";
-      svgElement.style.fill = buttonStyles.main.disabledColor;
-      menuButtons.forEach((button) => (button.disabled = true));
   
       mainButton.innerHTML = '<div class="loader"></div>';
   
@@ -8938,7 +10455,7 @@
         }
 
         if (Ge_mini_Key_Pool.length === 0) await fetchGeminiKeys();
-        const userApiKey = localStorage.getItem("sort-play-gemini-api-key") || Ge_mini_Key();
+        const userApiKey = localStorage.getItem(STORAGE_KEY_GEMINI_API_KEY) || Ge_mini_Key();
   
         selectedAiModel = modelSelect.value; 
   
@@ -8973,20 +10490,7 @@
                     return await Promise.all(batch.map(id => fetchInternalTrackMetadata(id)));
                 };
 
-                if (isFallbackActive()) {
-                    responseTracks = await fetchBatchInternal();
-                } else {
-                    try {
-                        const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-                        responseTracks = response?.tracks || [];
-                    } catch (error) {
-                        if (registerWebApiFailure()) {
-                            responseTracks = await fetchBatchInternal();
-                        } else {
-                            throw error;
-                        }
-                    }
-                }
+                responseTracks = await fetchBatchInternal();
 
                 if (responseTracks) {
                     const availableTracks = await Promise.all(responseTracks.map(async track => {
@@ -9011,103 +10515,13 @@
         const sourceUri = currentUri;
         const isArtistPage = URI.isArtist(sourceUri);
         const isAlbumPage = URI.isAlbum(sourceUri);
-        let sourceName = "Source";
-        const sourceId = sourceUri.split(":")[2];
-
-        try {
-            if (isArtistPage) {
-                const fetchArtistFallback = async () => {
-                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
-                    return res.data.artistUnion.profile.name;
-                };
-
-                if (isFallbackActive()) {
-                    sourceName = await fetchArtistFallback();
-                } else {
-                    try {
-                        const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceId}`);
-                        sourceName = artistData.name;
-                    } catch (e) {
-                        if (registerWebApiFailure()) {
-                            sourceName = await fetchArtistFallback();
-                        } else { throw e; }
-                    }
-                }
-            } else if (isLikedSongsPage(sourceUri)) {
-                sourceName = "Liked Songs";
-            } else if (isAlbumPage) {
-                const fetchAlbumFallback = async () => {
-                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                    return res.data.albumUnion.name;
-                };
-
-                if (isFallbackActive()) {
-                    sourceName = await fetchAlbumFallback();
-                } else {
-                    try {
-                        const albumData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
-                        sourceName = albumData.name;
-                    } catch (e) {
-                        if (registerWebApiFailure()) {
-                            sourceName = await fetchAlbumFallback();
-                        } else { throw e; }
-                    }
-                }
-            } else {
-                const fetchPlaylistFallback = async () => {
-                    const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(sourceUri);
-                    return meta.name;
-                };
-
-                if (isFallbackActive()) {
-                    sourceName = await fetchPlaylistFallback();
-                } else {
-                    try {
-                        const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceId}`);
-                        sourceName = playlistData.name;
-                    } catch (e) {
-                        if (registerWebApiFailure()) {
-                            sourceName = await fetchPlaylistFallback();
-                        } else { throw e; }
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn("Failed to fetch source name for AI Pick playlist", e);
-        }
-
-        let suffixPattern = new RegExp(
-          `\\s*(${possibleSuffixes.join("|")})\\s*`
-        );
-        while (suffixPattern.test(sourceName)) {
-          sourceName = sourceName.replace(suffixPattern, "");
-        }
+        
+        let { sourceName, artistName } = await fetchCleanSourceNameAndArtist(sourceUri);
 
         let playlistDescription;
         if (isArtistPage) {
           playlistDescription = `Tracks by ${sourceName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
         } else if (isAlbumPage) {
-            let artistName = "Unknown Artist";
-            try {
-                const fetchAlbumArtistFallback = async () => {
-                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                    return res.data.albumUnion.artists.items[0]?.profile?.name || "Unknown Artist";
-                };
-
-                if (isFallbackActive()) {
-                    artistName = await fetchAlbumArtistFallback();
-                } else {
-                    try {
-                        const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
-                        artistName = albumDetails.artists[0].name;
-                    } catch (e) {
-                        if (registerWebApiFailure()) {
-                            artistName = await fetchAlbumArtistFallback();
-                        } else { throw e; }
-                    }
-                }
-            } catch (e) {}
-            
             playlistDescription = `Tracks from ${sourceName} by ${artistName}, picked by AI using Sort-Play for request: "${userPrompt}"`;
         } else {
           playlistDescription = `Tracks picked by AI using Sort-Play for request: "${userPrompt}"`;
@@ -9123,7 +10537,17 @@
         
         await addPlaylistToLibrary(newPlaylist.uri);
 
-        showNotification(`AI Pick playlist created with ${verifiedTracks.length} tracks!`);
+        let notificationMsg = `AI Pick from playlist created with ${verifiedTracks.length} tracks!`;
+        if (isArtistPage) {
+            notificationMsg = `AI Pick from discography of ${sourceName} created with ${verifiedTracks.length} tracks!`;
+        } else if (isAlbumPage) {
+            notificationMsg = `AI Pick from album created with ${verifiedTracks.length} tracks!`;
+        } else if (isLikedSongsPage(sourceUri)) {
+            notificationMsg = `AI Pick from Liked Songs created with ${verifiedTracks.length} tracks!`;
+        } else if (isLocalFilesPage(sourceUri)) {
+            notificationMsg = `AI Pick from Local Files created with ${verifiedTracks.length} tracks!`;
+        }
+        showNotification(notificationMsg);
         
         await navigateToPlaylist(newPlaylist);
 
@@ -9164,13 +10588,13 @@
       let activeTab = 'presets';
       let editingPreset = null;
       
-      let presets = JSON.parse(localStorage.getItem('sort-play-ai-prompt-presets'));
+      let presets = JSON.parse(localStorage.getItem(STORAGE_KEY_AI_PROMPT_PRESETS));
       if (!presets || presets.length === 0) presets = [...DEFAULT_PROMPT_PRESETS];
       
-      let history = JSON.parse(localStorage.getItem('sort-play-ai-prompt-history') || '[]');
+      let history = JSON.parse(localStorage.getItem(STORAGE_KEY_AI_PROMPT_HISTORY) || '[]');
 
       const savePresets = () => {
-          localStorage.setItem('sort-play-ai-prompt-presets', JSON.stringify(presets));
+          localStorage.setItem(STORAGE_KEY_AI_PROMPT_PRESETS, JSON.stringify(presets));
       };
 
       const render = () => {
@@ -9245,32 +10669,32 @@
               <div class="history-item" data-index="${i}">
                   <div class="history-text">${h}</div>
                   <button class="preset-action-btn save-history-btn" data-index="${i}" title="Save as Preset">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      ${plusIcon16Svg}
                   </button>
               </div>
           `).join('');
 
           modalContainer.innerHTML = `
               <style>
-                  .pl-tabs { display: flex; border-bottom: 1px solid #333; }
-                  .pl-tab { flex: 1; padding: 16px; text-align: center; background: transparent; border: none; color: #888; font-weight: bold; cursor: pointer; font-size: 14px; transition: color 0.2s, box-shadow 0.2s; }
-                  .pl-tab:hover { color: #fff; }
-                  .pl-tab.active { color: #1ED760; box-shadow: inset 0 -2px 0 #1ED760; }
-                  .pl-content { padding: 16px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: #555 transparent; min-height: 200px; }
-                  .pl-content::-webkit-scrollbar { width: 6px; }
-                  .pl-content::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
-                  .preset-item, .history-item { display: flex; justify-content: space-between; align-items: center; background: #242424; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s; border: 1px solid transparent; }
-                  .preset-item:hover, .history-item:hover { background: #2a2a2a; border-color: #444; }
-                  .preset-info { display: flex; flex-direction: column; overflow: hidden; flex: 1; margin-right: 12px; }
-                  .preset-title { font-size: 14px; color: #fff; font-weight: bold; margin-bottom: 4px; }
-                  .preset-prompt, .history-text { font-size: 13px; color: #b3b3b3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
-                  .history-text { flex: 1; margin-right: 12px; }
-                  .preset-actions { display: flex; gap: 4px; }
-                  .preset-action-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; transition: color 0.2s, background 0.2s; }
-                  .preset-action-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
-                  .preset-action-btn.delete-btn:hover { color: #f15e6c; background: rgba(241, 94, 108, 0.1); }
-                  .pl-empty { text-align: center; color: #888; padding: 30px 0; font-size: 14px; font-style: italic; }
-                  .pl-footer { padding: 16px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+                .pl-tabs { display: flex; border-bottom: 1px solid #333; }
+                .pl-tab { flex: 1; padding: 16px; text-align: center; background: transparent; border: none; color: #888; font-weight: bold; cursor: pointer; font-size: 14px; transition: color 0.2s, box-shadow 0.2s; }
+                .pl-tab:hover { color: #fff; }
+                .pl-tab.active { color: #1ED760; box-shadow: inset 0 -2px 0 #1ED760; }
+                .pl-content { padding: 16px; overflow-y: auto; flex: 1; scrollbar-width: thin; scrollbar-color: #555 transparent; min-height: 200px; }
+                .pl-content::-webkit-scrollbar { width: 6px; }
+                .pl-content::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+                .preset-item, .history-item { display: flex; justify-content: space-between; align-items: center; background: #242424; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; transition: background 0.2s; border: 1px solid transparent; }
+                .preset-item:hover, .history-item:hover { background: #2a2a2a; border-color: #444; }
+                .preset-info { display: flex; flex-direction: column; overflow: hidden; flex: 1; margin-right: 12px; }
+                .preset-title { font-size: 14px; color: #fff; font-weight: bold; margin-bottom: 4px; }
+                .preset-prompt, .history-text { font-size: 13px; color: #b3b3b3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+                .history-text { flex: 1; margin-right: 12px; }
+                .preset-actions { display: flex; gap: 4px; }
+                .preset-action-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 6px; border-radius: 4px; display: flex; transition: color 0.2s, background 0.2s; }
+                .preset-action-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+                .preset-action-btn.delete-btn:hover { color: #f15e6c; background: rgba(241, 94, 108, 0.1); }
+                .pl-empty { text-align: center; color: #888; padding: 30px 0; font-size: 14px; font-style: italic; }
+                .pl-footer { padding: 16px; border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
               </style>
               <div class="pl-tabs">
                   <button class="pl-tab ${activeTab === 'presets' ? 'active' : ''}" data-tab="presets">Presets</button>
@@ -9681,7 +11105,7 @@
   }
 
   function showGeminiApiKeyModal() {
-    const savedApiKey = localStorage.getItem("sort-play-gemini-api-key");
+    const savedApiKey = localStorage.getItem(STORAGE_KEY_GEMINI_API_KEY);
 
     const overlay = document.createElement("div");
     overlay.id = "sort-play-gemini-modal-overlay";
@@ -9739,10 +11163,8 @@
     const saveButton = document.getElementById("saveGeminiApi");
     const cancelButton = document.getElementById("cancelGeminiApi");
 
-    saveButton.addEventListener("mouseenter", () => { saveButton.style.backgroundColor = "#3BE377"; });
-    saveButton.addEventListener("mouseleave", () => { saveButton.style.backgroundColor = "#1ED760"; });
-    cancelButton.addEventListener("mouseenter", () => { cancelButton.style.backgroundColor = "#444444"; });
-    cancelButton.addEventListener("mouseleave", () => { cancelButton.style.backgroundColor = "#333333"; });
+    addHoverEffect(saveButton, "#1ED760", "#3BE377");
+    addHoverEffect(cancelButton, "#333333", "#444444");
 
     saveButton.addEventListener("click", async () => {
       const apiKey = inputField.value.trim();
@@ -9763,18 +11185,18 @@
             });
           }
           
-          localStorage.setItem("sort-play-gemini-api-key", apiKey);
-          localStorage.setItem("sort-play-gemini-is-paid", "true");
+          localStorage.setItem(STORAGE_KEY_GEMINI_API_KEY, apiKey);
+          localStorage.setItem(STORAGE_KEY_GEMINI_IS_PAID, "true");
           showNotification("Paid Gemini API key verified and saved!");
         } catch (error) {
           console.warn("[Sort-Play] Pro model check failed, assuming free tier key:", error);
-          localStorage.setItem("sort-play-gemini-api-key", apiKey);
-          localStorage.setItem("sort-play-gemini-is-paid", "false");
+          localStorage.setItem(STORAGE_KEY_GEMINI_API_KEY, apiKey);
+          localStorage.setItem(STORAGE_KEY_GEMINI_IS_PAID, "false");
           showNotification("Free Gemini API key saved. (Pro models disabled)");
         }
       } else {
-        localStorage.removeItem("sort-play-gemini-api-key");
-        localStorage.removeItem("sort-play-gemini-is-paid");
+        localStorage.removeItem(STORAGE_KEY_GEMINI_API_KEY);
+        localStorage.removeItem(STORAGE_KEY_GEMINI_IS_PAID);
         showNotification("Gemini API key cleared.");
       }
 
@@ -9850,20 +11272,14 @@
       }
   }
 
-  async function getCachedPaletteAnalysis(albumId) {
-      return await idb.get('palettes', albumId, CACHE_EXPIRE_PALETTE);
-  }
-  async function setCachedPaletteAnalysis(albumId, analysisData) {
-      await idb.set('palettes', albumId, analysisData);
-  }
-
   async function getAlbumColorAnalysis(albumId) {
       const cachedAnalysis = await getCachedPaletteAnalysis(albumId);
       if (cachedAnalysis) {
           return cachedAnalysis;
       }
 
-      const fetchInternal = async () => {
+      try {
+          let albumDetails;
           try {
               const hexId = spotifyHex(albumId);
               const token = Spicetify.Platform.Session.accessToken;
@@ -9880,51 +11296,27 @@
                           height: img.height || 0
                       }));
                       images.sort((a, b) => b.width - a.width);
-                      return { images: images };
+                      albumDetails = { images: images };
                   }
               }
-          } catch(e) {
-          }
+          } catch(e) {}
 
-          const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
-              uri: `spotify:album:${albumId}`,
-              locale: "en",
-              offset: 0,
-              limit: 1
-          });
-          const u = res.data.albumUnion;
-          if (u && u.coverArt && u.coverArt.sources && u.coverArt.sources.length > 0) {
-              return { images: u.coverArt.sources };
-          }
-          throw new Error(`No images found for album ${albumId} via Internal APIs`);
-      };
-
-      try {
-          let albumDetails;
-
-          if (isFallbackActive()) {
-              albumDetails = await fetchInternal();
-          } else {
-              try {
-                  albumDetails = await withRetry(
-                    () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`),
-                    CONFIG.spotify.retryAttempts,
-                    CONFIG.spotify.retryDelay
-                  );
-              } catch (error) {
-                  if (registerWebApiFailure()) {
-                      albumDetails = await fetchInternal();
-                  } else {
-                      throw error;
-                  }
+          if (!albumDetails) {
+              const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
+                  uri: `spotify:album:${albumId}`,
+                  locale: "en",
+                  offset: 0,
+                  limit: 1
+              });
+              const u = res.data.albumUnion;
+              if (u && u.coverArt && u.coverArt.sources && u.coverArt.sources.length > 0) {
+                  albumDetails = { images: u.coverArt.sources };
+              } else {
+                  throw new Error(`No images found for album ${albumId} via Internal APIs`);
               }
           }
 
-          const images = albumDetails?.images;
-          if (!images || images.length === 0) {
-              throw new Error(`No images found for album ${albumId}`);
-          }
-
+          const images = albumDetails.images;
           const imageUrl = images[images.length - 1].url;
           const analysisData = await getPaletteAnalysis(imageUrl);
 
@@ -9970,34 +11362,9 @@
     try {
         let releaseDate = null;
 
-        if (isFallbackActive()) {
-            const meta = await fetchInternalTrackMetadata(trackId);
-            if (meta && meta.album && meta.album.release_date) {
-                releaseDate = meta.album.release_date;
-            }
-        } else {
-            try {
-                const result = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                if (result && result.album && result.album.release_date) {
-                    releaseDate = result.album.release_date;
-                }
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    const meta = await fetchInternalTrackMetadata(trackId);
-                    if (meta && meta.album && meta.album.release_date) {
-                        releaseDate = meta.album.release_date;
-                    }
-                }
-            }
-        }
-
-        if (!releaseDate) {
-             try {
-                 const albumResult = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
-                 if (albumResult && albumResult.release_date) {
-                     releaseDate = albumResult.release_date;
-                 }
-             } catch(e) {}
+        const meta = await fetchInternalTrackMetadata(trackId);
+        if (meta && meta.album && meta.album.release_date) {
+            releaseDate = meta.album.release_date;
         }
       
       if (releaseDate) {
@@ -10042,19 +11409,7 @@
   }
 
   async function handleGenreFilter() {
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    toggleMenu();
-    closeAllMenus();
-    menuButtons.forEach((button) => {
-        button.disabled = true;
-        if (button.tagName.toLowerCase() === 'button') {
-            button.style.backgroundColor = "transparent";
-        }
-    });
+    startProcessing();
 
     try {
         const currentUri = getCurrentUri();
@@ -10125,20 +11480,7 @@
   }
 
   async function handleCustomFilter() {
-    menuButtons.forEach((btn) => {
-      if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-        btn.style.backgroundColor = "transparent";
-      }
-    });
-    setButtonProcessing(true);
-    mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-    mainButton.style.color = buttonStyles.main.disabledColor;
-    mainButton.style.cursor = "default";
-    svgElement.style.fill = buttonStyles.main.disabledColor;
-    menuButtons.forEach((button) => (button.disabled = true));
-    
-    toggleMenu();
-    closeAllMenus();
+    startProcessing();
 
     try {
         const currentUri = getCurrentUri();
@@ -10223,43 +11565,12 @@
         );
 
         mainButton.innerText = "Analyzing...";
-        const trackMap = new Map(tracksWithReleaseDates.map(t => [t.uri.split(":")[2], t]));
-
-        const trackIdsToFetch = [];
-        for (const track of tracksWithReleaseDates) {
-            const trackId = track.uri.split(":")[2];
-            const cached = await getTrackCache(trackId, true, false, selectedAiModel);
-            if (!cached) trackIdsToFetch.push(trackId);
-        }
-
-        if (trackIdsToFetch.length > 0) {
-            const batchStats = await getBatchTrackStats(trackIdsToFetch);
-            for (const [trackId, stats] of Object.entries(batchStats)) {
-                const originalTrack = trackMap.get(trackId);
-                if (originalTrack) {
-                    const cacheData = {
-                        song_title: originalTrack.songTitle || originalTrack.name,
-                        artist: originalTrack.allArtists || originalTrack.artistName,
-                        album: originalTrack.albumName,
-                        uri: originalTrack.uri,
-                        stats: stats
-                    };
-                    await setTrackCache(trackId, cacheData, true, false, selectedAiModel);
-                }
-            }
-        }
-
-        const aiCacheKeys = tracksWithReleaseDates.map(t => {
-            return getCacheKey(t.uri.split(":")[2], true, false, selectedAiModel);
-        });
-        
-        const bulkAiData = await idb.getMany('aiData', aiCacheKeys);
+        const trackIds = tracksWithReleaseDates.map(t => t.uri.split(":")[2]);
+        const allStats = await getBatchTrackStats(trackIds);
 
         const tracksWithFeatures = tracksWithReleaseDates.map(track => {
             const trackId = track.uri.split(":")[2];
-            const cacheKey = getCacheKey(trackId, true, false, selectedAiModel);
-            const cachedData = bulkAiData.get(cacheKey);
-            return { ...track, features: cachedData ? cachedData.stats : {} };
+            return { ...track, features: allStats[trackId] || {} };
         });
         
         showCustomFilterModal(tracksWithFeatures, currentUri);
@@ -10448,38 +11759,8 @@
         unconvertedCount: unconvertedLocalCount
     };
   }
-  
-  function debounce(func, delay) {
-      let timeout;
-      return function(...args) {
-          const context = this;
-          clearTimeout(timeout);
-          timeout = setTimeout(() => func.apply(context, args), delay);
-      };
-  }
 
-  function formatDuration(ms) {
-    if (ms === null || ms === undefined || isNaN(ms)) {
-        return "N/A";
-    }
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${String(seconds).padStart(2, '0')}`;
-  }
-
-  const removeIconSVG = `<svg class="remove-icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg"><path d="M982.032787 847.737705L637.901639 503.606557l327.344263-327.344262c33.57377-33.57377 33.57377-83.934426 0-117.508197s-83.934426-33.57377-117.508197 0L520.393443 386.098361 176.262295 50.360656C142.688525 16.786885 92.327869 16.786885 58.754098 50.360656 25.180328 83.934426 25.180328 134.295082 58.754098 167.868852l344.131148 335.737705-335.737705 335.737705c-33.57377 33.57377-33.57377 83.934426 0 117.508197 16.786885 16.786885 41.967213 25.180328 58.754098 25.180328s41.967213-8.393443 58.754099-25.180328l335.737705-335.737705 344.131147 344.131148c16.786885 16.786885 33.57377 25.180328 58.754099 25.180328 25.180328 0 41.967213-8.393443 58.754098-25.180328 33.57377-33.57377 33.57377-83.934426 0-117.508197z"/></svg>`;
-  const restoreIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="5.9844 5.9844 36 36.0312" width="14px" height="14px" preserveAspectRatio="none" class="remove-icon"><path d="M 24 42 C 23.211 42 22.462 41.934 21.752 41.846 C 20.221 41.685 19.438 39.926 20.343 38.681 C 20.78 38.08 21.513 37.77 22.248 37.877 C 22.852 37.952 23.431 38 24 38 C 31.756 38 38 31.756 38 24 C 38 16.244 31.756 10 24 10 C 16.244 10 10 16.244 10 24 C 10 26.635 10.739 29.081 12 31.178 L 12 31 C 11.978 29.46 13.631 28.475 14.976 29.226 C 15.617 29.584 16.01 30.265 16 31 L 16 36.488 L 16 37 C 16 38.105 15.105 39 14 39 L 8 39 C 6.46 39.022 5.475 37.369 6.226 36.024 C 6.584 35.383 7.265 34.99 8 35 L 9.77 35 C 7.412 31.956 6 28.138 6 24 C 6 14.082 14.082 6 24 6 C 33.918 6 42 14.082 42 24 C 42 33.918 33.918 42 24 42 Z" style="transform-origin: 23.9844px 24px;" transform="matrix(0, 1, -1, 0, -0.000001907349, 0.00000100024)" id="object-0"/></svg>`;
-  const saveIconSVG = `<svg xmlns="http://www.w3.org/2000/svg" fill="#ffffff" viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>`;  const loadIconSVG = `<svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g id="File / Folder">
-  <path id="Vector" d="M3 6V16.8C3 17.9201 3 18.4798 3.21799 18.9076C3.40973 19.2839 3.71547 19.5905 4.0918 19.7822C4.5192 20 5.07899 20 6.19691 20H17.8031C18.921 20 19.48 20 19.9074 19.7822C20.2837 19.5905 20.5905 19.2841 20.7822 18.9078C21.0002 18.48 21.0002 17.9199 21.0002 16.7998L21.0002 9.19978C21.0002 8.07967 21.0002 7.51962 20.7822 7.0918C20.5905 6.71547 20.2839 6.40973 19.9076 6.21799C19.4798 6 18.9201 6 17.8 6H12M3 6H12M3 6C3 4.89543 3.89543 4 5 4H8.67452C9.1637 4 9.40886 4 9.63904 4.05526C9.84311 4.10425 10.0379 4.18526 10.2168 4.29492C10.4186 4.41857 10.5918 4.59182 10.9375 4.9375L12 6" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
-  </svg>`;
-  const clearIconSVG = `<svg viewBox="16 15 43 43" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" enable-background="new 0 0 76.00 76.00" xml:space="preserve">
-    <path fill="#ffffff" fill-opacity="1" stroke-width="0.2" stroke-linejoin="round" d="M 18.0147,41.5355C 16.0621,39.5829 16.0621,36.4171 18.0147,34.4645L 26.9646,25.5149C 28.0683,24.4113 29,24 31,24L 52,24C 54.7614,24 57,26.2386 57,29L 57,47C 57,49.7614 54.7614,52 52,52L 31,52C 29,52 28.0683,51.589 26.9646,50.4854L 18.0147,41.5355 Z M 47.5281,42.9497L 42.5784,37.9999L 47.5281,33.0502L 44.9497,30.4717L 40,35.4215L 35.0502,30.4717L 32.4718,33.0502L 37.4215,37.9999L 32.4718,42.9497L 35.0502,45.5281L 40,40.5783L 44.9497,45.5281L 47.5281,42.9497 Z "/>
-  </svg>`;
-
-function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () => {}) {
+  function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () => {}) {
         const tag = document.createElement("span");
         tag.className = "keyword-tag";
         tag.innerHTML = `
@@ -10570,60 +11851,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             saveModal.className = "save-keywords-modal";
             saveModal.innerHTML = `
                 <style>
-                .save-keywords-modal {
-                    background-color: #282828;
-                    border-radius: 8px;
-                    padding: 16px;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    z-index: 3001;
-                    width: 300px;
-                }
-                .save-keywords-title {
-                    color: #fff;
-                    font-size: 14px;
-                    font-weight: bold;
-                    margin-bottom: 12px;
-                }
-                .save-keywords-input {
-                    width: 100%;
-                    padding: 8px;
-                    border-radius: 4px;
-                    border: 1px solid #434343;
-                    background: #121212;
-                    color: white;
-                    margin-bottom: 12px;
-                    box-sizing: border-box;
-                }
-                .save-keywords-button {
-                    background-color: #1db954;
-                    border: none;
-                    color: black;
-                    padding: 8px 16px;
-                    border-radius: 20px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    display: block;
-                    width: auto;
-                    margin: 0 auto;
-                }
-
-                .save-keywords-button:hover {
-                    background-color: #1ed760;
-                }
-
-                .save-keywords-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    right: 0;
-                    bottom: 0;
-                    background-color: rgba(0, 0, 0, 0.5);
-                    z-index: 3000;
-                }
+                  .save-keywords-modal { background-color: #282828; border-radius: 8px; padding: 16px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3001; width: 300px; }
+                  .save-keywords-title { color: #fff; font-size: 14px; font-weight: bold; margin-bottom: 12px; }
+                  .save-keywords-input { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #434343; background: #121212; color: white; margin-bottom: 12px; box-sizing: border-box; }
+                  .save-keywords-button { background-color: #1db954; border: none; color: black; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; display: block; width: auto; margin: 0 auto; }
+                  .save-keywords-button:hover { background-color: #1ed760; }
+                  .save-keywords-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); z-index: 3000; }
                 </style>
                 <div class="save-keywords-title">Enter Keywords Group Name</div>
                 <input type="text" class="save-keywords-input" placeholder="Group Name">
@@ -10646,7 +11879,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             saveBtn.addEventListener("click", async () => {
                 const groupName = saveInput.value.trim();
                 if (groupName) {
-                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                    let savedKeywordGroups = JSON.parse(localStorage.getItem(STORAGE_KEY_KEYWORD_GROUPS) || "{}");
                     
                     if (savedKeywordGroups[groupName]) {
                         const confirmPromise = showConfirmationModal({
@@ -10669,7 +11902,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     }
 
                     savedKeywordGroups[groupName] = [...keywordSet];
-                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+                    localStorage.setItem(STORAGE_KEY_KEYWORD_GROUPS, JSON.stringify(savedKeywordGroups));
                     showNotification(`Keywords saved as "${groupName}"`);
                     closeModal();
                 } else {
@@ -10685,7 +11918,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             e.preventDefault();
             e.stopPropagation();
 
-            let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+            let savedKeywordGroups = JSON.parse(localStorage.getItem(STORAGE_KEY_KEYWORD_GROUPS) || "{}");
             const groupNames = Object.keys(savedKeywordGroups).reverse();
 
             if (groupNames.length === 0) {
@@ -10697,72 +11930,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             dropdown.className = "load-keywords-dropdown";
             dropdown.innerHTML = `
                 <style>
-                .load-keywords-dropdown {
-                    background-color: #282828;
-                    border-radius: 4px;
-                    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
-                    position: absolute;
-                    right: 0;
-                    z-index: 3002;
-                    min-width: 180px;
-                    max-width: 250px;
-                    max-height: 200px;
-                    overflow-y: auto;
-                }
-                .load-keywords-option {
-                    color: #fff;
-                    padding-top: 8px;
-                    padding-right: 5px;
-                    padding-bottom: 8px;
-                    padding-left: 12px;
-                    cursor: pointer;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .load-keywords-option:hover {
-                    background-color: #383838;
-                }
-                .load-keywords-option:active, .load-keywords-option.selected {
-                    background-color: #1db954;
-                    color: black;
-                }
-                .load-keywords-option .remove-button {
-                    opacity: 0;
-                    transition: opacity 0.2s;
-                    cursor: pointer;
-                    padding: 4px;
-                    display: flex;
-                    align-items: center;
-                    max-width: 30px;
-                }
-                .load-keywords-option:hover .remove-button {
-                    opacity: 1;
-                }
-                .remove-icon {
-                    width: 12px;
-                    height: 12px;
-                    fill: currentColor;
-                }
-                .load-keywords-option-text {
-                    flex-grow: 1;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    font-size: 14px;
-                }
-                .load-keywords-dropdown::-webkit-scrollbar {
-                    width: 8px;
-                }
-                .load-keywords-dropdown::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                .load-keywords-dropdown::-webkit-scrollbar-thumb {
-                    background-color: #4d4d4d;
-                    border-radius: 4px;
-                }
+                  .load-keywords-dropdown { background-color: #282828; border-radius: 4px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); position: absolute; right: 0; z-index: 3002; min-width: 180px; max-width: 250px; max-height: 200px; overflow-y: auto; }
+                  .load-keywords-option { color: #fff; padding-top: 8px; padding-right: 5px; padding-bottom: 8px; padding-left: 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; align-items: center; }
+                  .load-keywords-option:hover { background-color: #383838; }
+                  .load-keywords-option:active, .load-keywords-option.selected { background-color: #1db954; color: black; }
+                  .load-keywords-option .remove-button { opacity: 0; transition: opacity 0.2s; cursor: pointer; padding: 4px; display: flex; align-items: center; max-width: 30px; }
+                  .load-keywords-option:hover .remove-button { opacity: 1; }
+                  .remove-icon { width: 12px; height: 12px; fill: currentColor; }
+                  .load-keywords-option-text { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+                  .load-keywords-dropdown::-webkit-scrollbar { width: 8px; }
+                  .load-keywords-dropdown::-webkit-scrollbar-track { background: transparent; }
+                  .load-keywords-dropdown::-webkit-scrollbar-thumb { background-color: #4d4d4d; border-radius: 4px; }
                 </style>
             `;
 
@@ -10809,9 +11987,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 removeButton.addEventListener("click", (e) => {
                     e.stopPropagation();
 
-                    let savedKeywordGroups = JSON.parse(localStorage.getItem("sort-play-keyword-groups") || "{}");
+                    let savedKeywordGroups = JSON.parse(localStorage.getItem(STORAGE_KEY_KEYWORD_GROUPS) || "{}");
                     delete savedKeywordGroups[groupName];
-                    localStorage.setItem("sort-play-keyword-groups", JSON.stringify(savedKeywordGroups));
+                    localStorage.setItem(STORAGE_KEY_KEYWORD_GROUPS, JSON.stringify(savedKeywordGroups));
 
                     option.remove();
                     showNotification(`Removed keyword group "${groupName}"`);
@@ -10850,13 +12028,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
     function saveKeywords(titleAlbumKeywords, artistKeywords) {
-        localStorage.setItem("sort-play-title-album-keywords", JSON.stringify([...titleAlbumKeywords]));
-        localStorage.setItem("sort-play-artist-keywords", JSON.stringify([...artistKeywords]));
+        localStorage.setItem(STORAGE_KEY_TITLE_ALBUM_KEYWORDS, JSON.stringify([...titleAlbumKeywords]));
+        localStorage.setItem(STORAGE_KEY_ARTIST_KEYWORDS, JSON.stringify([...artistKeywords]));
     }
 
      function loadKeywords() {
-      const savedTitleAlbumKeywords = localStorage.getItem("sort-play-title-album-keywords");
-      const savedArtistKeywords = localStorage.getItem("sort-play-artist-keywords");
+      const savedTitleAlbumKeywords = localStorage.getItem(STORAGE_KEY_TITLE_ALBUM_KEYWORDS);
+      const savedArtistKeywords = localStorage.getItem(STORAGE_KEY_ARTIST_KEYWORDS);
 
       const titleAlbumKeywords = savedTitleAlbumKeywords ? new Set(JSON.parse(savedTitleAlbumKeywords)) : new Set();
       const artistKeywords = savedArtistKeywords ? new Set(JSON.parse(savedArtistKeywords)) : new Set();
@@ -10876,7 +12054,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let isFirstLoad = true;
     let isLastLoad = false;
     let matchWholeWord = false;
-    let activeRangeFilter = localStorage.getItem("sort-play-active-range-filter") || "releaseDate";
+    let activeRangeFilter = localStorage.getItem(STORAGE_KEY_ACTIVE_RANGE_FILTER) || "releaseDate";
     let handleTrackMove = null;
 
     tracks.forEach(track => {
@@ -11402,11 +12580,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const minRange = parseFormattedNumber(modalContainer.querySelector("#rangeMin").value) || minRangeValue;
         const maxRange = parseFormattedNumber(modalContainer.querySelector("#rangeMax").value) || maxRangeValue;
     
-        localStorage.setItem("sort-play-filter-title", filterTitle);
-        localStorage.setItem("sort-play-filter-album", filterAlbum);
-        localStorage.setItem("sort-play-filter-artist", filterArtist);
-        localStorage.setItem("sort-play-match-whole-word", matchWholeWord);
-        localStorage.setItem("sort-play-active-range-filter", activeRangeFilter);
+        localStorage.setItem(STORAGE_KEY_FILTER_TITLE, filterTitle);
+        localStorage.setItem(STORAGE_KEY_FILTER_ALBUM, filterAlbum);
+        localStorage.setItem(STORAGE_KEY_FILTER_ARTIST, filterArtist);
+        localStorage.setItem(STORAGE_KEY_MATCH_WHOLE_WORD, matchWholeWord);
+        localStorage.setItem(STORAGE_KEY_ACTIVE_RANGE_FILTER, activeRangeFilter);
     
         tracks.forEach((track) => {
             if (rangeFilterEnabled) {
@@ -11733,1094 +12911,174 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     modalContainer.innerHTML = `
     <style>
-    .custom-filter-modal {
-        width: 100%;
-        max-width: 1200px;
-        color: #fff;
-    }
-    .tracklist-table .actions-col {
-        box-shadow: 2px 0 2px #121212;
-    }
-    .GenericModal__overlay .GenericModal {
-        border-radius: 30px;
-        overflow: hidden;
-    }
-    .GenericModal > .main-embedWidgetGenerator-container {
-      height: auto !important;
-    } 
-    .main-trackCreditsModal-originalCredits{
-      padding-bottom: 20px !important;
-    }
-    .text-overflow {
-        position: relative;
-    }
-
-    .playlist-player-wrapper {
-        background-color: #1c1c1c;
-        border-radius: 20px;
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 15px;
-        border: 4px solid #1c1c1c;
-    }
-
-    .playlist-wrapper {
-        max-height: 30vh;
-        background-color: #121212;
-        overflow: auto;
-        padding: 0 0px;
-        scrollbar-width: thin;
-        scrollbar-color: #232323 transparent;
-        position: relative;
-    }
-
-    .playlist-wrapper::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    .playlist-wrapper::-webkit-scrollbar-thumb {
-        background-color: #ffffff40;
-        border-radius: 4px;
-    }
-
-    .playlist-wrapper::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .tracklist-table {
-        width: 100%;
-        border-collapse: separate;
-        color: #b3b3b3;
-        font-size: 14px;
-        table-layout: fixed;
-    }
-
-    .tracklist-table th {
-        text-align: left;
-        padding: 8px;
-        border-bottom: 1px solid #282828;
-        font-weight: 400;
-        font-family: 'SpotifyMixUI' !important;
-        color: #b3b3b3;
-        position: sticky;
-        top: 0;
-        background: #121212;
-        z-index: 2;
-        height: 45px;
-        vertical-align: middle;
-        white-space: nowrap;
-    }
-    .tracklist-table th:hover {
-        color: #ffffff;
-    }
-
-    .tracklist-table th.sorted {
-        color: #1ED760;
-    }
-    .tracklist-table .index-col {
-        width: 52px;
-    }
-
-    .tracklist-table th.index-col {
-        text-align: center;
-    }
-
-    .tracklist-table .title-col {
-        width: 340px;
-        padding-right: 16px;
-    }
-
-    .tracklist-table .artist-col {
-        width: 200px;
-    }
-
-    .tracklist-table th:nth-child(4) {
-        width: 200px;
-    }
-    .tracklist-table th:nth-child(6) {
-        width: 85px;
-        text-align: center;
-    }
-
-    .tracklist-table th:nth-child(8) {
-        width: 90px;
-        text-align: center;
-    }
-
-
-    .tracklist-table th:nth-child(7) {
-        width: 120px;
-        text-align: center;
-    }
-
-    .tracklist-table th:nth-child(5) {
-        width: 100px;
-        text-align: center;
-        white-space: normal;
-    }
-
-    .tracklist-table th:nth-child(n+9) {
-        text-align: center;
-    }
-
-    .tracklist-table th:nth-child(9) {
-        width: 70px;
-    }
-
-    .tracklist-table th:nth-child(10) {
-        width: 110px;
-    }
-
-    .tracklist-table th:nth-child(11) {
-        width: 80px;
-    }
-
-    .tracklist-table th:nth-child(12) {
-        width: 80px;
-    }
-
-    .tracklist-table th:nth-child(13) {
-        width: 80px;
-    }
-
-    .tracklist-table th:nth-child(14) {
-        width: 100px;
-    }
-
-    .tracklist-table th:nth-child(15) {
-        width: 110px;
-    }
-
-    .tracklist-table th:nth-child(16) {
-        width: 140px;
-    }
-
-    .tracklist-table th:nth-child(17) {
-        width: 90px;
-    }
-
-    .sticky-col {
-        position: sticky;
-        background: #121212;
-        z-index: 1;
-    }
-
-    .index-col {
-        left: 0;
-        text-align: center;
-    }
-
-    .title-col {
-        left: 52px;
-    }
-
-    .artist-col {
-        left: 392px;
-        width: 200px;
-    }
-
-    .tracklist-table td:nth-child(n+6) {
-        text-align: center;
-    }
-
-    .tracklist-table td:nth-child(4) {
-        width: 200px;
-    }
-    .tracklist-table td:nth-child(5) {
-        width: 100px;
-        text-align: center;
-    }
-
-    .tracklist-table .actions-col {
-        width: 60px;
-        right: 0;
-        text-align: center;
-        vertical-align: middle;
-        box-shadow: 2px 0 2px #121212;
-    }
-
-    .actions-col {
-        right: 0;
-        padding: 0 !important;
-    }
-
-    .actions-col::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        height: 100%;
-        width: 1px;
-        background: #282828;
-        pointer-events: none;
-    }
-
-    .tracklist-table td:nth-child(n+6):not(:last-child) {
-        text-align: center;
-    }
-
-    .tracklist-table tr.removed {
-        background-color: #4a1515 !important;
-    }
-
-    .tracklist-table tr.removed:hover {
-        background-color: #5a1919 !important;
-    }
-
-    .tracklist-table tr.removed .sticky-col {
-        background-color: #4a1515 !important;
-    }
-
-    .tracklist-table tr.removed:hover .sticky-col {
-        background-color: #5a1919 !important;
-    }
-
-    .tracklist-table tr.removed.active {
-        background-color: #6a1d1d !important;
-    }
-
-    .tracklist-table tr.removed.active .sticky-col {
-        background-color: #6a1d1d !important;
-    }
-
-    .custom-filter-modal .sort-type-select {
-      padding: 7px;
-      border-radius: 4px;
-      border: 1px solid #434343;
-      background: #282828;
-      color: white;
-      width: 170px;
-      cursor: pointer;
-      margin-right: 100px;
-    }
-
-    #customFilterCreatePlaylist {
-        margin: 0;
-        padding: 8px 32px;
-        border-radius: 500px;
-        border: none;
-        background: #1db954;
-        color: black;
-        font-size: 14px;
-        font-weight: 700;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-    }
-
-    #customFilterCreatePlaylist:hover {
-        background: #1ed760;
-    }
-
-    .remove-button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto;
-        width: 100%;
-        height: 100%;
-        padding: 0;
-    }
-
-    .remove-icon {
-        width: 14px;
-        height: 14px;
-        fill: #b3b3b3;
-        transition: fill 0.2s ease;
-    }
-
-    .remove-button:hover .remove-icon {
-        fill: #ffffff;
-    }
-    .text-overflow {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
-        width: 100%;
-    }
-
-    th.sticky-col {
-        z-index: 3;
-    }
-
-    .artist-col::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: 0;
-        height: 100%;
-        width: 1px;
-        background: #282828;
-        pointer-events: none;
-    }
-
-    .tracklist-table tr {
-        height: 35px;
-    }
-
-    .tracklist-table tr:hover {
-        background-color: #282828;
-    }
-     .tracklist-table tr.active {
-        background-color: #5A5A5A !important;
-    }
-
-    .tracklist-table tbody tr {
-        height: 35px;
-    }
-
-    .tracklist-table tbody tr:hover {
-        background-color: #282828;
-    }
-     .tracklist-table tr.active .sticky-col {
-        background-color: #5A5A5A !important;
-    }
-
-
-    .tracklist-table tbody tr:hover .sticky-col {
-        background-color: #282828;
-    }
-
-    .tracklist-table thead tr .sticky-col {
-        background-color: #121212;
-    }
-
-    .tracklist-table td {
-        padding: 8px;
-        border: none;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        vertical-align: middle;
-        height: 35px;
-    }
-
-    .main-image-container {
-        width: 33px;
-        height: 33px;
-        min-width: 33px;
-        min-height: 33px;
-        border-radius: 4px;
-        background-color: #282828;
-        position: relative;
-        aspect-ratio: 1 / 1;
-        flex-shrink: 0;
-    }
-
-    .main-image-image2 {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        transition: opacity 0.3s ease;
-        object-fit: cover;
-    }
-
-    .song-info {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        height: 100%;
-        min-width: 0;
-        padding-right: 16px;
-    }
-
-    .song-info img {
-        width: 33px;
-        height: 33px;
-        border-radius: 4px;
-        object-fit: cover;
-    }
-
-    .song-title {
-        color: #fff;
-        font-weight: 400;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
-    }
-
-
-    .main-embedWidgetGenerator-container {
-        width: 1200px !important;
-        max-width: 1500px !important;
-        max-height: 90vh !important;
-        border-radius: 30px;
-        overflow: hidden;
-        background-color: #121212 !important;
-        border: 2px solid #282828;
-    }
-
-    .GenericModal__overlay .GenericModal {
-        border-radius: 30px;
-        overflow: hidden;
-    }
-
-    .main-trackCreditsModal-mainSection {
-        overflow-y: hidden !important;
-        padding: 16px 32px 9px 32px;
-    }
-
-    .main-trackCreditsModal-header {
-        padding: 16px 32px 12px !important;
-    }
-
-    .custom-filter-modal .main-popupModal-content {
-        overflow-y: auto;
-    }
-    .GenericModal {
-        position: relative;
-        z-index: 1000;
-    }
-
-    .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.25);
-        backdrop-filter: blur(5px);
-        -webkit-backdrop-filter: blur(5px);
-        z-index: 999;
-    }
-    .playlist-title-container {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-      padding: 14px 20px;
-    }
-
-    .playlist-stats-container {
-        display: flex;
-        gap: 12px;
-        color: #b3b3b3;
-        font-size: 14px;
-        margin-left: auto;
-    }
-    .player-controls2 {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px 20px;
-    }
-
-    .control-button2 {
-        background-color: transparent;
-        border: 0;
-        color: #ffffff;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: color 0.2s ease;
-    }
-
-    .progress-bar2-container {
-        position: absolute;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: #b3b3b3;
-        font-size: 12px;
-        width: 450px;
-        max-width: 450px;
-    }
-
-    #currentTime, #duration {
-        min-width: 45px;
-        text-align: center;
-        font-variant-numeric: tabular-nums;
-    }
-    #currentTime {
-        text-align: right;
-    }
-
-    #duration {
-        text-align: left;
-    }
-    .progress-bar2 {
-        flex: 1;
-        height: 4px;
-        background-color: #4d4d4d;
-        border-radius: 2px;
-        cursor: pointer;
-        position: relative;
-        min-width: 0;
-    }
-
-    .progress-bar2-inner {
-        position: absolute;
-        height: 100%;
-        background-color: #ffffff;
-        border-radius: 2px;
-        transition: width 0.1s linear;
-    }
-
-    .progress-bar2:hover .progress-bar2-inner {
-        background-color: #1db954;
-    }
-
-
-    .track-info-container {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        max-width: 300px;
-        min-width: 200px;
-    }
-
-    .track-info-text {
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-    }
-
-    .track-title {
-        color: #fff;
-        font-size: 14px;
-        font-weight: 500;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .track-artist {
-        color: #b3b3b3;
-        font-size: 12px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    .track-album-art {
-        width: 40px;
-        height: 40px;
-        border-radius: 4px;
-        background-color: #282828;
-        flex-shrink: 0;
-    }
-
-
-    .max-rows-container {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        white-space: nowrap;
-    }
-
-    .max-rows-label {
-        color: #b3b3b3;
-        font-size: 12px;
-    }
-
-    .max-rows-select {
-        padding: 3px 4px;
-        border-radius: 4px;
-        border: 1px solid #434343;
-        background: #282828;
-        color: white;
-        cursor: pointer;
-    }
-    .filter-settings-container {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto;
-        gap: 15px;
-        margin-bottom: 15px;
-    }
-
-    .settings-left-wrapper,
-    .settings-right-wrapper {
-        background-color: #1c1c1c;
-        border-radius: 20px;
-        padding: 20px;
-        position: relative;
-    }
-
-    .settings-left-wrapper {
-      grid-column: 1;
-      grid-row: 1 / span 2;
-      display: flex;
-      flex-direction: column;
-      gap: 0px;
-      position: relative;
-    }
-    .settings-right-wrapper {
-        grid-column: 2;
-        grid-row: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 0px;
-        position: relative;
-    }
-
-    .buttons-wrapper {
-        grid-column: 2;
-        grid-row: 2;
-        background-color: #1c1c1c;
-        border-radius: 20px;
-        padding: 15px 20px;
-         display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-
-
-    .settings-left-wrapper.disabled > *:not(.settings-title-wrapper) {
-        opacity: 0.5;
-        pointer-events: none;
-    }
-
-    .settings-left-wrapper.disabled .settings-title-wrapper {
-        opacity: 1;
-        pointer-events: all;
-    }
-
-    .settings-left-wrapper.disabled #keywordFilterToggle {
-        pointer-events: all;
-    }
-
-    .settings-left-wrapper.disabled .settings-title {
-        opacity: 1;
-    }
-
-    .settings-title {
-        color: white;
-        font-weight: bold;
-        font-size: 15px;
-        margin-bottom: 5px;
-    }
-    .settings-title-wrapper {
-      display: flex;
-      justify-content: space-between;
-      width: 100%;
-      margin-bottom: 8px;
-    }
-
-    #rangeFilterType {
-        padding: 6px;
-        border-radius: 4px;
-        border: 1px solid #434343;
-        background: #282828;
-        color: white;
-        width: 150px;
-        cursor: pointer;
-    }
-
-    .range-filter-container {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .range-filter-title-wrapper {
-        display: flex;
-        justify-content: flex-start;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 15px;
-    }
-
-    .range-filter-label {
-        color: #fff;
-        font-size: 13px;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-
-    .range-filter-title {
-        color: #fff;
-        font-size: 13px;
-        font-weight: 500;
-    }
-
-    .range-input-container {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-    }
-
-    .range-input {
-        width: 85px;
-        padding: 4px;
-        border-radius: 4px;
-        border: 1px solid #434343;
-        background: #282828;
-        color: white;
-        text-align: center;
-    }
-    .dual-range-sliderx-container {
-        position: relative;
-        width: 100%;
-        height: 20px;
-        flex: 1;
-    }
-
-    .dual-range-sliderx-container input[type="range"] {
-        -webkit-appearance: none;
-        -moz-appearance: none;
-        appearance: none;
-        width: 100%;
-        outline: none;
-        position: absolute;
-        margin: auto;
-        top: 0;
-        bottom: 0;
-        background-color: transparent;
-        pointer-events: none;
-    }
-
-    .sliderx-track {
-        width: 100%;
-        height: 5px;
-        position: absolute;
-        margin: auto;
-        top: 0;
-        bottom: 0;
-        border-radius: 5px;
-        background-color: #4d4d4d;
-    }
-
-    .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-runnable-track {
-        -webkit-appearance: none;
-        height: 5px;
-    }
-
-    .dual-range-sliderx-container input[type="range"]::-moz-range-track {
-        -moz-appearance: none;
-        height: 5px;
-    }
-
-    .dual-range-sliderx-container input[type="range"]::-ms-track {
-        appearance: none;
-        height: 5px;
-    }
-
-    .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-thumb {
-        -webkit-appearance: none;
-        height: 16px;
-        width: 16px;
-        background-color: #fff;
-        cursor: pointer;
-        margin-top: -6px;
-        pointer-events: auto;
-        border-radius: 50%;
-        border: 1px solid #434343;
-    }
-    .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-thumb:hover {
-        border: 1px solid #b3b3b3;
-    }
-
-    .dual-range-sliderx-container input[type="range"]::-moz-range-thumb {
-        -webkit-appearance: none;
-        height: 16px;
-        width: 16px;
-        cursor: pointer;
-        border-radius: 50%;
-        background-color: #fff;
-        pointer-events: auto;
-        border: 1px solid #434343;
-    }
-
-    .dual-range-sliderx-container input[type="range"]::-ms-thumb {
-        appearance: none;
-        height: 16px;
-        width: 16px;
-        cursor: pointer;
-        border-radius: 50%;
-        background-color: #fff;
-        pointer-events: auto;
-          border: 1px solid #434343;
-    }
-    .range-filters-items {
-        max-height: 170px;
-        overflow-y: auto;
-        padding-top: 9px;
-        scrollbar-width: thin;
-        scrollbar-color: #ffffff40 transparent;
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-    .range-filters-items::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-
-    .range-filters-items::-webkit-scrollbar-thumb {
-        background-color: #ffffff40;
-        border-radius: 4px;
-    }
-
-    .range-filters-items::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .custom-filter-modal .switch {
-      position: relative;
-      display: inline-block;
-      width: 36px;
-      height: 20px;
-    }
-
-    .custom-filter-modal .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .custom-filter-modal .sliderx {
-      position: absolute;
-      cursor: pointer;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-color: #484848;
-      border-radius: 24px;
-      transition: .2s;
-    }
-
-    .custom-filter-modal .sliderx:before {
-      position: absolute;
-      content: "";
-      height: 14px;
-      width: 14px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      border-radius: 50%;
-      transition: .2s;
-    }
-
-    .custom-filter-modal input:checked + .sliderx {
-      background-color: #1DB954;
-    }
-
-    .custom-filter-modal input:checked + .sliderx:before {
-      transform: translateX(16px);
-    }
-    .keyword-filter-container {
-        display: flex;
-        gap: 15px;
-        width: 100%;
-    }
-
-    .filter-group {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .filter-group-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      height: 20px;
-      justify-content: space-between;
-    }
-
-    .filter-group-title {
-        color: #fff;
-        font-size: 13px;
-        font-weight: 500;
-    }
-
-    .toggle-group {
-        display: flex;
-        gap: 5px;
-        align-items: center;
-    }
-
-    .filter-mode-toggle-label {
-        color: #b3b3b3;
-        font-size: 13px;
-    }
-
-    .keyword-input-container {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        background: #282828;
-        border-radius: 6px;
-        min-height: 0px;
-        max-height: 96px;
-        width: 100%;
-    }
-    .keyword-tags-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        padding: 6px;
-        overflow-y: auto;
-        min-height: 68px;
-        max-height: 68px;
-        max-width: 252px;
-        scrollbar-width: thin;
-        scrollbar-color: #ffffff40 transparent;
-    }
-
-    .keyword-input-wrapper {
-        position: relative;
-        padding: 3px;
-        border-top: 1px solid #444;
-        background: #313131;
-        border-bottom-left-radius: 6px;
-        border-bottom-right-radius: 6px;
-        display: flex;
-        align-items: center;
-    }
-    .keyword-input {
-        background: none;
-        border: none;
-        color: white;
-        padding: 4px;
-        width: 100%;
-        height: 24px;
-        margin: 0;
-        flex: 1;
-        min-width: 0;
-    }
-
-    .keyword-actions-container {
-        display: flex;
-        margin-left: auto;
-        flex-shrink: 0;
-    }
-
-    .keyword-action-button {
-        background-color: transparent;
-        border: none;
-        color: white;
-        padding: 2px 7px;
-        border-radius: 12px;
-        font-size: 12px;
-        cursor: pointer;
-        transition: background-color 0.2s ease;
-        height: 24px;
-        white-space: nowrap;
-    }
-
-    .keyword-action-button:hover {
-        background-color: #484848;
-    }
-
-    .keyword-action-button svg {
-        width: 14px;
-        height: 14px;
-        fill: #fff;
-        display: block;
-        margin: 0 auto;
-    }
-    .keyword-tag {
-        display: inline-flex;
-        align-items: center;
-        background: #383838;
-        border-radius: 12px;
-        padding: 2px 8px;
-        color: white;
-        font-size: 12px;
-        white-space: nowrap;
-        flex-shrink: 0;
-        height: 24px;
-    }
-
-    .keyword-tag-remove {
-        margin-left: 4px;
-        cursor: pointer;
-        color: #ccc;
-        font-size: 14px;
-    }
-
-    .keyword-input:focus {
-        outline: none;
-    }
-      .filter-mode-radio-group {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        margin: 10px 0;
-    }
-
-    .radio-button-container {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        cursor: pointer;
-    }
-
-    .radio-button {
-        width: 16px;
-        height: 16px;
-        border: 2px solid #b3b3b3;
-        border-radius: 50%;
-        display: flex;
-        padding: 2px;
-    }
-
-    .radio-button input {
-        display: none;
-    }
-
-    .radio-button-inner {
-        width: 8px;
-        height: 8px;
-        background-color: #1DB954;
-        border-radius: 50%;
-        display: none;
-    }
-
-    .radio-button input:checked + .radio-button-inner {
-        display: block;
-    }
-
-    .radio-label {
-        color: #b3b3b3;
-        font-size: 13px;
-    }
-
-    .radio-button-container:hover .radio-button {
-        border-color: #ffffff;
-    }
-
-    .radio-button-container:hover .radio-label {
-        color: #ffffff;
-    }
-    .load-more-row {
-        cursor: pointer;
-        background-color: #3e3e3e;
-        text-align: center;
-        position: sticky;
-        left: 0;
-        z-index: 1;
-    }
-    .load-more-cell {
-        padding: 10px;
-        font-size: 12px;
-        text-align: center;
-        transition: background-color 0.2s;
-    }
-    .load-more-row:hover .load-more-cell {
-        background-color: #4c4c4c;
-    }
-     .buttons-container {
-        display: flex;
-        justify-content: flex-start;
-        padding: 16px 32px;
-    }
+      .custom-filter-modal { width: 100%; max-width: 1200px; color: #fff; }
+      .tracklist-table .actions-col { box-shadow: 2px 0 2px #121212; }
+      .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
+      .GenericModal > .main-embedWidgetGenerator-container { height: auto !important; }
+      .main-trackCreditsModal-originalCredits { padding-bottom: 20px !important; }
+      .text-overflow { position: relative; }
+      .playlist-player-wrapper { background-color: #1c1c1c; border-radius: 20px; position: relative; display: flex; flex-direction: column; margin-bottom: 15px; border: 4px solid #1c1c1c; }
+      .playlist-wrapper { max-height: 30vh; background-color: #121212; overflow: auto; padding: 0 0px; scrollbar-width: thin; scrollbar-color: #232323 transparent; position: relative; }
+      .playlist-wrapper::-webkit-scrollbar { width: 8px; height: 8px; }
+      .playlist-wrapper::-webkit-scrollbar-thumb { background-color: #ffffff40; border-radius: 4px; }
+      .playlist-wrapper::-webkit-scrollbar-track { background: transparent; }
+      .tracklist-table { width: 100%; border-collapse: separate; color: #b3b3b3; font-size: 14px; table-layout: fixed; }
+      .tracklist-table th { text-align: left; padding: 8px; border-bottom: 1px solid #282828; font-weight: 400; font-family: 'SpotifyMixUI' !important; color: #b3b3b3; position: sticky; top: 0; background: #121212; z-index: 2; height: 45px; vertical-align: middle; white-space: nowrap; }
+      .tracklist-table th:hover { color: #ffffff; }
+      .tracklist-table th.sorted { color: #1ED760; }
+      .tracklist-table .index-col { width: 52px; }
+      .tracklist-table th.index-col { text-align: center; }
+      .tracklist-table .title-col { width: 340px; padding-right: 16px; }
+      .tracklist-table .artist-col { width: 200px; }
+      .tracklist-table th:nth-child(4) { width: 200px; }
+      .tracklist-table th:nth-child(6) { width: 85px; text-align: center; }
+      .tracklist-table th:nth-child(8) { width: 90px; text-align: center; }
+      .tracklist-table th:nth-child(7) { width: 120px; text-align: center; }
+      .tracklist-table th:nth-child(5) { width: 100px; text-align: center; white-space: normal; }
+      .tracklist-table th:nth-child(n+9) { text-align: center; }
+      .tracklist-table th:nth-child(9) { width: 70px; }
+      .tracklist-table th:nth-child(10) { width: 110px; }
+      .tracklist-table th:nth-child(11) { width: 80px; }
+      .tracklist-table th:nth-child(12) { width: 80px; }
+      .tracklist-table th:nth-child(13) { width: 80px; }
+      .tracklist-table th:nth-child(14) { width: 100px; }
+      .tracklist-table th:nth-child(15) { width: 110px; }
+      .tracklist-table th:nth-child(16) { width: 140px; }
+      .tracklist-table th:nth-child(17) { width: 90px; }
+      .sticky-col { position: sticky; background: #121212; z-index: 1; }
+      .index-col { left: 0; text-align: center; }
+      .title-col { left: 52px; }
+      .artist-col { left: 392px; width: 200px; }
+      .tracklist-table td:nth-child(n+6) { text-align: center; }
+      .tracklist-table td:nth-child(4) { width: 200px; }
+      .tracklist-table td:nth-child(5) { width: 100px; text-align: center; }
+      .tracklist-table .actions-col { width: 60px; right: 0; text-align: center; vertical-align: middle; box-shadow: 2px 0 2px #121212; }
+      .actions-col { right: 0; padding: 0 !important; }
+      .actions-col::after { content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 1px; background: #282828; pointer-events: none; }
+      .tracklist-table td:nth-child(n+6):not(:last-child) { text-align: center; }
+      .tracklist-table tr.removed { background-color: #4a1515 !important; }
+      .tracklist-table tr.removed:hover { background-color: #5a1919 !important; }
+      .tracklist-table tr.removed .sticky-col { background-color: #4a1515 !important; }
+      .tracklist-table tr.removed:hover .sticky-col { background-color: #5a1919 !important; }
+      .tracklist-table tr.removed.active { background-color: #6a1d1d !important; }
+      .tracklist-table tr.removed.active .sticky-col { background-color: #6a1d1d !important; }
+      .custom-filter-modal .sort-type-select { padding: 7px; border-radius: 4px; border: 1px solid #434343; background: #282828; color: white; width: 170px; cursor: pointer; margin-right: 100px; }
+      #customFilterCreatePlaylist { margin: 0; padding: 8px 32px; border-radius: 500px; border: none; background: #1db954; color: black; font-size: 14px; font-weight: 700; cursor: pointer; transition: background-color 0.2s ease; }
+      #customFilterCreatePlaylist:hover { background: #1ed760; }
+      .remove-button { background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 0 auto; width: 100%; height: 100%; padding: 0; }
+      .remove-icon { width: 14px; height: 14px; fill: #b3b3b3; transition: fill 0.2s ease; }
+      .remove-button:hover .remove-icon { fill: #ffffff; }
+      .text-overflow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; width: 100%; }
+      th.sticky-col { z-index: 3; }
+      .artist-col::after { content: ''; position: absolute; top: 0; right: 0; height: 100%; width: 1px; background: #282828; pointer-events: none; }
+      .tracklist-table tr { height: 35px; }
+      .tracklist-table tr:hover { background-color: #282828; }
+      .tracklist-table tr.active { background-color: #5A5A5A !important; }
+      .tracklist-table tbody tr { height: 35px; }
+      .tracklist-table tbody tr:hover { background-color: #282828; }
+      .tracklist-table tr.active .sticky-col { background-color: #5A5A5A !important; }
+      .tracklist-table tbody tr:hover .sticky-col { background-color: #282828; }
+      .tracklist-table thead tr .sticky-col { background-color: #121212; }
+      .tracklist-table td { padding: 8px; border: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; height: 35px; }
+      .main-image-container { width: 33px; height: 33px; min-width: 33px; min-height: 33px; border-radius: 4px; background-color: #282828; position: relative; aspect-ratio: 1 / 1; flex-shrink: 0; }
+      .main-image-image2 { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.3s ease; object-fit: cover; }
+      .song-info { display: flex; align-items: center; gap: 12px; height: 100%; min-width: 0; padding-right: 16px; }
+      .song-info img { width: 33px; height: 33px; border-radius: 4px; object-fit: cover; }
+      .song-title { color: #fff; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+      .main-embedWidgetGenerator-container { width: 1200px !important; max-width: 1500px !important; max-height: 90vh !important; border-radius: 30px; overflow: hidden; background-color: #121212 !important; border: 2px solid #282828; }
+      .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
+      .main-trackCreditsModal-mainSection { overflow-y: hidden !important; padding: 16px 32px 9px 32px; }
+      .main-trackCreditsModal-header { padding: 16px 32px 12px !important; }
+      .custom-filter-modal .main-popupModal-content { overflow-y: auto; }
+      .GenericModal { position: relative; z-index: 1000; }
+      .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 999; }
+      .playlist-title-container { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 14px 20px; }
+      .playlist-stats-container { display: flex; gap: 12px; color: #b3b3b3; font-size: 14px; margin-left: auto; }
+      .player-controls2 { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 20px; }
+      .control-button2 { background-color: transparent; border: 0; color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s ease; }
+      .progress-bar2-container { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; color: #b3b3b3; font-size: 12px; width: 450px; max-width: 450px; }
+      #currentTime, #duration { min-width: 45px; text-align: center; font-variant-numeric: tabular-nums; }
+      #currentTime { text-align: right; }
+      #duration { text-align: left; }
+      .progress-bar2 { flex: 1; height: 4px; background-color: #4d4d4d; border-radius: 2px; cursor: pointer; position: relative; min-width: 0; }
+      .progress-bar2-inner { position: absolute; height: 100%; background-color: #ffffff; border-radius: 2px; transition: width 0.1s linear; }
+      .progress-bar2:hover .progress-bar2-inner { background-color: #1db954; }
+      .track-info-container { display: flex; align-items: center; gap: 12px; max-width: 300px; min-width: 200px; }
+      .track-info-text { display: flex; flex-direction: column; min-width: 0; }
+      .track-title { color: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .track-artist { color: #b3b3b3; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .track-album-art { width: 40px; height: 40px; border-radius: 4px; background-color: #282828; flex-shrink: 0; }
+      .max-rows-container { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+      .max-rows-label { color: #b3b3b3; font-size: 12px; }
+      .max-rows-select { padding: 3px 4px; border-radius: 4px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; }
+      .filter-settings-container { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; gap: 15px; margin-bottom: 15px; }
+      .settings-left-wrapper, .settings-right-wrapper { background-color: #1c1c1c; border-radius: 20px; padding: 20px; position: relative; }
+      .settings-left-wrapper { grid-column: 1; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 0px; position: relative; }
+      .settings-right-wrapper { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; gap: 0px; position: relative; }
+      .buttons-wrapper { grid-column: 2; grid-row: 2; background-color: #1c1c1c; border-radius: 20px; padding: 15px 20px; display: flex; align-items: center; justify-content: space-between; }
+      .settings-left-wrapper.disabled > *:not(.settings-title-wrapper) { opacity: 0.5; pointer-events: none; }
+      .settings-left-wrapper.disabled .settings-title-wrapper { opacity: 1; pointer-events: all; }
+      .settings-left-wrapper.disabled #keywordFilterToggle { pointer-events: all; }
+      .settings-left-wrapper.disabled .settings-title { opacity: 1; }
+      .settings-title { color: white; font-weight: bold; font-size: 15px; margin-bottom: 5px; }
+      .settings-title-wrapper { display: flex; justify-content: space-between; width: 100%; margin-bottom: 8px; }
+      #rangeFilterType { padding: 6px; border-radius: 4px; border: 1px solid #434343; background: #282828; color: white; width: 150px; cursor: pointer; }
+      .range-filter-container { display: flex; flex-direction: column; gap: 8px; }
+      .range-filter-title-wrapper { display: flex; justify-content: flex-start; align-items: center; gap: 12px; margin-bottom: 15px; }
+      .range-filter-label { color: #fff; font-size: 13px; font-weight: 500; white-space: nowrap; }
+      .range-filter-title { color: #fff; font-size: 13px; font-weight: 500; }
+      .range-input-container { display: flex; align-items: center; gap: 15px; }
+      .range-input { width: 85px; padding: 4px; border-radius: 4px; border: 1px solid #434343; background: #282828; color: white; text-align: center; }
+      .dual-range-sliderx-container { position: relative; width: 100%; height: 20px; flex: 1; }
+      .dual-range-sliderx-container input[type="range"] { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 100%; outline: none; position: absolute; margin: auto; top: 0; bottom: 0; background-color: transparent; pointer-events: none; }
+      .sliderx-track { width: 100%; height: 5px; position: absolute; margin: auto; top: 0; bottom: 0; border-radius: 5px; background-color: #4d4d4d; }
+      .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-runnable-track { -webkit-appearance: none; height: 5px; }
+      .dual-range-sliderx-container input[type="range"]::-moz-range-track { -moz-appearance: none; height: 5px; }
+      .dual-range-sliderx-container input[type="range"]::-ms-track { appearance: none; height: 5px; }
+      .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-thumb { -webkit-appearance: none; height: 16px; width: 16px; background-color: #fff; cursor: pointer; margin-top: -6px; pointer-events: auto; border-radius: 50%; border: 1px solid #434343; }
+      .dual-range-sliderx-container input[type="range"]::-webkit-sliderx-thumb:hover { border: 1px solid #b3b3b3; }
+      .dual-range-sliderx-container input[type="range"]::-moz-range-thumb { -webkit-appearance: none; height: 16px; width: 16px; cursor: pointer; border-radius: 50%; background-color: #fff; pointer-events: auto; border: 1px solid #434343; }
+      .dual-range-sliderx-container input[type="range"]::-ms-thumb { appearance: none; height: 16px; width: 16px; cursor: pointer; border-radius: 50%; background-color: #fff; pointer-events: auto; border: 1px solid #434343; }
+      .range-filters-items { max-height: 170px; overflow-y: auto; padding-top: 9px; scrollbar-width: thin; scrollbar-color: #ffffff40 transparent; display: flex; flex-direction: column; gap: 5px; }
+      .range-filters-items::-webkit-scrollbar { width: 8px; height: 8px; }
+      .range-filters-items::-webkit-scrollbar-thumb { background-color: #ffffff40; border-radius: 4px; }
+      .range-filters-items::-webkit-scrollbar-track { background: transparent; }
+      .custom-filter-modal .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+      .custom-filter-modal .switch input { opacity: 0; width: 0; height: 0; }
+      .custom-filter-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+      .custom-filter-modal .sliderx:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+      .custom-filter-modal input:checked + .sliderx { background-color: #1DB954; }
+      .custom-filter-modal input:checked + .sliderx:before { transform: translateX(16px); }
+      .keyword-filter-container { display: flex; gap: 15px; width: 100%; }
+      .filter-group { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+      .filter-group-header { display: flex; align-items: center; gap: 8px; height: 20px; justify-content: space-between; }
+      .filter-group-title { color: #fff; font-size: 13px; font-weight: 500; }
+      .toggle-group { display: flex; gap: 5px; align-items: center; }
+      .filter-mode-toggle-label { color: #b3b3b3; font-size: 13px; }
+      .keyword-input-container { position: relative; display: flex; flex-direction: column; background: #282828; border-radius: 6px; min-height: 0px; max-height: 96px; width: 100%; }
+      .keyword-tags-container { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; overflow-y: auto; min-height: 68px; max-height: 68px; max-width: 252px; scrollbar-width: thin; scrollbar-color: #ffffff40 transparent; }
+      .keyword-input-wrapper { position: relative; padding: 3px; border-top: 1px solid #444; background: #313131; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; display: flex; align-items: center; }
+      .keyword-input { background: none; border: none; color: white; padding: 4px; width: 100%; height: 24px; margin: 0; flex: 1; min-width: 0; }
+      .keyword-actions-container { display: flex; margin-left: auto; flex-shrink: 0; }
+      .keyword-action-button { background-color: transparent; border: none; color: white; padding: 2px 7px; border-radius: 12px; font-size: 12px; cursor: pointer; transition: background-color 0.2s ease; height: 24px; white-space: nowrap; }
+      .keyword-action-button:hover { background-color: #484848; }
+      .keyword-action-button svg { width: 14px; height: 14px; fill: #fff; display: block; margin: 0 auto; }
+      .keyword-tag { display: inline-flex; align-items: center; background: #383838; border-radius: 12px; padding: 2px 8px; color: white; font-size: 12px; white-space: nowrap; flex-shrink: 0; height: 24px; }
+      .keyword-tag-remove { margin-left: 4px; cursor: pointer; color: #ccc; font-size: 14px; }
+      .keyword-input:focus { outline: none; }
+      .filter-mode-radio-group { display: flex; align-items: center; gap: 16px; margin: 10px 0; }
+      .radio-button-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+      .radio-button { width: 16px; height: 16px; border: 2px solid #b3b3b3; border-radius: 50%; display: flex; padding: 2px; }
+      .radio-button input { display: none; }
+      .radio-button-inner { width: 8px; height: 8px; background-color: #1DB954; border-radius: 50%; display: none; }
+      .radio-button input:checked + .radio-button-inner { display: block; }
+      .radio-label { color: #b3b3b3; font-size: 13px; }
+      .radio-button-container:hover .radio-button { border-color: #ffffff; }
+      .radio-button-container:hover .radio-label { color: #ffffff; }
+      .load-more-row { cursor: pointer; background-color: #3e3e3e; text-align: center; position: sticky; left: 0; z-index: 1; }
+      .load-more-cell { padding: 10px; font-size: 12px; text-align: center; transition: background-color 0.2s; }
+      .load-more-row:hover .load-more-cell { background-color: #4c4c4c; }
+      .buttons-container { display: flex; justify-content: flex-start; padding: 16px 32px; }
     </style>
     <div class="playlist-player-wrapper">
         <div class="playlist-title-container">
@@ -12851,9 +13109,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           </div>
           <div class="progress-bar2-container">
               <button class="control-button2" id="playPauseButton">
-                  <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                      <path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/>
-                  </svg>
+                  ${playIconSvg}
               </button>
               <span id="currentTime">0:00</span>
               <div class="progress-bar2" id="progressBar">
@@ -13025,70 +13281,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     (async () => {
         try {
-            const id = currentUri.split(":")[2];
-            if (URI.isPlaylistV1OrV2(currentUri)) {
-                const getName = async () => {
-                    if (isFallbackActive()) {
-                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUri);
-                        return meta.name;
-                    } else {
-                        try {
-                            const r = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${id}`);
-                            return r.name;
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUri);
-                                return meta.name;
-                            }
-                            throw e;
-                        }
-                    }
-                };
-                const name = await getName();
-                playlistTitleElement.textContent = name;
-                playlistTitleElement.title = name;
-
-            } else if (URI.isArtist(currentUri)) {
-                const getName = async () => {
-                    const fetchFallback = async () => {
-                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: currentUri, locale: "en", includePrerelease: false });
-                        return res.data.artistUnion.profile.name;
-                    };
-                    if (isFallbackActive()) return await fetchFallback();
-                    try {
-                        const r = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${id}`);
-                        return r.name;
-                    } catch (e) {
-                        if (registerWebApiFailure()) return await fetchFallback();
-                        throw e;
-                    }
-                };
-                const name = await getName();
-                playlistTitleElement.textContent = `All tracks by ${name}`;
-                playlistTitleElement.title = `All tracks by ${name}`;
-
-            } else if (isLikedSongsPage(currentUri)) {
-                playlistTitleElement.textContent = "Liked Songs";
-                playlistTitleElement.title = "Liked Songs";
-
-            } else if (URI.isAlbum(currentUri)) {
-                const getName = async () => {
-                    const fetchFallback = async () => {
-                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUri, locale: "en", offset: 0, limit: 1 });
-                        return res.data.albumUnion.name;
-                    };
-                    if (isFallbackActive()) return await fetchFallback();
-                    try {
-                        const r = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${id}`);
-                        return r.name;
-                    } catch (e) {
-                        if (registerWebApiFailure()) return await fetchFallback();
-                        throw e;
-                    }
-                };
-                const name = await getName();
-                playlistTitleElement.textContent = name;
-                playlistTitleElement.title = name;
+            const { sourceName } = await fetchSourceNameAndArtist(currentUri);
+            if (URI.isArtist(currentUri)) {
+                playlistTitleElement.textContent = `All tracks by ${sourceName}`;
+                playlistTitleElement.title = `All tracks by ${sourceName}`;
+            } else {
+                playlistTitleElement.textContent = sourceName;
+                playlistTitleElement.title = sourceName;
             }
         } catch (e) {
             console.warn("Failed to set modal title", e);
@@ -13133,11 +13332,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     maxRowsSelect = modalContainer.querySelector(".max-rows-select");
 
     keepMatchingMode = false;
-    titleToggle.checked = localStorage.getItem("sort-play-filter-title") !== "false";
-    albumToggle.checked = localStorage.getItem("sort-play-filter-album") !== "false";
-    artistToggle.checked = localStorage.getItem("sort-play-filter-artist") !== "false";
-    matchWholeWord = localStorage.getItem("sort-play-match-whole-word") === "true";
-    const savedPageSize = localStorage.getItem("sort-play-page-size");
+    titleToggle.checked = localStorage.getItem(STORAGE_KEY_FILTER_TITLE) !== "false";
+    albumToggle.checked = localStorage.getItem(STORAGE_KEY_FILTER_ALBUM) !== "false";
+    artistToggle.checked = localStorage.getItem(STORAGE_KEY_FILTER_ARTIST) !== "false";
+    matchWholeWord = localStorage.getItem(STORAGE_KEY_MATCH_WHOLE_WORD) === "true";
+    const savedPageSize = localStorage.getItem(STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE);
     maxRowsSelect.value = savedPageSize || "100";
     matchWholeWordToggle.checked = matchWholeWord;
 
@@ -13154,7 +13353,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             pageSize = parseInt(selectedValue);
         }
 
-        localStorage.setItem("sort-play-page-size", selectedValue);
+        localStorage.setItem(STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE, selectedValue);
 
         startIndex = 0;
         isFirstLoad = true;
@@ -13405,8 +13604,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     function updatePlayButton(isPlaying) {
         playPauseButton.innerHTML = isPlaying
-            ? '<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>'
-            : '<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>';
+            ? `${pauseIconSvg}`
+            : `${playIconSvg}`;
     }
 
     updatePlayButton(Spicetify.Player.isPlaying());
@@ -13672,11 +13871,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         Spicetify.PopupModal.hide();
         setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
         mainButton.innerHTML = "0%";
 
         try {
@@ -13697,70 +13891,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             mainButton.innerText = "100%";
 
             const sourceUri = currentUri;
-            const sourceId = sourceUri.split(":")[2];
-            let sourceName = "Source";
-
-            try {
-                if (URI.isArtist(sourceUri)) {
-                    const fetchArtistFallback = async () => {
-                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
-                        return res.data.artistUnion.profile.name;
-                    };
-
-                    if (isFallbackActive()) {
-                        sourceName = await fetchArtistFallback();
-                    } else {
-                        try {
-                            const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceId}`);
-                            sourceName = artistData.name;
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                sourceName = await fetchArtistFallback();
-                            } else { throw e; }
-                        }
-                    }
-                } else if (isLikedSongsPage(sourceUri)) {
-                    sourceName = "Liked Songs";
-                } else if (URI.isAlbum(sourceUri)) {
-                    const fetchAlbumFallback = async () => {
-                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                        return res.data.albumUnion.name;
-                    };
-
-                    if (isFallbackActive()) {
-                        sourceName = await fetchAlbumFallback();
-                    } else {
-                        try {
-                            const albumData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
-                            sourceName = albumData.name;
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                sourceName = await fetchAlbumFallback();
-                            } else { throw e; }
-                        }
-                    }
-                } else {
-                    const fetchPlaylistFallback = async () => {
-                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(sourceUri);
-                        return meta.name;
-                    };
-
-                    if (isFallbackActive()) {
-                        sourceName = await fetchPlaylistFallback();
-                    } else {
-                        try {
-                            const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceId}`);
-                            sourceName = playlistData.name;
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                sourceName = await fetchPlaylistFallback();
-                            } else { throw e; }
-                        }
-                    }
-                }
-            } catch (e) {
-                console.warn("Failed to fetch source name for Custom Filter playlist", e);
-            }
+            let { sourceName, artistName } = await fetchSourceNameAndArtist(sourceUri);
 
             let suffixPattern = new RegExp(
                 `\\s*(${possibleSuffixes.join("|")})\\s*`
@@ -13770,31 +13901,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 sourceName = sourceName.replace(suffixPattern, "");
             }
 
-
             let baseDescription = `Filtered using Sort-Play`;
             if (URI.isArtist(sourceUri)) {
                 baseDescription = `Tracks by ${sourceName} Filtered using Sort-Play`;
             } else if (URI.isAlbum(sourceUri)) {
-                let artistName = "Unknown Artist";
-                try {
-                    const fetchAlbumArtistFallback = async () => {
-                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                        return res.data.albumUnion.artists.items[0]?.profile?.name || "Unknown Artist";
-                    };
-
-                    if (isFallbackActive()) {
-                        artistName = await fetchAlbumArtistFallback();
-                    } else {
-                        try {
-                            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
-                            artistName = albumDetails.artists[0].name;
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                artistName = await fetchAlbumArtistFallback();
-                            } else { throw e; }
-                        }
-                    }
-                } catch (e) {}
                 baseDescription = `Tracks from ${sourceName} by ${artistName} Filtered using Sort-Play`;
             }
 
@@ -13811,23 +13921,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 await addPlaylistToLibrary(newPlaylist.uri);
 
-                const sortTypeInfo = {
-                    playCount: { fullName: "play count", shortName: "PlayCount" },
-                    popularity: { fullName: "popularity", shortName: "Popularity" },
-                    releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-                    scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
-                    personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
-                    shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-                    aiPick: { fullName: "AI pick", shortName: "AI Pick" },
-                    averageColor: { fullName: "album color", shortName: "Color" },
-                    default: { fullName: "Default", shortName: "Default" },
-                    current: { fullName: "Current", shortName: "Current" },
+                const sortTypeInfo = getSortTypeInfo(selectedSortType);
 
-                }[selectedSortType];
+                let notificationMsg = `Playlist filtered & sorted by ${sortTypeInfo.fullName}!`;
+                if (URI.isArtist(sourceUri)) {
+                    notificationMsg = `Discography of ${sourceName} filtered & sorted by ${sortTypeInfo.fullName}!`;
+                } else if (URI.isAlbum(sourceUri)) {
+                    notificationMsg = `Album filtered & sorted by ${sortTypeInfo.fullName}!`;
+                } else if (isLikedSongsPage(sourceUri)) {
+                    notificationMsg = `Liked Songs filtered & sorted by ${sortTypeInfo.fullName}!`;
+                } else if (isLocalFilesPage(sourceUri)) {
+                    notificationMsg = `Local Files filtered & sorted by ${sortTypeInfo.fullName}!`;
+                }
 
-                showNotification(
-                    `Playlist created with ${sortTypeInfo.fullName} and custom filter!`
-                );
+                showNotification(notificationMsg);
 
                 await navigateToPlaylist(newPlaylist);
             } catch (error) {
@@ -14230,7 +14337,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (filters.genreFilterSettings && (filters.genreFilterSettings.selectedGenres?.length > 0 || filters.genreFilterSettings.excludedGenres?.length > 0)) {
         if (!isHeadless) mainButton.innerText = "Filtering Genres...";
-        const { selectedGenres, excludedGenres, matchAllGenres: jobMatchAll, groupGenres } = filters.genreFilterSettings;
+        const { selectedGenres, excludedGenres, matchAllGenres: jobMatchAll } = filters.genreFilterSettings;
         
         
         const { trackGenreMap } = await fetchAllTrackGenres(
@@ -14467,25 +14574,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         try {
             let currentDescription = null;
 
-            const fetchDescriptionInternal = async () => {
-                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(job.targetPlaylistUri);
-                return meta.description;
-            };
-
-            if (isFallbackActive()) {
-                currentDescription = await fetchDescriptionInternal();
-            } else {
-                try {
-                    const currentPlaylistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-                    currentDescription = currentPlaylistData.description;
-                } catch (e) {
-                    if (registerWebApiFailure()) {
-                        currentDescription = await fetchDescriptionInternal();
-                    } else {
-                        throw e;
-                    }
-                }
-            }
+            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(job.targetPlaylistUri);
+            currentDescription = meta.description;
 
             if (currentDescription && currentDescription.includes("Managed by Sort-Play.")) {
                 const allSortableItems = buttonStyles.menuItems.flatMap(item => {
@@ -14583,23 +14673,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (newDescription) {
         try {
-            const playlistId = job.targetPlaylistUri.split(':')[2];
-            if (isFallbackActive()) {
-                await Spicetify.Platform.PlaylistAPI.setAttributes(job.targetPlaylistUri, { description: newDescription });
-            } else {
-                try {
-                    await Spicetify.CosmosAsync.put(
-                        `https://api.spotify.com/v1/playlists/${playlistId}`,
-                        { description: newDescription }
-                    );
-                } catch (e) {
-                    if (registerWebApiFailure()) {
-                        await Spicetify.Platform.PlaylistAPI.setAttributes(job.targetPlaylistUri, { description: newDescription });
-                    } else {
-                        throw e;
-                    }
-                }
-            }
+            await Spicetify.Platform.PlaylistAPI.setAttributes(job.targetPlaylistUri, { description: newDescription });
         } catch (e) {
             console.warn("Sort-Play: Failed to update playlist description.", e);
         }
@@ -14607,6 +14681,82 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     if (updateSchedule) job.lastRun = Date.now();
     return job;
+  }
+
+  async function checkAndRunDedicatedJobs() {
+    const jobs = getDedicatedJobs();
+    const now = Date.now();
+
+    const brokenTypes = new Set();
+    playlistCardsData.forEach(section => {
+        section.cards.forEach(card => {
+            if (card.broken) brokenTypes.add(card.id);
+        });
+    });
+
+    const isJobDue = (job, currentTime) => {
+        if (brokenTypes.has(job.dedicatedType)) return false;
+
+        const lastRun = job.lastRun || 0;
+        const schedule = job.schedule;
+
+        if (schedule === 'manual') return false;
+
+        if (typeof schedule === 'number') {
+            return currentTime > lastRun + schedule;
+        }
+
+        if (typeof schedule === 'string' && schedule.startsWith('release-')) {
+            const nowDate = new Date(currentTime);
+            const lastRunDate = new Date(lastRun);
+
+            if (nowDate.getDay() !== 5) return false;
+            if (lastRunDate.toDateString() === nowDate.toDateString()) return false;
+
+            const daysSinceLastRun = (currentTime - lastRun) / (1000 * 60 * 60 * 24);
+
+            switch (schedule) {
+                case 'release-weekly': return daysSinceLastRun > 6;
+                case 'release-every-two-weeks': return daysSinceLastRun > 13;
+                case 'release-monthly': return daysSinceLastRun > 27;
+                default: return false;
+            }
+        }
+        return false;
+    };
+
+    const jobsToRun = jobs.filter(job => isJobDue(job, now));
+    const totalJobs = jobsToRun.length;
+
+    if (totalJobs > 0) {
+        const stickyNotification = showNotification(`Starting Dedicated Updates (0/${totalJobs})...`, 'sticky');
+
+        try {
+            for (let i = 0; i < totalJobs; i++) {
+                const job = jobsToRun[i];
+                const currentStep = i + 1;
+                
+                stickyNotification.update(`Updating Dedicated Playlists (${currentStep}/${totalJobs}): ${job.targetPlaylistName}`);
+
+                try {
+                    const updatedJob = await runDedicatedJob(job);
+                    updateDedicatedJob(updatedJob);
+                } catch (error) {
+                    console.error(`Failed to run dedicated playlist job for "${job.targetPlaylistName}":`, error);
+                    showNotification(`Failed to update dedicated playlist: ${job.targetPlaylistName}`, true);
+                    job.lastRun = now;
+                    updateDedicatedJob(job);
+                }
+                
+                if (i < totalJobs - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+        } finally {
+            stickyNotification.remove();
+            showNotification(`Finished updating ${totalJobs} dedicated playlists.`);
+        }
+    }
   }
 
   async function checkAndRunJobs() {
@@ -14708,34 +14858,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
             };
 
-            if (isFallbackActive()) {
-                return await fetchWithInternal();
-            }
-
-            try {
-                const playlistId = item.uri.split(':')[2];
-                const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-                const fetchedImages = playlistData.images || [];
-                return {
-                    uri: item.uri,
-                    name: item.name,
-                    info: 'Playlist',
-                    coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
-                    type: 'playlist'
-                };
-            } catch (error) {
-                if (registerWebApiFailure()) {
-                    return await fetchWithInternal();
-                }
-                console.warn(`Sort-Play: Could not fetch full details for playlist ${item.name}`, error);
-                return {
-                    uri: item.uri,
-                    name: item.name,
-                    info: 'Playlist',
-                    coverUrl: null,
-                    type: 'playlist'
-                };
-            }
+            return await fetchWithInternal();
         };
 
         const processItem = async (item) => {
@@ -14781,34 +14904,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             return resolvedAlbumsInternal;
         };
 
-        let resolvedAlbums = [];
-
-        if (isFallbackActive()) {
-            resolvedAlbums = await fetchAlbumsInternal();
-        } else {
-            try {
-                const albumsRes = await Spicetify.CosmosAsync.get('https://api.spotify.com/v1/me/albums?limit=50');
-                if (albumsRes.items) {
-                    albumsRes.items.forEach(item => {
-                        const images = item.album.images || [];
-                        resolvedAlbums.push({
-                            uri: item.album.uri,
-                            name: item.album.name,
-                            info: `Album by ${item.album.artists.map(a => a.name).join(', ')}`,
-                            coverUrl: images.length ? (images[images.length - 1] || images[0]).url : null,
-                            type: 'album'
-                        });
-                    });
-                }
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    resolvedAlbums = await fetchAlbumsInternal();
-                } else {
-                    console.warn("Failed to fetch albums via Web API", e);
-                }
-            }
-        }
-        
+        let resolvedAlbums = await fetchAlbumsInternal();
         return [...hierarchy, ...resolvedAlbums];
 
     } catch (error) {
@@ -14840,123 +14936,45 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const sourceDataCache = new Map();
     const manuallyAddedUris = new Set();
 
-    const folderIconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="color: #b3b3b3;"><path d="M1 4a2 2 0 0 1 2-2h5.155a3 3 0 0 1 2.357 1.158L12.557 6H21a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V4z"></path></svg>`;
-    const caretIconSvg = `<svg class="caret-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #b3b3b3;"><path d="M9.75 6.01l7.68 5.67a.5.5 0 0 1 0 .82l-7.68 5.49A.5.5 0 0 1 9 17.59V6.41a.5.5 0 0 1 .75-.4z"></path></svg>`;
-
     modalContainer.innerHTML = `
         <style>
-            #user-library-container {
-                margin-top: 8px;
-                background-color: #282828;
-                border-radius: 6px;
-                padding: 8px;
-                height: 300px;
-                max-height: 300px;
-                overflow-y: auto;
-                scrollbar-width: thin;
-                scrollbar-color: #535353 #282828;
-            }
-            #user-library-container::-webkit-scrollbar { width: 8px; }
-            #user-library-container::-webkit-scrollbar-track { background: #282828; }
-            #user-library-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
-            
-            .library-item {
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                padding: 6px 8px;
-                border-radius: 4px;
-                cursor: pointer;
-                transition: background-color 0.2s ease, border 0.2s ease;
-                border: 1px solid transparent;
-            }
-            .library-item:hover { background-color: #3e3e3e; }
-            .library-item.selected {
-                background-color: #3a4f3a;
-                border: 1px solid #1ed760;
-            }
-            .library-item-cover { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; }
-            .library-item-text { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
-            .library-item-title { color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .library-item-info { color: #b3b3b3; font-size: 12px; }
-
-            .folder-container { margin-bottom: 2px; }
-            .folder-header { 
-                display: flex; align-items: center; gap: 12px; padding: 6px 8px; 
-                border-radius: 4px; cursor: pointer; transition: background-color 0.2s;
-                border: 1px solid transparent;
-            }
-            .folder-header:hover { background-color: #3e3e3e; }
-            .folder-header.selected { background-color: #3a4f3a; border: 1px solid #1ed760; }
-            .folder-children { margin-left: 24px; display: none; border-left: 1px solid #444; }
-            .folder-children.expanded { display: block; }
-            .caret-btn { 
-                background: none; border: none; cursor: pointer; 
-                display: flex; align-items: center; justify-content: center; margin-right: -5px;
-            }
-            .caret-icon { transition: transform 0.2s; }
-            .caret-icon.rotated { transform: rotate(90deg); }
-
-            .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
-            .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
-            .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
-            .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
-            
-            .input-wrapper { position: relative; }
-            #source-url-input {
-                width: 100%;
-                background-color: #3e3e3e;
-                border: 1px solid #3e3e3e;
-                border-radius: 4px;
-                padding: 8px 35px 8px 12px;
-                color: white;
-                box-sizing: border-box;
-                font-size: 14px;
-                transition: padding-right 0.2s ease;
-            }
-            #source-url-input:focus { border-color: #555; outline: none; }
-
-            #source-clear-btn {
-                position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-                background: none; border: none; color: #b3b3b3; cursor: pointer;
-                font-size: 20px; padding: 4px; line-height: 1; display: none;
-                transition: right 0.2s ease, color 0.2s;
-            }
-            #source-clear-btn:hover { color: white; }
-            
-            #source-add-btn {
-                position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-                background-color: #1ED760; border: 1px solid #1abc54; color: #000; cursor: pointer;
-                font-size: 20px; padding: 0; line-height: 1; display: none;
-                font-weight: 500;
-                width: 28px; height: 28px;
-                border-radius: 4px;
-                align-items: center; justify-content: center;
-                transition: background-color 0.2s;
-                z-index: 2;
-            }
-            #source-add-btn:hover { background-color: #3BE377; border-color: #3BE377; }
-            #source-add-btn svg { fill: currentColor; width: 20px; height: 20px; }
-            
-            #added-sources-list {
-                display: flex; flex-direction: column; gap: 4px; margin-top: 12px;
-                max-height: 140px; overflow-y: auto;
-                scrollbar-width: thin; scrollbar-color: #535353 transparent;
-            }
-            .library-item.manual-item {
-                background-color: #2a2a2a;
-                border-color: #333;
-                cursor: default;
-            }
-            .library-item.manual-item:hover {
-                background-color: #333;
-            }
-            .remove-manual-btn {
-                background: none; border: none; cursor: pointer; color: #b3b3b3;
-                padding: 4px; display: flex; align-items: center; justify-content: center;
-                transition: color 0.2s;
-            }
-            .remove-manual-btn:hover { color: #fff; }
+          #user-library-container { margin-top: 8px; background-color: #282828; border-radius: 6px; padding: 8px; height: 300px; max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+          #user-library-container::-webkit-scrollbar { width: 8px; }
+          #user-library-container::-webkit-scrollbar-track { background: #282828; }
+          #user-library-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+          .library-item { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s ease, border 0.2s ease; border: 1px solid transparent; }
+          .library-item:hover { background-color: #3e3e3e; }
+          .library-item.selected { background-color: #3a4f3a; border: 1px solid #1ed760; }
+          .library-item-cover { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; }
+          .library-item-text { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+          .library-item-title { color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          .library-item-info { color: #b3b3b3; font-size: 12px; }
+          .folder-container { margin-bottom: 2px; }
+          .folder-header { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; border: 1px solid transparent; }
+          .folder-header:hover { background-color: #3e3e3e; }
+          .folder-header.selected { background-color: #3a4f3a; border: 1px solid #1ed760; }
+          .folder-children { margin-left: 24px; display: none; border-left: 1px solid #444; }
+          .folder-children.expanded { display: block; }
+          .caret-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-right: -5px; }
+          .caret-icon { transition: transform 0.2s; }
+          .caret-icon.rotated { transform: rotate(90deg); }
+          .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
+          .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+          .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+          .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+          .input-wrapper { position: relative; }
+          #source-url-input { width: 100%; background-color: #3e3e3e; border: 1px solid #3e3e3e; border-radius: 4px; padding: 8px 35px 8px 12px; color: white; box-sizing: border-box; font-size: 14px; transition: padding-right 0.2s ease; }
+          #source-url-input:focus { border-color: #555; outline: none; }
+          #source-clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 20px; padding: 4px; line-height: 1; display: none; transition: right 0.2s ease, color 0.2s; }
+          #source-clear-btn:hover { color: white; }
+          #source-add-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background-color: #1ED760; border: 1px solid #1abc54; color: #000; cursor: pointer; font-size: 20px; padding: 0; line-height: 1; display: none; font-weight: 500; width: 28px; height: 28px; border-radius: 4px; align-items: center; justify-content: center; transition: background-color 0.2s; z-index: 2; }
+          #source-add-btn:hover { background-color: #3BE377; border-color: #3BE377; }
+          #source-add-btn svg { fill: currentColor; width: 20px; height: 20px; }
+          #added-sources-list { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; max-height: 140px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+          .library-item.manual-item { background-color: #2a2a2a; border-color: #333; cursor: default; }
+          .library-item.manual-item:hover { background-color: #333; }
+          .remove-manual-btn { background: none; border: none; cursor: pointer; color: #b3b3b3; padding: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.2s; }
+          .remove-manual-btn:hover { color: #fff; }
         </style>
         <div class="main-trackCreditsModal-header" style="padding: 20px 24px 10px;">
             <h1 class="main-trackCreditsModal-title" style="font-size: 20px; font-weight: 700; color: white;">${title}</h1>
@@ -14968,7 +14986,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 <input type="text" id="source-url-input" placeholder="Search library or paste link..." autocomplete="off">
                 <button id="source-clear-btn" title="Clear">&times;</button>
                 <button id="source-add-btn" title="Add Link">
-                    <svg viewBox="0 0 24 24"><path d="M11.75 3a.75.75 0 0 1 .75.75V11h7.25a.75.75 0 0 1 0 1.5h-7.25v7.25a.75.75 0 0 1-1.5 0V12.5H3.75a.75.75 0 0 1 0-1.5h7.25V3.75a.75.75 0 0 1 .75-.75z"></path></svg>
+                    ${addLinkIconSvg}
                 </button>
             </div>
 
@@ -15027,103 +15045,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let newSourceData = { uri: newUri };
 
         if (URI.isPlaylistV1OrV2(newUri)) {
-            const fetchPlaylistFallback = async () => {
-                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(newUri);
-                const owner = meta.owner?.displayName || meta.owner?.name || meta.owner?.username || "Unknown Owner";
-                return {
-                    name: meta.name,
-                    info: `Playlist by ${owner}`,
-                    coverUrl: meta.images?.length ? (meta.images[meta.images.length - 1] || meta.images[0]).url : null,
-                    isStatic: false,
-                    totalTracks: meta.totalLength
-                };
-            };
-
-            if (isFallbackActive()) {
-                Object.assign(newSourceData, await fetchPlaylistFallback());
-            } else {
-                try {
-                    const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${newUri.split(":")[2]}`);
-                    newSourceData.name = data.name;
-                    const ownerName = data.owner?.display_name || data.owner?.id || "Unknown Owner";
-                    newSourceData.info = `Playlist by ${ownerName}`;
-                    newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
-                    newSourceData.isStatic = false;
-                    newSourceData.totalTracks = data.tracks.total;
-                } catch (error) {
-                    if (registerWebApiFailure()) {
-                        Object.assign(newSourceData, await fetchPlaylistFallback());
-                    } else {
-                        throw error;
-                    }
-                }
-            }
+            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(newUri);
+            const owner = meta.owner?.displayName || meta.owner?.name || meta.owner?.username || "Unknown Owner";
+            Object.assign(newSourceData, {
+                name: meta.name,
+                info: `Playlist by ${owner}`,
+                coverUrl: meta.images?.length ? (meta.images[meta.images.length - 1] || meta.images[0]).url : null,
+                isStatic: false,
+                totalTracks: meta.totalLength
+            });
         } else if (URI.isArtist(newUri)) {
-            const fetchArtistFallback = async () => {
-                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, {
-                    uri: newUri, locale: "en", includePrerelease: false
-                });
-                const u = res.data.artistUnion;
-                return {
-                    name: u.profile.name,
-                    info: `Artist Page`,
-                    coverUrl: u.visuals.avatarImage?.sources?.[0]?.url || null,
-                    isStatic: true,
-                    totalTracks: 'N/A'
-                };
-            };
-
-            if (isFallbackActive()) {
-                Object.assign(newSourceData, await fetchArtistFallback());
-            } else {
-                try {
-                    const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${newUri.split(":")[2]}`);
-                    newSourceData.name = data.name;
-                    newSourceData.info = `Artist Page`;
-                    newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
-                    newSourceData.isStatic = true;
-                    newSourceData.totalTracks = 'N/A';
-                } catch (error) {
-                    if (registerWebApiFailure()) {
-                        Object.assign(newSourceData, await fetchArtistFallback());
-                    } else {
-                        throw error;
-                    }
-                }
-            }
+            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, {
+                uri: newUri, locale: "en", includePrerelease: false
+            });
+            const u = res.data.artistUnion;
+            Object.assign(newSourceData, {
+                name: u.profile.name,
+                info: `Artist Page`,
+                coverUrl: u.visuals.avatarImage?.sources?.[0]?.url || null,
+                isStatic: true,
+                totalTracks: 'N/A'
+            });
         } else if (URI.isAlbum(newUri)) {
-            const fetchAlbumFallback = async () => {
-                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
-                    uri: newUri, locale: "en", offset: 0, limit: 1
-                });
-                const u = res.data.albumUnion;
-                return {
-                    name: u.name,
-                    info: `Album by ${u.artists.items.map(a => a.profile.name).join(', ')}`,
-                    coverUrl: u.coverArt.sources?.[0]?.url || null,
-                    isStatic: true,
-                    totalTracks: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount
-                };
-            };
-
-            if (isFallbackActive()) {
-                Object.assign(newSourceData, await fetchAlbumFallback());
-            } else {
-                try {
-                    const data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${newUri.split(":")[2]}`);
-                    newSourceData.name = data.name;
-                    newSourceData.info = `Album by ${data.artists.map(a => a.name).join(', ')}`;
-                    newSourceData.coverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
-                    newSourceData.isStatic = true;
-                    newSourceData.totalTracks = data.tracks.total;
-                } catch (error) {
-                    if (registerWebApiFailure()) {
-                        Object.assign(newSourceData, await fetchAlbumFallback());
-                    } else {
-                        throw error;
-                    }
-                }
-            }
+            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, {
+                uri: newUri, locale: "en", offset: 0, limit: 1
+            });
+            const u = res.data.albumUnion;
+            Object.assign(newSourceData, {
+                name: u.name,
+                info: `Album by ${u.artists.items.map(a => a.profile.name).join(', ')}`,
+                coverUrl: u.coverArt.sources?.[0]?.url || null,
+                isStatic: true,
+                totalTracks: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount
+            });
         }
         
         sourceDataCache.set(newUri, newSourceData);
@@ -15155,7 +15109,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     <span class="library-item-info">${data.info || 'Added via link'}</span>
                 </div>
                 <button class="remove-manual-btn" title="Remove">
-                    <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"></path></svg>
+                    ${removeManualIconSvg}
                 </button>
             `;
 
@@ -15775,56 +15729,56 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         modalContainer.innerHTML = `
             <style>
-                .modal-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
-                .modal-title { font-size: 24px; font-weight: 700; color: white; }
-                .scan-banner { background-color: #2a2a2a; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #333; transition: opacity 0.3s ease; }
-                .scan-text { color: #b3b3b3; font-size: 14px; }
-                .scan-btn { background-color: #1ED760; color: black; border: none; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background-color 0.1s; }
-                .scan-btn:hover { background-color: #3BE377; }
-                .scan-btn:disabled { background-color: #555; color: #888; cursor: default; }
-                .modal-content { padding: 20px 32px; flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
-                .search-container { position: relative; margin-bottom: 16px; }
-                .search-bar { width: 100%; padding: 10px 16px; background-color: #333; border: 1px solid #333; border-radius: 8px; color: white; font-size: 14px; box-sizing: border-box; }
-                .search-bar:focus { border-color: #555; outline: none; }
-                .settings-row { display: flex; gap: 20px; margin-bottom: 16px; align-items: center; }
-                .switch-label { color: #ccc; font-size: 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
-                .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
-                .switch input { opacity: 0; width: 0; height: 0; }
-                .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; transition: .2s; border-radius: 20px; }
-                .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
-                input:checked + .slider { background-color: #1ED760; }
-                input:checked + .slider:before { transform: translateX(16px); }
-                .genre-list-container { flex-grow: 1; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #555 transparent; }
-                .genre-list-container::-webkit-scrollbar { width: 8px; }
-                .genre-list-container::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
-                .genre-section-title { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 16px 0 8px; letter-spacing: 0.5px; }
-                .genre-group { display: flex; flex-wrap: wrap; gap: 8px; }
-                .genre-button { background-color: #333; color: #ddd; padding: 6px 12px; border-radius: 16px; border: none; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.1s; }
-                .genre-button.selected { background-color: #1ED760; color: black; }
-                .genre-button.excluded { background-color: #a92121; color: white; }
-                .genre-button.has-count { padding: 4px 6px 4px 10px; }
-                .genre-count-badge { background-color: rgba(255, 255, 255, 0.1); color: #e0e0e0; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 400; min-width: 16px; text-align: center; }
-                .genre-button.selected .genre-count-badge { background-color: rgba(0, 0, 0, 0.2); color: #000; }
-                .genre-button.excluded .genre-count-badge { background-color: rgba(255, 255, 255, 0.2); color: #fff; }
-                .detected-badge { font-size: 8px; color: #1ED760; }
-                .modal-footer { padding: 16px 32px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
-                .genre-stats-footer { display: flex; gap: 20px; }
-                .footer-buttons { display: flex; gap: 12px; }
-                .stat-item { color: #b3b3b3; font-size: 14px; }
-                .btn-secondary { background: transparent; border: 1px solid #666; color: white; padding: 8px 20px; border-radius: 20px; font-weight: 600; cursor: pointer; }
-                .btn-secondary:hover { border-color: white; }
-                .btn-primary { background-color: #1ED760; border: none; color: black; padding: 8px 24px; border-radius: 20px; font-weight: 600; cursor: pointer; }
-                .btn-primary:hover { background-color: #3BE377; }
-                .no-results { color: #666; font-style: italic; font-size: 13px; width: 100%; text-align: center; padding: 10px; }
-                .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
-                .custom-tooltip { visibility: hidden; position: absolute; z-index: 10000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; pointer-events: none; }
-                .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
-                .tooltip-container:hover .custom-tooltip { visibility: visible; }
+              .modal-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
+              .modal-title { font-size: 24px; font-weight: 700; color: white; }
+              .scan-banner { background-color: #2a2a2a; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #333; transition: opacity 0.3s ease; }
+              .scan-text { color: #b3b3b3; font-size: 14px; }
+              .scan-btn { background-color: #1ED760; color: black; border: none; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background-color 0.1s; }
+              .scan-btn:hover { background-color: #3BE377; }
+              .scan-btn:disabled { background-color: #555; color: #888; cursor: default; }
+              .modal-content { padding: 20px 32px; flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+              .search-container { position: relative; margin-bottom: 16px; }
+              .search-bar { width: 100%; padding: 10px 16px; background-color: #333; border: 1px solid #333; border-radius: 8px; color: white; font-size: 14px; box-sizing: border-box; }
+              .search-bar:focus { border-color: #555; outline: none; }
+              .settings-row { display: flex; gap: 20px; margin-bottom: 16px; align-items: center; }
+              .switch-label { color: #ccc; font-size: 14px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+              .switch { position: relative; display: inline-block; width: 36px; height: 20px; }
+              .switch input { opacity: 0; width: 0; height: 0; }
+              .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; transition: .2s; border-radius: 20px; }
+              .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
+              input:checked + .slider { background-color: #1ED760; }
+              input:checked + .slider:before { transform: translateX(16px); }
+              .genre-list-container { flex-grow: 1; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+              .genre-list-container::-webkit-scrollbar { width: 8px; }
+              .genre-list-container::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
+              .genre-section-title { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 16px 0 8px; letter-spacing: 0.5px; }
+              .genre-group { display: flex; flex-wrap: wrap; gap: 8px; }
+              .genre-button { background-color: #333; color: #ddd; padding: 6px 12px; border-radius: 16px; border: none; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.1s; }
+              .genre-button.selected { background-color: #1ED760; color: black; }
+              .genre-button.excluded { background-color: #a92121; color: white; }
+              .genre-button.has-count { padding: 4px 6px 4px 10px; }
+              .genre-count-badge { background-color: rgba(255, 255, 255, 0.1); color: #e0e0e0; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 400; min-width: 16px; text-align: center; }
+              .genre-button.selected .genre-count-badge { background-color: rgba(0, 0, 0, 0.2); color: #000; }
+              .genre-button.excluded .genre-count-badge { background-color: rgba(255, 255, 255, 0.2); color: #fff; }
+              .detected-badge { font-size: 8px; color: #1ED760; }
+              .modal-footer { padding: 16px 32px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
+              .genre-stats-footer { display: flex; gap: 20px; }
+              .footer-buttons { display: flex; gap: 12px; }
+              .stat-item { color: #b3b3b3; font-size: 14px; }
+              .btn-secondary { background: transparent; border: 1px solid #666; color: white; padding: 8px 20px; border-radius: 20px; font-weight: 600; cursor: pointer; }
+              .btn-secondary:hover { border-color: white; }
+              .btn-primary { background-color: #1ED760; border: none; color: black; padding: 8px 24px; border-radius: 20px; font-weight: 600; cursor: pointer; }
+              .btn-primary:hover { background-color: #3BE377; }
+              .no-results { color: #666; font-style: italic; font-size: 13px; width: 100%; text-align: center; padding: 10px; }
+              .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
+              .custom-tooltip { visibility: hidden; position: absolute; z-index: 10000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; pointer-events: none; }
+              .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+              .tooltip-container:hover .custom-tooltip { visibility: visible; }
             </style>
             <div class="modal-header">
                 <span class="modal-title">Genre Filter</span>
                 <button class="main-trackCreditsModal-closeBtn" id="close-modal-btn">
-                    <svg width="18" height="18" viewBox="0 0 32 32" fill="currentColor"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143"></path></svg>
+                    ${closeModalIcon18Svg}
                 </button>
             </div>
             <div class="scan-banner" style="${isScanned ? 'display: none;' : ''}">
@@ -16101,7 +16055,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             #filter-overlay .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
             #filter-overlay input:checked + .sliderx { background-color: #1DB954; }
             #filter-overlay input:checked + .sliderx:before { transform: translateX(16px); }
-            #filter-overlay .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+            #filter-overlay .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
             #filter-overlay .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
             #filter-overlay .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
             #filter-overlay .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
@@ -16379,7 +16333,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             saveBtn.addEventListener("click", async () => {
                 const presetName = saveInput.value.trim();
                 if (presetName) {
-                    let savedPresets = JSON.parse(localStorage.getItem("sort-play-filter-presets") || "{}");
+                    let savedPresets = JSON.parse(localStorage.getItem(STORAGE_KEY_FILTER_PRESETS) || "{}");
                     
                     if (savedPresets[presetName]) {
                         const confirmPromise = showConfirmationModal({
@@ -16437,7 +16391,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     };
 
                     savedPresets[presetName] = state;
-                    localStorage.setItem("sort-play-filter-presets", JSON.stringify(savedPresets));
+                    localStorage.setItem(STORAGE_KEY_FILTER_PRESETS, JSON.stringify(savedPresets));
                     showNotification(`Preset saved as "${presetName}"`);
                     closeSaveModal();
                 } else {
@@ -16467,16 +16421,16 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             dropdown.className = "load-preset-dropdown";
             dropdown.innerHTML = `
                 <style>
-                .load-preset-dropdown { background-color: #282828; border-radius: 4px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); position: absolute; z-index: 3002; min-width: 180px; max-width: 250px; max-height: 200px; overflow-y: auto; }
-                .load-preset-dropdown::-webkit-scrollbar { width: 8px; }
-                .load-preset-dropdown::-webkit-scrollbar-track { background: transparent; }
-                .load-preset-dropdown::-webkit-scrollbar-thumb { background-color: #4d4d4d; border-radius: 4px; }
-                .load-preset-option { color: #fff; padding: 8px 5px 8px 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; align-items: center; }
-                .load-preset-option:hover { background-color: #383838; }
-                .load-preset-option .remove-button { opacity: 0; transition: opacity 0.2s; cursor: pointer; padding: 4px; display: flex; align-items: center; max-width: 30px; }
-                .load-preset-option:hover .remove-button { opacity: 1; }
-                .load-preset-option-text { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
-                .remove-icon { width: 12px; height: 12px; fill: currentColor; }
+                  .load-preset-dropdown { background-color: #282828; border-radius: 4px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); position: absolute; z-index: 3002; min-width: 180px; max-width: 250px; max-height: 200px; overflow-y: auto; }
+                  .load-preset-dropdown::-webkit-scrollbar { width: 8px; }
+                  .load-preset-dropdown::-webkit-scrollbar-track { background: transparent; }
+                  .load-preset-dropdown::-webkit-scrollbar-thumb { background-color: #4d4d4d; border-radius: 4px; }
+                  .load-preset-option { color: #fff; padding: 8px 5px 8px 12px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; align-items: center; }
+                  .load-preset-option:hover { background-color: #383838; }
+                  .load-preset-option .remove-button { opacity: 0; transition: opacity 0.2s; cursor: pointer; padding: 4px; display: flex; align-items: center; max-width: 30px; }
+                  .load-preset-option:hover .remove-button { opacity: 1; }
+                  .load-preset-option-text { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+                  .remove-icon { width: 12px; height: 12px; fill: currentColor; }
                 </style>
             `;
 
@@ -16710,10 +16664,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
 
         keepMatchingMode = currentFilters.keepMatchingMode ?? false;
-        filterTitle = currentFilters.filterTitle ?? (localStorage.getItem("sort-play-filter-title") !== "false");
-        filterAlbum = currentFilters.filterAlbum ?? (localStorage.getItem("sort-play-filter-album") !== "false");
-        filterArtist = currentFilters.filterArtist ?? (localStorage.getItem("sort-play-filter-artist") !== "false");
-        matchWholeWord = currentFilters.matchWholeWord ?? (localStorage.getItem("sort-play-match-whole-word") === "true");
+        filterTitle = currentFilters.filterTitle ?? (localStorage.getItem(STORAGE_KEY_FILTER_TITLE) !== "false");
+        filterAlbum = currentFilters.filterAlbum ?? (localStorage.getItem(STORAGE_KEY_FILTER_ALBUM) !== "false");
+        filterArtist = currentFilters.filterArtist ?? (localStorage.getItem(STORAGE_KEY_FILTER_ARTIST) !== "false");
+        matchWholeWord = currentFilters.matchWholeWord ?? (localStorage.getItem(STORAGE_KEY_MATCH_WHOLE_WORD) === "true");
         
         filterModeRadios.forEach(radio => radio.checked = (keepMatchingMode && radio.value === "keep") || (!keepMatchingMode && radio.value === "exclude"));
         titleToggle.checked = filterTitle;
@@ -16778,10 +16732,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         modalContainer.querySelector('#save-filters').addEventListener('click', () => {
             saveKeywords(titleAlbumKeywords, artistKeywords);
-            localStorage.setItem("sort-play-filter-title", filterTitle);
-            localStorage.setItem("sort-play-filter-album", filterAlbum);
-            localStorage.setItem("sort-play-filter-artist", filterArtist);
-            localStorage.setItem("sort-play-match-whole-word", matchWholeWord);
+            localStorage.setItem(STORAGE_KEY_FILTER_TITLE, filterTitle);
+            localStorage.setItem(STORAGE_KEY_FILTER_ALBUM, filterAlbum);
+            localStorage.setItem(STORAGE_KEY_FILTER_ARTIST, filterArtist);
+            localStorage.setItem(STORAGE_KEY_MATCH_WHOLE_WORD, matchWholeWord);
 
             const getVal = (id) => document.getElementById(id).value;
 
@@ -16933,7 +16887,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     <button class="job-action-btn job-run-btn" data-job-id="${job.id}" title="Run Now" ${runningJobIds.has(job.id) ? 'disabled' : ''}>&#x25B6;</button>
                     <button class="job-action-btn job-edit-btn" data-job-id="${job.id}" title="Edit Job">${penIconSvg}</button>
                     <button class="job-action-btn job-delete-btn" data-job-id="${job.id}" title="Delete Job">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707a1 1 0 0 1 0-1.414z"></path></svg>
+                        ${deleteJobIconSvg}
                     </button>
                 </div>
             </div>
@@ -16945,196 +16899,48 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         shadowRoot.innerHTML = `
             <style>
-                :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; font-size: 16px; font-weight: 400; }
-                *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-                h1 { margin: 0; line-height: normal; }
-                .dynamic-playlist-modal .main-trackCreditsModal-mainSection { 
-                    padding: 24px 32px 38px !important; 
-                    max-height: 70vh; 
-                    flex-grow: 1; 
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                }
-                .dynamic-playlist-modal .job-list-header { 
-                    display: flex; 
-                    justify-content: flex-end; 
-                    align-items: center; 
-                    margin-bottom: 20px; 
-                    flex-shrink: 0;
-                }
-                .dynamic-playlist-modal .job-list-container {
-                    flex-grow: 1;
-                    overflow-y: auto;
-                    margin-right: -16px;
-                    padding-right: 16px;
-                    scrollbar-width: thin;
-                    scrollbar-color: #535353 transparent;
-                }
-                .dynamic-playlist-modal .job-list-container::-webkit-scrollbar { width: 8px; }
-                .dynamic-playlist-modal .job-list-container::-webkit-scrollbar-track { background: transparent; }
-                .dynamic-playlist-modal .job-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
-                .dynamic-playlist-modal .job-list { 
-                    display: flex; 
-                    flex-direction: column; 
-                    gap: 10px; 
-                }
-                .dynamic-playlist-modal .job-item { 
-                    display: flex; 
-                    align-items: center; 
-                    gap: 16px;
-                    background-color: #282828; 
-                    padding: 15px; 
-                    border-radius: 8px; 
-                    transition: background-color 0.2s; 
-                }
-                .dynamic-playlist-modal .job-item.deleted {
-                    background-color: #431919;
-                }
-                .dynamic-playlist-modal .job-item.deleted:hover {
-                    background-color: #5a2e2e;
-                }
-                .dynamic-playlist-modal .job-cover-art-container {
-                    width: 70px;
-                    height: 70px;
-                    border-radius: 4px;
-                    flex-shrink: 0;
-                    background-color: #353535;
-                    color: #b3b3b3;
-                    background-image: ${PLACEHOLDER_SVG_DATA_URI};
-                    background-size: 45%;
-                    background-position: center;
-                    background-repeat: no-repeat;
-                }
-                .dynamic-playlist-modal .job-cover-art-container img {
-                    width: 100%;
-                    height: 100%;
-                    border-radius: 4px;
-                    object-fit: cover;
-                }
-                .dynamic-playlist-modal .job-item:hover { 
-                    background-color: #383838; 
-                }
-                .dynamic-playlist-modal .job-details { 
-                    flex-grow: 1; 
-                    display: flex; 
-                    flex-direction: column; 
-                    gap: 4px; 
-                    overflow: hidden; 
-                }
-                .dynamic-playlist-modal .job-source-name { 
-                    color: white; 
-                    font-weight: 500; 
-                    font-size: 16px; 
-                    white-space: nowrap; 
-                    overflow: hidden; 
-                    text-overflow: ellipsis; 
-                    max-width: 350px; 
-                }
-                .dynamic-playlist-modal .job-info, .job-last-run { 
-                    color: #b3b3b3; 
-                    font-size: 14px; 
-                }
-                .dynamic-playlist-modal .job-status-line {
-                    display: flex;
-                    align-items: center;
-                }
-                .dynamic-playlist-modal .job-deleted-status {
-                    color: #ff8a8a;
-                    font-weight: 500;
-                    font-size: 14px;
-                    margin-left: 3px;
-                }
-                .main-trackCreditsModal-closeBtn { 
-                    background: transparent; 
-                    border: 0; 
-                    padding: 0; 
-                    color: #b3b3b3; 
-                    cursor: pointer; 
-                    transition: color 0.2s ease;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .main-trackCreditsModal-closeBtn:hover { 
-                    color: #ffffff; 
-                }
-                .dynamic-playlist-modal .job-actions {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 4px;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .dynamic-playlist-modal .job-action-btn {
-                    background: none;
-                    border: none;
-                    color: #b3b3b3;
-                    cursor: pointer;
-                    padding: 4px;
-                    line-height: 1;
-                    border-radius: 50%;
-                    transition: background-color 0.2s, color 0.2s;
-                    width: 24px;
-                    height: 24px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                }
-                .dynamic-playlist-modal .job-action-btn:hover {
-                    background-color: rgba(255,255,255,0.1);
-                    color: white;
-                }
-                .dynamic-playlist-modal .job-action-btn:disabled {
-                    opacity: 0.5;
-                    color: #666;
-                }
-                .dynamic-playlist-modal .job-action-btn:disabled:hover {
-                    background-color: transparent;
-                    color: #666;
-                }
-                .dynamic-playlist-modal .job-run-btn {
-                    font-size: 12px;
-                }
-                .dynamic-playlist-modal .no-jobs-message { 
-                    color: #b3b3b3; 
-                    text-align: center; 
-                    padding: 20px; 
-                }
-                .dynamic-playlist-modal .main-trackCreditsModal-closeBtn { 
-                    background: transparent; 
-                    border: 0; 
-                    padding: 0; 
-                    color: #b3b3b3; 
-                    cursor: pointer; 
-                    transition: color 0.2s ease; 
-                }
-                .dynamic-playlist-modal .main-trackCreditsModal-closeBtn:hover { 
-                    color: #ffffff; 
-                }
-                .dynamic-playlist-modal .main-button-primary {
-                    background-color: #1ED760;
-                    color: black;
-                    padding: 8px 18px;
-                    border-radius: 20px;
-                    font-weight: 550;
-                    font-size: 13px;
-                    text-transform: uppercase;
-                    border: none;
-                    cursor: pointer;
-                    transition: background-color 0.1s ease;
-                }
-                .dynamic-playlist-modal .main-button-primary:hover {
-                    background-color: #3BE377;
-                }
-                @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
-                .dynamic-playlist-modal { animation: fadeIn 0.2s ease; }
+              :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; font-size: 16px; font-weight: 400; }
+              *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+              h1 { margin: 0; line-height: normal; }
+              .dynamic-playlist-modal .main-trackCreditsModal-mainSection { padding: 24px 32px 38px !important; max-height: 70vh; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+              .dynamic-playlist-modal .job-list-header { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px; flex-shrink: 0; }
+              .dynamic-playlist-modal .job-list-container { flex-grow: 1; overflow-y: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+              .dynamic-playlist-modal .job-list-container::-webkit-scrollbar { width: 8px; }
+              .dynamic-playlist-modal .job-list-container::-webkit-scrollbar-track { background: transparent; }
+              .dynamic-playlist-modal .job-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+              .dynamic-playlist-modal .job-list { display: flex; flex-direction: column; gap: 10px; }
+              .dynamic-playlist-modal .job-item { display: flex; align-items: center; gap: 16px; background-color: #282828; padding: 15px; border-radius: 8px; transition: background-color 0.2s; }
+              .dynamic-playlist-modal .job-item.deleted { background-color: #431919; }
+              .dynamic-playlist-modal .job-item.deleted:hover { background-color: #5a2e2e; }
+              .dynamic-playlist-modal .job-cover-art-container { width: 70px; height: 70px; border-radius: 4px; flex-shrink: 0; background-color: #353535; color: #b3b3b3; background-image: ${PLACEHOLDER_SVG_DATA_URI}; background-size: 45%; background-position: center; background-repeat: no-repeat; }
+              .dynamic-playlist-modal .job-cover-art-container img { width: 100%; height: 100%; border-radius: 4px; object-fit: cover; }
+              .dynamic-playlist-modal .job-item:hover { background-color: #383838; }
+              .dynamic-playlist-modal .job-details { flex-grow: 1; display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+              .dynamic-playlist-modal .job-source-name { color: white; font-weight: 500; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; }
+              .dynamic-playlist-modal .job-info, .job-last-run { color: #b3b3b3; font-size: 14px; }
+              .dynamic-playlist-modal .job-status-line { display: flex; align-items: center; }
+              .dynamic-playlist-modal .job-deleted-status { color: #ff8a8a; font-weight: 500; font-size: 14px; margin-left: 3px; }
+              .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+              .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+              .dynamic-playlist-modal .job-actions { display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; }
+              .dynamic-playlist-modal .job-action-btn { background: none; border: none; color: #b3b3b3; cursor: pointer; padding: 4px; line-height: 1; border-radius: 50%; transition: background-color 0.2s, color 0.2s; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+              .dynamic-playlist-modal .job-action-btn:hover { background-color: rgba(255,255,255,0.1); color: white; }
+              .dynamic-playlist-modal .job-action-btn:disabled { opacity: 0.5; color: #666; }
+              .dynamic-playlist-modal .job-action-btn:disabled:hover { background-color: transparent; color: #666; }
+              .dynamic-playlist-modal .job-run-btn { font-size: 12px; }
+              .dynamic-playlist-modal .no-jobs-message { color: #b3b3b3; text-align: center; padding: 20px; }
+              .dynamic-playlist-modal .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
+              .dynamic-playlist-modal .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+              .dynamic-playlist-modal .main-button-primary { background-color: #1ED760; color: black; padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer; transition: background-color 0.1s ease; }
+              .dynamic-playlist-modal .main-button-primary:hover { background-color: #3BE377; }
+              @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+              .dynamic-playlist-modal { animation: fadeIn 0.2s ease; }
             </style>
             <div class="dynamic-playlist-modal">
                 <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
                     <h1 class="main-trackCreditsModal-title" style="font-size: 26px; font-weight: 700; color: white;">Dynamic Playlists (beta)</h1>
                     <button id="closeDynamicPlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-                        <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+                        ${closeModalIcon18Svg}
                     </button>
                 </div>
                 <div class="main-trackCreditsModal-mainSection">
@@ -17276,30 +17082,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
 
                 try {
-                    const playlistId = job.targetPlaylistUri.split(':')[2];
                     let playlistData = null;
 
-                    const fetchMetaInternal = async () => {
-                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(job.targetPlaylistUri);
-                        return {
-                            name: meta.name,
-                            images: meta.images
-                        };
+                    const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(job.targetPlaylistUri);
+                    playlistData = {
+                        name: meta.name,
+                        images: meta.images
                     };
-
-                    if (isFallbackActive()) {
-                        playlistData = await fetchMetaInternal();
-                    } else {
-                        try {
-                            playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                playlistData = await fetchMetaInternal();
-                            } else {
-                                throw e;
-                            }
-                        }
-                    }
                     
                     if (job.isDeleted) {
                         job.isDeleted = false;
@@ -17399,269 +17188,89 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             `;
         }
         shadowRoot.innerHTML = `
-            <style>
-                :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; font-size: 16px; font-weight: 400; }
-                *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-                h1 { margin: 0; line-height: normal; }
-                .job-form-modal .main-trackCreditsModal-mainSection { 
-                    padding: 24px 32px 38px !important; display: flex; flex-direction: column; scrollbar-width: none;
-                }
-                .job-form-layout-container {
-                    display: flex;
-                    gap: 16px;
-                }
-                .job-form-left-column {
-                    flex: 1;
-                    min-width: 0;
-                }
-                .job-form-right-column {
-                    flex: 1;
-                    min-width: 0;
-                    display: flex;
-                    flex-direction: column;
-                    gap: 16px;
-                }
-              .job-form-modal .card { background-color: #282828; border-radius: 8px; padding: 16px; }
-              .job-form-modal .card-title { font-weight: 700; color: white; margin-bottom: 12px; font-size: 16px; }
-              .job-form-modal #source-list-container { display: flex; flex-direction: column; gap: 8px; max-height: 335px; overflow-y: auto; padding-right: 5px; margin-right: -4px;scrollbar-width: thin; overflow-y: scroll;}
-              .job-form-modal .source-item { display: flex; align-items: center; gap: 10px; background-color: #3e3e3e; padding: 8px; border-radius: 6px; }
-              .job-form-modal .source-cover-art-small { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
-              .job-form-modal .source-text-info { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
-              .job-form-modal .source-name { color: white; font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-              .job-form-modal .source-info { color: #b3b3b3; font-size: 12px; margin-top: 2px; }
-              .job-form-modal .source-item-actions { display: flex; align-items: center; gap: 4px; }
-              .job-form-modal .remove-source-btn, .job-form-modal .edit-source-btn { 
-                  background: none; border: none; color: #b3b3b3; cursor: pointer; 
-                  padding: 4px; line-height: 1; border-radius: 50%; 
-                  height: 26px; width: 26px; display: flex; align-items: center; justify-content: center;
-              }
-              .job-form-modal .remove-source-btn { font-size: 20px; }
-              .job-form-modal .remove-source-btn:hover, .job-form-modal .edit-source-btn:hover { 
-                  color: white; background-color: rgba(255,255,255,0.1); 
-              }
-              .job-form-modal .source-actions-container { display: flex; gap: 8px; margin-top: 12px; }
-              .job-form-modal .source-actions-container button {
-                  width: auto;
-                  margin-top: 0;
-                  background-color: rgba(255,255,255,0.1);
-                  border: none;
-                  color: white;
-                  border-radius: 34px;
-                  height: 25px;
-                  border: 1px solid #666;
-              }
-              .job-form-modal .source-actions-container button:hover {
-                  background-color: rgba(255,255,255,0.2);
-                  cursor: pointer;
-                  transition: background-color 0.05s ease;
-              }
-              .job-form-modal #add-source-btn { flex-grow: 1; }
-              .job-form-modal #clear-sources-btn { flex-grow: 0; padding: 0 20px; }
-              .job-form-modal .form-select {
-                  width: 220px; background: #282828; color: white; border: 1px solid #666;
-                  border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 14px; cursor: pointer;
-                  font-family: 'SpotifyMixUI', sans-serif !important;
-                  -webkit-appearance: none; -moz-appearance: none; appearance: none;
-                  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-                  background-repeat: no-repeat; background-position: right 12px center; background-size: 16px;
-              }
-              .job-form-modal .form-select:focus {
-                  outline: none;
-                  border: 1px solid #666;
-              }
-              .job-form-modal .form-select option {
-                  background-color: #282828;
-                  color: white;
-                  font-family: 'SpotifyMixUI', sans-serif !important;
-                  font-size: 14px;
-                  padding: 4px;
-              }
-              .job-form-modal .setting-row { display: flex; justify-content: space-between; align-items: center; }
-              .job-form-modal .card .setting-row + .setting-row { margin-top: 12px; }
-              .job-form-modal .setting-row .description { color: #c1c1c1; font-size: 16px; }
-              .main-trackCreditsModal-closeBtn { 
-                  background: transparent; 
-                  border: 0; 
-                  padding: 0; 
-                  color: #b3b3b3; 
-                  cursor: pointer; 
-                  transition: color 0.2s ease;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-              }
-              .main-trackCreditsModal-closeBtn:hover { 
-                  color: #ffffff; 
-              }
-              .job-form-modal .setting-row.disabled { opacity: 0.5; pointer-events: none; }
-              .job-form-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
-              .job-form-modal .switch input { opacity: 0; width: 0; height: 0; }
-              .job-form-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
-              .job-form-modal .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
-              .job-form-modal input:checked + .sliderx { background-color: #1DB954; }
-              .job-form-modal input:checked + .sliderx:before { transform: translateX(16px); }
-              .job-form-modal .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
-              .job-form-modal .main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease;}
-              .job-form-modal .main-button-secondary:hover { background-color: #444444; }
-              .job-form-modal .main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
-              .job-form-modal .main-button-primary:hover { background-color: #3BE377; }
-              .job-form-modal #playlist-name-input:focus { border: 1px solid #666 !important; }
-              .custom-schedule-container { display: none; align-items: center; gap: 8px; margin-top: 16px; padding: 10px; background-color: #3e3e3e; border-radius: 8px; }
-              .custom-schedule-container.visible { display: flex; }
-              .custom-schedule-container input[type="number"] { width: 60px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center; }
-              .custom-schedule-container label { font-size: 12px; color: #b3b3b3; }
-              .custom-schedule-ok-btn { padding: 6px 12px; border-radius: 15px; border: none; background-color: #1ed760; color: black; font-weight: bold; cursor: pointer; }
-              .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
-              .custom-tooltip {
-                  visibility: hidden; position: absolute; z-index: 2005; background-color: #373737;
-                  color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px;
-                  max-width: 280px; width: max-content; bottom: 100%; left: 50%;
-                  transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                  line-height: 1.4; word-wrap: break-word; text-align: left;
-              }
-              .custom-tooltip::after {
-                  content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
-                  border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent;
-              }
-              .tooltip-container:hover .custom-tooltip { visibility: visible; }
-              .job-form-modal #source-error-message {
-                  color: #f15e6c;
-                  font-size: 13px;
-                  text-align: center;
-                  margin-top: 8px;
-                  margin-bottom: 4px;
-              }
-              #configure-filters-btn {
-                  background-color: #282828;
-              }
-              #configure-filters-btn:hover {
-                  background-color: #3e3e3e;
-                  border-color: #878787;
-              }
-              #configure-genres-btn {
-                  background-color: #282828;
-              }
-              #configure-genres-btn:hover {
-                  background-color: #3e3e3e;
-                border-color: #878787;
-              }
-              .job-form-modal .limit-input-group {
-                  display: flex;
-                  align-items: stretch;
-                  background-color: #2a2a2a;
-                  border: 1px solid #555;
-                  border-radius: 4px;
-                  overflow: hidden;
-                  transition: border-color 0.2s;
-                  height: 26px;
-              }
-              .job-form-modal .source-limit-input {
-                  width: 40px !important;
-                  border: none !important;
-                  background: transparent !important;
-                  padding: 0 4px !important;
-                  text-align: center;
-                  color: white !important;
-                  font-weight: 500;
-                  height: 100%;
-                  outline: none !important;
-                  -moz-appearance: textfield;
-              }
-              .job-form-modal .source-limit-input::-webkit-outer-spin-button,
-              .job-form-modal .source-limit-input::-webkit-inner-spin-button {
-                  -webkit-appearance: none;
-                  margin: 0;
-              }
-              .job-form-modal .limit-spinners {
-                  display: flex;
-                  flex-direction: column;
-                  width: 20px;
-                  border-left: 1px solid #555;
-                  border-right: 1px solid #555;
-              }
-              .job-form-modal .limit-spinner-btn {
-                  flex: 1;
-                  background-color: #444;
-                  border: none;
-                  color: #b3b3b3;
-                  cursor: pointer;
-                  padding: 0;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  transition: background 0.2s;
-                  line-height: 0;
-              }
-              .job-form-modal .limit-spinner-btn:hover {
-                  background-color: #666;
-                  color: white;
-              }
-              .job-form-modal .limit-spinner-btn.up {
-                  border-bottom: 1px solid #555;
-              }
-              .job-form-modal .limit-spinner-btn svg {
-                  width: 8px;
-                  height: 8px;
-                  fill: currentColor;
-              }
-              .job-form-modal .limit-mode-btn {
-                  background-color: #444;
-                  border: none;
-                  color: #b3b3b3;
-                  width: 28px;
-                  padding: 0;
-                  font-size: 11px;
-                  font-weight: 700;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  transition: all 0.2s;
-              }
-              .job-form-modal .limit-mode-btn:hover {
-                  background-color: #555;
-                  color: white;
-              }
-              .job-form-modal .limit-mode-btn.active {
-                  background-color: #1ed760;
-                  color: black;
-              }
-              .job-form-modal .limit-preview {
-                  font-size: 11px;
-                  color: #888;
-                  margin-left: 8px;
-                  white-space: nowrap;
-                  font-style: italic;
-              }
-              .job-form-modal .source-limit-toggle-btn {
-                  background-color: #444;
-                  border: 1px solid #555;
-                  color: #b3b3b3;
-                  padding: 0 10px;
-                  height: 24px;
-                  border-radius: 4px;
-                  font-size: 11px;
-                  font-weight: 700;
-                  cursor: pointer;
-                  margin-right: 5px;
-                  transition: all 0.2s;
-              }
-              .job-form-modal .source-limit-toggle-btn:hover {
-                  background-color: #555;
-                  color: white;
-              }
-              .job-form-modal .source-limit-toggle-btn.active {
-                  background-color: #fff;
-                  color: black;
-              }
-              @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
-              .job-form-modal { animation: fadeIn 0.2s ease; }
+          <style>
+            :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; font-size: 16px; font-weight: 400; }
+            *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+            h1 { margin: 0; line-height: normal; }
+            .job-form-modal .main-trackCreditsModal-mainSection { padding: 24px 32px 38px !important; display: flex; flex-direction: column; scrollbar-width: none; }
+            .job-form-layout-container { display: flex; gap: 16px; }
+            .job-form-left-column { flex: 1; min-width: 0; }
+            .job-form-right-column { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+            .job-form-modal .card { background-color: #282828; border-radius: 8px; padding: 16px; }
+            .job-form-modal .card-title { font-weight: 700; color: white; margin-bottom: 12px; font-size: 16px; }
+            .job-form-modal #source-list-container { display: flex; flex-direction: column; gap: 8px; max-height: 335px; overflow-y: auto; padding-right: 5px; margin-right: -4px; scrollbar-width: thin; overflow-y: scroll; }
+            .job-form-modal .source-item { display: flex; align-items: center; gap: 10px; background-color: #3e3e3e; padding: 8px; border-radius: 6px; }
+            .job-form-modal .source-cover-art-small { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+            .job-form-modal .source-text-info { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+            .job-form-modal .source-name { color: white; font-weight: 500; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .job-form-modal .source-info { color: #b3b3b3; font-size: 12px; margin-top: 2px; }
+            .job-form-modal .source-item-actions { display: flex; align-items: center; gap: 4px; }
+            .job-form-modal .remove-source-btn, .job-form-modal .edit-source-btn { background: none; border: none; color: #b3b3b3; cursor: pointer; padding: 4px; line-height: 1; border-radius: 50%; height: 26px; width: 26px; display: flex; align-items: center; justify-content: center; }
+            .job-form-modal .remove-source-btn { font-size: 20px; }
+            .job-form-modal .remove-source-btn:hover, .job-form-modal .edit-source-btn:hover { color: white; background-color: rgba(255,255,255,0.1); }
+            .job-form-modal .source-actions-container { display: flex; gap: 8px; margin-top: 12px; }
+            .job-form-modal .source-actions-container button { width: auto; margin-top: 0; background-color: rgba(255,255,255,0.1); border: none; color: white; border-radius: 34px; height: 25px; border: 1px solid #666; }
+            .job-form-modal .source-actions-container button:hover { background-color: rgba(255,255,255,0.2); cursor: pointer; transition: background-color 0.05s ease; }
+            .job-form-modal #add-source-btn { flex-grow: 1; }
+            .job-form-modal #clear-sources-btn { flex-grow: 0; padding: 0 20px; }
+            .job-form-modal .form-select { width: 220px; background: #282828; color: white; border: 1px solid #666; border-radius: 15px; padding: 8px 12px; padding-right: 32px; font-size: 14px; cursor: pointer; font-family: 'SpotifyMixUI', sans-serif !important; -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("${selectDropdownIconSvgDataUri}"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; }
+            .job-form-modal .form-select:focus { outline: none; border: 1px solid #666; }
+            .job-form-modal .form-select option { background-color: #282828; color: white; font-family: 'SpotifyMixUI', sans-serif !important; font-size: 14px; padding: 4px; }
+            .job-form-modal .setting-row { display: flex; justify-content: space-between; align-items: center; }
+            .job-form-modal .card .setting-row + .setting-row { margin-top: 12px; }
+            .job-form-modal .setting-row .description { color: #c1c1c1; font-size: 16px; }
+            .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+            .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+            .job-form-modal .setting-row.disabled { opacity: 0.5; pointer-events: none; }
+            .job-form-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+            .job-form-modal .switch input { opacity: 0; width: 0; height: 0; }
+            .job-form-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+            .job-form-modal .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+            .job-form-modal input:checked + .sliderx { background-color: #1DB954; }
+            .job-form-modal input:checked + .sliderx:before { transform: translateX(16px); }
+            .job-form-modal .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
+            .job-form-modal .main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+            .job-form-modal .main-button-secondary:hover { background-color: #444444; }
+            .job-form-modal .main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
+            .job-form-modal .main-button-primary:hover { background-color: #3BE377; }
+            .job-form-modal #playlist-name-input:focus { border: 1px solid #666 !important; }
+            .custom-schedule-container { display: none; align-items: center; gap: 8px; margin-top: 16px; padding: 10px; background-color: #3e3e3e; border-radius: 8px; }
+            .custom-schedule-container.visible { display: flex; }
+            .custom-schedule-container input[type="number"] { width: 60px; padding: 6px; border-radius: 4px; border: 1px solid #666; background-color: #282828; color: white; text-align: center; }
+            .custom-schedule-container label { font-size: 12px; color: #b3b3b3; }
+            .custom-schedule-ok-btn { padding: 6px 12px; border-radius: 15px; border: none; background-color: #1ed760; color: black; font-weight: bold; cursor: pointer; }
+            .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
+            .custom-tooltip { visibility: hidden; position: absolute; z-index: 2005; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 280px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
+            .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+            .tooltip-container:hover .custom-tooltip { visibility: visible; }
+            .job-form-modal #source-error-message { color: #f15e6c; font-size: 13px; text-align: center; margin-top: 8px; margin-bottom: 4px; }
+            #configure-filters-btn { background-color: #282828; }
+            #configure-filters-btn:hover { background-color: #3e3e3e; border-color: #878787; }
+            #configure-genres-btn { background-color: #282828; }
+            #configure-genres-btn:hover { background-color: #3e3e3e; border-color: #878787; }
+            .job-form-modal .limit-input-group { display: flex; align-items: stretch; background-color: #2a2a2a; border: 1px solid #555; border-radius: 4px; overflow: hidden; transition: border-color 0.2s; height: 26px; }
+            .job-form-modal .source-limit-input { width: 40px !important; border: none !important; background: transparent !important; padding: 0 4px !important; text-align: center; color: white !important; font-weight: 500; height: 100%; outline: none !important; -moz-appearance: textfield; }
+            .job-form-modal .source-limit-input::-webkit-outer-spin-button, .job-form-modal .source-limit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+            .job-form-modal .limit-spinners { display: flex; flex-direction: column; width: 20px; border-left: 1px solid #555; border-right: 1px solid #555; }
+            .job-form-modal .limit-spinner-btn { flex: 1; background-color: #444; border: none; color: #b3b3b3; cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: background 0.2s; line-height: 0; }
+            .job-form-modal .limit-spinner-btn:hover { background-color: #666; color: white; }
+            .job-form-modal .limit-spinner-btn.up { border-bottom: 1px solid #555; }
+            .job-form-modal .limit-spinner-btn svg { width: 8px; height: 8px; fill: currentColor; }
+            .job-form-modal .limit-mode-btn { background-color: #444; border: none; color: #b3b3b3; width: 28px; padding: 0; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+            .job-form-modal .limit-mode-btn:hover { background-color: #555; color: white; }
+            .job-form-modal .limit-mode-btn.active { background-color: #1ed760; color: black; }
+            .job-form-modal .limit-preview { font-size: 11px; color: #888; margin-left: 8px; white-space: nowrap; font-style: italic; }
+            .job-form-modal .source-limit-toggle-btn { background-color: #444; border: 1px solid #555; color: #b3b3b3; padding: 0 10px; height: 24px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; margin-right: 5px; transition: all 0.2s; }
+            .job-form-modal .source-limit-toggle-btn:hover { background-color: #555; color: white; }
+            .job-form-modal .source-limit-toggle-btn.active { background-color: #fff; color: black; }
+            @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
+            .job-form-modal { animation: fadeIn 0.2s ease; }
           </style>
             <div class="job-form-modal">
                 <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
                     <h1 class="main-trackCreditsModal-title" style="font-size: 26px; font-weight: 700; color: white;">${isEditing ? 'Edit' : 'New'} Dynamic Playlist</h1>
                     <button id="closeDynamicPlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-                        <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+                        ${closeModalIcon18Svg}
                     </button>
                 </div>
                 <div class="main-trackCreditsModal-mainSection">
@@ -17943,10 +17552,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                         max="${isPercent ? 100 : (source.totalTracks || '')}">
                                     <div class="limit-spinners">
                                         <button class="limit-spinner-btn up" data-index="${index}" title="Increase">
-                                            <svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"></path></svg>
+                                            ${spinnerUpIconSvg}
                                         </button>
                                         <button class="limit-spinner-btn down" data-index="${index}" title="Decrease">
-                                            <svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"></path></svg>
+                                            ${spinnerDownIconSvg}
                                         </button>
                                     </div>
                                     <button class="limit-mode-btn ${isPercent ? 'active' : ''}" 
@@ -18348,44 +17957,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                             sourceCoverUrl = data.images?.length ? (data.images[data.images.length - 1] || data.images[0]).url : null;
                             totalTracks = data.totalLength;
                         } else if (URI.isArtist(sourceUri)) {
-                            const id = sourceUri.split(":")[2];
-                            let data;
-                            if (isFallbackActive()) {
-                                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
-                                data = { name: res.data.artistUnion.profile.name, images: [{ url: res.data.artistUnion.visuals.avatarImage?.sources?.[0]?.url }] };
-                            } else {
-                                try {
-                                    data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${id}`);
-                                } catch(e) {
-                                    if(registerWebApiFailure()) {
-                                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
-                                        data = { name: res.data.artistUnion.profile.name, images: [{ url: res.data.artistUnion.visuals.avatarImage?.sources?.[0]?.url }] };
-                                    }
-                                }
-                            }
+                            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
+                            const data = { name: res.data.artistUnion.profile.name, images: [{ url: res.data.artistUnion.visuals.avatarImage?.sources?.[0]?.url }] };
                             sourceName = data.name; sourceInfo = `Artist Page`; sourceCoverUrl = data.images?.[0]?.url; isStaticSource = true; totalTracks = 'N/A';
                         } else if (isLikedSongsPage(sourceUri)) {
                             sourceName = "Liked Songs"; sourceInfo = "Your collection"; sourceCoverUrl = 'https://misc.scdn.co/liked-songs/liked-songs-640.png';
                             const likedSongs = await getLikedSongs();
                             totalTracks = likedSongs.length;
                         } else if (URI.isAlbum(sourceUri)) {
-                            const id = sourceUri.split(":")[2];
-                            let data;
-                            if (isFallbackActive()) {
-                                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                                const u = res.data.albumUnion;
-                                data = { name: u.name, artists: u.artists.items, images: [{ url: u.coverArt.sources[0].url }], tracks: { total: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount } };
-                            } else {
-                                try {
-                                    data = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${id}`);
-                                } catch(e) {
-                                    if(registerWebApiFailure()) {
-                                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                                        const u = res.data.albumUnion;
-                                        data = { name: u.name, artists: u.artists.items, images: [{ url: u.coverArt.sources[0].url }], tracks: { total: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount } };
-                                    }
-                                }
-                            }
+                            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
+                            const u = res.data.albumUnion;
+                            const data = { name: u.name, artists: u.artists.items, images: [{ url: u.coverArt.sources[0].url }], tracks: { total: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount } };
                             const artistNames = data.artists.map(a => a.profile ? a.profile.name : a.name).join(', ');
                             sourceName = data.name; sourceInfo = `Album by ${artistNames}`; sourceCoverUrl = data.images?.[0]?.url; isStaticSource = true; totalTracks = data.tracks.total;
                         }
@@ -18845,451 +18427,79 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     shadowRoot.innerHTML = `
     <style>
-    :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
-    *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-    h1 { margin: 0; line-height: normal; }
-    .genre-filter-modal .main-trackCreditsModal-mainSection {
-      overflow-y: hidden !important;
-      padding: 17px 32px 32px 32px;
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-    }
-    .genre-filter-modal .main-trackCreditsModal-header {
-      padding: 29px 32px 19px 32px !important;
-      border-bottom: 1px solid #282828 !important;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    .genre-filter-modal .main-trackCreditsModal-closeBtn { 
-        background: transparent; 
-        border: 0; 
-        padding: 0; 
-        color: #b3b3b3; 
-        cursor: pointer; 
-        transition: color 0.2s ease; 
-    }
-    .genre-filter-modal .main-trackCreditsModal-closeBtn:hover { 
-        color: #ffffff; 
-    }
-    .genre-filter-modal .genre-button {
-      padding: 6px 7px 6px 16px;
-      margin: 4px;
-      border-radius: 20px;
-      border: none;
-      cursor: pointer;
-      background-color: #303030;
-      color: white;
-      font-weight: 500;
-      font-size: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      position: relative;
-      overflow: hidden;
-      z-index: 0;
-      transition: background-color 0.2s ease, color 0.2s ease;
-    }
-    .genre-filter-modal .genre-button > * {
-      position: relative;
-      z-index: 2;
-    }
-    .genre-filter-modal .genre-button::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      z-index: 1;
-      opacity: 0;
-      transition: opacity 0.2s ease;
-    }
-    .genre-filter-modal .genre-button.related {
-      background-color: rgb(52 123 77 / 30%);
-      border: none;
-      color: white;
-    }
-    .genre-filter-modal .genre-button.selected {
-      border: none;
-      color: #ffffff;
-    }
-    .genre-filter-modal .genre-button.selected::before {
-      background: linear-gradient(to right, rgb(30 215 96 / 35%), rgb(30 215 96 / 80%));
-      opacity: 1;
-    }
-    .genre-filter-modal .genre-button.excluded {
-      color: #ffffff;
-      border: none;
-    }
-    .genre-filter-modal .genre-button.excluded::before {
-      background: linear-gradient(to right, rgb(169 33 33 / 45%), rgb(169 33 33 / 85%));
-      opacity: 1;
-    }
-    .genre-filter-modal .genre-count-badge {
-      background-color: #454545;
-      color: #e0e0e0;
-      padding: 1px 8px;
-      border-radius: 12px;
-      font-size: 13px;
-      font-weight: 400;
-      min-width: 22px;
-      text-align: center;
-      line-height: 1.5;
-      transition: background-color 0.1s ease, color 0.1s ease;
-    }
-    .genre-filter-modal .genre-button.selected .genre-count-badge {
-      background-color: rgb(20, 109, 52);
-      color: #ffffff;
-    }
-    .genre-filter-modal .genre-button.excluded .genre-count-badge {
-      background-color: rgb(91, 21, 21);
-      color: #ffffff;
-    }
-    .genre-filter-modal .genre-button.related .genre-count-badge {
-      background-color: rgb(59, 78, 66);
-      color: #ffffff;
-    }
-    .genre-filter-modal .search-bar {
-      width: 100%;
-      padding-top: 10px;
-      padding-right: 35px;
-      padding-bottom: 10px;
-      padding-left: 40px;
-      border-radius: 12px;
-      border: 1px solid #343434;
-      background: #1e1e1e;
-      color: white;
-    }
-    .genre-filter-modal .search-bar-container {
-      position: relative;
-      flex: 1;
-      display: flex;
-      align-items: center;
-    }
-    .genre-filter-modal .search-icon {
-        position: absolute;
-        left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        pointer-events: none;
-        color: #b3b3b3;
-    }
-    .genre-filter-modal .clear-search-button {
-      position: absolute;
-      right: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      color: #b3b3b3;
-      cursor: pointer;
-      font-size: 24px;
-      padding: 0 5px;
-      line-height: 1;
-      display: none;
-    }
-    .genre-filter-modal .clear-search-button:hover {
-      color: white;
-    }
-    .genre-filter-modal .sort-type-select {
-      padding: 8px;
-      border-radius: 10px;
-      border: 1px solid #434343;
-      background: #313131;
-      color: white;
-      width: 217px;
-      cursor: pointer;
-      transition: border-color 0.05s ease;
-    }
-    .genre-filter-modal .sort-type-select:hover {
-      border: 1px solid #5b5b5b;
-    }
-    .genre-filter-modal .create-playlist-button {
-      padding: 8px 18px;
-      border-radius: 20px;
-      border: none;
-      cursor: pointer;
-      background-color: #1ED760;
-      color: black;
-      font-weight: 600;
-      font-size: 14px;
-      transition: all 0.04s ease;
-      margin-top: 5px;
-      flex-shrink: 0;
-    }
-    .genre-filter-modal .create-playlist-button:hover {
-      background-color: #3BE377;
-    }
-    .genre-filter-modal .genre-container {
-      display: flex;
-      flex-wrap: wrap;
-      height: 100%;
-      width: 100%;
-      overflow-y: auto;
-      background-color: #1e1e1e; 
-      border: 1px solid #343434;
-      padding: 10px 10px;
-      box-sizing: border-box;
-      border-bottom-left-radius: 0;
-      border-bottom-right-radius: 0;
-      border-top-left-radius: 12px;
-      border-top-right-radius: 12px;
-      scrollbar-width: auto;
-      scrollbar-color: auto;
-    }
-    .genre-filter-modal .genre-scroll-wrapper {
-        position: relative;
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        margin-bottom: -15px; 
-        margin-top: 2px;
-        z-index: 0;
-    }
-    .genre-filter-modal .genre-scroll-wrapper::before,
-    .genre-filter-modal .genre-scroll-wrapper::after {
-        content: "";
-        position: absolute;
-        left: 1px;
-        right: 8px;
-        height: 26px;
-        z-index: 10;
-        pointer-events: none;
-        transition: opacity 0.2s ease;
-        opacity: 0;
-    }
-    .genre-filter-modal .genre-scroll-wrapper::before {
-        top: 1px;
-        border-top-left-radius: 12px;
-        border-top-right-radius: 12px;
-        background: linear-gradient(to bottom, #1e1e1e 0%, rgba(30, 30, 30, 0) 100%);
-    }
-    .genre-filter-modal .genre-scroll-wrapper::after {
-        bottom: 1px;
-        background: linear-gradient(to top, #1e1e1e 0%, rgba(30, 30, 30, 0) 100%);
-    }
-    .genre-filter-modal .genre-scroll-wrapper.no-transition::before,
-    .genre-filter-modal .genre-scroll-wrapper.no-transition::after {
-        transition: none !important;
-    }
-    .genre-filter-modal .genre-scroll-wrapper.can-scroll-top::before {
-        opacity: 1;
-    }
-    .genre-filter-modal .genre-scroll-wrapper.can-scroll-bottom::after {
-        opacity: 1;
-    }
-    .genre-filter-modal .genre-container::-webkit-scrollbar {
-      width: 6px !important;
-    }
-    .genre-filter-modal .genre-container::-webkit-scrollbar-button {
-      display: none !important;
-      height: 0 !important;
-      width: 0 !important;
-    }
-    .genre-filter-modal .genre-container::-webkit-scrollbar-track {
-      background: transparent !important; 
-      margin-top: 20px !important;
-    }
-    .genre-filter-modal .genre-container::-webkit-scrollbar-thumb {
-      background-color: #343434 !important;
-      border-radius: 20px !important;
-    }
-    .genre-filter-modal .genre-container::-webkit-scrollbar-thumb:hover {
-      background-color: #777 !important;
-    }
-    .genre-filter-modal .genre-container::-webkit-scrollbar-corner {
-      background: transparent !important;
-    }
-    .genre-filter-modal .select-all-button {
-      padding: 10px;
-      border-radius: 12px;
-      border: 1px solid #343434;
-      cursor: pointer;
-      background-color: #252525; 
-      color: white;
-      font-weight: 500;
-      font-size: 14px;
-      transition: all 0.4s ease;  
-      display: flex;  
-      align-items: center; 
-      justify-content: center;
-    }
-    .genre-filter-modal .select-all-button:hover {
-      filter: brightness(1.2); 
-    }
-    .genre-filter-modal .select-all-button:active {
-      background-color: #B3B3B3;
-      color: black;
-      transition: none;
-    }
-    .genre-filter-modal .select-all-button svg {
-      fill: #b3b3b3; 
-    }
-    .genre-filter-modal .genre-header {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    .genre-filter-modal .setting-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 2px 0;
-      width: auto; 
-    }
-    .genre-filter-modal .switch {
-        position: relative;
-        display: inline-block;
-        width: 40px;
-        height: 24px;
-    }
-    .genre-filter-modal .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-    .genre-filter-modal .sliderx {
-        position: absolute;
-        cursor: pointer;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: #484848;
-        border-radius: 24px;
-        transition: .2s;
-    }
-    .genre-filter-modal .sliderx:before {
-        position: absolute;
-        content: "";
-        height: 18px;
-        width: 18px;
-        left: 3px;
-        bottom: 3px;
-        background-color: white;
-        border-radius: 50%;
-        transition: .2s;
-    }
-    .genre-filter-modal input:checked + .sliderx {
-        background-color: #1DB954;
-    }
-    .genre-filter-modal input:checked + .sliderx:before {
-        transform: translateX(16px);
-    }
-    .genre-filter-modal .settings-container {
-      display: flex;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .genre-filter-modal .settings-box {
-      flex: 1;
-      background-color: #252525;
-      border-radius: 12px;
-      border: 1px solid #343434;
-      padding: 12px 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 8px;
-    }
-    .genre-filter-modal .setting-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .genre-filter-modal .setting-label {
-      color: #ccc;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .genre-filter-modal .setting-label svg {
-      margin-left: 0 !important;
-      margin-bottom: 1px !important;
-    }
-    .genre-filter-modal .sort-type-select {
-      padding: 6px 10px !important;
-      border-radius: 6px !important;
-      border: 1px solid #444 !important;
-      background: #333 !important;
-      color: white !important;
-      width: 100% !important;
-      cursor: pointer !important;
-      font-size: 14px !important;
-    }
-    .tooltip-container {
-      position: relative; 
-      display: inline-block;
-    }
-    .custom-tooltip {
-      visibility: hidden;
-      position: absolute;
-      z-index: 1;
-      background-color: #373737;
-      color: white;
-      padding: 8px 12px;
-      border-radius: 4px;
-      font-size: 14px;
-      max-width: 240px;
-      width: max-content;
-      bottom: 100%;   
-      left: 50%;       
-      transform: translateX(-50%);  
-      margin-bottom: 5px;   
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-      line-height: 1.4;
-      word-wrap: break-word;
-    }
-    .custom-tooltip::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #373737 transparent transparent transparent;
-    }
-    .tooltip-container:hover .custom-tooltip {
-        visibility: visible;
-    }
-    .genre-filter-modal .genre-stats {
-      display: flex;
-      justify-content: center; 
-      align-items: center;    
-      color: #c1c1c1;
-      font-size: 14px;
-      background-color: #252525;
-      padding: 10px 0;
-      border: 1px solid #343434;
-      border-top: none;
-      border-bottom-left-radius: 12px;
-      border-bottom-right-radius: 12px;
-      margin-bottom: 5px; 
-      position: relative;
-      z-index: 1; 
-      flex-shrink: 0;
-    }
-    .genre-filter-modal .genre-stats span {
-      margin: 0 25px;
-    }
-    .genre-modal-title {
-      font-size: 15px;
-      font-weight: 400;
-      color: white;
-      flex-shrink: 0;
-    }
+      :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
+      *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+      h1 { margin: 0; line-height: normal; }
+      .genre-filter-modal .main-trackCreditsModal-mainSection { overflow-y: hidden !important; padding: 17px 32px 32px 32px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
+      .genre-filter-modal .main-trackCreditsModal-header { padding: 29px 32px 19px 32px !important; border-bottom: 1px solid #282828 !important; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+      .genre-filter-modal .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
+      .genre-filter-modal .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+      .genre-filter-modal .genre-button { padding: 6px 7px 6px 16px; margin: 4px; border-radius: 20px; border: none; cursor: pointer; background-color: #303030; color: white; font-weight: 500; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; position: relative; overflow: hidden; z-index: 0; transition: background-color 0.2s ease, color 0.2s ease; }
+      .genre-filter-modal .genre-button > * { position: relative; z-index: 2; }
+      .genre-filter-modal .genre-button::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0; transition: opacity 0.2s ease; }
+      .genre-filter-modal .genre-button.related { background-color: rgb(52 123 77 / 30%); border: none; color: white; }
+      .genre-filter-modal .genre-button.selected { border: none; color: #ffffff; }
+      .genre-filter-modal .genre-button.selected::before { background: linear-gradient(to right, rgb(30 215 96 / 35%), rgb(30 215 96 / 80%)); opacity: 1; }
+      .genre-filter-modal .genre-button.excluded { color: #ffffff; border: none; }
+      .genre-filter-modal .genre-button.excluded::before { background: linear-gradient(to right, rgb(169 33 33 / 45%), rgb(169 33 33 / 85%)); opacity: 1; }
+      .genre-filter-modal .genre-count-badge { background-color: #454545; color: #e0e0e0; padding: 1px 8px; border-radius: 12px; font-size: 13px; font-weight: 400; min-width: 22px; text-align: center; line-height: 1.5; transition: background-color 0.1s ease, color 0.1s ease; }
+      .genre-filter-modal .genre-button.selected .genre-count-badge { background-color: rgb(20, 109, 52); color: #ffffff; }
+      .genre-filter-modal .genre-button.excluded .genre-count-badge { background-color: rgb(91, 21, 21); color: #ffffff; }
+      .genre-filter-modal .genre-button.related .genre-count-badge { background-color: rgb(59, 78, 66); color: #ffffff; }
+      .genre-filter-modal .search-bar { width: 100%; padding-top: 10px; padding-right: 35px; padding-bottom: 10px; padding-left: 40px; border-radius: 12px; border: 1px solid #343434; background: #1e1e1e; color: white; }
+      .genre-filter-modal .search-bar-container { position: relative; flex: 1; display: flex; align-items: center; }
+      .genre-filter-modal .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #b3b3b3; }
+      .genre-filter-modal .clear-search-button { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 24px; padding: 0 5px; line-height: 1; display: none; }
+      .genre-filter-modal .clear-search-button:hover { color: white; }
+      .genre-filter-modal .sort-type-select { padding: 8px; border-radius: 10px; border: 1px solid #434343; background: #313131; color: white; width: 217px; cursor: pointer; transition: border-color 0.05s ease; }
+      .genre-filter-modal .sort-type-select:hover { border: 1px solid #5b5b5b; }
+      .genre-filter-modal .create-playlist-button { padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 600; font-size: 14px; transition: all 0.04s ease; margin-top: 5px; flex-shrink: 0; }
+      .genre-filter-modal .create-playlist-button:hover { background-color: #3BE377; }
+      .genre-filter-modal .genre-container { display: flex; flex-wrap: wrap; height: 100%; width: 100%; overflow-y: auto; background-color: #1e1e1e; border: 1px solid #343434; padding: 10px 10px; box-sizing: border-box; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-top-left-radius: 12px; border-top-right-radius: 12px; scrollbar-width: auto; scrollbar-color: auto; }
+      .genre-filter-modal .genre-scroll-wrapper { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: -15px; margin-top: 2px; z-index: 0; }
+      .genre-filter-modal .genre-scroll-wrapper::before, .genre-filter-modal .genre-scroll-wrapper::after { content: ""; position: absolute; left: 1px; right: 8px; height: 26px; z-index: 10; pointer-events: none; transition: opacity 0.2s ease; opacity: 0; }
+      .genre-filter-modal .genre-scroll-wrapper::before { top: 1px; border-top-left-radius: 12px; border-top-right-radius: 12px; background: linear-gradient(to bottom, #1e1e1e 0%, rgba(30, 30, 30, 0) 100%); }
+      .genre-filter-modal .genre-scroll-wrapper::after { bottom: 1px; background: linear-gradient(to top, #1e1e1e 0%, rgba(30, 30, 30, 0) 100%); }
+      .genre-filter-modal .genre-scroll-wrapper.no-transition::before, .genre-filter-modal .genre-scroll-wrapper.no-transition::after { transition: none !important; }
+      .genre-filter-modal .genre-scroll-wrapper.can-scroll-top::before { opacity: 1; }
+      .genre-filter-modal .genre-scroll-wrapper.can-scroll-bottom::after { opacity: 1; }
+      .genre-filter-modal .genre-container::-webkit-scrollbar { width: 6px !important; }
+      .genre-filter-modal .genre-container::-webkit-scrollbar-button { display: none !important; height: 0 !important; width: 0 !important; }
+      .genre-filter-modal .genre-container::-webkit-scrollbar-track { background: transparent !important; margin-top: 20px !important; }
+      .genre-filter-modal .genre-container::-webkit-scrollbar-thumb { background-color: #343434 !important; border-radius: 20px !important; }
+      .genre-filter-modal .genre-container::-webkit-scrollbar-thumb:hover { background-color: #777 !important; }
+      .genre-filter-modal .genre-container::-webkit-scrollbar-corner { background: transparent !important; }
+      .genre-filter-modal .select-all-button { padding: 10px; border-radius: 12px; border: 1px solid #343434; cursor: pointer; background-color: #252525; color: white; font-weight: 500; font-size: 14px; transition: all 0.4s ease; display: flex; align-items: center; justify-content: center; }
+      .genre-filter-modal .select-all-button:hover { filter: brightness(1.2); }
+      .genre-filter-modal .select-all-button:active { background-color: #B3B3B3; color: black; transition: none; }
+      .genre-filter-modal .select-all-button svg { fill: #b3b3b3; }
+      .genre-filter-modal .genre-header { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+      .genre-filter-modal .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; width: auto; }
+      .genre-filter-modal .switch { position: relative; display: inline-block; width: 40px; height: 24px; }
+      .genre-filter-modal .switch input { opacity: 0; width: 0; height: 0; }
+      .genre-filter-modal .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+      .genre-filter-modal .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+      .genre-filter-modal input:checked + .sliderx { background-color: #1DB954; }
+      .genre-filter-modal input:checked + .sliderx:before { transform: translateX(16px); }
+      .genre-filter-modal .settings-container { display: flex; gap: 12px; flex-shrink: 0; }
+      .genre-filter-modal .settings-box { flex: 1; background-color: #252525; border-radius: 12px; border: 1px solid #343434; padding: 12px 16px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+      .genre-filter-modal .setting-row { display: flex; justify-content: space-between; align-items: center; }
+      .genre-filter-modal .setting-label { color: #ccc; font-size: 14px; display: flex; align-items: center; gap: 4px; }
+      .genre-filter-modal .setting-label svg { margin-left: 0 !important; margin-bottom: 1px !important; }
+      .genre-filter-modal .sort-type-select { padding: 6px 10px !important; border-radius: 6px !important; border: 1px solid #444 !important; background: #333 !important; color: white !important; width: 100% !important; cursor: pointer !important; font-size: 14px !important; }
+      .tooltip-container { position: relative; display: inline-block; }
+      .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
+      .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+      .tooltip-container:hover .custom-tooltip { visibility: visible; }
+      .genre-filter-modal .genre-stats { display: flex; justify-content: center; align-items: center; color: #c1c1c1; font-size: 14px; background-color: #252525; padding: 10px 0; border: 1px solid #343434; border-top: none; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-bottom: 5px; position: relative; z-index: 1; flex-shrink: 0; }
+      .genre-filter-modal .genre-stats span { margin: 0 25px; }
+      .genre-modal-title { font-size: 15px; font-weight: 400; color: white; flex-shrink: 0; }
     </style>
     <div class="genre-filter-modal" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
     <div class="main-trackCreditsModal-header">
         <h1 style="font-size: 26px; font-weight: 700; color: white; margin:0;">Genre Filter</h1>
         <button id="closeGenreModalBtn" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+            ${closeModalIcon18Svg}
         </button>
     </div>
 
@@ -19303,16 +18513,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         </h2>
             <div class="genre-header">
             <div class="search-bar-container">
-                    <svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M 7 1.75 a 5.25 5.25 0 1 0 0 10.5 a 5.25 5.25 0 0 0 0 -10.5 M 0.25 7 a 6.75 6.75 0 1 1 12.096 4.12 l 3.184 3.185 a 0.75 0.75 0 1 1 -1.06 1.06 L 11.304 12.2 A 6.75 6.75 0 0 1 0.25 7"></path>
-                    </svg>
+                    ${searchIconSvg}
                     <input type="text" class="search-bar" placeholder="Search genres...">
                     <button class="clear-search-button">&times;</button>
                 </div>
                 <button class="select-all-button" title="Select All">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18px" height="18px">
-                        <path d="M 4 2 C 2.895 2 2 2.895 2 4 L 2 16 C 2 17.105 2.895 18 4 18 L 16 18 C 17.105 18 18 17.105 18 16 L 18 4 C 18 2.895 17.105 2 16 2 L 4 2 z M 4 4 L 16 4 L 16 16 L 4 16 L 4 4 z M 20 6 L 20 20 L 6 20 L 6 22 L 20 22 C 21.105 22 22 21.105 22 20 L 22 6 L 20 6 z M 13.292969 6.2929688 L 9 10.585938 L 6.7070312 8.2929688 L 5.2929688 9.7070312 L 9 13.414062 L 14.707031 7.7070312 L 13.292969 6.2929688 z"/>
-                    </svg>
+                    ${selectAllIconSvg}
                 </button>
             </div>
             <div class="genre-scroll-wrapper">
@@ -19824,20 +19030,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
               await addPlaylistToLibrary(newPlaylist.uri);
     
-              const sortTypeInfo = {
-                  default: { fullName: "default order", shortName: "Default" },
-                  playCount: { fullName: "play count", shortName: "PlayCount" },
-                  popularity: { fullName: "popularity", shortName: "Popularity" },
-                  releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-                  scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
-                  personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
-                  shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-                  aiPick: { fullName: "AI pick", shortName: "AI Pick" },
-                  averageColor: { fullName: "album color", shortName: "Color" },
-              }[sortType];
-              showNotification(
-                  `Playlist created with ${sortTypeInfo.fullName} and genre filter!`
-              );
+              const sortTypeInfo = getSortTypeInfo(sortType);
+
+              let notificationMsg = `Playlist filtered by genre & sorted by ${sortTypeInfo.fullName}!`;
+              if (URI.isArtist(sourceUri)) {
+                  notificationMsg = `Discography of ${sourceName} filtered by genre & sorted by ${sortTypeInfo.fullName}!`;
+              } else if (URI.isAlbum(sourceUri)) {
+                  notificationMsg = `Album filtered by genre & sorted by ${sortTypeInfo.fullName}!`;
+              } else if (isLikedSongsPage(sourceUri)) {
+                  notificationMsg = `Liked Songs filtered by genre & sorted by ${sortTypeInfo.fullName}!`;
+              } else if (isLocalFilesPage(sourceUri)) {
+                  notificationMsg = `Local Files filtered by genre & sorted by ${sortTypeInfo.fullName}!`;
+              }
+
+              showNotification(notificationMsg);
               
               await navigateToPlaylist(newPlaylist);
     
@@ -19852,104 +19058,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
     
     
-      let sourceName = "Source";
-      const sourceId = sourceUri.split(":")[2];
-
-      try {
-          if (URI.isArtist(sourceUri)) {
-              const fetchArtistFallback = async () => {
-                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUri, locale: "en", includePrerelease: false });
-                  return res.data.artistUnion.profile.name;
-              };
-
-              if (isFallbackActive()) {
-                  sourceName = await fetchArtistFallback();
-              } else {
-                  try {
-                      const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${sourceId}`);
-                      sourceName = artistData.name;
-                  } catch (e) {
-                      if (registerWebApiFailure()) {
-                          sourceName = await fetchArtistFallback();
-                      } else { throw e; }
-                  }
-              }
-          } else if (isLikedSongsPage(sourceUri)) {
-              sourceName = "Liked Songs";
-          } else if (URI.isAlbum(sourceUri)) {
-              const fetchAlbumFallback = async () => {
-                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                  return res.data.albumUnion.name;
-              };
-
-              if (isFallbackActive()) {
-                  sourceName = await fetchAlbumFallback();
-              } else {
-                  try {
-                      const albumData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceId}`);
-                      sourceName = albumData.name;
-                  } catch (e) {
-                      if (registerWebApiFailure()) {
-                          sourceName = await fetchAlbumFallback();
-                      } else { throw e; }
-                  }
-              }
-          } else {
-              const fetchPlaylistFallback = async () => {
-                  const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(sourceUri);
-                  return meta.name;
-              };
-
-              if (isFallbackActive()) {
-                  sourceName = await fetchPlaylistFallback();
-              } else {
-                  try {
-                      const playlistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${sourceId}`);
-                      sourceName = playlistData.name;
-                  } catch (e) {
-                      if (registerWebApiFailure()) {
-                          sourceName = await fetchPlaylistFallback();
-                      } else { throw e; }
-                  }
-              }
-          }
-      } catch (e) {
-          console.warn("Failed to fetch source name for Genre Filter playlist", e);
-      }
-    
-      let suffixPattern = new RegExp(
-          `\\s*(${possibleSuffixes.join("|")})\\s*`
-      );
-    
-      while (suffixPattern.test(sourceName)) {
-          sourceName = sourceName.replace(suffixPattern, "");
-      }
-    
+      let { sourceName, artistName } = await fetchCleanSourceNameAndArtist(sourceUri);
     
       let baseDescription = `Filtered using Sort-Play by genres: `;
       if (URI.isArtist(sourceUri)) {
           baseDescription = `Tracks by ${sourceName} ` + baseDescription;
       } else if (URI.isAlbum(sourceUri)) {
-          let artistName = "Unknown Artist";
-          try {
-              const fetchAlbumArtistFallback = async () => {
-                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUri, locale: "en", offset: 0, limit: 1 });
-                  return res.data.albumUnion.artists.items[0]?.profile?.name || "Unknown Artist";
-              };
-
-              if (isFallbackActive()) {
-                  artistName = await fetchAlbumArtistFallback();
-              } else {
-                  try {
-                      const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${sourceUri.split(":")[2]}`);
-                      artistName = albumDetails.artists[0].name;
-                  } catch (e) {
-                      if (registerWebApiFailure()) {
-                          artistName = await fetchAlbumArtistFallback();
-                      } else { throw e; }
-                  }
-              }
-          } catch (e) {}
           baseDescription = `Tracks from ${sourceName} by ${artistName} ` + baseDescription;
       }
     
@@ -19977,20 +19091,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       if (sortType === "default") {
         sortedTracks = filteredTracks;
         setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
         mainButton.innerHTML = "100%";
         await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
       } else if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
           setButtonProcessing(true);
-          mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-          mainButton.style.color = buttonStyles.main.disabledColor;
-          mainButton.style.cursor = "default";
-          svgElement.style.fill = buttonStyles.main.disabledColor;
-          menuButtons.forEach((button) => (button.disabled = true));
           mainButton.innerHTML = "0%";
     
           const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
@@ -20042,40 +19146,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               )).unique;
           }
     
-          if (sortType === "playCount") {
-            const getVal = (t) => (t.playCount === "N/A" || t.playCount == null) ? -1 : Number(t.playCount);
-            sortedTracks = uniqueTracks.sort((a, b) => 
-                sortOrderState.playCount ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
-            );
-          } else if (sortType === "popularity") {
-            const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
-            sortedTracks = uniqueTracks.sort((a, b) => 
-                sortOrderState.popularity ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
-            );
-        } else if (sortType === "releaseDate") {
-          sortedTracks = uniqueTracks
-            .sort((a, b) => {
-              const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-              const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-
-              const dateComparison = sortOrderState.releaseDate
-                ? valA - valB
-                : valB - valA;
-    
-              if (dateComparison !== 0) {
-                return dateComparison;
-              }
-
-              const albumA = (a.albumName || "").toLowerCase();
-              const albumB = (b.albumName || "").toLowerCase();
-              const albumCompare = albumA.localeCompare(albumB);
-              if (albumCompare !== 0) return albumCompare;
-              
-              return (a.trackNumber || 0) - (b.trackNumber || 0);
-            });
-        } else if (sortType === "shuffle") {
-          sortedTracks = shuffleArray(uniqueTracks);
-        }
+          sortedTracks = applyStandardSort(uniqueTracks, sortType);
     
           mainButton.innerText = "100%";
     
@@ -20084,11 +19155,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
           try {
               setButtonProcessing(true);
-              mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-              mainButton.style.color = buttonStyles.main.disabledColor;
-              mainButton.style.cursor = "default";
-              svgElement.style.fill = buttonStyles.main.disabledColor;
-              menuButtons.forEach((button) => (button.disabled = true));
               mainButton.innerHTML = "0%";
     
               const tracksWithScrobbles = await handleScrobblesSorting(
@@ -20132,15 +19198,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       }
     });
   }
-
-  
-  function isTrackRecent(releaseDateString) {
-    const releaseDate = new Date(releaseDateString);
-    const twoWeeksAgo = new Date();
-    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-  
-    return releaseDate >= twoWeeksAgo;
-  }
   
   const CONFIG = {
     concurrencyLimit: 20,
@@ -20155,65 +19212,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       retryDelay: 1000,
     }
   };
-
-  function canCallSpotifyApi() {
-    const now = Date.now();
-    const oneSecondAgo = now - 1000;
-
-    spotifyApiLimits.requests = spotifyApiLimits.requests.filter(
-        (timestamp) => timestamp > oneSecondAgo
-    );
-
-    return spotifyApiLimits.requests.length < spotifyApiLimits.maxRequestsPerSecond;
-  }
-
-  async function callSpotifyApiWithRateLimit(fn) {
-    while (!canCallSpotifyApi()) {
-        await new Promise((resolve) => setTimeout(resolve, 50)); 
-    }
-
-    spotifyApiLimits.requests.push(Date.now());
-    return await fn();
-  }
-
-  async function withRetry(fn, retryAttempts, retryDelay) {
-    let lastError;
-    for (let attempt = 0; attempt < retryAttempts; attempt++) {
-        try {
-            const response = await callSpotifyApiWithRateLimit(fn);
-            
-            if (response?.code === 429) {
-                const error = new Error("Too Many Requests");
-                error.status = 429;
-                throw error;
-            }
-            
-            if (response?.error) {
-                const error = new Error(response.message || response.error);
-                error.status = response.code;
-                throw error;
-            }
-            
-            return response;
-        } catch (error) {
-            lastError = error;
-            let waitTime = retryDelay * Math.pow(2, attempt); 
-            waitTime += Math.random() * retryDelay;          
-            waitTime = Math.min(waitTime, 60000);            
-
-            if (error.status === 429) {
-                waitTime = Math.max(5000, waitTime); 
-            }
-            
-            console.warn(`Attempt ${attempt + 1}/${retryAttempts} failed. Waiting ${waitTime}ms before retry...`);
-            
-            if (attempt < retryAttempts - 1) {
-                await new Promise((resolve) => setTimeout(resolve, waitTime));
-            }
-        }
-    }
-    throw lastError;
-  }
 
   async function getLastfmGenres(artist, track) {
     const cacheKey = `${artist}-${track}`;
@@ -20506,23 +19504,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             let trackDetails = preFetchedTrackDetails;
             
             if (!trackDetails) {
-                if (isFallbackActive()) {
-                    trackDetails = await fetchInternalTrackMetadata(trackId);
-                } else {
-                    try {
-                        trackDetails = await withRetry(
-                            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`),
-                            CONFIG.spotify.retryAttempts,
-                            CONFIG.spotify.retryDelay
-                        );
-                    } catch (error) {
-                        if (registerWebApiFailure()) {
-                            trackDetails = await fetchInternalTrackMetadata(trackId);
-                        } else {
-                            throw error;
-                        }
-                    }
-                }
+                trackDetails = await fetchInternalTrackMetadata(trackId);
             }
             
             if (!trackDetails || trackDetails.error) throw new Error("Failed to fetch track details");
@@ -20755,24 +19737,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   return await Promise.all(promises);
               };
   
-              if (isFallbackActive()) {
-                  responseTracks = await fetchBatchInternal();
-              } else {
-                  try {
-                      const response = await withRetry(
-                          () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${chunkTrackIds.join(',')}`),
-                          CONFIG.spotify.retryAttempts,
-                          CONFIG.spotify.retryDelay
-                      );
-                      responseTracks = response?.tracks || [];
-                  } catch (error) {
-                      if (registerWebApiFailure()) {
-                          responseTracks = await fetchBatchInternal();
-                      } else {
-                          throw error;
-                      }
-                  }
-              }
+              responseTracks = await fetchBatchInternal();
   
               responseTracks.forEach((td, idx) => {
                   if (td) {
@@ -21069,23 +20034,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     return { tracks: results };
                 };
 
-                if (isFallbackActive()) {
-                    response = await fetchBatchInternal();
-                } else {
-                    try {
-                        response = await withRetry(
-                            () => Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`),
-                            CONFIG.spotify.retryAttempts,
-                            CONFIG.spotify.retryDelay
-                        );
-                    } catch (error) {
-                        if (registerWebApiFailure()) {
-                            response = await fetchBatchInternal();
-                        } else {
-                            throw error;
-                        }
-                    }
-                }
+                response = await fetchBatchInternal();
 
                 if (response && response.tracks) {
                     response.tracks.forEach(track => {
@@ -21418,6 +20367,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   const styleElement = document.createElement("style");
   styleElement.innerHTML = `
+    ${spSpinnerLoaderStyle}
     .sort-play-font-scope,
     .sort-play-font-scope * {
       font-family: 'SpotifyMixUI', sans-serif !important;
@@ -21786,6 +20736,200 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
   };
 
+  function getArtistDiscographyMap() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP) || '{}'); }
+      catch(e) { return {}; }
+  }
+
+  function addArtistDiscographyMap(artistUri, playlistUri) {
+      const map = getArtistDiscographyMap();
+      if (!map[artistUri]) map[artistUri] = [];
+      map[artistUri] = map[artistUri].filter(uri => uri !== playlistUri);
+      map[artistUri].unshift(playlistUri); 
+      localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP, JSON.stringify(map));
+  }
+
+  async function getUserOwnedPlaylistsInternal() {
+      const user = await Spicetify.Platform.UserAPI.getUser();
+      const username = user.username;
+      const rootlist = await Spicetify.Platform.RootlistAPI.getContents();
+      
+      const uris = [];
+      const traverse = (items) => {
+          for (const item of items) {
+              if (item.type === 'playlist') {
+                  uris.push(item.uri);
+              } else if (item.type === 'folder' && item.items) {
+                  traverse(item.items);
+              }
+          }
+      };
+      traverse(rootlist.items);
+
+      const ownedPlaylists = [];
+      const BATCH_SIZE = 100;
+      
+      for (let i = 0; i < uris.length; i += BATCH_SIZE) {
+          const batch = uris.slice(i, i + BATCH_SIZE);
+          const promises = batch.map(async (uri) => {
+              try {
+                  const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+                  if (meta && meta.owner && (meta.owner.username === username || meta.owner.uri.includes(username))) {
+                      return {
+                          uri: uri,
+                          name: meta.name,
+                          images: meta.images,
+                          tracks: { total: meta.totalLength }
+                      };
+                  }
+              } catch(e) {}
+              return null;
+          });
+          const results = await Promise.all(promises);
+          results.forEach(r => { if(r) ownedPlaylists.push(r); });
+      }
+      return ownedPlaylists;
+  }
+
+  function showArtistDuplicateModal(mappedPlaylists, possiblePlaylists, artistName) {
+      return new Promise((resolve) => {
+          const overlay = document.createElement("div");
+          overlay.className = "sort-play-font-scope";
+          overlay.style.cssText = `
+              position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+              background-color: rgba(0, 0, 0, 0.7); z-index: 3000;
+              display: flex; justify-content: center; align-items: center;
+              backdrop-filter: blur(8px);
+          `;
+
+          const modal = document.createElement("div");
+          modal.className = "main-embedWidgetGenerator-container";
+          modal.style.cssText = `
+              width: 520px !important; background-color: #181818 !important;
+              border: 1px solid #282828; border-radius: 20px; display: flex;
+              flex-direction: column; max-height: 80vh; overflow: hidden;
+          `;
+
+          let selectedUri = mappedPlaylists.length > 0 ? mappedPlaylists[0].uri : (possiblePlaylists.length === 1 ? possiblePlaylists[0].uri : null);
+
+          const renderItem = (p, isMapped) => {
+              const cover = p.images?.length ? p.images[p.images.length - 1].url : 'https://i.imgur.com/33q4t4k.png';
+              const isSelected = p.uri === selectedUri;
+              const baseClass = isMapped ? 'playlist-item mapped' : 'playlist-item unmapped';
+              const selClass = isSelected ? 'selected' : '';
+              return `
+                  <div class="${baseClass} ${selClass}" data-uri="${p.uri}">
+                      <img src="${cover}" class="playlist-cover">
+                      <div class="playlist-info">
+                          <div class="playlist-name" title="${p.name}">${p.name}</div>
+                          <div class="playlist-meta">Playlist • ${p.tracks?.total || 0} tracks</div>
+                      </div>
+                  </div>
+              `;
+          };
+
+          let listHtml = '';
+          if (mappedPlaylists.length > 0) {
+              listHtml += mappedPlaylists.map(p => renderItem(p, true)).join('');
+          }
+          if (possiblePlaylists.length > 0) {
+              listHtml += `<div class="unmapped-header">Possible duplicates in your library</div>`;
+              listHtml += possiblePlaylists.map(p => renderItem(p, false)).join('');
+          }
+
+          modal.innerHTML = `
+              <style>
+                  .duplicate-modal-body { padding: 16px 24px; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+                  .duplicate-modal-body::-webkit-scrollbar { width: 8px; }
+                  .duplicate-modal-body::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+                  .playlist-item { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: background-color 0.2s, border-color 0.2s; margin-bottom: 8px; }
+                  .playlist-item.mapped { background-color: #282828; border: 1px solid #333; }
+                  .playlist-item.unmapped { background-color: #202020; border: 1px solid #2a2a2a; }
+                  .playlist-item:hover { background-color: #383838; }
+                  .playlist-item.selected { background-color: #3a4f3a; border-color: #1ed760; }
+                  .playlist-cover { width: 44px; height: 44px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #333; }
+                  .playlist-info { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+                  .playlist-name { color: white; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+                  .playlist-meta { color: #b3b3b3; font-size: 12px; }
+                  .unmapped-header { font-size: 12px; color: #888; text-transform: uppercase; font-weight: 700; margin: 16px 0 8px 4px; letter-spacing: 0.5px; }
+                  
+                  .dup-btn { padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; transition: background 0.2s, opacity 0.2s; }
+                  .dup-btn:disabled { cursor: not-allowed; opacity: 0.5; }
+                  .dup-btn.action-btn:hover:not(:disabled) { background: #444 !important; }
+
+                  .duplicate-modal-footer {padding: 16px 24px 24px;border-top: 1px solid #282828;background-color: #181818;display: flex;flex-direction: column; gap: 16px;flex-shrink: 0;
+                  }
+              </style>
+              <div style="padding: 24px 24px 16px; border-bottom: 1px solid #282828; flex-shrink: 0;">
+                  <h2 style="margin:0 0 8px 0; color:white; font-size:22px; font-weight:700;">Discography Exists</h2>
+                  <p style="margin:0; color:#b3b3b3; font-size:14px; line-height:1.4;">You already have playlists related to <b>${artistName}</b>. Select one to overwrite, or create a brand new playlist.</p>
+              </div>
+              
+              <div class="duplicate-modal-body" id="dup-list-container">
+                  ${listHtml}
+              </div>
+
+              <div class="duplicate-modal-footer">
+                  <label style="color: #b3b3b3; font-size: 13px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; width: fit-content;">
+                      <input type="checkbox" id="dup-dont-show-again" style="accent-color: #1db954; width: 16px; height: 16px; margin: 0;">
+                      Don't ask again (Always create new)
+                  </label>
+                  
+                  <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                      <button id="dup-cancel" class="dup-btn" style="background: transparent; border: 1px solid #666; color: white;">Cancel</button>
+                      <div style="display: flex; gap: 10px;">
+                          <button id="dup-replace" class="dup-btn action-btn" style="background: #333; color: white;" ${!selectedUri ? 'disabled' : ''}>Replace Selected</button>
+                          <button id="dup-create" class="dup-btn action-btn" style="background: #333; color: white;">Create New</button>
+                      </div>
+                  </div>
+              </div>
+          `;
+
+          document.body.appendChild(overlay);
+          overlay.appendChild(modal);
+
+          const listContainer = modal.querySelector("#dup-list-container");
+          const replaceBtn = modal.querySelector("#dup-replace");
+
+          listContainer.addEventListener("click", (e) => {
+              const item = e.target.closest(".playlist-item");
+              if (!item) return;
+
+              listContainer.querySelectorAll(".playlist-item").forEach(el => el.classList.remove("selected"));
+              item.classList.add("selected");
+              selectedUri = item.dataset.uri;
+              
+              replaceBtn.disabled = false;
+              replaceBtn.style.opacity = "1";
+          });
+
+          const close = (actionData) => {
+              overlay.remove();
+              resolve(actionData);
+          };
+
+          modal.querySelector("#dup-cancel").onclick = () => close({ action: 'cancel' });
+          modal.querySelector("#dup-create").onclick = () => {
+              if (modal.querySelector("#dup-dont-show-again").checked) {
+                  showArtistDiscographyDuplicateWarning = false;
+                  saveSettings();
+              }
+              close({ action: 'createNew' });
+          };
+          replaceBtn.onclick = () => {
+              if (selectedUri) {
+                  if (modal.querySelector("#dup-dont-show-again").checked) {
+                      showArtistDiscographyDuplicateWarning = false;
+                      saveSettings();
+                  }
+                  close({ action: 'replace', uri: selectedUri });
+              }
+          };
+
+          overlay.onclick = (e) => { if (e.target === overlay) close({ action: 'cancel' }); };
+      });
+  }
+  
   async function getTracksFromFolder(folderUri) {
       try {
           const rootlist = await Spicetify.Platform.RootlistAPI.getContents();
@@ -21919,69 +21063,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         });
     };
 
-    if (isFallbackActive()) {
-        try {
-            return await fetchAlbumTracksGQL();
-        } catch (e) {
-            console.error("[Sort-Play] Fallback getAlbumTracks failed:", e);
-            return [];
-        }
-    }
-
     try {
-      const albumData = await CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
-      if (!albumData || !albumData.tracks) {
-        throw new Error("Failed to fetch initial album data.");
-      }
-  
-      let allTracks = albumData.tracks.items;
-      let nextUrl = albumData.tracks.next;
-  
-      while (nextUrl) {
-        const nextPageData = await CosmosAsync.get(nextUrl);
-        if (nextPageData && nextPageData.items) {
-          allTracks.push(...nextPageData.items);
-          nextUrl = nextPageData.next;
-        } else {
-          nextUrl = null; 
-        }
-      }
-
-      return allTracks.map(track => ({
-        uri: track.uri,
-        uid: null,
-        name: track.name,
-        songTitle: track.name,
-        albumUri: albumData.uri,
-        albumName: albumData.name,
-        artistUris: track.artists.map(artist => artist.uri),
-        allArtists: track.artists.map(artist => artist.name).join(", "),
-        artistName: track.artists[0].name,
-        durationMilis: track.duration_ms,
-        durationMs: track.duration_ms,
-        playCount: "N/A",
-        popularity: null,
-        releaseDate: null,
-        trackNumber: track.track_number,
-        track: {
-          album: { id: albumId, name: albumData.name },
-          name: track.name,
-          duration_ms: track.duration_ms,
-          id: track.id,
-          track_number: track.track_number
-        }
-      }));
-    } catch (error) {
-      if (registerWebApiFailure()) {
-          try {
-              return await fetchAlbumTracksGQL();
-          } catch (e) {
-              return [];
-          }
-      }
-      console.error(`Error fetching tracks for album ${albumId}:`, error);
-      showNotification("Failed to fetch all album tracks.", true);
-      return [];
+        return await fetchAlbumTracksGQL();
+    } catch (e) {
+        console.error("[Sort-Play] getAlbumTracks failed:", e);
+        return [];
     }
   }
 
@@ -22008,22 +21094,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
       if (artistData.errors) throw new Error(artistData.errors[0].message);
       const artistName = artistData.data.artistUnion.profile.name;
-      const artistId = artistUri.split(":")[2];
 
       const allAlbumMetadata = new Map();
-
-      const fetchAlbumIdsWeb = async () => {
-          let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
-          while (nextUrl) {
-            const albumRes = await CosmosAsync.get(nextUrl);
-            if (!albumRes.items) break;
-            albumRes.items.forEach((album) => {
-                allAlbumMetadata.set(album.id, { type: album.album_type, date: album.release_date });
-            });
-            nextUrl = albumRes.next;
-            if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
-          }
-      };
 
       const fetchAlbumIdsGQL = async () => {
           let offset = 0;
@@ -22091,106 +21163,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           }
       };
 
-      if (isFallbackActive()) {
-          await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL()]);
-      } else {
-          try {
-              await fetchAlbumIdsWeb();
-          } catch (e) {
-              if (registerWebApiFailure()) {
-                  await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL()]);
-              } else {
-                  throw e;
-              }
-          }
-      }
+      await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL()]);
   
       const allTracks = [];
-      const allAlbumIdArray = Array.from(allAlbumMetadata.keys());
 
-      const fetchTracksWeb = async () => {
-          const batchSize = 20; 
-          const batchPromises = [];
-          
-          for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
-            const batch = allAlbumIdArray.slice(i, i + batchSize);
-            const promise = withRetry(
-                () => CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`),
-                CONFIG.spotify.retryAttempts,
-                CONFIG.spotify.retryDelay
-            ).catch(err => {
-                console.warn(`[Sort-Play] Failed to fetch album batch for artist ${artistName} (skipped):`, err);
-                return { albums: [] }; 
-            });
-            batchPromises.push(promise);
-          }
-          
-          const albumDataBatches = await Promise.all(batchPromises);
-          
-          for (const batch of albumDataBatches) {
-            if (!batch || !batch.albums) continue;
-
-            const batchResults = await Promise.all(batch.albums.map(async (album) => {
-                if (!album || !album.tracks || !album.tracks.items) return [];
-                
-                let rawTracks = [...album.tracks.items];
-                const totalTracks = album.total_tracks || 0;
-
-                if (totalTracks > 50) {
-                    const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
-                    
-                    let shouldFetchMore = true;
-                    if (isCompilation) {
-                        const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
-                        if (foundInFirstPage) {
-                            shouldFetchMore = false;
-                        }
-                    }
-
-                    if (shouldFetchMore) {
-                        const pagePromises = [];
-                        for (let offset = 50; offset < totalTracks; offset += 50) {
-                            const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
-                            pagePromises.push(CosmosAsync.get(url).catch(() => null));
-                        }
-
-                        const pageResults = await Promise.all(pagePromises);
-                        pageResults.forEach(res => {
-                            if (res && res.items) {
-                                rawTracks.push(...res.items);
-                            }
-                        });
-                    }
-                }
-
-                return rawTracks
-                  .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
-                  .map(track => ({
-                    uri: track.uri,
-                    uid: null, 
-                    name: track.name,
-                    albumUri: album.uri,
-                    albumName: album.name,
-                    artistUris: track.artists.map(artist => artist.uri),
-                    allArtists: track.artists.map(artist => artist.name).join(", "),
-                    artistName: track.artists[0].name,
-                    durationMilis: track.duration_ms,
-                    album_type: album.album_type,
-                    playcount: 0, popularity: 0, releaseDate: 0,
-                    track: {
-                      album: { id: album.id },
-                      name: track.name,
-                      duration_ms: track.duration_ms,
-                      id: track.id,
-                    },
-                  }));
-            }));
-
-            batchResults.forEach(albumTracks => allTracks.push(...albumTracks));
-          }
-      };
-
-      const fetchTracksFallback = async () => {
+      const fetchTracks = async () => {
           const albumIds = Array.from(allAlbumMetadata.keys());
           const BATCH_SIZE = 50;
           
@@ -22222,19 +21199,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           }
       };
 
-      if (isFallbackActive()) {
-          await fetchTracksFallback();
-      } else {
-          try {
-              await fetchTracksWeb();
-          } catch (e) {
-              if (registerWebApiFailure()) {
-                  await fetchTracksFallback();
-              } else {
-                  throw e;
-              }
-          }
-      }
+      await fetchTracks();
 
       const coreTracks = [];
       const compilationTracks = [];
@@ -22289,20 +21254,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
       if (artistData.errors) throw new Error(artistData.errors[0].message);
       const artistName = artistData.data.artistUnion.profile.name;
-      const artistId = artistUri.split(":")[2];
 
       const allAlbumIds = new Set();
-
-      const fetchAlbumIdsWeb = async () => {
-          let nextUrl = `https://api.spotify.com/v1/artists/${artistId}/albums?include_groups=album,single,appears_on,compilation&limit=50`;
-          while (nextUrl) {
-            const albumRes = await CosmosAsync.get(nextUrl);
-            if (!albumRes.items) break;
-            albumRes.items.forEach((album) => allAlbumIds.add(album.id));
-            nextUrl = albumRes.next;
-            if (nextUrl) await new Promise(resolve => setTimeout(resolve, 50)); 
-          }
-      };
 
       const fetchAlbumIdsGQL = async () => {
           let offset = 0;
@@ -22325,106 +21278,12 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           }
       };
 
-      if (isFallbackActive()) {
-          await fetchAlbumIdsGQL();
-      } else {
-          try {
-              await fetchAlbumIdsWeb();
-          } catch (e) {
-              if (registerWebApiFailure()) {
-                  await fetchAlbumIdsGQL();
-              } else {
-                  throw e;
-              }
-          }
-      }
+      await fetchAlbumIdsGQL();
   
       const allTracks = [];
       const allAlbumIdArray = Array.from(allAlbumIds);
 
-      const fetchTracksWeb = async () => {
-          const batchSize = 20; 
-          const batchPromises = [];
-          
-          for (let i = 0; i < allAlbumIdArray.length; i += batchSize) {
-            const batch = allAlbumIdArray.slice(i, i + batchSize);
-            const promise = withRetry(
-                () => CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${batch.join(',')}`),
-                CONFIG.spotify.retryAttempts,
-                CONFIG.spotify.retryDelay
-            ).catch(err => {
-                console.warn(`[Sort-Play] Failed to fetch album batch for shuffle:`, err);
-                return { albums: [] }; 
-            });
-            batchPromises.push(promise);
-          }
-          
-          const albumDataBatches = await Promise.all(batchPromises);
-          
-          for (const batch of albumDataBatches) {
-            if (!batch || !batch.albums) continue;
-
-            const batchResults = await Promise.all(batch.albums.map(async (album) => {
-                if (!album || !album.tracks || !album.tracks.items) return [];
-
-                let rawTracks = [...album.tracks.items];
-                const totalTracks = album.total_tracks || 0;
-
-                if (totalTracks > 50) {
-                    const isCompilation = album.album_type === 'compilation' || album.album_group === 'appears_on';
-                    
-                    let shouldFetchMore = true;
-                    if (isCompilation) {
-                        const foundInFirstPage = rawTracks.some(t => t.artists.some(a => a.uri === artistUri || a.name === artistName));
-                        if (foundInFirstPage) {
-                            shouldFetchMore = false;
-                        }
-                    }
-
-                    if (shouldFetchMore) {
-                        const pagePromises = [];
-                        for (let offset = 50; offset < totalTracks; offset += 50) {
-                            const url = `https://api.spotify.com/v1/albums/${album.id}/tracks?limit=50&offset=${offset}`;
-                            pagePromises.push(CosmosAsync.get(url).catch(() => null));
-                        }
-
-                        const pageResults = await Promise.all(pagePromises);
-                        pageResults.forEach(res => {
-                            if (res && res.items) {
-                                rawTracks.push(...res.items);
-                            }
-                        });
-                    }
-                }
-
-                return rawTracks
-                    .filter(track => track.artists.some(artist => artist.name === artistName || artist.uri === artistUri))
-                    .map(track => ({
-                      uri: track.uri,
-                      uid: null, 
-                      name: track.name,
-                      albumUri: album.uri,
-                      albumName: album.name,
-                      artistUris: track.artists.map(artist => artist.uri),
-                      allArtists: track.artists.map(artist => artist.name).join(", "),
-                      artistName: track.artists[0].name,
-                      durationMilis: track.duration_ms,
-                      album_type: album.album_type,
-                      playcount: 0, popularity: 0, releaseDate: 0,
-                      track: {
-                        album: { id: album.id },
-                        name: track.name,
-                        duration_ms: track.duration_ms,
-                        id: track.id,
-                      },
-                    }));
-            }));
-
-            batchResults.forEach(tracks => allTracks.push(...tracks));
-          }
-      };
-
-      const fetchTracksFallback = async () => {
+      const fetchTracks = async () => {
           const promises = allAlbumIdArray.map(async (id) => {
               const tracks = await getAlbumTracks(id);
               return tracks.filter(track => {
@@ -22440,19 +21299,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           results.forEach(tracks => allTracks.push(...tracks));
       };
 
-      if (isFallbackActive()) {
-          await fetchTracksFallback();
-      } else {
-          try {
-              await fetchTracksWeb();
-          } catch (e) {
-              if (registerWebApiFailure()) {
-                  await fetchTracksFallback();
-              } else {
-                  throw e;
-              }
-          }
-      }
+      await fetchTracks();
   
       const uniqueTracksMap = new Map();
       const isCoreDiscography = (track) => 
@@ -22486,11 +21333,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   async function getArtistImageUrl(artistId) {
-    const fetchWeb = async () => {
-        const artistData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artistId}`);
-        return artistData.images[0]?.url;
-    };
-
     const fetchGQL = async () => {
         const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, {
             uri: `spotify:artist:${artistId}`,
@@ -22505,18 +21347,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return bestSource.url;
     };
 
-    if (isFallbackActive()) {
-        try { return await fetchGQL(); } catch(e) { return null; }
-    }
-
-    try {
-        return await fetchWeb();
-    } catch (e) {
-        if (registerWebApiFailure()) {
-            try { return await fetchGQL(); } catch(e) { return null; }
-        }
-        return null;
-    }
+    try { return await fetchGQL(); } catch(e) { return null; }
   }
   
   function setPlaylistImage(playlistId, base64Image, maxRetries = 10, retryInterval = 4000) {
@@ -22556,33 +21387,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             if (typeof Spicetify.Platform.PlaylistAPI.resync === 'function') await Spicetify.Platform.PlaylistAPI.resync(playlistUri);
         };
 
-        const setWebApiImage = async () => {
-            try {
-                await Spicetify.CosmosAsync.put(
-                    `https://api.spotify.com/v1/playlists/${playlistId}/images`,
-                    base64Image.split("base64,")[1]
-                );
-            } catch (putError) {
-                const isExpectedJsonError = putError instanceof SyntaxError && putError.message.includes("Unexpected end of JSON input");
-                if (!isExpectedJsonError) throw putError;
-            }
-        };
-
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                if (isFallbackActive()) {
-                    await setInternalImage();
-                } else {
-                    try {
-                        await setWebApiImage();
-                    } catch (error) {
-                        if (registerWebApiFailure()) {
-                            await setInternalImage();
-                        } else {
-                            throw error;
-                        }
-                    }
-                }
+                await setInternalImage();
 
                 await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -22602,7 +21409,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             }
         }
     })();
-}
+  }
 
   async function imageUrlToBase64(url) {
     if (typeof url === 'string') {
@@ -22650,60 +21457,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       img.onerror = (error) => reject(error);
       img.src = imageUrl;
     });
-  }
-
-  const getWebpackService = (id) => {
-    const req = window.webpackChunkclient_web.push([[Symbol()], {}, (r) => r]);
-    return Object.values(req.m).flatMap(m => {
-      try { return Object.values(req(Object.keys(req.m).find(k => req.m[k] === m))); } catch { return []; }
-    }).find(c => c?.SERVICE_ID === id);
-  };
-
-  const parseVarint = (obj) => {
-    const bytes = Object.values(obj);
-    let res = 0n;
-    let shift = 0n;
-    for (let i = 1; i < bytes.length; i++) {
-      res += BigInt(bytes[i] & 0x7f) << shift;
-      if (!(bytes[i] & 0x80)) break;
-      shift += 7n;
-    }
-    return Number(res);
-  };
-
-  let metadataServiceClient = null;
-  const getMetadataClient = () => {
-      if (metadataServiceClient) return metadataServiceClient;
-      try {
-          const MetadataService = getWebpackService("spotify.mdata_esperanto.proto.MetadataService");
-          const transport = Spicetify.Platform.ProductStateAPI.productStateApi.transport;
-          metadataServiceClient = new MetadataService(transport);
-      } catch (e) {
-          console.error("[Sort-Play] Failed to initialize MetadataService", e);
-      }
-      return metadataServiceClient;
-  };
-
-  async function fetchPlayCountsBatchNew(uris) {
-      const client = getMetadataClient();
-      if (!client) throw new Error("Metadata client not available");
-      
-      const validUris = uris.filter(uri => uri && uri.startsWith("spotify:track:"));
-      if (validUris.length === 0) return new Map();
-
-      const response = await client.fetch({
-        extensionQuery: [{ extensionKind: 185, entityUri: validUris }],
-      });
-
-      const results = new Map();
-      if (response.extension && response.extension[0] && response.extension[0].entityExtension) {
-          response.extension[0].entityExtension.forEach(item => {
-              if (item.extensionData && item.extensionData.value) {
-                  results.set(item.entityUri, parseVarint(item.extensionData.value));
-              }
-          });
-      }
-      return results;
   }
 
   async function getPlayCountsForAlbum(albumId, retries = 10, retryDelay = 2000) {
@@ -23145,23 +21898,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const processRefreshInternal = async (id) => {
         const data = await fetchInternalTrackMetadata(id);
         if (data) {
-            const cacheData = {
-                name: data.name,
-                album: {
-                    name: data.album.name,
-                    id: data.album.id,
-                    uri: data.album.uri,
-                    release_date: data.album.release_date,
-                    album_type: 'album' 
-                },
-                artists: data.artists.map(a => ({ id: a.id, name: a.name, uri: a.uri })),
-                duration_ms: data.duration_ms,
-                popularity: data.popularity,
-                external_ids: data.external_ids,
-                id: data.id,
-                uri: data.uri,
-                albumType: 'album'
-            };
+            const cacheData = formatTrackCacheData(data);
             cachedMetadata.set(data.id, cacheData);
         }
     };
@@ -23170,42 +21907,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const batchIds = missingIds.slice(i, i + BATCH_SIZE);
         if (batchIds.length === 0) continue;
 
-        if (isFallbackActive()) {
-            await Promise.all(batchIds.map(id => processRefreshInternal(id)));
-        } else {
-            try {
-                const trackDetailsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
-                if (trackDetailsResponse && trackDetailsResponse.tracks) {
-                    trackDetailsResponse.tracks.forEach(detailedTrack => {
-                        if (!detailedTrack) return;
-                        const cacheData = {
-                            name: detailedTrack.name,
-                            album: {
-                                name: detailedTrack.album.name,
-                                id: detailedTrack.album.id,
-                                uri: detailedTrack.album.uri,
-                                release_date: detailedTrack.album.release_date,
-                                album_type: detailedTrack.album.album_type
-                            },
-                            artists: detailedTrack.artists.map(a => ({ id: a.id, name: a.name, uri: a.uri })),
-                            duration_ms: detailedTrack.duration_ms,
-                            popularity: detailedTrack.popularity,
-                            external_ids: detailedTrack.external_ids,
-                            id: detailedTrack.id,
-                            uri: detailedTrack.uri,
-                            albumType: detailedTrack.album.album_type 
-                        };
-                        cachedMetadata.set(detailedTrack.id, cacheData);
-                    });
-                }
-            } catch (error) {
-                if (registerWebApiFailure()) {
-                    await Promise.all(batchIds.map(id => processRefreshInternal(id)));
-                } else {
-                    console.warn(`[Sort-Play] Failed to refresh a batch of track album info:`, error);
-                }
-            }
-        }
+        await Promise.all(batchIds.map(id => processRefreshInternal(id)));
         const progress = Math.min(100, Math.floor(((i + BATCH_SIZE) / missingIds.length) * 100));
         updateProgress(progress);
     }
@@ -23312,25 +22014,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const processInternalItem = async (id) => {
         const data = await fetchInternalTrackMetadata(id);
         if (data) {
-            const cacheData = {
-                name: data.name,
-                album: {
-                    name: data.album.name,
-                    id: data.album.id,
-                    uri: data.album.id ? `spotify:album:${data.album.id}` : null,
-                    release_date: data.album.release_date
-                },
-                artists: data.artists.map(a => ({
-                    id: a.id,
-                    name: a.name,
-                    uri: a.id ? `spotify:artist:${a.id}` : null
-                })),
-                duration_ms: data.duration_ms,
-                popularity: data.popularity,
-                external_ids: data.external_ids,
-                id: data.id,
-                uri: data.uri
-            };
+            const cacheData = formatTrackCacheData(data);
             cachedMetadata.set(data.id, cacheData);
             idb.set('trackMetadata', data.id, cacheData);
         }
@@ -23339,63 +22023,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     for (let i = 0; i < missingIds.length; i += batchSize) {
       const batch = missingIds.slice(i, i + batchSize);
       
-      if (isFallbackActive()) {
-          await Promise.all(batch.map(id => processInternalItem(id)));
-      } else {
-          let retries = 0;
-          let delay = initialDelay;
-          let success = false;
-
-          while (retries < maxRetries && !success) {
-            try {
-              const response = await Spicetify.CosmosAsync.get(
-                `https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`
-              );
-
-              if (response && response.tracks) {
-                response.tracks.forEach((trackData) => {
-                    if (trackData) {
-                        const cacheData = {
-                            name: trackData.name,
-                            album: {
-                                name: trackData.album.name,
-                                id: trackData.album.id,
-                                uri: trackData.album.uri,
-                                release_date: trackData.album.release_date
-                            },
-                            artists: trackData.artists.map(a => ({
-                                id: a.id,
-                                name: a.name,
-                                uri: a.uri
-                            })),
-                            duration_ms: trackData.duration_ms,
-                            popularity: trackData.popularity,
-                            external_ids: trackData.external_ids,
-                            id: trackData.id,
-                            uri: trackData.uri
-                        };
-                        cachedMetadata.set(trackData.id, cacheData);
-                        idb.set('trackMetadata', trackData.id, cacheData);
-                    }
-                });
-                success = true;
-              }
-            } catch (error) {
-               if (registerWebApiFailure()) {
-                   await Promise.all(batch.map(id => processInternalItem(id)));
-                   success = true;
-               }
-            }
-
-            if (!success) {
-              retries++;
-              if (retries < maxRetries) {
-                await new Promise((resolve) => setTimeout(resolve, delay));
-                delay *= 2;
-              }
-            }
-          }
-      }
+      await Promise.all(batch.map(id => processInternalItem(id)));
       
       tracksProcessed += batch.length;
       const intermediateProgress = Math.round(
@@ -23465,15 +22093,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
       return { ...track, releaseDate: releaseDate, trackNumber: trackNumber };
     } catch (error) {
-      if (isFallbackActive()) {
-          try {
-              const meta = await fetchInternalTrackMetadata(trackId);
-              if (meta && meta.album && meta.album.release_date) {
-                  await setCachedReleaseDate(trackId, meta.album.release_date);
-                  return { ...track, releaseDate: meta.album.release_date, trackNumber: track.trackNumber || 0 };
-              }
-          } catch (e) {}
-      }
+      try {
+          const meta = await fetchInternalTrackMetadata(trackId);
+          if (meta && meta.album && meta.album.release_date) {
+              await setCachedReleaseDate(trackId, meta.album.release_date);
+              return { ...track, releaseDate: meta.album.release_date, trackNumber: track.trackNumber || 0 };
+          }
+      } catch (e) {}
       console.error(`Error getting release date for track ${track.name} (album ${albumId}):`, error);
       return { ...track, releaseDate: cached?.date || cached || null, trackNumber: cached?.trackNumber || 0 };
     }
@@ -23488,23 +22114,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     while (retries < maxRetries) {
       try {
-        let artistName, trackName;
+        const overrides = getLfmOverrides();
+        const override = trackId ? overrides[trackId] : null;
 
-        artistName = track.artistName;
-        if (!artistName && track.artists && track.artists.length > 0) {
-            artistName = track.artists[0]?.name;
-        }
-        if (!artistName && track.allArtists) {
-            artistName = track.allArtists.split(',')[0].trim();
-        }
-        if (artistName && artistName.includes(';')) {
-            artistName = artistName.split(';')[0].trim();
-        }
-
-        trackName = track.name;
-
-        if (artistName) artistName = artistName.trim();
-        if (trackName) trackName = trackName.trim();
+        let artistName = override ? override.artist : getPrimaryArtistName(track);
+        let trackName = override ? override.track : (track.name ? track.name.trim() : null);
 
         if (!artistName || !trackName) {
           return {
@@ -23631,20 +22245,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return { ...track, personalScrobbles: null, error: "Invalid track ID.", errorLabel: "Invalid" };
     }
 
-    let trackName = track.name;
-    let artistName = track.artistName;
-    if (!artistName && track.artists && track.artists.length > 0) {
-        artistName = track.artists[0]?.name;
-    }
-    if (!artistName && track.allArtists) {
-        artistName = track.allArtists.split(',')[0].trim();
-    }
-    if (artistName && artistName.includes(';')) {
-        artistName = artistName.split(';')[0].trim();
-    }
+    const overrides = getLfmOverrides();
+    const override = trackId ? overrides[trackId] : null;
 
-    if (artistName) artistName = artistName.trim();
-    if (trackName) trackName = trackName.trim();
+    let artistName = override ? override.artist : getPrimaryArtistName(track);
+    let trackName = override ? override.track : (track.name ? track.name.trim() : null);
 
     const isCurrentTrack = track.uri === currentTrackUriForScrobbleCache;
     const cachedData = isLocal ? null : await getCachedPersonalScrobbles(trackId);
@@ -23769,32 +22374,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const modalContainer = document.createElement("div");
     modalContainer.innerHTML = `
       <style>
-      .main-embedWidgetGenerator-container {
-        width: 425px !important;
-        border-radius: 30px;
-        overflow: hidden; 
-        background-color: #181818 !important;
-        border: 2px solid #282828;
-      }
-      .GenericModal__overlay .GenericModal {
-        border-radius: 30px;
-        overflow: hidden;
-      }
-      .main-trackCreditsModal-mainSection {
-        overflow-y: hidden !important;
-      }
-      .GenericModal > .main-embedWidgetGenerator-container {
-        height: auto !important;
-      } 
-      .main-buttons-button:hover {
-        filter: brightness(1.2); 
-      }
-      .main-trackCreditsModal-header {
-        padding: 27px 32px 12px !important;
-      }
-      .main-trackCreditsModal-originalCredits{
-        padding-bottom: 20px !important;
-      }
+        .main-embedWidgetGenerator-container { width: 425px !important; border-radius: 30px; overflow: hidden; background-color: #181818 !important; border: 2px solid #282828; }
+        .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
+        .main-trackCreditsModal-mainSection { overflow-y: hidden !important; }
+        .GenericModal > .main-embedWidgetGenerator-container { height: auto !important; }
+        .main-buttons-button:hover { filter: brightness(1.2); }
+        .main-trackCreditsModal-header { padding: 27px 32px 12px !important; }
+        .main-trackCreditsModal-originalCredits { padding-bottom: 20px !important; }
       </style>
       <div style="display: flex; flex-direction: column; gap: 15px;">
         <div style="color: white; font-size: 16px; margin-bottom: 15px;">
@@ -23836,11 +22422,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   
     continueButton.addEventListener("click", async () => {
       Spicetify.PopupModal.hide();
-      menuButtons.forEach((btn) => {
-        if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-          btn.style.backgroundColor = "transparent";
-        }
-      });
       await handleSortAndCreatePlaylist("aiPick");  
     });
   
@@ -23850,44 +22431,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         showGeminiApiKeyModal();  
       }, 350);
     });
-  }
-
-  const ICON_PATHS = {
-    sortAsc: "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z",
-    sortDesc: "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z",
-    groupAlbum: "M4 6.1c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4.5 5.04 4.5 5.6 4.5h2.8c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C10 5.26 10 5.54 10 6.1v2.8c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H5.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C4 9.74 4 9.46 4 8.9V6.1zm9-.1c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541C20 5.301 20 5.534 20 6s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 6.699 13 6.466 13 6zm0 6c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541c.076.184.076.417.076.883s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 12.699 13 12.466 13 12zm0 6c0-.466 0-.699.076-.883a1 1 0 0 1 .541-.541c.184-.076.417-.076.883-.076h4c.466 0 .699 0 .883.076a1 1 0 0 1 .541.541c.076.184.076.417.076.883s0 .699-.076.883a1 1 0 0 1-.541.541c-.184.076-.417.076-.883.076h-4c-.466 0-.699 0-.883-.076a1 1 0 0 1-.541-.541C13 18.699 13 18.466 13 18zm-9-2.9c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 13.5 5.04 13.5 5.6 13.5h2.8c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C10 14.26 10 14.54 10 15.1v2.8c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437c-.214.109-.494.109-1.054.109H5.6c-.56 0-.84 0-1.054-.109a1 1 0 0 1-.437-.437C4 18.74 4 18.46 4 17.9v-2.8z",
-    ungroupList: "M8 6L21 6.00078M8 12L21 12.0008M8 18L21 18.0007M3 6.5H4V5.5H3V6.5ZM3 12.5H4V11.5H3V12.5ZM3 18.5H4V17.5H3V18.5Z"
-  };
-  
-  function getSortArrowSvg(reverse) {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 16 16");
-    svg.setAttribute("width", "50%");
-    svg.setAttribute("height", "50%");
-    svg.style.fill = '#ffffffe6'; 
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("d", reverse ? ICON_PATHS.sortAsc : ICON_PATHS.sortDesc);
-
-    svg.appendChild(path);
-    return svg;
-  }
-
-  function getGroupingIconSvg(isGrouped) {
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("width", "19px");
-    svg.setAttribute("height", "19px");
-    svg.style.fill = 'none';
-    svg.style.stroke = '#ffffffe6';
-    svg.setAttribute("stroke-width", "2");
-    svg.setAttribute("stroke-linecap", "round");
-    svg.setAttribute("stroke-linejoin", "round");
-    
-    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    path.setAttribute("fill", "none");
-    path.setAttribute("d", isGrouped ? ICON_PATHS.groupAlbum : ICON_PATHS.ungroupList);
-    svg.appendChild(path);
-    return svg;
   }
 
   function createInnerButton(sortType, parentButton, svg) {
@@ -24010,11 +22553,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   }
 
   function createInnerPlayButton() {
-    const plusIconSvg = `<svg width="17px" height="17px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 12H18M12 6V18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-
     const innerButton = document.createElement("button");
     innerButton.title = "Shuffle and Add to Queue";
-    innerButton.innerHTML = plusIconSvg;
+    innerButton.innerHTML = innerPlayPlusIconSvg;
 
     const buttonBgColor = "rgba(var(--spice-rgb-selected-row), 0.03)";
     const buttonHoverBgColor = "rgba(var(--spice-rgb-selected-row), 0.2)";
@@ -24050,15 +22591,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       event.stopPropagation();
       innerButton.style.backgroundColor = buttonBgColor;
       
-      menuButtons.forEach((btn) => {
-        if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-            btn.style.backgroundColor = "transparent";
-        }
-      });
-
-      setButtonProcessing(true);
-      mainButton.innerHTML = '<div class="loader"></div>';
-      closeAllMenus();
+      startProcessing();
 
       try {
         await executeShuffleAndPlay(getCurrentUri());
@@ -24305,12 +22838,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   mainButton.style.alignItems = "center";
   mainButton.style.transition = "min-width 0.2s ease, background-color 0.1s ease, color 0.1s ease";
 
-  const threeDotsSvg = `
-    <svg width="15px" height="15px" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
-      <path d="M9.5 14a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
-    </svg>`;
-
-  const svgElement = new DOMParser().parseFromString(threeDotsSvg, "image/svg+xml").documentElement;
+  const tempDiv = document.createElement("div");
+  tempDiv.innerHTML = threeDotsSvg.trim();
+  const svgElement = tempDiv.firstElementChild;
   svgElement.style.position = "relative";
   svgElement.style.marginLeft = "-2px";
   svgElement.style.bottom = "1px";
@@ -24520,7 +23050,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       } else {
         iconSvgString = sortIconSvg;
       }
-      const icon = new DOMParser().parseFromString(iconSvgString, "image/svg+xml").documentElement;
+      
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = iconSvgString.trim();
+      const icon = tempDiv.firstElementChild;
       leftContainer.appendChild(icon);
 
       const buttonTextSpan = document.createElement("span");
@@ -24616,7 +23149,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       } else {
         iconSvgString = sortIconSvg;
       }
-      const icon = new DOMParser().parseFromString(iconSvgString, "image/svg+xml").documentElement;
+      
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = iconSvgString.trim();
+      const icon = tempDiv.firstElementChild;
       button.appendChild(icon);
 
       const buttonTextSpan = document.createElement("span");
@@ -25025,17 +23561,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   let setButtonProcessing = (processing) => {
     isProcessing = processing;
-    mainButton.style.cursor = "pointer"; 
-    
     if (processing) {
+      mainButton.style.cursor = "default";
       mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
       mainButton.style.color = buttonStyles.main.disabledColor;
       svgElement.style.fill = buttonStyles.main.disabledColor;
+      menuButtons.forEach((button) => (button.disabled = true));
     } else {
+      mainButton.style.cursor = "pointer";
       const nativeColor = getNativeTertiaryButtonColor();
       mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
       mainButton.style.color = nativeColor;
       svgElement.style.fill = nativeColor;
+      menuButtons.forEach((button) => (button.disabled = false));
     }
   };
   
@@ -25163,132 +23701,43 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
   async function replacePlaylistTracks(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const validUris = trackUris.filter(uri => typeof uri === 'string' && (uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(uri)));
-    const hasLocalTracks = validUris.some(uri => Spicetify.URI.isLocal(uri));
     const playlistUri = `spotify:playlist:${playlistId}`;
 
-    const replaceInternal = async (uris) => {
-        const content = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri);
-        if (content.items.length > 0) {
-            const toRemove = content.items.map(i => ({ uri: i.uri, uid: i.uid }));
-            for (let i = 0; i < toRemove.length; i += 100) {
-                await Spicetify.Platform.PlaylistAPI.remove(playlistUri, toRemove.slice(i, i + 100));
-            }
-        }
-        await addTracksToPlaylist(playlistId, uris, maxRetries, initialDelay);
-    };
-
-    if (hasLocalTracks || isFallbackActive()) {
-        await replaceInternal(validUris);
-    } else {
-        const BATCH_SIZE = 100;
-        const firstBatch = validUris.slice(0, BATCH_SIZE);
-        const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-        
-        let retries = 0;
-        let currentDelay = initialDelay;
-        let success = false;
-
-        while (retries <= maxRetries && !success) {
-            try {
-                await Spicetify.CosmosAsync.put(playlistUrl, { uris: firstBatch });
-                success = true;
-            } catch (error) {
-                if (registerWebApiFailure()) {
-                    await replaceInternal(validUris);
-                    return;
-                }
-                console.error(`[Sort-Play] Error replacing tracks in playlist ${playlistId} (Attempt ${retries + 1}):`, error);
-                retries++;
-                if (retries <= maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, currentDelay));
-                    currentDelay *= 2;
-                } else {
-                    try { await replaceInternal(validUris); return; } catch(e) {}
-                    throw new Error(`Failed to replace tracks in playlist ${playlistId}.`);
-                }
-            }
-        }
-
-        if (success && validUris.length > BATCH_SIZE) {
-            const remainingUris = validUris.slice(BATCH_SIZE);
-            await addTracksToPlaylist(playlistId, remainingUris);
+    const content = await Spicetify.Platform.PlaylistAPI.getContents(playlistUri);
+    if (content.items.length > 0) {
+        const toRemove = content.items.map(i => ({ uri: i.uri, uid: i.uid }));
+        for (let i = 0; i < toRemove.length; i += 100) {
+            await Spicetify.Platform.PlaylistAPI.remove(playlistUri, toRemove.slice(i, i + 100));
         }
     }
+    await addTracksToPlaylist(playlistId, validUris, maxRetries, initialDelay);
   }
 
   async function addTracksToPlaylist(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const playlistUri = `spotify:playlist:${playlistId}`;
     const validUris = trackUris.filter(uri => typeof uri === "string" && (Spicetify.URI.isLocal(uri) || uri.startsWith("spotify:track:")));
-    const hasLocalTracks = validUris.some(uri => Spicetify.URI.isLocal(uri));
     const BATCH_SIZE = 100;
 
-    const addInternal = async (uris) => {
-        for (let i = 0; i < uris.length; i += BATCH_SIZE) {
-            const batch = uris.slice(i, i + BATCH_SIZE);
-            await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { after: 'end' });
-        }
-    };
+    for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
+        const batch = validUris.slice(i, i + BATCH_SIZE);
+        
+        let retries = 0;
+        let success = false;
+        let currentDelay = initialDelay;
 
-    if (hasLocalTracks || isFallbackActive()) {
-        for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
-            const batch = validUris.slice(i, i + BATCH_SIZE);
-            
-            let retries = 0;
-            let success = false;
-            let currentDelay = initialDelay;
-
-            while (!success && retries <= maxRetries) {
-                try {
-                    await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { after: 'end' });
-                    success = true;
-                } catch (error) {
-                    console.error(`[Sort-Play] Platform API Error adding batch (Attempt ${retries + 1}):`, error);
-                    if (retries === maxRetries) {
-                        showNotification("Failed to add some tracks.", 'warning');
-                        break;
-                    }
-                    retries++;
-                    await new Promise(resolve => setTimeout(resolve, currentDelay));
-                    currentDelay *= 2;
-                }
-            }
-        }
-    } else {
-        const playlistUrl = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
-        for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
-            const batch = validUris.slice(i, i + BATCH_SIZE);
-            
-            if (isFallbackActive()) {
-                try { await addInternal(batch); continue; } catch(e) {}
-            }
-
-            let retries = 0;
-            let currentDelay = initialDelay;
-            let success = false;
-
-            while (retries <= maxRetries) {
-                try {
-                    await Spicetify.CosmosAsync.post(playlistUrl, { uris: batch });
-                    success = true;
+        while (!success && retries <= maxRetries) {
+            try {
+                await Spicetify.Platform.PlaylistAPI.add(playlistUri, batch, { after: 'end' });
+                success = true;
+            } catch (error) {
+                console.error(`[Sort-Play] Platform API Error adding batch (Attempt ${retries + 1}):`, error);
+                if (retries === maxRetries) {
+                    showNotification("Failed to add some tracks.", 'warning');
                     break;
-                } catch (error) {
-                    if (registerWebApiFailure()) {
-                        try {
-                            await addInternal(batch);
-                            success = true;
-                            break;
-                        } catch(e) {}
-                    }
-                    console.error(`[Sort-Play] CosmosAsync Error adding batch (Attempt ${retries + 1}):`, error);
-                    if (retries === maxRetries) {
-                        try { await addInternal(batch); success = true; break; } catch(e) {}
-                        if(!success) showNotification("Failed to add some Spotify tracks.", 'warning');
-                        break;
-                    }
-                    retries++;
-                    await new Promise((resolve) => setTimeout(resolve, currentDelay));
-                    currentDelay *= 2;
                 }
+                retries++;
+                await new Promise(resolve => setTimeout(resolve, currentDelay));
+                currentDelay *= 2;
             }
         }
     }
@@ -25508,7 +23957,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     let finalSortedTracks;
-    const fallbackActive = isFallbackActive();
 
     if (useEnergyWaveShuffle && !containsLocalFiles && tracks.length <= energyWaveShuffleLimit) {
         const trackIds = tracksToProcess.map(t => t.trackId || t.uri.split(":")[2]);
@@ -25564,9 +24012,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         shuffleContextMenuItem = new Spicetify.ContextMenu.Item(
             "Shuffle & Play",
             async (uris) => {
-                setButtonProcessing(true);
-                mainButton.innerHTML = '<div class="loader"></div>';
-                closeAllMenus();
+                startProcessing();
 
                 try {
                     await executeShuffleAndPlay(uris[0]);
@@ -25593,9 +24039,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const MAX_RETRIES = 3;
     const RETRY_DELAYS = [1000, 3000, 5000];
 
-    setButtonProcessing(true);
-    mainButton.innerHTML = '<div class="loader"></div>';
-    closeAllMenus();
+    startProcessing();
 
     const logData = {
         summary: {},
@@ -25961,7 +24405,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .copy-track-button:hover { color: white; }
         .copy-track-button svg { width: 14px; height: 14px; }
         .copy-track-button.copied { color: #1ED760; }
-        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
         .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
         .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
         .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
@@ -25971,7 +24415,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 27px 32px 12px !important;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Conversion Report</span></h1>
           <button id="closeReportModalX" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+            ${closeModalIcon18Svg}
           </button>
       </div>
       <div class="main-trackCreditsModal-mainSection" style="padding: 22px 32px !important; overflow:auto">
@@ -26410,7 +24854,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
 
   async function getTopItems(type, time_range, totalLimit) {
-    if (isFallbackActive()) {
         const timeRangeMap = {
             'short_term': 'SHORT_TERM',
             'long_term': 'LONG_TERM',
@@ -26499,42 +24942,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
         
         return allItems.slice(0, totalLimit);
-    }
-
-    let allItems = [];
-    let offset = 0;
-    const limitPerRequest = 50;
-
-    try {
-        while (allItems.length < totalLimit) {
-            const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/me/top/${type}`, {
-                time_range: time_range,
-                limit: limitPerRequest,
-                offset: offset
-            });
-
-            if (!res.items || res.items.length === 0) {
-                break;
-            }
-
-            allItems = allItems.concat(res.items);
-            offset += limitPerRequest;
-
-            if (res.items.length < limitPerRequest) {
-                break;
-            }
-        }
-    } catch (e) {
-        if (registerWebApiFailure()) {
-            return getTopItems(type, time_range, totalLimit);
-        }
-        throw e;
-    }
-    return allItems.slice(0, totalLimit);
   }
 
   async function getAllFollowedArtists() {
-    if (isFallbackActive()) {
         try {
             if (Spicetify.Platform?.LibraryAPI?.getContents) {
                 const res = await Spicetify.Platform.LibraryAPI.getContents({ 
@@ -26555,31 +24965,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 if (artists.length > 0) return artists;
             }
         } catch (e) {
-            console.warn("[Sort-Play] LibraryAPI fallback failed", e);
+            console.warn("[Sort-Play] LibraryAPI fetch failed", e);
         }
         return [];
-    }
-
-    let allArtists = [];
-    let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
-
-    try {
-        while (nextUrl) {
-            const response = await Spicetify.CosmosAsync.get(nextUrl);
-            if (response?.artists?.items) {
-                allArtists.push(...response.artists.items);
-                nextUrl = response.artists.next;
-            } else {
-                nextUrl = null;
-            }
-        }
-    } catch (error) {
-        if (registerWebApiFailure()) {
-            return getAllFollowedArtists();
-        }
-        console.error("Failed to fetch all followed artists:", error);
-    }
-    return allArtists;
   }
 
   async function getComprehensiveKnownArtistsSet(options = {}) {
@@ -26638,14 +25026,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let playlistDescription = "";
 
     if (!isHeadless) {
-        setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-        toggleMenu();
-        closeAllMenus();
+        startProcessing();
     }
 
     try {
@@ -27388,14 +25769,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const { isHeadless = false } = options;
     const { GraphQL, CosmosAsync } = Spicetify;
     if (!isHeadless) {
-        setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-        toggleMenu();
-        closeAllMenus();
+        startProcessing();
     }
 
     try {
@@ -27404,39 +25778,17 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         updateProgress("Get artists...");
         
         async function getFollowedArtists() {
-            if (isFallbackActive()) {
-                try {
-                    if (Spicetify.Platform?.LibraryAPI?.getContents) {
-                        const res = await Spicetify.Platform.LibraryAPI.getContents({ limit: 50000, sort: { field: "NAME", order: "ASC" } });
-                        return (res.items || [])
-                            .filter(item => item.type === 'artist' || (item.uri && item.uri.includes(':artist:')))
-                            .map(a => ({ uri: a.uri, name: a.name, id: a.uri.split(':')[2] }));
-                    }
-                } catch (e) {
-                    console.warn("[Sort-Play] LibraryAPI fallback failed", e);
-                }
-                return [];
-            }
-
-            let artists = [];
-            let nextUrl = 'https://api.spotify.com/v1/me/following?type=artist&limit=50';
             try {
-                while (nextUrl) {
-                    const response = await Spicetify.CosmosAsync.get(nextUrl);
-                    if (response.artists?.items) {
-                        artists.push(...response.artists.items);
-                        nextUrl = response.artists.next;
-                    } else {
-                        nextUrl = null;
-                    }
+                if (Spicetify.Platform?.LibraryAPI?.getContents) {
+                    const res = await Spicetify.Platform.LibraryAPI.getContents({ limit: 50000, sort: { field: "NAME", order: "ASC" } });
+                    return (res.items || [])
+                        .filter(item => item.type === 'artist' || (item.uri && item.uri.includes(':artist:')))
+                        .map(a => ({ uri: a.uri, name: a.name, id: a.uri.split(':')[2] }));
                 }
             } catch (e) {
-                if (registerWebApiFailure()) {
-                    return getFollowedArtists();
-                }
-                throw e;
+                console.warn("[Sort-Play] LibraryAPI fetch failed", e);
             }
-            return artists;
+            return [];
         }
 
         const followedArtists = await getFollowedArtists();
@@ -27507,109 +25859,53 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         let initialTrackPool = [];
         const verifiedNewTracks = [];
 
-        if (isFallbackActive()) {
-            const CONCURRENCY = 5;
-            let processedCount = 0;
-            
-            for (let i = 0; i < allNewReleases.length; i += CONCURRENCY) {
-                const batch = allNewReleases.slice(i, i + CONCURRENCY);
-                const results = await Promise.all(batch.map(async (albumMeta) => {
-                    try {
-                        const albumId = albumMeta.uri.split(':')[2];
-                        let tracks = await getAlbumTracks(albumId);
-                        
-                        if (!tracks || !Array.isArray(tracks)) tracks = [];
-
-                        if (followedReleasesAlbumLimit !== 'all') {
-                            const limit = parseInt(followedReleasesAlbumLimit, 10);
-                            if (!isNaN(limit)) tracks = tracks.slice(0, limit);
-                        }
-                        
-                        return tracks.map(t => ({
-                            track: t,
-                            albumMeta: albumMeta 
-                        }));
-                    } catch (e) { return []; }
-                }));
-                
-                results.flat().forEach(item => {
-                    const t = item.track;
-                    const meta = item.albumMeta;
+        const CONCURRENCY = 5;
+        let processedCount = 0;
+        
+        for (let i = 0; i < allNewReleases.length; i += CONCURRENCY) {
+            const batch = allNewReleases.slice(i, i + CONCURRENCY);
+            const results = await Promise.all(batch.map(async (albumMeta) => {
+                try {
+                    const albumId = albumMeta.uri.split(':')[2];
+                    let tracks = await getAlbumTracks(albumId);
                     
-                    const adapted = {
-                        uri: t.uri,
-                        id: t.uri.split(':')[2],
-                        name: t.name,
-                        duration_ms: t.durationMilis,
-                        track_number: t.trackNumber || (t.track?.track_number) || 0,
-                        artists: t.track?.artists || (t.artistUris || []).map((u, idx) => ({ id: u.split(':')[2], name: (t.allArtists || "").split(', ')[idx] || 'Unknown' })),
-                        album: {
-                            name: t.albumName,
-                            release_date: meta.date?.isoString || t.releaseDate,
-                            album_type: meta.type || 'album',
-                            total_tracks: 0 
-                        }
-                    };
-                    verifiedNewTracks.push(adapted);
-                });
+                    if (!tracks || !Array.isArray(tracks)) tracks = [];
+
+                    if (followedReleasesAlbumLimit !== 'all') {
+                        const limit = parseInt(followedReleasesAlbumLimit, 10);
+                        if (!isNaN(limit)) tracks = tracks.slice(0, limit);
+                    }
+                    
+                    return tracks.map(t => ({
+                        track: t,
+                        albumMeta: albumMeta 
+                    }));
+                } catch (e) { return []; }
+            }));
+            
+            results.flat().forEach(item => {
+                const t = item.track;
+                const meta = item.albumMeta;
                 
-                processedCount += batch.length;
-                updateProgress(`Tracks ${Math.round((processedCount / allNewReleases.length) * 100)}%`);
-            }
-        } else {
-            const albumUris = allNewReleases.map(a => a.uri);
-            try {
-                for (let i = 0; i < albumUris.length; i += 20) {
-                    const albumIdBatch = albumUris.slice(i, i + 20).map(uri => uri.split(':')[2]);
-                    const albumsData = await CosmosAsync.get(`https://api.spotify.com/v1/albums?ids=${albumIdBatch.join(',')}`);
-                    if (albumsData.albums) {
-                        for (const album of albumsData.albums) {
-                            if (album && album.tracks && album.tracks.items) {
-                                let tracksFromAlbum = album.tracks.items;
-                                if (followedReleasesAlbumLimit !== 'all') {
-                                    tracksFromAlbum = tracksFromAlbum.slice(0, parseInt(followedReleasesAlbumLimit, 10));
-                                }
-                                initialTrackPool.push(...tracksFromAlbum);
-                            }
-                        }
+                const adapted = {
+                    uri: t.uri,
+                    id: t.uri.split(':')[2],
+                    name: t.name,
+                    duration_ms: t.durationMilis,
+                    track_number: t.trackNumber || (t.track?.track_number) || 0,
+                    artists: t.track?.artists || (t.artistUris || []).map((u, idx) => ({ id: u.split(':')[2], name: (t.allArtists || "").split(', ')[idx] || 'Unknown' })),
+                    album: {
+                        name: t.albumName,
+                        release_date: meta.date?.isoString || t.releaseDate,
+                        album_type: meta.type || 'album',
+                        total_tracks: 0 
                     }
-                }
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    return generateFollowedReleasesChronological(options);
-                }
-                throw e;
-            }
-
-            if (initialTrackPool.length === 0) {
-                throw new Error("Could not fetch any tracks from the new releases.");
-            }
-
-            updateProgress("Verifying...");
-            const trackIdsToVerify = initialTrackPool.map(t => t.id);
-
-            try {
-                for (let i = 0; i < trackIdsToVerify.length; i += 50) {
-                    const batchIds = trackIdsToVerify.slice(i, i + 50);
-                    const trackDetailsResponse = await CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batchIds.join(',')}`);
-
-                    if (trackDetailsResponse && trackDetailsResponse.tracks) {
-                        for (const detailedTrack of trackDetailsResponse.tracks) {
-                            if (detailedTrack && detailedTrack.album && detailedTrack.album.release_date) {
-                                const trackReleaseDate = new Date(detailedTrack.album.release_date);
-                                if (trackReleaseDate >= dateLimit) {
-                                    verifiedNewTracks.push(detailedTrack);
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    return generateFollowedReleasesChronological(options);
-                }
-                throw e;
-            }
+                };
+                verifiedNewTracks.push(adapted);
+            });
+            
+            processedCount += batch.length;
+            updateProgress(`Tracks ${Math.round((processedCount / allNewReleases.length) * 100)}%`);
         }
         
         updateProgress("Deduplicating...");
@@ -27725,13 +26021,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
 
-        if (openPlaylistAfterSortEnabled && newPlaylist.uri) { 
-            const tempPath = "/library"; 
-            Spicetify.Platform.History.push(tempPath);
-            await new Promise(resolve => setTimeout(resolve, 600)); 
-            const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
-            if (newPlaylistPath) Spicetify.Platform.History.push(newPlaylistPath);
-        }
+        await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error generating Chronological Followed Releases:", error);
@@ -27806,20 +26096,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 return await Promise.all(trackIds.map(id => fetchInternalTrackMetadata(id)));
             };
 
-            if (isFallbackActive()) {
-                responseTracks = await fetchBatchInternal();
-            } else {
-                try {
-                    const fullTrackDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${trackIds.join(',')}`);
-                    responseTracks = fullTrackDetails?.tracks || [];
-                } catch (error) {
-                    if (registerWebApiFailure()) {
-                        responseTracks = await fetchBatchInternal();
-                    } else {
-                        throw error;
-                    }
-                }
-            }
+            responseTracks = await fetchBatchInternal();
 
             if (responseTracks) {
                 for (const fullTrack of responseTracks) {
@@ -27940,14 +26217,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const { isHeadless = false } = options;
     
     if (!isHeadless) {
-        setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-        toggleMenu();
-        closeAllMenus();
+        startProcessing();
     }
 
     const updateProgress = (msg) => {
@@ -28334,10 +26604,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     const startButton = document.getElementById("startTastemaker");
     const cancelButton = document.getElementById("cancelTastemaker");
 
-    startButton.addEventListener("mouseenter", () => { startButton.style.backgroundColor = "#3BE377"; });
-    startButton.addEventListener("mouseleave", () => { startButton.style.backgroundColor = "#1ED760"; });
-    cancelButton.addEventListener("mouseenter", () => { cancelButton.style.backgroundColor = "#444444"; });
-    cancelButton.addEventListener("mouseleave", () => { cancelButton.style.backgroundColor = "#333333"; });
+    addHoverEffect(startButton, "#1ED760", "#3BE377");
+    addHoverEffect(cancelButton, "#333333", "#444444");
 
     startButton.addEventListener("click", () => {
       const username = inputField.value.trim();
@@ -28358,14 +26626,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       if (!targetUsername) return;
 
       if (!isHeadless) {
-          setButtonProcessing(true);
-          mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-          mainButton.style.color = buttonStyles.main.disabledColor;
-          mainButton.style.cursor = "default";
-          svgElement.style.fill = buttonStyles.main.disabledColor;
-          menuButtons.forEach((button) => (button.disabled = true));
-          toggleMenu();
-          closeAllMenus();
+          startProcessing();
       }
 
       const updateProgress = (msg) => {
@@ -28612,14 +26873,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     if (!isHeadless) {
-        setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-        toggleMenu();
-        closeAllMenus();
+        startProcessing();
     }
 
     const updateProgress = (msg) => {
@@ -28870,14 +27124,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   async function generateRandomGenrePlaylist(options = {}) {
     const { isHeadless = false } = options;
     if (!isHeadless) {
-        setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-        toggleMenu();
-        closeAllMenus();
+        startProcessing();
     }
 
     try {
@@ -29038,10 +27285,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return sortedTracks;
   }
 
-  function escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  }
-
   async function handleSortAndCreatePlaylist(sortType, options = {}) {
     const { isHeadless = false } = options;
 
@@ -29070,11 +27313,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     if (sortType === "aiPick") {
-        setButtonProcessing(true);
-        mainButton.innerHTML = '<div class="loader"></div>';
-        mainButton.innerText = "Preparing...";
-        toggleMenu();
-        closeAllMenus();
+        startProcessing("Preparing...");
     
         try {
             const currentUri = getCurrentUri();
@@ -29125,14 +27364,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     
     if (topTrackSortTypes[sortType]) {
         if (!isHeadless) {
-            setButtonProcessing(true);
-            mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-            mainButton.style.color = buttonStyles.main.disabledColor;
-            mainButton.style.cursor = "default";
-            svgElement.style.fill = buttonStyles.main.disabledColor;
-            menuButtons.forEach((button) => (button.disabled = true));
-            toggleMenu();
-            closeAllMenus();
+            startProcessing();
         }
         
         try {
@@ -29161,17 +27393,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             
             showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
 
-            if (openPlaylistAfterSortEnabled && newPlaylist && newPlaylist.uri) { 
-                const tempPath = "/library"; 
-                Spicetify.Platform.History.push(tempPath);
-                await new Promise(resolve => setTimeout(resolve, 450)); 
-                const newPlaylistPath = Spicetify.URI.fromString(newPlaylist.uri).toURLPath(true);
-                if (newPlaylistPath) {
-                  Spicetify.Platform.History.push(newPlaylistPath);
-                } else {
-                  console.warn("Could not determine path for new playlist URI:", newPlaylist.uri);
-                }
-            }
+            await navigateToPlaylist(newPlaylist);
         } catch (error) {
             console.error("Error creating top tracks playlist:", error);
             showNotification("Failed to create top tracks playlist.", true);
@@ -29184,14 +27406,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     }
 
     if (!isHeadless) {
-        setButtonProcessing(true);
-        mainButton.style.backgroundColor = buttonStyles.main.disabledBackgroundColor;
-        mainButton.style.color = buttonStyles.main.disabledColor;
-        mainButton.style.cursor = "default";
-        svgElement.style.fill = buttonStyles.main.disabledColor;
-        menuButtons.forEach((button) => (button.disabled = true));
-        toggleMenu();
-        closeAllMenus();
+        startProcessing();
     }
 
     const initialPagePath = Spicetify.Platform.History.location.pathname; 
@@ -29204,40 +27419,70 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return;
       }
 
+      let isArtistPage = URI.isArtist(currentUriAtStart);
+      let targetPlaylistUriToReplace = null;
+      
+      const quickFilterTypes = [
+          'deduplicateOnly', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
+          'filterSinglesEPs', 'filterAlbumsEPs', 'filterAlbums', 'filterAlbumsCompilations', 
+          'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles', 'filterCompilations', 
+          'removeTrashed', 'excludeByPlaylist', 'filterFollowedMain', 'filterFollowedAny', 
+          'removeFollowed'
+      ];
+
+      if (isDirectSortType(sortType) && !quickFilterTypes.includes(sortType) && isArtistPage && createPlaylistAfterSort && !isHeadless && showArtistDiscographyDuplicateWarning) {
+          mainButton.innerText = "Checking...";
+          const { sourceName: artistName } = await fetchSourceNameAndArtist(currentUriAtStart);
+          const userPlaylists = await getUserOwnedPlaylistsInternal();
+          
+          const map = getArtistDiscographyMap();
+          const mappedUris = map[currentUriAtStart] || [];
+          
+          const mappedPlaylists = [];
+          const possiblePlaylists = [];
+          const artistNameLower = artistName.toLowerCase();
+
+          userPlaylists.forEach(p => {
+              if (mappedUris.includes(p.uri)) {
+                  mappedPlaylists.push(p);
+              } else if (p.name && p.name.toLowerCase().includes(artistNameLower)) {
+                  possiblePlaylists.push(p);
+              }
+          });
+
+          mappedPlaylists.sort((a, b) => mappedUris.indexOf(a.uri) - mappedUris.indexOf(b.uri));
+
+          if (mappedPlaylists.length > 0 || possiblePlaylists.length > 0) {
+              const result = await showArtistDuplicateModal(mappedPlaylists, possiblePlaylists, artistName);
+              if (result.action === 'cancel') {
+                  resetButtons();
+                  return;
+              } else if (result.action === 'replace' && result.uri) {
+                  targetPlaylistUriToReplace = result.uri;
+              }
+              mainButton.innerHTML = '<div class="loader"></div>';
+          }
+      }
+
       let tracks;
-      let isArtistPage = false;
       let isAlbumPage = false;
       let currentPlaylistDetails = null;
       let sourcePlaylistCoverUrl = null;
-      let sourceNameForDialog = "Current Context"; 
 
       if (URI.isPlaylistV1OrV2(currentUriAtStart)) {
         const playlistId = currentUriAtStart.split(":")[2];
         tracks = await getPlaylistTracks(playlistId);
         try {
-            if (isFallbackActive()) {
-                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUriAtStart);
-                currentPlaylistDetails = { name: meta.name, owner: { id: meta.owner.uri.split(':')[2], display_name: meta.owner.name }, images: meta.images };
-            } else {
-                try {
-                    currentPlaylistDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/playlists/${playlistId}`);
-                } catch (e) {
-                    if (registerWebApiFailure()) {
-                        const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUriAtStart);
-                        currentPlaylistDetails = { name: meta.name, owner: { id: meta.owner.uri.split(':')[2], display_name: meta.owner.name }, images: meta.images };
-                    }
-                }
-            }
-            sourceNameForDialog = currentPlaylistDetails?.name || "Current Playlist";
+            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUriAtStart);
+            currentPlaylistDetails = { name: meta.name, owner: { id: meta.owner.uri.split(':')[2], display_name: meta.owner.name }, images: meta.images };
             if (currentPlaylistDetails?.images?.length > 0) {
                 sourcePlaylistCoverUrl = currentPlaylistDetails.images[0].url;
             }
         } catch (e) {
             console.warn("Could not fetch current playlist details for ownership check/dialog", e);
         }
-      } else if (URI.isArtist(currentUriAtStart)) {
+      } else if (isArtistPage) {
         tracks = await getArtistTracks(currentUriAtStart);
-        isArtistPage = true;
       } else if (isLikedSongsPage(currentUriAtStart)) {
         tracks = await getLikedSongs();
       } else if (isLocalFilesPage(currentUriAtStart)) {
@@ -29248,22 +27493,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         isAlbumPage = true;
         try {
             let albumDetails;
-            if (isFallbackActive()) {
-                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUriAtStart, locale: "en", offset: 0, limit: 1 });
-                const u = res.data.albumUnion;
-                albumDetails = { name: u.name, images: [{ url: u.coverArt.sources[0].url }] };
-            } else {
-                try {
-                    albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
-                } catch(e) {
-                    if (registerWebApiFailure()) {
-                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUriAtStart, locale: "en", offset: 0, limit: 1 });
-                        const u = res.data.albumUnion;
-                        albumDetails = { name: u.name, images: [{ url: u.coverArt.sources[0].url }] };
-                    }
-                }
-            }
-            sourceNameForDialog = albumDetails?.name || "Current Album";
+            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUriAtStart, locale: "en", offset: 0, limit: 1 });
+            const u = res.data.albumUnion;
+            albumDetails = { name: u.name, images: [{ url: u.coverArt.sources[0].url }] };
             if (albumDetails?.images?.length > 0) {
                 sourcePlaylistCoverUrl = albumDetails.images[0].url;
             }
@@ -29300,7 +27532,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                        currentPlaylistDetails.owner &&
                                        currentPlaylistDetails.owner.id === user.username;
 
-      if (canModifyCurrentPlaylist && !isHeadless) {
+      if (canModifyCurrentPlaylist && !isHeadless && !targetPlaylistUriToReplace) {
         const userChoice = await showConfirmationModal({
             title: "Sort Current Playlist?",
             description: `This will replace all tracks in this playlist with the sorted version. Do you want to modify the current playlist, or create a new one instead?`,
@@ -29403,31 +27635,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
 
 
-        if (
-          sortType === "playCount" ||
-          sortType === "popularity" ||
-          sortType === "shuffle" ||
-          sortType === "releaseDate" ||
-          sortType === "averageColor" ||
-          sortType === "deduplicateOnly" ||
-          sortType === "filterLiked" ||
-          sortType === "keepLiked" ||
-          sortType === "sortByLiked" ||
-          sortType === "filterSingles" ||
-          sortType === "filterEPs" ||
-          sortType === "filterSinglesEPs" ||
-          sortType === "filterAlbumsEPs" ||
-          sortType === "filterAlbums" ||
-          sortType === "filterAlbumsCompilations" ||
-          sortType === "filterAlbumsEPsCompilations" ||
-          sortType === "filterAlbumsEPsSingles" ||
-          sortType === "filterCompilations" ||
-          sortType === "removeTrashed" ||
-          sortType === "excludeByPlaylist" ||
-          sortType === "filterFollowedMain" ||
-          sortType === "filterFollowedAny" ||
-          sortType === "removeFollowed"
-        ) {
+        if (BASIC_SORT_TYPES.includes(sortType)) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
             const tracksWithReleaseDates = await processBatchesWithDelay(
@@ -29501,38 +27709,35 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           uniqueTracks = deduplicationResult.unique;
           removedTracks = deduplicationResult.removed;
 
-          if (sortType === "playCount") {
-            const getVal = (t) => (t.playCount === "N/A" || t.playCount == null) ? -1 : Number(t.playCount);
-            sortedTracks = uniqueTracks.sort((a, b) => 
-                sortOrderState.playCount ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
-            );
-          } else if (sortType === "popularity") {
-            const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
-            sortedTracks = uniqueTracks.sort((a, b) => 
-                sortOrderState.popularity ? getVal(a) - getVal(b) : getVal(b) - getVal(a)
-            );
-        } else if (sortType === "releaseDate") {
-          sortedTracks = uniqueTracks
-            .sort((a, b) => {
-              const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-              const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+          if (sortType === "playCount" || sortType === "popularity" || sortType === "releaseDate") {
+            sortedTracks = applyStandardSort(uniqueTracks, sortType);
+          } else if (sortType === "shuffle") {
+            const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
 
-              const dateComparison = sortOrderState.releaseDate
-                ? valA - valB
-                : valB - valA;
-    
-              if (dateComparison !== 0) {
-                return dateComparison;
-              }
+            if (useEnergyWaveShuffle && !containsLocalFiles) {
+                if (!isHeadless) mainButton.innerText = "Analyzing...";
+                const trackIds = uniqueTracks.map(t => t.trackId);
+                const allStats = await getBatchTrackStats(trackIds);
 
-              const albumA = (a.albumName || "").toLowerCase();
-              const albumB = (b.albumName || "").toLowerCase();
-              const albumCompare = albumA.localeCompare(albumB);
-              if (albumCompare !== 0) return albumCompare;
-              
-              return (a.trackNumber || 0) - (b.trackNumber || 0);
-            });
-        } else if (sortType === "averageColor") {
+                const tracksWithAudioFeatures = uniqueTracks.map(track => {
+                    const stats = allStats[track.trackId] || {};
+                    return { ...track, ...stats, features: stats };
+                });
+                
+                const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+                const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+                missingDataCount = tracksWithoutData.length;
+
+                const waveSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
+
+                sortedTracks = [...waveSortedTracks, ...shuffleArray(tracksWithoutData)];
+            } else {
+                if (useEnergyWaveShuffle && containsLocalFiles && !isHeadless) {
+                    showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
+                }
+                sortedTracks = shuffleArray(uniqueTracks);
+            }
+          } else if (sortType === "averageColor") {
               sortedTracks = uniqueTracks
                   .filter(track => track.averageColor && track.averageColor.dominantHsl)
                   .sort((a, b) => {
@@ -30034,7 +28239,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             const trackIds = tracksWithPopularity.map(t => t.trackId);
             
             const allStats = await getBatchTrackStats(trackIds, (progress) => {
-                if (!isHeadless && isFallbackActive()) mainButton.innerText = `BPM/Key ${Math.floor(progress * 0.5)}%`;
+                if (!isHeadless) mainButton.innerText = `BPM/Key ${Math.floor(progress * 0.5)}%`;
             });
 
             const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
@@ -30212,91 +28417,39 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         const sourceUriForNaming = currentUriAtStart; 
         let finalSourceName;
-        if (URI.isArtist(sourceUriForNaming)) {
-            const id = sourceUriForNaming.split(":")[2];
-            try {
-                if (isFallbackActive()) {
-                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUriForNaming, locale: "en", includePrerelease: false });
-                    finalSourceName = res.data.artistUnion.profile.name;
-                } else {
-                    finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${id}`).then((r) => r.name);
-                }
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: sourceUriForNaming, locale: "en", includePrerelease: false });
-                    finalSourceName = res.data.artistUnion.profile.name;
-                }
-            }
-        } else if (isLikedSongsPage(sourceUriForNaming)) {
-            finalSourceName = "Liked Songs";
-        } else if (isLocalFilesPage(sourceUriForNaming)) {
-            finalSourceName = "Local Files";
-        } else if (URI.isAlbum(sourceUriForNaming)) {
-            const albumId = sourceUriForNaming.split(":")[2];
-            try {
-                if (isFallbackActive()) {
-                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUriForNaming, locale: "en", offset: 0, limit: 1 });
-                    finalSourceName = res.data.albumUnion.name;
-                } else {
-                    finalSourceName = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`).then((r) => r.name);
-                }
-            } catch (e) {
-                if (registerWebApiFailure()) {
-                    const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: sourceUriForNaming, locale: "en", offset: 0, limit: 1 });
-                    finalSourceName = res.data.albumUnion.name;
-                }
-            }
+        if (URI.isPlaylistV1OrV2(sourceUriForNaming) && currentPlaylistDetails?.name) {
+            finalSourceName = currentPlaylistDetails.name;
         } else {
-            finalSourceName = currentPlaylistDetails?.name || "Current Playlist";
+            const { sourceName } = await fetchSourceNameAndArtist(sourceUriForNaming);
+            finalSourceName = sourceName;
         }
         
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
         while (suffixPattern.test(finalSourceName)) {
           finalSourceName = finalSourceName.replace(suffixPattern, "");
         }
-        const sortTypeInfo = {
-          playCount: { fullName: "play count", shortName: "PlayCount" },
-          popularity: { fullName: "popularity", shortName: "Popularity" },
-          releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
-          scrobbles: { fullName: "Last.fm scrobbles", shortName: "Scrobbles" },
-          personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
-          lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
-          shuffle: { fullName: "shuffle", shortName: "Shuffle" },
-          averageColor: { fullName: "album color", shortName: "Color" },
-          deduplicateOnly: { fullName: "deduplication", shortName: "Deduplicated" },
-          filterLiked: { fullName: "hiding liked songs", shortName: "Unliked" },
-          keepLiked: { fullName: "keeping only liked songs", shortName: "Liked Only" },
-          sortByLiked: { fullName: "liked status", shortName: "Liked" },
-          filterSingles: { fullName: "singles only", shortName: "Singles" },
-          filterEPs: { fullName: "EPs only", shortName: "EPs" },
-          filterSinglesEPs: { fullName: "singles & EPs only", shortName: "Singles & EPs" },
-          filterAlbumsEPs: { fullName: "albums & EPs only", shortName: "Albums & EPs" },
-          filterAlbumsCompilations: { fullName: "albums & compilations only", shortName: "Albums & Compilations" },
-          filterAlbumsEPsCompilations: { fullName: "albums, EPs & compilations only", shortName: "Albums, EPs & Compilations" },
-          filterAlbumsEPsSingles: { fullName: "albums, EPs & singles only", shortName: "Albums, EPs & Singles" },
-          filterCompilations: { fullName: "compilations only", shortName: "Compilations" },
-          filterAlbums: { fullName: "albums only", shortName: "Albums" },
-          removeTrashed: { fullName: "removing trashed songs", shortName: "Clean" },
-          excludeByPlaylist: { fullName: "excluding playlist tracks", shortName: "Filtered" },
-          filterFollowedMain: { fullName: "main followed artists", shortName: "Followed Main" },
-          filterFollowedAny: { fullName: "any followed artists", shortName: "Followed Any" },
-          removeFollowed: { fullName: "non-followed artists", shortName: "Unfollowed" },
-          energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
-          tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
-          energy: { fullName: "energy", shortName: "Energy" },
-          danceability: { fullName: "danceability", shortName: "Danceability" },
-          valence: { fullName: "valence", shortName: "Valence" },
-          acousticness: { fullName: "acousticness", shortName: "Acousticness" },
-          instrumentalness: { fullName: "instrumentalness", shortName: "Instrumentalness" }
-        }[sortType];
+        const sortTypeInfo = getSortTypeInfo(sortType);
 
-        if (canModifyCurrentPlaylist) {
-            const playlistIdToModify = currentUriAtStart.split(":")[2];
-            modifiedPlaylistOriginalPath = initialPagePath; 
+        const filterOnlyTypes = [
+            'deduplicateOnly', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
+            'filterSinglesEPs', 'filterAlbumsEPs', 'filterAlbums', 'filterAlbumsCompilations', 
+            'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles', 'filterCompilations', 
+            'removeTrashed', 'excludeByPlaylist', 'filterFollowedMain', 'filterFollowedAny', 
+            'removeFollowed'
+        ];
+        const actionVerbPast = filterOnlyTypes.includes(sortType) ? "Filtered" : "Sorted";
+        const actionVerbPresent = filterOnlyTypes.includes(sortType) ? "filtered" : "sorted";
+
+        if (canModifyCurrentPlaylist || targetPlaylistUriToReplace) {
+            const playlistIdToModify = targetPlaylistUriToReplace ? targetPlaylistUriToReplace.split(":")[2] : currentUriAtStart.split(":")[2];
+            modifiedPlaylistOriginalPath = targetPlaylistUriToReplace ? null : initialPagePath; 
+            newPlaylistObjectForNavigation = targetPlaylistUriToReplace ? { uri: targetPlaylistUriToReplace } : null;
 
             try {
                 const requestBody = {
-                    description: `Sorted by ${sortTypeInfo.fullName} using Sort-Play`
+                    description: sortType === 'shuffle' 
+                        ? `Shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
+                        : `${actionVerbPast} by ${sortTypeInfo.fullName} using Sort-Play`
                 };
 
                 if (changeTitleOnModify) {
@@ -30304,22 +28457,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
 
                 try {
-                    if (isFallbackActive()) {
-                        await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistIdToModify}`, requestBody);
-                    } else {
-                        try {
-                            await Spicetify.CosmosAsync.put(
-                                `https://api.spotify.com/v1/playlists/${playlistIdToModify}`,
-                                requestBody
-                            );
-                        } catch (error) {
-                            if (registerWebApiFailure()) {
-                                await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistIdToModify}`, requestBody);
-                            } else {
-                                throw error;
-                            }
-                        }
-                    }
+                    await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistIdToModify}`, requestBody);
                 } catch (error) {
                     const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
                     if (!isExpectedJsonError) {
@@ -30328,14 +28466,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 }
 
                 if (!isHeadless) mainButton.innerText = "Saving...";
-
-                const filterOnlyTypes = [
-                    'deduplicateOnly', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
-                    'filterSinglesEPs', 'filterAlbumsEPs', 'filterAlbums', 'filterAlbumsCompilations', 
-                    'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles', 'filterCompilations', 
-                    'removeTrashed', 'excludeByPlaylist', 'filterFollowedMain', 'filterFollowedAny', 
-                    'removeFollowed'
-                ];
 
                 const isGroupingSort = ['filterAlbums', 'filterAlbumsEPs', 'filterAlbumsCompilations', 'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles'].includes(sortType);
                 const isOrderChanged = isGroupingSort && sortOrderState[sortType];
@@ -30361,8 +28491,24 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     showRemovedTracksModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
                 }
                 
-                showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
-                playlistUriForQueue = currentUriAtStart; 
+                let notificationMsg = sortType === 'shuffle' 
+                    ? `Playlist shuffled${useEnergyWaveShuffle ? ' with Vibe & Flow' : ''}!`
+                    : `Playlist ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                if (isArtistPage) {
+                    notificationMsg = sortType === 'shuffle' ? `Discography of ${finalSourceName} shuffled!` : `Discography of ${finalSourceName} ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                    if (targetPlaylistUriToReplace) {
+                        addArtistDiscographyMap(currentUriAtStart, targetPlaylistUriToReplace);
+                    }
+                } else if (isAlbumPage) {
+                    notificationMsg = sortType === 'shuffle' ? `Album shuffled!` : `Album ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                } else if (isLikedSongsPage(currentUriAtStart)) {
+                    notificationMsg = sortType === 'shuffle' ? `Liked Songs shuffled!` : `Liked Songs ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                } else if (isLocalFilesPage(currentUriAtStart)) {
+                    notificationMsg = sortType === 'shuffle' ? `Local Files shuffled!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                }
+
+                showNotification(notificationMsg);
+                playlistUriForQueue = targetPlaylistUriToReplace || currentUriAtStart; 
                 playlistWasModifiedOrCreated = true; 
 
             } catch (error) {
@@ -30379,39 +28525,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
               if (removedTracks.length > 0 && !isArtistPage) {
                 showRemovedTracksModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
               }
-              let playlistDescription = `Sorted by ${sortTypeInfo.fullName} using Sort-Play`;
+              let playlistDescription = sortType === 'shuffle'
+                  ? `Shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
+                  : `${actionVerbPast} by ${sortTypeInfo.fullName} using Sort-Play`;
+              
               if (isArtistPage) {
-                playlistDescription = `Discography of ${finalSourceName} - created and sorted by ${sortTypeInfo.fullName} using Sort-Play`
+                playlistDescription = sortType === 'shuffle'
+                    ? `Discography of ${finalSourceName} - created and shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
+                    : `Discography of ${finalSourceName} - created and ${actionVerbPresent} by ${sortTypeInfo.fullName} using Sort-Play`;
               } else if (isAlbumPage) {
-                const albumId = currentUriAtStart.split(":")[2];
-                let artistName = "Unknown Artist";
-                
-                try {
-                    const fetchAlbumArtistFallback = async () => {
-                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUriAtStart, locale: "en", offset: 0, limit: 1 });
-                        if (res.data.albumUnion.artists.items.length > 0) {
-                            return res.data.albumUnion.artists.items[0].profile.name;
-                        }
-                        return "Unknown Artist";
-                    };
-
-                    if (isFallbackActive()) {
-                        artistName = await fetchAlbumArtistFallback();
-                    } else {
-                        try {
-                            const albumDetails = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/albums/${albumId}`);
-                            artistName = albumDetails.artists[0].name;
-                        } catch (e) {
-                            if (registerWebApiFailure()) {
-                                artistName = await fetchAlbumArtistFallback();
-                            } else {
-                                throw e;
-                            }
-                        }
-                    }
-                } catch (e) { console.warn("Failed to fetch album artist for description", e); }
-
-                playlistDescription = `Tracks from ${finalSourceName} by ${artistName} - created and sorted by ${sortTypeInfo.fullName} using Sort-Play`;
+                const { artistName } = await fetchSourceNameAndArtist(currentUriAtStart);
+                playlistDescription = sortType === 'shuffle'
+                    ? `Tracks from ${finalSourceName} by ${artistName} - created and shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
+                    : `Tracks from ${finalSourceName} by ${artistName} - created and ${actionVerbPresent} by ${sortTypeInfo.fullName} using Sort-Play`;
               }
 
               if (playlistDescription.length > 300) {
@@ -30445,6 +28571,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                       playlistUriForQueue = newPlaylist.uri;
                       newPlaylistObjectForNavigation = newPlaylist; 
                       playlistWasModifiedOrCreated = true;
+                      if (isArtistPage) {
+                          addArtistDiscographyMap(currentUriAtStart, newPlaylist.uri);
+                      }
                   }
 
                   if (!isHeadless) mainButton.innerText = "Saving...";
@@ -30478,7 +28607,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                   await addPlaylistToLibrary(newPlaylist.uri);
               }
 
-              showNotification(`Playlist sorted by ${sortTypeInfo.fullName}!`);
+              let notificationMsg = sortType === 'shuffle' 
+                  ? `Playlist shuffled${useEnergyWaveShuffle ? ' with Vibe & Flow' : ''}!`
+                  : `Playlist ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+              if (isArtistPage) {
+                  notificationMsg = sortType === 'shuffle' ? `Discography of ${finalSourceName} shuffled!` : `Discography of ${finalSourceName} ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+              } else if (isAlbumPage) {
+                  notificationMsg = sortType === 'shuffle' ? `Album shuffled!` : `Album ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+              } else if (isLikedSongsPage(currentUriAtStart)) {
+                  notificationMsg = sortType === 'shuffle' ? `Liked Songs shuffled!` : `Liked Songs ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+              } else if (isLocalFilesPage(currentUriAtStart)) {
+                  notificationMsg = sortType === 'shuffle' ? `Local Files shuffled!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+              }
+
+              showNotification(notificationMsg);
 
             } catch (error) {
               console.error("Error creating or updating playlist:", error);
@@ -30559,6 +28701,57 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     "G♯/A♭m": "1A", "D♯/E♭m": "2A", "A♯/B♭m": "3A", "Fm": "4A", "Cm": "5A", 
     "Gm": "6A", "Dm": "7A", "Am": "8A", "Em": "9A", "Bm": "10A", "F♯/G♭m": "11A", "C♯/D♭m": "12A"
   };
+
+  const VERSION_KEYWORDS = [
+      'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
+      'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
+      'radio edit', 'radio mix', 'radio', 'single version', 'single edit', 'album version',
+      'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
+      'special edition', 'original mix', 'original version', 'live', 'live at',
+      'live in', 'live from', 'feat\\.?', 'ft\\.?', 'featuring', 'demo',
+      'instrumental', 'acoustic'
+  ];
+  const VERSION_REGEX_STR = `[\\(\\[\\-]?\\s*(${VERSION_KEYWORDS.join('|')})[^\\)\\]]*[\\)\\]\\-]?`;
+  const VERSION_REGEX_REPLACE = new RegExp(VERSION_REGEX_STR, 'gi');
+  const VERSION_REGEX_TEST = new RegExp(VERSION_REGEX_STR, 'i');
+
+  function getCleanTitle(rawTitle) {
+      if (!rawTitle) return "";
+      return rawTitle
+          .toLowerCase()
+          .replace(VERSION_REGEX_REPLACE, '')
+          .replace(/['’ʼ]/g, "'")
+          .replace(/[^a-z0-9\s]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+  }
+
+  function getCamelotKey(features) {
+      if (!features) return null;
+      let camelotKey = features.camelot;
+      if (!camelotKey && (features.key_raw !== undefined && features.key_raw !== -1 && features.mode !== undefined)) {
+          const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+          const keyName = pitchClasses[features.key_raw];
+          const modeSuffix = features.mode === 0 ? 'm' : '';
+          camelotKey = KEY_TO_CAMELOT_MAP[keyName + modeSuffix] || KEY_TO_CAMELOT_MAP[keyName] || null;
+      }
+      return camelotKey;
+  }
+
+  function startProcessing(buttonText = null) {
+      menuButtons.forEach((btn) => {
+          if (btn.tagName.toLowerCase() === 'button') {
+              btn.style.backgroundColor = "transparent";
+          }
+      });
+      setButtonProcessing(true);
+      if (buttonText) {
+          mainButton.innerText = buttonText;
+      } else {
+          mainButton.innerHTML = '<div class="loader"></div>';
+      }
+      closeAllMenus();
+  }
 
 
   function getHarmonicCompatibilityScore(camelotKey1, camelotKey2) {
@@ -30736,16 +28929,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const tracksWithProfile = tracks.map(track => {
         const f = track.features || {};
-        let camelotKey = f.camelot;
-        if (!camelotKey && (f.key_raw !== undefined && f.key_raw !== -1 && f.mode !== undefined)) {
-            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-            const keyName = pitchClasses[f.key_raw];
-            const modeSuffix = f.mode === 0 ? 'm' : '';
-            camelotKey = KEY_TO_CAMELOT_MAP[keyName + modeSuffix] || KEY_TO_CAMELOT_MAP[keyName];
-        }
         return {
             ...track,
-            profile: { tempo: f.tempo || 120, camelotKey: camelotKey }
+            profile: { tempo: f.tempo || 120, camelotKey: getCamelotKey(f) }
         };
     });
 
@@ -30824,17 +29010,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     const tracksWithProfile = tracks.map(track => {
         const f = track.features || {};
-        let camelotKey = f.camelot;
-        if (!camelotKey && (f.key_raw !== undefined && f.key_raw !== -1 && f.mode !== undefined)) {
-            const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-            const keyName = pitchClasses[f.key_raw];
-            const modeSuffix = f.mode === 0 ? 'm' : '';
-            camelotKey = KEY_TO_CAMELOT_MAP[keyName + modeSuffix] || KEY_TO_CAMELOT_MAP[keyName];
-        }
-
         return {
             ...track,
-            profile: { tempo: f.tempo || 120, camelotKey: camelotKey }
+            profile: { tempo: f.tempo || 120, camelotKey: getCamelotKey(f) }
         };
     });
 
@@ -30925,28 +29103,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return val <= 1 ? val : val / 100;
     };
 
-    const versionKeywords = [
-        'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
-        'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
-        'radio edit', 'radio mix', 'radio', 'single version', 'single edit', 'album version',
-        'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
-        'special edition', 'original mix', 'original version', 'live', 'live at',
-        'live in', 'live from', 'feat\\.?', 'ft\\.?', 'featuring', 'demo',
-        'instrumental', 'acoustic'
-    ];
-    const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})[^\\)\\]]*[\\)\\]\\-]?`, 'gi');
-
-    const getCleanTitle = (rawTitle) => {
-        if (!rawTitle) return "";
-        return rawTitle
-            .toLowerCase()
-            .replace(versionRegex, '')
-            .replace(/['’ʼ]/g, "'")
-            .replace(/[^a-z0-9\s]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-    };
-
     const trackProfiles = tracks.map(track => {
         const f = track.features || {};
         
@@ -30960,15 +29116,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         const moodBucket = `${getTier(energy)}-Energy/${getTier(valence)}-Valence`;
 
-        const keyName = f.key || "C";
-        const mode = f.mode === 0 ? 'm' : '';
-        const camelotKey = KEY_TO_CAMELOT_MAP[keyName + mode] || KEY_TO_CAMELOT_MAP[keyName] || null;
-
         return {
             ...track,
             profile: { 
                 moodBucket, 
-                camelotKey, 
+                camelotKey: getCamelotKey(f), 
                 tempo: f.tempo || null,
                 energy: energy ?? 0.5,
                 valence: valence ?? 0.5,
@@ -31204,28 +29356,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         return normalized <= 0.33 ? 'Low' : normalized <= 0.66 ? 'Medium' : 'High';
     };
 
-    const versionKeywords = [
-        'remastered', 'remaster', '\\d{4} remaster', 'anniversary edition',
-        'deluxe edition', 'super deluxe', 'legacy edition', 'mono', 'stereo',
-        'radio edit', 'radio mix', 'radio', 'single version', 'single edit', 'album version',
-        'extended mix', 'extended version', 'club mix', 'clean', 'explicit',
-        'special edition', 'original mix', 'original version', 'live', 'live at',
-        'live in', 'live from', 'feat\\.?', 'ft\\.?', 'featuring', 'demo',
-        'instrumental', 'acoustic'
-    ];
-    const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})[^\\)\\]]*[\\)\\]\\-]?`, 'gi');
-
-    const getCleanTitle = (rawTitle) => {
-        if (!rawTitle) return "";
-        return rawTitle
-            .toLowerCase()
-            .replace(versionRegex, '')
-            .replace(/['’ʼ]/g, "'")
-            .replace(/[^a-z0-9\s]/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-    };
-
     const trackProfiles = tracks.map(track => {
         const f = track.features || {};
         
@@ -31237,15 +29367,11 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         
         const moodBucket = `${getTier(energy)}-Energy/${getTier(valence)}-Valence`;
 
-        const keyName = f.key || "C";
-        const mode = f.mode === 0 ? 'm' : '';
-        const camelotKey = KEY_TO_CAMELOT_MAP[keyName + mode] || KEY_TO_CAMELOT_MAP[keyName] || null;
-
         return {
             ...track,
             profile: { 
                 moodBucket, 
-                camelotKey, 
+                camelotKey: getCamelotKey(f), 
                 tempo: f.tempo || null,
                 energy: energy ?? 0.5,
                 valence: valence ?? 0.5,
@@ -31478,6 +29604,38 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return sortedPlaylist.map(profiledTrack => tracks.find(t => t.uri === profiledTrack.uri));
   }
 
+  const BASIC_SORT_TYPES = [
+    "playCount", "popularity", "shuffle", "releaseDate", "averageColor", 
+    "deduplicateOnly", "filterLiked", "keepLiked", "sortByLiked", 
+    "filterSingles", "filterEPs", "filterSinglesEPs", "filterAlbumsEPs", 
+    "filterAlbums", "filterAlbumsCompilations", "filterAlbumsEPsCompilations", 
+    "filterAlbumsEPsSingles", "filterCompilations", "removeTrashed", 
+    "excludeByPlaylist", "filterFollowedMain", "filterFollowedAny", "removeFollowed"
+  ];
+
+  function applyStandardSort(uniqueTracks, sortType) {
+    if (sortType === "playCount") {
+        const getVal = (t) => (t.playCount === "N/A" || t.playCount == null) ? -1 : Number(t.playCount);
+        return [...uniqueTracks].sort((a, b) => sortOrderState.playCount ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
+    } else if (sortType === "popularity") {
+        const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
+        return [...uniqueTracks].sort((a, b) => sortOrderState.popularity ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
+    } else if (sortType === "releaseDate") {
+        return [...uniqueTracks].sort((a, b) => {
+            const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+            const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+            const dateComparison = sortOrderState.releaseDate ? valA - valB : valB - valA;
+            if (dateComparison !== 0) return dateComparison;
+            const albumCompare = (a.albumName || "").toLowerCase().localeCompare((b.albumName || "").toLowerCase());
+            if (albumCompare !== 0) return albumCompare;
+            return (a.trackNumber || 0) - (b.trackNumber || 0);
+        });
+    } else if (sortType === "shuffle") {
+        return shuffleArray(uniqueTracks);
+    }
+    return uniqueTracks;
+  }
+
   function shuffleArray(array) {
     if (array.length < 10) {
       return simpleShuffle(array);
@@ -31580,11 +29738,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         border: 1px solid #282828;
     `;
 
-    const linkIconSVG = `<?xml version="1.0" encoding="utf-8"?>
-        <svg width="14px" height="14px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M14 7H16C18.7614 7 21 9.23858 21 12C21 14.7614 18.7614 17 16 17H14M10 7H8C5.23858 7 3 9.23858 3 12C3 14.7614 5.23858 17 8 17H10M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>`;
-
     const groups = new Map();
     let unknownGroup = [];
 
@@ -31678,7 +29831,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     let removedListHTML = '';
     let groupIndex = 1;
     
-    for (const [key, group] of groups.entries()) {
+    for (const group of groups.values()) {
         const keptHtml = renderTrackRow(group.keptTrack, 'kept', `${groupIndex}.`);
         const removedHtml = group.removed.map((t, idx) => {
             const isLast = idx === group.removed.length - 1;
@@ -31717,49 +29870,20 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .conversion-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
         .duplicate-group { background-color: rgba(255,255,255,0.02); border: 1px solid #333; border-radius: 8px; margin-bottom: 8px; overflow: hidden; display: flex; flex-direction: column; }
         .removed-items-container { background-color: rgba(0,0,0,0.15); display: flex; flex-direction: column; }
-        
         .track-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; flex: 1; min-width: 0; transition: background-color 0.2s; }
         .track-item.kept-track { background-color: rgba(30, 215, 96, 0.05); }
         .track-item.kept-track:hover { background-color: rgba(30, 215, 96, 0.1); }
-        
         .track-item.removed-track { background-color: transparent; border-bottom: 1px solid rgba(255,255,255,0.03); padding-left: 48px; position: relative; }
         .track-item.removed-track:hover { background-color: rgba(241, 94, 108, 0.08); }
         .track-item.removed-track:last-child { border-bottom: none; }
-        
         .track-item.removed-track.standalone { padding-left: 12px; }
         .track-item.removed-track.standalone::before, .track-item.removed-track.standalone::after { display: none !important; }
-
-        .track-item.removed-track::before {
-            content: '';
-            position: absolute;
-            left: 24px;
-            top: 0;
-            bottom: 0;
-            border-left: 2px solid #555;
-        }
-        .track-item.removed-track:first-child::before {
-            top: -8px; 
-        }
-        .track-item.removed-track::after {
-            content: '';
-            position: absolute;
-            left: 24px;
-            top: 50%;
-            width: 16px;
-            border-top: 2px solid #555;
-        }
-        .track-item.removed-track.last-removed::before {
-            bottom: 50%;
-            border-bottom-left-radius: 8px;
-            border-left: 2px solid #555;
-            border-bottom: 2px solid #555;
-            width: 16px;
-        }
-        .track-item.removed-track.last-removed::after {
-            display: none;
-        }
-
-        .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding-right: 12px;}
+        .track-item.removed-track::before { content: ''; position: absolute; left: 24px; top: 0; bottom: 0; border-left: 2px solid #555; }
+        .track-item.removed-track:first-child::before { top: -8px; }
+        .track-item.removed-track::after { content: ''; position: absolute; left: 24px; top: 50%; width: 16px; border-top: 2px solid #555; }
+        .track-item.removed-track.last-removed::before { bottom: 50%; border-bottom-left-radius: 8px; border-left: 2px solid #555; border-bottom: 2px solid #555; width: 16px; }
+        .track-item.removed-track.last-removed::after { display: none; }
+        .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding-right: 12px; }
         .track-item-cover { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; transition: opacity 0.3s ease; }
         .track-item-title { color: #e0e0e0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
         .track-item-artist-wrapper { display: flex; font-size: 12px; color: #b3b3b3; min-width: 0; margin-top: 2px; }
@@ -31772,7 +29896,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         .copy-track-button:hover { color: white; background-color: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
         .copy-track-button svg { width: 14px; height: 14px; }
         .copy-track-button.copied { color: #1ED760; border-color: #1ED760; background-color: rgba(30, 215, 96, 0.1); }
-        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease;}
+        .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
         .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
         .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
         .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
@@ -31782,7 +29906,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 27px 32px 12px !important;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>${modalTitle}</span></h1>
           <button id="closeRemovedModalX" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            <svg width="18" height="18" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>
+            ${closeModalIcon18Svg}
           </button>
       </div>
       <div class="main-trackCreditsModal-mainSection" style="padding: 16px 32px !important; overflow:auto">
@@ -31893,7 +30017,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     modalContainer.querySelector("#copyAllRemoved").addEventListener("click", () => {
         let trackListText = "";
         let groupNum = 1;
-        for (const [key, group] of groups.entries()) {
+        for (const group of groups.values()) {
             const k = group.keptTrack;
             const kTitle = k.songTitle || k.name || 'Unknown Title';
             const kArtist = k.allArtists || k.artistName || (k.artists && k.artists.map(a=>a.name).join(', ')) || 'Unknown Artist';
@@ -32050,26 +30174,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const processDedupeInternal = async (id) => {
             const data = await fetchInternalTrackMetadata(id);
             if (data) {
-                const cacheData = {
-                    name: data.name,
-                    album: {
-                        name: data.album.name,
-                        id: data.album.id,
-                        uri: data.album.uri,
-                        release_date: data.album.release_date,
-                        album_type: 'album'
-                    },
-                    artists: data.artists.map(a => ({
-                        id: a.id,
-                        name: a.name,
-                        uri: a.uri
-                    })),
-                    duration_ms: data.duration_ms,
-                    popularity: data.popularity,
-                    external_ids: data.external_ids,
-                    id: data.id,
-                    uri: data.uri
-                };
+                const cacheData = formatTrackCacheData(data);
                 cachedMetadata.set(data.id, cacheData);
                 idb.set('trackMetadata', data.id, cacheData);
             }
@@ -32077,48 +30182,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
         for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
             const batch = missingIds.slice(i, i + BATCH_SIZE);
-            
-            if (isFallbackActive()) {
-                await Promise.all(batch.map(id => processDedupeInternal(id)));
-            } else {
-                try {
-                    const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(',')}`);
-                    if (response && response.tracks) {
-                        response.tracks.forEach(track => {
-                            if (track) {
-                                const cacheData = {
-                                    name: track.name,
-                                    album: {
-                                        name: track.album.name,
-                                        id: track.album.id,
-                                        uri: track.album.uri,
-                                        release_date: track.album.release_date,
-                                        album_type: track.album.album_type
-                                    },
-                                    artists: track.artists.map(a => ({
-                                        id: a.id,
-                                        name: a.name,
-                                        uri: a.uri
-                                    })),
-                                    duration_ms: track.duration_ms,
-                                    popularity: track.popularity,
-                                    external_ids: track.external_ids,
-                                    id: track.id,
-                                    uri: track.uri
-                                };
-                                cachedMetadata.set(track.id, cacheData);
-                                idb.set('trackMetadata', track.id, cacheData);
-                            }
-                        });
-                    }
-                } catch (e) {
-                    if (registerWebApiFailure()) {
-                        await Promise.all(batch.map(id => processDedupeInternal(id)));
-                    } else {
-                        console.warn("[Sort-Play] Failed to fetch ISRC batch during deduplication", e);
-                    }
-                }
-            }
+            await Promise.all(batch.map(id => processDedupeInternal(id)));
         }
     }
 
@@ -32171,26 +30235,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         try {
             const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${id}`);
             if (res?.external_ids?.isrc) {
-                const cacheData = {
-                    name: res.name,
-                    album: {
-                        name: res.album.name,
-                        id: res.album.id,
-                        uri: res.album.uri,
-                        release_date: res.album.release_date,
-                        album_type: res.album.album_type
-                    },
-                    artists: res.artists.map(a => ({
-                        id: a.id,
-                        name: a.name,
-                        uri: a.uri
-                    })),
-                    duration_ms: res.duration_ms,
-                    popularity: res.popularity,
-                    external_ids: res.external_ids,
-                    id: res.id,
-                    uri: res.uri
-                };
+                const cacheData = formatTrackCacheData(res);
                 cachedMetadata.set(id, cacheData);
                 await idb.set('trackMetadata', id, cacheData);
                 return res.external_ids.isrc;
@@ -32208,7 +30253,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     ];
     const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})\\s*[\\)\\]\\-]?`, 'i');
 
-    const getCleanTitle = (rawTitle) => {
+    const getCleanTitleLocal = (rawTitle) => {
         return rawTitle
             .toLowerCase()
             .replace(versionRegex, '')
@@ -32283,7 +30328,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         trackCleanData.set(track, {
             rawTitle,
             rawTitleLower: rawTitle.trim().toLowerCase(),
-            cleanTitle: getCleanTitle(rawTitle),
+            cleanTitle: getCleanTitleLocal(rawTitle),
             normalizedTitle: getNormalizedTitle(rawTitle),
             tokens: getTokens(rawTitle),
             artistSet: new Set(normalizeAndSplitArtists(artist)),
@@ -32855,105 +30900,8 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     setButtonProcessing(false);
     mainButton.innerText = "Sort Play"; 
     mainButton.appendChild(svgElement); 
-    mainButton.style.backgroundColor = buttonStyles.main.backgroundColor;
-    mainButton.style.cursor = "pointer";
     applyCurrentThemeColors(); 
     mainButton.style.filter = "brightness(1)";
-    menuButtons.forEach((button) => {
-      button.disabled = false;
-    });
-  }
-
-  const extendedMetadataJsonDescriptor = {
-    nested: {
-        Message: {
-            fields: {
-                header: { type: "Header", id: 1 },
-                request: { type: "Request", id: 2, rule: "repeated" }
-            }
-        },
-        Header: {
-            fields: {
-                country: { type: "string", id: 1 },
-                catalogue: { type: "string", id: 2 },
-                task_id: { type: "bytes", id: 3 }
-            }
-        },
-        Request: {
-            fields: {
-                entity_uri: { type: "string", id: 1 },
-                query: { type: "Query", id: 2 }
-            }
-        },
-        Query: {
-            fields: {
-                extension_kind: { type: "uint32", id: 1 }
-            }
-        }
-    }
-  };
-
-  const audioFeaturesJsonDescriptor = {
-    nested: {
-        Message: {
-            fields: {
-                header: { type: "Header", id: 1 },
-                extension_kind: { type: "uint32", id: 2 },
-                response: { type: "Response", id: 3, rule: "repeated" }
-            }
-        },
-        Header: {
-            fields: { status: { type: "uint32", id: 1 } }
-        },
-        Response: {
-            fields: {
-                info: { type: "ResponseInfo", id: 1 },
-                track: { type: "string", id: 2 },
-                attributes: { type: "AudioAttributesWrapper", id: 3, rule: "optional" }
-            }
-        },
-        ResponseInfo: {
-            fields: { status: { type: "uint32", id: 1 } }
-        },
-        AudioAttributesWrapper: {
-            fields: {
-                typestr: { type: "string", id: 1 },
-                attributes: { type: "AudioAttributes", id: 2 }
-            }
-        },
-        AudioAttributes: {
-            fields: {
-                bpm: { type: "double", id: 1 },
-                key: { type: "Key", id: 2 },
-                danceability: { type: "double", id: 3 },
-                energy: { type: "double", id: 4 }
-            }
-        },
-        Key: {
-            fields: {
-                key: { type: "string", id: 1 },
-                majorMinor: { type: "uint32", id: 2 },
-                camelot: { type: "CamelotKey", id: 3 }
-            }
-        },
-        CamelotKey: {
-            fields: {
-                key: { type: "string", id: 1 },
-                backgroundColor: { type: "string", id: 2 }
-            }
-        }
-    }
-  };
-
-  async function loadProtobuf() {
-    if (typeof protobuf !== 'undefined') return protobuf;
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/protobufjs@7.2.5/dist/protobuf.min.js';
-        script.onload = () => resolve(window.protobuf);
-        script.onerror = reject;
-        document.head.appendChild(script);
-    });
   }
 
   async function fetchInternalAudioFeaturesBatch(trackIds) {
@@ -33195,84 +31143,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
     return results;
   }
-
-  function getTracklistTrackUri(tracklistElement) {
-    const reactPropsKey = Object.keys(tracklistElement).find(key => key.startsWith("__reactProps$"));
-    if (reactPropsKey) {
-        const props = tracklistElement[reactPropsKey];
-        
-        const findUri = (obj, maxDepth = 10, visited = new Set()) => {
-            if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
-            visited.add(obj);
-            if (obj.hasOwnProperty('uri') && typeof obj.uri === 'string' && (obj.uri.startsWith('spotify:track:') || obj.uri.startsWith('spotify:local:'))) return obj.uri;
-            for (const k in obj) {
-                if (['children', 'props', 'value', 'item', 'track'].includes(k) || !isNaN(k)) {
-                    const res = findUri(obj[k], maxDepth - 1, visited);
-                    if (res) return res;
-                }
-            }
-            return null;
-        };
-        
-        const uri = findUri(props);
-        if (uri) return uri;
-    }
-
-    let values = Object.values(tracklistElement);
-    if (!values || !values[0]?.pendingProps) {
-        return null;
-    }
-    return (
-        values[0]?.pendingProps?.children?.props?.value?.spec?._path?.[0]?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props
-            ?.uri ||
-        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
-    );
-  }
-
-  const waitForElement = (selector) => {
-    return new Promise((resolve) => {
-      if (document.querySelector(selector)) {
-        return resolve(document.querySelector(selector));
-      }
-      const observer = new MutationObserver(() => {
-        if (document.querySelector(selector)) {
-          observer.disconnect();
-          resolve(document.querySelector(selector));
-        }
-      });
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
-    });
-  };
-  
-  async function setCachedScrobbles(trackId, scrobbleCount) {
-    await idb.set('scrobbles', trackId, scrobbleCount);
-  }
-  
-  async function getCachedPersonalScrobbles(trackId) {
-    return await idb.get('personalScrobbles', trackId, CACHE_EXPIRE_PERSONAL_SCROBBLES);
-  }
-  async function setCachedPersonalScrobbles(trackId, scrobbleCount, isPending) {
-    await idb.set('personalScrobbles', trackId, { count: scrobbleCount, pendingUpdate: isPending });
-  }
-
-  async function flagCachedPersonalScrobbleForUpdate(trackId) {
-    try {
-      const cached = await idb.get('personalScrobbles', trackId);
-      
-      if (cached) {
-        cached.pendingUpdate = true;
-        await idb.set('personalScrobbles', trackId, cached);
-      }
-    } catch (error) {
-      console.error('Error flagging personal scrobble cache:', error);
-    }
-  }
   
   let previousTrackUriForScrobbleCache = null;
 
@@ -33310,149 +31180,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
             handleSongChange(newTrack.uri);
         }
     });
-  }
-
-  async function setCachedReleaseDate(trackId, rawReleaseDate, trackNumber = 0) { 
-    await idb.set('releaseDates', trackId, { date: rawReleaseDate, trackNumber: trackNumber });
-  }
-  
-  function formatReleaseDate(rawDate, format = 'YYYY-MM-DD') {
-    if (rawDate && typeof rawDate === 'object' && rawDate.date !== undefined) {
-        rawDate = rawDate.date;
-    }
-
-    if (!rawDate || rawDate === "_" || rawDate === "―") {
-        return "―";
-    }
-
-    let dateObj;
-    let yearOnly = false;
-    let monthYearOnly = false;
-
-    if (typeof rawDate === 'number') { 
-        dateObj = new Date(rawDate);
-    } else if (typeof rawDate === 'string') {
-        let dateStrToParse = rawDate;
-        if (rawDate.length === 4) { 
-             yearOnly = true;
-             dateStrToParse = `${rawDate}-01-01`;
-        } else if (rawDate.length === 7) {
-             monthYearOnly = true;
-             dateStrToParse = `${rawDate}-01`; 
-        }
-        dateObj = new Date(dateStrToParse);
-    } else {
-        return "―";
-    }
-
-    if (isNaN(dateObj.getTime())) {
-        return "―";
-    }
-
-    const year = dateObj.getFullYear();
-    const monthNumeric = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-    const dayNumeric = dateObj.getDate().toString().padStart(2, '0');
-    const monthShort = dateObj.toLocaleString('default', { month: 'short' });
-
-    if (yearOnly) {
-        switch (format) {
-            case 'YYYY': return year.toString();
-            case 'MM-YYYY': return `??-${year}`;
-            case 'YYYY-MM': return `${year}-??`;
-            case 'MMM D, YYYY': return `???, ${year}`; 
-            case 'D MMM, YYYY': return `???, ${year}`; 
-            case 'YYYY, MMM D': return `${year}, ???`;
-            default: return year.toString();
-        }
-    }
-
-    if (monthYearOnly) {
-        switch (format) {
-            case 'YYYY': return year.toString();
-            case 'MM-YYYY': return `${monthNumeric}-${year}`;
-            case 'YYYY-MM': return `${year}-${monthNumeric}`;
-            case 'MMM D, YYYY': return `${monthShort}, ${year}`; 
-            case 'D MMM, YYYY': return `${monthShort}, ${year}`; 
-            case 'YYYY, MMM D': return `${year}, ${monthShort}`;
-            default: return `${year}-${monthNumeric}`;
-        }
-    }
-
-    switch (format) {
-        case 'YYYY-MM-DD':
-            return `${year}-${monthNumeric}-${dayNumeric}`;
-        case 'DD-MM-YYYY':
-            return `${dayNumeric}-${monthNumeric}-${year}`;
-        case 'MM-DD-YYYY':
-            return `${monthNumeric}-${dayNumeric}-${year}`;
-        case 'YYYY':
-            return year.toString();
-        case 'YYYY-MM':
-            return `${year}-${monthNumeric}`;
-        case 'MM-YYYY':
-            return `${monthNumeric}-${year}`;
-        case 'MMM D, YYYY':
-            return `${monthShort} ${dateObj.getDate()}, ${year}`;
-        case 'D MMM, YYYY':
-            return `${dateObj.getDate()} ${monthShort}, ${year}`;
-        case 'YYYY, MMM D':
-            return `${year}, ${monthShort} ${dateObj.getDate()}`;
-        default:
-            return `${year}-${monthNumeric}-${dayNumeric}`;
-    }
-  }
-
-  function cleanupLegacyCache() {
-    if (localStorage.getItem('sort-play-idb-migration-cleanup-done-v2') === 'true') {
-        return;
-    }
-
-    const keysToRemove = [
-        'spotify-play-count-cache2', 
-        'spotify-play-count-cache-timestamp2',
-        'spotify-release-date-cache2', 
-        'spotify-release-date-cache-timestamp2',
-        'spotify-scrobbles-cache3', 
-        'spotify-scrobbles-cache-timestamp3',
-        'sort-play-personal-scrobbles-cache', 
-        'sort-play-personal-scrobbles-cache-timestamp',
-        'spotify-palette-analysis-cache',
-        'spotify-palette-analysis-cache-timestamp'
-    ];
-
-    let removedCount = 0;
-
-    keysToRemove.forEach(key => {
-        if (localStorage.getItem(key)) {
-            localStorage.removeItem(key);
-            removedCount++;
-        }
-    });
-
-    const prefixes = [
-        'sort-play-playlist-cache-v1-',
-        'sort-play-genre-cache-v2-',
-        'sort-play-like-'
-    ];
-
-    const allKeys = Object.keys(localStorage);
-    for (let i = 0; i < allKeys.length; i++) {
-        const key = allKeys[i];
-        if (prefixes.some(prefix => key.startsWith(prefix))) {
-            localStorage.removeItem(key);
-            removedCount++;
-        }
-    }
-    
-    if (removedCount > 0) {
-        console.log(`[Sort-Play] Cleaned up ${removedCount} legacy localStorage items.`);
-    }
-
-    localStorage.setItem('sort-play-idb-migration-cleanup-done-v2', 'true');
-  }
-
-  async function setCachedPlayCount(trackId, playCount) {
-    await idb.set('playCounts', trackId, playCount);
   }
 
   function getTrackDataObject(trackElement) {
@@ -33501,19 +31228,320 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     return null;
   }
 
-  async function fetchLastFmTrackExtendedInfo(artist, track, username) {
+  function getLfmOverrides() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY_LFM_OVERRIDES) || '{}'); }
+      catch(e) { return {}; }
+  }
+
+  function setLfmOverride(trackId, artist, track, originalTitle) {
+      const overrides = getLfmOverrides();
+      overrides[trackId] = { artist, track, ts: Date.now(), originalTitle };
+      localStorage.setItem(STORAGE_KEY_LFM_OVERRIDES, JSON.stringify(overrides));
+  }
+
+  function removeLfmOverride(trackId) {
+      const overrides = getLfmOverrides();
+      delete overrides[trackId];
+      localStorage.setItem(STORAGE_KEY_LFM_OVERRIDES, JSON.stringify(overrides));
+  }
+
+  function parseLastFmUrl(url) {
+      try {
+          const urlObj = new URL(url);
+          if (!urlObj.hostname.includes("last.fm")) return null;
+          const pathParts = urlObj.pathname.split('/').filter(Boolean);
+          if (pathParts.length >= 2 && pathParts[0] === 'music') {
+              const artist = decodeURIComponent(pathParts[1].replace(/\+/g, ' '));
+              let track = null;
+              if (pathParts[2] === '_' && pathParts[3]) {
+                  track = decodeURIComponent(pathParts[3].replace(/\+/g, ' '));
+              } else if (pathParts[2]) {
+                  track = decodeURIComponent(pathParts[2].replace(/\+/g, ' '));
+              }
+              if (artist && track) return { artist, track };
+          }
+      } catch(e) { return null; }
+      return null;
+  }
+
+  function showLastFmOverrideModal(trackId, originalTitle, refreshModalCallback) {
+      const overlay = document.createElement("div");
+      overlay.className = "sort-play-font-scope";
+      overlay.style.cssText = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 3000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(8px);";
+      
+      const modal = document.createElement("div");
+      modal.className = "main-embedWidgetGenerator-container";
+      modal.style.cssText = "width: 420px !important; background-color: #181818 !important; border: 1px solid #282828; border-radius: 20px; padding: 25px 30px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);";
+      
+      modal.innerHTML = `
+          <h2 style="margin:0; color:white; font-size:22px; font-weight:700;">Fix Last.fm Match</h2>
+          <p style="color:#b3b3b3; font-size:14px; margin:0; line-height:1.4;">Paste the correct Last.fm track URL (e.g., <i>https://www.last.fm/music/Artist/_/Track</i>) or leave empty to clear the existing override.</p>
+          <input type="text" id="lfm-override-input" placeholder="https://www.last.fm/music/..." style="width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #444; background: #282828; color: white; font-size: 14px; margin-top: 5px;">
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:10px;">
+              <button id="lfm-override-cancel" style="padding: 8px 18px; border-radius: 20px; background: transparent; color: white; border: 1px solid #666; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s;">Cancel</button>
+              <button id="lfm-override-save" style="padding: 8px 24px; border-radius: 20px; background: #1db954; color: black; border: none; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s;">Save</button>
+          </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.appendChild(modal);
+
+      const input = modal.querySelector("#lfm-override-input");
+      input.focus();
+
+      const existing = getLfmOverrides()[trackId];
+      if (existing) {
+          input.value = `https://www.last.fm/music/${encodeURIComponent(existing.artist)}/_/${encodeURIComponent(existing.track)}`;
+      }
+
+      const close = () => overlay.remove();
+      
+      const cancelBtn = modal.querySelector("#lfm-override-cancel");
+      cancelBtn.onclick = close;
+      cancelBtn.onmouseover = () => cancelBtn.style.background = '#333';
+      cancelBtn.onmouseout = () => cancelBtn.style.background = 'transparent';
+
+      const saveBtn = modal.querySelector("#lfm-override-save");
+      saveBtn.onclick = async () => {
+          const val = input.value.trim();
+          if (!val) {
+              removeLfmOverride(trackId);
+              await idb.del('scrobbles', trackId);
+              await idb.del('personalScrobbles', trackId);
+              document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
+              if (typeof updateTracklist === 'function') updateTracklist();
+              showNotification("Last.fm override cleared.");
+              close();
+              if (refreshModalCallback) refreshModalCallback();
+              return;
+          }
+          const parsed = parseLastFmUrl(val);
+          if (parsed) {
+              setLfmOverride(trackId, parsed.artist, parsed.track, originalTitle);
+              await idb.del('scrobbles', trackId);
+              await idb.del('personalScrobbles', trackId);
+              document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
+              if (typeof updateTracklist === 'function') updateTracklist();
+              showNotification("Last.fm link saved! Scrobble counts will update.");
+              close();
+              if (refreshModalCallback) refreshModalCallback();
+          } else {
+              showNotification("Invalid Last.fm track URL.", true);
+          }
+      };
+      saveBtn.onmouseover = () => saveBtn.style.background = '#3BE377';
+      saveBtn.onmouseout = () => saveBtn.style.background = '#1db954';
+
+      overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  }
+
+  function showLfmOverridesManagerModal() {
+      const overlay = document.createElement("div");
+      overlay.className = "sort-play-font-scope";
+      overlay.style.cssText = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 3000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(8px);";
+      
+      const modal = document.createElement("div");
+      modal.className = "main-embedWidgetGenerator-container";
+      modal.style.cssText = "width: 600px !important; background-color: #181818 !important; border: 1px solid #282828; border-radius: 20px; display: flex; flex-direction: column; max-height: 80vh;";
+      
+      modal.innerHTML = `
+          <style>
+              .lfm-ov-list { flex: 1; overflow-y: auto; padding: 10px 24px; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+              .lfm-ov-list::-webkit-scrollbar { width: 8px; }
+              .lfm-ov-list::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+              .lfm-ov-item { display: flex; justify-content: space-between; align-items: center; background: #242424; padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #333; }
+              .lfm-ov-item:hover { border-color: #444; }
+              .lfm-ov-info { display: flex; flex-direction: column; overflow: hidden; padding-right: 15px; }
+              .lfm-ov-title { color: #fff; font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+              .lfm-ov-target { color: #1ed760; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+              .lfm-ov-del-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 6px; border-radius: 4px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+              .lfm-ov-del-btn:hover { background: rgba(241, 94, 108, 0.1); color: #f15e6c; }
+              .lfm-ov-btn { padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; transition: background 0.2s; }
+          </style>
+          <div style="padding: 24px 24px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+              <h2 style="margin:0; color:white; font-size:22px; font-weight:700;">Track Overrides Manager</h2>
+              <div style="display: flex; gap: 8px;">
+                  <button id="lfm-ov-import" class="lfm-ov-btn" style="background: transparent; border: 1px solid #666; color: white;">Import JSON</button>
+                  <button id="lfm-ov-export" class="lfm-ov-btn" style="background: transparent; border: 1px solid #666; color: white;">Export JSON</button>
+              </div>
+          </div>
+          <div class="lfm-ov-list" id="lfm-ov-container"></div>
+          <div style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+              <button id="lfm-ov-clear" class="lfm-ov-btn" style="background: rgba(241,94,108,0.15); color: #f15e6c;">Clear All</button>
+              <button id="lfm-ov-close" class="lfm-ov-btn" style="background: #1db954; color: black;">Done</button>
+          </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.appendChild(modal);
+
+      const renderList = () => {
+          const container = modal.querySelector("#lfm-ov-container");
+          const overrides = getLfmOverrides();
+          const keys = Object.keys(overrides);
+          
+          if (keys.length === 0) {
+              container.innerHTML = '<div style="text-align: center; padding: 40px; color: #888; font-style: italic;">No manual track overrides saved.</div>';
+              return;
+          }
+
+          container.innerHTML = keys.map(id => {
+              const data = overrides[id];
+              return `
+                  <div class="lfm-ov-item">
+                      <div class="lfm-ov-info">
+                          <span class="lfm-ov-title" title="${data.originalTitle || id}">${data.originalTitle || id}</span>
+                          <span class="lfm-ov-target" title="${data.artist} - ${data.track}">&#x21B3; ${data.artist} - ${data.track}</span>
+                      </div>
+                      <div style="display: flex; gap: 4px; flex-shrink: 0;">
+                          <button class="lfm-ov-del-btn lfm-ov-edit-btn" data-id="${id}" title="Edit Override">${penIconSvg}</button>
+                          <button class="lfm-ov-del-btn" data-id="${id}" title="Remove Override">${trashIconSVG}</button>
+                      </div>
+                  </div>
+              `;
+          }).join('');
+
+          container.querySelectorAll('.lfm-ov-edit-btn').forEach(btn => {
+              btn.onclick = () => {
+                  const id = btn.dataset.id;
+                  const data = overrides[id];
+                  showLastFmOverrideModal(id, data.originalTitle || "Unknown Track", () => {
+                      renderList();
+                  });
+              };
+          });
+
+          container.querySelectorAll('.lfm-ov-del-btn:not(.lfm-ov-edit-btn)').forEach(btn => {
+              btn.onclick = async () => {
+                  const id = btn.dataset.id;
+                  removeLfmOverride(id);
+                  await idb.del('scrobbles', id);
+                  await idb.del('personalScrobbles', id);
+                  renderList();
+                  document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
+                  if (typeof updateTracklist === 'function') updateTracklist();
+              };
+          });
+      };
+
+      renderList();
+
+      modal.querySelector("#lfm-ov-clear").onclick = async () => {
+          const confirmed = await showConfirmationModal({
+              title: "Clear All Overrides?",
+              description: "Are you sure you want to permanently delete all your manual Last.fm track overrides?",
+              confirmText: "Clear All",
+              cancelText: "Cancel"
+          });
+          if (confirmed === 'confirm') {
+              const keys = Object.keys(getLfmOverrides());
+              localStorage.removeItem(STORAGE_KEY_LFM_OVERRIDES);
+              for (const id of keys) {
+                  await idb.del('scrobbles', id);
+                  await idb.del('personalScrobbles', id);
+              }
+              renderList();
+              document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
+              if (typeof updateTracklist === 'function') updateTracklist();
+              showNotification("All overrides cleared.");
+          }
+      };
+
+      modal.querySelector("#lfm-ov-import").onclick = () => {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.accept = ".json";
+          input.onchange = e => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = async (event) => {
+                  try {
+                      const data = JSON.parse(event.target.result);
+                      const current = getLfmOverrides();
+                      Object.assign(current, data);
+                      localStorage.setItem(STORAGE_KEY_LFM_OVERRIDES, JSON.stringify(current));
+                      for (const id of Object.keys(data)) {
+                          await idb.del('scrobbles', id);
+                          await idb.del('personalScrobbles', id);
+                      }
+                      renderList();
+                      document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
+                      if (typeof updateTracklist === 'function') updateTracklist();
+                      showNotification("Overrides imported successfully.");
+                  } catch (err) {
+                      showNotification("Invalid JSON file.", true);
+                  }
+              };
+              reader.readAsText(file);
+          };
+          input.click();
+      };
+
+      modal.querySelector("#lfm-ov-export").onclick = async () => {
+          const data = getLfmOverrides();
+          if (Object.keys(data).length === 0) return showNotification("No overrides to export.", true);
+          
+          const jsonString = JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonString], { type: 'application/json' });
+
+          if (window.showSaveFilePicker) {
+              try {
+                  const handle = await window.showSaveFilePicker({
+                      suggestedName: 'sort-play_lfm_overrides.json',
+                      types: [{
+                          description: 'JSON Files',
+                          accept: { 'application/json': ['.json'] },
+                      }],
+                  });
+                  const writable = await handle.createWritable();
+                  await writable.write(blob);
+                  await writable.close();
+                  showNotification("Overrides exported successfully!");
+              } catch (err) {
+                  if (err.name !== 'AbortError') {
+                      console.error('Error saving file:', err);
+                      showNotification("Failed to export data.", true);
+                  }
+              }
+          } else {
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'sort-play_lfm_overrides.json';
+              a.click();
+              URL.revokeObjectURL(url);
+              showNotification("Overrides exported successfully!");
+          }
+      };
+
+      const close = () => overlay.remove();
+      modal.querySelector("#lfm-ov-close").onclick = close;
+      overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  }
+
+  async function fetchLastFmTrackExtendedInfo(artist, track, username, trackId) {
       const results = {
           track: null,
           artist: null,
           user: null
       };
 
+      let lfmArtist = artist;
+      let lfmTrack = track;
+      
+      if (trackId) {
+          const overrides = getLfmOverrides();
+          if (overrides[trackId]) {
+              lfmArtist = overrides[trackId].artist;
+              lfmTrack = overrides[trackId].track;
+          }
+      }
+
       const promises = [];
 
       const trackParams = new URLSearchParams({
           method: 'track.getInfo',
-          artist: artist,
-          track: track,
+          artist: lfmArtist,
+          track: lfmTrack,
           format: 'json',
           autocorrect: lastFmAutocorrect ? '1' : '0'
       });
@@ -33654,7 +31682,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       if (existing) existing.remove();
 
       const username = loadLastFmUsername();
-      const isCommentsCollapsedInitial = localStorage.getItem('sort-play-lfm-comments-collapsed') === 'true';
+      const isCommentsCollapsedInitial = localStorage.getItem(STORAGE_KEY_LFM_COMMENTS_COLLAPSED) === 'true';
       
       const overlay = document.createElement("div");
       overlay.id = "sort-play-lfm-details-overlay";
@@ -33700,8 +31728,9 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       const artistName = trackInfo.artistName || (trackInfo.artists && trackInfo.artists[0]?.name) || "";
       const trackName = trackInfo.name || trackInfo.songTitle || "";
       const trackUri = trackInfo.uri || "";
+      const trackId = trackUri.split(":")[2] || null;
 
-      const lfmPromise = fetchLastFmTrackExtendedInfo(artistName, trackName, username);
+      const lfmPromise = fetchLastFmTrackExtendedInfo(artistName, trackName, username, trackId);
       
       let spotifyImagePromise = Promise.resolve(null);
       if (trackUri && trackUri.startsWith("spotify:track:")) {
@@ -33721,16 +31750,27 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           const tData = data.track;
           const aData = data.artist;
 
+          const triggerFixMatch = () => {
+              const displayTitle = trackInfo.songTitle || trackInfo.name || "Unknown Track";
+              showLastFmOverrideModal(trackId, displayTitle, () => {
+                  closeModal();
+                  showLastFmTrackDetailsModal(trackInfo);
+              });
+          };
+
           if (!tData) {
               modalContainer.style.width = '640px';
               modalContainer.innerHTML = `
                   <div style="padding: 50px; text-align: center; color: #fff !important; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
                       <h3 style="margin-bottom: 20px; color: #fff !important;">Track not found on Last.fm</h3>
+                      ${trackId ? `<button id="lfm-fix-match-btn" class="main-buttons-button main-button-secondary" style="margin-bottom: 20px; background-color: transparent !important; color: #1ed760 !important; border: 1px solid #1ed760; font-weight: bold; border-radius: 20px; padding: 8px 20px;">Fix Match (Override Link)</button>` : ''}
                       <button id="lfm-close-btn" class="main-buttons-button main-button-secondary" style="background-color: #333 !important; color: white !important;">Close</button>
                   </div>
               `;
               const btn = modalContainer.querySelector('#lfm-close-btn');
               if (btn) btn.onclick = closeModal;
+              const fixBtn = modalContainer.querySelector('#lfm-fix-match-btn');
+              if (fixBtn) fixBtn.onclick = triggerFixMatch;
               return;
           }
 
@@ -33758,10 +31798,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
           const trackTags = filterTags(tData.toptags?.tag).slice(0, 5);
           const artistTags = filterTags(aData?.tags?.tag).slice(0, 5);
-          
-          const barsIcon = `<svg width="18px" height="18px" viewBox="0 0 16 16" fill="currentColor"><path d="M12 2a1 1 0 011 1v10a1 1 0 11-2 0V3a1 1 0 011-1zM8 6a1 1 0 011 1v6a1 1 0 11-2 0V7a1 1 0 011-1zM5 10a1 1 0 00-2 0v3a1 1 0 102 0v-3z"/></svg>`;
-          const myPlaysIcon = `<svg viewBox="0 0 24 24" width="20px" height="20px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7C16 9.20914 14.2091 11 12 11C9.79086 11 8 9.20914 8 7C8 4.79086 9.79086 3 12 3C14.2091 3 16 4.79086 16 7Z"></path><path d="M12 14C8.13401 14 5 17.134 5 21H19C19 17.134 15.866 14 12 14Z"></path></svg>`;
-          const listenersIcon = `<svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 20V18C13 15.2386 10.7614 13 8 13C5.23858 13 3 15.2386 3 18V20H13ZM13 20H21V19C21 16.0545 18.7614 14 16 14C14.5867 14 13.3103 14.6255 12.4009 15.6311M11 7C11 8.65685 9.65685 10 8 10C6.34315 10 5 8.65685 5 7C5 5.34315 6.34315 4 8 4C9.65685 4 11 5.34315 11 7ZM18 9C18 10.1046 17.1046 11 16 11C14.8954 11 14 10.1046 14 9C14 7.89543 14.8954 7 16 7C17.1046 7 18 7.89543 18 9Z"/></svg>`;
 
           let currentPage = 1;
           let hasNextPage = true;
@@ -33770,143 +31806,56 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
           modalContainer.innerHTML = `
             <style>
-                #sort-play-lfm-details-overlay * { box-sizing: border-box; }
-                
-                .lfm-modal-layout { 
-                    display: flex; flex-direction: row; 
-                    width: 1040px; height: 100%; 
-                    flex: 1; min-height: 0; 
-                }
-                
-                .lfm-main-panel {
-                    width: 640px; flex-shrink: 0;
-                    display: flex; flex-direction: column;
-                    height: 100%; background-color: #181818;
-                }
-                .lfm-header {
-                    display: flex; padding: 30px 24px 24px;
-                    background: linear-gradient(180deg, #222 0%, #181818 100%) !important;
-                    gap: 24px; align-items: flex-start; flex-shrink: 0;
-                }
-                .lfm-cover {
-                    width: 140px; height: 140px;
-                    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-                    border-radius: 4px; object-fit: cover; flex-shrink: 0;
-                }
-                .lfm-info {
-                    display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px;
-                }
-                .lfm-title {
-                    font-size: 26px; font-weight: 800; color: white !important;
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; margin-bottom: 2px;
-                }
-                .lfm-artist {
-                    font-size: 18px; font-weight: 500; color: white !important;
-                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-                }
-                
-                .lfm-body {
-                    padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px;
-                    background-color: #181818 !important; flex: 1; overflow-y: auto; min-height: 0;
-                    scrollbar-width: thin; scrollbar-color: #535353 transparent;
-                }
-                .lfm-body::-webkit-scrollbar { width: 8px; }
-                .lfm-body::-webkit-scrollbar-track { background: transparent; }
-                .lfm-body::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
-
-                .lfm-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-                .lfm-stat-box {
-                    background: #242424 !important; border-radius: 8px !important;
-                    padding: 16px 20px !important; display: flex; flex-direction: column; justify-content: center; gap: 6px;
-                    border: 1px solid #333 !important; transition: border-color 0.2s; min-height: 85px;
-                }
-                .lfm-stat-box:hover { border-color: #444 !important; }
-                .lfm-stat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
-                .lfm-stat-label { font-size: 11px; color: #b3b3b3 !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
-                .lfm-stat-value { font-size: 22px; font-weight: 700; color: white !important; letter-spacing: -0.5px; }
-                .lfm-stat-sub { font-size: 12px; color:#888 !important; margin-top: -2px; }
-
-                .lfm-tags-container { display: flex; flex-direction: column; gap: 12px; }
-                .tag-section-header { font-size: 12px; color: #888 !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: 8px; }
-                .lfm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
-                .lfm-tag {
-                    background: #2a2a2a !important; color: #ddd !important;
-                    padding: 6px 14px !important; border-radius: 16px !important;
-                    font-size: 13px !important; font-weight: 500 !important; border: 1px solid transparent !important;
-                }
-                .lfm-tag:hover { background-color: #333 !important; border-color: #444 !important; color: white !important; }
-
-                .lfm-footer {
-                    padding: 20px 24px; border-top: 1px solid #282828 !important;
-                    display: flex; justify-content: space-between; align-items: center;
-                    background: #181818 !important; flex-shrink: 0;
-                }
-                .lfm-btn {
-                    background-color: #ba0000 !important; color: white !important; border: none !important;
-                    padding: 10px 24px !important; border-radius: 24px !important;
-                    font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important;
-                    display: flex; align-items: center; gap: 8px; transition: background-color 0.2s;
-                }
-                .lfm-btn:hover { background-color: #d60000 !important; }
-
-                .lfm-comments-panel {
-                    width: 400px; flex-shrink: 0; border-left: 1px solid #282828;
-                    display: flex; flex-direction: column; height: 100%;
-                    background-color: #121212; transition: opacity 0.3s; opacity: 1;
-                }
-                .lfm-comments-panel.collapsed { opacity: 0; pointer-events: none; }
-                
-                .lfm-comments-header {
-                    padding: 30px 24px 20px; border-bottom: 1px solid #282828; flex-shrink: 0; background-color: #181818;
-                }
-                .lfm-comments-body {
-                    flex: 1; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: #535353 transparent; min-height: 0;
-                }
-                .lfm-comments-body::-webkit-scrollbar { width: 6px; }
-                .lfm-comments-body::-webkit-scrollbar-thumb { background-color: #444; border-radius: 3px; }
-
-                .lfm-comment-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px; }
-                .comment-item { display: flex; flex-direction: column; position: relative; }
-                .comment-content { display: flex; gap: 10px; align-items: stretch; position: relative; z-index: 2; }
-                
-                .avatar-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; position: relative; }
-                .parent-drop-line { position: absolute; bottom: 0; width: 0; border-left: 2px solid #333; z-index: 1; }
-
-                .comment-thread-replies {
-                    list-style: none; margin: 0; padding-top: 12px; padding-bottom: 0; padding-right: 0;
-                    display: flex; flex-direction: column; gap: 16px;
-                }
-                .replies-level-0 { padding-left: 42px; }
-                .replies-level-deep { padding-left: 38px; }
-
-                .reply-item { position: relative; display: flex; flex-direction: column; }
-                
-                .reply-item::before {
-                    content: ''; position: absolute;
-                    top: -16px; left: -27px;
-                    width: 27px; height: 28px;
-                    border-left: 2px solid #333; border-bottom: 2px solid #333; 
-                    border-bottom-left-radius: 16px;
-                    z-index: 1;
-                }
-                .reply-item:not(:last-child)::after {
-                    content: ''; position: absolute;
-                    top: 0px; left: -27px; bottom: -16px; border-left: 2px solid #333;
-                    z-index: 1;
-                }
-
-                .close-icon-btn {
-                    position: absolute; top: 20px; right: 20px;
-                    background: rgba(0,0,0,0.4) !important; border: none !important; border-radius: 50% !important;
-                    width: 32px !important; height: 32px !important; color: white !important;
-                    cursor: pointer !important; display: flex; align-items: center; justify-content: center;
-                    transition: background 0.2s; z-index: 10;
-                }
-                .close-icon-btn:hover { background: rgba(0,0,0,0.7) !important; }
+              #sort-play-lfm-details-overlay * { box-sizing: border-box; }
+              .lfm-modal-layout { display: flex; flex-direction: row; width: 1040px; height: 100%; flex: 1; min-height: 0; }
+              .lfm-main-panel { width: 640px; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; background-color: #181818; }
+              .lfm-header { display: flex; padding: 30px 24px 24px; background: linear-gradient(180deg, #222 0%, #181818 100%) !important; gap: 24px; align-items: flex-start; flex-shrink: 0; }
+              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+              .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px; }
+              .lfm-title { font-size: 26px; font-weight: 800; color: white !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; margin-bottom: 2px; }
+              .lfm-artist { font-size: 18px; font-weight: 500; color: white !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+              .lfm-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px; background-color: #181818 !important; flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+              .lfm-body::-webkit-scrollbar { width: 8px; }
+              .lfm-body::-webkit-scrollbar-track { background: transparent; }
+              .lfm-body::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+              .lfm-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+              .lfm-stat-box { background: #242424 !important; border-radius: 8px !important; padding: 16px 20px !important; display: flex; flex-direction: column; justify-content: center; gap: 6px; border: 1px solid #333 !important; transition: border-color 0.2s; min-height: 85px; }
+              .lfm-stat-box:hover { border-color: #444 !important; }
+              .lfm-stat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
+              .lfm-stat-label { font-size: 11px; color: #b3b3b3 !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+              .lfm-stat-value { font-size: 22px; font-weight: 700; color: white !important; letter-spacing: -0.5px; }
+              .lfm-stat-sub { font-size: 12px; color: #888 !important; margin-top: -2px; }
+              .lfm-tags-container { display: flex; flex-direction: column; gap: 12px; }
+              .tag-section-header { font-size: 12px; color: #888 !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: 8px; }
+              .lfm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+              .lfm-tag { background: #2a2a2a !important; color: #ddd !important; padding: 6px 14px !important; border-radius: 16px !important; font-size: 13px !important; font-weight: 500 !important; border: 1px solid transparent !important; }
+              .lfm-tag:hover { background-color: #333 !important; border-color: #444 !important; color: white !important; }
+              .lfm-footer { padding: 20px 24px; border-top: 1px solid #282828 !important; display: flex; justify-content: space-between; align-items: center; background: #181818 !important; flex-shrink: 0; }
+              .lfm-btn { background-color: #ba0000 !important; color: white !important; border: none !important; padding: 10px 24px !important; border-radius: 24px !important; font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important; display: flex; align-items: center; gap: 8px; transition: background-color 0.2s; }
+              .lfm-btn:hover { background-color: #d60000 !important; }
+              .lfm-comments-panel { width: 400px; flex-shrink: 0; border-left: 1px solid #282828; display: flex; flex-direction: column; height: 100%; background-color: #121212; transition: opacity 0.3s; opacity: 1; }
+              .lfm-comments-panel.collapsed { opacity: 0; pointer-events: none; }
+              .lfm-comments-header { padding: 30px 24px 20px; border-bottom: 1px solid #282828; flex-shrink: 0; background-color: #181818; }
+              .lfm-comments-body { flex: 1; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: #535353 transparent; min-height: 0; }
+              .lfm-comments-body::-webkit-scrollbar { width: 6px; }
+              .lfm-comments-body::-webkit-scrollbar-thumb { background-color: #444; border-radius: 3px; }
+              .lfm-comment-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px; }
+              .comment-item { display: flex; flex-direction: column; position: relative; }
+              .comment-content { display: flex; gap: 10px; align-items: stretch; position: relative; z-index: 2; }
+              .avatar-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; position: relative; }
+              .parent-drop-line { position: absolute; bottom: 0; width: 0; border-left: 2px solid #333; z-index: 1; }
+              .comment-thread-replies { list-style: none; margin: 0; padding-top: 12px; padding-bottom: 0; padding-right: 0; display: flex; flex-direction: column; gap: 16px; }
+              .replies-level-0 { padding-left: 42px; }
+              .replies-level-deep { padding-left: 38px; }
+              .reply-item { position: relative; display: flex; flex-direction: column; }
+              .reply-item::before { content: ''; position: absolute; top: -16px; left: -27px; width: 27px; height: 28px; border-left: 2px solid #333; border-bottom: 2px solid #333; border-bottom-left-radius: 16px; z-index: 1; }
+              .reply-item:not(:last-child)::after { content: ''; position: absolute; top: 0px; left: -27px; bottom: -16px; border-left: 2px solid #333; z-index: 1; }
+              .close-icon-btn { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.4) !important; border: none !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex; align-items: center; justify-content: center; transition: background 0.2s; z-index: 10; }
+              .close-icon-btn:hover { background: rgba(0,0,0,0.7) !important; }
             </style>
 
             <button class="close-icon-btn" id="lfm-close-x">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>
+                ${closeIconSmall2Svg}
             </button>
 
             <div class="lfm-modal-layout">
@@ -33914,7 +31863,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     <div class="lfm-header">
                         <img src="${albumImage}" class="lfm-cover">
                         <div class="lfm-info">
-                            <div class="lfm-title" title="${tData.name}">${tData.name}</div>
+                            <div class="lfm-title" title="${tData.name}">
+                                ${tData.name}
+                                ${trackId ? `<button id="lfm-fix-match-btn-header" title="Fix Match (Override Link)" style="background:none; border:none; cursor:pointer; color:#b3b3b3; padding:0; margin-left:8px; vertical-align:middle; transition: color 0.2s;">${penIconSvg}</button>` : ''}
+                            </div>
                             <div class="lfm-artist">${tData.artist.name}</div>
                         </div>
                     </div>
@@ -33966,7 +31918,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                         </button>
                         <a href="${trackUrl}" target="_blank" class="lfm-btn">
                             View on Last.fm 
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>
+                            ${externalLinkIconSvg}
                         </a>
                     </div>
                 </div>
@@ -33986,6 +31938,13 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           const closeBtn = modalContainer.querySelector('#lfm-close-x');
           if (closeBtn) closeBtn.onclick = closeModal;
           
+          const fixBtnHeader = modalContainer.querySelector('#lfm-fix-match-btn-header');
+          if (fixBtnHeader) {
+              fixBtnHeader.onclick = triggerFixMatch;
+              fixBtnHeader.onmouseover = () => fixBtnHeader.style.color = '#fff';
+              fixBtnHeader.onmouseout = () => fixBtnHeader.style.color = '#b3b3b3';
+          }
+
           const setUserBtn = modalContainer.querySelector('#set-user-btn');
           if (setUserBtn) {
               setUserBtn.onclick = () => {
@@ -34037,7 +31996,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                                       ${c.body}
                                   </div>
                                   <div style="display: flex; align-items: center; gap: 4px; margin-top: 6px;">
-                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
+                                      ${thumbsUpIconSvg}
                                       <span style="color: #888; font-size: 12px; font-weight: 500;">${c.likes || 0}</span>
                                   </div>
                               </div>
@@ -34079,10 +32038,10 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
           };
 
           toggleBtn.addEventListener('click', () => {
-              const currentlyCollapsed = localStorage.getItem('sort-play-lfm-comments-collapsed') === 'true';
+              const currentlyCollapsed = localStorage.getItem(STORAGE_KEY_LFM_COMMENTS_COLLAPSED) === 'true';
               const willBeCollapsed = !currentlyCollapsed;
               
-              localStorage.setItem('sort-play-lfm-comments-collapsed', willBeCollapsed);
+              localStorage.setItem(STORAGE_KEY_LFM_COMMENTS_COLLAPSED, willBeCollapsed);
               
               if (willBeCollapsed) {
                   modalContainer.style.width = '640px';
@@ -34126,7 +32085,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
   function updateLastFmContextMenu() {
       if (showLastFmContextMenu && !lastFmContextMenuItem) {
           if (!Spicetify.SVGIcons["lastfm"]) {
-              Spicetify.SVGIcons["lastfm"] = `<svg width="18" height="18" viewBox="1 0 24 24" fill="currentColor"><path d="M7,13v6a1,1,0,0,1-2,0V13a1,1,0,0,1,2,0Zm11,7a1,1,0,0,0,1-1V5a1,1,0,0,0-2,0V19A1,1,0,0,0,18,20Zm-6,0a1,1,0,0,0,1-1V9a1,1,0,0,0-2,0V19A1,1,0,0,0,12,20Z"/></svg>`;
+              Spicetify.SVGIcons["lastfm"] = lastFmIconSvg;
           }
 
           lastFmContextMenuItem = new Spicetify.ContextMenu.Item(
@@ -34257,7 +32216,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
     currentOptions.forEach(opt => {
         const item = document.createElement('button');
         item.className = 'main-contextMenu-menuItemButton';
-        item.style.cssText = 'color: #b3b3b3; padding: 4px 8px; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; font-size: 13px; border-radius: 2px; height: 28px;';
+        item.style.cssText = 'color: #b3b3b3; padding: 4px 8px; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; font-size: 13px; border-radius: 2px; height: 28px !important; min-height: 28px !important;';
         item.innerText = opt.label;
         
         let isSelected = false;
@@ -34289,19 +32248,19 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         item.onclick = () => {
             if (contextType === 'playlist1') {
                 selectedColumnType = opt.value;
-                localStorage.setItem("sort-play-selected-column-type", selectedColumnType);
+                localStorage.setItem(STORAGE_KEY_SELECTED_COLUMN_TYPE, selectedColumnType);
                 updateTracklist();
             } else if (contextType === 'playlist2') {
                 selectedSecondColumnType = opt.value;
-                localStorage.setItem("sort-play-selected-second-column-type", selectedSecondColumnType);
+                localStorage.setItem(STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE, selectedSecondColumnType);
                 updateTracklist();
             } else if (contextType === 'album') {
                 selectedAlbumColumnType = opt.value;
-                localStorage.setItem("sort-play-selected-album-column-type", selectedAlbumColumnType);
+                localStorage.setItem(STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE, selectedAlbumColumnType);
                 updateAlbumTracklist();
             } else if (contextType === 'artist') {
                 selectedArtistColumnType = opt.value;
-                localStorage.setItem("sort-play-selected-artist-column-type", selectedArtistColumnType);
+                localStorage.setItem(STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE, selectedArtistColumnType);
                 updateArtistTracklist();
             }
             menu.remove();
@@ -34746,38 +32705,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     await Promise.all(workers);
                 };
 
-                if (isFallbackActive()) {
-                    await fetchAndProcessInternal();
-                } else {
-                    try {
-                        const resp = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${idsToFetchFromApi.join(',')}`);
-                        if (resp?.tracks) {
-                            await Promise.all(resp.tracks.map(async (detailedTrack) => {
-                                if (detailedTrack) {
-                                    const cacheData = {
-                                        name: detailedTrack.name,
-                                        album: {
-                                            name: detailedTrack.album.name,
-                                            id: detailedTrack.album.id,
-                                            uri: detailedTrack.album.uri,
-                                            release_date: detailedTrack.album.release_date
-                                        },
-                                        artists: detailedTrack.artists.map(a => ({ id: a.id, name: a.name, uri: a.uri })),
-                                        duration_ms: detailedTrack.duration_ms,
-                                        popularity: detailedTrack.popularity,
-                                        external_ids: detailedTrack.external_ids,
-                                        id: detailedTrack.id,
-                                        uri: detailedTrack.uri
-                                    };
-                                    idb.set('trackMetadata', detailedTrack.id, cacheData);
-                                    await processTrackData(detailedTrack);
-                                }
-                            }));
-                        }
-                    } catch(e) {
-                        if (registerWebApiFailure()) await fetchAndProcessInternal();
-                    }
-                }
+                await fetchAndProcessInternal();
             }
             
             idsToFetchFromApi.forEach(id => {
@@ -34918,7 +32846,43 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
       isUpdatingTracklist = false;
     }
   }
-  
+
+  function getTracklistTrackUri(tracklistElement) {
+    const reactPropsKey = Object.keys(tracklistElement).find(key => key.startsWith("__reactProps$"));
+    if (reactPropsKey) {
+        const props = tracklistElement[reactPropsKey];
+        
+        const findUri = (obj, maxDepth = 10, visited = new Set()) => {
+            if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
+            visited.add(obj);
+            if (obj.hasOwnProperty('uri') && typeof obj.uri === 'string' && (obj.uri.startsWith('spotify:track:') || obj.uri.startsWith('spotify:local:'))) return obj.uri;
+            for (const k in obj) {
+                if (['children', 'props', 'value', 'item', 'track'].includes(k) || !isNaN(k)) {
+                    const res = findUri(obj[k], maxDepth - 1, visited);
+                    if (res) return res;
+                }
+            }
+            return null;
+        };
+        
+        const uri = findUri(props);
+        if (uri) return uri;
+    }
+
+    let values = Object.values(tracklistElement);
+    if (!values || !values[0]?.pendingProps) {
+        return null;
+    }
+    return (
+        values[0]?.pendingProps?.children?.props?.value?.spec?._path?.[0]?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props
+            ?.uri ||
+        values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
+    );
+  }
+
   function updateTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
@@ -35440,7 +33404,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                 <div class="main-trackList-rowSectionStart" role="columnheader" aria-colindex="2"><div class="main-trackList-column"><span class="encore-text-body-small">Title</span></div></div>
                 <div class="main-trackList-rowSectionVariable" role="columnheader" aria-colindex="3"><div><span class="encore-text-body-small">Plays</span></div></div>
                 <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="justify-content: center;"><button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button></div>
-                <div class="main-trackList-rowSectionEnd" role="columnheader" aria-colindex="5"><div aria-label="Duration" class="main-trackList-column main-trackList-durationHeader"><svg data-encore-id="icon" role="img" aria-hidden="true" viewBox="0 0 16 16" class="Svg-sc-ytk21e-0 Svg-img-icon-small"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg></div></div>
+                <div class="main-trackList-rowSectionEnd" role="columnheader" aria-colindex="5"><div aria-label="Duration" class="main-trackList-column main-trackList-durationHeader">${durationIconSvg}</div></div>
             </div>`;
             headerWrapper.style.cssText = 'position: sticky; top: 0px; z-index: 2;';
             headerWrapper.querySelector('.sort-play-artist-col-header button').onclick = (e) => showColumnSelector(e, 'artist');
@@ -35750,7 +33714,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
 
                 const childIcons = menu.querySelectorAll('svg');
                 childIcons.forEach(svg => {
-                    if (svg.style.fill !== 'rgb(30, 215, 96)') { 
+                    if (svg.style && svg.style.fill !== 'rgb(30, 215, 96)') { 
                         svg.style.fill = nativeMenuColor;
                     }
                 });
@@ -35758,10 +33722,6 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         }
     });
   }
-  
-  const LIKE_BUTTON_ICON_NOT_LIKED = `<path d="M1.69 2A4.582 4.582 0 018 2.023 4.583 4.583 0 0111.88.817h.002a4.618 4.618 0 013.782 3.65v.003a4.543 4.543 0 01-1.011 3.84L9.35 14.629a1.765 1.765 0 01-2.093.464 1.762 1.762 0 01-.605-.463L1.348 8.309A4.582 4.582 0 011.689 2zm3.158.252A3.082 3.082 0 002.49 7.337l.005.005L7.8 13.664a.264.264 0 00.311.069.262.262 0 00.09-.069l5.312-6.33a3.043 3.043 0 00.68-2.573 3.118 3.118 0 00-2.551-2.463 3.079 3.079 0 00-2.612.816l-.007.007a1.501 1.501 0 01-2.045 0l-.009-.008a3.082 3.082 0 00-2.121-.861z"></path>`;
-  const LIKE_BUTTON_ICON_LIKED = `<path d="M15.724 4.22A4.313 4.313 0 0012.192.814a4.269 4.269 0 00-3.622 1.13.837.837 0 01-1.14 0 4.272 4.272 0 00-6.21 5.855l5.916 7.05a1.128 1.128 0 001.727 0l5.916-7.05a4.228 4.228 0 00.945-3.577z"></path>`;
-  const LIKE_BUTTON_ICON_ISRC_LIKED = `<path d="m15.92,3.56h0c-.36-1.81-1.8-3.2-3.62-3.49-1.35-.22-2.72.21-3.71,1.16-.16.15-.37.23-.58.23s-.42-.08-.58-.23c-.85-.82-1.95-1.23-3.04-1.23S2.09.45,1.23,1.33c-1.57,1.63-1.65,4.18-.17,5.9l6.06,7.22c.23.27.56.41.89.41h0c.26,0,.53-.09.74-.27.05-.04.1-.09.14-.14l6.06-7.22c.87-1.01,1.23-2.36.97-3.66h0Zm-7.91,9.39h0L2.31,6.18h0s0-.01,0-.01c-.45-.52-.68-1.18-.66-1.86s.29-1.33.77-1.82c.52-.54,1.22-.83,1.97-.83s1.39.27,1.9.77h.01s.01.02.01.02c.46.43,1.07.67,1.7.67v9.86h0Z"></path>`;
   
   function initializeLikeButtonFeature() {
     const styleId = 'sort-play-like-button-tooltip-style';
@@ -35851,17 +33811,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         const processLikeInternal = async (id) => {
             const track = await fetchInternalTrackMetadata(id);
             if (track) {
-                const cacheData = {
-                    name: track.name,
-                    album: track.album,
-                    artists: track.artists,
-                    duration_ms: track.duration_ms,
-                    popularity: track.popularity,
-                    external_ids: track.external_ids,
-                    id: track.id,
-                    uri: track.uri
-                };
-                idb.set('trackMetadata', track.id, cacheData);
+                idb.set('trackMetadata', track.id, formatTrackCacheData(track));
 
                 if (track.external_ids && track.external_ids.isrc) {
                     newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
@@ -35872,34 +33822,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
         for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 50) {
             let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
             
-            if (isFallbackActive()) {
-                await Promise.all(batch.map(id => processLikeInternal(id)));
-            } else {
-                try {
-                    const response = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks?ids=${batch.join(",")}`);
-                    if (response && response.tracks) {
-                        response.tracks.forEach(track => {
-                            if (track && track.external_ids && track.external_ids.isrc) {
-                                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
-                                idb.set('trackMetadata', track.id, {
-                                    name: track.name,
-                                    album: track.album,
-                                    artists: track.artists,
-                                    duration_ms: track.duration_ms,
-                                    popularity: track.popularity,
-                                    external_ids: track.external_ids,
-                                    id: track.id,
-                                    uri: track.uri
-                                });
-                            }
-                        });
-                    }
-                } catch (error) {
-                    if (registerWebApiFailure()) {
-                        await Promise.all(batch.map(id => processLikeInternal(id)));
-                    }
-                }
-            }
+            await Promise.all(batch.map(id => processLikeInternal(id)));
             
             if (i + 50 < likedTracksIdsWithUnknownISRCs.length) {
                 await new Promise(resolve => setTimeout(resolve, 150));
@@ -36023,18 +33946,7 @@ function createKeywordTag(keyword, container, keywordSet, onUpdateCallback = () 
                     if (meta && meta.external_ids && meta.external_ids.isrc) {
                         currentIsrc = meta.external_ids.isrc;
                     } else if (trackId) {
-                        let track = null;
-                        if (isFallbackActive()) {
-                            track = await fetchInternalTrackMetadata(trackId);
-                        } else {
-                            try {
-                                track = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/tracks/${trackId}`);
-                            } catch (e) {
-                                if (registerWebApiFailure()) {
-                                    track = await fetchInternalTrackMetadata(trackId);
-                                }
-                            }
-                        }
+                        let track = await fetchInternalTrackMetadata(trackId);
 
                         if (track && track.external_ids && track.external_ids.isrc) {
                             currentIsrc = track.external_ids.isrc;
