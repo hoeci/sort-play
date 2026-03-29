@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.70.0";
+  const SORT_PLAY_VERSION = "5.71.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -245,6 +245,9 @@
   let genreSourcesApLastfm = true;
   let autoUpdateGenreModal = false;
   let isProcessing = false;
+  let isDiscoProcessing = false;
+  let isMultiDiscoMode = false;
+  let stickyDiscoNotification = null;
   let isMenuOpen = false;
   let areSubMenusCreated = false;
   let activeSubMenuParent = null;
@@ -283,6 +286,9 @@
   let artistDiscographyContextMenuItem = null;
   let shuffleContextMenuItem = null;
   let metadataServiceClient = null;
+  const MAX_CONCURRENT_DISCOGRAPHY = 3;
+  const discographyQueue = [];
+  const activeDiscographyJobs = new Map();
   const revokedLfmKeys = new Set();
   const runningJobIds = new Set();
   const artistGenreCache = new Map();
@@ -1327,8 +1333,8 @@
   notificationStyles.innerHTML = `
       #sort-play-notifications-wrapper { position: fixed; bottom: 108px; left: 0; z-index: 2147483647; display: flex; flex-direction: column; align-items: flex-start; gap: 0; pointer-events: none; max-height: 80vh; }
       .sp-notification-section { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; transition: margin-top 0.2s ease; }
-      .sp-notification-divider { height: 1px; background: rgba(255, 255, 255, 0.15); width: 100%; margin: 10px 0; display: none; max-width: 450px; }
-      .sp-notification-divider.visible { display: block; }
+      .sp-notification-divider { height: 1px; background: rgba(255, 255, 255, 0.15); width: 100%; margin: 0; opacity: 0; visibility: hidden; max-width: 450px; transition: opacity 0.1s ease, margin 0.1s ease, visibility 0.1s ease; pointer-events: none; }
+      .sp-notification-divider.visible { opacity: 1; visibility: visible; margin: 10px 0; }
       .sort-play-notification-toast { background-color: #fff; color: #000; padding: 14px 24px 14px 20px; border-radius: 0 8px 8px 0; box-shadow: 4px 4px 12px rgba(0,0,0,0.3); font-family: 'SpotifyMixUI', sans-serif; font-size: 16px; font-weight: 500; opacity: 0; transform: translateX(-100%); transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1), margin-bottom 0.25s ease, max-height 0.25s ease; pointer-events: auto; cursor: pointer; max-width: 450px; text-align: left; border-left: 10px solid #1db954; word-wrap: break-word; }
       .sort-play-notification-toast:hover { filter: brightness(0.95); }
       .sort-play-notification-toast.visible { opacity: 1; transform: translateX(0); }
@@ -1392,7 +1398,12 @@
 
       toast.innerText = text;
 
-      toast.onclick = () => removeToast(toast);
+      if (isSticky) {
+          toast.ondblclick = () => removeToast(toast);
+          toast.title = "Double-click to dismiss";
+      } else {
+          toast.onclick = () => removeToast(toast);
+      }
 
       container.appendChild(toast);
       updateDivider();
@@ -11381,30 +11392,35 @@
     }
   }
   
-  async function processArtistPageTracks(tracks, isHeadless = false, sortType = null) {
-    if (!isHeadless) mainButton.innerText = "Correcting...";
+  async function processArtistPageTracks(tracks, isHeadless = false, sortType = null, progressCallback = null) {
+    const updateProgress = (msg) => {
+        if (progressCallback) progressCallback(msg);
+        else if (!isHeadless) mainButton.innerText = msg;
+    };
+
+    updateProgress("Correcting...");
     
     const refreshedTracks = await refreshTrackAlbumInfo(
         tracks, 
-        (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.30)}%`; }
+        (progress) => { updateProgress(`${Math.floor(progress * 0.30)}%`); }
     );
 
-    if (!isHeadless) mainButton.innerText = "Enriching...";
+    updateProgress("Enriching...");
     
     const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
         refreshedTracks, 
-        (progress) => { if (!isHeadless) mainButton.innerText = `${30 + Math.floor(progress * 0.60)}%`; }
+        (progress) => { updateProgress(`${30 + Math.floor(progress * 0.60)}%`); }
     );
 
     const { unique } = await deduplicateTracks(
         tracksWithPlayCounts, 
         true, 
         true,
-        (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; },
+        (progress) => { updateProgress(`Dedup ${progress}%`); },
         sortType
     );
     
-    if (!isHeadless) mainButton.innerText = "Ready";
+    updateProgress("Ready");
     return unique;
   }
 
@@ -27285,8 +27301,123 @@
     return sortedTracks;
   }
 
+  function updateGlobalDiscoProgress() {
+      const totalActive = activeDiscographyJobs.size;
+      const totalQueued = discographyQueue.length;
+      const totalJobs = totalActive + totalQueued;
+      
+      if (totalJobs === 0) {
+          if (stickyDiscoNotification) {
+              stickyDiscoNotification.remove();
+              stickyDiscoNotification = null;
+          }
+          if (isDiscoProcessing) {
+              isDiscoProcessing = false;
+              isMultiDiscoMode = false;
+              if (isProcessing) resetButtons();
+          }
+          return;
+      }
+
+      if (!isProcessing) {
+          setButtonProcessing(true);
+          isDiscoProcessing = true;
+      }
+
+      if (totalJobs > 1) {
+          isMultiDiscoMode = true;
+      }
+
+      if (!isMultiDiscoMode) {
+          if (stickyDiscoNotification) {
+              stickyDiscoNotification.remove();
+              stickyDiscoNotification = null;
+          }
+          const [job] = activeDiscographyJobs.values();
+          if (job) mainButton.innerText = job.lastMsg;
+      } else {
+          mainButton.innerText = `Processing (${totalJobs})...`;
+
+          if (!stickyDiscoNotification) {
+              stickyDiscoNotification = showNotification("Starting discography creation...", "sticky");
+          }
+          
+          let lines = [];
+          activeDiscographyJobs.forEach((state) => {
+              lines.push(`• ${state.name}: ${state.lastMsg}`);
+          });
+          if (totalQueued > 0) {
+              lines.push(`...and ${totalQueued} more in queue`);
+          }
+          stickyDiscoNotification.update(`Creating Discographies:\n${lines.join('\n')}`);
+      }
+  }
+
+  async function processDiscographyQueue() {
+      if (discographyQueue.length === 0 && activeDiscographyJobs.size === 0) {
+          updateGlobalDiscoProgress();
+          return;
+      }
+      if (discographyQueue.length === 0 || activeDiscographyJobs.size >= MAX_CONCURRENT_DISCOGRAPHY) {
+          updateGlobalDiscoProgress();
+          return;
+      }
+
+      const { artistUri, sortType } = discographyQueue.shift();
+      
+      let progressUpdater = {
+          update: (msg) => {
+              const jobState = activeDiscographyJobs.get(artistUri);
+              if (jobState) {
+                  jobState.lastMsg = msg;
+                  updateGlobalDiscoProgress();
+              }
+          }
+      };
+      
+      activeDiscographyJobs.set(artistUri, { name: "Artist", lastMsg: "Starting..." });
+      
+      fetchSourceNameAndArtist(artistUri).then(({sourceName}) => {
+          if (activeDiscographyJobs.has(artistUri)) {
+              activeDiscographyJobs.get(artistUri).name = sourceName;
+              updateGlobalDiscoProgress();
+          }
+      }).catch(()=>{});
+
+      updateGlobalDiscoProgress();
+
+      handleSortAndCreatePlaylist(sortType, { 
+          sourceUri: artistUri, 
+          isHeadless: true, 
+          progressCallback: (msg) => progressUpdater.update(msg)
+      }).then(() => {
+          activeDiscographyJobs.delete(artistUri);
+          processDiscographyQueue();
+      }).catch((e) => {
+          console.error("Discography job failed", e);
+          activeDiscographyJobs.delete(artistUri);
+          processDiscographyQueue();
+      });
+      
+      processDiscographyQueue();
+  }
+
+  function enqueueDiscographyJob(artistUri, sortType) {
+      if (activeDiscographyJobs.has(artistUri) || discographyQueue.some(j => j.artistUri === artistUri)) {
+          showNotification("Already processing this artist.", "warning");
+          return;
+      }
+      discographyQueue.push({ artistUri, sortType });
+      processDiscographyQueue();
+  }
+
   async function handleSortAndCreatePlaylist(sortType, options = {}) {
-    const { isHeadless = false } = options;
+    const { isHeadless = false, progressCallback = null } = options;
+
+    const updateProgressText = (msg) => {
+        if (progressCallback) progressCallback(msg);
+        else if (!isHeadless) mainButton.innerText = msg;
+    };
 
     if (sortType === "sortByParent" || sortType === "createNewPlaylist") {
       return;
@@ -27313,7 +27444,8 @@
     }
 
     if (sortType === "aiPick") {
-        startProcessing("Preparing...");
+        if (!isHeadless && !progressCallback) startProcessing("Preparing...");
+        else if (progressCallback) progressCallback("Preparing...");
     
         try {
             const currentUri = getCurrentUri();
@@ -27342,12 +27474,12 @@
             }
 
             if (isArtistPage) {
-                tracks = await processArtistPageTracks(tracks);
+                tracks = await processArtistPageTracks(tracks, isHeadless, sortType, progressCallback);
             }
             
             const openModal = async () => {
                 await showAiPickModal(tracks, currentUri);
-                resetButtons(); 
+                if (!isHeadless && !progressCallback) resetButtons();
             };
 
             await openModal();
@@ -27357,23 +27489,23 @@
         } catch (error) {
             console.error("Error preparing AI Pick:", error);
             showNotification(error.message, true);
-            resetButtons();
+            if (!isHeadless && !progressCallback) resetButtons();
         }
         return;
     }
     
     if (topTrackSortTypes[sortType]) {
-        if (!isHeadless) {
+        if (!isHeadless && !progressCallback) {
             startProcessing();
         }
         
         try {
-            if (!isHeadless) mainButton.innerText = "Fetching...";
+            updateProgressText("Fetching...");
             const topTracksData = await getTopItems('tracks', topTrackSortTypes[sortType].time_range, topTracksLimit);
             
             if (!topTracksData || topTracksData.length === 0) {
                 showNotification(`No top tracks found for "${topTrackSortTypes[sortType].name}".`, true);
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
 
@@ -27381,10 +27513,10 @@
             const playlistName = `My Top Tracks: ${topTrackSortTypes[sortType].name}`;
             const playlistDescription = `Your top tracks ${topTrackSortTypes[sortType].description}, created by Sort-Play.`;
             
-            if (!isHeadless) mainButton.innerText = "Creating...";
+            updateProgressText("Creating...");
             const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(sortType, playlistName, playlistDescription);
             
-            if (!isHeadless) mainButton.innerText = "Saving...";
+            updateProgressText("Saving...");
             if (wasUpdated) {
                 await replacePlaylistTracks(newPlaylist.id, trackUris);
             } else {
@@ -27398,14 +27530,14 @@
             console.error("Error creating top tracks playlist:", error);
             showNotification("Failed to create top tracks playlist.", true);
         } finally {
-            if (!isHeadless) {
+            if (!isHeadless && !progressCallback) {
                 resetButtons();
             }
         }
         return; 
     }
 
-    if (!isHeadless) {
+    if (!isHeadless && !progressCallback) {
         startProcessing();
     }
 
@@ -27414,7 +27546,7 @@
     try {
       const currentUriAtStart = options.sourceUri || getCurrentUri(); 
       if (!currentUriAtStart) {
-        if (!isHeadless) resetButtons();
+        if (!isHeadless && !progressCallback) resetButtons();
         showNotification("Please select a playlist or artist first");
         return;
       }
@@ -27430,8 +27562,8 @@
           'removeFollowed'
       ];
 
-      if (isDirectSortType(sortType) && !quickFilterTypes.includes(sortType) && isArtistPage && createPlaylistAfterSort && !isHeadless && showArtistDiscographyDuplicateWarning) {
-          mainButton.innerText = "Checking...";
+      if (isDirectSortType(sortType) && !quickFilterTypes.includes(sortType) && isArtistPage && createPlaylistAfterSort && showArtistDiscographyDuplicateWarning) {
+          updateProgressText("Checking...");
           const { sourceName: artistName } = await fetchSourceNameAndArtist(currentUriAtStart);
           const userPlaylists = await getUserOwnedPlaylistsInternal();
           
@@ -27455,12 +27587,13 @@
           if (mappedPlaylists.length > 0 || possiblePlaylists.length > 0) {
               const result = await showArtistDuplicateModal(mappedPlaylists, possiblePlaylists, artistName);
               if (result.action === 'cancel') {
-                  resetButtons();
+                  if (!isHeadless && !progressCallback) resetButtons();
                   return;
               } else if (result.action === 'replace' && result.uri) {
                   targetPlaylistUriToReplace = result.uri;
               }
-              mainButton.innerHTML = '<div class="loader"></div>';
+              if (progressCallback) progressCallback("Processing...");
+              else if (!isHeadless) mainButton.innerHTML = '<div class="loader"></div>';
           }
       }
 
@@ -27508,7 +27641,7 @@
 
       if (!tracks || tracks.length === 0) {
           showNotification('No tracks found to sort');
-          if (!isHeadless) resetButtons();
+          if (!isHeadless && !progressCallback) resetButtons();
           return;
       }
 
@@ -27543,7 +27676,7 @@
 
         if (userChoice === 'cancel') {
             showNotification("Sorting cancelled.");
-            if (!isHeadless) resetButtons();
+            if (!isHeadless && !progressCallback) resetButtons();
             return;
         } else if (userChoice === 'neutral') {
             canModifyCurrentPlaylist = false;
@@ -27553,7 +27686,7 @@
       if (directSortsToConvertLocalTracks.includes(sortType)) {
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks,
-            (progress) => { if (!isHeadless) mainButton.innerText = progress; },
+            (progress) => { updateProgressText(progress); },
             true
         );
         tracks = convertedTracks;
@@ -27578,47 +27711,47 @@
       if (sortType === "lastScrobbled") {
           try {
               const result = await handleLastScrobbledSorting(
-                tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${progress}%`; }
+                tracks, (progress) => { updateProgressText(`${progress}%`); }
               );
               sortedTracks = result.sortedTracks;
               removedTracks = result.removedTracks;
-              if (!isHeadless) mainButton.innerText = "100%";
+              updateProgressText("100%");
           } catch (error) {
-              if (!isHeadless) resetButtons();
+              if (!isHeadless && !progressCallback) resetButtons();
               showNotification(error.message, true);
               return;
           }
       } else {
-        if (!isHeadless) mainButton.innerText = "0%";
+        updateProgressText("0%");
 
         let tracksWithPopularity;
 
         if (isArtistPage) {
-            tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType);
+            tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType, progressCallback);
         }
         else if (sortType === 'deduplicateOnly' || sortType === 'excludeByPlaylist') {
-            if (!isHeadless) mainButton.innerText = "Enriching...";
+            updateProgressText("Enriching...");
             
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
-              tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.40)}%`; }
+              tracks, (progress) => { updateProgressText(`${Math.floor(progress * 0.40)}%`); }
             );
     
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
               tracksWithPlayCounts, 
-              (progress) => { if (!isHeadless) mainButton.innerText = `${40 + Math.floor(progress * 0.60)}%`; }
+              (progress) => { updateProgressText(`${40 + Math.floor(progress * 0.60)}%`); }
             );
         
         } else if (sortType === 'playCount') {
-            if (!isHeadless) mainButton.innerText = "0%";
+            updateProgressText("0%");
             tracksWithPopularity = await enrichTracksWithPlayCounts(
-                tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }
+                tracks, (progress) => { updateProgressText(`${Math.floor(progress * 0.80)}%`); }
             );
 
         } else if (sortType === 'popularity') {
-            if (!isHeadless) mainButton.innerText = "0%";
+            updateProgressText("0%");
             tracksWithPopularity = await fetchPopularityForMultipleTracks(
               tracks, 
-              (progress) => { if (!isHeadless) mainButton.innerText = `${10 + Math.floor(progress * 0.90)}%`; }
+              (progress) => { updateProgressText(`${10 + Math.floor(progress * 0.90)}%`); }
             );
 
         } else {
@@ -27639,7 +27772,7 @@
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
             const tracksWithReleaseDates = await processBatchesWithDelay(
-              tracksWithPopularity, 50, 500, (progress) => { if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.80)}%`; }, getTrackDetailsWithReleaseDate
+              tracksWithPopularity, 50, 500, (progress) => { updateProgressText(`${Math.floor(progress * 0.80)}%`); }, getTrackDetailsWithReleaseDate
             );
             tracksForDeduplication = tracksWithReleaseDates;
           } else if (sortType === "averageColor") {
@@ -27666,7 +27799,7 @@
                       cachedTracks, 50, 500,
                       (progress) => {
                           const overallProgress = (cachedTracks.length / totalColorTracks) * progress;
-                          if (!isHeadless) mainButton.innerText = `${60 + Math.floor(overallProgress * 0.40)}%`;
+                          updateProgressText(`${60 + Math.floor(overallProgress * 0.40)}%`);
                       },
                       getTrackDetailsWithPaletteAnalysis
                   );
@@ -27679,7 +27812,7 @@
                       (progress) => {
                           const cachedPortion = (cachedTracks.length / totalColorTracks) * 40;
                           const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress * 0.40;
-                          if (!isHeadless) mainButton.innerText = `${60 + Math.floor(cachedPortion + uncachedPortion)}%`;
+                          updateProgressText(`${60 + Math.floor(cachedPortion + uncachedPortion)}%`);
                       },
                       getTrackDetailsWithPaletteAnalysis
                   );
@@ -27691,10 +27824,10 @@
             tracksForDeduplication = tracksWithPopularity;
           }
           if (["filterSingles", "filterAlbums", "filterEPs", "filterSinglesEPs", "filterAlbumsEPs", "filterAlbumsCompilations", "filterAlbumsEPsCompilations", "filterAlbumsEPsSingles", "filterCompilations"].includes(sortType)) {
-            if (!isHeadless) mainButton.innerText = "Checking...";
+            updateProgressText("Checking...");
             if (!isArtistPage) {
                 tracksForDeduplication = await refreshTrackAlbumInfo(tracksForDeduplication, (progress) => {
-                    if (!isHeadless) mainButton.innerText = `${Math.floor(progress * 0.50)}%`;
+                    updateProgressText(`${Math.floor(progress * 0.50)}%`);
                 });
             }
          }
@@ -27703,7 +27836,7 @@
               tracksForDeduplication, 
               sortType === "deduplicateOnly", 
               isArtistPage,
-              (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; },
+              (progress) => { updateProgressText(`Dedup ${progress}%`); },
               sortType
           );
           uniqueTracks = deduplicationResult.unique;
@@ -27715,7 +27848,7 @@
             const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
 
             if (useEnergyWaveShuffle && !containsLocalFiles) {
-                if (!isHeadless) mainButton.innerText = "Analyzing...";
+                updateProgressText("Analyzing...");
                 const trackIds = uniqueTracks.map(t => t.trackId);
                 const allStats = await getBatchTrackStats(trackIds);
 
@@ -27775,7 +27908,7 @@
             const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
 
             if (useEnergyWaveShuffle && !containsLocalFiles) {
-                if (!isHeadless) mainButton.innerText = "Analyzing...";
+                updateProgressText("Analyzing...");
                 const trackIds = uniqueTracks.map(t => t.trackId);
                 const allStats = await getBatchTrackStats(trackIds);
 
@@ -27800,7 +27933,7 @@
         } else if (sortType === "deduplicateOnly") {
             if (removedTracks.length === 0) {
                 showNotification("No duplicate tracks found.");
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
             const originalOrderMap = new Map();
@@ -27815,14 +27948,14 @@
                 return orderA - orderB;
             });
         } else if (sortType === "filterLiked" || sortType === "keepLiked" || sortType === "sortByLiked") {
-            if (!isHeadless) mainButton.innerText = "Checking...";
+            updateProgressText("Checking...");
             const likedSongs = await getLikedSongs();
             const likedSongUris = new Set(likedSongs.map(s => s.uri));
             
-            if (!isHeadless) mainButton.innerText = "ISRCs...";
+            updateProgressText("ISRCs...");
             
             const tracksWithMetadata = await refreshTrackAlbumInfo(uniqueTracks, (progress) => {
-                if (!isHeadless) mainButton.innerText = `ISRCs ${Math.floor(progress)}%`;
+                updateProgressText(`ISRCs ${Math.floor(progress)}%`);
             });
 
             const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
@@ -28096,11 +28229,11 @@
 
             if (sortedTracks.length === uniqueTracks.length) {
                 showNotification("No trashed songs found in this list.");
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
         } else if (sortType === "excludeByPlaylist") {
-            if (!isHeadless) mainButton.innerText = "Select...";
+            updateProgressText("Select...");
             
             let exclusionSources = [];
             await new Promise(resolve => {
@@ -28118,11 +28251,11 @@
             });
 
             if (exclusionSources.length === 0) {
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
 
-            if (!isHeadless) mainButton.innerText = "Fetching...";
+            updateProgressText("Fetching...");
             
             let exTracks = [];
             try {
@@ -28143,20 +28276,20 @@
                 exTracks = results.flat();
             } catch(e) {
                 showNotification("Failed to fetch exclusion playlists.", true);
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
 
-            if (!isHeadless) mainButton.innerText = "Processing...";
+            updateProgressText("Processing...");
             
             const exTracksWithPlaycounts = await enrichTracksWithPlayCounts(
                 exTracks, 
-                (progress) => { if (!isHeadless) mainButton.innerText = `Meta ${Math.floor(progress)}%`; }
+                (progress) => { updateProgressText(`Meta ${Math.floor(progress)}%`); }
             );
 
             const preparedExTracks = await fetchPopularityForMultipleTracks(
                 exTracksWithPlaycounts, 
-                (progress) => { if (!isHeadless) mainButton.innerText = `Meta ${Math.floor(progress)}%`; }
+                (progress) => { updateProgressText(`Meta ${Math.floor(progress)}%`); }
             );
             
             const markedExTracks = preparedExTracks.map(t => ({ 
@@ -28172,7 +28305,7 @@
                 combinedTracks, 
                 true, 
                 false,
-                () => { if (!isHeadless) mainButton.innerText = "Comparing..."; },
+                () => { updateProgressText("Comparing..."); },
                 'excludeByPlaylist'
             );
 
@@ -28186,12 +28319,12 @@
 
             if (sortedTracks.length === uniqueTracks.length) {
                 showNotification("No matches found in the excluded playlists.");
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
           
           } else if (['filterFollowedMain', 'filterFollowedAny', 'removeFollowed'].includes(sortType)) {
-            if (!isHeadless) mainButton.innerText = "Fetching...";
+            updateProgressText("Fetching...");
             
             let followedArtistIds = new Set();
             try {
@@ -28200,11 +28333,11 @@
             } catch (e) {
                 console.error("Failed to fetch followed artists", e);
                 showNotification("Could not fetch followed artists list.", true);
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
 
-            if (!isHeadless) mainButton.innerText = "Filtering...";
+            updateProgressText("Filtering...");
 
             const originalOrderMap = new Map();
             tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
@@ -28232,14 +28365,14 @@
             }).sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
           }
 
-          if (!isHeadless) mainButton.innerText = "100%";
+          updateProgressText("100%");
 
         } else if (sortType === "energyWave") {
-            if (!isHeadless) mainButton.innerText = "Analyzing...";
+            updateProgressText("Analyzing...");
             const trackIds = tracksWithPopularity.map(t => t.trackId);
             
             const allStats = await getBatchTrackStats(trackIds, (progress) => {
-                if (!isHeadless) mainButton.innerText = `BPM/Key ${Math.floor(progress * 0.5)}%`;
+                updateProgressText(`BPM/Key ${Math.floor(progress * 0.5)}%`);
             });
 
             const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
@@ -28251,7 +28384,7 @@
                 tracksWithAudioFeatures, 
                 false, 
                 isArtistPage,
-                (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+                (progress) => { updateProgressText(`Dedup ${progress}%`); }
             );
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
@@ -28275,13 +28408,13 @@
             }
 
             sortedTracks = [...journeySortedTracks, ...tracksWithoutData];
-            if (!isHeadless) mainButton.innerText = "100%";
+            updateProgressText("100%");
 
         } else if (['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'].includes(sortType)) {
             const trackIds = tracksWithPopularity.map(t => t.trackId);
             const allStats = await getBatchTrackStats(trackIds, (progress) => {
                 const overallProgress = 60 + Math.floor(progress * 0.40);
-                if (!isHeadless) mainButton.innerText = `${overallProgress}%`;
+                updateProgressText(`${overallProgress}%`);
             });
 
             const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
@@ -28293,7 +28426,7 @@
                 tracksWithAudioFeatures, 
                 false, 
                 isArtistPage,
-                (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+                (progress) => { updateProgressText(`Dedup ${progress}%`); }
             );
             uniqueTracks = deduplicationResult.unique;
             removedTracks = deduplicationResult.removed;
@@ -28315,14 +28448,14 @@
                 const tracksWithScrobbles = await handleScrobblesSorting(
                   tracksWithPopularity,
                   sortType,
-                  (progress) => { if (!isHeadless) mainButton.innerText = `${80 + Math.floor(progress * 0.20)}%`; }
+                  (progress) => { updateProgressText(`${80 + Math.floor(progress * 0.20)}%`); }
                 );
 
                 const deduplicationResult = await deduplicateTracks(
                     tracksWithScrobbles, 
                     sortType === "deduplicateOnly", 
                     isArtistPage,
-                    (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; }
+                    (progress) => { updateProgressText(`Dedup ${progress}%`); }
                 );
                 uniqueTracks = deduplicationResult.unique;
                 removedTracks = deduplicationResult.removed;
@@ -28365,23 +28498,23 @@
                             : valB - valA;
                     });
                 }
-                if (!isHeadless) mainButton.innerText = "100%";
+                updateProgressText("100%");
 
               } catch (error) {
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 showNotification(error.message);
                 return;
               }
         } else if (sortType === "lastScrobbled") { 
             try {
                 const result = await handleLastScrobbledSorting(
-                    tracks, (progress) => { if (!isHeadless) mainButton.innerText = `${progress}%`; }
+                    tracks, (progress) => { updateProgressText(`${progress}%`); }
                 );
                 sortedTracks = result.sortedTracks;
                 removedTracks = result.removedTracks;
-                if (!isHeadless) mainButton.innerText = "100%";
+                updateProgressText("100%");
             } catch (error) {
-                if (!isHeadless) resetButtons();
+                if (!isHeadless && !progressCallback) resetButtons();
                 showNotification(error.message, true);
                 return;
             }
@@ -28411,7 +28544,7 @@
             if (!addToQueueEnabled) {
                 showNotification("No tracks to process for playlist.", 'warning');
             }
-            if (!isHeadless) resetButtons();
+            if (!isHeadless && !progressCallback) resetButtons();
             return;
         }
         
@@ -28465,7 +28598,7 @@
                     }
                 }
 
-                if (!isHeadless) mainButton.innerText = "Saving...";
+                updateProgressText("Saving...");
 
                 const isGroupingSort = ['filterAlbums', 'filterAlbumsEPs', 'filterAlbumsCompilations', 'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles'].includes(sortType);
                 const isOrderChanged = isGroupingSort && sortOrderState[sortType];
@@ -28544,7 +28677,7 @@
                 playlistDescription = playlistDescription.substring(0, 296) + "...";
               }
 
-              if (!isHeadless) mainButton.innerText = "Creating...";
+              updateProgressText("Creating...");
 
               let basePlaylistName = finalSourceName;
               if (changeTitleOnCreate) {
@@ -28561,7 +28694,7 @@
                       currentPlaylistName += ` (${i + 1}/${totalParts})`;
                   }
 
-                  if (!isHeadless) mainButton.innerText = "Creating...";
+                  updateProgressText("Creating...");
 
                   const newPlaylist = await createPlaylist(currentPlaylistName, playlistDescription);
                   
@@ -28576,7 +28709,7 @@
                       }
                   }
 
-                  if (!isHeadless) mainButton.innerText = "Saving...";
+                  updateProgressText("Saving...");
                   
                   if (isArtistPage) {
                     try {
@@ -28689,7 +28822,7 @@
       console.error("Error during sorting process:", error);
       showNotification(`An error occurred during the sorting process: ${error.message}`);
     } finally {
-      if (!isHeadless) {
+      if (!isHeadless && !progressCallback) {
         resetButtons();
       }
     }
@@ -28922,169 +29055,6 @@
     }
     
     return journeyMap;
-  }
-  
-  async function harmonicTempoSort(tracks) {
-    if (tracks.length < 3) return [...tracks];
-
-    const tracksWithProfile = tracks.map(track => {
-        const f = track.features || {};
-        return {
-            ...track,
-            profile: { tempo: f.tempo || 120, camelotKey: getCamelotKey(f) }
-        };
-    });
-
-    const validTracks = tracksWithProfile.filter(t => t.profile.camelotKey && t.profile.tempo);
-    const others = tracksWithProfile.filter(t => !t.profile.camelotKey || !t.profile.tempo);
-
-    if (validTracks.length === 0) return tracks;
-
-    validTracks.sort((a, b) => a.profile.tempo - b.profile.tempo);
-    
-    const sorted = [validTracks.shift()];
-    let currentTrack = sorted[0];
-
-    const LOOK_AHEAD = 100;
-
-    while (validTracks.length > 0) {
-        let bestIdx = -1;
-        let bestScore = -Infinity;
-        
-        const scanCount = Math.min(validTracks.length, LOOK_AHEAD);
-
-        for (let i = 0; i < scanCount; i++) {
-            const candidate = validTracks[i];
-            
-            const t1 = currentTrack.profile.tempo;
-            const t2 = candidate.profile.tempo;
-            
-            const ratio = t2 / t1;
-            const isDoubleTime = ratio >= 1.9 && ratio <= 2.1;
-            const isHalfTime = ratio >= 0.45 && ratio <= 0.55;
-            const diff = Math.abs(t1 - t2);
-            const percentDiff = (diff / t1) * 100;
-
-            let tempoScore = 0;
-            if (isDoubleTime || isHalfTime) tempoScore = 90;
-            else if (percentDiff <= 3) tempoScore = 100;
-            else if (percentDiff <= 6) tempoScore = 80;
-            else if (percentDiff <= 15) tempoScore = 40;
-            else tempoScore = -50;
-
-            if (t2 > t1 && percentDiff > 0 && percentDiff < 5) tempoScore += 10;
-
-            const harmScore = getHarmonicCompatibilityScore(currentTrack.profile.camelotKey, candidate.profile.camelotKey);
-            const totalScore = (harmScore * 2.5) + (tempoScore * 1.5);
-
-            if (totalScore > bestScore) {
-                bestScore = totalScore;
-                bestIdx = i;
-            }
-        }
-
-        if (bestScore < 0) {
-            let closestTempoIdx = 0;
-            let minTempoDiff = Infinity;
-            for(let k=0; k < scanCount; k++) {
-                const d = Math.abs(validTracks[k].profile.tempo - currentTrack.profile.tempo);
-                if(d < minTempoDiff) { minTempoDiff = d; closestTempoIdx = k; }
-            }
-            bestIdx = closestTempoIdx;
-        }
-
-        currentTrack = validTracks.splice(bestIdx, 1)[0];
-        sorted.push(currentTrack);
-    }
-
-    return [...sorted, ...others].map(t => {
-        const { profile, ...rest } = t;
-        return rest;
-    });
-  }
-
-  async function randomizedHarmonicShuffle(tracks) {
-    if (tracks.length < 3) return shuffleArray(tracks);
-    
-    await new Promise(r => setTimeout(r, 20));
-
-    const tracksWithProfile = tracks.map(track => {
-        const f = track.features || {};
-        return {
-            ...track,
-            profile: { tempo: f.tempo || 120, camelotKey: getCamelotKey(f) }
-        };
-    });
-
-    const validTracks = tracksWithProfile.filter(t => t.profile.camelotKey && t.profile.tempo);
-    const others = tracksWithProfile.filter(t => !t.profile.camelotKey || !t.profile.tempo);
-
-    if (validTracks.length === 0) return shuffleArray(tracks);
-
-    const sorted = [];
-    let pool = [...validTracks];
-    
-    const startIndex = Math.floor(Math.random() * pool.length);
-    sorted.push(pool.splice(startIndex, 1)[0]);
-    let currentTrack = sorted[0];
-
-    const CANDIDATE_POOL_SIZE = 200; 
-
-    while (pool.length > 0) {
-        if (sorted.length % 500 === 0) {
-            await new Promise(r => setTimeout(r, 0));
-        }
-
-        let candidateIndices = [];
-        if (pool.length <= CANDIDATE_POOL_SIZE) {
-            candidateIndices = pool.map((_, i) => i);
-        } else {
-            const indicesSet = new Set();
-            while (indicesSet.size < CANDIDATE_POOL_SIZE) {
-                indicesSet.add(Math.floor(Math.random() * pool.length));
-            }
-            candidateIndices = Array.from(indicesSet);
-        }
-
-        const candidates = candidateIndices.map(idx => {
-            const candidate = pool[idx];
-            const t1 = currentTrack.profile.tempo;
-            const t2 = candidate.profile.tempo;
-            
-            const ratio = t2 / t1;
-            const isDoubleTime = ratio >= 1.9 && ratio <= 2.1;
-            const isHalfTime = ratio >= 0.45 && ratio <= 0.55;
-            const diff = Math.abs(t1 - t2);
-            const percentDiff = (diff / t1) * 100;
-
-            let tempoScore = 0;
-            if (isDoubleTime || isHalfTime) tempoScore = 80;
-            else if (percentDiff <= 4) tempoScore = 100;
-            else if (percentDiff <= 8) tempoScore = 70;
-            else if (percentDiff <= 15) tempoScore = 40;
-            else tempoScore = -30;
-
-            const harmScore = getHarmonicCompatibilityScore(currentTrack.profile.camelotKey, candidate.profile.camelotKey);
-            
-            return { index: idx, score: (harmScore * 2) + (tempoScore * 1) + Math.random() * 5 };
-        });
-
-        candidates.sort((a, b) => b.score - a.score);
-        
-        const windowSize = Math.max(1, Math.ceil(candidates.length * 0.1));
-        const pickWrap = candidates[Math.floor(Math.random() * windowSize)];
-        
-        const selected = pool[pickWrap.index];
-        
-        sorted.push(selected);
-        currentTrack = selected;
-        pool.splice(pickWrap.index, 1);
-    }
-
-    return [...sorted, ...shuffleArray(others)].map(t => {
-        const { profile, ...rest } = t;
-        return rest;
-    });
   }
   
   async function energyWaveSort(tracks, persona = 'wave') {
@@ -32161,7 +32131,7 @@
                   });
                   closeAllMenus();
                   
-                  await handleSortAndCreatePlaylist(artistDiscographySortType, { sourceUri: artistUri });
+                  enqueueDiscographyJob(artistUri, artistDiscographySortType);
               },
               (uris) => {
                   if (uris.length !== 1) return false;
@@ -34235,7 +34205,7 @@
                 continue;
             }
     
-            const addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1');
+            const addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1, .main-nowPlayingWidget-plusButtonWrapper');
             if (!addToPlaylistButtonWrapper || !addToPlaylistButtonWrapper.parentElement) {
                 console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Add to playlist button wrapper not found or has no parent`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -34243,7 +34213,7 @@
                 continue;
             }
     
-            const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button');
+            const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button, .main-nowPlayingWidget-plusButtonWrapper button');
             if (!templateButton) {
                 console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Template button not found`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -34270,7 +34240,7 @@
                 return;
             }
     
-            const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button svg';
+            const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button svg, .main-nowPlayingWidget-plusButtonWrapper button svg';
     
             try {
                 Spicetify.ReactDOM.render(
