@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.71.0";
+  const SORT_PLAY_VERSION = "5.71.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -4100,12 +4100,12 @@
           .sp-chat-bubble { background: #282828; color: white; padding: 6px 10px; border-radius: 14px; font-size: 13px; line-height: 1.5; word-break: break-word; min-width: 60px; max-width: 85%; display: block; overflow: hidden; user-select: text; -webkit-user-select: text; }
           .sp-chat-msg.sp-chat-msg-me .sp-chat-bubble { background: #193222; }
           .sp-chat-author { font-size: 12px; color: #1db954; font-weight: 700; margin-bottom: 2px; line-height: 1.2; }
-          .sp-chat-reply-ref { border-left: 3px solid; padding: 4px 8px; border-radius: 5px; margin-bottom: 4px; display: flex; flex-direction: row; gap: 8px; align-items: center; overflow: hidden; }
-          .sp-chat-reply-content { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+          .sp-chat-reply-ref { border-left: 3px solid; padding: 4px 8px; border-radius: 5px; margin-bottom: 4px; display: flex; flex-direction: row; gap: 8px; align-items: center; overflow: hidden; min-width: 170px; box-sizing: border-box; }
+          .sp-chat-reply-content { display: flex; flex-direction: column; overflow: hidden; flex: 1; min-width: 0; }
           .sp-chat-reply-img-wrapper { position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e; flex-shrink: 0; margin-left: -2px; }
           .sp-chat-reply-img { position: relative; z-index: 1; }
-          .sp-chat-reply-author { font-size: 11px; color: #1db954; font-weight: 700; margin-bottom: 1px; line-height: 1.2; }
-          .sp-chat-reply-text { font-size: 12px; color: #b3b3b3; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+          .sp-chat-reply-author { font-size: 11px; color: #1db954; font-weight: 700; margin-bottom: 1px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 0; min-width: 100%; }
+          .sp-chat-reply-text { font-size: 12px; color: #b3b3b3; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 0; min-width: 100%; }
           .sp-chat-text { margin-bottom: 0; display: block; }
           .sp-chat-meta { float: right; display: inline-flex; justify-content: flex-end; align-items: center; gap: 4px; margin-top: 5px; margin-left: 10px; }
           .sp-chat-msg.image-only-msg .sp-chat-meta { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.4); border-radius: 10px; padding: 2px 6px; margin: 0 -2px -2px 0; opacity: 0; transition: opacity 0.1s ease; pointer-events: none; z-index: 5; }
@@ -6484,9 +6484,18 @@
 
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
-    modalContainer.style.zIndex = "2006";
+    modalContainer.style.cssText = `
+        width: 420px !important;
+        border-radius: 30px;
+        overflow: hidden; 
+        background-color: #181818 !important;
+        border: 2px solid #282828;
+        display: flex;
+        flex-direction: column;
+        z-index: 2006;
+    `;
     modalContainer.innerHTML = `
-      <div class="main-trackCreditsModal-header">
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Customize Folder Name</span></h1>
       </div>
       <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px 20px !important;">
@@ -7026,6 +7035,9 @@
         display: flex;
         flex-direction: column;
         border-radius: 30px;
+        overflow: hidden;
+        background-color: #181818 !important;
+        border: 2px solid #282828;
     `;
 
     const wallets = [
@@ -7059,7 +7071,7 @@
         .copy-button.copied:hover { background-color: #1ED760; }
         .copy-button svg { width: 16px; height: 16px; }
       </style>
-      <div class="main-trackCreditsModal-header">
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important; border-bottom: 1px solid #282828;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Support Sort-Play</span></h1>
       </div>
       <div class="main-trackCreditsModal-mainSection" style="padding: 22px 47px 20px !important; max-height: 60vh; flex-grow: 1;">
@@ -7617,11 +7629,17 @@
         `;
 
         const modalContainer = document.createElement("div");
-        modalContainer.className = "main-embedWidgetGenerator-container";
-        modalContainer.style.zIndex = "2005";
-        modalContainer.style.width = "500px";
-        modalContainer.style.borderRadius = "20px";
-        
+        modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+        modalContainer.style.cssText = `
+            width: 500px !important;
+            border-radius: 30px;
+            overflow: hidden; 
+            background-color: #181818 !important;
+            border: 2px solid #282828;
+            display: flex;
+            flex-direction: column;
+            z-index: 2005;
+        `;
         
         const scheduleToShortTextMap = {
             'release-every-two-weeks': 'Every 2 Weeks (Fri)',
@@ -7655,7 +7673,7 @@
             .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
             .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
           </style>
-          <div class="main-trackCreditsModal-header">
+          <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
               <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Auto-Update Schedule</span></h1>
           </div>
           <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px !important;">
@@ -10162,23 +10180,41 @@
         return `<option value="${model.id}" ${isSelected} ${isDisabled}>${model.label}${labelSuffix}</option>`;
     }).join('');
 
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-ai-pick-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    `;
+
     const modalContainer = document.createElement("div");
-    modalContainer.className = "ai-pick-modal";
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope ai-pick-modal";
+    modalContainer.style.cssText = `
+        width: 620px !important;
+        max-width: 620px !important;
+        border-radius: 30px;
+        overflow: hidden;
+        background-color: #181818 !important;
+        border: 2px solid #282828;
+        display: flex;
+        flex-direction: column;
+        z-index: 2003;
+    `;
+
     modalContainer.innerHTML = `
       <style>
-        .main-popupModal-container .main-embedWidgetGenerator-container, .ai-pick-modal .main-embedWidgetGenerator-container, div.main-embedWidgetGenerator-container { width: 620px !important; max-width: 620px !important; border-radius: 30px; overflow: hidden; background-color: #181818 !important; border: 2px solid #282828; }
-        .GenericModal > .main-embedWidgetGenerator-container { height: auto !important; }
-        .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
-        .main-trackCreditsModal-mainSection { overflow-y: hidden !important; padding: 16px 32px 9px 32px; }
-        .main-trackCreditsModal-header { padding: 27px 32px 12px !important; }
-        .main-trackCreditsModal-originalCredits { padding-bottom: 20px !important; }
         .ai-pick-modal .setting-row::after { content: ""; display: table; clear: both; }
         .ai-pick-modal .setting-row { display: flex; padding: 5px 0; align-items: center; }
         .ai-pick-modal .setting-row .col.description { float: left; padding-right: 15px; width: auto; color: white; }
         .ai-pick-modal .setting-row .col.action { display: flex; align-items: center; justify-content: flex-end; text-align: right; }
-        .ai-pick-modal .main-popupModal-content { overflow-y: auto; }
         .ai-pick-modal textarea { width: 100%; height: 150px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; }
-        .ai-pick-modal button { padding: 8px 18px; border-radius: 14px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 600; font-size: 14px; transition: all 0.04s ease; }
+        .ai-pick-modal button:not(.main-trackCreditsModal-closeBtn):not(.icon-only-btn) { padding: 8px 18px; border-radius: 14px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 600; font-size: 14px; transition: all 0.04s ease; }
         .ai-pick-modal #sendAiRequest { transition: transform 0.1s ease, background-color 0.2s ease; }
         .ai-pick-modal #sendAiRequest:hover { background-color: #3BE377; transform: scale(1.04); }
         .ai-pick-modal #sendAiRequest:active { transform: scale(1); }
@@ -10224,132 +10260,126 @@
         .ai-pick-modal .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; width: auto; }
         .ai-pick-modal .setting-row .description { color: white; width: auto; flex-grow: 1; font-size: 15px; }
         .ai-pick-modal .setting-row .action { flex-shrink: 0; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 999; }
-        .GenericModal { position: relative; z-index: 1000; }
         .tooltip-container { position: relative; display: inline-block; }
         .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
         .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
         .tooltip-container:hover .custom-tooltip { visibility: visible; }
+        .ai-pick-modal .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+        .ai-pick-modal .main-trackCreditsModal-closeBtn:hover { color: #ffffff; background: transparent; }
       </style>
 
-      <div style="display: flex; flex-direction: column; gap: 15px;">
-        <div style="color: white; font-weight: 500; font-size: 16px;">
-          Ask AI to pick tracks from this playlist
-        </div>
-        
-        <div class="prompt-wrapper">
-          <div class="textarea-container">
-              <textarea id="aiPrompt" class="sort-play-ai-prompt" placeholder="Enter your request for the AI..."></textarea>
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; border-bottom: 1px solid #282828;">
+          <h1 class="main-trackCreditsModal-title" style="margin: 0;"><span style='font-size: 26px; font-weight: 700; color: white;'>AI Pick</span></h1>
+          <button class="main-trackCreditsModal-closeBtn" id="closeAiPickModal" aria-label="Close">
+            ${closeModalIcon20Svg}
+          </button>
+      </div>
+
+      <div class="main-trackCreditsModal-mainSection" style="padding: 24px 32px 24px 32px; display: flex; flex-direction: column;">
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+          <div style="color: white; font-weight: 500; font-size: 16px;">
+            Ask AI to pick tracks from this playlist
           </div>
-          <div class="button-container">
-            <button id="promptLibraryBtn" class="icon-only-btn" title="Prompt Library & History">${libraryIconSVG}</button>
-            <button id="sendAiRequest">Send</button>
-          </div>
-        </div>
-      
-        <div class="settings-container">
-          <div class="settings-right-wrapper">
-            <div class="settings-title">Include in AI Analysis:</div>
-            <div class="setting-row" id="includeSongStats">
-            <label class="description">
-            Song Statistics
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">Includes popularity, play count, release date, danceability, energy, valence, and tempo.</span>
-            </span>
-        </label>
-              <div class="action">
-                <label class="switch">
-                  <input type="checkbox" ${includeSongStats ? 'checked' : ''}>
-                  <span class="sliderx"></span>
-                </label>
-              </div>
+          
+          <div class="prompt-wrapper">
+            <div class="textarea-container">
+                <textarea id="aiPrompt" class="sort-play-ai-prompt" placeholder="Enter your request for the AI..."></textarea>
             </div>
-            
-            <div class="setting-row" id="includeLyrics">
+            <div class="button-container">
+              <button id="promptLibraryBtn" class="icon-only-btn" title="Prompt Library & History">${libraryIconSVG}</button>
+              <button id="sendAiRequest">Send</button>
+            </div>
+          </div>
+        
+          <div class="settings-container">
+            <div class="settings-right-wrapper">
+              <div class="settings-title">Include in AI Analysis:</div>
+              <div class="setting-row" id="includeSongStats">
               <label class="description">
-                Song Lyrics
-                <span class="tooltip-container">
-                    ${infoIconSvg}
-                    <span class="custom-tooltip">Retrieving lyrics slows down the process and is not recommended for big playlists.</span>
-                </span>
-              </label>
-              <div class="action">
-                <label class="switch">
-                  <input type="checkbox" ${includeLyrics ? 'checked' : ''}>
-                  <span class="sliderx"></span>
+              Song Statistics
+              <span class="tooltip-container">
+                  ${infoIconSvg}
+                  <span class="custom-tooltip">Includes popularity, play count, release date, danceability, energy, valence, and tempo.</span>
+              </span>
+          </label>
+                <div class="action">
+                  <label class="switch">
+                    <input type="checkbox" ${includeSongStats ? 'checked' : ''}>
+                    <span class="sliderx"></span>
+                  </label>
+                </div>
+              </div>
+              
+              <div class="setting-row" id="includeLyrics">
+                <label class="description">
+                  Song Lyrics
+                  <span class="tooltip-container">
+                      ${infoIconSvg}
+                      <span class="custom-tooltip">Retrieving lyrics slows down the process and is not recommended for big playlists.</span>
+                  </span>
                 </label>
+                <div class="action">
+                  <label class="switch">
+                    <input type="checkbox" ${includeLyrics ? 'checked' : ''}>
+                    <span class="sliderx"></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+        
+            <div class="settings-left-wrapper">
+              <div class="model-row">
+                <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:</label>
+                <select id="aiModel">
+                  ${aiModelOptionsHtml}
+                </select>
+              </div>
+              <div class="button-row">
+                <button id="editSystemInstruction" class="secondary-button">Edit System Instruction</button>
               </div>
             </div>
           </div>
-      
-          <div class="settings-left-wrapper">
-            <div class="model-row">
-              <label style="color: white; display: block; margin-bottom: 9px; font-weight: bold; font-size: 14px;">AI Model:</label>
-              <select id="aiModel">
-                ${aiModelOptionsHtml}
-              </select>
-            </div>
+          
+          <div class="system-instruction" id="systemInstructionEditor">
+            <label class="instruction-label">User System Instruction:</label>
+            <textarea id="systemInstructionText">${userSystemInstruction}</textarea>
+            
+            <label class="instruction-label">Fixed System Instruction (Not Editable):</label>
+            <textarea class="fixed" readonly>${FIXED_SYSTEM_INSTRUCTION}</textarea>
+            
             <div class="button-row">
-              <button id="editSystemInstruction" class="secondary-button">Edit System Instruction</button>
+              <button id="saveSystemInstruction">Save</button>
+              <button id="resetSystemInstruction" class="secondary-button">Reset to Default</button>
+              <button id="cancelSystemInstruction" class="secondary-button">Cancel</button>
             </div>
-          </div>
-        </div>
-        
-        <div class="system-instruction" id="systemInstructionEditor">
-          <label class="instruction-label">User System Instruction:</label>
-          <textarea id="systemInstructionText">${userSystemInstruction}</textarea>
-          
-          <label class="instruction-label">Fixed System Instruction (Not Editable):</label>
-          <textarea class="fixed" readonly>${FIXED_SYSTEM_INSTRUCTION}</textarea>
-          
-          <div class="button-row">
-            <button id="saveSystemInstruction">Save</button>
-            <button id="resetSystemInstruction" class="secondary-button">Reset to Default</button>
-            <button id="cancelSystemInstruction" class="secondary-button">Cancel</button>
           </div>
         </div>
       </div>
     `;
   
-    Spicetify.PopupModal.display({
-      title: "<span style='font-size: 30px;'>AI Pick</span>",
-      content: modalContainer,
-      isLarge: true,
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+        });
     });
 
-    tagActiveModalWithFontScope();
+    const closeModal = () => {
+        abortController.abort();
+        overlay.style.opacity = "0";
+        setTimeout(() => overlay.remove(), 200);
+    };
 
-    const overlay = document.createElement("div");
-    overlay.className = "modal-overlay";
-  
-    const genericModalOverlay = document.querySelector(".GenericModal__overlay");
-  
-    if (genericModalOverlay) {
-      genericModalOverlay.appendChild(overlay);
-    }
-  
-    if (overlay) {
-      overlay.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-      });
-    }
-  
-    const modalContainerElement = document.querySelector(".main-popupModal-container");
-    if (modalContainerElement) {
-      modalContainerElement.style.zIndex = "2000";
-    }
+    modalContainer.querySelector("#closeAiPickModal").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+            closeModal();
+        }
+    });
 
     preventDragCloseModal(abortController.signal);
-
-    const modalObserver = new MutationObserver((mutations, obs) => {
-      if (!document.querySelector('.GenericModal')) {
-        abortController.abort();
-        obs.disconnect();
-      }
-    });
-    modalObserver.observe(document.body, { childList: true, subtree: true });
 
     const songStatsToggle = modalContainer.querySelector("#includeSongStats input");
     const lyricsToggle = modalContainer.querySelector("#includeLyrics input");
@@ -10425,14 +10455,14 @@
       editButton.disabled = false;
     });
   
-    const promptLibraryBtn = document.getElementById("promptLibraryBtn");
+    const promptLibraryBtn = modalContainer.querySelector("#promptLibraryBtn");
     promptLibraryBtn.addEventListener("click", () => {
       showPromptLibraryModal(aiPromptTextarea);
     });
 
-    const sendButton = document.getElementById("sendAiRequest");
+    const sendButton = modalContainer.querySelector("#sendAiRequest");
     sendButton.addEventListener("click", async () => {
-      const userPrompt = document.getElementById("aiPrompt").value.trim();
+      const userPrompt = modalContainer.querySelector("#aiPrompt").value.trim();
       if (!userPrompt) {
         showNotification("Please enter a request.", true);
         return;
@@ -10444,7 +10474,7 @@
       if (history.length > 50) history.length = 50;
       localStorage.setItem(STORAGE_KEY_AI_PROMPT_HISTORY, JSON.stringify(history));
   
-      Spicetify.PopupModal.hide();
+      closeModal();
   
       setButtonProcessing(true);
   
@@ -12060,8 +12090,34 @@
 
   async function showCustomFilterModal(tracks, currentUri) {
     const abortController = new AbortController();
+    
+    const overlay = document.createElement("div");
+    overlay.id = "custom-filter-overlay";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2006;
+        display: flex; justify-content: center; align-items: center;
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    `;
+
     const modalContainer = document.createElement("div");
-    modalContainer.className = "custom-filter-modal";
+    modalContainer.className = "custom-filter-modal main-embedWidgetGenerator-container";
+    modalContainer.style.cssText = `
+        z-index: 2007;
+        width: 1200px !important;
+        max-width: 95vw !important;
+        height: auto;
+        max-height: 90vh;
+        background-color: #121212 !important;
+        border: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+        border-radius: 30px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        overflow: hidden;
+    `;
+
     const originalTracks = [...tracks];
     let displayedTracks = [];
     let startIndex = 0;
@@ -12927,14 +12983,11 @@
 
     modalContainer.innerHTML = `
     <style>
-      .custom-filter-modal { width: 100%; max-width: 1200px; color: #fff; }
+      .custom-filter-modal { width: 100%; color: #fff; }
       .tracklist-table .actions-col { box-shadow: 2px 0 2px #121212; }
-      .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
-      .GenericModal > .main-embedWidgetGenerator-container { height: auto !important; }
-      .main-trackCreditsModal-originalCredits { padding-bottom: 20px !important; }
       .text-overflow { position: relative; }
       .playlist-player-wrapper { background-color: #1c1c1c; border-radius: 20px; position: relative; display: flex; flex-direction: column; margin-bottom: 15px; border: 4px solid #1c1c1c; }
-      .playlist-wrapper { max-height: 30vh; background-color: #121212; overflow: auto; padding: 0 0px; scrollbar-width: thin; scrollbar-color: #232323 transparent; position: relative; }
+      .playlist-wrapper { max-height: 30vh; background-color: #121212; overflow: auto; padding: 0 0px; scrollbar-width: thin; scrollbar-color: #2f2f2f transparent; position: relative; }
       .playlist-wrapper::-webkit-scrollbar { width: 8px; height: 8px; }
       .playlist-wrapper::-webkit-scrollbar-thumb { background-color: #ffffff40; border-radius: 4px; }
       .playlist-wrapper::-webkit-scrollbar-track { background: transparent; }
@@ -13001,13 +13054,13 @@
       .song-info { display: flex; align-items: center; gap: 12px; height: 100%; min-width: 0; padding-right: 16px; }
       .song-info img { width: 33px; height: 33px; border-radius: 4px; object-fit: cover; }
       .song-title { color: #fff; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-      .main-embedWidgetGenerator-container { width: 1200px !important; max-width: 1500px !important; max-height: 90vh !important; border-radius: 30px; overflow: hidden; background-color: #121212 !important; border: 2px solid #282828; }
-      .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
-      .main-trackCreditsModal-mainSection { overflow-y: hidden !important; padding: 16px 32px 9px 32px; }
-      .main-trackCreditsModal-header { padding: 16px 32px 12px !important; }
-      .custom-filter-modal .main-popupModal-content { overflow-y: auto; }
-      .GenericModal { position: relative; z-index: 1000; }
-      .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.25); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); z-index: 999; }
+      
+      .main-trackCreditsModal-mainSection { padding: 20px 32px 24px 32px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 transparent; flex: 1; min-height: 0; }
+      .main-trackCreditsModal-header { padding: 24px 32px 16px !important; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; flex-shrink: 0; }
+      .main-trackCreditsModal-title { font-size: 26px; font-weight: 700; color: white; margin: 0; }
+      .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+      .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+
       .playlist-title-container { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 14px 20px; }
       .playlist-stats-container { display: flex; gap: 12px; color: #b3b3b3; font-size: 14px; margin-left: auto; }
       .player-controls2 { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 20px; }
@@ -13096,202 +13149,206 @@
       .load-more-row:hover .load-more-cell { background-color: #4c4c4c; }
       .buttons-container { display: flex; justify-content: flex-start; padding: 16px 32px; }
     </style>
-    <div class="playlist-player-wrapper">
-        <div class="playlist-title-container">
-          <span class="playlist-title" style="color: #fff; font-size: 15px; font-weight: bold;">Playlist Name</span>
-          <div class="playlist-stats-container">
-          </div>
-      </div>
-      <div class="playlist-wrapper">
-          <table class="tracklist-table">
-              <thead>
-                  <tr>
-                      ${tableHeaders}
-                  </tr>
-              </thead>
-              <tbody>
-                  ${generateTableRows(displayedTracks)}
-              </tbody>
-          </table>
-      </div>
-        <div class="player-controls2">
-          <div class="track-info-container">
-              <div class="track-album-art">
-              </div>
-              <div class="track-info-text">
-                  <span class="track-title">Track Title</span>
-                  <span class="track-artist">Artist Name</span>
-              </div>
-          </div>
-          <div class="progress-bar2-container">
-              <button class="control-button2" id="playPauseButton">
-                  ${playIconSvg}
-              </button>
-              <span id="currentTime">0:00</span>
-              <div class="progress-bar2" id="progressBar">
-                  <div class="progress-bar2-inner" id="progressBarInner"></div>
-              </div>
-              <span id="duration">0:00</span>
-          </div>
-          <div class="max-rows-container">
-              <span class="max-rows-label">Max Rows:</span>
-              <select class="max-rows-select">
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="200">200</option>
-                  <option value="300">300</option>
-                  <option value="500">500</option>
-                  <option value="700">800</option>
-                  <option value="1000">1000</option>
-                  <option value="all">All</option>
-              </select>
-          </div>
-      </div>
+    <div class="main-trackCreditsModal-header">
+        <h1 class="main-trackCreditsModal-title">Custom Filter</h1>
+        <button id="closeCustomFilterModalBtn" aria-label="Close" class="main-trackCreditsModal-closeBtn">
+            ${closeModalIcon20Svg || closeModalIcon18Svg}
+        </button>
     </div>
-    <div class="filter-settings-container">
-      <div class="settings-left-wrapper">
-          <div class="settings-title-wrapper">
-              <div class="settings-title">Keyword Filters</div>
-              <label class="switch">
-                  <input type="checkbox" id="keywordFilterToggle">
-                  <span class="sliderx"></span>
-              </label>
+    <div class="main-trackCreditsModal-mainSection">
+        <div class="playlist-player-wrapper">
+            <div class="playlist-title-container">
+              <span class="playlist-title" style="color: #fff; font-size: 15px; font-weight: bold;">Playlist Name</span>
+              <div class="playlist-stats-container">
+              </div>
           </div>
-          <div class="filter-mode-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
-            <div class="filter-mode-radio-group" style="display: flex; align-items: center; gap: 16px;">
-              <div class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-right: 8px;">Filter Mode:</div>
-              <label class="radio-button-container">
-                <span class="radio-button">
-                  <input type="radio" name="filterMode" value="exclude">
-                  <span class="radio-button-inner"></span>
-                </span>
-                <span class="radio-label">Exclude</span>
-              </label>
-              <label class="radio-button-container">
-                <span class="radio-button">
-                  <input type="radio" name="filterMode" value="keep">
-                  <span class="radio-button-inner"></span>
-                </span>
-                <span class="radio-label">Keep</span>
-              </label>
-              <span class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-left: 14px;">Match Whole Word:</span>
-            </div>
+          <div class="playlist-wrapper">
+              <table class="tracklist-table">
+                  <thead>
+                      <tr>
+                          ${tableHeaders}
+                      </tr>
+                  </thead>
+                  <tbody>
+                      ${generateTableRows(displayedTracks)}
+                  </tbody>
+              </table>
+          </div>
+            <div class="player-controls2">
+              <div class="track-info-container">
+                  <div class="track-album-art">
+                  </div>
+                  <div class="track-info-text">
+                      <span class="track-title">Track Title</span>
+                      <span class="track-artist">Artist Name</span>
+                  </div>
+              </div>
+              <div class="progress-bar2-container">
+                  <button class="control-button2" id="playPauseButton">
+                      ${playIconSvg}
+                  </button>
+                  <span id="currentTime">0:00</span>
+                  <div class="progress-bar2" id="progressBar">
+                      <div class="progress-bar2-inner" id="progressBarInner"></div>
+                  </div>
+                  <span id="duration">0:00</span>
+              </div>
+              <div class="max-rows-container">
+                  <span class="max-rows-label">Max Rows:</span>
+                  <select class="max-rows-select">
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                      <option value="200">200</option>
+                      <option value="300">300</option>
+                      <option value="500">500</option>
+                      <option value="700">800</option>
+                      <option value="1000">1000</option>
+                      <option value="all">All</option>
+                  </select>
+              </div>
+          </div>
+        </div>
+        <div class="filter-settings-container">
+          <div class="settings-left-wrapper">
+              <div class="settings-title-wrapper">
+                  <div class="settings-title">Keyword Filters</div>
+                  <label class="switch">
+                      <input type="checkbox" id="keywordFilterToggle">
+                      <span class="sliderx"></span>
+                  </label>
+              </div>
+              <div class="filter-mode-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 10px;">
+                <div class="filter-mode-radio-group" style="display: flex; align-items: center; gap: 16px;">
+                  <div class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-right: 8px;">Filter Mode:</div>
+                  <label class="radio-button-container">
+                    <span class="radio-button">
+                      <input type="radio" name="filterMode" value="exclude">
+                      <span class="radio-button-inner"></span>
+                    </span>
+                    <span class="radio-label">Exclude</span>
+                  </label>
+                  <label class="radio-button-container">
+                    <span class="radio-button">
+                      <input type="radio" name="filterMode" value="keep">
+                      <span class="radio-button-inner"></span>
+                    </span>
+                    <span class="radio-label">Keep</span>
+                  </label>
+                  <span class="filter-mode-title" style="color: #fff; font-size: 13px; font-weight: 500; margin-left: 14px;">Match Whole Word:</span>
+                </div>
 
-            <label class="switch">
-              <input type="checkbox" id="matchWholeWordToggle">
-              <span class="sliderx"></span>
-            </label>
-          </div>
-          <div class="keyword-filter-container">
-              <div class="filter-group">
-                  <div class="filter-group-header">
-                      <span class="filter-group-title">Titles/Albums</span>
-                      <div class="toggle-group">
-                          <span class="filter-mode-toggle-label">Title</span>
-                          <label class="switch">
-                              <input type="checkbox" id="titleToggle" checked>
+                <label class="switch">
+                  <input type="checkbox" id="matchWholeWordToggle">
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+              <div class="keyword-filter-container">
+                  <div class="filter-group">
+                      <div class="filter-group-header">
+                          <span class="filter-group-title">Titles/Albums</span>
+                          <div class="toggle-group">
+                              <span class="filter-mode-toggle-label">Title</span>
+                              <label class="switch">
+                                  <input type="checkbox" id="titleToggle" checked>
+                                  <span class="sliderx"></span>
+                              </label>
+                              <span class="filter-mode-toggle-label">Album</span>
+                              <label class="switch">
+                              <input type="checkbox" id="albumToggle" checked>
                               <span class="sliderx"></span>
                           </label>
-                          <span class="filter-mode-toggle-label">Album</span>
-                          <label class="switch">
-                          <input type="checkbox" id="albumToggle" checked>
-                          <span class="sliderx"></span>
-                      </label>
+                          </div>
                       </div>
-                  </div>
-                  <div class="keyword-input-container" id="titleAlbumKeywords">
-                      <div class="keyword-tags-container">
-                      </div>
-                      <div class="keyword-input-wrapper">
-                        <input type="text" class="keyword-input" placeholder="Add keywords...">
-                          <div class="keyword-actions-container">
-                              <button class="keyword-action-button keyword-save-button" title="Save Keywords">${saveIconSVG}</button>
-                              <button class="keyword-action-button keyword-load-button" title="Load Keywords">${loadIconSVG}</button>
-                              <button class="keyword-action-button keyword-remove-all-button" title="Clear Keywords">${clearIconSVG}</button>
+                      <div class="keyword-input-container" id="titleAlbumKeywords">
+                          <div class="keyword-tags-container">
+                          </div>
+                          <div class="keyword-input-wrapper">
+                            <input type="text" class="keyword-input" placeholder="Add keywords...">
+                              <div class="keyword-actions-container">
+                                  <button class="keyword-action-button keyword-save-button" title="Save Keywords">${saveIconSVG}</button>
+                                  <button class="keyword-action-button keyword-load-button" title="Load Keywords">${loadIconSVG}</button>
+                                  <button class="keyword-action-button keyword-remove-all-button" title="Clear Keywords">${clearIconSVG}</button>
+                              </div>
                           </div>
                       </div>
                   </div>
-              </div>
 
-              <div class="filter-group">
-                <div class="filter-group-header">
-                  <span class="filter-group-title">Artists</span>
-                    <div class="toggle-group">
-                      <label class="switch">
-                        <input type="checkbox" id="artistToggle" checked>
-                        <span class="sliderx"></span>
-                      </label>
-                    </div>
-                  </div>
-                  <div class="keyword-input-container" id="artistKeywords">
-                      <div class="keyword-tags-container">
-                      </div>
-                      <div class="keyword-input-wrapper">
-                          <input type="text" class="keyword-input" placeholder="Add keywords...">
-                      </div>
-                  </div>
-              </div>
-            </div>
-      </div>
-      <div class="settings-right-wrapper">
-            <div class="settings-title-wrapper">
-                <div class="settings-title">Range Filters</div>
-                  <label class="switch">
-                    <input type="checkbox" id="rangeFilterToggle" checked>
-                  <span class="sliderx"></span>
-              </label>
-            </div>
-            <div class="range-filters-items">
-                <div class="range-filter-container">
-                  <div class="range-filter-title-wrapper">
-                      <span class="range-filter-label">Filter by:</span>
-                          <div class="range-filter-title">
-                              <select id="rangeFilterType">
-                                <option value="releaseDate" ${activeRangeFilter === 'releaseDate' ? 'selected' : ''}>Release Date</option>
-                                <option value="durationMs" ${activeRangeFilter === 'durationMs' ? 'selected' : ''}>Duration</option>
-                                <option value="playCount" ${activeRangeFilter === 'playCount' ? 'selected' : ''}>Plays</option>
-                                <option value="popularity" ${activeRangeFilter === 'popularity' ? 'selected' : ''}>Popularity</option>
-                                <option value="features.energy" ${activeRangeFilter === 'features.energy' ? 'selected' : ''}>Energy</option>
-                                <option value="features.danceability" ${activeRangeFilter === 'features.danceability' ? 'selected' : ''}>Danceability</option>
-                                <option value="features.valence" ${activeRangeFilter === 'features.valence' ? 'selected' : ''}>Valence</option>
-                                <option value="features.tempo" ${activeRangeFilter === 'features.tempo' ? 'selected' : ''}>Tempo</option>
-                              </select>
-                          </div>
-                    </div>
-                    <div class="range-input-container">
-                        <input type="text" class="range-input" id="rangeMin" placeholder="Min">
-                        <div class="dual-range-sliderx-container" id="rangesliderx">
-                            <div class="sliderx-track"></div>
-                            <input type="range"  id="rangesliderx-1">
-                            <input type="range"  id="rangesliderx-2">
+                  <div class="filter-group">
+                    <div class="filter-group-header">
+                      <span class="filter-group-title">Artists</span>
+                        <div class="toggle-group">
+                          <label class="switch">
+                            <input type="checkbox" id="artistToggle" checked>
+                            <span class="sliderx"></span>
+                          </label>
                         </div>
-                        <input type="text" class="range-input" id="rangeMax" placeholder="Max">
+                      </div>
+                      <div class="keyword-input-container" id="artistKeywords">
+                          <div class="keyword-tags-container">
+                          </div>
+                          <div class="keyword-input-wrapper">
+                              <input type="text" class="keyword-input" placeholder="Add keywords...">
+                          </div>
+                      </div>
+                  </div>
+                </div>
+          </div>
+          <div class="settings-right-wrapper">
+                <div class="settings-title-wrapper">
+                    <div class="settings-title">Range Filters</div>
+                      <label class="switch">
+                        <input type="checkbox" id="rangeFilterToggle" checked>
+                      <span class="sliderx"></span>
+                  </label>
+                </div>
+                <div class="range-filters-items">
+                    <div class="range-filter-container">
+                      <div class="range-filter-title-wrapper">
+                          <span class="range-filter-label">Filter by:</span>
+                              <div class="range-filter-title">
+                                  <select id="rangeFilterType">
+                                    <option value="releaseDate" ${activeRangeFilter === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                                    <option value="durationMs" ${activeRangeFilter === 'durationMs' ? 'selected' : ''}>Duration</option>
+                                    <option value="playCount" ${activeRangeFilter === 'playCount' ? 'selected' : ''}>Plays</option>
+                                    <option value="popularity" ${activeRangeFilter === 'popularity' ? 'selected' : ''}>Popularity</option>
+                                    <option value="features.energy" ${activeRangeFilter === 'features.energy' ? 'selected' : ''}>Energy</option>
+                                    <option value="features.danceability" ${activeRangeFilter === 'features.danceability' ? 'selected' : ''}>Danceability</option>
+                                    <option value="features.valence" ${activeRangeFilter === 'features.valence' ? 'selected' : ''}>Valence</option>
+                                    <option value="features.tempo" ${activeRangeFilter === 'features.tempo' ? 'selected' : ''}>Tempo</option>
+                                  </select>
+                              </div>
+                        </div>
+                        <div class="range-input-container">
+                            <input type="text" class="range-input" id="rangeMin" placeholder="Min">
+                            <div class="dual-range-sliderx-container" id="rangesliderx">
+                                <div class="sliderx-track"></div>
+                                <input type="range"  id="rangesliderx-1">
+                                <input type="range"  id="rangesliderx-2">
+                            </div>
+                            <input type="text" class="range-input" id="rangeMax" placeholder="Max">
+                        </div>
                     </div>
                 </div>
-            </div>
-      </div>
-      <div class="buttons-wrapper">
-          <label for="sort-type-select" style="color: #fff; font-size: 13px; margin-right: 8px;">Sort Type:</label>
-            <select class="sort-type-select" id="sort-type-select">
-                <option value="default">Original Order</option>
-                <option value="current">Current Order</option>
-                <option value="playCount">Play Count</option>
-                <option value="popularity">Popularity</option>
-                <option value="releaseDate">Release Date</option>
-                <option value="shuffle">Shuffle</option>
-            </select>
-            <button id="customFilterCreatePlaylist">Create Playlist</button>
-      </div>
-  </div>
+          </div>
+          <div class="buttons-wrapper">
+              <label for="sort-type-select" style="color: #fff; font-size: 13px; margin-right: 8px;">Sort Type:</label>
+                <select class="sort-type-select" id="sort-type-select">
+                    <option value="default">Original Order</option>
+                    <option value="current">Current Order</option>
+                    <option value="playCount">Play Count</option>
+                    <option value="popularity">Popularity</option>
+                    <option value="releaseDate">Release Date</option>
+                    <option value="shuffle">Shuffle</option>
+                </select>
+                <button id="customFilterCreatePlaylist">Create Playlist</button>
+          </div>
+        </div>
+    </div>
     `;
 
-    Spicetify.PopupModal.display({
-        title: "<span style='font-size: 24px; font-weight: 700;'>Custom Filter</span>",
-        content: modalContainer,
-        isLarge: true,
-    });
-    tagActiveModalWithFontScope();
-    
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
     const playlistTitleElement = modalContainer.querySelector(".playlist-title");
     updatePlaylistStats();
     
@@ -13310,25 +13367,25 @@
         }
     })();
 
-    const overlay = document.createElement("div");
-    overlay.className = "modal-overlay";
-    const genericModalOverlay = document.querySelector(".GenericModal__overlay");
+    const cleanup = () => {
+        if (observer) {
+            observer.disconnect();
+        }
+        clearInterval(progressInterval);
+        Spicetify.Player.removeEventListener('onplaypause', playerStateHandler);
 
-    if (genericModalOverlay) {
-        genericModalOverlay.appendChild(overlay);
-    }
+        abortController.abort();
+        activeRow = null;
 
-    if (overlay) {
-        overlay.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-    }
+        overlay.remove();
+    };
 
-    const modalContainerElement = document.querySelector(".main-popupModal-container");
-    if (modalContainerElement) {
-        modalContainerElement.style.zIndex = "2000";
-    }
+    modalContainer.querySelector("#closeCustomFilterModalBtn").addEventListener("click", cleanup);
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) {
+            cleanup();
+        }
+    });
 
     tableBody = modalContainer.querySelector(".tracklist-table tbody");
     let activeRow = null;
@@ -13673,43 +13730,6 @@
 
     const progressInterval = setInterval(updateProgress, 100);
 
-    const cleanup = () => {
-        if (observer) {
-            observer.disconnect();
-        }
-        clearInterval(progressInterval);
-        Spicetify.Player.removeEventListener('onplaypause', playerStateHandler);
-        if (closeButton) {
-            closeButton.removeEventListener("click", cleanup);
-        }
-
-        abortController.abort();
-        activeRow = null;
-
-        Spicetify.PopupModal.hide();
-
-    };
-    const closeButton = document.querySelector('.main-trackCreditsModal-closeBtn');
-    if (closeButton) {
-        closeButton.addEventListener("click", cleanup);
-    }
-
-
-    const modalContainerElementForMutation = document.querySelector('.main-popupModal-container');
-    if (modalContainerElementForMutation) {
-        const mutationObserver = new MutationObserver((mutations) => {
-            const closeButton = modalContainerElementForMutation.querySelector('.main-trackCreditsModal-closeBtn');
-            if (closeButton && !closeButton.hasAttribute('data-cleanup-attached')) {
-                closeButton.setAttribute('data-cleanup-attached', 'true');
-                closeButton.addEventListener("click", cleanup);
-            }
-        });
-
-        mutationObserver.observe(modalContainerElementForMutation, {
-            childList: true,
-            subtree: true
-        });
-    }
     setupDualRangesliderx("rangesliderx", "rangeMin", "rangeMax", abortController.signal);
     updateRangeUI(activeRangeFilter);
 
@@ -13885,7 +13905,7 @@
             return;
         }
 
-        Spicetify.PopupModal.hide();
+        cleanup();
         setButtonProcessing(true);
         mainButton.innerHTML = "0%";
 
@@ -22386,63 +22406,67 @@
   }
 
   function showDefaultApiKeyWarning() {
-    const abortController = new AbortController();
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-apikey-warning-overlay";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 3000;
+        display: flex; justify-content: center; align-items: center;
+        backdrop-filter: blur(8px);
+    `;
+
     const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container";
+    modalContainer.style.cssText = `
+        width: 425px !important; background-color: #181818 !important;
+        border: 1px solid #282828; border-radius: 20px; display: flex;
+        flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    `;
+
     modalContainer.innerHTML = `
       <style>
-        .main-embedWidgetGenerator-container { width: 425px !important; border-radius: 30px; overflow: hidden; background-color: #181818 !important; border: 2px solid #282828; }
-        .GenericModal__overlay .GenericModal { border-radius: 30px; overflow: hidden; }
-        .main-trackCreditsModal-mainSection { overflow-y: hidden !important; }
-        .GenericModal > .main-embedWidgetGenerator-container { height: auto !important; }
         .main-buttons-button:hover { filter: brightness(1.2); }
-        .main-trackCreditsModal-header { padding: 27px 32px 12px !important; }
-        .main-trackCreditsModal-originalCredits { padding-bottom: 20px !important; }
       </style>
-      <div style="display: flex; flex-direction: column; gap: 15px;">
-        <div style="color: white; font-size: 16px; margin-bottom: 15px;">
+      <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 12px; border-bottom: 1px solid #282828;">
+          <h1 class="main-trackCreditsModal-title" style="margin: 0;"><span style='font-size: 25px; font-weight: 700; color: white;'>API Key Warning</span></h1>
+          <button id="closeApiKeyWarningBtn" aria-label="Close" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s;">
+              ${closeModalIcon20Svg}
+          </button>
+      </div>
+      <div class="main-trackCreditsModal-mainSection" style="padding: 24px 32px;">
+        <div style="color: #b3b3b3; font-size: 16px; margin-bottom: 24px; line-height: 1.4;">
           You are using the default API key for AI Pick. 
           For extended usage, please use your own API key.
         </div>
         <div style="display: flex; gap: 10px; justify-content: flex-end;">
           <button id="continueAnyway" class="main-buttons-button" 
-                  style="padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; font-weight: 500; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                  style="padding: 8px 16px; border-radius: 20px; border: none; cursor: pointer; background-color: #333333; color: white; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.2s ease;">
             Continue Anyway
           </button>
           <button id="addApiKey" class="main-buttons-button main-button-primary" 
-                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 600; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                  style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 600; font-size: 13px; text-transform: uppercase; transition: all 0.2s ease;">
             Set Free API Key
           </button>
         </div>
       </div>
     `;
-  
-    Spicetify.PopupModal.display({
-      title: "<span style='font-size: 25px;'>API Key Warning</span>",
-      content: modalContainer,
-      isLarge: true,
-    });
-    tagActiveModalWithFontScope();
 
-    preventDragCloseModal(abortController.signal);
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
 
-    const modalObserver = new MutationObserver((mutations, obs) => {
-      if (!document.querySelector('.GenericModal')) {
-        abortController.abort();
-        obs.disconnect();
-      }
-    });
-    modalObserver.observe(document.body, { childList: true, subtree: true });
-  
-    const continueButton = document.getElementById("continueAnyway");
-    const addApiKeyButton = document.getElementById("addApiKey");
-  
-    continueButton.addEventListener("click", async () => {
-      Spicetify.PopupModal.hide();
+    const closeModal = () => overlay.remove();
+
+    modalContainer.querySelector("#closeApiKeyWarningBtn").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+    modalContainer.querySelector("#continueAnyway").addEventListener("click", async () => {
+      closeModal();
       await handleSortAndCreatePlaylist("aiPick");  
     });
   
-    addApiKeyButton.addEventListener("click", () => {
-      Spicetify.PopupModal.hide();  
+    modalContainer.querySelector("#addApiKey").addEventListener("click", () => {
+      closeModal();
       setTimeout(() => {
         showGeminiApiKeyModal();  
       }, 350);
@@ -24313,6 +24337,8 @@
         display: flex;
         flex-direction: column;
         border-radius: 30px;
+        background-color: #181818 !important;
+        border: 1px solid #282828;
     `;
 
     const allProcessedTracks = [];
