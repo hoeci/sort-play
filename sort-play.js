@@ -3200,7 +3200,7 @@
             Top Tracks Playlist Max Size
         </label>
         <div class="col action">
-            <select id="topTracksLimitSelect" style="width: auto; min-width: 70px;">
+            <select id="topTracksLimitSelect" style="width: 70px;">
                 <option value="50">50</option>
                 <option value="100">100</option>
                 <option value="150">150</option>
@@ -3209,8 +3209,7 @@
                 <option value="500">500</option>
                 <option value="1000">1000</option>
                 <option value="2000">2000</option>
-                <option value="3000">3000</option>
-                <option value="11000">Max Available</option>
+                <option value="11000">Max</option>
             </select>
         </div>
     </div>
@@ -3220,7 +3219,7 @@
             Discovery Playlist Size
         </label>
         <div class="col action">
-            <select id="discoveryPlaylistSizeSelect" style="width: 65px;">
+            <select id="discoveryPlaylistSizeSelect" style="width: 70px;">
                 <option value="25">25</option>
                 <option value="50">50</option>
                 <option value="75">75</option>
