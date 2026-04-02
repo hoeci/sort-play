@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.71.1";
+  const SORT_PLAY_VERSION = "5.72.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -46,6 +46,7 @@
   const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
   const STORAGE_KEY_CHANGE_TITLE_ON_CREATE = "sort-play-change-title-on-create";
   const STORAGE_KEY_CHANGE_TITLE_ON_MODIFY = "sort-play-change-title-on-modify";
+  const STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY = "sort-play-change-description-on-modify";
   const STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR = "sort-play-dedicated-playlist-behavior";
   const STORAGE_KEY_DEDICATED_PLAYLIST_MAP = "sort-play-dedicated-playlist-map";
   const STORAGE_KEY_COLOR_SORT_MODE = "sort-play-color-sort-mode";
@@ -134,6 +135,7 @@
     STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT,
     STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, STORAGE_KEY_SORT_PLAY_FOLDER_NAME,
     STORAGE_KEY_CHANGE_TITLE_ON_CREATE, STORAGE_KEY_CHANGE_TITLE_ON_MODIFY,
+    STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY,
     STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, STORAGE_KEY_DEDICATED_PLAYLIST_MAP,
     STORAGE_KEY_COLOR_SORT_MODE, STORAGE_KEY_TOP_TRACKS_LIMIT,
     STORAGE_KEY_NEW_RELEASES_LIMIT, STORAGE_KEY_FOLLOWED_RELEASES_LIMIT,
@@ -198,6 +200,7 @@
   let sortPlayFolderName = "Sort-Play Library";
   let changeTitleOnCreate = false;
   let changeTitleOnModify = false;
+  let changeDescriptionOnModify = true;
   let setDedicatedPlaylistCovers = true;
   let selectedAiModel = DEFAULT_AI_MODEL;
   let topTracksLimit = 100;
@@ -327,7 +330,11 @@
   const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
   const CHAT_API_URL = "https://sort-play-chat.niko2nio2.workers.dev";
   
+  const ENABLE_SPOTIFY_ARTIST_GENRES = false;
+
   async function get_S_Client_Token() {
+      if (!ENABLE_SPOTIFY_ARTIST_GENRES) return null;
+
       if (s_Access_Token && Date.now() < s_Token_Exp) {
           return s_Access_Token;
       }
@@ -802,16 +809,6 @@
       element.addEventListener("mouseenter", () => { element.style.backgroundColor = hoverColor; });
       element.addEventListener("mouseleave", () => { element.style.backgroundColor = defaultColor; });
   }
-
-  function tagActiveModalWithFontScope() {
-    setTimeout(() => {
-      const modalContainer = document.querySelector(".main-popupModal-container");
-      if (modalContainer) {
-        modalContainer.classList.add('sort-play-font-scope');
-      }
-    }, 50);
-  }
-
   
   function preventDragCloseModal(signal) {
     let mouseDownInsideModal = false;
@@ -1844,6 +1841,8 @@
     changeTitleOnCreate = changeTitleOnCreateStored === null ? false : changeTitleOnCreateStored === "true";
     const changeTitleStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY);
     changeTitleOnModify = changeTitleStored === null ? false : changeTitleStored === "true";
+    const changeDescStored = localStorage.getItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY);
+    changeDescriptionOnModify = changeDescStored === null ? true : changeDescStored === "true";
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
@@ -1886,6 +1885,11 @@
     useGenrePlaylistDatabase = localStorage.getItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE) !== "false";
     autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
 
+    if (!ENABLE_SPOTIFY_ARTIST_GENRES) {
+        genreSourcesNpSpotify = false;
+        genreSourcesApSpotify = false;
+    }
+
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
         if (storedValue !== null) {
@@ -1927,6 +1931,7 @@
     localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE, changeTitleOnCreate);
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY, changeTitleOnModify);
+    localStorage.setItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY, changeDescriptionOnModify);
     localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
     localStorage.setItem(STORAGE_KEY_SHOW_LIKE_BUTTON, showLikeButton);
@@ -2014,6 +2019,7 @@
           [STORAGE_KEY_SORT_PLAY_FOLDER_NAME]: "Sort-Play Library",
           [STORAGE_KEY_CHANGE_TITLE_ON_CREATE]: "false",
           [STORAGE_KEY_CHANGE_TITLE_ON_MODIFY]: "false",
+          [STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY]: "true",
           [STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR]: "{}",
           [STORAGE_KEY_DEDICATED_PLAYLIST_MAP]: "{}",
           [STORAGE_KEY_COLOR_SORT_MODE]: "perceptual",
@@ -2511,10 +2517,10 @@
       .sort-play-settings .col { padding: 0; }
       .sort-play-settings .setting-row::after { content: ""; display: table; clear: both; }
       .sort-play-settings .setting-row { padding: 5px 0; align-items: center; }
-      .sort-play-settings .setting-row .col.description { float: left; padding-right: 15px; width: auto; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
+      .sort-play-settings .setting-row .col.description { float: left; padding-right: 10px; width: auto; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
       .sort-play-settings .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
       .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 120px; }
-      .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 10px; width: 120px; }
+      .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 5px; width: 120px; }
       .sort-play-settings select:disabled { opacity: 0.5; cursor: not-allowed; }
       .column-settings-button { background: none; border: none; margin: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; opacity: 0.7; transition: opacity 0.2s; }
       .column-settings-button:hover { opacity: 1; }
@@ -2577,7 +2583,7 @@
             Add Sorted Tracks to Queue
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Adds tracks to queue after direct sorts (Play Count, Popularity, Scrobbles, Shuffle, etc.).<br>Filters & AI Pick excluded.</span>
+                <span class="custom-tooltip">Adds tracks to queue after direct sorts and Quick Filters (Play Count, Shuffle, Remove Duplicates, etc.).<br>Advanced Filters are excluded.</span>
             </span>
         </label>
         <div class="col action">
@@ -2593,7 +2599,7 @@
             Create Playlist After Sorting
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Creates a new playlist with the sorted tracks. Applies only when sorting directly (not using filters or AI).</span>
+                <span class="custom-tooltip">Creates a new playlist with the sorted or filtered tracks. Applies to direct sorts and Quick Filters (Advanced Filters have their own creation flows).</span>
             </span>
         </label>
         <div class="col action"><label class="switch" id="createPlaylistSwitchLabel">
@@ -2608,7 +2614,7 @@
             Modify Current Playlist
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Sorts your owned playlist directly instead of creating a new one.</span>
+                <span class="custom-tooltip">Modifies your owned playlist directly instead of creating a new one when using direct sorts or Quick Filters.</span>
             </span>
         </label>
         <div class="col action">
@@ -2675,7 +2681,7 @@
 
     <div class="setting-row" id="colorSortModeSetting">
         <label class="col description">
-            Color Sort Mode
+            Album Color Sort Mode
             <span class="tooltip-container">
                 ${infoIconSvg}
                 <span class="custom-tooltip">"Perceptual" groups black & white albums first.<br>"Hue Gradient" creates a pure rainbow effect.</span>
@@ -3000,7 +3006,7 @@
             </span>
         </label>
         <div class="col action">
-            <select id="artistDiscographySortSelect" style="max-width: 140px; margin-right: 10px;">
+            <select id="artistDiscographySortSelect" style="max-width: 140px; margin-right: 5px;">
                 <option value="playCount" ${artistDiscographySortType === 'playCount' ? 'selected' : ''}>Play Count</option>
                 <option value="popularity" ${artistDiscographySortType === 'popularity' ? 'selected' : ''}>Popularity</option>
                 <option value="releaseDate" ${artistDiscographySortType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
@@ -3090,7 +3096,7 @@
             Update Title When Creating
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Appends a sort tag like (PlayCount) to new playlists created via direct sorting.</span>
+                <span class="custom-tooltip">Appends a tag like (PlayCount) to new playlists created via direct sorting or Quick Filters.</span>
             </span>
         </label>
         <div class="col action">
@@ -3106,12 +3112,28 @@
             Update Title When Modifying
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Appends a sort tag like (PlayCount) to the playlist title after modifying it.</span>
+                <span class="custom-tooltip">Appends a tag like (PlayCount) to the playlist title after modifying it via direct sorting or Quick Filters.</span>
             </span>
         </label>
         <div class="col action">
             <label class="switch" id="changeTitleOnModifySwitchLabel">
                 <input type="checkbox" id="changeTitleOnModifyToggle" ${changeTitleOnModify ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="changeDescriptionOnModifySettingRow">
+        <label class="col description">
+            Update Description When Modifying
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Updates the playlist description to indicate how it was sorted/filtered.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="changeDescriptionOnModifySwitchLabel">
+                <input type="checkbox" id="changeDescriptionOnModifyToggle" ${changeDescriptionOnModify ? 'checked' : ''}>
                 <span class="sliderx"></span>
             </label>
         </div>
@@ -3175,10 +3197,10 @@
 
     <div class="setting-row" id="topTracksLimitSetting">
         <label class="col description">
-            Top Tracks Playlist Size
+            Top Tracks Playlist Max Size
         </label>
         <div class="col action">
-            <select id="topTracksLimitSelect" style="width: 65px;">
+            <select id="topTracksLimitSelect" style="width: auto; min-width: 70px;">
                 <option value="50">50</option>
                 <option value="100">100</option>
                 <option value="150">150</option>
@@ -3186,6 +3208,9 @@
                 <option value="250">250</option>
                 <option value="500">500</option>
                 <option value="1000">1000</option>
+                <option value="2000">2000</option>
+                <option value="3000">3000</option>
+                <option value="11000">Max Available</option>
             </select>
         </div>
     </div>
@@ -3209,7 +3234,7 @@
             New Releases Time Window
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Set the lookback period for New Releases playlists, anchored to the music industry's Friday release schedule.</span>
+                <span class="custom-tooltip">Set the lookback period for New Releases playlists. 'Release Week' options are anchored to the music industry's Friday release schedule, while 'Days' are a rolling window.</span>
             </span>
         </label>
         <div class="col action">
@@ -3402,6 +3427,7 @@
     const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
     const changeTitleOnCreateToggle = modalContainer.querySelector("#changeTitleOnCreateToggle");
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
+    const changeDescriptionOnModifyToggle = modalContainer.querySelector("#changeDescriptionOnModifyToggle");
     const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
     const showSecondAdditionalColumnToggle = modalContainer.querySelector("#showSecondAdditionalColumnToggle");
     const secondColumnTypeSelect = modalContainer.querySelector("#secondColumnTypeSelect");
@@ -3539,6 +3565,11 @@
         document.getElementById('changeTitleOnModifySwitchLabel').classList.remove("disabled");
         document.getElementById('changeTitleOnModifySettingRow').classList.remove("dependent-disabled");
         changeTitleOnModifyToggle.checked = changeTitleOnModify;
+
+        changeDescriptionOnModifyToggle.disabled = false;
+        document.getElementById('changeDescriptionOnModifySwitchLabel').classList.remove("disabled");
+        document.getElementById('changeDescriptionOnModifySettingRow').classList.remove("dependent-disabled");
+        changeDescriptionOnModifyToggle.checked = changeDescriptionOnModify;
     }
 
     function updateSortCurrentPlaylistToggleState() {
@@ -3712,6 +3743,13 @@
     changeTitleOnModifyToggle.addEventListener("change", () => {
         if (!changeTitleOnModifyToggle.disabled) {
             changeTitleOnModify = changeTitleOnModifyToggle.checked;
+            saveSettings();
+        }
+    });
+
+    changeDescriptionOnModifyToggle.addEventListener("change", () => {
+        if (!changeDescriptionOnModifyToggle.disabled) {
+            changeDescriptionOnModify = changeDescriptionOnModifyToggle.checked;
             saveSettings();
         }
     });
@@ -6298,6 +6336,7 @@
                           <span class="sliderx"></span>
                       </label>
                   </div>
+                  ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
                   <div class="setting-row">
                       <label class="setting-label" for="npSpotifyToggle">Spotify (Artist Tags)</label>
                       <label class="switch">
@@ -6305,6 +6344,7 @@
                           <span class="sliderx"></span>
                       </label>
                   </div>
+                  ` : ''}
                   <div class="setting-row">
                       <label class="setting-label" for="npLastfmToggle">Last.fm (Filtered Track & Artist Tags)</label>
                       <label class="switch">
@@ -6324,6 +6364,7 @@
               <div style="display: flex; flex-direction: column; gap: 4px;">
                   <div class="section-header">Artist Page Sources</div>
                   
+                  ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
                   <div class="setting-row">
                       <label class="setting-label" for="apSpotifyToggle">Spotify (Artist Tags)</label>
                       <label class="switch">
@@ -6331,6 +6372,7 @@
                           <span class="sliderx"></span>
                       </label>
                   </div>
+                  ` : ''}
                   <div class="setting-row">
                       <label class="setting-label" for="apLastfmToggle">Last.fm (Filtered Artist Tags)</label>
                       <label class="switch">
@@ -6372,10 +6414,10 @@
         genreSourcesNpSpotifyTrack = npSpotifyTrackToggle.checked;
         showGenreTagsArtistPage = showTagsApToggle.checked;
         showGenresContextMenu = showGenresCtxToggle2.checked;
-        genreSourcesNpSpotify = npSpotifyToggle.checked;
+        genreSourcesNpSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && npSpotifyToggle) ? npSpotifyToggle.checked : false;
         genreSourcesNpLastfm = npLastfmToggle.checked;
         genreSourcesNpDeezer = npDeezerToggle.checked;
-        genreSourcesApSpotify = apSpotifyToggle.checked;
+        genreSourcesApSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && apSpotifyToggle) ? apSpotifyToggle.checked : false;
         genreSourcesApLastfm = apLastfmToggle.checked;
         useGenrePlaylistDatabase = useGenreDbToggle.checked;
         autoUpdateGenreModal = autoUpdateModalToggle.checked;
@@ -6395,11 +6437,11 @@
     showTagsNpToggle.addEventListener("change", updateVarsAndSave);
     showTagsApToggle.addEventListener("change", updateVarsAndSave);
     showGenresCtxToggle2.addEventListener("change", updateVarsAndSave);
-    npSpotifyToggle.addEventListener("change", updateVarsAndSave);
+    if (npSpotifyToggle) npSpotifyToggle.addEventListener("change", updateVarsAndSave);
     npSpotifyTrackToggle.addEventListener("change", updateVarsAndSave);
     npLastfmToggle.addEventListener("change", updateVarsAndSave);
     npDeezerToggle.addEventListener("change", updateVarsAndSave);
-    apSpotifyToggle.addEventListener("change", updateVarsAndSave);
+    if (apSpotifyToggle) apSpotifyToggle.addEventListener("change", updateVarsAndSave);
     apLastfmToggle.addEventListener("change", updateVarsAndSave);
     useGenreDbToggle.addEventListener("change", updateVarsAndSave);
     autoUpdateModalToggle.addEventListener("change", updateVarsAndSave);
@@ -8140,7 +8182,10 @@
           const categoryMap = new Map();
           const order = ['Spotify (Track)', 'Spotify (Artist)', 'Last.fm (Track)', 'Last.fm (Artist)', 'Deezer (Album)', 'Other'];
           
-          order.forEach(c => categoryMap.set(c, []));
+          order.forEach(c => {
+              if (!ENABLE_SPOTIFY_ARTIST_GENRES && c === 'Spotify (Artist)') return;
+              categoryMap.set(c, []);
+          });
 
           genreMap.forEach(item => {
               item.sources.forEach(source => {
@@ -8152,7 +8197,10 @@
                       const match = source.match(/\(([\d.]+%)\)/);
                       if (match) score = match[1];
                   }
-                  else if (source.startsWith("Spotify Artist")) category = 'Spotify (Artist)';
+                  else if (source.startsWith("Spotify Artist")) {
+                      if (!ENABLE_SPOTIFY_ARTIST_GENRES) return;
+                      category = 'Spotify (Artist)';
+                  }
                   else if (source.startsWith("Last.fm Track")) category = 'Last.fm (Track)';
                   else if (source.startsWith("Last.fm Artist")) category = 'Last.fm (Artist)';
                   else if (source.startsWith("Deezer")) category = 'Deezer (Album)';
@@ -8178,8 +8226,8 @@
               if (genres.length > 0) {
                   shouldShow = true;
               } else {
-                  if (category === 'Spotify (Track)' && genreSourcesNpSpotify) shouldShow = true;
-                  else if (category === 'Spotify (Artist)' && genreSourcesNpSpotify) shouldShow = true;
+                  if (category === 'Spotify (Track)' && genreSourcesNpSpotifyTrack) shouldShow = true;
+                  else if (category === 'Spotify (Artist)' && genreSourcesNpSpotify && ENABLE_SPOTIFY_ARTIST_GENRES) shouldShow = true;
                   else if (category === 'Last.fm (Track)' && genreSourcesNpLastfm) shouldShow = true;
                   else if (category === 'Last.fm (Artist)' && genreSourcesNpLastfm) shouldShow = true;
                   else if (category === 'Deezer (Album)' && genreSourcesNpDeezer) shouldShow = true;
@@ -8778,6 +8826,78 @@
       }
   }
   
+  async function fetchNativeSpotifyTrackGenresBatch(trackUris) {
+      try {
+          const client = getMetadataClient();
+          if (!client) return new Map();
+          
+          const validUris = trackUris.filter(uri => uri && uri.startsWith("spotify:track:"));
+          if (validUris.length === 0) return new Map();
+
+          const response = await client.fetch({ extensionQuery: [
+              { extensionKind: 6, entityUri: validUris },
+              { extensionKind: 28, entityUri: validUris }
+          ]});
+          
+          const results = new Map();
+          validUris.forEach(uri => results.set(uri, { concepts: [], scores: [] }));
+
+          if (response.extension) {
+              response.extension.forEach(ext => {
+                  const kind = ext.extensionKind;
+                  if ((kind === 6 || kind === 28) && ext.entityExtension) {
+                      ext.entityExtension.forEach(item => {
+                          if (item.extensionData && item.extensionData.value) {
+                              const uri = item.entityUri;
+                              const res = results.get(uri) || { concepts: [], scores: [] };
+                              
+                              if (kind === 6) {
+                                  const text = new TextDecoder().decode(item.extensionData.value);
+                                  const matches = text.match(/[A-Za-z0-9 _-]{3,}/g);
+                                  if (matches) {
+                                      res.concepts = matches.filter(s => !s.startsWith('spotify') && !s.match(/^[a-zA-Z0-9]{20,}$/) && s !== 'concept');
+                                  }
+                              } else if (kind === 28) {
+                                  const buffer = new Uint8Array(Object.values(item.extensionData.value)).buffer;
+                                  const dataView = new DataView(buffer);
+                                  for(let i = 0; i < buffer.byteLength - 8; i++) {
+                                      try {
+                                          let val = dataView.getFloat64(i, true);
+                                          if (val > 0.001 && val <= 1.0) res.scores.push(val);
+                                      } catch(e){}
+                                  }
+                              }
+                              results.set(uri, res);
+                          }
+                      });
+                  }
+              });
+          }
+          
+          const finalMap = new Map();
+          results.forEach((data, uri) => {
+              const uniqueConceptsMap = new Map();
+              data.concepts.forEach((concept, index) => {
+                  const lower = concept.toLowerCase();
+                  if (!uniqueConceptsMap.has(lower)) {
+                      uniqueConceptsMap.set(lower, data.scores[index] || 0);
+                  }
+              });
+              
+              const genres = Array.from(uniqueConceptsMap.entries()).map(([name, score]) => ({
+                  name,
+                  score
+              }));
+              
+              finalMap.set(uri, genres);
+          });
+          return finalMap;
+      } catch (e) {
+          console.warn("[Sort-Play] Failed to fetch Native Spotify Track Genres Batch:", e);
+          return new Map();
+      }
+  }
+  
   async function fetchDisplayGenres(track) {
       if (!track || !track.uri) return new Map();
       
@@ -9234,8 +9354,8 @@
             if (item.sources.size === 1) {
                 const score = getSpotifyTrackScore(item.sources);
                 if (score !== -1) {
-                    if (score < 20) return false;
-                    if (score < 50 && highestSpotifyTrackScore >= 50) return false;
+                    if (score < 8) return false;
+                    if (score < 20 && highestSpotifyTrackScore >= 20) return false;
                 }
             }
             return true;
@@ -15624,6 +15744,7 @@
             const capturedRawSet = new Set();
             rawGenresMap.forEach(data => {
                 const genres = [
+                    ...(data.spotify_track_genres || []),
                     ...(data.spotify_artist_genres || []),
                     ...(data.lastfm_track_genres || []),
                     ...(data.lastfm_artist_genres || []),
@@ -15659,6 +15780,7 @@
 
                 if (rawData) {
                     let combined = [
+                        ...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })),
                         ...(rawData.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
                         ...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
                         ...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
@@ -15715,7 +15837,7 @@
                     const details = genreDetails.get(genreName);
                     
                     if (trackArtist) details.artists.add(trackArtist);
-                    if (source === 'spotify' || source === 'deezer' || source === 'apple_music') details.isTrusted = true;
+                    if (source === 'spotify' || source === 'spotify_track' || source === 'deezer' || source === 'apple_music') details.isTrusted = true;
                     if (trackArtist && genreName.toLowerCase() === trackArtist) details.isSelfTitle = true;
 
                     if (!genresCountedForTrack.has(genreName)) {
@@ -18692,6 +18814,7 @@
                 const rawData = rawGenreData.get(track.uri);
                 if (!rawData) return;
                 const rawGenres = [
+                    ...(rawData.spotify_track_genres || []),
                     ...(rawData.spotify_artist_genres || []),
                     ...(rawData.lastfm_track_genres || []),
                     ...(rawData.lastfm_artist_genres || []),
@@ -18739,6 +18862,7 @@
                 if (!rawData) return;
 
                 const rawGenres = [
+                    ...(rawData.spotify_track_genres || []),
                     ...(rawData.spotify_artist_genres || []),
                     ...(rawData.lastfm_track_genres || []),
                     ...(rawData.lastfm_artist_genres || []),
@@ -18872,7 +18996,7 @@
                 details.count++;
                 if (trackArtist) details.artists.add(trackArtist);
 
-                if (genreData?.source === 'spotify' || genreData?.source === 'deezer' || genreData?.source === 'apple_music') {
+                if (genreData?.source === 'spotify' || genreData?.source === 'spotify_track' || genreData?.source === 'deezer' || genreData?.source === 'apple_music') {
                     details.isTrusted = true;
                 }
                 
@@ -19583,7 +19707,7 @@
                 }
             }
     
-            if (artistIdsToFetch.length > 0) {
+            if (ENABLE_SPOTIFY_ARTIST_GENRES && artistIdsToFetch.length > 0) {
                 const artistBatches = [];
                 for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                     artistBatches.push(artistIdsToFetch.slice(i, i + 50));
@@ -19846,7 +19970,7 @@
         });
 
         const artistIdsToFetch = Array.from(uniqueArtistIds);
-        if (artistIdsToFetch.length > 0) {
+        if (ENABLE_SPOTIFY_ARTIST_GENRES && artistIdsToFetch.length > 0) {
             updateProgress("Artists...");
             for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                 const batch = artistIdsToFetch.slice(i, i + 50);
@@ -20025,6 +20149,7 @@
             let genres = finalGenresMap.get(track.uri);
             if (genres) {
                 let combined = [
+                    ...(genres.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })),
                     ...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
                     ...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
                     ...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
@@ -20073,41 +20198,40 @@
                 response = await fetchBatchInternal();
 
                 if (response && response.tracks) {
-                    response.tracks.forEach(track => {
-                        if (track) {
-                            const uri = track.uri || `spotify:track:${track.id}`;
-                            const releaseDateText = track.album?.release_date || "N/A";
-                            const durationMs = safeVal(track.duration_ms);
-                            
-                            const artistNames = track.artists ? track.artists.map(a => a.name) : [];
-                            const isExplicit = (track.explicit !== undefined && track.explicit !== null) ? track.explicit : null;
-                            const trackName = track.name;
-                            const popularity = track.popularity;
-                            const isrc = track.external_ids?.isrc;
+                    batch.forEach((id, idx) => {
+                        const track = response.tracks[idx];
+                        const uri = `spotify:track:${id}`;
+                        const genreData = finalGenresMap.get(uri);
 
-                            const genreData = finalGenresMap.get(uri);
-                            if (genreData) {
-                                genreData.release_date_text = releaseDateText;
-                                genreData.duration_ms = durationMs;
+                        if (genreData) {
+                            if (track) {
+                                genreData.release_date_text = track.album?.release_date || "N/A";
+                                genreData.duration_ms = safeVal(track.duration_ms);
+                                genreData.artist_name = (track.artists && track.artists.length > 0) ? track.artists.map(a => a.name) : ["Unknown Artist"];
+                                genreData.explicit = (track.explicit !== undefined && track.explicit !== null) ? track.explicit : false;
+                                genreData.track_name = track.name || "Unknown Track";
+                                genreData.popularity = (track.popularity !== undefined && track.popularity !== null) ? track.popularity : -1;
                                 
-                                genreData.artist_name = artistNames;
-                                genreData.explicit = isExplicit;
-                                genreData.track_name = trackName;
-                                genreData.popularity = popularity;
-                                
-                                if (isrc && !genreData.isrc) {
-                                    genreData.isrc = isrc;
+                                if (track.external_ids?.isrc && !genreData.isrc) {
+                                    genreData.isrc = track.external_ids.isrc;
                                 }
+                            } else {
+                                genreData.release_date_text = genreData.release_date_text || "N/A";
+                                genreData.duration_ms = genreData.duration_ms || -1;
+                                genreData.artist_name = genreData.artist_name || ["Unknown Artist"];
+                                genreData.explicit = genreData.explicit !== undefined ? genreData.explicit : false;
+                                genreData.track_name = genreData.track_name || "Unknown Track";
+                                genreData.popularity = genreData.popularity !== undefined ? genreData.popularity : -1;
+                            }
 
-                                if (genreData.isrc) {
-                                    const existing = itemsToSaveMap.get(uri);
-                                    itemsToSaveMap.set(uri, {
-                                        ...(existing || {}),
-                                        track_uri: uri,
-                                        isrc: genreData.isrc,
-                                        ...genreData
-                                    });
-                                }
+                            if (genreData.isrc) {
+                                const existing = itemsToSaveMap.get(uri);
+                                itemsToSaveMap.set(uri, {
+                                    ...(existing || {}),
+                                    track_uri: uri,
+                                    isrc: genreData.isrc,
+                                    ...genreData
+                                });
                             }
                         }
                     });
@@ -20246,6 +20370,48 @@
         }
     }
 
+    updateProgress("Genres...");
+    const urisToFetchNative = [];
+    finalGenresMap.forEach((data, uri) => {
+        if (!data.spotify_track_genres) urisToFetchNative.push(uri);
+    });
+
+    if (urisToFetchNative.length > 0) {
+        const genreMap = await getGenreMapping();
+        const BATCH_SIZE = 500;
+        let processedNative = 0;
+        for (let i = 0; i < urisToFetchNative.length; i += BATCH_SIZE) {
+            const batch = urisToFetchNative.slice(i, i + BATCH_SIZE);
+            const nativeGenresMap = await fetchNativeSpotifyTrackGenresBatch(batch);
+            
+            batch.forEach(uri => {
+                const nativeGenres = nativeGenresMap.get(uri) || [];
+                
+                const validNative = nativeGenres.filter(g => {
+                    const name = g.name.toLowerCase();
+                    return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
+                });
+
+                let finalNative = [];
+                if (validNative.length > 0) {
+                    validNative.forEach(g => {
+                        const pct = g.score * 100;
+                        if (pct > 5) {
+                            finalNative.push(g.name); 
+                        }
+                    });
+                }
+
+                const data = finalGenresMap.get(uri);
+                if (data) {
+                    data.spotify_track_genres = finalNative;
+                }
+            });
+            processedNative += batch.length;
+            updateProgress(`Genres ${Math.round((processedNative / urisToFetchNative.length) * 100)}%`);
+        }
+    }
+
     finalGenresMap.forEach((data, uri) => {
         sessionGenreCache.set(uri, data);
         if (data.isrc) sessionGenreCache.set(data.isrc, data);
@@ -20269,6 +20435,7 @@
         let genres = finalGenresMap.get(track.uri);
         if (genres) {
             let combined = [
+                ...(genres.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })),
                 ...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
                 ...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
                 ...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
@@ -24908,79 +25075,105 @@
         }
 
         let allItems = [];
-        const offsets = [0, 50, 100]; 
+        let offset = 0;
         
-        for (const offset of offsets) {
-            if (allItems.length >= totalLimit) break;
+        while (allItems.length < totalLimit) {
+            let success = false;
+            let reachedEnd = false;
+            let maxRetries = 3;
+            let retryDelay = 1000;
 
-            try {
-                const variables = {
-                    includeTopArtists: type === 'artists',
-                    topArtistsInput: {
-                        offset: offset,
-                        limit: 50,
-                        sortBy: "AFFINITY",
-                        timeRange: gqlTimeRange
-                    },
-                    includeTopTracks: type === 'tracks',
-                    topTracksInput: {
-                        offset: offset,
-                        limit: 50,
-                        sortBy: "AFFINITY",
-                        timeRange: gqlTimeRange
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const variables = {
+                        includeTopArtists: type === 'artists',
+                        topArtistsInput: {
+                            offset: offset,
+                            limit: 50,
+                            sortBy: "AFFINITY",
+                            timeRange: gqlTimeRange
+                        },
+                        includeTopTracks: type === 'tracks',
+                        topTracksInput: {
+                            offset: offset,
+                            limit: 50,
+                            sortBy: "AFFINITY",
+                            timeRange: gqlTimeRange
+                        }
+                    };
+
+                    const res = await Spicetify.GraphQL.Request({
+                        name: "userTopContent",
+                        operation: "query",
+                        sha256Hash: "49ee15704de4a7fdeac65a02db20604aa11e46f02e809c55d9a89f6db9754356",
+                        value: null,
+                    }, variables);
+
+                    let items = [];
+                    if (type === 'artists' && res?.data?.me?.profile?.topArtists?.items) {
+                        items = res.data.me.profile.topArtists.items.map(i => {
+                            const d = i.data;
+                            return {
+                                id: d.uri.split(':')[2],
+                                uri: d.uri,
+                                name: d.profile?.name,
+                                genres: [],
+                                images: d.visuals?.avatarImage?.sources || []
+                            };
+                        });
+                    } else if (type === 'tracks' && res?.data?.me?.profile?.topTracks?.items) {
+                        items = res.data.me.profile.topTracks.items.map(i => {
+                            const d = i.data;
+                            return {
+                                id: d.uri.split(':')[2],
+                                uri: d.uri,
+                                name: d.name,
+                                artists: d.artists?.items?.map(a => ({
+                                    name: a.profile?.name,
+                                    uri: a.uri,
+                                    id: a.uri.split(':')[2]
+                                })) || [],
+                                album: {
+                                    name: d.albumOfTrack?.name,
+                                    uri: d.albumOfTrack?.uri,
+                                    images: d.albumOfTrack?.coverArt?.sources || []
+                                },
+                                duration_ms: d.duration?.totalMilliseconds
+                            };
+                        });
                     }
-                };
 
-                const res = await Spicetify.GraphQL.Request({
-                    name: "userTopContent",
-                    operation: "query",
-                    sha256Hash: "49ee15704de4a7fdeac65a02db20604aa11e46f02e809c55d9a89f6db9754356",
-                    value: null,
-                }, variables);
+                    if (items.length === 0) {
+                        reachedEnd = true;
+                    } else {
+                        allItems = allItems.concat(items);
+                        if (items.length < 50) {
+                            reachedEnd = true;
+                        }
+                    }
 
-                let items = [];
-                if (type === 'artists' && res?.data?.me?.profile?.topArtists?.items) {
-                    items = res.data.me.profile.topArtists.items.map(i => {
-                        const d = i.data;
-                        return {
-                            id: d.uri.split(':')[2],
-                            uri: d.uri,
-                            name: d.profile?.name,
-                            genres: [],
-                            images: d.visuals?.avatarImage?.sources || []
-                        };
-                    });
-                } else if (type === 'tracks' && res?.data?.me?.profile?.topTracks?.items) {
-                    items = res.data.me.profile.topTracks.items.map(i => {
-                        const d = i.data;
-                        return {
-                            id: d.uri.split(':')[2],
-                            uri: d.uri,
-                            name: d.name,
-                            artists: d.artists?.items?.map(a => ({
-                                name: a.profile?.name,
-                                uri: a.uri,
-                                id: a.uri.split(':')[2]
-                            })) || [],
-                            album: {
-                                name: d.albumOfTrack?.name,
-                                uri: d.albumOfTrack?.uri,
-                                images: d.albumOfTrack?.coverArt?.sources || []
-                            },
-                            duration_ms: d.duration?.totalMilliseconds
-                        };
-                    });
+                    success = true;
+                    break; 
+
+                } catch (e) {
+                    console.error(`[Sort-Play] GQL Top Items fetch failed for offset ${offset} (Attempt ${attempt}/${maxRetries})`, e);
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, retryDelay));
+                        retryDelay *= 2; 
+                    }
                 }
+            }
 
-                if (items.length === 0) break;
-                allItems = allItems.concat(items);
-
-                if (items.length < 50) break;
-
-            } catch (e) {
-                console.error(`[Sort-Play] GQL Top Items fetch failed for offset ${offset}`, e);
+            if (!success) {
+                console.warn(`[Sort-Play] Fetching top items failed at offset ${offset} after ${maxRetries} attempts. Returning accumulated items.`);
                 break;
             }
+
+            if (reachedEnd) {
+                break;
+            }
+
+            offset += 50;
         }
         
         return allItems.slice(0, totalLimit);
@@ -28605,22 +28798,26 @@
             newPlaylistObjectForNavigation = targetPlaylistUriToReplace ? { uri: targetPlaylistUriToReplace } : null;
 
             try {
-                const requestBody = {
-                    description: sortType === 'shuffle' 
+                const requestBody = {};
+                
+                if (changeDescriptionOnModify) {
+                    requestBody.description = sortType === 'shuffle' 
                         ? `Shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
-                        : `${actionVerbPast} by ${sortTypeInfo.fullName} using Sort-Play`
-                };
+                        : `${actionVerbPast} by ${sortTypeInfo.fullName} using Sort-Play`;
+                }
 
                 if (changeTitleOnModify) {
                     requestBody.name = `${finalSourceName} (${sortTypeInfo.shortName})`;
                 }
 
-                try {
-                    await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistIdToModify}`, requestBody);
-                } catch (error) {
-                    const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
-                    if (!isExpectedJsonError) {
-                        console.warn("An unexpected error occurred while updating playlist details. Proceeding with track replacement.", error);
+                if (Object.keys(requestBody).length > 0) {
+                    try {
+                        await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistIdToModify}`, requestBody);
+                    } catch (error) {
+                        const isExpectedJsonError = error instanceof SyntaxError && error.message.includes("Unexpected end of JSON input");
+                        if (!isExpectedJsonError) {
+                            console.warn("An unexpected error occurred while updating playlist details. Proceeding with track replacement.", error);
+                        }
                     }
                 }
 
