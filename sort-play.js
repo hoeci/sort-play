@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.72.0";
+  const SORT_PLAY_VERSION = "5.73.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -47,6 +47,7 @@
   const STORAGE_KEY_CHANGE_TITLE_ON_CREATE = "sort-play-change-title-on-create";
   const STORAGE_KEY_CHANGE_TITLE_ON_MODIFY = "sort-play-change-title-on-modify";
   const STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY = "sort-play-change-description-on-modify";
+  const STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION = "sort-play-overwrite-custom-description";
   const STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR = "sort-play-dedicated-playlist-behavior";
   const STORAGE_KEY_DEDICATED_PLAYLIST_MAP = "sort-play-dedicated-playlist-map";
   const STORAGE_KEY_COLOR_SORT_MODE = "sort-play-color-sort-mode";
@@ -119,6 +120,7 @@
   const STORAGE_KEY_FILTER_ARTIST = "sort-play-filter-artist";
   const STORAGE_KEY_MATCH_WHOLE_WORD = "sort-play-match-whole-word";
   const STORAGE_KEY_CHAT_CUSTOM_NAME = "sp-chat-custom-name";
+  const STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION = "sort-play-auto-hide-discography-notification";
 
   const SYNCABLE_SETTINGS_KEYS = [
     STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
@@ -135,7 +137,7 @@
     STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT,
     STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, STORAGE_KEY_SORT_PLAY_FOLDER_NAME,
     STORAGE_KEY_CHANGE_TITLE_ON_CREATE, STORAGE_KEY_CHANGE_TITLE_ON_MODIFY,
-    STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY,
+    STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY, STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION,
     STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, STORAGE_KEY_DEDICATED_PLAYLIST_MAP,
     STORAGE_KEY_COLOR_SORT_MODE, STORAGE_KEY_TOP_TRACKS_LIMIT,
     STORAGE_KEY_NEW_RELEASES_LIMIT, STORAGE_KEY_FOLLOWED_RELEASES_LIMIT,
@@ -169,7 +171,8 @@
     STORAGE_KEY_KEYWORD_GROUPS, STORAGE_KEY_TITLE_ALBUM_KEYWORDS, 
     STORAGE_KEY_ARTIST_KEYWORDS, STORAGE_KEY_MATCH_WHOLE_WORD,
     STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE, STORAGE_KEY_ACTIVE_RANGE_FILTER, 
-    STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST
+    STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
+    STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION
   ];
 
   const AI_MODELS = [
@@ -201,6 +204,7 @@
   let changeTitleOnCreate = false;
   let changeTitleOnModify = false;
   let changeDescriptionOnModify = true;
+  let overwriteCustomDescription = true;
   let setDedicatedPlaylistCovers = true;
   let selectedAiModel = DEFAULT_AI_MODEL;
   let topTracksLimit = 100;
@@ -247,6 +251,7 @@
   let genreSourcesApSpotify = true;
   let genreSourcesApLastfm = true;
   let autoUpdateGenreModal = false;
+  let autoHideDiscographyNotification = false;
   let isProcessing = false;
   let isDiscoProcessing = false;
   let isMultiDiscoMode = false;
@@ -1328,10 +1333,9 @@
   
   const notificationStyles = document.createElement('style');
   notificationStyles.innerHTML = `
-      #sort-play-notifications-wrapper { position: fixed; bottom: 108px; left: 0; z-index: 2147483647; display: flex; flex-direction: column; align-items: flex-start; gap: 0; pointer-events: none; max-height: 80vh; }
-      .sp-notification-section { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; transition: margin-top 0.2s ease; }
-      .sp-notification-divider { height: 1px; background: rgba(255, 255, 255, 0.15); width: 100%; margin: 0; opacity: 0; visibility: hidden; max-width: 450px; transition: opacity 0.1s ease, margin 0.1s ease, visibility 0.1s ease; pointer-events: none; }
-      .sp-notification-divider.visible { opacity: 1; visibility: visible; margin: 10px 0; }
+      #sort-play-notifications-wrapper { position: fixed; bottom: 108px; left: 0; z-index: 2147483647; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 0; pointer-events: none; height: 75vh; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%); mask-image: linear-gradient(to bottom, transparent 0%, black 15%); }
+      .sp-notification-section { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; transition: margin-top 0.2s ease; flex-shrink: 0; }
+      .sp-notification-divider { height: 1px; background: rgba(255, 255, 255, 0.15); width: 100%; margin: 0; opacity: 0; visibility: hidden; max-width: 450px; transition: opacity 0.1s ease, margin 0.1s ease, visibility 0.1s ease; pointer-events: none; flex-shrink: 0; }
       .sort-play-notification-toast { background-color: #fff; color: #000; padding: 14px 24px 14px 20px; border-radius: 0 8px 8px 0; box-shadow: 4px 4px 12px rgba(0,0,0,0.3); font-family: 'SpotifyMixUI', sans-serif; font-size: 16px; font-weight: 500; opacity: 0; transform: translateX(-100%); transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1), margin-bottom 0.25s ease, max-height 0.25s ease; pointer-events: auto; cursor: pointer; max-width: 450px; text-align: left; border-left: 10px solid #1db954; word-wrap: break-word; }
       .sort-play-notification-toast:hover { filter: brightness(0.95); }
       .sort-play-notification-toast.visible { opacity: 1; transform: translateX(0); }
@@ -1372,7 +1376,7 @@
       stickyNotificationContainer = notificationContainer.children[2];
   }
 
-  function showNotification(text, typeOrIsError = false, duration = 4800) {
+  function showNotification(text, typeOrIsError = false, duration = 5000) {
       let type = 'info';
       if (typeof typeOrIsError === 'boolean') {
           type = typeOrIsError ? 'error' : 'info';
@@ -1400,16 +1404,44 @@
           toast.title = "Double-click to dismiss";
       } else {
           toast.onclick = () => removeToast(toast);
+          if (duration === 0) {
+              toast.title = "Click to dismiss";
+          }
       }
 
       container.appendChild(toast);
       updateDivider();
 
-      setTimeout(() => toast.classList.add('visible'), 50);
+      setTimeout(() => {
+          toast.classList.add('visible');
+      }, 50);
 
       let autoDismiss;
       if (duration > 0) {
-          autoDismiss = setTimeout(() => removeToast(toast), duration);
+          const startCountdown = () => {
+              if (!autoDismiss) {
+                  autoDismiss = setTimeout(() => removeToast(toast), duration);
+              }
+          };
+
+          const attachInteractionListeners = () => {
+              const interactionEvents = ['mousemove', 'mousedown', 'keydown', 'wheel', 'touchstart'];
+              const onInteract = () => {
+                  interactionEvents.forEach(e => document.removeEventListener(e, onInteract));
+                  startCountdown();
+              };
+              interactionEvents.forEach(e => document.addEventListener(e, onInteract));
+          };
+
+          if (document.hasFocus()) {
+              attachInteractionListeners();
+          } else {
+              const onFocus = () => {
+                  window.removeEventListener('focus', onFocus);
+                  attachInteractionListeners();
+              };
+              window.addEventListener('focus', onFocus);
+          }
       }
 
       function removeToast(element) {
@@ -1431,7 +1463,7 @@
       }
 
       return {
-          update: (newText) => toast.innerText = newText,
+          update: (newText) => { toast.innerText = newText; },
           remove: () => removeToast(toast),
           element: toast
       };
@@ -1843,6 +1875,8 @@
     changeTitleOnModify = changeTitleStored === null ? false : changeTitleStored === "true";
     const changeDescStored = localStorage.getItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY);
     changeDescriptionOnModify = changeDescStored === null ? true : changeDescStored === "true";
+    const overwriteDescStored = localStorage.getItem(STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION);
+    overwriteCustomDescription = overwriteDescStored === null ? true : overwriteDescStored === "true";
     const setDedicatedCoversStored = localStorage.getItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS);
     setDedicatedPlaylistCovers = setDedicatedCoversStored === null ? true : setDedicatedCoversStored === "true";
     chatPanelVisible = localStorage.getItem(STORAGE_KEY_CHAT_PANEL_VISIBLE) === "true";
@@ -1884,6 +1918,7 @@
     genreSourcesApLastfm = localStorage.getItem(STORAGE_KEY_GENRE_SOURCES_AP_LASTFM) !== "false";
     useGenrePlaylistDatabase = localStorage.getItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE) !== "false";
     autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
+    autoHideDiscographyNotification = localStorage.getItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION) === "true";
 
     if (!ENABLE_SPOTIFY_ARTIST_GENRES) {
         genreSourcesNpSpotify = false;
@@ -1932,6 +1967,7 @@
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE, changeTitleOnCreate);
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY, changeTitleOnModify);
     localStorage.setItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY, changeDescriptionOnModify);
+    localStorage.setItem(STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION, overwriteCustomDescription);
     localStorage.setItem(STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS, setDedicatedPlaylistCovers);
     localStorage.setItem(STORAGE_KEY_CHAT_PANEL_VISIBLE, chatPanelVisible);
     localStorage.setItem(STORAGE_KEY_SHOW_LIKE_BUTTON, showLikeButton);
@@ -1974,6 +2010,7 @@
     localStorage.setItem(STORAGE_KEY_GENRE_SOURCES_AP_LASTFM, genreSourcesApLastfm);
     localStorage.setItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE, useGenrePlaylistDatabase);
     localStorage.setItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL, autoUpdateGenreModal);
+    localStorage.setItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, autoHideDiscographyNotification);
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
 
     for (const sortType in sortOrderState) {
@@ -2020,6 +2057,7 @@
           [STORAGE_KEY_CHANGE_TITLE_ON_CREATE]: "false",
           [STORAGE_KEY_CHANGE_TITLE_ON_MODIFY]: "false",
           [STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY]: "true",
+          [STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION]: "true",
           [STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR]: "{}",
           [STORAGE_KEY_DEDICATED_PLAYLIST_MAP]: "{}",
           [STORAGE_KEY_COLOR_SORT_MODE]: "perceptual",
@@ -2085,7 +2123,8 @@
           [STORAGE_KEY_FILTER_TITLE]: "true",
           [STORAGE_KEY_FILTER_ALBUM]: "true",
           [STORAGE_KEY_FILTER_ARTIST]: "true",
-          [STORAGE_KEY_MATCH_WHOLE_WORD]: "false"
+          [STORAGE_KEY_MATCH_WHOLE_WORD]: "false",
+          [STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION]: "false"
         };
     
         if (key === STORAGE_KEY_NP_CONFIG) {
@@ -3139,6 +3178,22 @@
         </div>
     </div>
 
+    <div class="setting-row" id="overwriteCustomDescriptionSettingRow">
+        <label class="col description">
+            Overwrite Custom Descriptions
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">If disabled, existing playlist descriptions won't be replaced unless they already have "Sort-Play" in them.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="overwriteCustomDescriptionSwitchLabel">
+                <input type="checkbox" id="overwriteCustomDescriptionToggle" ${overwriteCustomDescription ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Discography
     </div>
@@ -3313,6 +3368,27 @@
     </div>
 
     
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Notifications
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="autoHideDiscographyNotificationSetting">
+        <label class="col description">
+            Auto-Hide Discography Notification
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Automatically dismisses the notification that appears after an artist discography is created.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="autoHideDiscographyNotificationToggle" ${autoHideDiscographyNotification ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+    
     </div>
     </div>
     <div class="sort-play-settings-footer">
@@ -3427,6 +3503,7 @@
     const changeTitleOnCreateToggle = modalContainer.querySelector("#changeTitleOnCreateToggle");
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
     const changeDescriptionOnModifyToggle = modalContainer.querySelector("#changeDescriptionOnModifyToggle");
+    const overwriteCustomDescriptionToggle = modalContainer.querySelector("#overwriteCustomDescriptionToggle");
     const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
     const showSecondAdditionalColumnToggle = modalContainer.querySelector("#showSecondAdditionalColumnToggle");
     const secondColumnTypeSelect = modalContainer.querySelector("#secondColumnTypeSelect");
@@ -3438,6 +3515,7 @@
     const showGenreTagsToggle = modalContainer.querySelector("#showGenreTagsToggle");
     const showGenresContextMenuToggle = modalContainer.querySelector("#showGenresContextMenuToggle");
     const genreSourcesSettingsBtn = modalContainer.querySelector("#genreSourcesSettingsBtn");
+    const autoHideDiscographyNotificationToggle = modalContainer.querySelector("#autoHideDiscographyNotificationToggle");
     const useEnergyWaveShuffleToggle = modalContainer.querySelector("#useEnergyWaveShuffleToggle");
     const showNowPlayingDataToggle = modalContainer.querySelector("#showNowPlayingDataToggle");
     const nowPlayingSettingsBtn = modalContainer.querySelector("#nowPlayingSettingsBtn");
@@ -3497,6 +3575,11 @@
 
     showGenresContextMenuToggle.addEventListener("change", () => {
         showGenresContextMenu = showGenresContextMenuToggle.checked;
+        saveSettings();
+    });
+
+    autoHideDiscographyNotificationToggle.addEventListener("change", () => {
+        autoHideDiscographyNotification = autoHideDiscographyNotificationToggle.checked;
         saveSettings();
     });
 
@@ -3569,6 +3652,15 @@
         document.getElementById('changeDescriptionOnModifySwitchLabel').classList.remove("disabled");
         document.getElementById('changeDescriptionOnModifySettingRow').classList.remove("dependent-disabled");
         changeDescriptionOnModifyToggle.checked = changeDescriptionOnModify;
+
+        const overwriteToggle = document.getElementById('overwriteCustomDescriptionToggle');
+        if (overwriteToggle) {
+            const isDescOn = changeDescriptionOnModify;
+            overwriteToggle.disabled = !isDescOn;
+            document.getElementById('overwriteCustomDescriptionSwitchLabel').classList.toggle("disabled", !isDescOn);
+            document.getElementById('overwriteCustomDescriptionSettingRow').classList.toggle("dependent-disabled", !isDescOn);
+            overwriteToggle.checked = overwriteCustomDescription;
+        }
     }
 
     function updateSortCurrentPlaylistToggleState() {
@@ -3749,6 +3841,14 @@
     changeDescriptionOnModifyToggle.addEventListener("change", () => {
         if (!changeDescriptionOnModifyToggle.disabled) {
             changeDescriptionOnModify = changeDescriptionOnModifyToggle.checked;
+            updateChangeTitleToggleState();
+            saveSettings();
+        }
+    });
+
+    overwriteCustomDescriptionToggle.addEventListener("change", () => {
+        if (!overwriteCustomDescriptionToggle.disabled) {
+            overwriteCustomDescription = overwriteCustomDescriptionToggle.checked;
             saveSettings();
         }
     });
@@ -10247,24 +10347,36 @@
     let artistName = "Unknown Artist";
     if (!uri) return { sourceName, artistName };
 
-    try {
-        if (Spicetify.URI.isArtist(uri)) {
-            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri, locale: "en", includePrerelease: false });
-            sourceName = res.data?.artistUnion?.profile?.name || "Unknown Artist";
-        } else if (isLikedSongsPage(uri)) {
-            sourceName = "Liked Songs";
-        } else if (isLocalFilesPage(uri)) {
-            sourceName = "Local Files";
-        } else if (Spicetify.URI.isAlbum(uri)) {
-            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri, locale: "en", offset: 0, limit: 1 });
-            sourceName = res.data?.albumUnion?.name || "Unknown Album";
-            artistName = res.data?.albumUnion?.artists?.items?.[0]?.profile?.name || "Unknown Artist";
-        } else if (Spicetify.URI.isPlaylistV1OrV2(uri)) {
-            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
-            sourceName = meta?.name || "Unknown Playlist";
+    const maxRetries = 3;
+    let delay = 1000;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            if (Spicetify.URI.isArtist(uri)) {
+                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri, locale: "en", includePrerelease: false });
+                sourceName = res.data?.artistUnion?.profile?.name || "Unknown Artist";
+            } else if (isLikedSongsPage(uri)) {
+                sourceName = "Liked Songs";
+            } else if (isLocalFilesPage(uri)) {
+                sourceName = "Local Files";
+            } else if (Spicetify.URI.isAlbum(uri)) {
+                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri, locale: "en", offset: 0, limit: 1 });
+                sourceName = res.data?.albumUnion?.name || "Unknown Album";
+                artistName = res.data?.albumUnion?.artists?.items?.[0]?.profile?.name || "Unknown Artist";
+            } else if (Spicetify.URI.isPlaylistV1OrV2(uri)) {
+                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(uri);
+                sourceName = meta?.name || "Unknown Playlist";
+            }
+            break;
+        } catch (e) {
+            if (attempt === maxRetries) {
+                console.warn("Failed to fetch source name and artist for:", uri, e);
+            } else {
+                console.warn(`[Sort-Play] Fetch source name failed (Attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`, e.message || e);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+            }
         }
-    } catch (e) {
-        console.warn("Failed to fetch source name and artist for:", uri, e);
     }
 
     return { sourceName, artistName };
@@ -11900,6 +12012,7 @@
                     allArtists: spotifyTrack.artists.map(a => a.name).join(", "),
                     artistName: spotifyTrack.artists[0].name,
                     durationMilis: spotifyTrack.duration_ms,
+                    durationMs: spotifyTrack.duration_ms,
                     playCount: "N/A", popularity: null, releaseDate: null,
                     track: {
                         album: { id: spotifyTrack.album.id, name: spotifyTrack.album.name },
@@ -12438,7 +12551,7 @@
               </td>
               <td>${track.releaseDate ? new Date(track.releaseDate).toLocaleDateString() : "N/A"}</td>
               <td>${formatDuration(track.durationMs)}</td> 
-              <td>${Number(track.playCount).toLocaleString()}</td>
+              <td>${track.playCount !== "N/A" && track.playCount != null ? Number(track.playCount).toLocaleString() : "N/A"}</td>
               <td>${track.popularity !== null ? track.popularity : "N/A"}</td>
           `;
 
@@ -14280,7 +14393,7 @@
     let filteredTracks = combinedTracks;
 
     const likedFilterMode = filters.likedFilter || (filters.excludeLiked ? 'exclude' : 'all');
-    const scrobbleFilterMode = filters.scrobbleFilter || (filters.excludeListened ? 'exclude' : 'all');
+    const scrobbleFilterMode = filters.scrobbleFilter || filters.scrobblesFilter || (filters.excludeListened ? 'exclude' : 'all');
 
     if (likedFilterMode !== 'all') {
         if (!isHeadless) mainButton.innerText = "Filtering Liked...";
@@ -16138,7 +16251,7 @@
         let keepMatchingMode, filterTitle, filterAlbum, filterArtist, matchWholeWord;
         
         let likedFilterMode = currentFilters.likedFilter || (currentFilters.excludeLiked ? 'exclude' : 'all');
-        let scrobbleFilterMode = currentFilters.scrobbleFilter || (currentFilters.excludeListened ? 'exclude' : 'all');
+        let scrobbleFilterMode = currentFilters.scrobbleFilter || currentFilters.scrobblesFilter || (currentFilters.excludeListened ? 'exclude' : 'all');
         let followedFilterMode = currentFilters.followedFilter || 'all';
 
         const overlay = document.createElement("div");
@@ -16515,6 +16628,7 @@
                     const getVal = (id) => document.getElementById(id).value;
                     const state = {
                         likedFilter: likedFilterMode,
+                        scrobbleFilter: scrobbleFilterMode,
                         scrobblesFilter: scrobbleFilterMode,
                         followedFilter: followedFilterMode,
                         minPlayCount: getVal('filter-min-playcount'),
@@ -16563,7 +16677,7 @@
             e.stopPropagation();
 
             const loadBtn = e.currentTarget;
-            let savedPresets = JSON.parse(localStorage.getItem("sort-play-filter-presets") || "{}");
+            let savedPresets = JSON.parse(localStorage.getItem(STORAGE_KEY_FILTER_PRESETS) || "{}");
             const presetNames = Object.keys(savedPresets).reverse();
 
             if (presetNames.length === 0) {
@@ -16610,7 +16724,7 @@
                     const state = savedPresets[presetName];
                     
                     likedFilterMode = state.likedFilter || 'all';
-                    scrobbleFilterMode = state.scrobblesFilter || 'all';
+                    scrobbleFilterMode = state.scrobbleFilter || state.scrobblesFilter || 'all';
                     followedFilterMode = state.followedFilter || 'all';
                     
                     setSegmentedControl('liked-filter-control', likedFilterMode);
@@ -16687,7 +16801,7 @@
                 removeButton.addEventListener("click", (evt) => {
                     evt.stopPropagation();
                     delete savedPresets[presetName];
-                    localStorage.setItem("sort-play-filter-presets", JSON.stringify(savedPresets));
+                    localStorage.setItem(STORAGE_KEY_FILTER_PRESETS, JSON.stringify(savedPresets));
                     option.remove();
                     showNotification(`Removed preset "${presetName}"`);
                     if (Object.keys(savedPresets).length === 0) {
@@ -16898,7 +17012,7 @@
 
             const newFilters = {
                 likedFilter: likedFilterMode,
-                scrobblesFilter: scrobbleFilterMode,
+                scrobbleFilter: scrobbleFilterMode,
                 followedFilter: followedFilterMode,
                 minPlayCount: getVal('filter-min-playcount'),
                 maxPlayCount: getVal('filter-max-playcount'),
@@ -20787,6 +20901,7 @@
         artistName: item.artists[0]?.name,
         allArtists: normalizeArtistNames(item.artists),
         durationMilis: item.duration.milliseconds,
+        durationMs: item.duration.milliseconds,
         addedAt: item.addedAt,
         playCount: "N/A",
         popularity: null,
@@ -20827,6 +20942,7 @@
             artistName: item.artists[0]?.name,
             allArtists: normalizeArtistNames(item.artists),
             durationMilis: item.duration.milliseconds,
+            durationMs: item.duration.milliseconds,
             playCount: "N/A",
             popularity: null,
             releaseDate: null,
@@ -20859,6 +20975,7 @@
     allArtists: normalizeArtistNames(track.artists),
     artistName: track.artists[0]?.name,
     durationMilis: track.duration.milliseconds,
+    durationMs: track.duration.milliseconds,
     playcount: 0,
     popularity: 0,
     releaseDate: 0,
@@ -28800,9 +28917,32 @@
                 const requestBody = {};
                 
                 if (changeDescriptionOnModify) {
-                    requestBody.description = sortType === 'shuffle' 
-                        ? `Shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
-                        : `${actionVerbPast} by ${sortTypeInfo.fullName} using Sort-Play`;
+                    let shouldUpdateDescription = true;
+                    
+                    if (!overwriteCustomDescription) {
+                        const targetUri = targetPlaylistUriToReplace || currentUriAtStart;
+                        try {
+                            const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(targetUri);
+                            let currentDesc = meta.description || "";
+                            if (currentDesc) {
+                                const textArea = document.createElement("textarea");
+                                textArea.innerHTML = currentDesc;
+                                currentDesc = textArea.value;
+                            }
+                            
+                            if (currentDesc.trim() !== "" && !currentDesc.includes("Sort-Play")) {
+                                shouldUpdateDescription = false;
+                            }
+                        } catch (e) {
+                            console.warn("Could not fetch metadata to check description:", e);
+                        }
+                    }
+
+                    if (shouldUpdateDescription) {
+                        requestBody.description = sortType === 'shuffle' 
+                            ? `Shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
+                            : `${actionVerbPast} by ${sortTypeInfo.fullName} using Sort-Play`;
+                    }
                 }
 
                 if (changeTitleOnModify) {
@@ -28862,7 +29002,11 @@
                     notificationMsg = sortType === 'shuffle' ? `Local Files shuffled!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
                 }
 
-                showNotification(notificationMsg);
+                if (isArtistPage && !autoHideDiscographyNotification) {
+                    showNotification(notificationMsg, false, 0);
+                } else {
+                    showNotification(notificationMsg);
+                }
                 playlistUriForQueue = targetPlaylistUriToReplace || currentUriAtStart; 
                 playlistWasModifiedOrCreated = true; 
 
@@ -28893,6 +29037,23 @@
                 playlistDescription = sortType === 'shuffle'
                     ? `Tracks from ${finalSourceName} by ${artistName} - created and shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
                     : `Tracks from ${finalSourceName} by ${artistName} - created and ${actionVerbPresent} by ${sortTypeInfo.fullName} using Sort-Play`;
+              }
+
+              if (!overwriteCustomDescription && URI.isPlaylistV1OrV2(currentUriAtStart)) {
+                  try {
+                      const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUriAtStart);
+                      let currentDesc = meta.description || "";
+                      if (currentDesc) {
+                          const textArea = document.createElement("textarea");
+                          textArea.innerHTML = currentDesc;
+                          currentDesc = textArea.value;
+                      }
+                      if (currentDesc.trim() !== "" && !currentDesc.includes("Sort-Play")) {
+                          playlistDescription = currentDesc;
+                      }
+                  } catch (e) {
+                      console.warn("Could not fetch metadata to check description:", e);
+                  }
               }
 
               if (playlistDescription.length > 300) {
@@ -28975,7 +29136,11 @@
                   notificationMsg = sortType === 'shuffle' ? `Local Files shuffled!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
               }
 
-              showNotification(notificationMsg);
+              if (isArtistPage && !autoHideDiscographyNotification) {
+                  showNotification(notificationMsg, false, 0);
+              } else {
+                  showNotification(notificationMsg);
+              }
 
             } catch (error) {
               console.error("Error creating or updating playlist:", error);
@@ -29068,7 +29233,6 @@
   ];
   const VERSION_REGEX_STR = `[\\(\\[\\-]?\\s*(${VERSION_KEYWORDS.join('|')})[^\\)\\]]*[\\)\\]\\-]?`;
   const VERSION_REGEX_REPLACE = new RegExp(VERSION_REGEX_STR, 'gi');
-  const VERSION_REGEX_TEST = new RegExp(VERSION_REGEX_STR, 'i');
 
   function getCleanTitle(rawTitle) {
       if (!rawTitle) return "";
