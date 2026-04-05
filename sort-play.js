@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.73.0";
+  const SORT_PLAY_VERSION = "5.73.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -32168,7 +32168,8 @@
               .lfm-header { display: flex; padding: 30px 24px 24px; background: linear-gradient(180deg, #222 0%, #181818 100%) !important; gap: 24px; align-items: flex-start; flex-shrink: 0; }
               .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border-radius: 4px; object-fit: cover; flex-shrink: 0; }
               .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px; }
-              .lfm-title { font-size: 26px; font-weight: 800; color: white !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; margin-bottom: 2px; }
+              .lfm-title { display: flex; align-items: center; font-size: 26px; font-weight: 800; color: white !important; line-height: 1.2; margin-bottom: 2px; }
+              .lfm-title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .lfm-artist { font-size: 18px; font-weight: 500; color: white !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .lfm-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px; background-color: #181818 !important; flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
               .lfm-body::-webkit-scrollbar { width: 8px; }
@@ -32220,8 +32221,8 @@
                         <img src="${albumImage}" class="lfm-cover">
                         <div class="lfm-info">
                             <div class="lfm-title" title="${tData.name}">
-                                ${tData.name}
-                                ${trackId ? `<button id="lfm-fix-match-btn-header" title="Fix Match (Override Link)" style="background:none; border:none; cursor:pointer; color:#b3b3b3; padding:0; margin-left:8px; vertical-align:middle; transition: color 0.2s;">${penIconSvg}</button>` : ''}
+                                <span class="lfm-title-text">${tData.name}</span>
+                                ${trackId ? `<button id="lfm-fix-match-btn-header" title="Fix Match (Override Link)" style="background:none; border:none; cursor:pointer; color:#b3b3b3; padding:0; margin-left:8px; flex-shrink:0; display:flex; align-items:center; transition: color 0.2s;">${penIconSvg}</button>` : ''}
                             </div>
                             <div class="lfm-artist">${tData.artist.name}</div>
                         </div>
