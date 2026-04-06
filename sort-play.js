@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.73.1";
+  const SORT_PLAY_VERSION = "5.73.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -2558,7 +2558,7 @@
       .sort-play-settings .setting-row { padding: 5px 0; align-items: center; }
       .sort-play-settings .setting-row .col.description { float: left; padding-right: 10px; width: auto; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
       .sort-play-settings .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
-      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 120px; }
+      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 120px; height: auto;}
       .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 5px; width: 120px; }
       .sort-play-settings select:disabled { opacity: 0.5; cursor: not-allowed; }
       .column-settings-button { background: none; border: none; margin: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; opacity: 0.7; transition: opacity 0.2s; }
@@ -20818,6 +20818,13 @@
     }
     .sort-play-column-header {
         cursor: pointer !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        outline: none !important;
+        box-shadow: none !important;
+        transform: none !important;
     }
     .sort-play-column-header:hover span {
         color: #fff !important;
@@ -33278,9 +33285,9 @@
     const dateAddedIndexAttr = dateAddedHeaderCell ? dateAddedHeaderCell.getAttribute("aria-colindex") : null;
     const skeletonDateAddedIndex = nativeHeaders.indexOf(dateAddedHeaderCell);
 
-    const existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
+    let existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
     const headerTextSpan = existingHeaderColumn?.querySelector("span");
-    const existingSecondHeaderColumn = tracklistHeader.querySelector(".sort-play-second-column");
+    let existingSecondHeaderColumn = tracklistHeader.querySelector(".sort-play-second-column");
     const secondHeaderTextSpan = existingSecondHeaderColumn?.querySelector("span");
 
     const expectedHeaderText = {
@@ -33304,7 +33311,13 @@
         if (totalCols === 5) return "[index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr)";
         if (totalCols === 6) return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr)";
         if (totalCols === 7) return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr)";
-        return "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [var5] 2fr [last] minmax(120px,1fr)";
+        
+        let template = "[index] 16px [first] 5fr ";
+        for (let i = 1; i < totalCols - 2; i++) {
+            template += `[var${i}] 2fr `;
+        }
+        template += "[last] minmax(120px,1fr)";
+        return template;
     };
 
     if (dateAddedHeaderCell) {
@@ -33315,10 +33328,10 @@
         const headerColumn = document.createElement("div");
         headerColumn.className = `main-trackList-rowSectionVariable ${className}`;
         headerColumn.setAttribute("role", "columnheader");
-        headerColumn.style.cssText = "display: flex; justify-content: center;";
+        headerColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
         
         const btn = document.createElement("button");
-        btn.className = "main-trackList-column main-trackList-sortable sort-play-column-header";
+        btn.className = "sort-play-column-header";
         btn.onclick = (e) => showColumnSelector(e, contextType);
         const title = document.createElement("span");
         title.className = "TypeElement-mesto-type standalone-ellipsis-one-line";
@@ -33333,12 +33346,14 @@
             const headerColumn = createHeaderColumn('sort-play-column', expectedHeaderText, 'playlist1');
             if (endHeaderCell) tracklistHeader.insertBefore(headerColumn, endHeaderCell);
             else tracklistHeader.appendChild(headerColumn);
+            existingHeaderColumn = headerColumn;
         } else if (columnTypeChanged) {
             if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
             tracklist_.querySelectorAll('.sort-play-data').forEach(cell => { cell.textContent = ""; delete cell.dataset.spProcessed; });
         }
     } else if (existingHeaderColumn) {
         existingHeaderColumn.remove();
+        existingHeaderColumn = null;
     }
 
     if (showSecondAdditionalColumn) {
@@ -33348,13 +33363,19 @@
             const insertBeforeNode = firstExtra || endHeaderCell;
             if (insertBeforeNode) tracklistHeader.insertBefore(headerColumn, insertBeforeNode);
             else tracklistHeader.appendChild(headerColumn);
+            existingSecondHeaderColumn = headerColumn;
         } else if (secondColumnTypeChanged) {
             if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
             tracklist_.querySelectorAll('.sort-play-second-data').forEach(cell => { cell.textContent = ""; delete cell.dataset.spProcessed; });
         }
     } else if (existingSecondHeaderColumn) {
         existingSecondHeaderColumn.remove();
+        existingSecondHeaderColumn = null;
     }
+
+    const headerChildren = Array.from(tracklistHeader.children);
+    const sp1HeaderIndex = existingHeaderColumn ? headerChildren.indexOf(existingHeaderColumn) : -1;
+    const sp2HeaderIndex = existingSecondHeaderColumn ? headerChildren.indexOf(existingSecondHeaderColumn) : -1;
 
     let currentHeaderCols = Array.from(tracklistHeader.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
     currentHeaderCols.forEach((el, index) => {
@@ -33364,7 +33385,23 @@
         }
     });
     
-    const expectedColCount = currentHeaderCols.length.toString();
+    let maxCols = currentHeaderCols.length;
+    const allRenderedRows = tracklist_.querySelectorAll('.main-trackList-trackListRow');
+    for (const row of allRenderedRows) {
+        const rowCols = Array.from(row.querySelectorAll(':scope > [role="gridcell"]')).filter(el => el.style.display !== 'none').length;
+        if (rowCols > maxCols) {
+            maxCols = rowCols;
+        }
+    }
+    
+    let storedMax = parseInt(tracklist_.getAttribute('data-sp-max-cols') || "0");
+    if (maxCols > storedMax) {
+        storedMax = maxCols;
+        tracklist_.setAttribute('data-sp-max-cols', storedMax.toString());
+    }
+    maxCols = Math.max(maxCols, storedMax);
+
+    const expectedColCount = maxCols.toString();
     if (tracklist_.getAttribute('aria-colcount') !== expectedColCount) {
         tracklist_.setAttribute('aria-colcount', expectedColCount);
     }
@@ -33378,7 +33415,7 @@
 
     if (showAdditionalColumn || showSecondAdditionalColumn) {
         tracklist_.setAttribute('data-sp-grid', 'playlist');
-        const newHeaderTemplate = getDynamicGridTemplate(currentHeaderCols.length);
+        const newHeaderTemplate = getDynamicGridTemplate(maxCols);
         const cssString = `
             html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListHeaderRow,
             html body div.main-trackList-trackList[data-sp-grid="playlist"] .main-trackList-trackListRow,
@@ -33448,41 +33485,46 @@
     
     const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
     for (const track of allRows) {
-        const existingDataColumn = track.querySelector(".sort-play-data-column");
-        const existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
-        const endCell = track.querySelector(".main-trackList-rowSectionEnd");
+        let existingDataColumn = track.querySelector(".sort-play-data-column");
+        let existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
         
         const dateAddedCell = dateAddedIndexAttr ? track.querySelector(`[aria-colindex="${dateAddedIndexAttr}"]`) : null;
         if (dateAddedCell && !dateAddedCell.classList.contains('sort-play-data-column') && !dateAddedCell.classList.contains('sort-play-second-data-column')) {
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
         }
 
-        if (showAdditionalColumn) {
-            if (!existingDataColumn) {
-                const dataColumn = createDataColumn('sort-play-data-column sort-play-column', 'sort-play-data');
-                if (endCell) track.insertBefore(dataColumn, endCell);
-                else track.appendChild(dataColumn);
-            } else if (columnTypeChanged) {
-                const dataSpan = existingDataColumn.querySelector('.sort-play-data');
-                if (dataSpan) dataSpan.textContent = "";
-            }
-        } else if (existingDataColumn) {
-            existingDataColumn.remove();
-        }
-
         if (showSecondAdditionalColumn) {
             if (!existingSecondDataColumn) {
-                const dataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
-                const firstColumnCell = track.querySelector(".sort-play-data-column");
-                const insertBeforeNode = firstColumnCell || endCell;
-                if (insertBeforeNode) track.insertBefore(dataColumn, insertBeforeNode);
-                else track.appendChild(dataColumn);
+                existingSecondDataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
             } else if (secondColumnTypeChanged) {
                 const dataSpan = existingSecondDataColumn.querySelector('.sort-play-second-data');
                 if (dataSpan) dataSpan.textContent = "";
             }
+            const targetNode = track.children[sp2HeaderIndex];
+            if (targetNode && existingSecondDataColumn !== targetNode) {
+                track.insertBefore(existingSecondDataColumn, targetNode);
+            } else if (!targetNode && existingSecondDataColumn.parentElement !== track) {
+                track.appendChild(existingSecondDataColumn);
+            }
         } else if (existingSecondDataColumn) {
             existingSecondDataColumn.remove();
+        }
+
+        if (showAdditionalColumn) {
+            if (!existingDataColumn) {
+                existingDataColumn = createDataColumn('sort-play-data-column sort-play-column', 'sort-play-data');
+            } else if (columnTypeChanged) {
+                const dataSpan = existingDataColumn.querySelector('.sort-play-data');
+                if (dataSpan) dataSpan.textContent = "";
+            }
+            const targetNode = track.children[sp1HeaderIndex];
+            if (targetNode && existingDataColumn !== targetNode) {
+                track.insertBefore(existingDataColumn, targetNode);
+            } else if (!targetNode && existingDataColumn.parentElement !== track) {
+                track.appendChild(existingDataColumn);
+            }
+        } else if (existingDataColumn) {
+            existingDataColumn.remove();
         }
     }
   }
@@ -33490,55 +33532,104 @@
   function updateRecommendationTracklistStructure(tracklist_) {
     const currentUri = getCurrentUri();
     if (!currentUri || !URI.isPlaylistV1OrV2(currentUri)) return;
-    if (!showAdditionalColumn && !showSecondAdditionalColumn) return;
+    
+    if (!showAdditionalColumn && !showSecondAdditionalColumn) {
+        tracklist_.removeAttribute('data-sp-grid-rec');
+        let gridStyleEl = document.getElementById("sort-play-rec-grid-style");
+        if (gridStyleEl) gridStyleEl.innerHTML = "";
+        return;
+    }
 
     const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
+    let globalMaxCols = 0;
     
     for (const track of allRows) {
-        const existingDataColumn = track.querySelector(".sort-play-data-column");
-        const existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
-
-        const lastColumn = track.querySelector(".main-trackList-rowSectionEnd");
-        if (!lastColumn) continue;
-
-        let columnsAdded = 0;
-
-        if (showSecondAdditionalColumn && !existingSecondDataColumn) {
-            let dataColumn = document.createElement("div");
-            dataColumn.className = "main-trackList-rowSectionVariable sort-play-second-data-column sort-play-second-column";
-            dataColumn.setAttribute("role", "gridcell");
-            dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-            dataColumn.innerHTML = `<span class="sort-play-second-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-            
-            const insertionPoint = existingDataColumn || lastColumn;
-            track.insertBefore(dataColumn, insertionPoint);
-            columnsAdded++;
-        }
+        let existingDataColumn = track.querySelector(".sort-play-data-column");
+        let existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
+        const endCell = track.querySelector(".main-trackList-rowSectionEnd");
+        if (!endCell) continue;
 
         if (showAdditionalColumn && !existingDataColumn) {
-            let dataColumn = document.createElement("div");
-            dataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
-            dataColumn.setAttribute("role", "gridcell");
-            dataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-            dataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-            
-            track.insertBefore(dataColumn, lastColumn);
-            columnsAdded++;
+            existingDataColumn = document.createElement("div");
+            existingDataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
+            existingDataColumn.setAttribute("role", "gridcell");
+            existingDataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
+            existingDataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+            track.insertBefore(existingDataColumn, endCell);
+        }
+        
+        if (showSecondAdditionalColumn && !existingSecondDataColumn) {
+            existingSecondDataColumn = document.createElement("div");
+            existingSecondDataColumn.className = "main-trackList-rowSectionVariable sort-play-second-data-column sort-play-second-column";
+            existingSecondDataColumn.setAttribute("role", "gridcell");
+            existingSecondDataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
+            existingSecondDataColumn.innerHTML = `<span class="sort-play-second-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+            const targetNext = existingDataColumn || endCell;
+            track.insertBefore(existingSecondDataColumn, targetNext);
+        }
+        
+        const rowCols = Array.from(track.children).filter(el => el.style.display !== 'none').length;
+        if (rowCols > globalMaxCols) globalMaxCols = rowCols;
+    }
+    
+    let storedMax = parseInt(tracklist_.getAttribute('data-sp-max-cols-rec') || "0");
+    if (globalMaxCols > storedMax) {
+        storedMax = globalMaxCols;
+        tracklist_.setAttribute('data-sp-max-cols-rec', storedMax.toString());
+    }
+    globalMaxCols = Math.max(globalMaxCols, storedMax);
+
+    if (globalMaxCols > 0) {
+        let template = "[first] 5fr ";
+        for (let i = 1; i < globalMaxCols - 1; i++) {
+            template += `[var${i}] 2fr `;
+        }
+        template += "[last] minmax(120px, 1fr)";
+        
+        tracklist_.setAttribute('data-sp-grid-rec', 'true');
+        let gridStyleEl = document.getElementById("sort-play-rec-grid-style");
+        if (!gridStyleEl) {
+            gridStyleEl = document.createElement("style");
+            gridStyleEl.id = "sort-play-rec-grid-style";
+            document.head.appendChild(gridStyleEl);
+        }
+        
+        const cssString = `
+            html body div.main-trackList-trackList[data-sp-grid-rec="true"] .main-trackList-trackListRow,
+            html body div.main-trackList-trackList[data-sp-grid-rec="true"] .main-trackList-trackListRowGrid:not(.main-trackList-trackListRow) {
+                grid-template-columns: ${template} !important;
+            }
+        `;
+        if (gridStyleEl.innerHTML !== cssString) {
+            gridStyleEl.innerHTML = cssString;
         }
 
-        if (columnsAdded > 0 || existingDataColumn || existingSecondDataColumn) {
-            let template;
-            const hasTwo = (showAdditionalColumn || existingDataColumn) && (showSecondAdditionalColumn || existingSecondDataColumn);
-            const hasOne = (showAdditionalColumn || existingDataColumn) || (showSecondAdditionalColumn || existingSecondDataColumn);
+        for (const track of allRows) {
+            if (track.style.gridTemplateColumns) track.style.gridTemplateColumns = '';
+        }
+
+        const skeletonRows = tracklist_.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow)");
+        for (const skeleton of skeletonRows) {
+            if (skeleton.style.gridTemplateColumns) skeleton.style.gridTemplateColumns = '';
             
-            if (hasTwo) {
-                template = "[first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px, 1fr)";
-            } else if (hasOne) {
-                template = "[first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px, 1fr)";
+            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
+            if (!endCell) continue;
+            
+            let existingDataColumn = skeleton.querySelector(".sort-play-skeleton-col");
+            let existingSecondDataColumn = skeleton.querySelector(".sort-play-second-skeleton-col");
+
+            if (showAdditionalColumn && !existingDataColumn) {
+                existingDataColumn = document.createElement("div");
+                const baseClass = "main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
+                existingDataColumn.className = `${baseClass} sort-play-skeleton-col`;
+                skeleton.insertBefore(existingDataColumn, endCell);
             }
-            
-            if (template) {
-                track.style.setProperty('grid-template-columns', template, 'important');
+            if (showSecondAdditionalColumn && !existingSecondDataColumn) {
+                existingSecondDataColumn = document.createElement("div");
+                const baseClass = "main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
+                existingSecondDataColumn.className = `${baseClass} sort-play-second-skeleton-col`;
+                const targetNext = existingDataColumn || endCell;
+                skeleton.insertBefore(existingSecondDataColumn, targetNext);
             }
         }
     }
@@ -33594,7 +33685,29 @@
             default: expectedHeaderText = "Plays";
         }
 
-        const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
+        let currentHeaderCols = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
+        let maxCols = currentHeaderCols.length;
+        if (!headerRow.querySelector('.sort-play-album-col-header')) maxCols += 1;
+        
+        const sampleRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
+        for (let i = 0; i < sampleRows.length; i++) {
+            let rowCols = Array.from(sampleRows[i].querySelectorAll(':scope > [role="gridcell"]')).filter(el => el.style.display !== 'none').length;
+            if (!sampleRows[i].querySelector('.sort-play-album-col')) rowCols += 1;
+            if (rowCols > maxCols) maxCols = rowCols;
+        }
+        
+        let storedMax = parseInt(tracklistContainer.getAttribute('data-sp-max-cols') || "0");
+        if (maxCols > storedMax) {
+            storedMax = maxCols;
+            tracklistContainer.setAttribute('data-sp-max-cols', storedMax.toString());
+        }
+        maxCols = Math.max(maxCols, storedMax);
+
+        let newGridTemplate = "[index] 16px [first] 6fr ";
+        for (let i = 1; i < maxCols - 2; i++) {
+            newGridTemplate += `[var${i}] 3fr `;
+        }
+        newGridTemplate += "[last] minmax(120px,1fr)";
         
         let gridStyleEl = document.getElementById("sort-play-album-grid-style");
         if (!gridStyleEl) {
@@ -33614,21 +33727,21 @@
             gridStyleEl.innerHTML = cssString;
         }
 
-        const existingHeader = headerRow.querySelector('.sort-play-album-col-header');
+        let existingHeader = headerRow.querySelector('.sort-play-album-col-header');
 
         if (!existingHeader) {
             tracklistContainer.setAttribute('aria-colcount', '5');
-            const newHeaderCell = document.createElement('div');
-            newHeaderCell.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
-            newHeaderCell.innerHTML = `<button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
-            newHeaderCell.setAttribute('role', 'columnheader');
-            newHeaderCell.firstChild.onclick = (e) => showColumnSelector(e, 'album');
-            newHeaderCell.setAttribute('aria-colindex', '4');
-            newHeaderCell.style.justifyContent = 'center';
+            existingHeader = document.createElement('div');
+            existingHeader.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
+            existingHeader.innerHTML = `<button class="sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
+            existingHeader.setAttribute('role', 'columnheader');
+            existingHeader.firstChild.onclick = (e) => showColumnSelector(e, 'album');
+            existingHeader.setAttribute('aria-colindex', '4');
+            existingHeader.style.cssText = 'display: flex; justify-content: center; align-items: center;';
 
             const playsHeaderCell = headerRow.querySelector('[role="columnheader"][aria-colindex="3"]');
             if (playsHeaderCell) {
-                playsHeaderCell.after(newHeaderCell);
+                playsHeaderCell.after(existingHeader);
                 const lastHeaderCell = headerRow.querySelector('.main-trackList-rowSectionEnd');
                 if (lastHeaderCell) lastHeaderCell.setAttribute('aria-colindex', '5');
             }
@@ -33643,6 +33756,8 @@
                 });
             }
         }
+        
+        const headerIndex = Array.from(headerRow.children).indexOf(existingHeader);
         
         const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
         for (const skeleton of skeletonRows) {
@@ -33660,22 +33775,28 @@
         const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
         trackRows.forEach(row => {
             row.style.gridTemplateColumns = ""; 
-            if (row.querySelector('.sort-play-album-col')) return;
-            const newCell = document.createElement('div');
-            newCell.className = 'main-trackList-rowSectionVariable sort-play-album-col';
-            newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
-            newCell.setAttribute('role', 'gridcell');
-            newCell.setAttribute('aria-colindex', '4');
-            newCell.style.display = 'flex';
-            newCell.style.alignItems = 'center';
-            newCell.style.justifyContent = 'center';
-
-            const playsCell = row.querySelector('[role="gridcell"][aria-colindex="3"]');
-            if (playsCell) {
-                playsCell.after(newCell);
-                const lastCell = row.querySelector('.main-trackList-rowSectionEnd');
-                if (lastCell) lastCell.setAttribute('aria-colindex', '5');
+            let newCell = row.querySelector('.sort-play-album-col');
+            
+            if (!newCell) {
+                newCell = document.createElement('div');
+                newCell.className = 'main-trackList-rowSectionVariable sort-play-album-col';
+                newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
+                newCell.setAttribute('role', 'gridcell');
+                newCell.setAttribute('aria-colindex', '4');
+                newCell.style.display = 'flex';
+                newCell.style.alignItems = 'center';
+                newCell.style.justifyContent = 'center';
             }
+            
+            const targetNode = row.children[headerIndex];
+            if (targetNode && newCell !== targetNode) {
+                row.insertBefore(newCell, targetNode);
+            } else if (!targetNode && newCell.parentElement !== row) {
+                row.appendChild(newCell);
+            }
+            
+            const lastCell = row.querySelector('.main-trackList-rowSectionEnd');
+            if (lastCell) lastCell.setAttribute('aria-colindex', '5');
         });
 
         loadAdditionalColumnData(tracklistContainer);
@@ -33730,7 +33851,29 @@
             default: expectedHeaderText = "Plays";
         }
         
-        const newGridTemplate = "[index] 16px [first] 6fr [var1] 3fr [var2] 3fr [last] minmax(120px,1fr)";
+        const existingHeaderWrapperCheck = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
+        let maxCols = 4; 
+        if (!existingHeaderWrapperCheck) maxCols += 1;
+        
+        const sampleRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
+        for (let i = 0; i < sampleRows.length; i++) {
+            let rowCols = Array.from(sampleRows[i].querySelectorAll(':scope > [role="gridcell"]')).filter(el => el.style.display !== 'none').length;
+            if (!sampleRows[i].querySelector('.sort-play-artist-col')) rowCols += 1;
+            if (rowCols > maxCols) maxCols = rowCols;
+        }
+        
+        let storedMax = parseInt(tracklistContainer.getAttribute('data-sp-max-cols') || "0");
+        if (maxCols > storedMax) {
+            storedMax = maxCols;
+            tracklistContainer.setAttribute('data-sp-max-cols', storedMax.toString());
+        }
+        maxCols = Math.max(maxCols, storedMax);
+
+        let newGridTemplate = "[index] 16px [first] 6fr ";
+        for (let i = 1; i < maxCols - 2; i++) {
+            newGridTemplate += `[var${i}] 3fr `;
+        }
+        newGridTemplate += "[last] minmax(120px,1fr)";
         
         let gridStyleEl = document.getElementById("sort-play-artist-grid-style");
         if (!gridStyleEl) {
@@ -33750,26 +33893,26 @@
             gridStyleEl.innerHTML = cssString;
         }
 
-        const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
+        let existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
 
         if (!existingHeaderWrapper) {
             tracklistContainer.setAttribute('aria-colcount', '5');
-            const headerWrapper = document.createElement('div');
-            headerWrapper.className = 'main-trackList-trackListHeader sort-play-artist-header-wrapper';
-            headerWrapper.innerHTML = `<div class="main-trackList-trackListHeaderRow main-trackList-trackListRowGrid" role="row">
+            existingHeaderWrapper = document.createElement('div');
+            existingHeaderWrapper.className = 'main-trackList-trackListHeader sort-play-artist-header-wrapper';
+            existingHeaderWrapper.innerHTML = `<div class="main-trackList-trackListHeaderRow main-trackList-trackListRowGrid" role="row">
                 <div class="main-trackList-rowSectionIndex" role="columnheader" aria-colindex="1"><div>#</div></div>
                 <div class="main-trackList-rowSectionStart" role="columnheader" aria-colindex="2"><div class="main-trackList-column"><span class="encore-text-body-small">Title</span></div></div>
                 <div class="main-trackList-rowSectionVariable" role="columnheader" aria-colindex="3"><div><span class="encore-text-body-small">Plays</span></div></div>
-                <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="justify-content: center;"><button class="main-trackList-column sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button></div>
+                <div class="main-trackList-rowSectionVariable sort-play-artist-col-header" role="columnheader" aria-colindex="4" style="display: flex; justify-content: center; align-items: center;"><button class="sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button></div>
                 <div class="main-trackList-rowSectionEnd" role="columnheader" aria-colindex="5"><div aria-label="Duration" class="main-trackList-column main-trackList-durationHeader">${durationIconSvg}</div></div>
             </div>`;
-            headerWrapper.style.cssText = 'position: sticky; top: 0px; z-index: 2;';
-            headerWrapper.querySelector('.sort-play-artist-col-header button').onclick = (e) => showColumnSelector(e, 'artist');
+            existingHeaderWrapper.style.cssText = 'position: sticky; top: 0px; z-index: 2;';
+            existingHeaderWrapper.querySelector('.sort-play-artist-col-header button').onclick = (e) => showColumnSelector(e, 'artist');
             const rootlistWrapper = tracklistContainer.querySelector('.main-rootlist-wrapper');
             if (rootlistWrapper) {
-                tracklistContainer.insertBefore(headerWrapper, rootlistWrapper);
+                tracklistContainer.insertBefore(existingHeaderWrapper, rootlistWrapper);
             } else {
-                tracklistContainer.prepend(headerWrapper);
+                tracklistContainer.prepend(existingHeaderWrapper);
             }
         } else {
             const headerTextSpan = existingHeaderWrapper.querySelector('.sort-play-artist-col-header span');
@@ -33781,6 +33924,13 @@
                     delete cell.dataset.spProcessed;
                 });
             }
+        }
+        
+        let headerIndex = -1;
+        if (existingHeaderWrapper) {
+            const headerRow = existingHeaderWrapper.querySelector('.main-trackList-trackListHeaderRow');
+            const headerCol = headerRow.querySelector('.sort-play-artist-col-header');
+            if (headerRow && headerCol) headerIndex = Array.from(headerRow.children).indexOf(headerCol);
         }
 
         const skeletonRows = tracklistContainer.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not(.main-trackList-trackListHeaderRow)");
@@ -33799,22 +33949,28 @@
         const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
         trackRows.forEach(row => {
             row.style.gridTemplateColumns = "";
-            if (row.querySelector('.sort-play-artist-col')) return;
-            const newCell = document.createElement('div');
-            newCell.className = 'main-trackList-rowSectionVariable sort-play-artist-col';
-            newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
-            newCell.setAttribute('role', 'gridcell');
-            newCell.setAttribute('aria-colindex', '4');
-            newCell.style.display = 'flex';
-            newCell.style.alignItems = 'center';
-            newCell.style.justifyContent = 'center';
-
-            const playsCell = row.querySelector('[role="gridcell"][aria-colindex="3"]');
-            if (playsCell) {
-                playsCell.after(newCell);
-                const endSection = row.querySelector('.main-trackList-rowSectionEnd');
-                if (endSection) endSection.setAttribute('aria-colindex', '5');
+            let newCell = row.querySelector('.sort-play-artist-col');
+            
+            if (!newCell) {
+                newCell = document.createElement('div');
+                newCell.className = 'main-trackList-rowSectionVariable sort-play-artist-col';
+                newCell.innerHTML = `<span class="sort-play-data encore-text-body-small encore-internal-color-text-subdued" data-encore-id="text"></span>`;
+                newCell.setAttribute('role', 'gridcell');
+                newCell.setAttribute('aria-colindex', '4');
+                newCell.style.display = 'flex';
+                newCell.style.alignItems = 'center';
+                newCell.style.justifyContent = 'center';
             }
+
+            const targetNode = headerIndex !== -1 ? row.children[headerIndex] : null;
+            if (targetNode && newCell !== targetNode) {
+                row.insertBefore(newCell, targetNode);
+            } else if (!targetNode && newCell.parentElement !== row) {
+                row.appendChild(newCell);
+            }
+            
+            const endSection = row.querySelector('.main-trackList-rowSectionEnd');
+            if (endSection) endSection.setAttribute('aria-colindex', '5');
         });
 
         loadAdditionalColumnData(tracklistContainer);
@@ -33845,11 +34001,13 @@
         for (const mutation of mutations) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.classList && (node.classList.contains('main-trackList-trackListRow') || node.classList.contains('main-trackList-trackList') || node.classList.contains('main-trackList-trackListRowGrid'))) {
+                    const isRow = node.classList?.contains('main-trackList-trackListRow') || node.classList?.contains('main-trackList-trackListRowGrid');
+                    const isCell = node.classList?.contains('main-trackList-rowSectionVariable') || node.getAttribute?.('role') === 'gridcell' || node.classList?.contains('djInfoList') || node.classList?.contains('starRatings');
+                    if (isRow || isCell || node.classList?.contains('main-trackList-trackList')) {
                         shouldUpdate = true;
                         break;
                     }
-                    if (node.querySelector && (node.querySelector('.main-trackList-trackListRow') || node.querySelector('.main-trackList-trackList') || node.querySelector('.main-trackList-trackListRowGrid'))) {
+                    if (node.querySelector && node.querySelector('.main-trackList-trackListRow, .main-trackList-trackList, .main-trackList-trackListRowGrid, .main-trackList-rowSectionVariable, [role="gridcell"], .djInfoList, .starRatings')) {
                         shouldUpdate = true;
                         break;
                     }
@@ -33885,11 +34043,13 @@
         for (const mutation of mutations) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.classList && (node.classList.contains('main-trackList-trackListRow') || node.classList.contains('main-trackList-trackList') || node.classList.contains('main-trackList-trackListRowGrid'))) {
+                    const isRow = node.classList?.contains('main-trackList-trackListRow') || node.classList?.contains('main-trackList-trackListRowGrid');
+                    const isCell = node.classList?.contains('main-trackList-rowSectionVariable') || node.getAttribute?.('role') === 'gridcell' || node.classList?.contains('djInfoList') || node.classList?.contains('starRatings');
+                    if (isRow || isCell || node.classList?.contains('main-trackList-trackList')) {
                         shouldUpdate = true;
                         break;
                     }
-                    if (node.querySelector && (node.querySelector('.main-trackList-trackListRow') || node.querySelector('.main-trackList-trackList') || node.querySelector('.main-trackList-trackListRowGrid'))) {
+                    if (node.querySelector && node.querySelector('.main-trackList-trackListRow, .main-trackList-trackList, .main-trackList-trackListRowGrid, .main-trackList-rowSectionVariable, [role="gridcell"], .djInfoList, .starRatings')) {
                         shouldUpdate = true;
                         break;
                     }
@@ -33925,11 +34085,13 @@
         for (const mutation of mutations) {
             for (const node of mutation.addedNodes) {
                 if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.classList && (node.classList.contains('main-trackList-trackListRow') || node.classList.contains('main-trackList-trackList') || node.classList.contains('main-trackList-trackListRowGrid'))) {
+                    const isRow = node.classList?.contains('main-trackList-trackListRow') || node.classList?.contains('main-trackList-trackListRowGrid');
+                    const isCell = node.classList?.contains('main-trackList-rowSectionVariable') || node.getAttribute?.('role') === 'gridcell' || node.classList?.contains('djInfoList') || node.classList?.contains('starRatings');
+                    if (isRow || isCell || node.classList?.contains('main-trackList-trackList')) {
                         shouldUpdate = true;
                         break;
                     }
-                    if (node.querySelector && (node.querySelector('.main-trackList-trackListRow') || node.querySelector('.main-trackList-trackList') || node.querySelector('.main-trackList-trackListRowGrid'))) {
+                    if (node.querySelector && node.querySelector('.main-trackList-trackListRow, .main-trackList-trackList, .main-trackList-trackListRowGrid, .main-trackList-rowSectionVariable, [role="gridcell"], .djInfoList, .starRatings')) {
                         shouldUpdate = true;
                         break;
                     }
