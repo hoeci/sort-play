@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.74.1";
+  const SORT_PLAY_VERSION = "5.74.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -33287,7 +33287,7 @@
     if (!currentUri) return;
   
     if (URI.isPlaylistV1OrV2(currentUri)) {
-      const playlistContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
+      const playlistContainer = document.querySelector(".playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter");
       if (playlistContainer && !playlistContainer.contains(mainButton)) {
         mainButton.style.marginLeft = ""; 
         mainButton.style.marginRight = "";
@@ -33305,7 +33305,7 @@
         artistActionBar.appendChild(mainButton);
       }
     } else if (isLikedSongsPage(currentUri)) {
-      const likedSongsContainer = document.querySelector(".playlist-playlist-searchBoxContainer");
+      const likedSongsContainer = document.querySelector(".playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter");
       if (likedSongsContainer && !likedSongsContainer.contains(mainButton)) {
         mainButton.style.marginLeft = ""; 
         mainButton.style.marginRight = "";
@@ -34236,6 +34236,7 @@
                           node.className.includes('main-trackList-trackList') ||
                           node.className.includes('main-actionBar-ActionBarRow') ||
                           node.className.includes('playlist-playlist-searchBoxContainer') ||
+                          node.className.includes('playlist-playlist-searchBoxContainerFlexCenter') ||
                           node.className.includes('x-sortBox-sortDropdown')
                       ) {
                           shouldTrigger = true;
@@ -34244,7 +34245,7 @@
                   }
                   
                   if (node.querySelector) {
-                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .x-sortBox-sortDropdown')) {
+                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter, .x-sortBox-sortDropdown')) {
                           shouldTrigger = true;
                           break;
                       }
