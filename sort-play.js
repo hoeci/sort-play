@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.74.0";
+  const SORT_PLAY_VERSION = "5.74.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -23060,7 +23060,6 @@
       window.addEventListener('resize', closeAllMenus, { signal });
       window.addEventListener('wheel', preventScroll, { passive: false, signal });
       window.addEventListener('touchmove', preventScroll, { passive: false, signal });
-      window.addEventListener('scroll', closeAllMenus, { signal, capture: true });
 
     } else {
       closeAllMenus();
@@ -23107,7 +23106,7 @@
     }
     e.preventDefault();
   }
-
+  
   function hideAllSubMenus() {
     document.querySelectorAll('.submenu').forEach(sm => {
       sm.style.display = 'none';
@@ -23303,8 +23302,11 @@
     const subMenu = parentButton._submenu;
     if (!subMenu) return;
 
-    subMenu.style.visibility = 'hidden';
-    subMenu.style.display = 'flex';
+    if (subMenu.style.display !== 'flex') {
+        subMenu.style.visibility = 'hidden';
+        subMenu.style.display = 'flex';
+    }
+    
     const subMenuHeight = subMenu.offsetHeight;
     const subMenuWidth = subMenu.offsetWidth;
     
@@ -23413,6 +23415,8 @@
     if (!isMenuOpen) return;
 
     const buttonRect = mainButton.getBoundingClientRect();
+    if (buttonRect.width === 0 && buttonRect.height === 0) return;
+
     const { bottom: headerBottom } = getHeaderInfo();
     const menuHeight = menuContainer.offsetHeight;
     const menuWidth = menuContainer.offsetWidth;
@@ -23449,6 +23453,10 @@
     menuContainer.style.top = `${topPosition}px`;
     menuContainer.style.left = `${leftPosition}px`;
     menuContainer.style.transform = "none";
+
+    if (activeSubMenuParent) {
+        showSubMenu(activeSubMenuParent);
+    }
   }
 
   window.addEventListener("scroll", checkAndUpdateMenuPosition, true);
@@ -31895,11 +31903,21 @@
 
     const allTrackRows = Array.from(tracklist_.getElementsByClassName("main-trackList-trackListRow"));
     const spotifyTracksToProcess = [];
+    const expectedCols = columnConfigs.map(c => c.type).join('|');
 
     for (const trackElement of allTrackRows) {
         if (trackElement.classList.contains('sort-play-processing') || trackElement.hasAttribute('data-sp-fetch-failed')) continue;
         const trackUri = getTracklistTrackUri(trackElement);
         if (!trackUri) continue;
+
+        if (trackElement.dataset.spTrackUri !== trackUri || trackElement.dataset.spColTypes !== expectedCols) {
+            trackElement.dataset.spTrackUri = trackUri;
+            trackElement.dataset.spColTypes = expectedCols;
+            trackElement.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(cell => {
+                cell.textContent = "";
+                delete cell.dataset.spProcessed;
+            });
+        }
 
         if (Spicetify.URI.isLocal(trackUri)) {
             trackElement.classList.add('sort-play-processing');
