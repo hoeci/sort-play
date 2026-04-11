@@ -68,7 +68,7 @@ Apply instant filters to your current view without opening complex menus.
 Enhance your music views with more information.
 *   **Playlist Columns:** Add up to **two** extra data columns to any playlist view.
 *   **Album & Artist Columns:** Add one extra data column to album and artist pages.
-*   **Data Types:** Display Play Count, Release Date, Scrobbles, My Scrobbles, Key, BPM, Popularity, Energy, Danceability, Valence and  DJ Info (Key + BPM + Energy).
+*   **Data Types:** Display Play Count, Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence and DJ Info (Key + BPM + Energy).
 *   **Custom Formatting:** Configure the format for release dates and how your personal scrobbles are displayed (number vs. checkmark).
 *   **Quick Column Switching:** Click the header of any extra column to instantly switch its data type.
 </details>
@@ -77,10 +77,23 @@ Enhance your music views with more information.
 <summary><b>➕ UI & Enhancements</b> - Genre tags, now playing data, old like button, and other tweaks.</summary>
 <br>
 
-*   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, and Now Playing.
+*   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, and Now Playing sidebar.
 *   **Interactive Genre Tags:** Displays clickable tags on the Now Playing bar and Artist pages linking to EveryNoise.
 *   **Now Playing Data:** Display extra track info like Release Date, Play Count, and BPM directly in the player bar.
 *   **Configurable Sorting:** Easily toggle ascending/descending order for all applicable sort types.
+*   **Last.fm Overrides Manager:** Manually fix mismatched Last.fm links, complete with JSON import/export for backups.
+*   **Live Chat:** Access a live chat panel directly within the settings to talk with other Sort-Play users.
+</details>
+
+<details>
+<summary><b>➕ Context Menus</b> - Powerful right-click actions for tracks, artists, and playlists.</summary>
+<br>
+
+Access tools directly from Spotify's native right-click menus.
+*   **Track Menu: Show Genres:** Instantly view detailed, multi-source genre tags for any track in a popup window.
+*   **Track Menu: Last.fm Details:** View Last.fm listeners, scrobbles, track tags, and Shoutbox comments directly inside Spotify.
+*   **Artist Menu: Create Discography:** Generate a fully sorted and deduplicated discography playlist right from an artist's context menu.
+*   **All Menus: Shuffle & Play:** Instantly shuffle and play any playlist, album, or artist (with optional Vibe & Flow) directly from the right-click menu.
 </details>
 
 <details>
@@ -97,7 +110,6 @@ Apply any sort or filter option while on an Artist page to automatically fetch a
 
 *(Note: Compilation versions are always removed if an original version exists, keeping your list clean).*
 </details>
-
 
 <details>
 <summary><b>➕ Smart Shuffle & Flow</b> - Artist-aware shuffle with optional energy-based flow.</summary>
@@ -125,6 +137,7 @@ Generate a variety of curated playlists with a single click.
         *   **Pure Discovery:** Recommendations exclusively from artists completely new to your listening history.
     *   **Last.fm Generators:**
         *   **Infinite Vibe:** A continuous mood generated from your current track, recent obsessions, and library deep cuts.
+        *   **Tastemaker Profile:** Enter a Last.fm username to clone their top tracks, loved tracks, and obsessions into a fresh discovery playlist.
         *   **Neighbors Mix:** A balanced mix of obsessions, trends, and favorites from your Last.fm neighbors, filtered for discovery.
 *   **Automated Updates:** Schedule your dedicated playlists to update automatically (e.g., daily, weekly on Fridays) to always keep them fresh.
 *   **Customizable Limits:** Configure the size of your Top Tracks and Discovery playlists, the time window for New Releases, and the number of tracks to pull from each new album.
@@ -135,7 +148,7 @@ Generate a variety of curated playlists with a single click.
 <br>
 
 Build powerful, self-updating playlists that manage themselves.
-*   **Multi-Source:** Combine tracks from any number of playlists, artists, albums, or your Liked Songs.
+*   **Multi-Source:** Combine tracks from any number of playlists, artists, albums, folders, or your Liked Songs.
 *   **Automated Scheduling:** Set a custom schedule (e.g., every 3 hours, daily, weekly on Fridays) for automatic updates.
 *   **Advanced Filtering:** Automatically filter tracks based on rules:
     *   Exclude songs you have already liked.
@@ -185,6 +198,7 @@ Use AI to select specific songs from your current list based on your prompt.
 *   **Customizable Instructions:** Edit the AI's system instructions to fine-tune its behavior.
 *   **Advanced Controls:** Choose models and toggle data sources like song statistics and lyrics.
 *   **Use Your Own Key:** Provide your own free Google Gemini API key for extended usage.
+*   **Prompt Library & History:** Save your favorite AI prompts as presets and easily access your recent prompt history.
 </details>
 
 <details>
