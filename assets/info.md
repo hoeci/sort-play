@@ -23,10 +23,13 @@ Sort playlists, albums, and artists by Global Play Count, Popularity, Release Da
 Instantly apply filters. Deduplicate tracks, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
 
 ### ➕ Extra Data Columns
-Add up to two extra data columns to playlists and one to albums/artists. Display Play Count, Release Date, Scrobbles, Key, BPM, Popularity, and DJ Info (Key + BPM) with custom formatting.
+Add up to two extra data columns to playlists and one to albums/artists. Display Play Count, Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info with custom formatting.
 
 ### ➕ UI & Enhancements
 Old Like Button returns the heart icon. Display Now Playing Data and Interactive Genre Tags in the player bar.
+
+### ➕ Context Menus
+Access powerful tools directly from Spotify's right-click menus. View detailed track genres or Last.fm stats, generate a full artist discography, or instantly shuffle and play any playlist or album.
 
 ### ➕ Full Artist Discography
 Load complete collections from all releases with intelligent deduplication that keeps the most popular versions.
@@ -35,13 +38,13 @@ Load complete collections from all releases with intelligent deduplication that 
 Intelligent Shuffle prevents artist repeats. Vibe & Flow Shuffle, if enabled, creates dynamic listening journeys based on energy and mood.
 
 ### ➕ Dedicated Playlist Creation
-Generate My Top Tracks, New Releases from Followed Artists, Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery), Genre Tree/Random Explorer, and Last.fm Generators (Infinite Vibe, Neighbors Mix) with automated updates and customizable limits.
+Generate My Top Tracks, New Releases from Followed Artists, Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery), Genre Tree/Random Explorer, and Last.fm Generators (Infinite Vibe, Tastemaker Profile, Neighbors Mix) with automated updates and customizable limits.
 
 ### ➕ Dynamic Playlists
 Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies genre or keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
 
 ### ➕ Advanced Custom Filter
-Filter by keywords (track, album, artist) and range sliders (Release Date, Duration, Play Count, Popularity, and Tempo). View results in an interactive table with integrated mini-player. Save and load keyword sets.
+Filter by keywords (track, album, artist) and range sliders (Release Date, Duration, Play Count, Popularity, Tempo, Energy, etc.). View results in an interactive table with integrated mini-player. Save and load keyword sets.
 
 ### ➕ Genre Filtering
 Filter by genre using combined Spotify, Deezer and Last.fm data with intelligent mapping. Browse with track counts, search, and "match all" option.
