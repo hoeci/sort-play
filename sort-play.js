@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.74.2";
+  const SORT_PLAY_VERSION = "5.75.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -80,6 +80,8 @@
   const STORAGE_KEY_NOW_PLAYING_SEPARATOR = "sort-play-now-playing-separator";
   const STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT = "sort-play-now-playing-scrobbles-format";
   const STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT = "sort-play-now-playing-personal-scrobbles-format";
+  const STORAGE_KEY_LAST_SCROBBLED_FORMAT = "sort-play-last-scrobbled-format";
+  const STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT = "sort-play-now-playing-last-scrobbled-format";
   const STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS = "sort-play-global-playlist-counts";
   const STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP = "sort-play-artist-discography-map";
   const STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL = "sort-play-artist-discography-show-dup-modal";
@@ -155,6 +157,7 @@
     STORAGE_KEY_NOW_PLAYING_VALENCE_FORMAT, STORAGE_KEY_NOW_PLAYING_KEY_FORMAT,
     STORAGE_KEY_NOW_PLAYING_POPULARITY_FORMAT, STORAGE_KEY_NOW_PLAYING_SEPARATOR,
     STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT, STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT,
+    STORAGE_KEY_LAST_SCROBBLED_FORMAT, STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT,
     STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP, STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL,
     STORAGE_KEY_SHOW_ADDITIONAL_COLUMN, STORAGE_KEY_SHOW_SECOND_ADDITIONAL_COLUMN,
     STORAGE_KEY_SHOW_ALBUM_COLUMN, STORAGE_KEY_SHOW_ARTIST_COLUMN,
@@ -241,6 +244,8 @@
   let selectedNowPlayingSeparator = '•';
   let selectedNowPlayingScrobblesFormat = 'raw';
   let selectedNowPlayingPersonalScrobblesFormat = 'raw';
+  let lastScrobbledFormat = 'relative';
+  let selectedNowPlayingLastScrobbledFormat = 'relative';
   let showGenreTags = false;
   let showGenreTagsNowPlaying = true;
   let showGenreTagsArtistPage = true;
@@ -336,7 +341,7 @@
   const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
   const CHAT_API_URL = "https://sort-play-chat.niko2nio2.workers.dev";
   
-  const ENABLE_SPOTIFY_ARTIST_GENRES = false;
+  const ENABLE_SPOTIFY_ARTIST_GENRES = true;
 
   async function get_S_Client_Token() {
       if (!ENABLE_SPOTIFY_ARTIST_GENRES) return null;
@@ -810,6 +815,70 @@
       }
   }
 
+    function formatLastScrobbled(timestamp, format) {
+      if (timestamp === null || timestamp === undefined || timestamp === -1) return 'Err';
+      if (timestamp === 0) return '—';
+
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = Math.max(0, now - date);
+      
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHour / 24);
+      const diffWeek = Math.floor(diffDay / 7);
+      const diffMonth = Math.floor(diffDay / 30.44); 
+      const diffYear = Math.floor(diffDay / 365.25); 
+
+      const isCurrentYear = date.getFullYear() === now.getFullYear();
+      const dateOptions = isCurrentYear 
+          ? { month: 'short', day: 'numeric' } 
+          : { year: 'numeric', month: 'short', day: 'numeric' };
+
+      if (format === 'relative') {
+          if (diffMin < 1) return 'Just now';
+          if (diffMin === 1) return '1 min ago';
+          if (diffMin < 60) return `${diffMin} mins ago`;
+          if (diffHour === 1) return '1 hour ago';
+          if (diffHour < 24) return `${diffHour} hours ago`;
+          if (diffDay === 1) return 'Yesterday';
+          if (diffDay < 7) return `${diffDay} days ago`;
+          if (diffWeek === 1) return 'Last week';
+          if (diffWeek < 4) return `${diffWeek} weeks ago`;
+          if (diffMonth === 1) return 'Last month';
+          if (diffMonth < 12) return `${diffMonth} months ago`;
+          if (diffYear === 1) return 'Last year';
+          return `${diffYear} years ago`;
+      }
+      
+      if (format === 'standard') {
+          return date.toLocaleDateString(undefined, dateOptions);
+      }
+
+      if (format === 'datetime') {
+          const dateStr = date.toLocaleDateString(undefined, dateOptions);
+          const timeStr = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+          return `${dateStr} • ${timeStr}`;
+      }
+
+      if (format === 'tiered') {
+          if (diffHour < 24) return 'Today';
+          if (diffDay === 1) return 'Yesterday';
+          if (diffDay <= 7) return 'This Week';
+          if (diffDay <= 14) return 'Last Week';
+          if (diffDay <= 30) return 'This Month';
+          if (diffMonth === 1) return 'Last Month';
+          if (diffMonth <= 3) return 'Past 3 Months';
+          if (diffMonth <= 6) return 'Past 6 Months';
+          if (diffYear < 1) return 'This Year';
+          if (diffYear === 1) return 'Last Year';
+          return `${diffYear} Years Ago`;
+      }
+
+      return date.toLocaleDateString(undefined, dateOptions);
+  }
+
   function addHoverEffect(element, defaultColor, hoverColor) {
       if (!element) return;
       element.addEventListener("mouseenter", () => { element.style.backgroundColor = hoverColor; });
@@ -1152,16 +1221,16 @@
     db: null,
     mem: {},
     init: () => new Promise((resolve, reject) => {
-        const request = indexedDB.open("SortPlayDB", 9);
+        const request = indexedDB.open("SortPlayDB", 10);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres'].forEach(store => {
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres'].forEach(store => {
                 if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
             });
         };
         request.onsuccess = (e) => {
             idb.db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres'].forEach(s => idb.mem[s] = new Map());
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres'].forEach(s => idb.mem[s] = new Map());
             resolve();
         };
         request.onerror = (e) => reject(e);
@@ -1601,6 +1670,21 @@
   async function fetchLfmWithGateway(params) {
     if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
     let networkErrorRetries = 0;
+
+    const checkRevoked = async (response) => {
+        if (response.status === 403) {
+            try {
+                const cloned = response.clone();
+                const data = await cloned.json();
+                if (data && (data.error === 10 || data.message === "Invalid API key")) return true;
+                return false; 
+            } catch (e) {
+                return true; 
+            }
+        }
+        return false;
+    };
+
     while (true) {
         const apiKey = getNextLfmKey();
         if (!apiKey) {
@@ -1613,8 +1697,8 @@
         if (useLfmGateway) {
             try {
                 const response = await fetch(gatewayUrl);
-                if (response.status === 403) {
-                    console.warn(`Last.fm gateway request failed with 403. Revoking key ...${apiKey.slice(-4)} and retrying.`);
+                if (await checkRevoked(response)) {
+                    console.warn(`Last.fm gateway request failed with 403 (Invalid Key). Revoking key ...${apiKey.slice(-4)} and retrying.`);
                     revokedLfmKeys.add(apiKey);
                     continue;
                 }
@@ -1630,11 +1714,15 @@
         } else {
             let response;
             let needsGateway = false;
+            let isDirectKeyRevoked = false;
             try {
                 response = await fetch(directUrl);
-                if (response.status === 403) {
-                    console.warn(`Last.fm direct request failed with 403. Trying gateway for key ...${apiKey.slice(-4)}.`);
+                if (await checkRevoked(response)) {
+                    console.warn(`Last.fm direct request failed with 403 (Invalid Key). Trying gateway for key ...${apiKey.slice(-4)}.`);
                     needsGateway = true;
+                    isDirectKeyRevoked = true;
+                } else if (response.status === 403) {
+                    return response;
                 }
             } catch (error) {
                 console.warn(`Last.fm direct request failed with network error. Trying gateway for key ...${apiKey.slice(-4)}.`);
@@ -1647,14 +1735,16 @@
 
             try {
                 response = await fetch(gatewayUrl);
-                if (response.status === 403) {
-                    console.warn(`Last.fm gateway request also failed with 403. Revoking key ...${apiKey.slice(-4)} and retrying.`);
+                if (await checkRevoked(response)) {
+                    console.warn(`Last.fm gateway request also failed with 403 (Invalid Key). Revoking key ...${apiKey.slice(-4)} and retrying.`);
                     revokedLfmKeys.add(apiKey);
                     continue;
                 }
-                if (response.ok) {
-                    console.log("Last.fm gateway successful. Using gateway for the rest of the session.");
-                    useLfmGateway = true;
+                if (response.ok || response.status === 403) {
+                    if (!isDirectKeyRevoked) {
+                        console.log("Last.fm gateway successful. Using gateway for the rest of the session.");
+                        useLfmGateway = true;
+                    }
                 }
                 return response;
             } catch (gatewayError) {
@@ -1940,6 +2030,8 @@
     selectedNowPlayingSeparator = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR) || '•';
     selectedNowPlayingScrobblesFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT) || 'raw';
     selectedNowPlayingPersonalScrobblesFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT) || 'raw';
+    lastScrobbledFormat = localStorage.getItem(STORAGE_KEY_LAST_SCROBBLED_FORMAT) || 'relative';
+    selectedNowPlayingLastScrobbledFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT) || 'relative';
     lastFmAutocorrect = localStorage.getItem(STORAGE_KEY_LASTFM_AUTOCORRECT) === "true";
     showLastFmContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU) === "true";
     showGenresContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU) === "true";
@@ -1962,11 +2054,6 @@
     useGenrePlaylistDatabase = localStorage.getItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE) !== "false";
     autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
     autoHideDiscographyNotification = localStorage.getItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION) === "true";
-
-    if (!ENABLE_SPOTIFY_ARTIST_GENRES) {
-        genreSourcesNpSpotify = false;
-        genreSourcesApSpotify = false;
-    }
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -2031,6 +2118,8 @@
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SEPARATOR, selectedNowPlayingSeparator);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT, selectedNowPlayingScrobblesFormat);
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT, selectedNowPlayingPersonalScrobblesFormat);
+    localStorage.setItem(STORAGE_KEY_LAST_SCROBBLED_FORMAT, lastScrobbledFormat);
+    localStorage.setItem(STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT, selectedNowPlayingLastScrobbledFormat);
     localStorage.setItem(STORAGE_KEY_LASTFM_AUTOCORRECT, lastFmAutocorrect);
     localStorage.setItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, showLastFmContextMenu);
     updateLastFmContextMenu();
@@ -2133,6 +2222,8 @@
           [STORAGE_KEY_NOW_PLAYING_SEPARATOR]: "•",
           [STORAGE_KEY_NOW_PLAYING_SCROBBLES_FORMAT]: "raw",
           [STORAGE_KEY_NOW_PLAYING_PERSONAL_SCROBBLES_FORMAT]: "raw",
+          [STORAGE_KEY_LAST_SCROBBLED_FORMAT]: "relative",
+          [STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT]: "relative",
           [STORAGE_KEY_ARTIST_DISCOGRAPHY_MAP]: "{}",
           [STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL]: "true",
           [STORAGE_KEY_SHOW_ADDITIONAL_COLUMN]: "false",
@@ -2251,6 +2342,7 @@
         case 'popularity': format = selectedNowPlayingPopularityFormat; break;
         case 'scrobbles': format = selectedNowPlayingScrobblesFormat; break;
         case 'personalScrobbles': format = selectedNowPlayingPersonalScrobblesFormat; break;
+        case 'lastScrobbled': format = selectedNowPlayingLastScrobbledFormat; break;
     }
 
     const item = {
@@ -2276,7 +2368,7 @@
     
     if (localStorage.getItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA) === null && !storedConfig) {
          nowPlayingConfig = {
-            title: { enabled: false, items: [{ id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(), type: 'releaseDate', format: 'YYYY', separator: '•' }] },
+            title: { enabled: false, items: [{ id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(), type: 'releaseDate', format: 'YYYY-MM-DD', separator: '•' }] },
             artist: { enabled: false, items: [] }
         };
     }
@@ -2588,6 +2680,7 @@
         <option value="releaseDate" ${selectedValue === 'releaseDate' ? 'selected' : ''}>Release Date</option>
         <option value="scrobbles" ${selectedValue === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
         <option value="personalScrobbles" ${selectedValue === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
+        <option value="lastScrobbled" ${selectedValue === 'lastScrobbled' ? 'selected' : ''}>Last Scrobbled</option>
         <option value="djInfo" ${selectedValue === 'djInfo' ? 'selected' : ''}>DJ Info</option>
         <option value="key" ${selectedValue === 'key' ? 'selected' : ''}>Key</option>
         <option value="tempo" ${selectedValue === 'tempo' ? 'selected' : ''}>Tempo (BPM)</option>
@@ -2621,6 +2714,13 @@
         <button data-mode="standard_camelot" class="${keyDisplayMode === 'standard_camelot' ? 'selected' : ''}">Standard + Camelot</button>
     `;
 
+    const getLastScrobbledDropdownHtml = () => `
+        <button data-format="relative" class="${lastScrobbledFormat === 'relative' ? 'selected' : ''}">Time Ago (Relative)</button>
+        <button data-format="tiered" class="${lastScrobbledFormat === 'tiered' ? 'selected' : ''}">Tiered (Words)</button>
+        <button data-format="standard" class="${lastScrobbledFormat === 'standard' ? 'selected' : ''}">Date Only</button>
+        <button data-format="datetime" class="${lastScrobbledFormat === 'datetime' ? 'selected' : ''}">Date & Time</button>
+    `;
+
     modalContainer.innerHTML = `
     <style>
       .main-trackCreditsModal-mainSection { overflow-y: auto !important; padding: 16px 45px 16px 45px; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #333333 #181818; }
@@ -2640,8 +2740,8 @@
       .sort-play-settings .setting-row { padding: 5px 0; align-items: center; }
       .sort-play-settings .setting-row .col.description { float: left; padding-right: 10px; width: auto; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
       .sort-play-settings .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
-      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 120px; height: auto;}
-      .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 5px; width: 120px; }
+      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 125px; height: auto;}
+      .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 5px; width: 125px; }
       .sort-play-settings select:disabled { opacity: 0.5; cursor: not-allowed; }
       .column-settings-button { background: none; border: none; margin: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; opacity: 0.7; transition: opacity 0.2s; }
       .column-settings-button:hover { opacity: 1; }
@@ -2835,6 +2935,9 @@
             <button id="keySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
+            <button id="lastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
             <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
                 ${getColumnOptionsHtml(selectedColumnType, true)}
             </select>
@@ -2850,6 +2953,9 @@
             </div>
             <div id="keyDropdownContainer" class="column-settings-dropdown">
                 ${getKeyDropdownHtml()}
+            </div>
+            <div id="lastScrobbledDropdownContainer" class="column-settings-dropdown">
+                ${getLastScrobbledDropdownHtml()}
             </div>
         </div>
     </div>
@@ -2868,6 +2974,9 @@
             <button id="secondKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
+            <button id="secondLastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
             <select id="secondColumnTypeSelect" class="column-type-select" ${!showSecondAdditionalColumn ? 'disabled' : ''}>
                 ${getColumnOptionsHtml(selectedSecondColumnType, true)}
             </select>
@@ -2883,6 +2992,9 @@
             </div>
             <div id="secondKeyDropdownContainer" class="column-settings-dropdown">
                 ${getKeyDropdownHtml()}
+            </div>
+            <div id="secondLastScrobbledDropdownContainer" class="column-settings-dropdown">
+                ${getLastScrobbledDropdownHtml()}
             </div>
         </div>
     </div>
@@ -2901,6 +3013,9 @@
             <button id="albumKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
+            <button id="albumLastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
             <select id="albumColumnTypeSelect" class="column-type-select" ${!showAlbumColumn ? 'disabled' : ''}>
                 ${getColumnOptionsHtml(selectedAlbumColumnType, false)}
             </select>
@@ -2916,6 +3031,9 @@
             </div>
             <div id="albumKeyDropdownContainer" class="column-settings-dropdown">
                 ${getKeyDropdownHtml()}
+            </div>
+            <div id="albumLastScrobbledDropdownContainer" class="column-settings-dropdown">
+                ${getLastScrobbledDropdownHtml()}
             </div>
         </div>
     </div>
@@ -2934,6 +3052,9 @@
             <button id="artistKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
                 ${settingsSvg}
             </button>
+            <button id="artistLastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
+                ${settingsSvg}
+            </button>
             <select id="artistColumnTypeSelect" class="column-type-select" ${!showArtistColumn ? 'disabled' : ''}>
                 ${getColumnOptionsHtml(selectedArtistColumnType, false)}
             </select>
@@ -2949,6 +3070,9 @@
             </div>
             <div id="artistKeyDropdownContainer" class="column-settings-dropdown">
                 ${getKeyDropdownHtml()}
+            </div>
+            <div id="artistLastScrobbledDropdownContainer" class="column-settings-dropdown">
+                ${getLastScrobbledDropdownHtml()}
             </div>
         </div>
     </div>
@@ -3465,6 +3589,14 @@
     const secondKeyDropdownContainer = modalContainer.querySelector("#secondKeyDropdownContainer");
     const albumKeyDropdownContainer = modalContainer.querySelector("#albumKeyDropdownContainer");
     const artistKeyDropdownContainer = modalContainer.querySelector("#artistKeyDropdownContainer");
+    const lastScrobbledSettingsBtn = modalContainer.querySelector("#lastScrobbledSettingsBtn");
+    const secondLastScrobbledSettingsBtn = modalContainer.querySelector("#secondLastScrobbledSettingsBtn");
+    const albumLastScrobbledSettingsBtn = modalContainer.querySelector("#albumLastScrobbledSettingsBtn");
+    const artistLastScrobbledSettingsBtn = modalContainer.querySelector("#artistLastScrobbledSettingsBtn");
+    const lastScrobbledDropdownContainer = modalContainer.querySelector("#lastScrobbledDropdownContainer");
+    const secondLastScrobbledDropdownContainer = modalContainer.querySelector("#secondLastScrobbledDropdownContainer");
+    const albumLastScrobbledDropdownContainer = modalContainer.querySelector("#albumLastScrobbledDropdownContainer");
+    const artistLastScrobbledDropdownContainer = modalContainer.querySelector("#artistLastScrobbledDropdownContainer");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
@@ -3600,16 +3732,16 @@
         nowPlayingSettingsBtn.disabled = !showNowPlayingData;
         
         if (showNowPlayingData) {
-            if (!nowPlayingConfig.title.enabled && !nowPlayingConfig.artist.enabled) {
+            if (nowPlayingConfig.title.items.length === 0 && nowPlayingConfig.artist.items.length === 0) {
                 nowPlayingConfig.title.enabled = true;
-                if (nowPlayingConfig.title.items.length === 0) {
-                    nowPlayingConfig.title.items.push({
-                        id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
-                        type: 'releaseDate',
-                        format: 'YYYY',
-                        separator: '•'
-                    });
-                }
+                nowPlayingConfig.title.items.push({
+                    id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
+                    type: 'releaseDate',
+                    format: 'YYYY-MM-DD',
+                    separator: '•'
+                });
+            } else if (!nowPlayingConfig.title.enabled && !nowPlayingConfig.artist.enabled) {
+                nowPlayingConfig.title.enabled = true;
             }
         } else {
             nowPlayingConfig.title.enabled = false;
@@ -3905,7 +4037,7 @@
         });
     }, 50);
 
-    const updateColumnSettingsVisibility = (isShown, type, dateBtn, dateDrop, scrobbleBtn, scrobbleDrop, keyBtn, keyDrop) => {
+    const updateColumnSettingsVisibility = (isShown, type, dateBtn, dateDrop, scrobbleBtn, scrobbleDrop, keyBtn, keyDrop, lastScrobbleBtn, lastScrobbleDrop) => {
         const showDateSettings = isShown && type === 'releaseDate';
         dateBtn.style.display = showDateSettings ? 'flex' : 'none';
         dateBtn.disabled = !showDateSettings;
@@ -3920,12 +4052,17 @@
         keyBtn.style.display = showKeySettings ? 'flex' : 'none';
         keyBtn.disabled = !showKeySettings;
         if (!showKeySettings) keyDrop.style.display = 'none';
+
+        const showLastScrobbledSettings = isShown && type === 'lastScrobbled';
+        lastScrobbleBtn.style.display = showLastScrobbledSettings ? 'flex' : 'none';
+        lastScrobbleBtn.disabled = !showLastScrobbledSettings;
+        if (!showLastScrobbledSettings) lastScrobbleDrop.style.display = 'none';
     };
 
-    const updatePlaylistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showAdditionalColumn, selectedColumnType, dateFormatSettingsBtn, dateFormatDropdownContainer, myScrobblesSettingsBtn, myScrobblesDropdownContainer, keySettingsBtn, keyDropdownContainer);
-    const updateSecondPlaylistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showSecondAdditionalColumn, selectedSecondColumnType, secondDateFormatSettingsBtn, secondDateFormatDropdownContainer, secondMyScrobblesSettingsBtn, secondMyScrobblesDropdownContainer, secondKeySettingsBtn, secondKeyDropdownContainer);
-    const updateAlbumColumnSettingsVisibility = () => updateColumnSettingsVisibility(showAlbumColumn, selectedAlbumColumnType, albumDateFormatSettingsBtn, albumDateFormatDropdownContainer, albumMyScrobblesSettingsBtn, albumMyScrobblesDropdownContainer, albumKeySettingsBtn, albumKeyDropdownContainer);
-    const updateArtistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showArtistColumn, selectedArtistColumnType, artistDateFormatSettingsBtn, artistDateFormatDropdownContainer, artistMyScrobblesSettingsBtn, artistMyScrobblesDropdownContainer, artistKeySettingsBtn, artistKeyDropdownContainer);
+    const updatePlaylistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showAdditionalColumn, selectedColumnType, dateFormatSettingsBtn, dateFormatDropdownContainer, myScrobblesSettingsBtn, myScrobblesDropdownContainer, keySettingsBtn, keyDropdownContainer, lastScrobbledSettingsBtn, lastScrobbledDropdownContainer);
+    const updateSecondPlaylistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showSecondAdditionalColumn, selectedSecondColumnType, secondDateFormatSettingsBtn, secondDateFormatDropdownContainer, secondMyScrobblesSettingsBtn, secondMyScrobblesDropdownContainer, secondKeySettingsBtn, secondKeyDropdownContainer, secondLastScrobbledSettingsBtn, secondLastScrobbledDropdownContainer);
+    const updateAlbumColumnSettingsVisibility = () => updateColumnSettingsVisibility(showAlbumColumn, selectedAlbumColumnType, albumDateFormatSettingsBtn, albumDateFormatDropdownContainer, albumMyScrobblesSettingsBtn, albumMyScrobblesDropdownContainer, albumKeySettingsBtn, albumKeyDropdownContainer, albumLastScrobbledSettingsBtn, albumLastScrobbledDropdownContainer);
+    const updateArtistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showArtistColumn, selectedArtistColumnType, artistDateFormatSettingsBtn, artistDateFormatDropdownContainer, artistMyScrobblesSettingsBtn, artistMyScrobblesDropdownContainer, artistKeySettingsBtn, artistKeyDropdownContainer, artistLastScrobbledSettingsBtn, artistLastScrobbledDropdownContainer);
 
     updatePlaylistColumnSettingsVisibility();
     updateSecondPlaylistColumnSettingsVisibility();
@@ -3933,10 +4070,10 @@
     updateArtistColumnSettingsVisibility();
 
     const allDropdownsForScroll = [
-        dateFormatDropdownContainer, myScrobblesDropdownContainer, keyDropdownContainer,
-        albumDateFormatDropdownContainer, albumMyScrobblesDropdownContainer, albumKeyDropdownContainer,
-        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer, artistKeyDropdownContainer,
-        secondDateFormatDropdownContainer, secondMyScrobblesDropdownContainer, secondKeyDropdownContainer
+        dateFormatDropdownContainer, myScrobblesDropdownContainer, keyDropdownContainer, lastScrobbledDropdownContainer,
+        albumDateFormatDropdownContainer, albumMyScrobblesDropdownContainer, albumKeyDropdownContainer, albumLastScrobbledDropdownContainer,
+        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer, artistKeyDropdownContainer, artistLastScrobbledDropdownContainer,
+        secondDateFormatDropdownContainer, secondMyScrobblesDropdownContainer, secondKeyDropdownContainer, secondLastScrobbledDropdownContainer
     ];
     
     allDropdownsForScroll.forEach(dropdown => {
@@ -4036,6 +4173,7 @@
     const allDateFormatContainers = [dateFormatDropdownContainer, albumDateFormatDropdownContainer, artistDateFormatDropdownContainer, secondDateFormatDropdownContainer];
     const allScrobbleContainers = [myScrobblesDropdownContainer, albumMyScrobblesDropdownContainer, artistMyScrobblesDropdownContainer, secondMyScrobblesDropdownContainer];
     const allKeyContainers = [keyDropdownContainer, albumKeyDropdownContainer, artistKeyDropdownContainer, secondKeyDropdownContainer];
+    const allLastScrobbledContainers = [lastScrobbledDropdownContainer, albumLastScrobbledDropdownContainer, artistLastScrobbledDropdownContainer, secondLastScrobbledDropdownContainer];
 
     const setupGlobalSettingListeners = (containers, settingKey, updateFunc) => {
         containers.forEach(container => {
@@ -4073,6 +4211,9 @@
     });
     setupGlobalSettingListeners(allKeyContainers, 'mode', (value) => {
         keyDisplayMode = value;
+    });
+    setupGlobalSettingListeners(allLastScrobbledContainers, 'format', (value) => {
+        lastScrobbledFormat = value;
     });
 
     const setupSettingsButtonToggle = (button, dropdown, otherDropdowns) => {
@@ -4135,7 +4276,7 @@
         });
     };
 
-    const allDropdowns = [...allDateFormatContainers, ...allScrobbleContainers, ...allKeyContainers];
+    const allDropdowns = [...allDateFormatContainers, ...allScrobbleContainers, ...allKeyContainers, ...allLastScrobbledContainers];
     setupSettingsButtonToggle(dateFormatSettingsBtn, dateFormatDropdownContainer, allDropdowns.filter(d => d !== dateFormatDropdownContainer));
     setupSettingsButtonToggle(myScrobblesSettingsBtn, myScrobblesDropdownContainer, allDropdowns.filter(d => d !== myScrobblesDropdownContainer));
     setupSettingsButtonToggle(albumDateFormatSettingsBtn, albumDateFormatDropdownContainer, allDropdowns.filter(d => d !== albumDateFormatDropdownContainer));
@@ -4148,6 +4289,10 @@
     setupSettingsButtonToggle(secondKeySettingsBtn, secondKeyDropdownContainer, allDropdowns.filter(d => d !== secondKeyDropdownContainer));
     setupSettingsButtonToggle(albumKeySettingsBtn, albumKeyDropdownContainer, allDropdowns.filter(d => d !== albumKeyDropdownContainer));
     setupSettingsButtonToggle(artistKeySettingsBtn, artistKeyDropdownContainer, allDropdowns.filter(d => d !== artistKeyDropdownContainer));
+    setupSettingsButtonToggle(lastScrobbledSettingsBtn, lastScrobbledDropdownContainer, allDropdowns.filter(d => d !== lastScrobbledDropdownContainer));
+    setupSettingsButtonToggle(secondLastScrobbledSettingsBtn, secondLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== secondLastScrobbledDropdownContainer));
+    setupSettingsButtonToggle(albumLastScrobbledSettingsBtn, albumLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== albumLastScrobbledDropdownContainer));
+    setupSettingsButtonToggle(artistLastScrobbledSettingsBtn, artistLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== artistLastScrobbledDropdownContainer));
 
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
@@ -6278,7 +6423,7 @@
 
     return chatPanel;
   }
-
+  
   function showGenreTagsSettingsModal() {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-genre-sources-overlay";
@@ -6471,10 +6616,10 @@
         genreSourcesNpSpotifyTrack = npSpotifyTrackToggle.checked;
         showGenreTagsArtistPage = showTagsApToggle.checked;
         showGenresContextMenu = showGenresCtxToggle2.checked;
-        genreSourcesNpSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && npSpotifyToggle) ? npSpotifyToggle.checked : false;
+        genreSourcesNpSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && npSpotifyToggle) ? npSpotifyToggle.checked : genreSourcesNpSpotify;
         genreSourcesNpLastfm = npLastfmToggle.checked;
         genreSourcesNpDeezer = npDeezerToggle.checked;
-        genreSourcesApSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && apSpotifyToggle) ? apSpotifyToggle.checked : false;
+        genreSourcesApSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && apSpotifyToggle) ? apSpotifyToggle.checked : genreSourcesApSpotify;
         genreSourcesApLastfm = apLastfmToggle.checked;
         useGenrePlaylistDatabase = useGenreDbToggle.checked;
         autoUpdateGenreModal = autoUpdateModalToggle.checked;
@@ -6685,6 +6830,7 @@
         { value: 'popularity', label: 'Popularity' },
         { value: 'scrobbles', label: 'Scrobbles' },
         { value: 'personalScrobbles', label: 'My Scrobbles' },
+        { value: 'lastScrobbled', label: 'Last Scrobbled' },
         { value: 'tempo', label: 'Tempo (BPM)' },
         { value: 'energy', label: 'Energy' },
         { value: 'danceability', label: 'Danceability' },
@@ -6718,6 +6864,12 @@
             { value: 'raw', label: 'Raw Number' },
             { value: 'with_label', label: 'Label (Me: 123)' },
             { value: 'with_suffix', label: 'Suffix (123 scrobbles)' }
+        ],
+        lastScrobbled: [
+            { value: 'relative', label: 'Time Ago (2 hr ago)' },
+            { value: 'tiered', label: 'Tiered (Today)' },
+            { value: 'standard', label: 'Date Only' },
+            { value: 'datetime', label: 'Date & Time' }
         ],
         tempo: [
             { value: 'with_unit', label: '120 BPM' },
@@ -9014,7 +9166,7 @@
 
               const artistsToFetch = track.artists ? track.artists.filter(a => a.id || (a.uri && a.uri.split(':')[2])) : [];
 
-              if (genreSourcesNpSpotify && artistsToFetch.length > 0) {
+              if (ENABLE_SPOTIFY_ARTIST_GENRES && genreSourcesNpSpotify && artistsToFetch.length > 0) {
                   const idsToFetch = [];
                   
                   for (const artist of artistsToFetch) {
@@ -9272,6 +9424,9 @@
               } 
               if (typesNeeded.has('personalScrobbles')) {
                   getTrackDetailsWithPersonalScrobbles(mockTrackObj, true).catch(() => {});
+              } 
+              if (typesNeeded.has('lastScrobbled')) {
+                  getTrackDetailsWithLastScrobbled(mockTrackObj, true).catch(() => {});
               } 
               
               const audioFeatureTypes = ['tempo', 'energy', 'danceability', 'valence', 'key'];
@@ -9636,7 +9791,7 @@
               const promises = [];
 
               let spotifyFetchPromise;
-              if (genreSourcesApSpotify) {
+              if (ENABLE_SPOTIFY_ARTIST_GENRES && genreSourcesApSpotify) {
                   spotifyFetchPromise = (async () => {
                       if (artistGenreCache.has(artistId)) {
                           const cachedGenres = artistGenreCache.get(artistId);
@@ -9683,7 +9838,7 @@
               if (genreSourcesApLastfm) {
                   promises.push((async () => {
                       let nameToUse = domArtistName;
-                      if (!nameToUse && genreSourcesApSpotify) {
+                      if (!nameToUse && ENABLE_SPOTIFY_ARTIST_GENRES && genreSourcesApSpotify) {
                           nameToUse = await spotifyFetchPromise;
                       }
 
@@ -9824,6 +9979,7 @@
           case 'popularity': val = dataObj.popularity; break;
           case 'scrobbles': val = dataObj.scrobbles; break;
           case 'personalScrobbles': val = dataObj.personalScrobbles; break;
+          case 'lastScrobbled': val = dataObj.lastScrobbled; break;
           case 'tempo': val = dataObj.tempo; break;
           case 'energy': val = dataObj.energy; break;
           case 'danceability': val = dataObj.danceability; break;
@@ -9840,6 +9996,7 @@
           case 'popularity': return formatPopularity(val, format);
           case 'scrobbles': return formatScrobbles(val, format);
           case 'personalScrobbles': return formatPersonalScrobbles(val, format);
+          case 'lastScrobbled': return formatLastScrobbled(val, format);
           case 'tempo': return formatTempo(val, format);
           case 'key': return formatKey(val.key, val.mode, format, val.camelot);
           case 'energy': return formatAudioFeature(val, format, 'Energy');
@@ -9940,7 +10097,7 @@
                 promises.push(fetchPop());
             }
 
-            if (typesNeeded.has('scrobbles') || typesNeeded.has('personalScrobbles')) {
+            if (typesNeeded.has('scrobbles') || typesNeeded.has('personalScrobbles') || typesNeeded.has('lastScrobbled')) {
                 const trackInfo = {
                     name: track.name,
                     artistName: track.artists[0]?.name,
@@ -9952,6 +10109,9 @@
                 }
                 if (typesNeeded.has('personalScrobbles')) {
                     promises.push(getTrackDetailsWithPersonalScrobbles(trackInfo, true).then(d => dataContext.personalScrobbles = d));
+                }
+                if (typesNeeded.has('lastScrobbled')) {
+                    promises.push(getTrackDetailsWithLastScrobbled(trackInfo, true).then(d => dataContext.lastScrobbled = d));
                 }
             }
 
@@ -14018,7 +14178,7 @@
       closeAllMenus();
     }
   }
-  
+
   function getJobs() {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS) || '[]');
@@ -16789,8 +16949,6 @@
             e.stopPropagation();
         }
     });
-
-    
 
     const formatTimeAgo = (timestamp) => {
         if (!timestamp) return 'Never';
@@ -20394,7 +20552,7 @@
     .sort-play-tooltip {
       visibility: hidden;
       width: max-content;
-      max-width: 250px;
+      max-width: 300px;
       background-color: #282828;
       color: #fff;
       text-align: center;
@@ -20411,6 +20569,9 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
       pointer-events: none;
       text-decoration: none;
+      white-space: normal;
+      word-wrap: break-word;
+      line-height: 1.4;
     }
     .sort-play-failed-cell:hover .sort-play-tooltip {
       visibility: visible;
@@ -22073,22 +22234,26 @@
         if (lastFmAutocorrect) params.set('autocorrect', '1');
 
         let response = await fetchLfmWithGateway(params);
-        if (!response.ok) throw new Error(`Last.fm API request failed with status ${response.status}`);
-        
         let text = await response.text();
         if (!text || text.trim() === '') throw new Error("Received empty response from Last.fm");
         
         let data = JSON.parse(text);
 
+        if (data && data.error === 17) {
+            return data;
+        }
+
+        if (!response.ok && (!data || data.error !== 6)) {
+            throw new Error(`Last.fm API request failed with status ${response.status}`);
+        }
+
         if (data.error === 6 && useFallback) {
           params.set('autocorrect', lastFmAutocorrect ? '0' : '1');
           const responseRetry = await fetchLfmWithGateway(params);
-          if (responseRetry.ok) {
-            const textRetry = await responseRetry.text();
-            if (textRetry && textRetry.trim() !== '') {
-              const dataRetry = JSON.parse(textRetry);
-              if (!dataRetry.error) data = dataRetry;
-            }
+          const textRetry = await responseRetry.text();
+          if (textRetry && textRetry.trim() !== '') {
+            const dataRetry = JSON.parse(textRetry);
+            if (!dataRetry.error) data = dataRetry;
           }
         }
         return data;
@@ -22117,7 +22282,6 @@
 
       if (data.error) {
         if (data.error === 6) { 
-          console.warn(`Track not found on Last.fm: ${trackName} by ${artistName}.`);
           if (trackId) await setCachedScrobbles(trackId, -1);
           return { ...track, scrobbles: -1, error: "Track not found on Last.fm", errorLabel: "N/A" };
         }
@@ -22179,6 +22343,9 @@
       const data = await _fetchLastFmTrackInfoCore(artistName, trackName, username, useFallback);
 
       if (data.error) {
+        if (data.error === 17) {
+            return { ...track, personalScrobbles: -1, error: "Last.fm profile is private. Make your listening history public.", errorLabel: "Private" };
+        }
         if (data.error === 6) { 
           if (!isLocal) await setCachedPersonalScrobbles(trackId, -1, false);
           return { ...track, personalScrobbles: -1, error: "Track not found on Last.fm", errorLabel: "N/A" };
@@ -22212,6 +22379,126 @@
     }
   }
 
+  async function getTrackDetailsWithLastScrobbled(track, useFallback = false) {
+    const trackId = track.uri ? track.uri.split(":")[2] : (track.track ? track.track.id : null);
+    const isLocal = Spicetify.URI.isLocal(track.uri);
+    
+    if (isLocal && (!track.name || !track.artistName)) {
+        return { ...track, lastScrobbled: null, error: "Local file missing metadata.", errorLabel: "No Meta" };
+    }
+    
+    if (!trackId && !isLocal) {
+        return { ...track, lastScrobbled: null, error: "Invalid track ID.", errorLabel: "Invalid" };
+    }
+
+    const overrides = getLfmOverrides();
+    const override = trackId ? overrides[trackId] : null;
+
+    let artistName = override ? override.artist : getPrimaryArtistName(track);
+    let trackName = override ? override.track : (track.name ? track.name.trim() : null);
+
+    const cachedData = await idb.get('lastScrobbledDates', trackId, CACHE_EXPIRE_PERSONAL_SCROBBLES);
+    
+    if (cachedData !== null && cachedData !== undefined && !isLocal) {
+        return { ...track, lastScrobbled: cachedData };
+    }
+
+    const username = loadLastFmUsername();
+    if (!username) {
+      return { ...track, lastScrobbled: null, error: "Last.fm username not set.", errorLabel: "No User" };
+    }
+
+    if (!artistName || !trackName) {
+      return { ...track, lastScrobbled: null, error: "Missing track metadata.", errorLabel: "No Meta" };
+    }
+
+    try {
+      const maxRetries = 5;
+      let delay = 1000;
+      let data = null;
+      
+      for (let retries = 0; retries < maxRetries; retries++) {
+          try {
+              const params = new URLSearchParams({
+                  method: 'user.getTrackScrobbles',
+                  user: username,
+                  artist: artistName,
+                  track: trackName,
+                  limit: '1',
+                  format: 'json'
+              });
+              if (lastFmAutocorrect) params.set('autocorrect', '1');
+
+              let response = await fetchLfmWithGateway(params);
+              let text = await response.text();
+              if (!text || text.trim() === '') throw new Error("Received empty response from Last.fm");
+              
+              data = JSON.parse(text);
+
+              if (data && data.error === 17) {
+                  break;
+              }
+
+              if (!response.ok && (!data || data.error !== 6)) {
+                  throw new Error(`Last.fm API request failed with status ${response.status}`);
+              }
+
+              if (data.error === 6 && useFallback) {
+                  params.set('autocorrect', lastFmAutocorrect ? '0' : '1');
+                  const responseRetry = await fetchLfmWithGateway(params);
+                  const textRetry = await responseRetry.text();
+                  if (textRetry && textRetry.trim() !== '') {
+                      const dataRetry = JSON.parse(textRetry);
+                      if (!dataRetry.error) data = dataRetry;
+                  }
+              }
+              break;
+          } catch (error) {
+              if (retries === maxRetries - 1) throw error;
+              await new Promise(resolve => setTimeout(resolve, delay));
+              delay *= 2;
+          }
+      }
+
+      if (data && data.error) {
+        if (data.error === 17) {
+            return { ...track, lastScrobbled: -1, error: "Last.fm profile is private. Make your listening history public.", errorLabel: "Private" };
+        }
+        if (data.error === 6) { 
+          if (!isLocal) await idb.set('lastScrobbledDates', trackId, -1);
+          return { ...track, lastScrobbled: -1, error: "Track not found on Last.fm", errorLabel: "N/A" };
+        }
+        throw new Error(`Last.fm API error: ${data.message}`);
+      }
+      
+      let lastScrobbled = 0;
+      let isNowPlaying = false;
+      let tracksArr = data?.trackscrobbles?.track;
+      if (tracksArr) {
+          if (!Array.isArray(tracksArr)) tracksArr = [tracksArr];
+          if (tracksArr.length > 0) {
+              const mostRecent = tracksArr[0];
+              if (mostRecent.date && mostRecent.date.uts) {
+                  lastScrobbled = parseInt(mostRecent.date.uts, 10) * 1000;
+              } else if (mostRecent['@attr'] && mostRecent['@attr'].nowplaying === 'true') {
+                  lastScrobbled = Date.now();
+                  isNowPlaying = true;
+              }
+          }
+      }
+      
+      if (!isLocal && !isNowPlaying) {
+          await idb.set('lastScrobbledDates', trackId, lastScrobbled);
+      }
+
+      return { ...track, lastScrobbled: lastScrobbled };
+
+    } catch (error) {
+      console.error(`Error fetching last scrobbled for track ${trackName}:`, error);
+      return { ...track, lastScrobbled: null, error: "Failed to fetch after multiple attempts.", errorLabel: "Failed" };
+    }
+  }
+  
   function createInnerButton(sortType, parentButton, svg) {
     const innerButton = document.createElement("button");
     const isGroupingSort = sortType === 'filterAlbums' || sortType === 'filterAlbumsEPs' || sortType === 'filterAlbumsCompilations' || sortType === 'filterAlbumsEPsCompilations' || sortType === 'filterAlbumsEPsSingles';
@@ -30456,13 +30743,23 @@
       
       try {
         const response = await fetchLfmWithGateway(params);
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : null;
+
+        if (data && data.error) {
+            if (data.error === 17) {
+                throw new Error("Last.fm profile is private. Please make your listening history public.");
+            }
+            throw new Error(data.message || "Last.fm API Error");
+        }
+
         if (!response.ok) {
             console.warn(`Last.fm API request for recent tracks failed on page ${currentPage}`);
+            if (currentPage === 1) throw new Error("Failed to fetch recent scrobbles from Last.fm");
             break; 
         }
 
-        const data = await response.json();
-        const tracks = data.recenttracks?.track;
+        const tracks = data?.recenttracks?.track;
 
         if (!tracks || tracks.length === 0) {
           break;
@@ -30489,6 +30786,9 @@
         currentPage++;
       } catch (error) {
         console.error(`Error fetching page ${currentPage} of recent scrobbles:`, error);
+        if (currentPage === 1 || error.message.includes("private") || error.message.includes("public")) {
+            throw error;
+        }
         break; 
       }
     }
@@ -30803,7 +31103,10 @@
         
         if (previousTrackUriForScrobbleCache && previousTrackUriForScrobbleCache !== uri) {
             const prevId = previousTrackUriForScrobbleCache.split(":")[2];
-            if (prevId) flagCachedPersonalScrobbleForUpdate(prevId);
+            if (prevId) {
+                flagCachedPersonalScrobbleForUpdate(prevId);
+                idb.del('lastScrobbledDates', prevId);
+            }
         }
 
         currentTrackUriForScrobbleCache = uri;
@@ -30811,6 +31114,7 @@
         
         const trackId = uri.split(":")[2];
         idb.del('personalScrobbles', trackId);
+        idb.del('lastScrobbledDates', trackId);
     };
 
     const currentTrack = Spicetify.Player.data?.item;
@@ -30922,6 +31226,7 @@
                   removeLfmOverride(trackId);
                   await idb.del('scrobbles', trackId);
                   await idb.del('personalScrobbles', trackId);
+                  await idb.del('lastScrobbledDates', trackId);
                   document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
                   if (typeof updateTracklist === 'function') updateTracklist();
                   showNotification("Last.fm override cleared.");
@@ -30935,6 +31240,7 @@
                   setLfmOverride(trackId, parsed.artist, parsed.track, originalTitle);
                   await idb.del('scrobbles', trackId);
                   await idb.del('personalScrobbles', trackId);
+                  await idb.del('lastScrobbledDates', trackId);
                   document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
                   if (typeof updateTracklist === 'function') updateTracklist();
                   showNotification("Last.fm link saved! Scrobble counts will update.");
@@ -31028,6 +31334,7 @@
                   removeLfmOverride(id);
                   await idb.del('scrobbles', id);
                   await idb.del('personalScrobbles', id);
+                  await idb.del('lastScrobbledDates', id);
                   renderList();
                   document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
                   if (typeof updateTracklist === 'function') updateTracklist();
@@ -31050,6 +31357,7 @@
               for (const id of keys) {
                   await idb.del('scrobbles', id);
                   await idb.del('personalScrobbles', id);
+                  await idb.del('lastScrobbledDates', id);
               }
               renderList();
               document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
@@ -31075,6 +31383,7 @@
                       for (const id of Object.keys(data)) {
                           await idb.del('scrobbles', id);
                           await idb.del('personalScrobbles', id);
+                          await idb.del('lastScrobbledDates', id);
                       }
                       renderList();
                       document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
@@ -31764,6 +32073,7 @@
         { value: 'releaseDate', label: 'Release Date' },
         { value: 'scrobbles', label: 'Scrobbles' },
         { value: 'personalScrobbles', label: 'My Scrobbles' },
+        { value: 'lastScrobbled', label: 'Last Scrobbled' },
         { value: 'djInfo', label: 'DJ Info' },
         { value: 'key', label: 'Key' },
         { value: 'tempo', label: 'Tempo (BPM)' },
@@ -31933,7 +32243,7 @@
                     if (!dataElement || dataElement.dataset.spProcessed) return;
 
                     try {
-                        if (config.type === 'scrobbles' || config.type === 'personalScrobbles') {
+                        if (config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') {
                             dataElement.style.cursor = "pointer";
                             dataElement.onclick = (e) => {
                                 e.stopPropagation();
@@ -31963,6 +32273,17 @@
                                         updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
                                     } else {
                                         updateDisplay(dataElement, result.personalScrobbles, config.type);
+                                    }
+                                }
+                            } else if (config.type === 'lastScrobbled') {
+                                if (!loadLastFmUsername()) {
+                                    updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type);
+                                } else {
+                                    const result = await getTrackDetailsWithLastScrobbled(localTrackInfo, true);
+                                    if (result.lastScrobbled === -1 || result.error) {
+                                        updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
+                                    } else {
+                                        updateDisplay(dataElement, result.lastScrobbled, config.type);
                                     }
                                 }
                             }
@@ -32028,7 +32349,7 @@
         const batch = spotifyTracksToProcess.slice(i, i + BATCH_SIZE);
         const batchIds = batch.map(item => item.id);
         
-        const dataMap = { playCounts: null, releaseDates: null, scrobbles: null, personal: null, ai: null, metadata: null };
+        const dataMap = { playCounts: null, releaseDates: null, scrobbles: null, personal: null, ai: null, metadata: null, lastScrobbled: null };
         const fetchPromises = [];
 
         if (columnConfigs.some(c => c.type === 'playCount')) {
@@ -32043,8 +32364,10 @@
         if (columnConfigs.some(c => c.type === 'personalScrobbles')) {
             fetchPromises.push(idb.getMany('personalScrobbles', batchIds, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.personal = res));
         }
-        
-        if (columnConfigs.some(c => c.type === 'scrobbles' || c.type === 'personalScrobbles')) {
+        if (columnConfigs.some(c => c.type === 'lastScrobbled')) {
+            fetchPromises.push(idb.getMany('lastScrobbledDates', batchIds, CACHE_EXPIRE_PERSONAL_SCROBBLES).then(res => dataMap.lastScrobbled = res));
+        }
+        if (columnConfigs.some(c => c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled')) {
             fetchPromises.push(idb.getMany('trackMetadata', batchIds, CACHE_EXPIRE_METADATA).then(res => dataMap.metadata = res));
         }
 
@@ -32099,6 +32422,8 @@
                 else if (config.type === 'personalScrobbles' && dataMap.personal) {
                     const d = dataMap.personal.get(id);
                     if (d && !d.pendingUpdate) val = d.count;
+                } else if (config.type === 'lastScrobbled' && dataMap.lastScrobbled) {
+                    val = dataMap.lastScrobbled.get(id);
                 } else if (audioFeatureTypes.includes(config.type) && dataMap.ai) {
                     const aiKey = getCacheKey(id, true, false, "stats-column");
                     const cached = dataMap.ai.get(aiKey);
@@ -32106,11 +32431,11 @@
                     if (stats) val = (config.type === 'djInfo' || config.type === 'key') ? stats : stats[config.type];
                 }
 
-                if ((config.type === 'scrobbles' || config.type === 'personalScrobbles') && !trackInfo) {
+                if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && !trackInfo) {
                     val = undefined; 
                 }
 
-                if ((config.type === 'scrobbles' || config.type === 'personalScrobbles') && trackInfo) {
+                if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && trackInfo) {
                     dataElement.style.cursor = "pointer";
                     dataElement.onclick = (e) => {
                         e.stopPropagation();
@@ -32128,7 +32453,7 @@
                 }
 
                 if (val !== undefined && val !== null) {
-                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles') && val === -1) {
+                    if ((config.type === 'scrobbles' || config.type === 'personalScrobbles' || config.type === 'lastScrobbled') && val === -1) {
                          updateDisplay(dataElement, { error: "Track not found on Last.fm", errorLabel: "N/A" }, config.type);
                     } else {
                          updateDisplay(dataElement, val, config.type);
@@ -32201,7 +32526,7 @@
                             if (t.album.release_date) await setCachedReleaseDate(t.id, t.album.release_date);
                         } else if (c.type === 'popularity') {
                             updateDisplay(dEl, t.popularity, c.type);
-                        } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles') {
+                        } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled') {
                             const info = { name: t.name, artists: t.artists, uri: t.uri };
                             
                             dEl.style.cursor = "pointer";
@@ -32227,12 +32552,19 @@
                                     updateDisplay(dEl, r.scrobbles, c.type);
                                     if (r.scrobbles !== null) await setCachedScrobbles(t.id, r.scrobbles);
                                 }
-                            } else {
+                            } else if (c.type === 'personalScrobbles') {
                                 if (loadLastFmUsername()) {
                                     const r = await getTrackDetailsWithPersonalScrobbles(info, true);
                                     updateDisplay(dEl, (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.personalScrobbles, c.type);
                                 } else {
-                                    updateDisplay(dEl, { error: "Set username", errorLabel: "No User" }, c.type);
+                                    updateDisplay(dEl, { error: "Set last.fm username", errorLabel: "No User" }, c.type);
+                                }
+                            } else if (c.type === 'lastScrobbled') {
+                                if (loadLastFmUsername()) {
+                                    const r = await getTrackDetailsWithLastScrobbled(info, true);
+                                    updateDisplay(dEl, (r.lastScrobbled === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.lastScrobbled, c.type);
+                                } else {
+                                    updateDisplay(dEl, { error: "Set last.fm username", errorLabel: "No User" }, c.type);
                                 }
                             }
                         }
@@ -32338,6 +32670,11 @@
             }
         } else {
             displayValue = "Err"; 
+        }
+    } else if (type === 'lastScrobbled') {
+        if (value && typeof value === 'object' && value.error) {
+        } else {
+            displayValue = formatLastScrobbled(value, lastScrobbledFormat);
         }
     } else if (type === 'scrobbles') {
         if (value !== null && value !== undefined && !isNaN(value) && value !== -1) {
@@ -32512,7 +32849,7 @@
     const expectedHeaderText = {
         'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date",
         'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
-        'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
+        'lastScrobbled': "Last Played", 'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
         'danceability': "Dance", 'valence': "Valence"
     }[selectedColumnType] || "Plays";
     const columnTypeChanged = existingHeaderColumn && headerTextSpan?.innerText !== expectedHeaderText;
@@ -32520,7 +32857,7 @@
     const expectedSecondHeaderText = {
         'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date",
         'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
-        'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
+        'lastScrobbled': "Last Played", 'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
         'danceability': "Dance", 'valence': "Valence"
     }[selectedSecondColumnType] || "Popularity";
     const secondColumnTypeChanged = existingSecondHeaderColumn && secondHeaderTextSpan?.innerText !== expectedSecondHeaderText;
@@ -32895,6 +33232,7 @@
             case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
             case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
             case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+            case 'lastScrobbled': expectedHeaderText = "Last Played"; break;
             case 'djInfo': expectedHeaderText = "DJ Info"; break;
             case 'key': expectedHeaderText = "Key"; break;
             case 'tempo': expectedHeaderText = "BPM"; break;
@@ -33061,6 +33399,7 @@
             case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
             case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
             case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
+            case 'lastScrobbled': expectedHeaderText = "Last Played"; break;
             case 'djInfo': expectedHeaderText = "DJ Info"; break;
             case 'key': expectedHeaderText = "Key"; break;
             case 'tempo': expectedHeaderText = "BPM"; break;
