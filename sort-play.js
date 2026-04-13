@@ -14454,12 +14454,12 @@
         });
     }
 
-    if (filters.minPopularity || filters.maxPopularity || filters.minYear || filters.maxYear) {
+    if (filters.minPopularity || filters.maxPopularity || filters.minYear || filters.maxYear || filters.releasedInLastDays) {
         if (!isHeadless) mainButton.innerText = "Filtering Meta...";
         const tracksWithIds = await processBatchesWithDelay(filteredTracks, 50, 500, () => {}, collectTrackIdsForPopularity);
         let metaTracks = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
         
-        if (filters.minYear || filters.maxYear) {
+        if (filters.minYear || filters.maxYear || filters.releasedInLastDays) {
             metaTracks = await processBatchesWithDelay(metaTracks, 50, 500, () => {}, getTrackDetailsWithReleaseDate);
         }
         
@@ -14475,6 +14475,17 @@
                 if (isNaN(year)) return false;
                 if (filters.minYear && year < parseInt(filters.minYear)) return false;
                 if (filters.maxYear && year > parseInt(filters.maxYear)) return false;
+            }
+            if (filters.releasedInLastDays) {
+                const days = parseInt(filters.releasedInLastDays);
+                if (!isNaN(days)) {
+                    if (!t.releaseDate) return false;
+                    const releaseDate = new Date(t.releaseDate);
+                    if (isNaN(releaseDate.getTime())) return false;
+                    const cutoff = new Date();
+                    cutoff.setDate(cutoff.getDate() - days);
+                    if (releaseDate < cutoff) return false;
+                }
             }
             return true;
         });
@@ -16452,6 +16463,13 @@
                       </div>
 
                       <div class="setting-row">
+                          <span class="description">Released in Last X Days</span>
+                          <div class="range-input-group">
+                              <input type="number" id="filter-released-last-days" class="range-input" placeholder="Days" min="1" style="width: 80px;">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
                           <span class="description">Spotify Popularity (0-100)</span>
                           <div class="range-input-group">
                               <input type="number" id="filter-min-popularity" class="range-input" placeholder="Min" min="0" max="100"> - 
@@ -16568,6 +16586,7 @@
                             matchWholeWord,
                             titleAlbumKeywords: Array.from(titleAlbumKeywords),
                             artistKeywords: Array.from(artistKeywords),
+                            releasedInLastDays: getVal('filter-released-last-days'),
                         };
                         rangeConfigs.forEach(cfg => {
                             state[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
@@ -16649,6 +16668,7 @@
                         setVal(`filter-min-${cfg.id}`, state[`min${cfg.base}`]);
                         setVal(`filter-max-${cfg.id}`, state[`max${cfg.base}`]);
                     });
+                    setVal('filter-released-last-days', state.releasedInLastDays);
 
                     const kwToggle = modalContainer.querySelector('#keywordFilterToggle');
                     if (kwToggle) {
@@ -16761,6 +16781,9 @@
 
             rangeConfigs.forEach(cfg => checkRange(`filter-min-${cfg.id}`, `filter-max-${cfg.id}`, cfg.label, cfg.suffix));
 
+            const releasedInLastDaysVal = getVal('filter-released-last-days');
+            if (releasedInLastDaysVal) badges.push(`Released in last ${releasedInLastDaysVal} day(s)`);
+
             const keywordFilterEnabled = modalContainer.querySelector('#keywordFilterToggle').checked;
             if (keywordFilterEnabled) {
                 const mode = keepMatchingMode ? 'Keep' : 'Exclude';
@@ -16802,6 +16825,8 @@
             document.getElementById(`filter-min-${cfg.id}`).value = currentFilters[`min${cfg.base}`] || '';
             document.getElementById(`filter-max-${cfg.id}`).value = currentFilters[`max${cfg.base}`] || '';
         });
+        const releasedLastDaysEl = document.getElementById('filter-released-last-days');
+        if (releasedLastDaysEl) releasedLastDaysEl.value = currentFilters.releasedInLastDays || '';
 
         keywordFilterToggle.checked = currentFilters.keywordFilterEnabled || false;
         keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
@@ -16894,6 +16919,7 @@
                 matchWholeWord,
                 titleAlbumKeywords: Array.from(titleAlbumKeywords),
                 artistKeywords: Array.from(artistKeywords),
+                releasedInLastDays: getVal('filter-released-last-days'),
             };
             rangeConfigs.forEach(cfg => {
                 newFilters[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
