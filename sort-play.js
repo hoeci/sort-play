@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.75.0";
+  const SORT_PLAY_VERSION = "5.76.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -20,6 +20,7 @@
   const STORAGE_KEY_SHOW_GENRE_TAGS = "sort-play-show-genre-tags";
   const STORAGE_KEY_SHOW_GENRE_TAGS_NP = "sort-play-show-genre-tags-np";
   const STORAGE_KEY_SHOW_GENRE_TAGS_AP = "sort-play-show-genre-tags-ap";
+  const STORAGE_KEY_GENRE_SEPARATOR = "sort-play-genre-separator";
   const STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY = "sort-play-genre-sources-np-spotify";
   const STORAGE_KEY_GENRE_SOURCES_NP_SPOTIFY_TRACK = "sort-play-genre-sources-np-spotify-track";
   const STORAGE_KEY_GENRE_SOURCES_NP_LASTFM = "sort-play-genre-sources-np-lastfm";
@@ -176,16 +177,14 @@
     STORAGE_KEY_ARTIST_KEYWORDS, STORAGE_KEY_MATCH_WHOLE_WORD,
     STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE, STORAGE_KEY_ACTIVE_RANGE_FILTER, 
     STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
-    STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION
+    STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR
   ];
-
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
     { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", requiresCustomKey: false },
     { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3 Flash-Lite", requiresCustomKey: false }
   ];
   const DEFAULT_AI_MODEL = AI_MODELS[1].id;
-
   let showAdditionalColumn = false;
   let showSecondAdditionalColumn = false;
   let selectedColumnType = 'playCount';
@@ -259,6 +258,7 @@
   let genreSourcesApLastfm = true;
   let autoUpdateGenreModal = false;
   let autoHideDiscographyNotification = false;
+  let genreSeparator = ',';
   let isProcessing = false;
   let isDiscoProcessing = false;
   let isMultiDiscoMode = false;
@@ -374,6 +374,23 @@
       }
   }
 
+  const genreSeparatorOptions = [
+    { value: ',', text: ',' }, { value: '•', text: '•' }, { value: '|', text: '|' }, 
+    { value: '-', text: '-' }, { value: '–', text: '–' }, { value: '/', text: '/' }, 
+    { value: '·', text: '·' }, { value: '+', text: '+' }, { value: '~', text: '~' }, 
+    { value: ' ', text: 'ㅤ' }
+  ];
+  
+  const npSeparatorOptions = [
+      { value: '•', text: '•' }, { value: '●', text: '●' }, { value: '▪', text: '▪' }, { value: '■', text: '■' },
+      { value: '▢', text: '▢' }, { value: '|', text: '|' }, { value: '❚', text: '❚' }, { value: '-', text: '-' },
+      { value: '–', text: '–' }, { value: '—', text: '—' }, { value: '/', text: '/' }, { value: '//', text: '//' },
+      { value: '〢', text: '〢' }, { value: '::', text: '::' }, { value: '≡', text: '≡' }, { value: '►', text: '►' },
+      { value: '▸', text: '▸' }, { value: '➔', text: '➔' }, { value: '◆', text: '◆' }, { value: '✦', text: '✦' },
+      { value: '★', text: '★' }, { value: '✶', text: '✶' }, { value: '✵', text: '✵' }, { value: '✳', text: '✳' },
+      { value: '♪', text: '♪' }, { value: '✕', text: '✕' }, { value: '╳', text: '╳' }, { value: ' ', text: 'ㅤ' }
+  ];
+
   const settingsSvg = `<svg viewBox="0 0 256 256"><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></svg>`;
   const sortIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const quickFiltersIconSvg = `<svg width="22px" height="21px" viewBox="0 0 24 24" fill="none"><path d="M21 6H19M21 12H16M21 18H16M7 20V13.5612C7 13.3532 7 13.2492 6.97958 13.1497C6.96147 13.0615 6.93151 12.9761 6.89052 12.8958C6.84431 12.8054 6.77934 12.7242 6.64939 12.5617L3.35061 8.43826C3.22066 8.27583 3.15569 8.19461 3.10948 8.10417C3.06849 8.02393 3.03853 7.93852 3.02042 7.85026C3 7.75078 3 7.64677 3 7.43875V5.6C3 5.03995 3 4.75992 3.10899 4.54601C3.20487 4.35785 3.35785 4.20487 3.54601 4.10899C3.75992 4 4.03995 4 4.6 4H13.4C13.9601 4 14.2401 4 14.454 4.10899C14.6422 4.20487 14.7951 4.35785 14.891 4.54601C15 4.75992 15 5.03995 15 5.6V7.43875C15 7.64677 15 7.75078 14.9796 7.85026C14.9615 7.93852 14.9315 8.02393 14.8905 8.10417C14.8443 8.19461 14.7793 8.27583 14.6494 8.43826L11.3506 12.5617C11.2207 12.7242 11.1557 12.8054 11.1095 12.8958C11.0685 12.9761 11.0385 13.0615 11.0204 13.1497C11 13.2492 11 13.3532 11 13.5612V17L7 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
@@ -433,6 +450,7 @@
   const pauseIconSvg = `<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>`;
   const selectAllIconSvg = `<svg viewBox="0 0 24 24" width="18px" height="18px"><path d="M 4 2 C 2.895 2 2 2.895 2 4 L 2 16 C 2 17.105 2.895 18 4 18 L 16 18 C 17.105 18 18 17.105 18 16 L 18 4 C 18 2.895 17.105 2 16 2 L 4 2 z M 4 4 L 16 4 L 16 16 L 4 16 L 4 4 z M 20 6 L 20 20 L 6 20 L 6 22 L 20 22 C 21.105 22 22 21.105 22 20 L 22 6 L 20 6 z M 13.292969 6.2929688 L 9 10.585938 L 6.7070312 8.2929688 L 5.2929688 9.7070312 L 9 13.414062 L 14.707031 7.7070312 L 13.292969 6.2929688 z"/></svg>`;
   const searchIconSvg = `<svg class="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M 7 1.75 a 5.25 5.25 0 1 0 0 10.5 a 5.25 5.25 0 0 0 0 -10.5 M 0.25 7 a 6.75 6.75 0 1 1 12.096 4.12 l 3.184 3.185 a 0.75 0.75 0 1 1 -1.06 1.06 L 11.304 12.2 A 6.75 6.75 0 0 1 0.25 7"></path></svg>`;
+  const calendarIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`;
   const plusIcon16Svg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
   const durationIconSvg = `<svg data-encore-id="icon" role="img" aria-hidden="true" viewBox="0 0 16 16" class="Svg-sc-ytk21e-0 Svg-img-icon-small"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8z"></path><path d="M8 3.25a.75.75 0 0 1 .75.75v3.25H11a.75.75 0 0 1 0 1.5H7.25V4A.75.75 0 0 1 8 3.25z"></path></svg>`;
   const linkIconSVG = `<svg width="14px" height="14px" viewBox="0 0 24 24" fill="none"><path d="M14 7H16C18.7614 7 21 9.23858 21 12C21 14.7614 18.7614 17 16 17H14M10 7H8C5.23858 7 3 9.23858 3 12C3 14.7614 5.23858 17 8 17H10M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -2054,6 +2072,7 @@
     useGenrePlaylistDatabase = localStorage.getItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE) !== "false";
     autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
     autoHideDiscographyNotification = localStorage.getItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION) === "true";
+    genreSeparator = localStorage.getItem(STORAGE_KEY_GENRE_SEPARATOR) || ',';
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -2144,6 +2163,7 @@
     localStorage.setItem(STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE, useGenrePlaylistDatabase);
     localStorage.setItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL, autoUpdateGenreModal);
     localStorage.setItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, autoHideDiscographyNotification);
+    localStorage.setItem(STORAGE_KEY_GENRE_SEPARATOR, genreSeparator);
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
 
     for (const sortType in sortOrderState) {
@@ -2260,7 +2280,8 @@
           [STORAGE_KEY_FILTER_ALBUM]: "true",
           [STORAGE_KEY_FILTER_ARTIST]: "true",
           [STORAGE_KEY_MATCH_WHOLE_WORD]: "false",
-          [STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION]: "false"
+          [STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION]: "false",
+          [STORAGE_KEY_GENRE_SEPARATOR]: ","
         };
     
         if (key === STORAGE_KEY_NP_CONFIG) {
@@ -2587,6 +2608,38 @@
     }
   }
 
+  const getDateFormatDropdownHtml = () => `
+        <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
+        <button data-format="MM-DD-YYYY" class="${releaseDateFormat === 'MM-DD-YYYY' ? 'selected' : ''}">MM-DD-YYYY</button>
+        <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
+        <button data-format="MMM D, YYYY" class="${releaseDateFormat === 'MMM D, YYYY' ? 'selected' : ''}">Month D, YYYY</button>
+        <button data-format="D MMM, YYYY" class="${releaseDateFormat === 'D MMM, YYYY' ? 'selected' : ''}">D Month, YYYY</button>
+        <button data-format="YYYY, MMM D" class="${releaseDateFormat === 'YYYY, MMM D' ? 'selected' : ''}">YYYY, Month D</button>
+        <button data-format="YYYY-MM" class="${releaseDateFormat === 'YYYY-MM' ? 'selected' : ''}">YYYY-MM</button>
+        <button data-format="MM-YYYY" class="${releaseDateFormat === 'MM-YYYY' ? 'selected' : ''}">MM-YYYY</button>
+        <button data-format="YYYY" class="${releaseDateFormat === 'YYYY' ? 'selected' : ''}">YYYY</button>
+  `;
+
+  const getMyScrobblesDropdownHtml = () => `
+        <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
+        <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
+  `;
+
+  const getKeyDropdownHtml = () => `
+        <button data-mode="standard" class="${keyDisplayMode === 'standard' ? 'selected' : ''}">Standard (Cm)</button>
+        <button data-mode="camelot" class="${keyDisplayMode === 'camelot' ? 'selected' : ''}">Camelot (5A)</button>
+        <button data-mode="openkey" class="${keyDisplayMode === 'openkey' ? 'selected' : ''}">Open Key (4d)</button>
+        <button data-mode="full_name" class="${keyDisplayMode === 'full_name' ? 'selected' : ''}">Full Name (C Minor)</button>
+        <button data-mode="standard_camelot" class="${keyDisplayMode === 'standard_camelot' ? 'selected' : ''}">Standard + Camelot</button>
+  `;
+
+  const getLastScrobbledDropdownHtml = () => `
+        <button data-format="relative" class="${lastScrobbledFormat === 'relative' ? 'selected' : ''}">Time Ago (Relative)</button>
+        <button data-format="tiered" class="${lastScrobbledFormat === 'tiered' ? 'selected' : ''}">Tiered (Words)</button>
+        <button data-format="standard" class="${lastScrobbledFormat === 'standard' ? 'selected' : ''}">Date Only</button>
+        <button data-format="datetime" class="${lastScrobbledFormat === 'datetime' ? 'selected' : ''}">Date & Time</button>
+  `;
+
   function positionChatPanel(chatPanel) {
     if (!chatPanel) return;
     const settingsModal = document.querySelector(".GenericModal > .main-embedWidgetGenerator-container") || document.querySelector(".sort-play-settings");
@@ -2687,38 +2740,6 @@
         <option value="energy" ${selectedValue === 'energy' ? 'selected' : ''}>Energy</option>
         <option value="danceability" ${selectedValue === 'danceability' ? 'selected' : ''}>Danceability</option>
         <option value="valence" ${selectedValue === 'valence' ? 'selected' : ''}>Valence</option>
-    `;
-
-    const getDateFormatDropdownHtml = () => `
-        <button data-format="YYYY-MM-DD" class="${releaseDateFormat === 'YYYY-MM-DD' ? 'selected' : ''}">YYYY-MM-DD</button>
-        <button data-format="MM-DD-YYYY" class="${releaseDateFormat === 'MM-DD-YYYY' ? 'selected' : ''}">MM-DD-YYYY</button>
-        <button data-format="DD-MM-YYYY" class="${releaseDateFormat === 'DD-MM-YYYY' ? 'selected' : ''}">DD-MM-YYYY</button>
-        <button data-format="MMM D, YYYY" class="${releaseDateFormat === 'MMM D, YYYY' ? 'selected' : ''}">Month D, YYYY</button>
-        <button data-format="D MMM, YYYY" class="${releaseDateFormat === 'D MMM, YYYY' ? 'selected' : ''}">D Month, YYYY</button>
-        <button data-format="YYYY, MMM D" class="${releaseDateFormat === 'YYYY, MMM D' ? 'selected' : ''}">YYYY, Month D</button>
-        <button data-format="YYYY-MM" class="${releaseDateFormat === 'YYYY-MM' ? 'selected' : ''}">YYYY-MM</button>
-        <button data-format="MM-YYYY" class="${releaseDateFormat === 'MM-YYYY' ? 'selected' : ''}">MM-YYYY</button>
-        <button data-format="YYYY" class="${releaseDateFormat === 'YYYY' ? 'selected' : ''}">YYYY</button>
-    `;
-
-    const getMyScrobblesDropdownHtml = () => `
-        <button data-mode="number" class="${myScrobblesDisplayMode === 'number' ? 'selected' : ''}">Number Mode</button>
-        <button data-mode="sign" class="${myScrobblesDisplayMode === 'sign' ? 'selected' : ''}">Sign Mode</button>
-    `;
-
-    const getKeyDropdownHtml = () => `
-        <button data-mode="standard" class="${keyDisplayMode === 'standard' ? 'selected' : ''}">Standard (Cm)</button>
-        <button data-mode="camelot" class="${keyDisplayMode === 'camelot' ? 'selected' : ''}">Camelot (5A)</button>
-        <button data-mode="openkey" class="${keyDisplayMode === 'openkey' ? 'selected' : ''}">Open Key (4d)</button>
-        <button data-mode="full_name" class="${keyDisplayMode === 'full_name' ? 'selected' : ''}">Full Name (C Minor)</button>
-        <button data-mode="standard_camelot" class="${keyDisplayMode === 'standard_camelot' ? 'selected' : ''}">Standard + Camelot</button>
-    `;
-
-    const getLastScrobbledDropdownHtml = () => `
-        <button data-format="relative" class="${lastScrobbledFormat === 'relative' ? 'selected' : ''}">Time Ago (Relative)</button>
-        <button data-format="tiered" class="${lastScrobbledFormat === 'tiered' ? 'selected' : ''}">Tiered (Words)</button>
-        <button data-format="standard" class="${lastScrobbledFormat === 'standard' ? 'selected' : ''}">Date Only</button>
-        <button data-format="datetime" class="${lastScrobbledFormat === 'datetime' ? 'selected' : ''}">Date & Time</button>
     `;
 
     modalContainer.innerHTML = `
@@ -4142,7 +4163,7 @@
     });
 
     removeDateAddedToggle.addEventListener("change", () => {
-        if (showAdditionalColumn) {
+        if (showAdditionalColumn || showSecondAdditionalColumn) {
             removeDateAdded = removeDateAddedToggle.checked;
             saveSettings();
             updateTracklist();
@@ -6436,20 +6457,31 @@
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
     modalContainer.style.cssText = `
-        width: 420px !important;
+        width: 720px !important;
+        max-width: 90vw;
         border-radius: 30px;
-        overflow: visible; 
+        overflow: hidden; 
         background-color: #181818 !important;
         border: 2px solid #282828;
         display: flex;
         flex-direction: column;
+        max-height: 85vh;
     `;
 
     modalContainer.innerHTML = `
       <style>
         .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
-        .setting-label { color: #c1c1c1; font-size: 16px; font-weight: 500; }
+        .setting-label { color: #c1c1c1; font-size: 15px; font-weight: 500; }
         .section-header { font-weight: bold; font-size: 16px; color: white; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 4px; }
+        .separator-container { position: relative; display: flex; gap: 6px; }
+        .np-input { background: #181818; border: 1px solid #444; color: white; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 13px; width: 50px; text-align: center; }
+        .np-input:focus { border-color: #888; outline: none; }
+        .toggle-sep-menu-btn { background: #333; border: 1px solid #444; color: #ccc; border-radius: 4px; width: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .toggle-sep-menu-btn:hover { background: #444; color: white; }
+        .separator-dropdown { display: none; position: absolute; background-color: #282828; border: 1px solid #444; border-radius: 4px; padding: 8px; width: 200px; z-index: 100; top: 100%; right: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5); grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 4px; }
+        .separator-dropdown.visible { display: grid; }
+        .separator-option { background: #3e3e3e; border: none; color: #eee; border-radius: 4px; padding: 6px 0; cursor: pointer; font-size: 14px; text-align: center; display: flex; align-items: center; justify-content: center; }
+        .separator-option:hover { background: #555; color: white; }
         .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
@@ -6458,137 +6490,172 @@
         input:checked + .sliderx:before { transform: translateX(16px); }
         .custom-tooltip { visibility: hidden; position: absolute; z-index: 1000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
         .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+        .custom-tooltip.tooltip-bottom { bottom: auto; top: 100%; margin-bottom: 0; margin-top: 5px; }
+        .custom-tooltip.tooltip-bottom::after { top: auto; bottom: 100%; border-color: transparent transparent #373737 transparent; }
         .tooltip-container { position: relative; display: inline-block; vertical-align: middle; margin-left: 6px; }
         .tooltip-container:hover .custom-tooltip { visibility: visible; }
+        
+        .genre-modal-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-height: 65vh; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+        .genre-modal-layout::-webkit-scrollbar { width: 8px; }
+        .genre-modal-layout::-webkit-scrollbar-track { background: transparent; }
+        .genre-modal-layout::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+        .genre-col { display: flex; flex-direction: column; gap: 24px; }
       </style>
-      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Genre Settings</span></h1>
+      <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important; border-bottom: 1px solid #282828; flex-shrink: 0;">
+          <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Genre Tag Settings</span></h1>
       </div>
-      <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px 25px !important;">
-          <div style="display: flex; flex-direction: column; gap: 24px;">
-
-              <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <div class="section-header">Display Location</div>
-                  <div class="setting-row">
-                      <label class="setting-label" for="showTagsNpToggle">Now Playing View</label>
-                      <label class="switch">
-                          <input type="checkbox" id="showTagsNpToggle" ${showGenreTagsNowPlaying ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-                  <div class="setting-row">
-                      <label class="setting-label" for="showTagsApToggle">Artist Page</label>
-                      <label class="switch">
-                          <input type="checkbox" id="showTagsApToggle" ${showGenreTagsArtistPage ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-                  <div class="setting-row">
-                      <div style="display: flex; align-items: center;">
-                          <label class="setting-label" for="showGenresCtxToggle2">Track Context Menu</label>
-                          <span class="tooltip-container">
-                              ${infoIconSvg}
-                              <span class="custom-tooltip">Adds a "Show Genres" option to the track right-click menu.</span>
-                          </span>
+      <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px 25px !important; display: flex; flex-direction: column; overflow: hidden;">
+          <div class="genre-modal-layout">
+              <div class="genre-col">
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <div class="section-header">UI Integrations</div>
+                      <div class="setting-row">
+                          <div style="display: flex; align-items: center;">
+                              <label class="setting-label" style="color: white;" for="showGenreTagsMasterToggle">Enable UI Tags</label>
+                          </div>
+                          <label class="switch">
+                              <input type="checkbox" id="showGenreTagsMasterToggle" ${showGenreTags ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
                       </div>
-                      <label class="switch">
-                          <input type="checkbox" id="showGenresCtxToggle2" ${showGenresContextMenu ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
+                      
+                      <div id="ui-tags-sub-settings" style="display: flex; flex-direction: column; gap: 4px; padding-left: 16px; border-left: 2px solid #282828; margin-left: 6px; transition: opacity 0.2s; ${showGenreTags ? '' : 'opacity: 0.5; pointer-events: none;'}">
+                          <div class="setting-row">
+                              <label class="setting-label" for="showTagsNpToggle">Now Playing View</label>
+                              <label class="switch">
+                                  <input type="checkbox" id="showTagsNpToggle" ${showGenreTagsNowPlaying ? 'checked' : ''}>
+                                  <span class="sliderx"></span>
+                              </label>
+                          </div>
+                          <div class="setting-row">
+                              <label class="setting-label" for="showTagsApToggle">Artist Page</label>
+                              <label class="switch">
+                                  <input type="checkbox" id="showTagsApToggle" ${showGenreTagsArtistPage ? 'checked' : ''}>
+                                  <span class="sliderx"></span>
+                              </label>
+                          </div>
+                          <div class="setting-row">
+                              <div style="display: flex; align-items: center;">
+                                  <label class="setting-label">Now Playing Separator</label>
+                              </div>
+                              <div class="separator-container">
+                                  <input type="text" class="np-input" id="genreSeparatorInput" value="${genreSeparator.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}" placeholder="," maxlength="10">
+                                  <button class="toggle-sep-menu-btn" id="genreSeparatorBtn" title="Presets">▼</button>
+                                  <div class="separator-dropdown" id="genreSeparatorDropdown">
+                                      ${genreSeparatorOptions.map(sep => `<div class="separator-option" data-val="${sep.value}">${sep.text}</div>`).join('')}
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div class="setting-row" style="margin-top: 4px;">
+                          <div style="display: flex; align-items: center;">
+                              <label class="setting-label" style="color: white;" for="showGenresCtxToggle2">Track Context Menu</label>
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Adds a "Show Genres" option to the track right-click menu to view a popup window of genres.</span>
+                              </span>
+                          </div>
+                          <label class="switch">
+                              <input type="checkbox" id="showGenresCtxToggle2" ${showGenresContextMenu ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
+                      </div>
+                  </div>
+                  
+                  <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px;">
+                      <div class="section-header">Behavior</div>
+                      <div class="setting-row">
+                          <div style="display: flex; align-items: center;">
+                              <label class="setting-label" for="useGenreDbToggle">Link to EveryNoise Playlists</label>
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">If enabled, clicking a genre tag opens a specific curated playlist (e.g. The Sound of Pop) if available.<br><br>If disabled, it searches for the genre on Spotify.</span>
+                              </span>
+                          </div>
+                          <label class="switch">
+                              <input type="checkbox" id="useGenreDbToggle" ${useGenrePlaylistDatabase ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
+                      </div>
+                      <div class="setting-row">
+                          <div style="display: flex; align-items: center;">
+                              <label class="setting-label" for="autoUpdateModalToggle">Auto-Update Open Window</label>
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">If the Genre Details window is open, automatically update it when the song changes.</span>
+                              </span>
+                          </div>
+                          <label class="switch">
+                              <input type="checkbox" id="autoUpdateModalToggle" ${autoUpdateGenreModal ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
+                      </div>
                   </div>
               </div>
               
-              <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <div class="section-header">Behavior</div>
-                  <div class="setting-row">
-                      <div style="display: flex; align-items: center;">
-                          <label class="setting-label" for="useGenreDbToggle">Link to EveryNoise PLaylits</label>
-                          <span class="tooltip-container">
-                              ${infoIconSvg}
-                              <span class="custom-tooltip">If enabled, clicking a genre tag opens a specific curated playlist (e.g. The Sound of Pop) if available.<br><br>If disabled, it searches for the genre on Spotify.</span>
-                          </span>
+              <div class="genre-col">
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <div class="section-header">Track Genre Sources</div>
+                      
+                      <div class="setting-row">
+                          <label class="setting-label" for="npSpotifyTrackToggle">Spotify (Track Tags)</label>
+                          <label class="switch">
+                              <input type="checkbox" id="npSpotifyTrackToggle" ${genreSourcesNpSpotifyTrack ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
                       </div>
-                      <label class="switch">
-                          <input type="checkbox" id="useGenreDbToggle" ${useGenrePlaylistDatabase ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-                  <div class="setting-row">
-                      <div style="display: flex; align-items: center;">
-                          <label class="setting-label" for="autoUpdateModalToggle">Auto-Update Open Window</label>
-                          <span class="tooltip-container">
-                              ${infoIconSvg}
-                              <span class="custom-tooltip">If the Genre Details window is open, automatically update it when the song changes.</span>
-                          </span>
+                      ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
+                      <div class="setting-row">
+                          <label class="setting-label" for="npSpotifyToggle">Spotify (Artist Tags)</label>
+                          <label class="switch">
+                              <input type="checkbox" id="npSpotifyToggle" ${genreSourcesNpSpotify ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
                       </div>
-                      <label class="switch">
-                          <input type="checkbox" id="autoUpdateModalToggle" ${autoUpdateGenreModal ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
+                      ` : ''}
+                      <div class="setting-row">
+                          <label class="setting-label" for="npLastfmToggle">Last.fm (Filtered Track & Artist Tags)</label>
+                          <label class="switch">
+                              <input type="checkbox" id="npLastfmToggle" ${genreSourcesNpLastfm ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
+                      </div>
+                      <div class="setting-row">
+                          <label class="setting-label" for="npDeezerToggle">Deezer (Album Tags)</label>
+                          <label class="switch">
+                              <input type="checkbox" id="npDeezerToggle" ${genreSourcesNpDeezer ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
+                      </div>
                   </div>
-              </div>
 
-              <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <div class="section-header">Now Playing Sources</div>
-                  
-                  <div class="setting-row">
-                      <label class="setting-label" for="npSpotifyTrackToggle">Spotify (Track Tags)</label>
-                      <label class="switch">
-                          <input type="checkbox" id="npSpotifyTrackToggle" ${genreSourcesNpSpotifyTrack ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-                  ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
-                  <div class="setting-row">
-                      <label class="setting-label" for="npSpotifyToggle">Spotify (Artist Tags)</label>
-                      <label class="switch">
-                          <input type="checkbox" id="npSpotifyToggle" ${genreSourcesNpSpotify ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-                  ` : ''}
-                  <div class="setting-row">
-                      <label class="setting-label" for="npLastfmToggle">Last.fm (Filtered Track & Artist Tags)</label>
-                      <label class="switch">
-                          <input type="checkbox" id="npLastfmToggle" ${genreSourcesNpLastfm ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-                  <div class="setting-row">
-                      <label class="setting-label" for="npDeezerToggle">Deezer (Album Tags)</label>
-                      <label class="switch">
-                          <input type="checkbox" id="npDeezerToggle" ${genreSourcesNpDeezer ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
+                  <div style="display: flex; flex-direction: column; gap: 4px;">
+                      <div class="section-header">Artist Page Sources</div>
+                      
+                      ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
+                      <div class="setting-row">
+                          <label class="setting-label" for="apSpotifyToggle">Spotify (Artist Tags)</label>
+                          <label class="switch">
+                              <input type="checkbox" id="apSpotifyToggle" ${genreSourcesApSpotify ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
+                      </div>
+                      ` : ''}
+                      <div class="setting-row">
+                          <label class="setting-label" for="apLastfmToggle">Last.fm (Filtered Artist Tags)</label>
+                          <label class="switch">
+                              <input type="checkbox" id="apLastfmToggle" ${genreSourcesApLastfm ? 'checked' : ''}>
+                              <span class="sliderx"></span>
+                          </label>
+                      </div>
                   </div>
               </div>
-
-              <div style="display: flex; flex-direction: column; gap: 4px;">
-                  <div class="section-header">Artist Page Sources</div>
-                  
-                  ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
-                  <div class="setting-row">
-                      <label class="setting-label" for="apSpotifyToggle">Spotify (Artist Tags)</label>
-                      <label class="switch">
-                          <input type="checkbox" id="apSpotifyToggle" ${genreSourcesApSpotify ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-                  ` : ''}
-                  <div class="setting-row">
-                      <label class="setting-label" for="apLastfmToggle">Last.fm (Filtered Artist Tags)</label>
-                      <label class="switch">
-                          <input type="checkbox" id="apLastfmToggle" ${genreSourcesApLastfm ? 'checked' : ''}>
-                          <span class="sliderx"></span>
-                      </label>
-                  </div>
-              </div>
-
-              <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-                  <button id="doneGenreSources" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-                    Done
-                  </button>
-              </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 15px; border-top: 1px solid #282828; flex-shrink: 0;">
+              <button id="doneGenreSources" class="main-buttons-button main-button-primary" style="padding: 8px 24px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
+                Done
+              </button>
           </div>
       </div>
     `;
@@ -6598,6 +6665,8 @@
 
     const closeModal = () => overlay.remove();
 
+    const showGenreTagsMasterToggle = modalContainer.querySelector("#showGenreTagsMasterToggle");
+    const uiTagsSubSettings = modalContainer.querySelector("#ui-tags-sub-settings");
     const showTagsNpToggle = modalContainer.querySelector("#showTagsNpToggle");
     const showTagsApToggle = modalContainer.querySelector("#showTagsApToggle");
     const showGenresCtxToggle2 = modalContainer.querySelector("#showGenresCtxToggle2");
@@ -6610,9 +6679,22 @@
     const useGenreDbToggle = modalContainer.querySelector("#useGenreDbToggle");
     const autoUpdateModalToggle = modalContainer.querySelector("#autoUpdateModalToggle");
     const doneButton = modalContainer.querySelector("#doneGenreSources");
+    const genreSeparatorInput = modalContainer.querySelector("#genreSeparatorInput");
+    const genreSeparatorBtn = modalContainer.querySelector("#genreSeparatorBtn");
+    const genreSeparatorDropdown = modalContainer.querySelector("#genreSeparatorDropdown");
 
     const updateVarsAndSave = () => {
+        showGenreTags = showGenreTagsMasterToggle.checked;
+        if (uiTagsSubSettings) {
+            uiTagsSubSettings.style.opacity = showGenreTags ? "1" : "0.5";
+            uiTagsSubSettings.style.pointerEvents = showGenreTags ? "auto" : "none";
+        }
+        
+        const mainMasterToggle = document.getElementById("showGenreTagsToggle");
+        if (mainMasterToggle) mainMasterToggle.checked = showGenreTags;
+
         showGenreTagsNowPlaying = showTagsNpToggle.checked;
+        genreSeparator = genreSeparatorInput.value || ',';
         genreSourcesNpSpotifyTrack = npSpotifyTrackToggle.checked;
         showGenreTagsArtistPage = showTagsApToggle.checked;
         showGenresContextMenu = showGenresCtxToggle2.checked;
@@ -6636,6 +6718,7 @@
         updateArtistPageGenres();
     };
     
+    showGenreTagsMasterToggle.addEventListener("change", updateVarsAndSave);
     showTagsNpToggle.addEventListener("change", updateVarsAndSave);
     showTagsApToggle.addEventListener("change", updateVarsAndSave);
     showGenresCtxToggle2.addEventListener("change", updateVarsAndSave);
@@ -6647,6 +6730,37 @@
     apLastfmToggle.addEventListener("change", updateVarsAndSave);
     useGenreDbToggle.addEventListener("change", updateVarsAndSave);
     autoUpdateModalToggle.addEventListener("change", updateVarsAndSave);
+
+    genreSeparatorBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        genreSeparatorDropdown.classList.toggle("visible");
+        const closeDropdown = (evt) => {
+            if (!genreSeparatorDropdown.contains(evt.target) && evt.target !== genreSeparatorBtn) {
+                genreSeparatorDropdown.classList.remove("visible");
+                document.removeEventListener("click", closeDropdown);
+            }
+        };
+        if (genreSeparatorDropdown.classList.contains("visible")) {
+            document.addEventListener("click", closeDropdown);
+        }
+    });
+
+    modalContainer.querySelectorAll(".separator-option").forEach(opt => {
+        opt.addEventListener("click", (e) => {
+            genreSeparatorInput.value = e.target.dataset.val;
+            genreSeparatorDropdown.classList.remove("visible");
+            updateVarsAndSave();
+        });
+    });
+
+    genreSeparatorInput.addEventListener("blur", updateVarsAndSave);
+    genreSeparatorInput.addEventListener("keydown", (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            updateVarsAndSave();
+            genreSeparatorInput.blur();
+        }
+    });
 
     doneButton.addEventListener("click", closeModal);
     addHoverEffect(doneButton, "#1ED760", "#3BE377");
@@ -6888,16 +7002,6 @@
         ]
     };
 
-    const separatorOptions = [
-        { value: '•', text: '•' }, { value: '●', text: '●' }, { value: '▪', text: '▪' }, { value: '■', text: '■' },
-        { value: '▢', text: '▢' }, { value: '|', text: '|' }, { value: '❚', text: '❚' }, { value: '-', text: '-' },
-        { value: '–', text: '–' }, { value: '—', text: '—' }, { value: '/', text: '/' }, { value: '//', text: '//' },
-        { value: '〢', text: '〢' }, { value: '::', text: '::' }, { value: '≡', text: '≡' }, { value: '►', text: '►' },
-        { value: '▸', text: '▸' }, { value: '➔', text: '➔' }, { value: '◆', text: '◆' }, { value: '✦', text: '✦' },
-        { value: '★', text: '★' }, { value: '✶', text: '✶' }, { value: '✵', text: '✵' }, { value: '✳', text: '✳' },
-        { value: '♪', text: '♪' }, { value: '✕', text: '✕' }, { value: '╳', text: '╳' }, { value: ' ', text: 'ㅤ' }
-    ];
-
     let liveUpdateTimer = null;
 
     const performUpdate = (updateUI) => {
@@ -7064,7 +7168,7 @@
             `<option value="${f.value}" ${currentFormat === f.value ? 'selected' : ''}>${f.label}</option>`
         ).join('');
 
-        const separatorGrid = separatorOptions.map(sep => 
+        const separatorGrid = npSeparatorOptions.map(sep => 
             `<div class="separator-option" data-val="${sep.value}">${sep.text}</div>`
         ).join('');
 
@@ -9683,9 +9787,12 @@
                     data-uri="${href}"
                     onclick="event.preventDefault(); event.stopPropagation(); ${clickAction}"
                     >${titleCaseGenre}</a>`;
-        }).join("<span>, </span>");
+        });
 
-        genreContainer.innerHTML = genreLinks;
+        const safeSeparator = genreSeparator.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        const joinedLinks = genreLinks.join(genreSeparator === ',' ? '<span>, </span>' : (genreSeparator === ' ' ? '<span style="margin: 0 2px;"> </span>' : `<span style="margin: 0 4px;">${safeSeparator}</span>`));
+
+        genreContainer.innerHTML = joinedLinks;
 
         if (!isCached) {
             requestAnimationFrame(() => {
@@ -14454,12 +14561,12 @@
         });
     }
 
-    if (filters.minPopularity || filters.maxPopularity || filters.minYear || filters.maxYear) {
+    if (filters.minPopularity || filters.maxPopularity || filters.minYear || filters.maxYear || filters.releasedWithinDays) {
         if (!isHeadless) mainButton.innerText = "Filtering Meta...";
         const tracksWithIds = await processBatchesWithDelay(filteredTracks, 50, 500, () => {}, collectTrackIdsForPopularity);
         let metaTracks = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
         
-        if (filters.minYear || filters.maxYear) {
+        if (filters.minYear || filters.maxYear || filters.releasedWithinDays) {
             metaTracks = await processBatchesWithDelay(metaTracks, 50, 500, () => {}, getTrackDetailsWithReleaseDate);
         }
         
@@ -14469,12 +14576,47 @@
                 if (filters.minPopularity && pop < parseInt(filters.minPopularity)) return false;
                 if (filters.maxPopularity && pop > parseInt(filters.maxPopularity)) return false;
             }
-            if (filters.minYear || filters.maxYear) {
+            if (filters.minYear || filters.maxYear || filters.releasedWithinDays) {
                 if (!t.releaseDate) return false;
-                const year = new Date(t.releaseDate).getFullYear();
-                if (isNaN(year)) return false;
-                if (filters.minYear && year < parseInt(filters.minYear)) return false;
-                if (filters.maxYear && year > parseInt(filters.maxYear)) return false;
+                const dateObj = new Date(t.releaseDate);
+                const releaseMs = dateObj.getTime();
+                if (isNaN(releaseMs)) return false;
+
+                if (filters.minYear || filters.maxYear) {
+                    const parseFilterDate = (val, isMax) => {
+                        if (!val) return null;
+                        let cleanVal = val.toString().trim().replace(/\//g, '-');
+                        if (/^\d{4}$/.test(cleanVal)) {
+                            return isMax 
+                                ? new Date(`${cleanVal}-12-31T23:59:59.999Z`).getTime() 
+                                : new Date(`${cleanVal}-01-01T00:00:00.000Z`).getTime();
+                        }
+                        if (/^\d{4}-\d{2}$/.test(cleanVal)) {
+                            const [y, m] = cleanVal.split('-');
+                            return isMax 
+                                ? new Date(Date.UTC(parseInt(y), parseInt(m), 0, 23, 59, 59, 999)).getTime() 
+                                : new Date(`${cleanVal}-01T00:00:00.000Z`).getTime();
+                        }
+                        const d = new Date(cleanVal);
+                        if (!isNaN(d.getTime())) {
+                            if (isMax) d.setUTCHours(23, 59, 59, 999);
+                            else d.setUTCHours(0, 0, 0, 0);
+                            return d.getTime();
+                        }
+                        return null;
+                    };
+
+                    const minMs = parseFilterDate(filters.minYear, false);
+                    const maxMs = parseFilterDate(filters.maxYear, true);
+
+                    if (minMs !== null && releaseMs < minMs) return false;
+                    if (maxMs !== null && releaseMs > maxMs) return false;
+                }
+                
+                if (filters.releasedWithinDays) {
+                    const daysSinceRelease = (Date.now() - releaseMs) / (1000 * 60 * 60 * 24);
+                    if (daysSinceRelease > parseInt(filters.releasedWithinDays)) return false;
+                }
             }
             return true;
         });
@@ -15955,6 +16097,8 @@
             <style>
               .modal-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
               .modal-title { font-size: 24px; font-weight: 700; color: white; }
+              .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center; transition: color 0.2s ease; }
+              .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
               .scan-banner { background-color: #2a2a2a; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #333; transition: opacity 0.3s ease; }
               .scan-text { color: #b3b3b3; font-size: 14px; }
               .scan-btn { background-color: #1ED760; color: black; border: none; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background-color 0.1s; }
@@ -16203,7 +16347,7 @@
             { base: 'GlobalScrobbles', id: 'global-scrobbles', label: 'Global Scrobbles' },
             { base: 'Scrobbles', id: 'scrobbles', label: 'Scrobbles' },
             { base: 'Duration', id: 'duration', label: 'Duration', suffix: 's' },
-            { base: 'Year', id: 'year', label: 'Year' },
+            { base: 'Year', id: 'year', label: 'Date' },
             { base: 'Popularity', id: 'popularity', label: 'Pop' },
             { base: 'Tempo', id: 'tempo', label: 'Tempo', suffix: ' BPM' },
             { base: 'Energy', id: 'energy', label: 'Energy', suffix: '%' },
@@ -16233,17 +16377,25 @@
         modalContainer.className = "main-embedWidgetGenerator-container";
         modalContainer.style.zIndex = "2007";
         modalContainer.style.width = "1085px";
+        modalContainer.style.maxWidth = "95vw";
+        modalContainer.style.maxHeight = "95vh";
+        modalContainer.style.display = "flex";
+        modalContainer.style.flexDirection = "column";
         modalContainer.style.backgroundColor = "#181818";
         modalContainer.style.borderRadius = "25px";
         modalContainer.style.border = "2px solid #282828";
 
         modalContainer.innerHTML = `
           <style>
-            .main-trackCreditsModal-mainSection { padding: 20px 32px !important; overflow: hidden; }
-            #filter-overlay .filter-modal-layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 25px; max-height: 65vh; }
-            #filter-overlay .settings-column { display: flex; flex-direction: column; gap: 20px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
-            #filter-overlay .settings-column::-webkit-scrollbar { width: 6px; }
-            #filter-overlay .settings-column::-webkit-scrollbar-thumb { background-color: #444; border-radius: 3px; }
+            .main-trackCreditsModal-mainSection { padding: 20px 32px !important; overflow-y: auto; flex: 1; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+            .main-trackCreditsModal-mainSection::-webkit-scrollbar { width: 8px; }
+            .main-trackCreditsModal-mainSection::-webkit-scrollbar-track { background: transparent; }
+            .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+            #filter-overlay .filter-modal-layout { display: grid; grid-template-columns: 1.1fr 1fr; gap: 25px; }
+            #filter-overlay .settings-column { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+            @media (max-width: 950px) {
+                #filter-overlay .filter-modal-layout { grid-template-columns: 1fr; }
+            }
             #filter-overlay .settings-wrapper { background-color: #1c1c1c; border-radius: 20px; padding: 20px; position: relative; }
             #filter-overlay .settings-wrapper.disabled > *:not(.settings-title-wrapper) { opacity: 0.5; pointer-events: none; }
             #filter-overlay .settings-wrapper.disabled .settings-title-wrapper { opacity: 1; pointer-events: all; }
@@ -16282,8 +16434,8 @@
             #filter-overlay .range-input { width: 100px; padding: 6px; border-radius: 4px; border: 1px solid #444; background: #282828; color: white; text-align: center; font-size: 13px; }
             #filter-overlay .range-input:focus { outline: none; border-color: #1ED760; }
             #filter-overlay .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
-            #filter-overlay .custom-tooltip { visibility: hidden; position: absolute; z-index: 2008; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 280px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
-            #filter-overlay .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+            #filter-overlay .custom-tooltip { visibility: hidden; position: absolute; z-index: 2008; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 280px; width: max-content; bottom: 100%; left: -10px; margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
+            #filter-overlay .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 17px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
             #filter-overlay .tooltip-container:hover .custom-tooltip { visibility: visible; }
             #filter-overlay .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
             #filter-overlay .switch input { opacity: 0; width: 0; height: 0; }
@@ -16303,12 +16455,17 @@
             #filter-overlay .segment-btn.active { background-color: #555; color: white; font-weight: 700; }
             #filter-overlay .segment-btn.active[data-value="require"], #filter-overlay .segment-btn.active[data-value="exclude"] { background-color: #1ED760; color: black; }
             #filter-overlay .setting-row.disabled .segmented-control { opacity: 0.5; pointer-events: none; }
-            #filter-overlay .summary-container { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background-color: #242424; padding: 12px 16px; border-radius: 8px; border: 1px solid #333; margin-top: 20px; min-height: 44px; }
+            #filter-overlay .summary-container { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background-color: #242424; padding: 12px 16px; border-radius: 8px; border: 1px solid #333; margin-top: 20px; min-height: 52px; }
             #filter-overlay .summary-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; }
             #load-preset-btn, #save-preset-btn { transition: all 0.2s ease !important; }
             #load-preset-btn:hover, #save-preset-btn:hover { background-color: #333 !important; border-color: #fff !important; }
+            #filter-overlay .date-input-wrapper { position: relative; display: flex; align-items: center; width: 100px; }
+            #filter-overlay .date-input-wrapper .range-input { width: 100%; padding-right: 24px; text-align: left; padding-left: 6px; font-size: 12px; }
+            #filter-overlay .date-picker-hidden { position: absolute; right: 15px; top: 50%; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: none; padding: 0; z-index: -1; }
+            #filter-overlay .date-icon-btn { position: absolute; right: 2px; color: #b3b3b3; display: flex; align-items: center; justify-content: center; z-index: 2; background: none; border: none; cursor: pointer; padding: 4px; transition: color 0.2s; }
+            #filter-overlay .date-icon-btn:hover { color: white; }
           </style>
-          <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 12px; border-bottom: 1px solid #282828;">
+          <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 12px; border-bottom: 1px solid #282828; flex-shrink: 0;">
               <h1 class="main-trackCreditsModal-title" style="margin: 0;"><span style='font-size: 25px;'>Track Filtering Options</span></h1>
               <div class="preset-actions" style="display: flex; gap: 8px;">
                   <button id="load-preset-btn" class="main-buttons-button main-button-secondary" style="padding: 6px 16px; border-radius: 20px; font-weight: 550; font-size: 12px; cursor: pointer; border: 1px solid #666; background: transparent; color: white;">Load Preset</button>
@@ -16414,80 +16571,108 @@
                       <div class="setting-row">
                           <span class="description">Global Play Count</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-playcount" class="range-input" placeholder="Min" min="0" step="1000"> - 
-                              <input type="number" id="filter-max-playcount" class="range-input" placeholder="Max" min="0" step="1000">
+                              <input type="number" id="filter-min-playcount" class="range-input" placeholder="Min" step="1000"> - 
+                              <input type="number" id="filter-max-playcount" class="range-input" placeholder="Max" step="1000">
                           </div>
                       </div>
                       
                       <div class="setting-row">
                           <span class="description">Global Scrobbles</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-global-scrobbles" class="range-input" placeholder="Min" min="0" step="1000"> - 
-                              <input type="number" id="filter-max-global-scrobbles" class="range-input" placeholder="Max" min="0" step="1000">
+                              <input type="number" id="filter-min-global-scrobbles" class="range-input" placeholder="Min" step="1000"> - 
+                              <input type="number" id="filter-max-global-scrobbles" class="range-input" placeholder="Max" step="1000">
                           </div>
                       </div>
                       
                       <div class="setting-row ${isExcludeListenedDisabled ? 'disabled' : ''}">
                           <span class="description">Personal Scrobbles</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-scrobbles" class="range-input" placeholder="Min" min="0"> - 
-                              <input type="number" id="filter-max-scrobbles" class="range-input" placeholder="Max" min="0">
+                              <input type="number" id="filter-min-scrobbles" class="range-input" placeholder="Min"> - 
+                              <input type="number" id="filter-max-scrobbles" class="range-input" placeholder="Max">
                           </div>
                       </div>
 
                       <div class="setting-row">
                           <span class="description">Track Duration (Seconds)</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-duration" class="range-input" placeholder="Min" min="0"> - 
-                              <input type="number" id="filter-max-duration" class="range-input" placeholder="Max" min="0">
+                              <input type="number" id="filter-min-duration" class="range-input" placeholder="Min"> - 
+                              <input type="number" id="filter-max-duration" class="range-input" placeholder="Max">
                           </div>
                       </div>
 
                       <div class="setting-row">
-                          <span class="description">Release Year</span>
+                          <span class="description">
+                              Release Date
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Filter by exact date (YYYY-MM-DD), month (YYYY-MM), or year (YYYY). Slashes (/) are also supported. Use the calendar icon to pick a date.</span>
+                              </span>
+                          </span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-year" class="range-input" placeholder="Min" min="1900" max="2100"> - 
-                              <input type="number" id="filter-max-year" class="range-input" placeholder="Max" min="1900" max="2100">
+                              <div class="date-input-wrapper">
+                                  <input type="text" id="filter-min-year" class="range-input" placeholder="Min" autocomplete="off">
+                                  <input type="date" class="date-picker-hidden" id="min-date-picker">
+                                  <button class="date-icon-btn" id="min-date-btn" title="Pick Date">${calendarIconSvg}</button>
+                              </div>
+                              - 
+                              <div class="date-input-wrapper">
+                                  <input type="text" id="filter-max-year" class="range-input" placeholder="Max" autocomplete="off">
+                                  <input type="date" class="date-picker-hidden" id="max-date-picker">
+                                  <button class="date-icon-btn" id="max-date-btn" title="Pick Date">${calendarIconSvg}</button>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">
+                              Released in last X days
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Only keep tracks released within this many days from today.</span>
+                              </span>
+                          </span>
+                          <div class="range-input-group" style="justify-content: flex-end;">
+                              <input type="number" id="filter-released-within" class="range-input" placeholder="Days">
                           </div>
                       </div>
 
                       <div class="setting-row">
                           <span class="description">Spotify Popularity (0-100)</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-popularity" class="range-input" placeholder="Min" min="0" max="100"> - 
-                              <input type="number" id="filter-max-popularity" class="range-input" placeholder="Max" min="0" max="100">
+                              <input type="number" id="filter-min-popularity" class="range-input" placeholder="Min" max="100"> - 
+                              <input type="number" id="filter-max-popularity" class="range-input" placeholder="Max" max="100">
                           </div>
                       </div>
 
                       <div class="setting-row">
                           <span class="description">Tempo / BPM</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-tempo" class="range-input" placeholder="Min" min="0" max="300"> - 
-                              <input type="number" id="filter-max-tempo" class="range-input" placeholder="Max" min="0" max="300">
+                              <input type="number" id="filter-min-tempo" class="range-input" placeholder="Min" max="300"> - 
+                              <input type="number" id="filter-max-tempo" class="range-input" placeholder="Max" max="300">
                           </div>
                       </div>
 
                       <div class="setting-row">
                           <span class="description">Energy (0-100%)</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-energy" class="range-input" placeholder="Min" min="0" max="100"> - 
-                              <input type="number" id="filter-max-energy" class="range-input" placeholder="Max" min="0" max="100">
+                              <input type="number" id="filter-min-energy" class="range-input" placeholder="Min" max="100"> - 
+                              <input type="number" id="filter-max-energy" class="range-input" placeholder="Max" max="100">
                           </div>
                       </div>
 
                       <div class="setting-row">
                           <span class="description">Danceability (0-100%)</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-danceability" class="range-input" placeholder="Min" min="0" max="100"> - 
-                              <input type="number" id="filter-max-danceability" class="range-input" placeholder="Max" min="0" max="100">
+                              <input type="number" id="filter-min-danceability" class="range-input" placeholder="Min" max="100"> - 
+                              <input type="number" id="filter-max-danceability" class="range-input" placeholder="Max" max="100">
                           </div>
                       </div>
 
                       <div class="setting-row">
                           <span class="description">Valence (0-100%)</span>
                           <div class="range-input-group">
-                              <input type="number" id="filter-min-valence" class="range-input" placeholder="Min" min="0" max="100"> - 
-                              <input type="number" id="filter-max-valence" class="range-input" placeholder="Max" min="0" max="100">
+                              <input type="number" id="filter-min-valence" class="range-input" placeholder="Min" max="100"> - 
+                              <input type="number" id="filter-max-valence" class="range-input" placeholder="Max" max="100">
                           </div>
                       </div>
 
@@ -16496,11 +16681,10 @@
             </div>
 
             <div id="filter-summary-wrapper" class="summary-container"></div>
-
-            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px;">
-                <button id="cancel-filters" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
-                <button id="save-filters" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Save</button>
-            </div>
+          </div>
+          <div class="main-trackCreditsModal-originalCredits" style="padding: 16px 32px; border-top: 1px solid #282828; flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px;">
+              <button id="cancel-filters" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
+              <button id="save-filters" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none; color: black;">Save</button>
           </div>
         `;
         
@@ -16512,6 +16696,57 @@
             overlay.remove();
             resolve(data);
         };
+
+        const setupDatePicker = (inputId, pickerId, btnId) => {
+            const input = modalContainer.querySelector(`#${inputId}`);
+            const picker = modalContainer.querySelector(`#${pickerId}`);
+            const btn = modalContainer.querySelector(`#${btnId}`);
+            
+            if (picker && input && btn) {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const val = input.value.trim().replace(/\//g, '-');
+                    if (val) {
+                        if (/^\d{4}$/.test(val)) {
+                            picker.value = `${val}-01-01`;
+                        } else if (/^\d{4}-\d{1,2}$/.test(val)) {
+                            const [y, m] = val.split('-');
+                            picker.value = `${y}-${m.padStart(2, '0')}-01`;
+                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(val)) {
+                            const [y, m, d] = val.split('-');
+                            picker.value = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+                        } else {
+                            const parsed = Date.parse(val);
+                            if (!isNaN(parsed)) {
+                                const dObj = new Date(parsed);
+                                const y = dObj.getFullYear();
+                                const m = (dObj.getMonth() + 1).toString().padStart(2, '0');
+                                const dStr = dObj.getDate().toString().padStart(2, '0');
+                                picker.value = `${y}-${m}-${dStr}`;
+                            }
+                        }
+                    }
+                    
+                    try {
+                        picker.showPicker();
+                    } catch (err) {
+                        console.warn("[Sort-Play] showPicker not supported or element blocked.", err);
+                    }
+                });
+
+                picker.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        input.value = e.target.value;
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            }
+        };
+        setupDatePicker('filter-min-year', 'min-date-picker', 'min-date-btn');
+        setupDatePicker('filter-max-year', 'max-date-picker', 'max-date-btn');
 
         const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
         const keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
@@ -16568,6 +16803,7 @@
                             matchWholeWord,
                             titleAlbumKeywords: Array.from(titleAlbumKeywords),
                             artistKeywords: Array.from(artistKeywords),
+                            releasedWithinDays: getVal('filter-released-within'),
                         };
                         rangeConfigs.forEach(cfg => {
                             state[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
@@ -16649,6 +16885,7 @@
                         setVal(`filter-min-${cfg.id}`, state[`min${cfg.base}`]);
                         setVal(`filter-max-${cfg.id}`, state[`max${cfg.base}`]);
                     });
+                    setVal('filter-released-within', state.releasedWithinDays);
 
                     const kwToggle = modalContainer.querySelector('#keywordFilterToggle');
                     if (kwToggle) {
@@ -16741,25 +16978,31 @@
             if (!summaryWrapper) return;
             const badges = [];
 
-            if (likedFilterMode === 'require') badges.push('Only Liked');
-            else if (likedFilterMode === 'exclude') badges.push('Exclude Liked');
+            if (likedFilterMode === 'require') badges.push({ text: 'Only Liked', clear: () => { likedFilterMode = 'all'; setSegmentedControl('liked-filter-control', 'all'); } });
+            else if (likedFilterMode === 'exclude') badges.push({ text: 'Exclude Liked', clear: () => { likedFilterMode = 'all'; setSegmentedControl('liked-filter-control', 'all'); } });
 
-            if (followedFilterMode === 'require') badges.push('Only Followed');
-            else if (followedFilterMode === 'exclude') badges.push('Exclude Followed');
+            if (followedFilterMode === 'require') badges.push({ text: 'Only Followed', clear: () => { followedFilterMode = 'all'; setSegmentedControl('followed-filter-control', 'all'); } });
+            else if (followedFilterMode === 'exclude') badges.push({ text: 'Exclude Followed', clear: () => { followedFilterMode = 'all'; setSegmentedControl('followed-filter-control', 'all'); } });
 
-            if (scrobbleFilterMode === 'require') badges.push('Only Played');
-            else if (scrobbleFilterMode === 'exclude') badges.push('Exclude Played');
+            if (scrobbleFilterMode === 'require') badges.push({ text: 'Only Played', clear: () => { scrobbleFilterMode = 'all'; setSegmentedControl('scrobble-filter-control', 'all'); } });
+            else if (scrobbleFilterMode === 'exclude') badges.push({ text: 'Exclude Played', clear: () => { scrobbleFilterMode = 'all'; setSegmentedControl('scrobble-filter-control', 'all'); } });
 
             const getVal = (id) => modalContainer.querySelector(`#${id}`).value;
+            const setVal = (id, val) => { const el = modalContainer.querySelector(`#${id}`); if (el) el.value = val; };
+
             const checkRange = (idMin, idMax, label, suffix = '') => {
                 const min = getVal(idMin);
                 const max = getVal(idMax);
-                if (min && max) badges.push(`${label}: ${min} to ${max}${suffix}`);
-                else if (min) badges.push(`${label}: > ${min}${suffix}`);
-                else if (max) badges.push(`${label}: < ${max}${suffix}`);
+                const clearFn = () => { setVal(idMin, ''); setVal(idMax, ''); };
+                if (min && max) badges.push({ text: `${label}: ${min} to ${max}${suffix}`, clear: clearFn });
+                else if (min) badges.push({ text: `${label}: &gt; ${min}${suffix}`, clear: clearFn });
+                else if (max) badges.push({ text: `${label}: &lt; ${max}${suffix}`, clear: clearFn });
             };
 
             rangeConfigs.forEach(cfg => checkRange(`filter-min-${cfg.id}`, `filter-max-${cfg.id}`, cfg.label, cfg.suffix));
+
+            const daysWithin = getVal('filter-released-within');
+            if (daysWithin) badges.push({ text: `Released in last ${daysWithin} day(s)`, clear: () => setVal('filter-released-within', '') });
 
             const keywordFilterEnabled = modalContainer.querySelector('#keywordFilterToggle').checked;
             if (keywordFilterEnabled) {
@@ -16776,21 +17019,52 @@
                     else if (albumOn) target = "Album";
                     
                     if (target) {
-                        badges.push(`${mode} ${taKeywordsCount} ${target} keyword(s)`);
+                        badges.push({ 
+                            text: `${mode} ${taKeywordsCount} ${target} keyword(s)`, 
+                            clear: () => { 
+                                modalContainer.querySelector('#keywordFilterToggle').checked = false; 
+                                const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
+                                if (keywordFilterWrapper) keywordFilterWrapper.classList.add('disabled'); 
+                            } 
+                        });
                     }
                 }
                 
                 const artistKeywordsCount = artistKeywords.size;
                 if (artistKeywordsCount > 0 && artistToggle.checked) {
-                    badges.push(`${mode} ${artistKeywordsCount} Artist keyword(s)`);
+                    badges.push({ 
+                        text: `${mode} ${artistKeywordsCount} Artist keyword(s)`, 
+                        clear: () => { 
+                            modalContainer.querySelector('#keywordFilterToggle').checked = false; 
+                            const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
+                            if (keywordFilterWrapper) keywordFilterWrapper.classList.add('disabled'); 
+                        } 
+                    });
                 }
             }
 
+            summaryWrapper.innerHTML = '';
             if (badges.length === 0) {
-                summaryWrapper.innerHTML = `<span style="color: #888; font-style: italic; font-size: 13px;">No active filters. All source tracks will be included.</span>`;
+                summaryWrapper.innerHTML = `<span style="color: #888; font-style: italic; font-size: 13px;">No active filters.</span>`;
             } else {
-                summaryWrapper.innerHTML = `<span style="color: #fff; font-size: 13px; font-weight: bold; margin-right: 4px;">Active Filters:</span>` + 
-                    badges.map(b => `<span class="summary-badge">${b}</span>`).join('');
+                const title = document.createElement("span");
+                title.style.cssText = "color: #fff; font-size: 13px; font-weight: bold; margin-right: 4px;";
+                title.textContent = "Active Filters:";
+                summaryWrapper.appendChild(title);
+                
+                badges.forEach(b => {
+                    const badge = document.createElement("span");
+                    badge.className = "summary-badge";
+                    badge.innerHTML = `${b.text} <span class="badge-remove" style="margin-left: 6px; cursor: pointer; opacity: 0.7;" title="Remove Filter">&times;</span>`;
+                    const removeBtn = badge.querySelector('.badge-remove');
+                    removeBtn.addEventListener('click', () => {
+                        b.clear();
+                        updateSummary();
+                    });
+                    removeBtn.addEventListener('mouseenter', function() { this.style.opacity = '1'; });
+                    removeBtn.addEventListener('mouseleave', function() { this.style.opacity = '0.7'; });
+                    summaryWrapper.appendChild(badge);
+                });
             }
         };
 
@@ -16802,6 +17076,7 @@
             document.getElementById(`filter-min-${cfg.id}`).value = currentFilters[`min${cfg.base}`] || '';
             document.getElementById(`filter-max-${cfg.id}`).value = currentFilters[`max${cfg.base}`] || '';
         });
+        document.getElementById('filter-released-within').value = currentFilters.releasedWithinDays || '';
 
         keywordFilterToggle.checked = currentFilters.keywordFilterEnabled || false;
         keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
@@ -16839,7 +17114,76 @@
         matchWholeWordToggle.addEventListener('change', e => { matchWholeWord = e.target.checked; updateSummary(); });
         
         modalContainer.querySelectorAll('.range-input').forEach(input => {
-            input.addEventListener('input', updateSummary);
+            input.addEventListener('input', (e) => {
+                const el = e.target;
+                if (el.id !== 'filter-min-year' && el.id !== 'filter-max-year') {
+                    if (el.value !== '') {
+                        let val = parseFloat(el.value);
+                        if (val < 0) {
+                            el.value = '';
+                        }
+                    }
+                }
+                updateSummary();
+            });
+            
+            input.addEventListener('change', (e) => {
+                const el = e.target;
+                if (el.id === 'filter-min-year' || el.id === 'filter-max-year') {
+                    if (el.value) {
+                        let cleanVal = el.value.trim().replace(/\//g, '-');
+                        let isValid = false;
+                        
+                        if (/^\d{4}$/.test(cleanVal)) {
+                            const y = parseInt(cleanVal);
+                            if (y >= 1000 && y <= 9999) isValid = true;
+                        } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
+                            const [yStr, mStr] = cleanVal.split('-');
+                            const y = parseInt(yStr);
+                            const m = parseInt(mStr);
+                            if (y >= 1000 && y <= 9999 && m >= 1 && m <= 12) {
+                                isValid = true;
+                                el.value = `${y}-${m.toString().padStart(2, '0')}`;
+                            }
+                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+                            const [yStr, mStr, dStr] = cleanVal.split('-');
+                            const y = parseInt(yStr);
+                            const m = parseInt(mStr);
+                            const d = parseInt(dStr);
+                            const dateObj = new Date(y, m - 1, d);
+                            if (dateObj.getFullYear() === y && dateObj.getMonth() === m - 1 && dateObj.getDate() === d) {
+                                isValid = true;
+                                el.value = `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
+                            }
+                        } else {
+                            const d = new Date(cleanVal);
+                            if (!isNaN(d.getTime()) && d.getFullYear() >= 1000 && d.getFullYear() <= 9999) {
+                                isValid = true;
+                                const y = d.getFullYear();
+                                const m = (d.getMonth() + 1).toString().padStart(2, '0');
+                                const day = d.getDate().toString().padStart(2, '0');
+                                el.value = `${y}-${m}-${day}`;
+                            }
+                        }
+                        
+                        if (!isValid) {
+                            el.value = '';
+                        }
+                    }
+                } else {
+                    if (el.value !== '') {
+                        let val = parseFloat(el.value);
+                        if (isNaN(val) || val < 0) {
+                            el.value = '';
+                        } else {
+                            const maxAttr = el.getAttribute('max');
+                            if (maxAttr !== null && val > parseFloat(maxAttr)) val = parseFloat(maxAttr);
+                            el.value = val;
+                        }
+                    }
+                }
+                updateSummary();
+            });
         });
 
         const enforceRangeLogic = (minId, maxId) => {
@@ -16848,14 +17192,52 @@
             if (!minEl || !maxEl) return;
             
             const validate = (e) => {
-                const minVal = parseFloat(minEl.value);
-                const maxVal = parseFloat(maxEl.value);
-                
-                if (!isNaN(minVal) && !isNaN(maxVal)) {
-                    if (e.target === minEl && minVal > maxVal) {
-                        maxEl.value = minEl.value; 
-                    } else if (e.target === maxEl && maxVal < minVal) {
-                        minEl.value = maxEl.value; 
+                if (minId === 'filter-min-year') {
+                    const parseDateStr = (val, isMax) => {
+                        if (!val) return NaN;
+                        let cleanVal = val.trim().replace(/\//g, '-');
+                        if (/^\d{4}$/.test(cleanVal)) {
+                            const y = parseInt(cleanVal);
+                            if (y < 1000 || y > 9999) return NaN;
+                            return isMax 
+                                ? new Date(`${cleanVal}-12-31T23:59:59.999Z`).getTime() 
+                                : new Date(`${cleanVal}-01-01T00:00:00.000Z`).getTime();
+                        }
+                        if (/^\d{4}-\d{2}$/.test(cleanVal)) {
+                            const [y, m] = cleanVal.split('-');
+                            if (parseInt(y) < 1000 || parseInt(y) > 9999 || parseInt(m) < 1 || parseInt(m) > 12) return NaN;
+                            return isMax 
+                                ? new Date(Date.UTC(parseInt(y), parseInt(m), 0, 23, 59, 59, 999)).getTime() 
+                                : new Date(`${cleanVal}-01T00:00:00.000Z`).getTime();
+                        }
+                        const d = new Date(cleanVal);
+                        if (!isNaN(d.getTime())) {
+                            if (d.getFullYear() < 1000 || d.getFullYear() > 9999) return NaN;
+                            return isMax ? d.setUTCHours(23, 59, 59, 999) : d.setUTCHours(0, 0, 0, 0);
+                        }
+                        return NaN;
+                    };
+                    
+                    const minVal = parseDateStr(minEl.value, false);
+                    const maxVal = parseDateStr(maxEl.value, true);
+                    
+                    if (!isNaN(minVal) && !isNaN(maxVal)) {
+                        if (e.target === minEl && minVal > maxVal) {
+                            maxEl.value = minEl.value; 
+                        } else if (e.target === maxEl && maxVal < minVal) {
+                            minEl.value = maxEl.value; 
+                        }
+                    }
+                } else {
+                    const minVal = parseFloat(minEl.value);
+                    const maxVal = parseFloat(maxEl.value);
+                    
+                    if (!isNaN(minVal) && !isNaN(maxVal)) {
+                        if (e.target === minEl && minVal > maxVal) {
+                            maxEl.value = minEl.value; 
+                        } else if (e.target === maxEl && maxVal < minVal) {
+                            minEl.value = maxEl.value; 
+                        }
                     }
                 }
                 updateSummary();
@@ -16894,6 +17276,7 @@
                 matchWholeWord,
                 titleAlbumKeywords: Array.from(titleAlbumKeywords),
                 artistKeywords: Array.from(artistKeywords),
+                releasedWithinDays: getVal('filter-released-within'),
             };
             rangeConfigs.forEach(cfg => {
                 newFilters[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
@@ -20635,7 +21018,7 @@
       align-items: center;
       gap: 5px;
     }
-    .sort-play-column {
+    .sort-play-column, .sort-play-second-column {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -23373,6 +23756,15 @@
     if (window.mainMenuAbortController) {
       window.mainMenuAbortController.abort();
       window.mainMenuAbortController = null;
+    }
+
+    const columnSelector = document.getElementById('sort-play-column-selector');
+    if (columnSelector) {
+        columnSelector.remove();
+    }
+    if (window.columnSelectorAbortController) {
+        window.columnSelectorAbortController.abort();
+        window.columnSelectorAbortController = null;
     }
   }
   
@@ -32063,19 +32455,30 @@
 
   function showColumnSelector(event, contextType) {
     event.stopPropagation();
-    const abortController = new AbortController();
+    const anchorBtn = event.currentTarget;
+
     const existing = document.getElementById('sort-play-column-selector');
-    if (existing) existing.remove();
+    const isSameAnchor = existing && existing._anchor === anchorBtn;
+
+    closeAllMenus();
+
+    if (isSameAnchor) {
+        return;
+    }
+
+    window.columnSelectorAbortController = new AbortController();
+    const signal = window.columnSelectorAbortController.signal;
 
     const options = [
+        { value: 'off', label: 'Off (Hide Column)' },
         { value: 'playCount', label: 'Play Count' },
         { value: 'popularity', label: 'Popularity' },
-        { value: 'releaseDate', label: 'Release Date' },
+        { value: 'releaseDate', label: 'Release Date', hasSettings: true, getHtml: getDateFormatDropdownHtml, datasetKey: 'format', updateVar: v => releaseDateFormat = v },
         { value: 'scrobbles', label: 'Scrobbles' },
-        { value: 'personalScrobbles', label: 'My Scrobbles' },
-        { value: 'lastScrobbled', label: 'Last Scrobbled' },
+        { value: 'personalScrobbles', label: 'My Scrobbles', hasSettings: true, getHtml: getMyScrobblesDropdownHtml, datasetKey: 'mode', updateVar: v => myScrobblesDisplayMode = v },
+        { value: 'lastScrobbled', label: 'Last Scrobbled', hasSettings: true, getHtml: getLastScrobbledDropdownHtml, datasetKey: 'format', updateVar: v => lastScrobbledFormat = v },
         { value: 'djInfo', label: 'DJ Info' },
-        { value: 'key', label: 'Key' },
+        { value: 'key', label: 'Key', hasSettings: true, getHtml: getKeyDropdownHtml, datasetKey: 'mode', updateVar: v => keyDisplayMode = v },
         { value: 'tempo', label: 'Tempo (BPM)' },
         { value: 'energy', label: 'Energy' },
         { value: 'danceability', label: 'Danceability' },
@@ -32089,71 +32492,192 @@
 
     const menu = document.createElement('div');
     menu.id = 'sort-play-column-selector';
+    menu._anchor = anchorBtn;
     menu.className = 'main-contextMenu-menu sort-play-font-scope';
     menu.style.cssText = `
         position: fixed; z-index: 9999; background-color: #282828; border-radius: 4px; padding: 4px;
         box-shadow: 0 16px 24px rgba(0,0,0,.3), 0 6px 8px rgba(0,0,0,.2); max-height: 400px; overflow-y: auto;
-        min-width: 140px; display: flex; flex-direction: column;
+        min-width: 155px; display: flex; flex-direction: column;
     `;
 
+    const dropdownStyle = document.createElement('style');
+    dropdownStyle.innerHTML = `
+        .sp-col-selector-dropdown { display: none; position: fixed; background-color: #282828; min-width: 140px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.4); z-index: 10001; border-radius: 4px; padding: 4px 0; border: 1px solid #3e3e3e; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 #282828; }
+        .sp-col-selector-dropdown::-webkit-scrollbar { width: 8px; }
+        .sp-col-selector-dropdown::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
+        .sp-col-selector-dropdown::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #282828; }
+        .sp-col-selector-dropdown::-webkit-scrollbar-thumb:hover { background-color: #777; }
+        .sp-col-selector-dropdown button { color: #b3b3b3; padding: 6px 12px; text-decoration: none; display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-size: 13px; margin: 0; border-radius: 0; height: auto !important; min-height: unset !important; }
+        .sp-col-selector-dropdown button:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
+        .sp-col-selector-dropdown button.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
+    `;
+    menu.appendChild(dropdownStyle);
+
+    const allDropdowns = [];
+
     currentOptions.forEach(opt => {
+        const itemRow = document.createElement('div');
+        itemRow.style.cssText = 'display: flex; align-items: center; position: relative; border-radius: 2px;';
+
         const item = document.createElement('button');
         item.className = 'main-contextMenu-menuItemButton';
-        item.style.cssText = 'color: #b3b3b3; padding: 4px 8px; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; font-size: 13px; border-radius: 2px; height: 28px !important; min-height: 28px !important;';
+        item.style.cssText = 'color: #b3b3b3; padding: 4px 8px; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; font-size: 13px; height: 28px !important; min-height: 28px !important; flex-grow: 1; border-radius: 2px;';
         item.innerText = opt.label;
         
         let isSelected = false;
-        if (contextType === 'playlist1' && selectedColumnType === opt.value) isSelected = true;
-        if (contextType === 'playlist2' && selectedSecondColumnType === opt.value) isSelected = true;
-        if (contextType === 'album' && selectedAlbumColumnType === opt.value) isSelected = true;
-        if (contextType === 'artist' && selectedArtistColumnType === opt.value) isSelected = true;
+        if (opt.value === 'off') {
+            if (contextType === 'playlist1' && !showAdditionalColumn) isSelected = true;
+            if (contextType === 'playlist2' && !showSecondAdditionalColumn) isSelected = true;
+            if (contextType === 'album' && !showAlbumColumn) isSelected = true;
+            if (contextType === 'artist' && !showArtistColumn) isSelected = true;
+        } else {
+            if (contextType === 'playlist1' && showAdditionalColumn && selectedColumnType === opt.value) isSelected = true;
+            if (contextType === 'playlist2' && showSecondAdditionalColumn && selectedSecondColumnType === opt.value) isSelected = true;
+            if (contextType === 'album' && showAlbumColumn && selectedAlbumColumnType === opt.value) isSelected = true;
+            if (contextType === 'artist' && showArtistColumn && selectedArtistColumnType === opt.value) isSelected = true;
+        }
 
         if (isSelected) {
             item.style.color = '#fff';
-            item.style.fontWeight = 'bold';
-            item.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            itemRow.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
         }
 
-        item.onmouseenter = () => {
-            if (!isSelected) item.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+        let settingsBtn = null;
+
+        itemRow.onmouseenter = () => {
+            if (!isSelected) itemRow.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
             item.style.color = '#fff';
+            if (settingsBtn) settingsBtn.style.fill = '#fff';
         };
-        item.onmouseleave = () => {
+        itemRow.onmouseleave = () => {
             if (!isSelected) {
-                item.style.backgroundColor = 'transparent';
+                itemRow.style.backgroundColor = 'transparent';
                 item.style.color = '#b3b3b3';
             } else {
-                item.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                itemRow.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
                 item.style.color = '#fff';
             }
+            if (settingsBtn) settingsBtn.style.fill = isSelected ? '#fff' : '#b3b3b3';
         };
 
-        item.onclick = () => {
-            if (contextType === 'playlist1') {
-                selectedColumnType = opt.value;
-                localStorage.setItem(STORAGE_KEY_SELECTED_COLUMN_TYPE, selectedColumnType);
-                updateTracklist();
-            } else if (contextType === 'playlist2') {
-                selectedSecondColumnType = opt.value;
-                localStorage.setItem(STORAGE_KEY_SELECTED_SECOND_COLUMN_TYPE, selectedSecondColumnType);
-                updateTracklist();
-            } else if (contextType === 'album') {
-                selectedAlbumColumnType = opt.value;
-                localStorage.setItem(STORAGE_KEY_SELECTED_ALBUM_COLUMN_TYPE, selectedAlbumColumnType);
-                updateAlbumTracklist();
-            } else if (contextType === 'artist') {
-                selectedArtistColumnType = opt.value;
-                localStorage.setItem(STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE, selectedArtistColumnType);
-                updateArtistTracklist();
+        item.onclick = (e) => {
+            e.stopPropagation();
+            if (opt.value === 'off') {
+                if (contextType === 'playlist1') showAdditionalColumn = false;
+                if (contextType === 'playlist2') showSecondAdditionalColumn = false;
+                if (contextType === 'album') showAlbumColumn = false;
+                if (contextType === 'artist') showArtistColumn = false;
+            } else {
+                if (contextType === 'playlist1') { showAdditionalColumn = true; selectedColumnType = opt.value; }
+                else if (contextType === 'playlist2') { showSecondAdditionalColumn = true; selectedSecondColumnType = opt.value; }
+                else if (contextType === 'album') { showAlbumColumn = true; selectedAlbumColumnType = opt.value; }
+                else if (contextType === 'artist') { showArtistColumn = true; selectedArtistColumnType = opt.value; }
             }
-            menu.remove();
-            document.removeEventListener('click', closeMenu);
+            
+            saveSettings();
+
+            if (contextType === 'playlist1' || contextType === 'playlist2') updateTracklist();
+            else if (contextType === 'album') updateAlbumTracklist();
+            else if (contextType === 'artist') updateArtistTracklist();
+            
+            closeSelectorMenu();
         };
-        menu.appendChild(item);
+
+        itemRow.appendChild(item);
+
+        if (opt.hasSettings) {
+            settingsBtn = document.createElement('button');
+            settingsBtn.innerHTML = settingsSvg;
+            settingsBtn.style.cssText = `background: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 27px; height: 27px; transition: opacity 0.2s; padding: 6px; flex-shrink: 0; fill: ${isSelected ? '#fff' : '#b3b3b3'}; opacity: 0.7;`;
+
+            const dropdown = document.createElement('div');
+            dropdown.className = 'sp-col-selector-dropdown sort-play-font-scope';
+            dropdown.innerHTML = opt.getHtml();
+            
+            allDropdowns.push(dropdown);
+
+            const bindDropdownEvents = (dropdownEl, optionDef) => {
+                dropdownEl.querySelectorAll('button').forEach(btn => {
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        optionDef.updateVar(btn.getAttribute(`data-${optionDef.datasetKey}`));
+                        dropdownEl.innerHTML = optionDef.getHtml();
+                        bindDropdownEvents(dropdownEl, optionDef);
+                        
+                        document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
+                            el.textContent = "";
+                            delete el.dataset.spProcessed;
+                        });
+                        saveSettings();
+                        onPageChange();
+
+                        dropdownEl.style.display = 'none';
+                        if (dropdownEl.parentNode) dropdownEl.parentNode.removeChild(dropdownEl);
+                    };
+                });
+            };
+            bindDropdownEvents(dropdown, opt);
+
+            settingsBtn.onmouseenter = () => { settingsBtn.style.opacity = '1'; };
+            settingsBtn.onmouseleave = () => { settingsBtn.style.opacity = '0.7'; };
+
+            settingsBtn.onclick = (e) => {
+                e.stopPropagation();
+                const isVisible = dropdown.style.display === 'block';
+                
+                allDropdowns.forEach(d => {
+                    d.style.display = 'none';
+                    if (d.parentNode) d.parentNode.removeChild(d);
+                });
+
+                if (!isVisible) {
+                    document.body.appendChild(dropdown);
+                    dropdown.style.maxHeight = ''; 
+                    dropdown.style.display = 'block';
+                    
+                    const btnRect = settingsBtn.getBoundingClientRect();
+                    const dRect = dropdown.getBoundingClientRect();
+                    const vW = window.innerWidth;
+                    const vH = window.innerHeight;
+                    
+                    let dLeft = btnRect.right + 5;
+                    if (dLeft + dRect.width > vW - 10) {
+                        dLeft = btnRect.left - dRect.width - 5;
+                    }
+                    
+                    const margin = 10;
+                    const spaceBelow = vH - btnRect.top - margin;
+                    const spaceAbove = btnRect.bottom - margin;
+                    
+                    let dTop;
+                    
+                    if (dRect.height <= spaceBelow) {
+                        dTop = btnRect.top;
+                    } else if (dRect.height <= spaceAbove) {
+                        dTop = btnRect.bottom - dRect.height;
+                    } else {
+                        if (spaceBelow > spaceAbove) {
+                            dropdown.style.maxHeight = `${spaceBelow}px`;
+                            dTop = btnRect.top;
+                        } else {
+                            dropdown.style.maxHeight = `${spaceAbove}px`;
+                            dTop = btnRect.bottom - dropdown.offsetHeight;
+                        }
+                    }
+                    
+                    dropdown.style.left = `${dLeft}px`;
+                    dropdown.style.top = `${dTop}px`;
+                }
+            };
+
+            itemRow.appendChild(settingsBtn);
+        }
+
+        menu.appendChild(itemRow);
     });
 
     document.body.appendChild(menu);
-    const rect = event.currentTarget.getBoundingClientRect();
+    const rect = anchorBtn.getBoundingClientRect();
     const menuWidth = menu.offsetWidth;
     const menuHeight = menu.offsetHeight;
     const viewportWidth = window.innerWidth;
@@ -32174,22 +32698,36 @@
     menu.style.top = `${top}px`;
     menu.style.left = `${left}px`;
 
-    const closeMenu = (e) => {
-        if (!menu.contains(e.target) && e.target !== event.currentTarget) {
-            menu.remove();
-            abortController.abort();
+    const closeSelectorMenu = () => {
+        if (menu.parentNode) menu.remove();
+        allDropdowns.forEach(d => {
+            if (d.parentNode) d.parentNode.removeChild(d);
+        });
+        if (window.columnSelectorAbortController) {
+            window.columnSelectorAbortController.abort();
+            window.columnSelectorAbortController = null;
         }
     };
-    
-    const menuObserver = new MutationObserver((mutations, obs) => {
-        if (!document.getElementById('sort-play-column-selector')) {
-            abortController.abort();
-            obs.disconnect();
-        }
-    });
-    menuObserver.observe(document.body, { childList: true });
 
-    setTimeout(() => document.addEventListener('click', closeMenu, { signal: abortController.signal }), 0);
+    const clickOutsideHandler = (e) => {
+        if (e) {
+            if (menu.contains(e.target)) return;
+            let clickedInsideDropdown = false;
+            allDropdowns.forEach(d => {
+                if (d.contains(e.target)) clickedInsideDropdown = true;
+            });
+            if (clickedInsideDropdown) return;
+            if (e.type === 'click' && anchorBtn.contains(e.target)) return;
+        }
+        closeSelectorMenu();
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', clickOutsideHandler, { capture: true, signal });
+        document.addEventListener('contextmenu', clickOutsideHandler, { capture: true, signal });
+        window.addEventListener('wheel', clickOutsideHandler, { capture: true, signal });
+        window.addEventListener('resize', closeSelectorMenu, { signal });
+    }, 0);
   }
   
   async function loadAdditionalColumnData(tracklist_) {
@@ -32216,10 +32754,10 @@
     const expectedCols = columnConfigs.map(c => c.type).join('|');
 
     for (const trackElement of allTrackRows) {
-        if (trackElement.classList.contains('sort-play-processing') || trackElement.hasAttribute('data-sp-fetch-failed')) continue;
         const trackUri = getTracklistTrackUri(trackElement);
         if (!trackUri) continue;
 
+        let needsRestart = false;
         if (trackElement.dataset.spTrackUri !== trackUri || trackElement.dataset.spColTypes !== expectedCols) {
             trackElement.dataset.spTrackUri = trackUri;
             trackElement.dataset.spColTypes = expectedCols;
@@ -32227,6 +32765,13 @@
                 cell.textContent = "";
                 delete cell.dataset.spProcessed;
             });
+            trackElement.classList.remove('sort-play-processing');
+            trackElement.removeAttribute('data-sp-fetch-failed');
+            needsRestart = true;
+        }
+
+        if (!needsRestart && (trackElement.classList.contains('sort-play-processing') || trackElement.hasAttribute('data-sp-fetch-failed'))) {
+            continue;
         }
 
         if (Spicetify.URI.isLocal(trackUri)) {
@@ -32259,6 +32804,7 @@
                         
                             if (config.type === 'scrobbles') {
                                 const result = await getTrackDetailsWithScrobbles(localTrackInfo, true);
+                                if (trackElement.dataset.spColTypes !== expectedCols) return;
                                 if (result.scrobbles === -1 || result.error) {
                                     updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
                                 } else {
@@ -32266,9 +32812,11 @@
                                 }
                             } else if (config.type === 'personalScrobbles') {
                                 if (!loadLastFmUsername()) {
+                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
                                     updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type);
                                 } else {
                                     const result = await getTrackDetailsWithPersonalScrobbles(localTrackInfo, true);
+                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
                                     if (result.personalScrobbles === -1 || result.error) {
                                         updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
                                     } else {
@@ -32277,9 +32825,11 @@
                                 }
                             } else if (config.type === 'lastScrobbled') {
                                 if (!loadLastFmUsername()) {
+                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
                                     updateDisplay(dataElement, { error: "Set Last.fm username in setting", errorLabel: "No User" }, config.type);
                                 } else {
                                     const result = await getTrackDetailsWithLastScrobbled(localTrackInfo, true);
+                                    if (trackElement.dataset.spColTypes !== expectedCols) return;
                                     if (result.lastScrobbled === -1 || result.error) {
                                         updateDisplay(dataElement, { error: result.error || "Track not found on Last.fm", errorLabel: result.errorLabel || "N/A" }, config.type);
                                     } else {
@@ -32288,16 +32838,20 @@
                                 }
                             }
                         } else {
+                            if (trackElement.dataset.spColTypes !== expectedCols) return;
                             updateDisplay(dataElement, "―", config.type);
                         }
                     } catch (e) {
+                        if (trackElement.dataset.spColTypes !== expectedCols) return;
                         updateDisplay(dataElement, { error: "Local Load Failed", errorLabel: "Err" }, config.type);
                         trackElement.setAttribute('data-sp-fetch-failed', 'true');
                     }
                 });
                 
                 Promise.all(localPromises).finally(() => {
-                    trackElement.classList.remove('sort-play-processing');
+                    if (trackElement.dataset.spColTypes === expectedCols) {
+                        trackElement.classList.remove('sort-play-processing');
+                    }
                 });
             } else {
                 trackElement.classList.remove('sort-play-processing');
@@ -32384,6 +32938,8 @@
         const propsMap = new Map();
 
         for (const { element, id, props } of batch) {
+            if (element.dataset.spColTypes !== expectedCols) continue;
+            
             let isFullyCached = true;
             
             let trackInfo = null;
@@ -32477,15 +33033,17 @@
                     const stats = await getBatchTrackStats(idsToFetchFromApi);
                     for (const id of idsToFetchFromApi) {
                         const el = elementsToFetchFromApi.get(id);
-                        const stat = stats[id];
-                        if (stat && el) {
-                            await setTrackCache(id, { stats: stat }, true, false, "stats-column");
-                            
-                            columnConfigs.forEach(c => {
-                                if (audioFeatureTypes.includes(c.type)) {
-                                    updateDisplay(el.querySelector(c.dataSelector), (c.type === 'djInfo' || c.type === 'key') ? stat : stat[c.type], c.type);
-                                }
-                            });
+                        if (el && el.dataset.spColTypes === expectedCols) {
+                            const stat = stats[id];
+                            if (stat) {
+                                await setTrackCache(id, { stats: stat }, true, false, "stats-column");
+                                if (el.dataset.spColTypes !== expectedCols) continue;
+                                columnConfigs.forEach(c => {
+                                    if (audioFeatureTypes.includes(c.type)) {
+                                        updateDisplay(el.querySelector(c.dataSelector), (c.type === 'djInfo' || c.type === 'key') ? stat : stat[c.type], c.type);
+                                    }
+                                });
+                            }
                         }
                     }
                 } catch(e) {}
@@ -32496,7 +33054,7 @@
                 const processTrackData = async (t) => {
                     if (!t) return;
                     const el = elementsToFetchFromApi.get(t.id);
-                    if (!el) return;
+                    if (!el || el.dataset.spColTypes !== expectedCols) return;
                     
                     for (const c of nonAudioConfigs) {
                         const dEl = el.querySelector(c.dataSelector);
@@ -32516,6 +33074,7 @@
                                     track: t
                                 };
                                 const r = await getTrackDetailsWithPlayCount(trackObjForFetch);
+                                if (el.dataset.spColTypes !== expectedCols) return;
                                 updateDisplay(dEl, r?.playCount, c.type);
                                 if (r?.playCount !== "N/A" && r?.playCount !== undefined) {
                                     await setCachedPlayCount(t.id, r.playCount);
@@ -32546,6 +33105,7 @@
                         
                             if (c.type === 'scrobbles') {
                                 const r = await getTrackDetailsWithScrobbles(info, true);
+                                if (el.dataset.spColTypes !== expectedCols) return;
                                 if (r.scrobbles === -1 || r.error) {
                                     updateDisplay(dEl, { error: r.error || "Not found", errorLabel: "N/A" }, c.type);
                                 } else {
@@ -32555,21 +33115,27 @@
                             } else if (c.type === 'personalScrobbles') {
                                 if (loadLastFmUsername()) {
                                     const r = await getTrackDetailsWithPersonalScrobbles(info, true);
+                                    if (el.dataset.spColTypes !== expectedCols) return;
                                     updateDisplay(dEl, (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.personalScrobbles, c.type);
                                 } else {
+                                    if (el.dataset.spColTypes !== expectedCols) return;
                                     updateDisplay(dEl, { error: "Set last.fm username", errorLabel: "No User" }, c.type);
                                 }
                             } else if (c.type === 'lastScrobbled') {
                                 if (loadLastFmUsername()) {
                                     const r = await getTrackDetailsWithLastScrobbled(info, true);
+                                    if (el.dataset.spColTypes !== expectedCols) return;
                                     updateDisplay(dEl, (r.lastScrobbled === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.lastScrobbled, c.type);
                                 } else {
+                                    if (el.dataset.spColTypes !== expectedCols) return;
                                     updateDisplay(dEl, { error: "Set last.fm username", errorLabel: "No User" }, c.type);
                                 }
                             }
                         }
                     }
-                    el.classList.remove('sort-play-processing');
+                    if (el.dataset.spColTypes === expectedCols) {
+                        el.classList.remove('sort-play-processing');
+                    }
                 };
 
                 const fetchAndProcessInternal = async () => {
@@ -32625,7 +33191,7 @@
             
             idsToFetchFromApi.forEach(id => {
                 const el = elementsToFetchFromApi.get(id);
-                if (el) {
+                if (el && el.dataset.spColTypes === expectedCols) {
                     el.classList.remove('sort-play-processing');
                 }
             });
