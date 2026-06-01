@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.76.0";
+  const SORT_PLAY_VERSION = "5.77.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -341,10 +341,10 @@
   const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
   const CHAT_API_URL = "https://sort-play-chat.niko2nio2.workers.dev";
   
-  const ENABLE_SPOTIFY_ARTIST_GENRES = true;
+  const DEVELOPER_HAS_SPOTIFY_PREMIUM = false;
 
   async function get_S_Client_Token() {
-      if (!ENABLE_SPOTIFY_ARTIST_GENRES) return null;
+      if (!DEVELOPER_HAS_SPOTIFY_PREMIUM) return null;
 
       if (s_Access_Token && Date.now() < s_Token_Exp) {
           return s_Access_Token;
@@ -6605,7 +6605,7 @@
                               <span class="sliderx"></span>
                           </label>
                       </div>
-                      ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
+                      ${DEVELOPER_HAS_SPOTIFY_PREMIUM ? `
                       <div class="setting-row">
                           <label class="setting-label" for="npSpotifyToggle">Spotify (Artist Tags)</label>
                           <label class="switch">
@@ -6633,7 +6633,7 @@
                   <div style="display: flex; flex-direction: column; gap: 4px;">
                       <div class="section-header">Artist Page Sources</div>
                       
-                      ${ENABLE_SPOTIFY_ARTIST_GENRES ? `
+                      ${DEVELOPER_HAS_SPOTIFY_PREMIUM ? `
                       <div class="setting-row">
                           <label class="setting-label" for="apSpotifyToggle">Spotify (Artist Tags)</label>
                           <label class="switch">
@@ -6698,10 +6698,10 @@
         genreSourcesNpSpotifyTrack = npSpotifyTrackToggle.checked;
         showGenreTagsArtistPage = showTagsApToggle.checked;
         showGenresContextMenu = showGenresCtxToggle2.checked;
-        genreSourcesNpSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && npSpotifyToggle) ? npSpotifyToggle.checked : genreSourcesNpSpotify;
+        genreSourcesNpSpotify = (DEVELOPER_HAS_SPOTIFY_PREMIUM && npSpotifyToggle) ? npSpotifyToggle.checked : genreSourcesNpSpotify;
         genreSourcesNpLastfm = npLastfmToggle.checked;
         genreSourcesNpDeezer = npDeezerToggle.checked;
-        genreSourcesApSpotify = (ENABLE_SPOTIFY_ARTIST_GENRES && apSpotifyToggle) ? apSpotifyToggle.checked : genreSourcesApSpotify;
+        genreSourcesApSpotify = (DEVELOPER_HAS_SPOTIFY_PREMIUM && apSpotifyToggle) ? apSpotifyToggle.checked : genreSourcesApSpotify;
         genreSourcesApLastfm = apLastfmToggle.checked;
         useGenrePlaylistDatabase = useGenreDbToggle.checked;
         autoUpdateGenreModal = autoUpdateModalToggle.checked;
@@ -8503,7 +8503,7 @@
           const order = ['Spotify (Track)', 'Spotify (Artist)', 'Last.fm (Track)', 'Last.fm (Artist)', 'Deezer (Album)', 'Other'];
           
           order.forEach(c => {
-              if (!ENABLE_SPOTIFY_ARTIST_GENRES && c === 'Spotify (Artist)') return;
+              if (!DEVELOPER_HAS_SPOTIFY_PREMIUM && c === 'Spotify (Artist)') return;
               categoryMap.set(c, []);
           });
 
@@ -8518,7 +8518,7 @@
                       if (match) score = match[1];
                   }
                   else if (source.startsWith("Spotify Artist")) {
-                      if (!ENABLE_SPOTIFY_ARTIST_GENRES) return;
+                      if (!DEVELOPER_HAS_SPOTIFY_PREMIUM) return;
                       category = 'Spotify (Artist)';
                   }
                   else if (source.startsWith("Last.fm Track")) category = 'Last.fm (Track)';
@@ -8547,7 +8547,7 @@
                   shouldShow = true;
               } else {
                   if (category === 'Spotify (Track)' && genreSourcesNpSpotifyTrack) shouldShow = true;
-                  else if (category === 'Spotify (Artist)' && genreSourcesNpSpotify && ENABLE_SPOTIFY_ARTIST_GENRES) shouldShow = true;
+                  else if (category === 'Spotify (Artist)' && genreSourcesNpSpotify && DEVELOPER_HAS_SPOTIFY_PREMIUM) shouldShow = true;
                   else if (category === 'Last.fm (Track)' && genreSourcesNpLastfm) shouldShow = true;
                   else if (category === 'Last.fm (Artist)' && genreSourcesNpLastfm) shouldShow = true;
                   else if (category === 'Deezer (Album)' && genreSourcesNpDeezer) shouldShow = true;
@@ -9270,7 +9270,7 @@
 
               const artistsToFetch = track.artists ? track.artists.filter(a => a.id || (a.uri && a.uri.split(':')[2])) : [];
 
-              if (ENABLE_SPOTIFY_ARTIST_GENRES && genreSourcesNpSpotify && artistsToFetch.length > 0) {
+              if (DEVELOPER_HAS_SPOTIFY_PREMIUM && genreSourcesNpSpotify && artistsToFetch.length > 0) {
                   const idsToFetch = [];
                   
                   for (const artist of artistsToFetch) {
@@ -9598,6 +9598,9 @@
             genreContainer.style.fontSize = "12px";
             genreContainer.style.color = "var(--spice-subtext)";
             genreContainer.style.setProperty("grid-area", "genres");
+            genreContainer.style.width = "100%";
+            genreContainer.style.minWidth = "0";
+            genreContainer.style.marginTop = "2px";
             genreContainer.style.overflow = "hidden";
             genreContainer.style.textOverflow = "ellipsis";
             genreContainer.style.whiteSpace = "nowrap";
@@ -9836,7 +9839,7 @@
           
           container.dataset.artistId = artistId;
           container.dataset.status = 'loading';
-          container.innerHTML = `<span>Artist Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
+          container.innerHTML = `<span>Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
           
           const details = header.querySelector("span.main-entityHeader-detailsText");
           if (details) {
@@ -9849,7 +9852,7 @@
       if (container.dataset.artistId !== artistId) {
           container.dataset.artistId = artistId;
           container.dataset.status = 'loading';
-          container.innerHTML = `<span>Artist Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
+          container.innerHTML = `<span>Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
       }
       
       if (container.dataset.status === 'loaded') return;
@@ -9861,8 +9864,80 @@
           let genreSourcesMap;
           const genreMap = await getGenreMapping();
 
+          const renderCurrentUI = (isFinal = false) => {
+              const currentUriNow = getCurrentUri();
+              if (!currentUriNow || !currentUriNow.includes(artistId)) return;
+              
+              const containerNow = document.querySelector('.sort-play-artist-genres');
+              if (!containerNow || containerNow.dataset.artistId !== artistId) return;
+
+              if (!genreSourcesMap || genreSourcesMap.size === 0) {
+                  if (isFinal) {
+                      containerNow.innerHTML = `<span>Genres : </span><span style="opacity: 0.6;">No genres found</span>`;
+                      if (!containerNow.dataset.retried) {
+                          containerNow.dataset.retried = "true";
+                          setTimeout(() => {
+                              pendingArtistPageFetches.delete(artistId);
+                              updateArtistPageGenres();
+                          }, 2000);
+                      }
+                  } else {
+                      if (!containerNow.innerHTML.includes("Loading")) {
+                          containerNow.innerHTML = `<span>Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
+                      }
+                  }
+                  return;
+              }
+
+              const genreItems = Array.from(genreSourcesMap.values());
+
+              genreItems.sort((a, b) => {
+                  const aSize = a.sources.size;
+                  const bSize = b.sources.size;
+                  if (aSize > 1 && bSize <= 1) return -1;
+                  if (bSize > 1 && aSize <= 1) return 1;
+                  if (aSize > 1 && bSize > 1) return bSize - aSize;
+
+                  const hasSpotify = (sources) => Array.from(sources).some(s => s.startsWith('Spotify Artist'));
+                  const aHasSpotify = hasSpotify(a.sources);
+                  const bHasSpotify = hasSpotify(b.sources);
+                  if (aHasSpotify && !bHasSpotify) return -1;
+                  if (!aHasSpotify && bHasSpotify) return 1;
+                  return 0;
+              });
+              
+              const genreLinks = genreItems.map(item => {
+                  const rawName = item.name;
+                  const titleCaseGenre = rawName.replace(/\b\w/g, l => l.toUpperCase());
+                  const matchedPlaylist = useGenrePlaylistDatabase ? genreMap.find(p => normalizeGenre(p.genre) === normalizeGenre(rawName)) : null;
+                  
+                  let href = `/search/${encodeURIComponent(rawName)}/playlists`;
+                  let clickAction = `Spicetify.Platform.History.push('${href}')`;
+                  
+                  if (matchedPlaylist) {
+                      try {
+                          const path = Spicetify.URI.fromString(matchedPlaylist.uri).toURLPath(true);
+                          href = path;
+                          clickAction = `Spicetify.Platform.History.push('${path}')`;
+                      } catch (e) {
+                          const id = matchedPlaylist.uri.split(":").pop();
+                          clickAction = `Spicetify.Platform.History.push('/playlist/${id}')`;
+                      }
+                  }
+
+                  return `<a class="main-entityHeader-genreLink" href="${href}" title="Source: ${Array.from(item.sources).join(' & ')}"
+                          style="color: var(--spice-subtext); font-size: 1rem; text-decoration: none; transition: color 0.2s;" 
+                          onmouseover="this.style.color='var(--spice-text)'" onmouseout="this.style.color='var(--spice-subtext)'"
+                          onclick="event.preventDefault(); event.stopPropagation(); ${clickAction}">${titleCaseGenre}</a>`;
+              }).join("<span>, </span>");
+
+              containerNow.innerHTML = `<span>Genres : </span>${genreLinks}`;
+              containerNow.dataset.status = 'loaded';
+          };
+
           if (artistPageGenreCache.has(artistId)) {
               genreSourcesMap = artistPageGenreCache.get(artistId);
+              renderCurrentUI(true);
           } else {
               genreSourcesMap = new Map();
               
@@ -9870,7 +9945,7 @@
                   uri: `spotify:artist:${artistId}`,
                   locale: Spicetify.Locale.getLocale(),
                   includePrerelease: false
-              });
+              }).catch(() => null);
 
               let domArtistName = gqlRes?.data?.artistUnion?.profile?.name || "";
 
@@ -9886,35 +9961,38 @@
 
               const addGenres = (list, sourceLabel) => {
                   if (!list || !Array.isArray(list)) return;
+                  let changed = false;
                   list.forEach(g => {
                       const normalized = normalizeGenre(g);
                       if (!genreSourcesMap.has(normalized)) {
                           genreSourcesMap.set(normalized, { name: normalized, sources: new Set() });
+                          changed = true;
                       }
                       genreSourcesMap.get(normalized).sources.add(sourceLabel);
                   });
+                  if (changed) renderCurrentUI(false);
               };
 
               const promises = [];
 
               let spotifyFetchPromise;
-              if (ENABLE_SPOTIFY_ARTIST_GENRES && genreSourcesApSpotify) {
+              if (DEVELOPER_HAS_SPOTIFY_PREMIUM && genreSourcesApSpotify) {
                   spotifyFetchPromise = (async () => {
-                      if (artistGenreCache.has(artistId)) {
-                          const cachedGenres = artistGenreCache.get(artistId);
-                          const nameLabel = domArtistName || "This Artist";
-                          addGenres(cachedGenres, `Spotify Artist (${nameLabel})`);
-                          return domArtistName;
-                      }
-                      const dbCached = await idb.get('artistGenres', artistId, CACHE_EXPIRE_GENRES);
-                      if (dbCached) {
-                          artistGenreCache.set(artistId, dbCached);
-                          const nameLabel = domArtistName || "This Artist";
-                          addGenres(dbCached, `Spotify Artist (${nameLabel})`);
-                          return domArtistName;
-                      }
-
                       try {
+                          if (artistGenreCache.has(artistId)) {
+                              const cachedGenres = artistGenreCache.get(artistId);
+                              const nameLabel = domArtistName || "This Artist";
+                              addGenres(cachedGenres, `Spotify Artist (${nameLabel})`);
+                              return domArtistName;
+                          }
+                          const dbCached = await idb.get('artistGenres', artistId, CACHE_EXPIRE_GENRES);
+                          if (dbCached) {
+                              artistGenreCache.set(artistId, dbCached);
+                              const nameLabel = domArtistName || "This Artist";
+                              addGenres(dbCached, `Spotify Artist (${nameLabel})`);
+                              return domArtistName;
+                          }
+
                           const token = await get_S_Client_Token();
                           if (!token) throw new Error("No client token");
                           const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
@@ -9944,26 +10022,26 @@
 
               if (genreSourcesApLastfm) {
                   promises.push((async () => {
-                      let nameToUse = domArtistName;
-                      if (!nameToUse && ENABLE_SPOTIFY_ARTIST_GENRES && genreSourcesApSpotify) {
-                          nameToUse = await spotifyFetchPromise;
-                      }
-
-                      if (nameToUse) {
-                          if (lastfmArtistTagsCache.has(nameToUse)) {
-                              const cached = lastfmArtistTagsCache.get(nameToUse);
-                              if (cached.length > 0) addGenres(cached, 'Last.fm Artist');
-                              return;
-                          }
-                          const dbCachedLfm = await idb.get('lastfmArtistTags', nameToUse, CACHE_EXPIRE_GENRES);
-                          if (dbCachedLfm) {
-                              lastfmArtistTagsCache.set(nameToUse, dbCachedLfm);
-                              if (dbCachedLfm.length > 0) addGenres(dbCachedLfm, 'Last.fm Artist');
-                              return;
+                      try {
+                          let nameToUse = domArtistName;
+                          if (!nameToUse && DEVELOPER_HAS_SPOTIFY_PREMIUM && genreSourcesApSpotify) {
+                              nameToUse = await spotifyFetchPromise;
                           }
 
-                          let validTags = [];
-                          try {
+                          if (nameToUse) {
+                              if (lastfmArtistTagsCache.has(nameToUse)) {
+                                  const cached = lastfmArtistTagsCache.get(nameToUse);
+                                  if (cached.length > 0) addGenres(cached, 'Last.fm Artist');
+                                  return;
+                              }
+                              const dbCachedLfm = await idb.get('lastfmArtistTags', nameToUse, CACHE_EXPIRE_GENRES);
+                              if (dbCachedLfm) {
+                                  lastfmArtistTagsCache.set(nameToUse, dbCachedLfm);
+                                  if (dbCachedLfm.length > 0) addGenres(dbCachedLfm, 'Last.fm Artist');
+                                  return;
+                              }
+
+                              let validTags = [];
                               let canonicalArtistName = nameToUse;
                               const topTracksItems = gqlRes?.data?.artistUnion?.discography?.topTracks?.items;
                               
@@ -9995,82 +10073,29 @@
                                       validTags = rawTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
                                   }
                               }
-                          } catch (e) {}
 
-                          lastfmArtistTagsCache.set(nameToUse, validTags);
-                          idb.set('lastfmArtistTags', nameToUse, validTags);
-                          if (validTags.length > 0) addGenres(validTags, 'Last.fm Artist');
-                      }
+                              lastfmArtistTagsCache.set(nameToUse, validTags);
+                              idb.set('lastfmArtistTags', nameToUse, validTags);
+                              if (validTags.length > 0) addGenres(validTags, 'Last.fm Artist');
+                          }
+                      } catch (e) {}
                   })());
               }
 
               await Promise.all(promises);
-              if (genreSourcesMap.size > 0) artistPageGenreCache.set(artistId, genreSourcesMap);
+              
+              if (genreSourcesMap.size > 0) {
+                  artistPageGenreCache.set(artistId, genreSourcesMap);
+              }
+              renderCurrentUI(true);
           }
 
-          const currentUriNow = getCurrentUri();
-          if (!currentUriNow || !currentUriNow.includes(artistId)) return;
-          
-          container = header.querySelector('.sort-play-artist-genres');
-          if (!container) return;
-
-          if (genreSourcesMap.size === 0) {
-              container.innerHTML = `<span>Artist Genres : </span><span style="opacity: 0.6;">No genres found</span>`;
-              if (!container.dataset.retried) {
-                  container.dataset.retried = "true";
-                  setTimeout(() => {
-                      pendingArtistPageFetches.delete(artistId);
-                      updateArtistPageGenres();
-                  }, 2000);
-              }
-              return;
+      } catch (e) {
+          console.error("Error in updateArtistPageGenres:", e);
+          const containerNow = document.querySelector('.sort-play-artist-genres');
+          if (containerNow && containerNow.dataset.artistId === artistId) {
+              containerNow.innerHTML = `<span>Genres : </span><span style="opacity: 0.6;">Error loading genres</span>`;
           }
-
-          const genreItems = Array.from(genreSourcesMap.values());
-
-          genreItems.sort((a, b) => {
-              const aSize = a.sources.size;
-              const bSize = b.sources.size;
-              if (aSize > 1 && bSize <= 1) return -1;
-              if (bSize > 1 && aSize <= 1) return 1;
-              if (aSize > 1 && bSize > 1) return bSize - aSize;
-
-              const hasSpotify = (sources) => Array.from(sources).some(s => s.startsWith('Spotify Artist'));
-              const aHasSpotify = hasSpotify(a.sources);
-              const bHasSpotify = hasSpotify(b.sources);
-              if (aHasSpotify && !bHasSpotify) return -1;
-              if (!aHasSpotify && bHasSpotify) return 1;
-              return 0;
-          });
-          
-          const genreLinks = genreItems.map(item => {
-              const rawName = item.name;
-              const titleCaseGenre = rawName.replace(/\b\w/g, l => l.toUpperCase());
-              const matchedPlaylist = useGenrePlaylistDatabase ? genreMap.find(p => normalizeGenre(p.genre) === normalizeGenre(rawName)) : null;
-              
-              let href = `/search/${encodeURIComponent(rawName)}/playlists`;
-              let clickAction = `Spicetify.Platform.History.push('${href}')`;
-              
-              if (matchedPlaylist) {
-                  try {
-                      const path = Spicetify.URI.fromString(matchedPlaylist.uri).toURLPath(true);
-                      href = path;
-                      clickAction = `Spicetify.Platform.History.push('${path}')`;
-                  } catch (e) {
-                      const id = matchedPlaylist.uri.split(":").pop();
-                      clickAction = `Spicetify.Platform.History.push('/playlist/${id}')`;
-                  }
-              }
-
-              return `<a class="main-entityHeader-genreLink" href="${href}" title="Source: ${Array.from(item.sources).join(' & ')}"
-                      style="color: var(--spice-subtext); font-size: 1rem; text-decoration: none; transition: color 0.2s;" 
-                      onmouseover="this.style.color='var(--spice-text)'" onmouseout="this.style.color='var(--spice-subtext)'"
-                      onclick="event.preventDefault(); event.stopPropagation(); ${clickAction}">${titleCaseGenre}</a>`;
-          }).join("<span>, </span>");
-
-          container.innerHTML = `<span>Artist Genres : </span>${genreLinks}`;
-          container.dataset.status = 'loaded';
-
       } finally {
           pendingArtistPageFetches.delete(artistId);
       }
@@ -10520,7 +10545,8 @@
           "instrumentalness",
           "filterFollowedMain",
           "filterFollowedAny",
-          "removeFollowed"
+          "removeFollowed",
+          "filterOnePerArtist"
       ];
       return directSortTypes.includes(sortType);
   }
@@ -10553,6 +10579,7 @@
           filterFollowedMain: { fullName: "keeping only main followed artists", shortName: "Followed Main" },
           filterFollowedAny: { fullName: "keeping only followed artists", shortName: "Followed Any" },
           removeFollowed: { fullName: "excluding unfollowed artists", shortName: "Unfollowed" },
+          filterOnePerArtist: { fullName: "keeping one track per artist", shortName: "One per Artist" },
           energyWave: { fullName: "energy wave", shortName: "Energy Wave" },
           tempo: { fullName: "tempo (BPM)", shortName: "Tempo" },
           energy: { fullName: "energy", shortName: "Energy" },
@@ -20056,7 +20083,7 @@
                 }
             }
     
-            if (ENABLE_SPOTIFY_ARTIST_GENRES && artistIdsToFetch.length > 0) {
+            if (DEVELOPER_HAS_SPOTIFY_PREMIUM && artistIdsToFetch.length > 0) {
                 const artistBatches = [];
                 for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                     artistBatches.push(artistIdsToFetch.slice(i, i + 50));
@@ -20319,7 +20346,7 @@
         });
 
         const artistIdsToFetch = Array.from(uniqueArtistIds);
-        if (ENABLE_SPOTIFY_ARTIST_GENRES && artistIdsToFetch.length > 0) {
+        if (DEVELOPER_HAS_SPOTIFY_PREMIUM && artistIdsToFetch.length > 0) {
             updateProgress("Artists...");
             for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                 const batch = artistIdsToFetch.slice(i, i + 50);
@@ -21043,10 +21070,14 @@
         text-align: center;
         margin: auto;
     }
-      div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3) {
+      div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3),
+      div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3),
+      div.main-trackList-trackList[aria-label="Popular tracks"] .main-trackList-trackListHeaderRow .main-trackList-rowSectionVariable:nth-child(3) {
         justify-content: center;
     }
-    div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3) {
+    div.main-trackList-trackList[data-sp-grid="artist"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3),
+    div.main-trackList-trackList[aria-label="popular tracks"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3),
+    div.main-trackList-trackList[aria-label="Popular tracks"] .main-trackList-trackListRow .main-trackList-rowSectionVariable:nth-child(3) {
         justify-content: center;
     }
     #sort-play-now-playing-data {
@@ -21722,13 +21753,72 @@
                   }
                   offset += limit;
               } catch (e) {
-                  console.warn("Failed to fetch Appears On batch", e);
                   break;
               }
           }
       };
 
-      await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL()]);
+      const fetchAppearsOnViaSearch = async () => {
+          if (artistName.toLowerCase() === "various artists") return;
+          
+          const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
+          const currentYear = new Date().getFullYear();
+          const timeSlices = ["0-1989", "1990-1999"];
+          for (let y = 2000; y <= currentYear + 1; y++) {
+              timeSlices.push(y.toString());
+          }
+
+          const safeArtistName = artistName.replace(/"/g, '\\"');
+          const BATCH_SIZE = 15;
+          
+          for (let i = 0; i < timeSlices.length; i += BATCH_SIZE) {
+              const batch = timeSlices.slice(i, i + BATCH_SIZE);
+              await Promise.all(batch.map(async (slice) => {
+                  let offset = 0;
+                  let limit = 50;
+                  while (offset < 1000) {
+                      try {
+                          const res = await GraphQL.Request({
+                              name: "searchTracks",
+                              operation: "query",
+                              sha256Hash: SEARCH_HASH,
+                              value: null
+                          }, {
+                              searchTerm: `artist:"${safeArtistName}" year:${slice}`,
+                              offset: offset,
+                              limit: limit,
+                              numberOfTopResults: limit,
+                              includePreReleases: false
+                          });
+
+                          const tracks = res?.data?.searchV2?.tracksV2?.items || [];
+                          if (tracks.length === 0) break;
+
+                          tracks.forEach(tNode => {
+                              const t = tNode.item?.data;
+                              if (t && t.albumOfTrack && t.albumOfTrack.uri) {
+                                  const id = t.albumOfTrack.uri.split(':')[2];
+                                  if (!allAlbumMetadata.has(id)) {
+                                      allAlbumMetadata.set(id, { 
+                                          type: 'appears_on', 
+                                          date: null 
+                                      });
+                                  }
+                              }
+                          });
+
+                          if (tracks.length < limit) break;
+                          offset += limit;
+                      } catch (e) {
+                          break;
+                      }
+                  }
+              }));
+              await new Promise(r => setTimeout(r, 150));
+          }
+      };
+
+      await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL(), fetchAppearsOnViaSearch()]);
   
       const allTracks = [];
 
@@ -21820,7 +21910,7 @@
       if (artistData.errors) throw new Error(artistData.errors[0].message);
       const artistName = artistData.data.artistUnion.profile.name;
 
-      const allAlbumIds = new Set();
+      const allAlbumMetadata = new Map();
 
       const fetchAlbumIdsGQL = async () => {
           let offset = 0;
@@ -21835,21 +21925,122 @@
               const disc = res.data.artistUnion.discography.all;
               total = disc.totalCount;
               disc.items.forEach(group => {
-                  group.releases.items.forEach(rel => {
-                      allAlbumIds.add(rel.uri.split(':')[2]);
-                  });
+                  if (group.releases && group.releases.items) {
+                      group.releases.items.forEach(rel => {
+                          const id = rel.uri.split(':')[2];
+                          allAlbumMetadata.set(id, { 
+                              type: rel.type || 'album'
+                          });
+                      });
+                  }
               });
               offset += limit;
           }
       };
 
-      await fetchAlbumIdsGQL();
+      const fetchAppearsOnIdsGQL = async () => {
+          let offset = 0;
+          let limit = 100;
+          let total = null;
+          while (total === null || offset < total) {
+              try {
+                  const res = await GraphQL.Request(GraphQL.Definitions.queryArtistAppearsOn, {
+                      uri: artistUri,
+                      offset: offset,
+                      limit: limit
+                  });
+                  const appearsOn = res?.data?.artistUnion?.relatedContent?.appearsOn;
+                  if (!appearsOn) break;
+                  
+                  total = appearsOn.totalCount;
+                  
+                  if (appearsOn.items) {
+                      appearsOn.items.forEach(item => {
+                          const release = item.releases?.items?.[0];
+                          if (release) {
+                              const id = release.uri.split(':')[2];
+                              if (!allAlbumMetadata.has(id)) {
+                                  allAlbumMetadata.set(id, { 
+                                      type: 'appears_on'
+                                  });
+                              }
+                          }
+                      });
+                  }
+                  offset += limit;
+              } catch (e) {
+                  break;
+              }
+          }
+      };
+
+      const fetchAppearsOnViaSearch = async () => {
+          if (artistName.toLowerCase() === "various artists") return;
+          
+          const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
+          const currentYear = new Date().getFullYear();
+          const timeSlices = ["0-1989", "1990-1999"];
+          for (let y = 2000; y <= currentYear + 1; y++) {
+              timeSlices.push(y.toString());
+          }
+
+          const safeArtistName = artistName.replace(/"/g, '\\"');
+          const BATCH_SIZE = 15;
+          
+          for (let i = 0; i < timeSlices.length; i += BATCH_SIZE) {
+              const batch = timeSlices.slice(i, i + BATCH_SIZE);
+              await Promise.all(batch.map(async (slice) => {
+                  let offset = 0;
+                  let limit = 50;
+                  while (offset < 1000) {
+                      try {
+                          const res = await GraphQL.Request({
+                              name: "searchTracks",
+                              operation: "query",
+                              sha256Hash: SEARCH_HASH,
+                              value: null
+                          }, {
+                              searchTerm: `artist:"${safeArtistName}" year:${slice}`,
+                              offset: offset,
+                              limit: limit,
+                              numberOfTopResults: limit,
+                              includePreReleases: false
+                          });
+
+                          const tracks = res?.data?.searchV2?.tracksV2?.items || [];
+                          if (tracks.length === 0) break;
+
+                          tracks.forEach(tNode => {
+                              const t = tNode.item?.data;
+                              if (t && t.albumOfTrack && t.albumOfTrack.uri) {
+                                  const id = t.albumOfTrack.uri.split(':')[2];
+                                  if (!allAlbumMetadata.has(id)) {
+                                      allAlbumMetadata.set(id, { 
+                                          type: 'appears_on'
+                                      });
+                                  }
+                              }
+                          });
+
+                          if (tracks.length < limit) break;
+                          offset += limit;
+                      } catch (e) {
+                          break;
+                      }
+                  }
+              }));
+              await new Promise(r => setTimeout(r, 150));
+          }
+      };
+
+      await Promise.all([fetchAlbumIdsGQL(), fetchAppearsOnIdsGQL(), fetchAppearsOnViaSearch()]);
   
       const allTracks = [];
-      const allAlbumIdArray = Array.from(allAlbumIds);
+      const allAlbumIdArray = Array.from(allAlbumMetadata.keys());
 
       const fetchTracks = async () => {
           const promises = allAlbumIdArray.map(async (id) => {
+              const meta = allAlbumMetadata.get(id);
               const tracks = await getAlbumTracks(id);
               return tracks.filter(track => {
                   const hasArtistUri = track.artistUris && track.artistUris.includes(artistUri);
@@ -21857,7 +22048,7 @@
                   return hasArtistUri || hasArtistName;
               }).map(track => ({
                   ...track,
-                  album_type: 'album' 
+                  album_type: meta.type || 'album' 
               }));
           });
           const results = await Promise.all(promises);
@@ -23099,6 +23290,7 @@
         sortType: "quickFiltersParent",
         children: [
              { backgroundColor: "transparent", color: "white", text: "Remove Duplicates", sortType: "deduplicateOnly" },
+             { backgroundColor: "transparent", color: "white", text: "One Track per Artist", sortType: "filterOnePerArtist" },
              {
                 type: "divider",
              },
@@ -27925,7 +28117,7 @@
       let targetPlaylistUriToReplace = null;
       
       const quickFilterTypes = [
-          'deduplicateOnly', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
+          'deduplicateOnly', 'filterOnePerArtist', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
           'filterSinglesEPs', 'filterAlbumsEPs', 'filterAlbums', 'filterAlbumsCompilations', 
           'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles', 'filterCompilations', 
           'removeTrashed', 'excludeByPlaylist', 'filterFollowedMain', 'filterFollowedAny', 
@@ -28020,7 +28212,7 @@
       const directSortsToConvertLocalTracks = [
         'playCount', 'popularity', 'releaseDate', 'averageColor', 
         'energyWave', 'tempo', 'energy', 'danceability', 'valence', 
-        'acousticness', 'instrumentalness', 'deduplicateOnly'
+        'acousticness', 'instrumentalness', 'deduplicateOnly', 'filterOnePerArtist'
       ];
 
       const user = await Spicetify.Platform.UserAPI.getUser();
@@ -28098,7 +28290,7 @@
         if (isArtistPage) {
             tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType, progressCallback);
         }
-        else if (sortType === 'deduplicateOnly' || sortType === 'excludeByPlaylist') {
+        else if (sortType === 'deduplicateOnly' || sortType === 'excludeByPlaylist' || sortType === 'filterOnePerArtist') {
             updateProgressText("Enriching...");
             
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
@@ -28315,6 +28507,55 @@
                 const orderB = originalOrderMap.get(b.uri);
                 return orderA - orderB;
             });
+        } else if (sortType === "filterOnePerArtist") {
+            const artistBestTrack = new Map();
+            const artistAllTracks = new Map();
+            
+            uniqueTracks.forEach(track => {
+                const rawArtist = track.artists?.[0]?.name || track.artistName || "Unknown Artist";
+                const primaryArtistKey = rawArtist.toLowerCase().trim();
+                
+                if (!artistAllTracks.has(primaryArtistKey)) {
+                    artistAllTracks.set(primaryArtistKey, []);
+                }
+                artistAllTracks.get(primaryArtistKey).push(track);
+
+                const currentBest = artistBestTrack.get(primaryArtistKey);
+                const getScore = (t) => {
+                    if (t.playCount !== "N/A" && t.playCount != null) return Number(t.playCount);
+                    return t.popularity || 0; 
+                };
+                
+                if (!currentBest || getScore(track) > getScore(currentBest)) {
+                    artistBestTrack.set(primaryArtistKey, track);
+                }
+            });
+            
+            const originalOrderMap = new Map();
+            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+
+            const bestTracksSet = new Set(Array.from(artistBestTrack.values()).map(t => t.uri));
+            
+            sortedTracks = uniqueTracks
+                .filter(t => bestTracksSet.has(t.uri))
+                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+                
+            removedTracks = [];
+            artistAllTracks.forEach((tracksList, artistKey) => {
+                const keptTrack = artistBestTrack.get(artistKey);
+                tracksList.forEach(t => {
+                    if (t.uri !== keptTrack.uri) {
+                        t._keptTrack = keptTrack;
+                        removedTracks.push(t);
+                    }
+                });
+            });
+
+            if (removedTracks.length === 0) {
+                showNotification("No multiple tracks by the same artist found.");
+                if (!isHeadless && !progressCallback) resetButtons();
+                return;
+            }
         } else if (sortType === "filterLiked" || sortType === "keepLiked" || sortType === "sortByLiked") {
             updateProgressText("Checking...");
             const likedSongs = await getLikedSongs();
@@ -28869,7 +29110,7 @@
         const sortTypeInfo = getSortTypeInfo(sortType);
 
         const filterOnlyTypes = [
-            'deduplicateOnly', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
+            'deduplicateOnly', 'filterOnePerArtist', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
             'filterSinglesEPs', 'filterAlbumsEPs', 'filterAlbums', 'filterAlbumsCompilations', 
             'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles', 'filterCompilations', 
             'removeTrashed', 'excludeByPlaylist', 'filterFollowedMain', 'filterFollowedAny', 
@@ -29933,7 +30174,8 @@
     "filterSingles", "filterEPs", "filterSinglesEPs", "filterAlbumsEPs", 
     "filterAlbums", "filterAlbumsCompilations", "filterAlbumsEPsCompilations", 
     "filterAlbumsEPsSingles", "filterCompilations", "removeTrashed", 
-    "excludeByPlaylist", "filterFollowedMain", "filterFollowedAny", "removeFollowed"
+    "excludeByPlaylist", "filterFollowedMain", "filterFollowedAny", "removeFollowed",
+    "filterOnePerArtist"
   ];
 
   function applyStandardSort(uniqueTracks, sortType) {
@@ -30033,9 +30275,10 @@
 
   function showRemovedTracksModal(removedTracks, totalOriginalCount, sortType = 'deduplicateOnly') {
     const isExclusion = sortType === 'excludeByPlaylist';
-    const modalTitle = isExclusion ? "Excluded Tracks Report" : "Removed Duplicate Tracks";
-    const summaryLabel = isExclusion ? "Tracks Excluded" : "Duplicate Tracks Removed";
-    const fileName = isExclusion ? "sort-play_excluded_tracks.json" : "sort-play_removed_duplicates.json";
+    const isOnePerArtist = sortType === 'filterOnePerArtist';
+    const modalTitle = isExclusion ? "Excluded Tracks Report" : (isOnePerArtist ? "Artist Duplicates Removed" : "Removed Duplicate Tracks");
+    const summaryLabel = isExclusion ? "Tracks Excluded" : (isOnePerArtist ? "Other Artist Tracks" : "Duplicate Tracks Removed");
+    const fileName = isExclusion ? "sort-play_excluded_tracks.json" : (isOnePerArtist ? "sort-play_artist_duplicates.json" : "sort-play_removed_duplicates.json");
 
     const overlay = document.createElement("div");
     overlay.id = "sort-play-removed-tracks-overlay";
@@ -33935,7 +34178,16 @@
 
     requestAnimationFrame(() => {
       try {
-        const tracklistContainer = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks"]');
+        let tracklistContainer = document.querySelector('div.main-trackList-trackList[aria-label="popular tracks"], div.main-trackList-trackList[aria-label="Popular tracks"], div.main-trackList-trackList[aria-label="Popular Tracks"]');
+        if (!tracklistContainer) {
+            const h2s = Array.from(document.querySelectorAll('h2')).filter(h2 => h2.innerText.trim().toLowerCase() === 'popular');
+            if (h2s.length > 0) {
+                tracklistContainer = h2s[0].parentElement.querySelector('.main-trackList-trackList');
+            }
+            if (!tracklistContainer) {
+                tracklistContainer = document.querySelector('.main-trackList-trackList.main-trackList-indexable');
+            }
+        }
         if (!tracklistContainer) return;
 
         const currentUri = getCurrentUri();
