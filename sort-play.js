@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.78.0";
+  const SORT_PLAY_VERSION = "5.79.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -1235,6 +1235,48 @@
       };
   }
 
+  const localStorage = {
+    getItem(key) {
+        let spVal = null;
+        if (Spicetify.LocalStorage) {
+            try { spVal = Spicetify.LocalStorage.get(key); } catch (e) {}
+        }
+        const winVal = window.localStorage.getItem(key);
+        
+        if (spVal !== null && spVal !== undefined) {
+            if (winVal !== spVal) {
+                try { window.localStorage.setItem(key, spVal); } catch(e) {}
+            }
+            return spVal;
+        }
+        
+        if (winVal !== null && winVal !== undefined && Spicetify.LocalStorage) {
+            try { Spicetify.LocalStorage.set(key, winVal); } catch(e) {}
+        }
+        
+        return winVal;
+    },
+    setItem(key, value) {
+        const strVal = String(value);
+        if (Spicetify.LocalStorage) {
+            try { Spicetify.LocalStorage.set(key, strVal); } catch (e) {}
+        }
+        try { window.localStorage.setItem(key, strVal); } catch (e) {}
+    },
+    removeItem(key) {
+        if (Spicetify.LocalStorage) {
+            try { 
+                if (typeof Spicetify.LocalStorage.remove === 'function') {
+                    Spicetify.LocalStorage.remove(key); 
+                } else {
+                    Spicetify.LocalStorage.set(key, "");
+                }
+            } catch (e) {}
+        }
+        try { window.localStorage.removeItem(key); } catch (e) {}
+    }
+  };
+  
   const idb = {
     db: null,
     mem: {},
@@ -1451,7 +1493,7 @@
         'sort-play-like-'
     ];
 
-    const allKeys = Object.keys(localStorage);
+    const allKeys = Object.keys(window.localStorage);
     for (let i = 0; i < allKeys.length; i++) {
         const key = allKeys[i];
         if (prefixes.some(prefix => key.startsWith(prefix))) {
@@ -14600,6 +14642,51 @@
         });
     }
 
+    const parseFilterDate = (val, isMax) => {
+        if (!val) return null;
+        let cleanVal = val.toString().trim().replace(/\//g, '-');
+        if (/^\d{4}$/.test(cleanVal)) {
+            return isMax 
+                ? new Date(`${cleanVal}-12-31T23:59:59.999Z`).getTime() 
+                : new Date(`${cleanVal}-01-01T00:00:00.000Z`).getTime();
+        }
+        if (/^\d{4}-\d{2}$/.test(cleanVal)) {
+            const [y, m] = cleanVal.split('-');
+            return isMax 
+                ? new Date(Date.UTC(parseInt(y), parseInt(m), 0, 23, 59, 59, 999)).getTime() 
+                : new Date(`${cleanVal}-01T00:00:00.000Z`).getTime();
+        }
+        const d = new Date(cleanVal);
+        if (!isNaN(d.getTime())) {
+            if (isMax) d.setUTCHours(23, 59, 59, 999);
+            else d.setUTCHours(0, 0, 0, 0);
+            return d.getTime();
+        }
+        return null;
+    };
+
+    if (filters.minAddedDate || filters.maxAddedDate || filters.addedWithinDays) {
+        if (!isHeadless) mainButton.innerText = "Filtering Date Added...";
+        
+        const minMs = parseFilterDate(filters.minAddedDate, false);
+        const maxMs = parseFilterDate(filters.maxAddedDate, true);
+
+        filteredTracks = filteredTracks.filter(t => {
+            if (!t.addedAt) return false; 
+            const addedMs = new Date(t.addedAt).getTime();
+            if (isNaN(addedMs)) return false;
+
+            if (minMs !== null && addedMs < minMs) return false;
+            if (maxMs !== null && addedMs > maxMs) return false;
+            
+            if (filters.addedWithinDays) {
+                const daysSinceAdded = (Date.now() - addedMs) / (1000 * 60 * 60 * 24);
+                if (Math.floor(daysSinceAdded) > parseInt(filters.addedWithinDays)) return false;
+            }
+            return true;
+        });
+    }
+
     if (filters.minPopularity || filters.maxPopularity || filters.minYear || filters.maxYear || filters.releasedWithinDays) {
         if (!isHeadless) mainButton.innerText = "Filtering Meta...";
         const tracksWithIds = await processBatchesWithDelay(filteredTracks, 50, 500, () => {}, collectTrackIdsForPopularity);
@@ -14622,29 +14709,6 @@
                 if (isNaN(releaseMs)) return false;
 
                 if (filters.minYear || filters.maxYear) {
-                    const parseFilterDate = (val, isMax) => {
-                        if (!val) return null;
-                        let cleanVal = val.toString().trim().replace(/\//g, '-');
-                        if (/^\d{4}$/.test(cleanVal)) {
-                            return isMax 
-                                ? new Date(`${cleanVal}-12-31T23:59:59.999Z`).getTime() 
-                                : new Date(`${cleanVal}-01-01T00:00:00.000Z`).getTime();
-                        }
-                        if (/^\d{4}-\d{2}$/.test(cleanVal)) {
-                            const [y, m] = cleanVal.split('-');
-                            return isMax 
-                                ? new Date(Date.UTC(parseInt(y), parseInt(m), 0, 23, 59, 59, 999)).getTime() 
-                                : new Date(`${cleanVal}-01T00:00:00.000Z`).getTime();
-                        }
-                        const d = new Date(cleanVal);
-                        if (!isNaN(d.getTime())) {
-                            if (isMax) d.setUTCHours(23, 59, 59, 999);
-                            else d.setUTCHours(0, 0, 0, 0);
-                            return d.getTime();
-                        }
-                        return null;
-                    };
-
                     const minMs = parseFilterDate(filters.minYear, false);
                     const maxMs = parseFilterDate(filters.maxYear, true);
 
@@ -14654,7 +14718,7 @@
                 
                 if (filters.releasedWithinDays) {
                     const daysSinceRelease = (Date.now() - releaseMs) / (1000 * 60 * 60 * 24);
-                    if (daysSinceRelease > parseInt(filters.releasedWithinDays)) return false;
+                    if (Math.floor(daysSinceRelease) > parseInt(filters.releasedWithinDays)) return false;
                 }
             }
             return true;
@@ -16625,6 +16689,7 @@
             { base: 'Scrobbles', id: 'scrobbles', label: 'Scrobbles' },
             { base: 'Duration', id: 'duration', label: 'Duration', suffix: 's' },
             { base: 'Year', id: 'year', label: 'Date' },
+            { base: 'AddedDate', id: 'addedAt', label: 'Added Date' },
             { base: 'Popularity', id: 'popularity', label: 'Pop' },
             { base: 'Tempo', id: 'tempo', label: 'Tempo', suffix: ' BPM' },
             { base: 'Energy', id: 'energy', label: 'Energy', suffix: '%' },
@@ -16732,7 +16797,14 @@
             #filter-overlay .segment-btn.active { background-color: #555; color: white; font-weight: 700; }
             #filter-overlay .segment-btn.active[data-value="require"], #filter-overlay .segment-btn.active[data-value="exclude"] { background-color: #1ED760; color: black; }
             #filter-overlay .setting-row.disabled .segmented-control { opacity: 0.5; pointer-events: none; }
-            #filter-overlay .summary-container { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background-color: #242424; padding: 12px 16px; border-radius: 8px; border: 1px solid #333; margin-top: 20px; min-height: 52px; }
+            #filter-overlay .numeric-filters-wrapper { overflow-y: auto; max-height: calc(99vh - 290px); scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+            #filter-overlay .numeric-filters-wrapper::-webkit-scrollbar { width: 6px; }
+            #filter-overlay .numeric-filters-wrapper::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+            #filter-overlay .numeric-filters-wrapper::-webkit-scrollbar-track { background: transparent; margin: 10px 0; }
+            #filter-overlay .summary-content { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; align-content: flex-start; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 transparent; padding-right: 4px; }
+            #filter-overlay .summary-content::-webkit-scrollbar { width: 6px; }
+            #filter-overlay .summary-content::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+            #filter-overlay .summary-content::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
             #filter-overlay .summary-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; }
             #load-preset-btn, #save-preset-btn { transition: all 0.2s ease !important; }
             #load-preset-btn:hover, #save-preset-btn:hover { background-color: #333 !important; border-color: #fff !important; }
@@ -16839,10 +16911,15 @@
                           </div>
                       </div>
                   </div>
+
+                  <div class="settings-wrapper" style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
+                      <div class="settings-title" style="margin-bottom: 12px; flex-shrink: 0;">Active Filters</div>
+                      <div id="filter-summary-content" class="summary-content"></div>
+                  </div>
               </div>
 
               <div class="settings-column">
-                  <div class="settings-wrapper">
+                  <div class="settings-wrapper numeric-filters-wrapper">
                       <div class="settings-title" style="margin-bottom: 12px;">Numeric Range Filters (Leave blank to ignore)</div>
                       
                       <div class="setting-row">
@@ -16905,11 +16982,47 @@
                               Released in last X days
                               <span class="tooltip-container">
                                   ${infoIconSvg}
-                                  <span class="custom-tooltip">Only keep tracks released within this many days from today.</span>
+                                  <span class="custom-tooltip">Only keep tracks released within this many days from today. Enter 0 for tracks released today.</span>
                               </span>
                           </span>
                           <div class="range-input-group" style="justify-content: flex-end;">
                               <input type="number" id="filter-released-within" class="range-input" placeholder="Days">
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">
+                              Date Added
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Filter by when the track was added to the playlist or Liked Songs. Format: YYYY-MM-DD.</span>
+                              </span>
+                          </span>
+                          <div class="range-input-group">
+                              <div class="date-input-wrapper">
+                                  <input type="text" id="filter-min-addedAt" class="range-input" placeholder="Min" autocomplete="off">
+                                  <input type="date" class="date-picker-hidden" id="min-added-date-picker">
+                                  <button class="date-icon-btn" id="min-added-date-btn" title="Pick Date">${calendarIconSvg}</button>
+                              </div>
+                              - 
+                              <div class="date-input-wrapper">
+                                  <input type="text" id="filter-max-addedAt" class="range-input" placeholder="Max" autocomplete="off">
+                                  <input type="date" class="date-picker-hidden" id="max-added-date-picker">
+                                  <button class="date-icon-btn" id="max-added-date-btn" title="Pick Date">${calendarIconSvg}</button>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div class="setting-row">
+                          <span class="description">
+                              Added in last X days
+                              <span class="tooltip-container">
+                                  ${infoIconSvg}
+                                  <span class="custom-tooltip">Only keep tracks added to the source within this many days from today. Enter 0 for tracks added today.</span>
+                              </span>
+                          </span>
+                          <div class="range-input-group" style="justify-content: flex-end;">
+                              <input type="number" id="filter-added-within" class="range-input" placeholder="Days">
                           </div>
                       </div>
 
@@ -16956,8 +17069,6 @@
                   </div>
               </div>
             </div>
-
-            <div id="filter-summary-wrapper" class="summary-container"></div>
           </div>
           <div class="main-trackCreditsModal-originalCredits" style="padding: 16px 32px; border-top: 1px solid #282828; flex-shrink: 0; display: flex; justify-content: flex-end; gap: 10px;">
               <button id="cancel-filters" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
@@ -17024,6 +17135,8 @@
         };
         setupDatePicker('filter-min-year', 'min-date-picker', 'min-date-btn');
         setupDatePicker('filter-max-year', 'max-date-picker', 'max-date-btn');
+        setupDatePicker('filter-min-addedAt', 'min-added-date-picker', 'min-added-date-btn');
+        setupDatePicker('filter-max-addedAt', 'max-added-date-picker', 'max-added-date-btn');
 
         const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
         const keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
@@ -17081,6 +17194,7 @@
                             titleAlbumKeywords: Array.from(titleAlbumKeywords),
                             artistKeywords: Array.from(artistKeywords),
                             releasedWithinDays: getVal('filter-released-within'),
+                            addedWithinDays: getVal('filter-added-within'),
                         };
                         rangeConfigs.forEach(cfg => {
                             state[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
@@ -17163,6 +17277,7 @@
                         setVal(`filter-max-${cfg.id}`, state[`max${cfg.base}`]);
                     });
                     setVal('filter-released-within', state.releasedWithinDays);
+                    setVal('filter-added-within', state.addedWithinDays);
 
                     const kwToggle = modalContainer.querySelector('#keywordFilterToggle');
                     if (kwToggle) {
@@ -17251,7 +17366,7 @@
         };
 
         const updateSummary = () => {
-            const summaryWrapper = modalContainer.querySelector('#filter-summary-wrapper');
+            const summaryWrapper = modalContainer.querySelector('#filter-summary-content');
             if (!summaryWrapper) return;
             const badges = [];
 
@@ -17279,7 +17394,16 @@
             rangeConfigs.forEach(cfg => checkRange(`filter-min-${cfg.id}`, `filter-max-${cfg.id}`, cfg.label, cfg.suffix));
 
             const daysWithin = getVal('filter-released-within');
-            if (daysWithin) badges.push({ text: `Released in last ${daysWithin} day(s)`, clear: () => setVal('filter-released-within', '') });
+            if (daysWithin) {
+                const text = daysWithin === "0" ? "Released Today" : `Released in last ${daysWithin} day(s)`;
+                badges.push({ text, clear: () => setVal('filter-released-within', '') });
+            }
+
+            const addedDaysWithin = getVal('filter-added-within');
+            if (addedDaysWithin) {
+                const text = addedDaysWithin === "0" ? "Added Today" : `Added in last ${addedDaysWithin} day(s)`;
+                badges.push({ text, clear: () => setVal('filter-added-within', '') });
+            }
 
             const keywordFilterEnabled = modalContainer.querySelector('#keywordFilterToggle').checked;
             if (keywordFilterEnabled) {
@@ -17322,13 +17446,8 @@
 
             summaryWrapper.innerHTML = '';
             if (badges.length === 0) {
-                summaryWrapper.innerHTML = `<span style="color: #888; font-style: italic; font-size: 13px;">No active filters.</span>`;
+                summaryWrapper.innerHTML = `<span style="color: #888; font-style: italic; font-size: 13px; margin-top: 2px;">No active filters.</span>`;
             } else {
-                const title = document.createElement("span");
-                title.style.cssText = "color: #fff; font-size: 13px; font-weight: bold; margin-right: 4px;";
-                title.textContent = "Active Filters:";
-                summaryWrapper.appendChild(title);
-                
                 badges.forEach(b => {
                     const badge = document.createElement("span");
                     badge.className = "summary-badge";
@@ -17354,6 +17473,7 @@
             document.getElementById(`filter-max-${cfg.id}`).value = currentFilters[`max${cfg.base}`] || '';
         });
         document.getElementById('filter-released-within').value = currentFilters.releasedWithinDays || '';
+        document.getElementById('filter-added-within').value = currentFilters.addedWithinDays || '';
 
         keywordFilterToggle.checked = currentFilters.keywordFilterEnabled || false;
         keywordFilterWrapper.classList.toggle('disabled', !keywordFilterToggle.checked);
@@ -17393,7 +17513,9 @@
         modalContainer.querySelectorAll('.range-input').forEach(input => {
             input.addEventListener('input', (e) => {
                 const el = e.target;
-                if (el.id !== 'filter-min-year' && el.id !== 'filter-max-year') {
+                const isDateInput = el.id === 'filter-min-year' || el.id === 'filter-max-year' || el.id === 'filter-min-addedAt' || el.id === 'filter-max-addedAt';
+                
+                if (!isDateInput) {
                     if (el.value !== '') {
                         let val = parseFloat(el.value);
                         if (val < 0) {
@@ -17406,7 +17528,9 @@
             
             input.addEventListener('change', (e) => {
                 const el = e.target;
-                if (el.id === 'filter-min-year' || el.id === 'filter-max-year') {
+                const isDateInput = el.id === 'filter-min-year' || el.id === 'filter-max-year' || el.id === 'filter-min-addedAt' || el.id === 'filter-max-addedAt';
+                
+                if (isDateInput) {
                     if (el.value) {
                         let cleanVal = el.value.trim().replace(/\//g, '-');
                         let isValid = false;
@@ -17469,7 +17593,7 @@
             if (!minEl || !maxEl) return;
             
             const validate = (e) => {
-                if (minId === 'filter-min-year') {
+                if (minId === 'filter-min-year' || minId === 'filter-min-addedAt') {
                     const parseDateStr = (val, isMax) => {
                         if (!val) return NaN;
                         let cleanVal = val.trim().replace(/\//g, '-');
@@ -17526,7 +17650,7 @@
 
         const rangeKeys = [
             'playcount', 'global-scrobbles', 'scrobbles', 'duration', 
-            'year', 'popularity', 'tempo', 'energy', 'danceability', 'valence'
+            'year', 'popularity', 'tempo', 'energy', 'danceability', 'valence', 'addedAt'
         ];
         rangeKeys.forEach(key => enforceRangeLogic(`filter-min-${key}`, `filter-max-${key}`));
 
@@ -17554,6 +17678,7 @@
                 titleAlbumKeywords: Array.from(titleAlbumKeywords),
                 artistKeywords: Array.from(artistKeywords),
                 releasedWithinDays: getVal('filter-released-within'),
+                addedWithinDays: getVal('filter-added-within'),
             };
             rangeConfigs.forEach(cfg => {
                 newFilters[`min${cfg.base}`] = getVal(`filter-min-${cfg.id}`);
@@ -21444,10 +21569,10 @@
         allArtists: normalizeArtistNames(item.artists),
         durationMilis: item.duration.milliseconds,
         durationMs: item.duration.milliseconds,
-        addedAt: item.addedAt,
         playCount: "N/A",
         popularity: null,
         releaseDate: null,
+        addedAt: item.addedAt || null,
         track: {
             album: {
                 id: item.album.uri.split(":")[2]
@@ -21488,6 +21613,7 @@
             playCount: "N/A",
             popularity: null,
             releaseDate: null,
+            addedAt: item.addedAt || null,
             track: {
                 album: {
                     id: item.album.uri.split(":")[2],
@@ -21521,6 +21647,7 @@
     playcount: 0,
     popularity: 0,
     releaseDate: 0,
+    addedAt: track.addedAt,
     trackNumber: track.album?.trackNumber || track.trackNumber || 0,
     track: {
       album: {
@@ -21905,6 +22032,7 @@
                 playCount: rawPlaycount > 0 ? rawPlaycount : "N/A",
                 popularity: null,
                 releaseDate: releaseDate,
+                addedAt: null,
                 trackNumber: parseInt(t.trackNumber, 10) || 0,
                 track: {
                     album: { 
