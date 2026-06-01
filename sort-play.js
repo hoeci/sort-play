@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.77.0";
+  const SORT_PLAY_VERSION = "5.78.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -14413,55 +14413,67 @@
         }
 
         const trackFetchPromises = sources.map(async source => {
-            const sourceUri = source.uri;
-            let sourceTracks;
+            try {
+                const sourceUri = source.uri;
+                let sourceTracks;
 
-            if (URI.isPlaylistV1OrV2(sourceUri)) {
-                sourceTracks = await getPlaylistTracks(sourceUri.split(":")[2]);
-            } else if (URI.isArtist(sourceUri)) {
-                sourceTracks = await getArtistTracks(sourceUri, isHeadless);
-            } else if (isLikedSongsPage(sourceUri)) {
-                sourceTracks = await getLikedSongs();
-            } else if (URI.isAlbum(sourceUri)) {
-                sourceTracks = await getAlbumTracks(sourceUri.split(":")[2]);
-            } else if (source.type === 'folder' || sourceUri.includes('start-group') || sourceUri.includes(':folder:')) {
-                sourceTracks = await getTracksFromFolder(sourceUri);
-            } else {
-                console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
+                if (URI.isPlaylistV1OrV2(sourceUri)) {
+                    sourceTracks = await getPlaylistTracks(sourceUri.split(":")[2]);
+                } else if (URI.isArtist(sourceUri)) {
+                    const rawTracks = await getArtistTracks(sourceUri, isHeadless);
+                    sourceTracks = await processArtistPageTracks(
+                        rawTracks, 
+                        isHeadless, 
+                        sortType, 
+                        (msg) => { if (!isHeadless) mainButton.innerText = msg; }
+                    );
+                } else if (isLikedSongsPage(sourceUri)) {
+                    sourceTracks = await getLikedSongs();
+                } else if (URI.isAlbum(sourceUri)) {
+                    sourceTracks = await getAlbumTracks(sourceUri.split(":")[2]);
+                } else if (source.type === 'folder' || sourceUri.includes('start-group') || sourceUri.includes(':folder:')) {
+                    sourceTracks = await getTracksFromFolder(sourceUri);
+                } else {
+                    console.warn(`[Sort-Play Dynamic] Unsupported source URI type: ${sourceUri}`);
+                    return [];
+                }
+                
+                if (sourceTracks) {
+                    sourceTracks = sourceTracks.filter(track => !Spicetify.URI.isLocal(track.uri));
+                }
+
+                if (limitEnabled && source.limit > 0 && source.limitEnabled !== false) {
+                    let actualLimit = source.limit;
+                    if (source.limitMode === 'percent') {
+                        actualLimit = Math.max(1, Math.ceil(sourceTracks.length * (source.limit / 100)));
+                    }
+
+                    let historyKey = config.id ? `${config.id}_${source.uri}` : null;
+                    let storedHistory = historyKey ? await idb.get('jobHistory', historyKey) : [];
+                    let usedUris = new Set(storedHistory || source.usedTrackURIs || []);
+                    
+                    let availableTracks = sourceTracks.filter(t => !usedUris.has(t.uri));
+                    let selectedTracks;
+
+                    if (availableTracks.length < actualLimit && sourceTracks.length > 0) {
+                        const shuffledAll = shuffleArray(sourceTracks);
+                        selectedTracks = shuffledAll.slice(0, actualLimit);
+                        newUsedUrisBySource[source.uri] = selectedTracks.map(t => t.uri);
+                    } else {
+                        const shuffledAvailable = shuffleArray(availableTracks);
+                        selectedTracks = shuffledAvailable.slice(0, actualLimit);
+                        const newUris = selectedTracks.map(t => t.uri);
+                        newUris.forEach(uri => usedUris.add(uri));
+                        newUsedUrisBySource[source.uri] = Array.from(usedUris);
+                    }
+                    return selectedTracks;
+                }
+                return sourceTracks || [];
+            } catch (err) {
+                console.error(`[Sort-Play Dynamic] Failed to fetch tracks for source: ${source.name} (${source.uri})`, err);
+                if (!isHeadless) showNotification(`Failed to fetch tracks for source: ${source.name}`, 'warning');
                 return [];
             }
-            
-            if (sourceTracks) {
-                sourceTracks = sourceTracks.filter(track => !Spicetify.URI.isLocal(track.uri));
-            }
-
-            if (limitEnabled && source.limit > 0 && source.limitEnabled !== false) {
-                let actualLimit = source.limit;
-                if (source.limitMode === 'percent') {
-                    actualLimit = Math.max(1, Math.ceil(sourceTracks.length * (source.limit / 100)));
-                }
-
-                let historyKey = config.id ? `${config.id}_${source.uri}` : null;
-                let storedHistory = historyKey ? await idb.get('jobHistory', historyKey) : [];
-                let usedUris = new Set(storedHistory || source.usedTrackURIs || []);
-                
-                let availableTracks = sourceTracks.filter(t => !usedUris.has(t.uri));
-                let selectedTracks;
-
-                if (availableTracks.length < actualLimit && sourceTracks.length > 0) {
-                    const shuffledAll = shuffleArray(sourceTracks);
-                    selectedTracks = shuffledAll.slice(0, actualLimit);
-                    newUsedUrisBySource[source.uri] = selectedTracks.map(t => t.uri);
-                } else {
-                    const shuffledAvailable = shuffleArray(availableTracks);
-                    selectedTracks = shuffledAvailable.slice(0, actualLimit);
-                    const newUris = selectedTracks.map(t => t.uri);
-                    newUris.forEach(uri => usedUris.add(uri));
-                    newUsedUrisBySource[source.uri] = Array.from(usedUris);
-                }
-                return selectedTracks;
-            }
-            return sourceTracks;
         });
 
         const trackArrays = await Promise.all(trackFetchPromises);
@@ -14778,7 +14790,7 @@
 
     const { unique: uniqueTracks } = deduplicate ? await deduplicateTracks(
         tracksForProcessing, 
-        false, 
+        true, 
         sources.some(s => URI.isArtist(s.uri)),
         (progress) => { if (!isHeadless) mainButton.innerText = `Dedup ${progress}%`; },
         sortType
@@ -14893,8 +14905,10 @@
 
   async function runJob(jobConfig, isInitialRun = false, updateSchedule = true) {
     let job = { ...jobConfig };
-    let finalTrackUris;
+    let finalTrackUris = null;
     let newDescription = null;
+    let executionError = null;
+    let appendedEarlyReturn = false;
     const updateMode = job.updateMode || 'replace';
 
     if (isInitialRun) {
@@ -14953,13 +14967,18 @@
         
         await addPlaylistToLibrary(newPlaylist.uri);
         
-        const result = await executeSortOperation({ ...job, isHeadless: true });
-        finalTrackUris = result.trackUris;
-        
-        for (const [sourceUri, newHistory] of Object.entries(result.newUsedUrisBySource)) {
-            if (newHistory) {
-                await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
+        try {
+            const result = await executeSortOperation({ ...job, isHeadless: true });
+            finalTrackUris = result.trackUris;
+            
+            for (const [sourceUri, newHistory] of Object.entries(result.newUsedUrisBySource)) {
+                if (newHistory) {
+                    await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
+                }
             }
+        } catch (err) {
+            console.error("[Sort-Play Dynamic] Initial run execution failed:", err);
+            executionError = err;
         }
     } else {
         const playlistId = job.targetPlaylistUri.split(':')[2];
@@ -15012,55 +15031,67 @@
             console.warn("Sort-Play: Could not fetch current playlist details to update description.", e);
         }
 
-        if (updateMode === 'append') {
-            const result = await executeSortOperation({ ...job, isHeadless: true });
-            const sampledTrackUris = result.trackUris;
+        try {
+            if (updateMode === 'append') {
+                const result = await executeSortOperation({ ...job, isHeadless: true });
+                const sampledTrackUris = result.trackUris;
 
-            if (!sampledTrackUris || sampledTrackUris.length === 0) {
-                if (updateSchedule) job.lastRun = Date.now();
-                return job;
-            }
-            const targetTracks = await getPlaylistTracks(playlistId);
-            const targetTrackUris = new Set(targetTracks.map(t => t.uri));
-            const newTrackUris = sampledTrackUris.filter(uri => !targetTrackUris.has(uri));
+                if (!sampledTrackUris || sampledTrackUris.length === 0) {
+                    appendedEarlyReturn = true;
+                } else {
+                    const targetTracks = await getPlaylistTracks(playlistId);
+                    const targetTrackUris = new Set(targetTracks.map(t => t.uri));
+                    const newTrackUris = sampledTrackUris.filter(uri => !targetTrackUris.has(uri));
 
-            if (newTrackUris.length > 0) {
-                await Spicetify.Platform.PlaylistAPI.add(job.targetPlaylistUri, newTrackUris, { before: 0 });
-            }
-            for (const [sourceUri, newHistory] of Object.entries(result.newUsedUrisBySource)) {
-                if (newHistory) {
-                    await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
+                    if (newTrackUris.length > 0) {
+                        await Spicetify.Platform.PlaylistAPI.add(job.targetPlaylistUri, newTrackUris, { before: 0 });
+                    }
+                    for (const [sourceUri, newHistory] of Object.entries(result.newUsedUrisBySource)) {
+                        if (newHistory) {
+                            await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
+                        }
+                    }
+                    appendedEarlyReturn = true;
+                }
+            } else if (updateMode === 'merge') {
+                const targetTracks = await getPlaylistTracks(playlistId);
+                const mergeResult = await executeSortOperation({ ...job, isHeadless: true, additionalTracksToInclude: targetTracks });
+                finalTrackUris = mergeResult.trackUris;
+                for (const [sourceUri, newHistory] of Object.entries(mergeResult.newUsedUrisBySource)) {
+                    if (newHistory) {
+                        await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
+                    }
+                }
+            } else {
+                const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri, totalTracks: 0 }];
+                const updateResult = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
+                finalTrackUris = updateResult.trackUris;
+                for (const [sourceUri, newHistory] of Object.entries(updateResult.newUsedUrisBySource)) {
+                    if (newHistory) {
+                        await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
+                    }
                 }
             }
-            if (updateSchedule) job.lastRun = Date.now();
-            return job;
-        } else if (updateMode === 'merge') {
-            const targetTracks = await getPlaylistTracks(playlistId);
-            const mergeResult = await executeSortOperation({ ...job, isHeadless: true, additionalTracksToInclude: targetTracks });
-            finalTrackUris = mergeResult.trackUris;
-            for (const [sourceUri, newHistory] of Object.entries((updateMode === 'merge' ? mergeResult : updateResult).newUsedUrisBySource)) {
-                if (newHistory) {
-                    await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
-                }
-            }
-        } else {
-            const sourcesForUpdate = job.updateFromSource ? job.sources : [{ uri: job.targetPlaylistUri, totalTracks: 0 }];
-            const updateResult = await executeSortOperation({ ...job, sources: sourcesForUpdate, isHeadless: true });
-            finalTrackUris = updateResult.trackUris;
-            for (const [sourceUri, newHistory] of Object.entries((updateMode === 'merge' ? mergeResult : updateResult).newUsedUrisBySource)) {
-                if (newHistory) {
-                    await idb.set('jobHistory', `${job.id}_${sourceUri}`, newHistory);
-                }
-            }
+        } catch (err) {
+            console.error(`[Sort-Play Dynamic] Run execution failed for ${job.targetPlaylistName}:`, err);
+            executionError = err;
         }
     }
     
-    if (finalTrackUris && finalTrackUris.length > 0) {
-        await replacePlaylistTracks(job.targetPlaylistUri.split(':')[2], finalTrackUris);
-    } else {
-        const msg = `[Sort-Play Dynamic] Job for "${job.targetPlaylistName}" resulted in 0 tracks. Check filters or audio data.`;
-        console.warn(msg);
-        showNotification(msg, 'warning');
+    if (!appendedEarlyReturn) {
+        if (finalTrackUris && finalTrackUris.length > 0) {
+            await replacePlaylistTracks(job.targetPlaylistUri.split(':')[2], finalTrackUris);
+        } else {
+            if (executionError) {
+                const msg = `Sort failed for "${job.targetPlaylistName}". Job saved/kept and will retry later.`;
+                console.warn(`[Sort-Play Dynamic] ${msg}`);
+                if (!isInitialRun) showNotification(msg, 'warning');
+            } else {
+                const msg = `[Sort-Play Dynamic] Job for "${job.targetPlaylistName}" resulted in 0 tracks. Check filters or audio data.`;
+                console.warn(msg);
+                showNotification(msg, 'warning');
+            }
+        }
     }
 
     if (newDescription) {
@@ -15222,7 +15253,8 @@
                     name: item.name,
                     info: 'Playlist',
                     coverUrl: images.length ? (images[images.length - 1] || images[0]).url : item.imageUrl,
-                    type: 'playlist'
+                    type: 'playlist',
+                    totalTracks: item.totalLength ?? item.trackCount ?? item.tracks?.totalCount
                 };
             }
 
@@ -15235,7 +15267,8 @@
                         name: item.name || meta.name,
                         info: 'Playlist',
                         coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
-                        type: 'playlist'
+                        type: 'playlist',
+                        totalTracks: meta.totalLength
                     };
                 } catch (e) {
                     console.warn(`Sort-Play: Could not fetch metadata for playlist ${item.name}`, e);
@@ -15286,7 +15319,8 @@
                         name: item.name,
                         info: `Album by ${item.artists ? item.artists.map(a => a.name).join(', ') : 'Unknown'}`,
                         coverUrl: imageUrl,
-                        type: 'album'
+                        type: 'album',
+                        totalTracks: item.trackCount ?? item.tracks?.totalCount
                     });
                 });
             } catch (e) {
@@ -15304,7 +15338,7 @@
     }
   }
 
-  async function showChangeSourceModal(title, libraryItemsPromise, onSourceChanged, isMultiSelect = true, descriptionText = "Search for source, paste a link, or select from your library.", onCancel = null) {
+  async function showChangeSourceModal(title, libraryItemsPromise, onSourceChanged, isMultiSelect = true, descriptionText = "Search for source, paste a link, or select from your library.", onCancel = null, isDynamic = false) {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-change-source-modal";
     overlay.className = "sort-play-font-scope";
@@ -15318,12 +15352,17 @@
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container";
     modalContainer.style.cssText = `
-        width: 490px !important; display: flex; flex-direction: column;
+        width: ${isDynamic ? '950px' : '490px'} !important; display: flex; flex-direction: column;
         border-radius: 20px; background-color: #181818 !important; border: 1px solid #282828;
+        max-width: 95vw;
     `;
 
     let selectedSources = new Set();
     let libraryData = [];
+    let playlistsData = [];
+    let albumsData = [];
+    let artistsData = [];
+    let globalSearchResults = { playlists: [], albums: [], artists: [] };
     const sourceDataCache = new Map();
     const manuallyAddedUris = new Set();
 
@@ -15333,13 +15372,22 @@
           #user-library-container::-webkit-scrollbar { width: 8px; }
           #user-library-container::-webkit-scrollbar-track { background: #282828; }
           #user-library-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+          .dynamic-cols-wrapper { display: flex; gap: 12px; margin-top: 8px; height: 350px; }
+          .dynamic-col { flex: 1; display: flex; flex-direction: column; background-color: #282828; border-radius: 6px; overflow: hidden; }
+          .dynamic-col-header { padding: 10px; font-weight: bold; text-align: center; border-bottom: 1px solid #3e3e3e; color: #fff; background-color: #2a2a2a; flex-shrink: 0; font-size: 14px; letter-spacing: 0.5px; }
+          .dynamic-col-content { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+          .dynamic-col-content::-webkit-scrollbar { width: 8px; }
+          .dynamic-col-content::-webkit-scrollbar-track { background: transparent; }
+          .dynamic-col-content::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+          .global-search-divider { color: #1ed760; font-size: 11px; text-transform: uppercase; font-weight: bold; margin: 16px 0 8px; text-align: center; border-bottom: 1px solid #3e3e3e; line-height: 0.1em; }
+          .global-search-divider span { background: #282828; padding: 0 10px; }
           .library-item { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s ease, border 0.2s ease; border: 1px solid transparent; }
           .library-item:hover { background-color: #3e3e3e; }
           .library-item.selected { background-color: #3a4f3a; border: 1px solid #1ed760; }
           .library-item-cover { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; }
           .library-item-text { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
           .library-item-title { color: white; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-          .library-item-info { color: #b3b3b3; font-size: 12px; }
+          .library-item-info { color: #b3b3b3; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
           .folder-container { margin-bottom: 2px; }
           .folder-header { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; border: 1px solid transparent; }
           .folder-header:hover { background-color: #3e3e3e; }
@@ -15373,7 +15421,7 @@
         <div class="main-trackCreditsModal-mainSection" style="padding: 16px 24px; scrollbar-width: none;">
             <p style="color: #b3b3b3; font-size: 14px; margin: 0 0 12px;">${descriptionText}</p>
             
-            <div class="input-wrapper">
+            <div class="input-wrapper" style="${isDynamic ? 'z-index: 10; margin-bottom: 8px;' : ''}">
                 <input type="text" id="source-url-input" placeholder="Search library or paste link..." autocomplete="off">
                 <button id="source-clear-btn" title="Clear">&times;</button>
                 <button id="source-add-btn" title="Add Link">
@@ -15383,9 +15431,32 @@
 
             <div id="added-sources-list" style="display: none;"></div>
 
+            ${isDynamic ? `
+            <div class="dynamic-cols-wrapper">
+                <div class="dynamic-col">
+                    <div class="dynamic-col-header">Playlists</div>
+                    <div class="dynamic-col-content" id="col-playlists">
+                        <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading...</div>
+                    </div>
+                </div>
+                <div class="dynamic-col">
+                    <div class="dynamic-col-header">Albums</div>
+                    <div class="dynamic-col-content" id="col-albums">
+                        <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading...</div>
+                    </div>
+                </div>
+                <div class="dynamic-col">
+                    <div class="dynamic-col-header">Followed Artists</div>
+                    <div class="dynamic-col-content" id="col-artists">
+                        <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading...</div>
+                    </div>
+                </div>
+            </div>
+            ` : `
             <div id="user-library-container">
                 <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading Library...</div>
             </div>
+            `}
         </div>
         <div class="main-trackCreditsModal-originalCredits" style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: flex-end; gap: 10px;">
             <button id="cancel-change-source" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
@@ -15399,7 +15470,6 @@
     const searchInput = modalContainer.querySelector('#source-url-input');
     const clearButton = modalContainer.querySelector('#source-clear-btn');
     const addButton = modalContainer.querySelector('#source-add-btn');
-    const libraryContainer = modalContainer.querySelector('#user-library-container');
     const addedSourcesList = modalContainer.querySelector('#added-sources-list');
 
     const processUri = async (uri) => {
@@ -15493,11 +15563,13 @@
             const itemDiv = document.createElement('div');
             itemDiv.className = 'library-item manual-item';
             
+            const trackCountStr = data.totalTracks !== undefined && data.totalTracks !== '?' && data.totalTracks !== 'N/A' ? ` • ${data.totalTracks} tracks` : '';
+
             itemDiv.innerHTML = `
                 <img src="${data.coverUrl || ''}" class="library-item-cover" onerror="this.style.display='none'">
                 <div class="library-item-text">
                     <span class="library-item-title">${data.name}</span>
-                    <span class="library-item-info">${data.info || 'Added via link'}</span>
+                    <span class="library-item-info">${data.info || 'Added via link'}${trackCountStr}</span>
                 </div>
                 <button class="remove-manual-btn" title="Remove">
                     ${removeManualIconSvg}
@@ -15509,7 +15581,7 @@
                 manuallyAddedUris.delete(uri);
                 selectedSources.delete(uri);
                 
-                const libEl = libraryContainer.querySelector(`[data-uri="${uri}"]`);
+                const libEl = modalContainer.querySelector(`[data-uri="${uri}"]`);
                 if (libEl) libEl.classList.remove('selected');
                 
                 renderAddedSourcesList();
@@ -15535,7 +15607,7 @@
             selectedSources.clear();
             manuallyAddedUris.clear();
             renderAddedSourcesList();
-            libraryContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+            modalContainer.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
             selectedSources.add(item.uri);
             element.classList.add('selected');
             return;
@@ -15557,7 +15629,7 @@
                 }
             }
             
-            const elements = libraryContainer.querySelectorAll(`[data-uri="${u}"]`);
+            const elements = modalContainer.querySelectorAll(`[data-uri="${u}"]`);
             elements.forEach(el => el.classList.toggle('selected', shouldSelect));
         });
 
@@ -15566,106 +15638,140 @@
         }
     };
 
-    const renderTree = (items, container, filterText = '') => {
-        container.innerHTML = '';
+    const renderTree = (items, container, filterText = '', limit = 0, append = false) => {
+        if (!append) container.innerHTML = '';
         
-        if (items.length === 0) {
+        if (items.length === 0 && !append) {
              container.innerHTML = '<div style="text-align: center; color: #b3b3b3; font-size: 13px; padding: 10px;">No items found</div>';
              return;
         }
 
-        items.forEach(item => {
-            const matchesFilter = !filterText || item.name.toLowerCase().includes(filterText.toLowerCase());
-            
-            if (item.type === 'folder') {
-                const hasMatchingChild = (node) => {
-                    if (node.name.toLowerCase().includes(filterText.toLowerCase())) return true;
-                    if (node.children) return node.children.some(hasMatchingChild);
-                    return false;
-                };
+        let renderedCount = 0;
 
-                if (filterText && !hasMatchingChild(item)) return;
+        const processList = (list, parentEl) => {
+            for (const item of list) {
+                if (limit > 0 && renderedCount >= limit) break;
 
-                const folderDiv = document.createElement('div');
-                folderDiv.className = 'folder-container';
+                const matchesFilter = !filterText || item.name.toLowerCase().includes(filterText.toLowerCase());
                 
-                const header = document.createElement('div');
-                header.className = 'folder-header';
-                header.dataset.uri = item.uri;
-                if (selectedSources.has(item.uri)) header.classList.add('selected');
+                if (item.type === 'folder') {
+                    const hasMatchingChild = (node) => {
+                        if (node.name.toLowerCase().includes(filterText.toLowerCase())) return true;
+                        if (node.children) return node.children.some(hasMatchingChild);
+                        return false;
+                    };
 
-                header.innerHTML = `
-                    <button class="caret-btn">${caretIconSvg}</button>
-                    ${folderIconSvg}
-                    <div class="library-item-text">
-                        <span class="library-item-title">${item.name}</span>
-                        <span class="library-item-info">Folder</span>
-                    </div>
-                `;
+                    if (filterText && !hasMatchingChild(item)) continue;
 
-                const childrenContainer = document.createElement('div');
-                childrenContainer.className = 'folder-children';
+                    const folderDiv = document.createElement('div');
+                    folderDiv.className = 'folder-container';
+                    
+                    const header = document.createElement('div');
+                    header.className = 'folder-header';
+                    header.dataset.uri = item.uri;
+                    if (selectedSources.has(item.uri)) header.classList.add('selected');
 
-                const caretBtn = header.querySelector('.caret-btn');
-                const caretIcon = caretBtn.querySelector('.caret-icon');
-                
-                const toggleExpand = (e) => {
-                    e.stopPropagation();
-                    const isExpanded = childrenContainer.classList.contains('expanded');
-                    if (isExpanded) {
-                        childrenContainer.classList.remove('expanded');
-                        caretIcon.classList.remove('rotated');
-                    } else {
+                    header.innerHTML = `
+                        <button class="caret-btn">${caretIconSvg}</button>
+                        ${folderIconSvg}
+                        <div class="library-item-text">
+                            <span class="library-item-title">${item.name}</span>
+                            <span class="library-item-info">Folder</span>
+                        </div>
+                    `;
+
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'folder-children';
+
+                    const caretBtn = header.querySelector('.caret-btn');
+                    const caretIcon = caretBtn.querySelector('.caret-icon');
+                    
+                    const toggleExpand = (e) => {
+                        e.stopPropagation();
+                        const isExpanded = childrenContainer.classList.contains('expanded');
+                        if (isExpanded) {
+                            childrenContainer.classList.remove('expanded');
+                            caretIcon.classList.remove('rotated');
+                        } else {
+                            childrenContainer.classList.add('expanded');
+                            caretIcon.classList.add('rotated');
+                            if (!childrenContainer.hasChildNodes()) {
+                                processList(item.children, childrenContainer);
+                            }
+                        }
+                    };
+
+                    caretBtn.addEventListener('click', toggleExpand);
+
+                    header.addEventListener('click', (e) => {
+                        if (e.target.closest('.caret-btn')) return;
+                        toggleSelection(item, header);
+                    });
+                    
+                    if (filterText) {
                         childrenContainer.classList.add('expanded');
                         caretIcon.classList.add('rotated');
-                        if (!childrenContainer.hasChildNodes()) {
-                            renderTree(item.children, childrenContainer, filterText);
-                        }
+                        processList(item.children, childrenContainer);
                     }
-                };
 
-                caretBtn.addEventListener('click', toggleExpand);
+                    parentEl.appendChild(folderDiv);
+                } else {
+                    if (!matchesFilter) continue;
+                    renderedCount++;
 
-                header.addEventListener('click', (e) => {
-                    if (e.target.closest('.caret-btn')) return;
-                    toggleSelection(item, header);
-                });
-                
-                if (filterText) {
-                    childrenContainer.classList.add('expanded');
-                    caretIcon.classList.add('rotated');
-                    renderTree(item.children, childrenContainer, filterText);
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'library-item';
+                    itemDiv.dataset.uri = item.uri;
+                    if (selectedSources.has(item.uri)) itemDiv.classList.add('selected');
+
+                    const trackCountStr = item.totalTracks !== undefined && item.totalTracks !== '?' && item.totalTracks !== 'N/A' ? ` • ${item.totalTracks} tracks` : '';
+
+                    itemDiv.innerHTML = `
+                        <img src="${item.coverUrl || 'https://i.imgur.com/33q4t4k.png'}" class="library-item-cover" onerror="this.src='https://i.imgur.com/33q4t4k.png'">
+                        <div class="library-item-text">
+                            <span class="library-item-title">${item.name}</span>
+                            <span class="library-item-info">${item.info}${trackCountStr}</span>
+                        </div>
+                    `;
+
+                    itemDiv.addEventListener('click', () => {
+                        toggleSelection(item, itemDiv);
+                    });
+
+                    parentEl.appendChild(itemDiv);
                 }
-
-                folderDiv.appendChild(header);
-                folderDiv.appendChild(childrenContainer);
-                container.appendChild(folderDiv);
-
-            } else {
-                if (!matchesFilter) return;
-
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'library-item';
-                itemDiv.dataset.uri = item.uri;
-                if (selectedSources.has(item.uri)) itemDiv.classList.add('selected');
-
-                itemDiv.innerHTML = `
-                    <img src="${item.coverUrl || ''}" class="library-item-cover" onerror="this.style.display='none'">
-                    <div class="library-item-text">
-                        <span class="library-item-title">${item.name}</span>
-                        <span class="library-item-info">${item.info}</span>
-                    </div>
-                `;
-
-                itemDiv.addEventListener('click', () => {
-                    toggleSelection(item, itemDiv);
-                });
-
-                container.appendChild(itemDiv);
             }
-        });
+        };
+
+        processList(items, container);
     };
 
+    const renderDynamicColumns = (filterText) => {
+        const colPlaylists = modalContainer.querySelector('#col-playlists');
+        const colAlbums = modalContainer.querySelector('#col-albums');
+        const colArtists = modalContainer.querySelector('#col-artists');
+        
+        if (colPlaylists) renderTree(playlistsData, colPlaylists, filterText, 50);
+        if (colAlbums) renderTree(albumsData, colAlbums, filterText, 50);
+        if (colArtists) renderTree(artistsData, colArtists, filterText, 50);
+        
+        if (filterText && (globalSearchResults.playlists.length > 0 || globalSearchResults.albums.length > 0 || globalSearchResults.artists.length > 0)) {
+            const appendGlobal = (globalItems, container) => {
+                if (globalItems.length === 0 || !container) return;
+                const divider = document.createElement('div');
+                divider.className = 'global-search-divider';
+                divider.innerHTML = `<span>Global Search</span>`;
+                container.appendChild(divider);
+                renderTree(globalItems, container, '', 15, true); 
+            };
+            
+            appendGlobal(globalSearchResults.playlists, colPlaylists);
+            appendGlobal(globalSearchResults.albums, colAlbums);
+            appendGlobal(globalSearchResults.artists, colArtists);
+        }
+    };
+
+    let searchDebounce;
     searchInput.addEventListener('input', () => {
         const text = searchInput.value.trim();
         clearButton.style.display = text.length > 0 ? 'block' : 'none';
@@ -15682,7 +15788,108 @@
             searchInput.style.paddingRight = '35px';
         }
         
-        renderTree(libraryData, libraryContainer, text);
+        if (isDynamic) {
+            renderDynamicColumns(text);
+            
+            clearTimeout(searchDebounce);
+            if (text.length > 1 && !looksLikeLink) {
+                searchDebounce = setTimeout(async () => {
+                    try {
+                        const searchReq = {
+                            name: "searchDesktop",
+                            operation: "query",
+                            sha256Hash: "3c9d3f60dac5dea3876b6db3f534192b1c1d90032c4233c1bbaba526db41eb31",
+                            value: null
+                        };
+
+                        const res = await Spicetify.GraphQL.Request(searchReq, {
+                            searchTerm: text,
+                            offset: 0,
+                            limit: 15,
+                            numberOfTopResults: 5,
+                            includeAudiobooks: false,
+                            includePreReleases: false,
+                            includeEpisodes: false
+                        });
+
+                        const searchData = res?.data?.searchV2;
+
+                        if (searchData) {
+                            globalSearchResults.playlists = (searchData.playlists?.items || [])
+                                .map(i => i.data || i)
+                                .filter(p => p && p.uri && p.name)
+                                .map(p => {
+                                    const ownerName = p.ownerV2?.data?.name || p.owner?.name || 'Spotify';
+                                    const coverUrl = p.images?.items?.[0]?.sources?.[0]?.url || p.images?.[0]?.url || p.coverArt?.sources?.[0]?.url;
+                                    return {
+                                        uri: p.uri, name: p.name, info: `By ${ownerName}`,
+                                        coverUrl: coverUrl, type: 'playlist', totalTracks: p.tracks?.totalCount ?? '?', isGlobal: true
+                                    };
+                                });
+                            
+                            globalSearchResults.albums = (searchData.albumsV2?.items || searchData.albums?.items || [])
+                                .map(i => {
+                                    const rawAlbum = i.data || i;
+                                    if (!rawAlbum) return null;
+
+                                    let name = '';
+                                    let uri = '';
+                                    let artistNames = 'Unknown';
+                                    let coverUrl = null;
+
+                                    if (rawAlbum.__typename === "PreRelease" || rawAlbum.preReleaseContent) {
+                                        const content = rawAlbum.preReleaseContent;
+                                        name = content?.name;
+                                        uri = content?.uri;
+                                        artistNames = content?.artists?.items?.map(ar => {
+                                            const artistData = ar.data || ar;
+                                            return artistData.profile?.name || artistData.name;
+                                        }).filter(Boolean).join(', ') || 'Unknown';
+                                        coverUrl = content?.coverArt?.sources?.[0]?.url;
+                                    } else {
+                                        name = rawAlbum.name;
+                                        uri = rawAlbum.uri;
+                                        artistNames = rawAlbum.artists?.items?.map(ar => ar.profile?.name || ar.name).filter(Boolean).join(', ') || 'Unknown';
+                                        coverUrl = rawAlbum.coverArt?.sources?.[0]?.url || rawAlbum.images?.[0]?.url;
+                                    }
+
+                                    if (!name || !uri) return null;
+
+                                    return {
+                                        uri: uri,
+                                        name: name,
+                                        info: `Album by ${artistNames}`,
+                                        coverUrl: coverUrl,
+                                        type: 'album',
+                                        totalTracks: '?',
+                                        isGlobal: true
+                                    };
+                                })
+                                .filter(Boolean);
+                            
+                            globalSearchResults.artists = (searchData.artists?.items || [])
+                                .map(i => i.data || i)
+                                .filter(a => a && a.uri && (a.profile?.name || a.name))
+                                .map(a => {
+                                    const name = a.profile?.name || a.name;
+                                    const coverUrl = a.visuals?.avatarImage?.sources?.[0]?.url || a.images?.[0]?.url;
+                                    return {
+                                        uri: a.uri, name: name, info: 'Artist', coverUrl: coverUrl, type: 'artist', isGlobal: true
+                                    };
+                                });
+                            
+                            renderDynamicColumns(text);
+                        }
+                    } catch (e) { console.error("Global search failed", e); }
+                }, 600);
+            } else {
+                globalSearchResults = { playlists: [], albums: [], artists: [] };
+                renderDynamicColumns(text);
+            }
+        } else {
+            const libraryContainer = modalContainer.querySelector('#user-library-container');
+            if (libraryContainer) renderTree(libraryData, libraryContainer, text, 50);
+        }
     });
 
     clearButton.addEventListener('click', () => {
@@ -15691,7 +15898,13 @@
         addButton.style.display = 'none';
         clearButton.style.right = '10px';
         searchInput.style.paddingRight = '35px';
-        renderTree(libraryData, libraryContainer, '');
+        if (isDynamic) {
+            globalSearchResults = { playlists: [], albums: [], artists: [] };
+            renderDynamicColumns('');
+        } else {
+            const libraryContainer = modalContainer.querySelector('#user-library-container');
+            if (libraryContainer) renderTree(libraryData, libraryContainer, '', 50);
+        }
         searchInput.focus();
     });
 
@@ -15719,7 +15932,11 @@
                  clearButton.style.display = 'none';
                  clearButton.style.right = '10px';
                  searchInput.style.paddingRight = '35px';
-                 renderTree(libraryData, libraryContainer, '');
+                 if (isDynamic) renderDynamicColumns('');
+                 else {
+                     const libraryContainer = modalContainer.querySelector('#user-library-container');
+                     if (libraryContainer) renderTree(libraryData, libraryContainer, '');
+                 }
                  return;
             }
 
@@ -15738,7 +15955,7 @@
                 manuallyAddedUris.add(uri);
                 renderAddedSourcesList();
                 
-                const libEl = libraryContainer.querySelector(`[data-uri="${uri}"]`);
+                const libEl = modalContainer.querySelector(`[data-uri="${uri}"]`);
                 if (libEl) libEl.classList.add('selected');
 
                 searchInput.value = '';
@@ -15746,7 +15963,11 @@
                 clearButton.style.display = 'none';
                 clearButton.style.right = '10px';
                 searchInput.style.paddingRight = '35px';
-                renderTree(libraryData, libraryContainer, '');
+                if (isDynamic) renderDynamicColumns('');
+                else {
+                    const libraryContainer = modalContainer.querySelector('#user-library-container');
+                    if (libraryContainer) renderTree(libraryData, libraryContainer, '');
+                }
             } catch (e) {
                 showNotification("Invalid source or fetch failed.", true);
             } finally {
@@ -15807,13 +16028,42 @@
     try {
         libraryData = await libraryItemsPromise;
         if (libraryData) {
-            renderTree(libraryData, libraryContainer);
+            if (isDynamic) {
+                playlistsData = libraryData.filter(item => item.type === 'playlist' || item.type === 'folder');
+                albumsData = libraryData.filter(item => item.type === 'album');
+                
+                getAllFollowedArtists().then(artists => {
+                    artistsData = artists.map(a => ({
+                        uri: a.uri,
+                        name: a.name,
+                        info: 'Artist',
+                        type: 'artist',
+                        coverUrl: a.coverUrl
+                    }));
+                    renderDynamicColumns('');
+                });
+                
+                renderDynamicColumns('');
+            } else {
+                const libraryContainer = modalContainer.querySelector('#user-library-container');
+                if (libraryContainer) renderTree(libraryData, libraryContainer, '', 50);
+            }
         } else {
-            libraryContainer.innerHTML = '<div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Could not load library.</div>';
+            if (isDynamic) {
+                modalContainer.querySelectorAll('.dynamic-col-content').forEach(c => c.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>');
+            } else {
+                const libraryContainer = modalContainer.querySelector('#user-library-container');
+                if (libraryContainer) libraryContainer.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>';
+            }
         }
     } catch (error) {
         console.error("Failed to load library for modal:", error);
-        libraryContainer.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>';
+        if (isDynamic) {
+            modalContainer.querySelectorAll('.dynamic-col-content').forEach(c => c.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>');
+        } else {
+            const libraryContainer = modalContainer.querySelector('#user-library-container');
+            if (libraryContainer) libraryContainer.innerHTML = '<div style="text-align: center; color: #f15e6c; font-size: 14px; padding: 20px 0;">Error loading library.</div>';
+        }
     }
   }
 
@@ -17523,14 +17773,16 @@
                 runningJobIds.add(job.id);
                 closeModal();
         
-                showNotification(`Running job for "${job.targetPlaylistName}"...`);
+                const stickyNotification = showNotification(`Updating Dynamic Playlist: ${job.targetPlaylistName}...`, 'sticky');
         
                 try {
                     const shouldUpdateSchedule = isJobDue(job, Date.now());
                     const updatedJob = await runJob(job, false, shouldUpdateSchedule);
                     updateJob(updatedJob);
+                    stickyNotification.remove();
                     showNotification(`Dynamic playlist "${job.targetPlaylistName}" was updated.`);
                 } catch (error) {
+                    stickyNotification.remove();
                     showDetailedError(error, `Failed to manually run dynamic playlist job for "${job.targetPlaylistName}"`);
                 } finally {
                     runningJobIds.delete(job.id);
@@ -18069,12 +18321,14 @@
                 const limitBtnClass = isSourceLimitEnabled ? 'active' : '';
                 const limitControlsStyle = isSourceLimitEnabled ? 'opacity: 1; pointer-events: auto;' : 'opacity: 0.4; pointer-events: none;';
 
+                const trackCountDisplay = (source.totalTracks !== undefined && source.totalTracks !== null && source.totalTracks !== '?' && source.totalTracks !== 'N/A') ? ` • ${source.totalTracks} tracks` : '';
+
                 return `
                 <div class="source-item" data-uri="${source.uri}">
                     <img src="${source.coverUrl || 'https://i.imgur.com/33q4t4k.png'}" class="source-cover-art-small">
                     <div class="source-text-info">
                         <div class="source-name" title="${source.name}">${source.name}</div>
-                        <div class="source-info">${source.info} • ${source.totalTracks ?? 'N/A'} tracks</div>
+                        <div class="source-info">${source.info}${trackCountDisplay}</div>
                         <div class="source-limit-wrapper" style="display: none; margin-top: 6px; align-items: center;">
                             <button class="source-limit-toggle-btn ${limitBtnClass}" data-index="${index}" title="Toggle limit for this source">Limit</button>
                             <div class="limit-controls-container" style="display: flex; align-items: center; transition: opacity 0.2s; ${limitControlsStyle}">
@@ -18124,7 +18378,10 @@
                             else sources.splice(indexToChange, 1);
                             renderSources();
                         },
-                        true 
+                        true,
+                        "Search for source, paste a link, or select from your library.",
+                        null,
+                        true
                     );
                 });
             });
@@ -18312,6 +18569,9 @@
                     renderSources();
                     toggleLimitInputs(limitTracksToggle.checked);
                 },
+                true,
+                "Search for source, paste a link, or select from your library.",
+                null,
                 true
             );
         });
@@ -18467,12 +18727,17 @@
                     lastRun: null,
                 };
                 closeModal();
+                
+                const stickyNotification = showNotification(`Creating Dynamic Playlist: ${newJob.targetPlaylistName}...`, 'sticky');
+                
                 runJob(newJob, true)
                 .then(completedJob => {
                     addJob(completedJob);
+                    stickyNotification.remove();
                     showNotification(`Dynamic playlist "${completedJob.targetPlaylistName}" created successfully!`);
                 })
                 .catch(error => {
+                    stickyNotification.remove();
                     showDetailedError(error, `Error creating dynamic playlist "${newJob.targetPlaylistName}"`);
                 });
             }
@@ -21698,26 +21963,32 @@
           let limit = 100;
           let total = null;
           while (total === null || offset < total) {
-              const res = await GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, {
-                  uri: artistUri,
-                  offset: offset,
-                  limit: limit
-              });
-              const disc = res.data.artistUnion.discography.all;
-              total = disc.totalCount;
-              
-              disc.items.forEach(group => {
-                  if (group.releases && group.releases.items) {
-                      group.releases.items.forEach(rel => {
-                          const id = rel.uri.split(':')[2];
-                          allAlbumMetadata.set(id, { 
-                              type: rel.type || 'album',
-                              date: rel.date?.isoString || rel.date?.year 
+              try {
+                  const res = await GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, {
+                      uri: artistUri,
+                      offset: offset,
+                      limit: limit
+                  });
+                  const disc = res?.data?.artistUnion?.discography?.all;
+                  if (!disc) break;
+                  total = disc.totalCount;
+                  
+                  disc.items.forEach(group => {
+                      if (group.releases && group.releases.items) {
+                          group.releases.items.forEach(rel => {
+                              const id = rel.uri.split(':')[2];
+                              allAlbumMetadata.set(id, { 
+                                  type: rel.type || 'album',
+                                  date: rel.date?.isoString || rel.date?.year 
+                              });
                           });
-                      });
-                  }
-              });
-              offset += limit;
+                      }
+                  });
+                  offset += limit;
+              } catch (e) {
+                  console.warn("fetchAlbumIdsGQL failed", e);
+                  break;
+              }
           }
       };
 
@@ -21917,24 +22188,30 @@
           let limit = 100;
           let total = null;
           while (total === null || offset < total) {
-              const res = await GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, {
-                  uri: artistUri,
-                  offset: offset,
-                  limit: limit
-              });
-              const disc = res.data.artistUnion.discography.all;
-              total = disc.totalCount;
-              disc.items.forEach(group => {
-                  if (group.releases && group.releases.items) {
-                      group.releases.items.forEach(rel => {
-                          const id = rel.uri.split(':')[2];
-                          allAlbumMetadata.set(id, { 
-                              type: rel.type || 'album'
+              try {
+                  const res = await GraphQL.Request(GraphQL.Definitions.queryArtistDiscographyAll, {
+                      uri: artistUri,
+                      offset: offset,
+                      limit: limit
+                  });
+                  const disc = res?.data?.artistUnion?.discography?.all;
+                  if (!disc) break;
+                  total = disc.totalCount;
+                  disc.items.forEach(group => {
+                      if (group.releases && group.releases.items) {
+                          group.releases.items.forEach(rel => {
+                              const id = rel.uri.split(':')[2];
+                              allAlbumMetadata.set(id, { 
+                                  type: rel.type || 'album'
+                              });
                           });
-                      });
-                  }
-              });
-              offset += limit;
+                      }
+                  });
+                  offset += limit;
+              } catch (e) {
+                  console.warn("fetchAlbumIdsGQL failed for shuffle", e);
+                  break;
+              }
           }
       };
 
@@ -25592,11 +25869,17 @@
                 const items = res.items || [];
                 const artists = items
                     .filter(item => item.type === 'artist' || (item.uri && item.uri.includes(':artist:')))
-                    .map(a => ({ 
-                        uri: a.uri, 
-                        name: a.name, 
-                        id: a.uri ? a.uri.split(':')[2] : null 
-                    }))
+                    .map(a => {
+                        let coverUrl = null;
+                        if (a.images && a.images.length > 0) coverUrl = a.images[0].url;
+                        else if (a.image && a.image.url) coverUrl = a.image.url;
+                        return { 
+                            uri: a.uri, 
+                            name: a.name, 
+                            id: a.uri ? a.uri.split(':')[2] : null,
+                            coverUrl: coverUrl
+                        };
+                    })
                     .filter(a => a.id);
                 
                 if (artists.length > 0) return artists;
