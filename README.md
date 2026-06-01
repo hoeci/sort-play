@@ -50,6 +50,7 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 
 Apply instant filters to your current view without opening complex menus.
 *   **Remove Duplicates:** Instantly identify and remove duplicate tracks from the current list.
+*   **One Track per Artist:** Keep only a single track for each unique artist, automatically prioritizing the most played or most popular track.
 *   **Liked Status:**
     *   **Remove Liked:** Remove tracks you have already saved to your library (uses intelligent ISRC matching).
     *   **Liked Only:** Filter the list to show *only* the tracks you have saved.
