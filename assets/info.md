@@ -20,7 +20,7 @@
 Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, Last.fm Scrobbles, My Scrobbles, Last Scrobbled, Energy Wave, Album Color, and audio features (Tempo, Energy, etc.).
 
 ### ➕ Quick Filters
-Instantly apply filters. Deduplicate tracks, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
+Instantly apply filters. Deduplicate tracks, keep one track per artist, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
 
 ### ➕ Extra Data Columns
 Add up to two extra data columns to playlists and one to albums/artists. Display Play Count, Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info with custom formatting.
