@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.80.0";
+  const SORT_PLAY_VERSION = "5.80.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -15812,6 +15812,8 @@
                         processList(item.children, childrenContainer);
                     }
 
+                    folderDiv.appendChild(header);
+                    folderDiv.appendChild(childrenContainer);
                     parentEl.appendChild(folderDiv);
                 } else {
                     if (!matchesFilter) continue;
@@ -15849,9 +15851,9 @@
         const colAlbums = modalContainer.querySelector('#col-albums');
         const colArtists = modalContainer.querySelector('#col-artists');
         
-        if (colPlaylists) renderTree(playlistsData, colPlaylists, filterText, 50);
-        if (colAlbums) renderTree(albumsData, colAlbums, filterText, 50);
-        if (colArtists) renderTree(artistsData, colArtists, filterText, 50);
+        if (colPlaylists) renderTree(playlistsData, colPlaylists, filterText, 0);
+        if (colAlbums) renderTree(albumsData, colAlbums, filterText, 0);
+        if (colArtists) renderTree(artistsData, colArtists, filterText, 0);
         
         if (filterText && (globalSearchResults.playlists.length > 0 || globalSearchResults.albums.length > 0 || globalSearchResults.artists.length > 0)) {
             const appendGlobal = (globalItems, container) => {
@@ -15986,7 +15988,7 @@
             }
         } else {
             const libraryContainer = modalContainer.querySelector('#user-library-container');
-            if (libraryContainer) renderTree(libraryData, libraryContainer, text, 50);
+            if (libraryContainer) renderTree(libraryData, libraryContainer, text, 0);
         }
     });
 
@@ -16001,7 +16003,7 @@
             renderDynamicColumns('');
         } else {
             const libraryContainer = modalContainer.querySelector('#user-library-container');
-            if (libraryContainer) renderTree(libraryData, libraryContainer, '', 50);
+            if (libraryContainer) renderTree(libraryData, libraryContainer, '', 0);
         }
         searchInput.focus();
     });
@@ -16144,7 +16146,7 @@
                 renderDynamicColumns('');
             } else {
                 const libraryContainer = modalContainer.querySelector('#user-library-container');
-                if (libraryContainer) renderTree(libraryData, libraryContainer, '', 50);
+                if (libraryContainer) renderTree(libraryData, libraryContainer, '', 0);
             }
         } else {
             if (isDynamic) {
@@ -33067,7 +33069,7 @@
               }
 
               .lfm-header { display: flex; padding: 30px 24px 24px; background: transparent !important; gap: 24px; align-items: flex-start; flex-shrink: 0; border: none !important; }
-              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-radius: 4px; object-fit: cover; flex-shrink: 0; }
               .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px; padding-right: 10px; }
               .lfm-title { display: flex; align-items: center; font-size: 26px; font-weight: 800; color: white !important; line-height: 1.2; margin-bottom: 2px; }
               .lfm-title-text { 
