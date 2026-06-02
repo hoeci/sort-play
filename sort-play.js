@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.79.0";
+  const SORT_PLAY_VERSION = "5.80.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -32,6 +32,7 @@
   const STORAGE_KEY_CHAT_PANEL_VISIBLE = "sort-play-chat-panel-visible";
   const STORAGE_KEY_LASTFM_USERNAME = "sort-play-lastfm-username";
   const STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU = "sort-play-show-lastfm-context-menu";
+  const STORAGE_KEY_SHOW_LASTFM_ARTIST_CONTEXT_MENU = "sort-play-show-lastfm-artist-context-menu";
   const STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU = "sort-play-show-genres-context-menu";
   const STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU = "sort-play-show-artist-discography-context-menu";
   const STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU = "sort-play-show-shuffle-context-menu";
@@ -133,7 +134,7 @@
     STORAGE_KEY_GENRE_SOURCES_AP_SPOTIFY, STORAGE_KEY_GENRE_SOURCES_AP_LASTFM,
     STORAGE_KEY_USE_GENRE_PLAYLIST_DATABASE, STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL,
     STORAGE_KEY_CHAT_PANEL_VISIBLE, STORAGE_KEY_LASTFM_USERNAME,
-    STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU,
+    STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, STORAGE_KEY_SHOW_LASTFM_ARTIST_CONTEXT_MENU, STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU,
     STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU,
     STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, STORAGE_KEY_GENRE_FILTER_SORT,
     STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2, STORAGE_KEY_ADD_TO_QUEUE,
@@ -222,6 +223,7 @@
   let useLfmGateway = false;
   let lastFmAutocorrect = false;
   let showLastFmContextMenu = false;
+  let showLastFmArtistContextMenu = false;
   let chatPanelVisible = false;
   let showLikeButton = false;
   let likeButtonConfig = { trackRows: true, nowPlayingBar: true, nowPlayingView: true };
@@ -291,6 +293,7 @@
   let mountLikeButton_isRunning = false;
   let mountLikeButton_failedAttempts = 0;
   let lastFmContextMenuItem = null;
+  let lastFmArtistContextMenuItem = null;
   let showGenresContextMenu = false;
   let genresContextMenuItem = null;
   let showArtistDiscographyContextMenu = false;
@@ -446,6 +449,7 @@
   const externalLinkIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/><path d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/></svg>`;
   const closeIconSmall2Svg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>`;
   const thumbsUpIconSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>`;
+  const replyIconSvg = `<svg width="13" height="13" viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M32 18l13 13-13 13M45 31H24C15 31 8 24 8 15V6"/></svg>`;
   const playIconSvg = `<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>`;
   const pauseIconSvg = `<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>`;
   const selectAllIconSvg = `<svg viewBox="0 0 24 24" width="18px" height="18px"><path d="M 4 2 C 2.895 2 2 2.895 2 4 L 2 16 C 2 17.105 2.895 18 4 18 L 16 18 C 17.105 18 18 17.105 18 16 L 18 4 C 18 2.895 17.105 2 16 2 L 4 2 z M 4 4 L 16 4 L 16 16 L 4 16 L 4 4 z M 20 6 L 20 20 L 6 20 L 6 22 L 20 22 C 21.105 22 22 21.105 22 20 L 22 6 L 20 6 z M 13.292969 6.2929688 L 9 10.585938 L 6.7070312 8.2929688 L 5.2929688 9.7070312 L 9 13.414062 L 14.707031 7.7070312 L 13.292969 6.2929688 z"/></svg>`;
@@ -2094,6 +2098,7 @@
     selectedNowPlayingLastScrobbledFormat = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT) || 'relative';
     lastFmAutocorrect = localStorage.getItem(STORAGE_KEY_LASTFM_AUTOCORRECT) === "true";
     showLastFmContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU) === "true";
+    showLastFmArtistContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_LASTFM_ARTIST_CONTEXT_MENU) === "true";
     showGenresContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU) === "true";
     showArtistDiscographyContextMenu = localStorage.getItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU) === "true";
     const showShuffleContextMenuStored = localStorage.getItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU);
@@ -2183,16 +2188,13 @@
     localStorage.setItem(STORAGE_KEY_NOW_PLAYING_LAST_SCROBBLED_FORMAT, selectedNowPlayingLastScrobbledFormat);
     localStorage.setItem(STORAGE_KEY_LASTFM_AUTOCORRECT, lastFmAutocorrect);
     localStorage.setItem(STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, showLastFmContextMenu);
-    updateLastFmContextMenu();
+    localStorage.setItem(STORAGE_KEY_SHOW_LASTFM_ARTIST_CONTEXT_MENU, showLastFmArtistContextMenu);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU, showGenresContextMenu);
-    updateGenresContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, showArtistDiscographyContextMenu);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, artistDiscographySortType);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE, artistDiscographyDeduplicationMode);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL, showArtistDiscographyDuplicateWarning);
-    updateArtistDiscographyContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU, showShuffleContextMenu);
-    updateShuffleContextMenu();
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS, showGenreTags);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_NP, showGenreTagsNowPlaying);
     localStorage.setItem(STORAGE_KEY_SHOW_GENRE_TAGS_AP, showGenreTagsArtistPage);
@@ -2211,6 +2213,12 @@
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
     }
+
+    try { updateLastFmContextMenu(); } catch(e) { console.error("Sort-Play: Context Menu Update Error", e); }
+    try { updateLastFmArtistContextMenu(); } catch(e) { console.error("Sort-Play: Context Menu Update Error", e); }
+    try { updateGenresContextMenu(); } catch(e) { console.error("Sort-Play: Context Menu Update Error", e); }
+    try { updateArtistDiscographyContextMenu(); } catch(e) { console.error("Sort-Play: Context Menu Update Error", e); }
+    try { updateShuffleContextMenu(); } catch(e) { console.error("Sort-Play: Context Menu Update Error", e); }
   }
 
   window.SortPlaySyncUtils = {
@@ -2236,6 +2244,7 @@
           [STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL]: "false",
           [STORAGE_KEY_CHAT_PANEL_VISIBLE]: "false",
           [STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU]: "false",
+          [STORAGE_KEY_SHOW_LASTFM_ARTIST_CONTEXT_MENU]: "false",
           [STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU]: "false",
           [STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU]: "false",
           [STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU]: "true",
@@ -3277,6 +3286,22 @@
         </div>
     </div>
 
+    <div class="setting-row" id="lastFmArtistContextMenuSetting">
+        <label class="col description">
+        Artist Menu: Last.fm Details
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Adds a "Last.fm Details" option to the artist right-click menu to view details in a popup window.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="showLastFmArtistContextMenuToggle" ${showLastFmArtistContextMenu ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div class="setting-row" id="shuffleContextMenuSetting">
         <label class="col description">
         All Menus: Shuffle & Play
@@ -3666,6 +3691,7 @@
     const lastFmAutocorrectToggle = modalContainer.querySelector("#lastFmAutocorrectToggle");
     const manageLfmOverridesBtn = modalContainer.querySelector("#manageLfmOverridesBtn");
     const showLastFmContextMenuToggle = modalContainer.querySelector("#showLastFmContextMenuToggle");
+    const showLastFmArtistContextMenuToggle = modalContainer.querySelector("#showLastFmArtistContextMenuToggle");
     const showArtistDiscographyContextMenuToggle = modalContainer.querySelector("#showArtistDiscographyContextMenuToggle");
     const showShuffleContextMenuToggle = modalContainer.querySelector("#showShuffleContextMenuToggle");
     const artistDiscographySortSelect = modalContainer.querySelector("#artistDiscographySortSelect");
@@ -3958,6 +3984,11 @@
 
     showLastFmContextMenuToggle.addEventListener("change", () => {
         showLastFmContextMenu = showLastFmContextMenuToggle.checked;
+        saveSettings();
+    });
+
+    showLastFmArtistContextMenuToggle.addEventListener("change", () => {
+        showLastFmArtistContextMenu = showLastFmArtistContextMenuToggle.checked;
         saveSettings();
     });
 
@@ -9007,7 +9038,10 @@
                   showNotification("Could not fetch track details", true);
               }
           },
-          (uris) => uris.length === 1 && (uris[0].startsWith("spotify:track:") || Spicetify.URI.isLocal(uris[0])),
+          (uris) => {
+              if (!uris || uris.length !== 1) return false;
+              try { return uris[0].startsWith("spotify:track:") || Spicetify.URI.isLocal(uris[0]); } catch(e) { return false; }
+          },
           "genre-tag",
           genreTagIconSvg
       );
@@ -32541,11 +32575,12 @@
       return results;
   }
 
-  async function fetchLastFmShoutbox(artistRaw, trackRaw, targetPage = 1) {
+  async function fetchLastFmShoutbox(artistRaw, trackRaw, targetPage = 1, sortMode = 'popular') {
       const params = new URLSearchParams({
           artist: artistRaw,
           track: trackRaw,
-          page: targetPage
+          page: targetPage,
+          sort: sortMode
       });
 
       try {
@@ -32602,6 +32637,9 @@
                   }
               }
 
+              const replyLinkEl = container.querySelector('.shout-action-reply, a[href*="+shoutbox/"]');
+              const replyUrl = replyLinkEl ? replyLinkEl.getAttribute('href') : null;
+
               const replies = [];
               const repliesList = li.querySelector(':scope > ul.shout-list, :scope > .shout-list');
               
@@ -32620,7 +32658,8 @@
                   dateText,
                   body,
                   likes,
-                  replies
+                  replies,
+                  replyUrl
               };
           }
 
@@ -32645,20 +32684,78 @@
       }
   }
   
-  function showLastFmTrackDetailsModal(trackInfo) {
+  async function fetchLastFmExtendedInfo(artist, track, username, trackId) {
+      const results = {
+          track: null,
+          artist: null,
+          user: null
+      };
+
+      let lfmArtist = artist;
+      let lfmTrack = track;
+      
+      if (trackId && track) {
+          const overrides = getLfmOverrides();
+          if (overrides[trackId]) {
+              lfmArtist = overrides[trackId].artist;
+              lfmTrack = overrides[trackId].track;
+          }
+      }
+
+      const promises = [];
+
+      if (lfmTrack) {
+          const trackParams = new URLSearchParams({
+              method: 'track.getInfo',
+              artist: lfmArtist,
+              track: lfmTrack,
+              format: 'json',
+              autocorrect: lastFmAutocorrect ? '1' : '0'
+          });
+          if (username) trackParams.append('username', username);
+          
+          promises.push(fetchLfmWithGateway(trackParams).then(async res => {
+              if (res.ok) {
+                  const data = await res.json();
+                  results.track = data.track;
+              }
+          }));
+      }
+
+      const artistParams = new URLSearchParams({
+          method: 'artist.getInfo',
+          artist: lfmArtist,
+          format: 'json',
+          autocorrect: lastFmAutocorrect ? '1' : '0'
+      });
+      if (username) artistParams.append('username', username);
+
+      promises.push(fetchLfmWithGateway(artistParams).then(async res => {
+          if (res.ok) {
+              const data = await res.json();
+              results.artist = data.artist;
+          }
+      }));
+
+      await Promise.all(promises);
+      return results;
+  }
+
+  function showLastFmTrackDetailsModal(trackInfo, contextType = 'track') {
       const existing = document.getElementById("sort-play-lfm-details-overlay");
       if (existing) existing.remove();
 
       const username = loadLastFmUsername();
       const isCommentsCollapsedInitial = localStorage.getItem(STORAGE_KEY_LFM_COMMENTS_COLLAPSED) === 'true';
+      const isArtistContext = contextType === 'artist';
       
       const overlay = document.createElement("div");
       overlay.id = "sort-play-lfm-details-overlay";
       overlay.style.cssText = `
-          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-          background-color: rgba(0, 0, 0, 0.7) !important; z-index: 2002;
-          display: flex; justify-content: center; align-items: center;
-          backdrop-filter: blur(8px);
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7) !important; z-index: 2002;
+        display: flex; justify-content: center; align-items: center;
+        backdrop-filter: blur(8px);
       `;
 
       const modalContainer = document.createElement("div");
@@ -32667,23 +32764,24 @@
       modalContainer.style.cssText = `
           z-index: 2003;
           width: ${isCommentsCollapsedInitial ? '640px' : '1040px'} !important;
-          background-color: #181818 !important;
-          border: 1px solid #282828 !important;
+          background-color: transparent !important;
+          background-image: none !important;
+          border: 1px solid transparent !important;
           border-radius: 30px !important;
-          box-shadow: 0 10px 60px rgba(0,0,0,0.8) !important;
+          box-shadow: 0 10px 60px rgba(0,0,0,0) !important;
           display: flex;
           flex-direction: column;
           position: relative;
           overflow: hidden;
           height: 700px;
-          transition: width 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
-          will-change: width;
+          transition: width 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), background-color 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+          will-change: width, background-color, border-color, box-shadow;
       `;
 
       modalContainer.innerHTML = `
-          <div style="height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 15px;">
+          <div id="lfm-loading-state" style="height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 15px;">
               <div class="loader"></div>
-              <span style="color: #b3b3b3 !important; font-size: 14px; font-weight: 500;">Fetching Last.fm Data...</span>
+              <span style="color: rgba(255,255,255,0.7) !important; font-size: 14px; font-weight: 500; letter-spacing: 0.5px;">Fetching Last.fm Data...</span>
           </div>
       `;
 
@@ -32694,27 +32792,47 @@
       overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
       const artistName = trackInfo.artistName || (trackInfo.artists && trackInfo.artists[0]?.name) || "";
-      const trackName = trackInfo.name || trackInfo.songTitle || "";
+      const trackName = isArtistContext ? "" : (trackInfo.name || trackInfo.songTitle || "");
       const trackUri = trackInfo.uri || "";
       const trackId = trackUri.split(":")[2] || null;
 
-      const lfmPromise = fetchLastFmTrackExtendedInfo(artistName, trackName, username, trackId);
-      
-      let spotifyImagePromise = Promise.resolve(null);
-      if (trackUri && trackUri.startsWith("spotify:track:")) {
-          const trackId = trackUri.split(":")[2];
-          spotifyImagePromise = fetchInternalTrackMetadata(trackId).then(meta => {
-             if (meta && meta.album && meta.album.images && meta.album.images.length > 0) {
-                 return meta.album.images[0].url;
-             }
-             return null;
-          }).catch(err => {
-              console.warn("[Sort-Play] Failed to fetch internal cover for modal", err);
-              return null;
-          });
+      let lfmArtist = artistName;
+      let lfmTrack = trackName;
+      if (trackId && !isArtistContext) {
+          const overrides = getLfmOverrides();
+          if (overrides[trackId]) {
+              lfmArtist = overrides[trackId].artist;
+              lfmTrack = overrides[trackId].track;
+          }
       }
 
-      Promise.all([lfmPromise, spotifyImagePromise]).then(([data, spotifyCover]) => {
+      const lfmPromise = fetchLastFmExtendedInfo(artistName, trackName, username, trackId);
+
+      let currentSortMode = 'popular';
+      
+      let initialCommentsPromise = null;
+      if (!isCommentsCollapsedInitial) {
+          initialCommentsPromise = fetchLastFmShoutbox(lfmArtist, lfmTrack, 1, currentSortMode);
+      }
+      
+      let spotifyImagePromise = Promise.resolve(null);
+      if (trackUri) {
+          if (isArtistContext && trackUri.startsWith("spotify:artist:")) {
+              const artistId = trackUri.split(":")[2];
+              spotifyImagePromise = getArtistImageUrl(artistId).catch(() => null);
+          } else if (!isArtistContext && trackUri.startsWith("spotify:track:")) {
+              spotifyImagePromise = fetchInternalTrackMetadata(trackId).then(meta => {
+                 if (meta && meta.album && meta.album.images && meta.album.images.length > 0) {
+                     return meta.album.images[0].url;
+                 }
+                 return null;
+              }).catch(err => {
+                  return null;
+              });
+          }
+      }
+
+      Promise.all([lfmPromise, spotifyImagePromise]).then(async ([data, spotifyCover]) => {
           const tData = data.track;
           const aData = data.artist;
 
@@ -32722,11 +32840,11 @@
               const displayTitle = trackInfo.songTitle || trackInfo.name || "Unknown Track";
               showLastFmOverrideModal(trackId, displayTitle, () => {
                   closeModal();
-                  showLastFmTrackDetailsModal(trackInfo);
+                  showLastFmTrackDetailsModal(trackInfo, contextType);
               });
           };
 
-          if (!tData) {
+          if (!isArtistContext && !tData) {
               modalContainer.style.width = '640px';
               modalContainer.innerHTML = `
                   <div style="padding: 50px; text-align: center; color: #fff !important; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
@@ -32741,31 +32859,173 @@
               if (fixBtn) fixBtn.onclick = triggerFixMatch;
               return;
           }
+          
+          if (isArtistContext && !aData) {
+              modalContainer.style.width = '640px';
+              modalContainer.innerHTML = `
+                  <div style="padding: 50px; text-align: center; color: #fff !important; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+                      <h3 style="margin-bottom: 20px; color: #fff !important;">Artist not found on Last.fm</h3>
+                      <button id="lfm-close-btn" class="main-buttons-button main-button-secondary" style="background-color: #333 !important; color: white !important;">Close</button>
+                  </div>
+              `;
+              const btn = modalContainer.querySelector('#lfm-close-btn');
+              if (btn) btn.onclick = closeModal;
+              return;
+          }
 
           let albumImage = "https://lastfm.freetls.fastly.net/i/u/300x300/2a96cbd8b46e442fc41c2b86b821562f.png";
+          const defaultLfmStar = "2a96cbd8b46e442fc41c2b86b821562f.png";
           
-          if (spotifyCover) {
-              albumImage = spotifyCover;
+          const lfmImages = isArtistContext ? aData?.image : tData?.album?.image;
+          const lfmExtractedImage = lfmImages?.find(i => i.size === 'extralarge')?.['#text'] 
+                                 || lfmImages?.find(i => i.size === 'large')?.['#text'];
+          
+          if (isArtistContext) {
+              if (lfmExtractedImage && !lfmExtractedImage.includes(defaultLfmStar)) {
+                  albumImage = lfmExtractedImage;
+              } else if (spotifyCover) {
+                  albumImage = spotifyCover;
+              }
           } else {
-              albumImage = tData.album?.image?.find(i => i.size === 'extralarge')?.['#text'] 
-                  || tData.album?.image?.find(i => i.size === 'large')?.['#text'] 
-                  || albumImage;
+              if (spotifyCover) {
+                  albumImage = spotifyCover;
+              } else if (lfmExtractedImage) {
+                  albumImage = lfmExtractedImage;
+              }
+          }
+
+          const getDominantColor = (src) => {
+              return new Promise((resolve) => {
+                  const img = new Image();
+                  img.crossOrigin = 'Anonymous';
+                  img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      canvas.width = 50; canvas.height = 50;
+                      const ctx = canvas.getContext('2d');
+                      ctx.drawImage(img, 0, 0, 50, 50);
+                      try {
+                          const data = ctx.getImageData(0, 0, 50, 50).data;
+                          let r = 0, g = 0, b = 0, count = 0;
+                          for (let i = 0; i < data.length; i += 4) {
+                              if (data[i+3] < 128) continue;
+                              r += data[i]; g += data[i+1]; b += data[i+2];
+                              count++;
+                          }
+                          if(count === 0) return resolve([40, 40, 40]);
+                          resolve([Math.round(r/count), Math.round(g/count), Math.round(b/count)]);
+                      } catch(e) { resolve([40, 40, 40]); }
+                  };
+                  img.onerror = () => resolve([40, 40, 40]);
+                  img.src = src;
+              });
+          };
+
+          const [r, g, b] = await getDominantColor(albumImage);
+          const bgR = Math.round(r * 0.1);
+          const bgG = Math.round(g * 0.1);
+          const bgB = Math.round(b * 0.1);
+          const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+          const fabTextColor = brightness > 140 ? '#000000' : '#ffffff';
+          
+          let cR = r, cG = g, cB = b;
+          if (brightness < 80) {
+              cR = Math.min(255, r + 60);
+              cG = Math.min(255, g + 60);
+              cB = Math.min(255, b + 60);
           }
           
-          const userPlaycount = tData.userplaycount || 0;
-          const totalListeners = tData.listeners || 0;
-          const totalScrobbles = tData.playcount || 0;
-          const artistTotal = aData?.stats?.playcount || 0;
-          const userArtistCount = aData?.stats?.userplaycount; 
-          const trackUrl = tData.url;
+          const lineR = Math.min(255, bgR + 35);
+          const lineG = Math.min(255, bgG + 35);
+          const lineB = Math.min(255, bgB + 35);
+          const threadLineColor = `rgb(${lineR}, ${lineG}, ${lineB})`;
+          
+          modalContainer.style.setProperty('background-color', `rgb(${bgR}, ${bgG}, ${bgB})`, 'important');
+          modalContainer.style.setProperty('border-color', 'rgba(255,255,255,0.1)', 'important');
+          modalContainer.style.setProperty('box-shadow', '0 10px 60px rgba(0,0,0,0.8)', 'important');
+
+          const trackUrl = isArtistContext ? aData.url : tData.url;
+          
+          let statsHtml = '';
+          if (isArtistContext) {
+              const totalListeners = aData?.stats?.listeners || 0;
+              const artistTotal = aData?.stats?.playcount || 0;
+              const userArtistCount = aData?.stats?.userplaycount;
+              statsHtml = `
+                  <div class="lfm-stat-box">
+                      <div class="lfm-stat-header">${listenersIcon} <span class="lfm-stat-label">Total Listeners</span></div>
+                      <div class="lfm-stat-value">${Number(totalListeners).toLocaleString()}</div>
+                  </div>
+                  <div class="lfm-stat-box">
+                      <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Artist Scrobbles</span></div>
+                      <div class="lfm-stat-value">${Number(artistTotal).toLocaleString()}</div>
+                  </div>
+                  <div class="lfm-stat-box" style="grid-column: 1 / -1;">
+                      <div class="lfm-stat-header">${myPlaysIcon} <span class="lfm-stat-label">Your Artist Scrobbles</span></div>
+                      <div class="lfm-stat-value">
+                          ${username ? Number(userArtistCount || 0).toLocaleString() : `<span style="color:rgba(255,255,255,0.5) !important; font-size: 18px;">N/A</span>`}
+                      </div>
+                      ${!username ? `<div style="font-size: 12px; color: #fff !important; cursor: pointer !important; text-decoration: underline !important; opacity: 0.8;" id="set-user-btn">Set Last.fm Username</div>` : ''}
+                  </div>
+              `;
+          } else {
+              const userPlaycount = tData.userplaycount || 0;
+              const totalListeners = tData.listeners || 0;
+              const totalScrobbles = tData.playcount || 0;
+              const artistTotal = aData?.stats?.playcount || 0;
+              const userArtistCount = aData?.stats?.userplaycount;
+              statsHtml = `
+                  <div class="lfm-stat-box">
+                      <div class="lfm-stat-header">${listenersIcon} <span class="lfm-stat-label">Total Listeners</span></div>
+                      <div class="lfm-stat-value">${Number(totalListeners).toLocaleString()}</div>
+                  </div>
+                  <div class="lfm-stat-box">
+                      <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Track Scrobbles</span></div>
+                      <div class="lfm-stat-value">${Number(totalScrobbles).toLocaleString()}</div>
+                  </div>
+                  <div class="lfm-stat-box">
+                      <div class="lfm-stat-header">${myPlaysIcon} <span class="lfm-stat-label">Your Track Scrobbles</span></div>
+                      <div class="lfm-stat-value">
+                          ${username ? Number(userPlaycount).toLocaleString() : `<span style="color:rgba(255,255,255,0.5) !important; font-size: 18px;">N/A</span>`}
+                      </div>
+                      ${!username ? `<div style="font-size: 12px; color: #fff !important; cursor: pointer !important; text-decoration: underline !important; opacity: 0.8;" id="set-user-btn">Set Last.fm Username</div>` : ''}
+                  </div>
+                  <div class="lfm-stat-box">
+                      <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Artist Scrobbles</span></div>
+                      <div class="lfm-stat-value">${Number(artistTotal).toLocaleString()}</div>
+                      ${(username && userArtistCount !== undefined) ? `<div class="lfm-stat-sub">You: ${Number(userArtistCount).toLocaleString()}</div>` : ''}
+                  </div>
+              `;
+          }
           
           const filterTags = (tags) => (tags || []).filter(t => {
               const n = t.name.toLowerCase();
               return !['seen live', 'albums i own'].includes(n) && !/^\d+$/.test(n);
           });
 
-          const trackTags = filterTags(tData.toptags?.tag).slice(0, 5);
+          const trackTags = isArtistContext ? [] : filterTags(tData.toptags?.tag).slice(0, 5);
           const artistTags = filterTags(aData?.tags?.tag).slice(0, 5);
+
+          let tagsHtml = '';
+          if (trackTags.length > 0) {
+              tagsHtml += `
+                  <div>
+                      <div class="tag-section-header">Track Tags</div>
+                      <div class="lfm-tags">${trackTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}</div>
+                  </div>
+              `;
+          }
+          if (artistTags.length > 0) {
+              tagsHtml += `
+                  <div>
+                      <div class="tag-section-header">Artist Tags</div>
+                      <div class="lfm-tags">${artistTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}</div>
+                  </div>
+              `;
+          }
+
+          const titleStr = isArtistContext ? aData.name : tData.name;
+          const artistStr = isArtistContext ? "Artist" : tData.artist.name;
+          const coverStyle = isArtistContext ? 'border-radius: 50%;' : '';
 
           let currentPage = 1;
           let hasNextPage = true;
@@ -32774,133 +33034,172 @@
 
           modalContainer.innerHTML = `
             <style>
+              @keyframes fadeInLfmModal {
+                  0% { opacity: 0; }
+                  100% { opacity: 1; }
+              }
+              .lfm-fade-in-wrapper {
+                  animation: fadeInLfmModal 0.2s ease forwards;
+                  height: 100%; width: 100%; display: flex; flex-direction: row; position: relative;
+              }
               #sort-play-lfm-details-overlay * { box-sizing: border-box; }
               .lfm-modal-layout { display: flex; flex-direction: row; width: 1040px; height: 100%; flex: 1; min-height: 0; }
-              .lfm-main-panel { width: 640px; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; background-color: #181818; }
-              .lfm-header { display: flex; padding: 30px 24px 24px; background: linear-gradient(180deg, #222 0%, #181818 100%) !important; gap: 24px; align-items: flex-start; flex-shrink: 0; }
-              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border-radius: 4px; object-fit: cover; flex-shrink: 0; }
-              .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px; }
+              
+              .lfm-main-panel { 
+                  width: 640px; flex-shrink: 0; display: flex; flex-direction: column; height: 100%; 
+                  background-color: rgb(${bgR}, ${bgG}, ${bgB}); 
+                  position: relative;
+                  z-index: 1;
+                  overflow: hidden;
+              }
+              .lfm-main-panel::before {
+                  content: '';
+                  position: absolute;
+                  top: -20px; left: -20px; right: -20px; bottom: -20px;
+                  background-image: 
+                      linear-gradient(to bottom, rgba(${r}, ${g}, ${b}, 0.65) -35%, rgba(${bgR}, ${bgG}, ${bgB}, 0.9) 45%, rgb(${bgR}, ${bgG}, ${bgB}) 100%),
+                      url('${albumImage}');
+                  background-size: cover;
+                  background-position: top center;
+                  background-repeat: no-repeat;
+                  filter: blur(12px);
+                  z-index: -1;
+              }
+
+              .lfm-header { display: flex; padding: 30px 24px 24px; background: transparent !important; gap: 24px; align-items: flex-start; flex-shrink: 0; border: none !important; }
+              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+              .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px; padding-right: 10px; }
               .lfm-title { display: flex; align-items: center; font-size: 26px; font-weight: 800; color: white !important; line-height: 1.2; margin-bottom: 2px; }
-              .lfm-title-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-              .lfm-artist { font-size: 18px; font-weight: 500; color: white !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-              .lfm-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px; background-color: #181818 !important; flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+              .lfm-title-text { 
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+                  text-shadow: 0 2px 10px rgba(0,0,0,0.2); 
+                  padding-bottom: 6px; margin-bottom: -6px; 
+                  padding-right: 8px; 
+              }
+              .lfm-artist { 
+                  font-size: 18px; font-weight: 500; color: rgba(255,255,255,0.85) !important; 
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+                  text-shadow: 0 1px 5px rgba(0,0,0,0.2); 
+                  padding-bottom: 6px; margin-bottom: -6px; 
+                  padding-right: 8px; 
+              }
+              .lfm-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px; background-color: transparent !important; flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
               .lfm-body::-webkit-scrollbar { width: 8px; }
               .lfm-body::-webkit-scrollbar-track { background: transparent; }
-              .lfm-body::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+              .lfm-body::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15); border-radius: 4px; }
               .lfm-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-              .lfm-stat-box { background: #242424 !important; border-radius: 8px !important; padding: 16px 20px !important; display: flex; flex-direction: column; justify-content: center; gap: 6px; border: 1px solid #333 !important; transition: border-color 0.2s; min-height: 85px; }
-              .lfm-stat-box:hover { border-color: #444 !important; }
-              .lfm-stat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
-              .lfm-stat-label { font-size: 11px; color: #b3b3b3 !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
+              
+              .lfm-stat-box { background: rgba(255, 255, 255, 0.05) !important; border-radius: 8px !important; padding: 16px 20px !important; display: flex; flex-direction: column; justify-content: center; gap: 6px; border: 1px solid rgba(255,255,255,0.08) !important; transition: all 0.2s; min-height: 85px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+              .lfm-stat-box:hover { background: rgba(255, 255, 255, 0.08) !important; border-color: rgba(255, 255, 255, 0.15) !important; }
+              .lfm-stat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; color: #ccc; }
+              .lfm-stat-label { font-size: 11px; color: rgba(255,255,255,0.7) !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
               .lfm-stat-value { font-size: 22px; font-weight: 700; color: white !important; letter-spacing: -0.5px; }
-              .lfm-stat-sub { font-size: 12px; color: #888 !important; margin-top: -2px; }
+              .lfm-stat-sub { font-size: 12px; color: rgba(255,255,255,0.6) !important; margin-top: -2px; }
+              
               .lfm-tags-container { display: flex; flex-direction: column; gap: 12px; }
-              .tag-section-header { font-size: 12px; color: #888 !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: 8px; }
+              .tag-section-header { font-size: 12px; color: rgba(255,255,255,0.6) !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: 8px; }
               .lfm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
-              .lfm-tag { background: #2a2a2a !important; color: #ddd !important; padding: 6px 14px !important; border-radius: 16px !important; font-size: 13px !important; font-weight: 500 !important; border: 1px solid transparent !important; }
-              .lfm-tag:hover { background-color: #333 !important; border-color: #444 !important; color: white !important; }
-              .lfm-footer { padding: 20px 24px; border-top: 1px solid #282828 !important; display: flex; justify-content: space-between; align-items: center; background: #181818 !important; flex-shrink: 0; }
-              .lfm-btn { background-color: #ba0000 !important; color: white !important; border: none !important; padding: 10px 24px !important; border-radius: 24px !important; font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important; display: flex; align-items: center; gap: 8px; transition: background-color 0.2s; }
-              .lfm-btn:hover { background-color: #d60000 !important; }
-              .lfm-comments-panel { width: 400px; flex-shrink: 0; border-left: 1px solid #282828; display: flex; flex-direction: column; height: 100%; background-color: #121212; transition: opacity 0.3s; opacity: 1; }
+              
+              .lfm-tag { background: rgba(255,255,255,0.08) !important; color: #fff !important; padding: 6px 14px !important; border-radius: 16px !important; font-size: 13px !important; font-weight: 500 !important; border: 1px solid rgba(255,255,255,0.05) !important; transition: all 0.2s; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+              .lfm-tag:hover { background-color: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.2) !important; }
+              
+              .lfm-footer { padding: 20px 24px; border-top: 1px solid rgba(255,255,255,0.08) !important; display: flex; justify-content: space-between; align-items: center; background: transparent !important; flex-shrink: 0; }
+              
+              .lfm-btn { background-color: rgb(${r}, ${g}, ${b}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: 10px 24px !important; border-radius: 24px !important; font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, filter 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+              .lfm-btn:hover { filter: brightness(1.2); transform: scale(1.03); }
+              
+              .lfm-comments-panel { width: 400px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; height: 100%; background-color: rgb(${bgR}, ${bgG}, ${bgB}); background-image: linear-gradient(180deg, rgba(${cR}, ${cG}, ${cB}, 0.22) 0%, rgba(${cR}, ${cG}, ${cB}, 0.09) 35%, rgba(${cR}, ${cG}, ${cB}, 0.02) 70%, rgb(${bgR}, ${bgG}, ${bgB}) 100%); transition: opacity 0.3s; opacity: 1; }
               .lfm-comments-panel.collapsed { opacity: 0; pointer-events: none; }
-              .lfm-comments-header { padding: 30px 24px 20px; border-bottom: 1px solid #282828; flex-shrink: 0; background-color: #181818; }
-              .lfm-comments-body { flex: 1; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: #535353 transparent; min-height: 0; }
+              .lfm-comments-header { padding: 30px 24px 34px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; background-color: transparent; position: relative; }
+              .lfm-comments-body { flex: 1; overflow-y: auto; padding: 20px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; min-height: 0; }
               .lfm-comments-body::-webkit-scrollbar { width: 6px; }
-              .lfm-comments-body::-webkit-scrollbar-thumb { background-color: #444; border-radius: 3px; }
+              .lfm-comments-body::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15); border-radius: 3px; }
+              
+              .lfm-fab-add-comment { position: absolute; bottom: 24px; right: 24px; width: 46px; height: 46px; background-color: rgb(${r}, ${g}, ${b}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s, filter 0.2s; z-index: 10; text-decoration: none; }
+              .lfm-fab-add-comment:hover { transform: scale(1.03); filter: brightness(1.2); color: ${fabTextColor} !important; }
+              .lfm-fab-add-comment svg { stroke: currentColor !important; color: ${fabTextColor} !important; }
+              
               .lfm-comment-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 20px; }
               .comment-item { display: flex; flex-direction: column; position: relative; }
               .comment-content { display: flex; gap: 10px; align-items: stretch; position: relative; z-index: 2; }
               .avatar-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; position: relative; }
-              .parent-drop-line { position: absolute; bottom: 0; width: 0; border-left: 2px solid #333; z-index: 1; }
+              
+              .parent-drop-line { position: absolute; bottom: 0; width: 0; border-left: 2px solid ${threadLineColor}; z-index: 1; }
               .comment-thread-replies { list-style: none; margin: 0; padding-top: 12px; padding-bottom: 0; padding-right: 0; display: flex; flex-direction: column; gap: 16px; }
               .replies-level-0 { padding-left: 42px; }
               .replies-level-deep { padding-left: 38px; }
               .reply-item { position: relative; display: flex; flex-direction: column; }
-              .reply-item::before { content: ''; position: absolute; top: -16px; left: -27px; width: 27px; height: 28px; border-left: 2px solid #333; border-bottom: 2px solid #333; border-bottom-left-radius: 16px; z-index: 1; }
-              .reply-item:not(:last-child)::after { content: ''; position: absolute; top: 0px; left: -27px; bottom: -16px; border-left: 2px solid #333; z-index: 1; }
-              .close-icon-btn { position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.4) !important; border: none !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex; align-items: center; justify-content: center; transition: background 0.2s; z-index: 10; }
-              .close-icon-btn:hover { background: rgba(0,0,0,0.7) !important; }
+              .reply-item::before { content: ''; position: absolute; top: -16px; left: -27px; width: 27px; height: 28px; border-left: 2px solid ${threadLineColor}; border-bottom: 2px solid ${threadLineColor}; border-bottom-left-radius: 16px; z-index: 1; }
+              .reply-item:not(:last-child)::after { content: ''; position: absolute; top: 0px; left: -27px; bottom: -16px; border-left: 2px solid ${threadLineColor}; z-index: 1; }
+              
+              .top-right-controls { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; z-index: 10; }
+              
+              .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex; align-items: center; justify-content: center; transition: background 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+              .top-icon-btn:hover { background: rgba(${r}, ${g}, ${b}, 0.6) !important; border-color: rgba(255,255,255,0.3) !important; }
+              .top-icon-btn svg { width: 17px !important; height: 17px !important; }
+              
+              #lfm-comments-sort-select { transition: color 0.2s; }
+              #lfm-comments-sort-select:hover { color: #fff !important; }
+              #lfm-comments-sort-select option { background: rgb(${bgR}, ${bgG}, ${bgB}); color: #fff; }
             </style>
 
-            <button class="close-icon-btn" id="lfm-close-x">
-                ${closeIconSmall2Svg}
-            </button>
+            <div class="lfm-fade-in-wrapper">
+                <div class="top-right-controls">
+                    <button class="top-icon-btn" id="lfm-comments-toggle-btn" title="Toggle Comments">
+                        ${liveChatIconSVG}
+                    </button>
+                    <button class="top-icon-btn" id="lfm-close-x" title="Close">
+                        ${closeIconSmall2Svg}
+                    </button>
+                </div>
 
-            <div class="lfm-modal-layout">
-                <div class="lfm-main-panel">
+                <div class="lfm-modal-layout">
+                    <div class="lfm-main-panel">
                     <div class="lfm-header">
-                        <img src="${albumImage}" class="lfm-cover">
+                        <img src="${albumImage}" class="lfm-cover" style="${coverStyle}">
                         <div class="lfm-info">
-                            <div class="lfm-title" title="${tData.name}">
-                                <span class="lfm-title-text">${tData.name}</span>
-                                ${trackId ? `<button id="lfm-fix-match-btn-header" title="Fix Match (Override Link)" style="background:none; border:none; cursor:pointer; color:#b3b3b3; padding:0; margin-left:8px; flex-shrink:0; display:flex; align-items:center; transition: color 0.2s;">${penIconSvg}</button>` : ''}
+                            <div class="lfm-title" title="${titleStr}">
+                                <span class="lfm-title-text">${titleStr}</span>
+                                ${(trackId && !isArtistContext) ? `<button id="lfm-fix-match-btn-header" title="Fix Match (Override Link)" style="background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.6); padding:0; margin-left:8px; flex-shrink:0; display:flex; align-items:center; transition: color 0.2s;">${penIconSvg}</button>` : ''}
                             </div>
-                            <div class="lfm-artist">${tData.artist.name}</div>
+                            <div class="lfm-artist">${artistStr}</div>
                         </div>
                     </div>
 
                     <div class="lfm-body">
                         <div class="lfm-stats-grid">
-                            <div class="lfm-stat-box">
-                                <div class="lfm-stat-header">${listenersIcon} <span class="lfm-stat-label">Total Listeners</span></div>
-                                <div class="lfm-stat-value">${Number(totalListeners).toLocaleString()}</div>
-                            </div>
-                            <div class="lfm-stat-box">
-                                <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Track Scrobbles</span></div>
-                                <div class="lfm-stat-value">${Number(totalScrobbles).toLocaleString()}</div>
-                            </div>
-                            <div class="lfm-stat-box">
-                                <div class="lfm-stat-header">${myPlaysIcon} <span class="lfm-stat-label">Your Track Scrobbles</span></div>
-                                <div class="lfm-stat-value">
-                                    ${username ? Number(userPlaycount).toLocaleString() : `<span style="color:#666 !important; font-size: 18px;">N/A</span>`}
-                                </div>
-                                ${!username ? `<div style="font-size: 12px; color: #f15e6c !important; cursor: pointer !important; text-decoration: underline !important;" id="set-user-btn">Set Last.fm Username</div>` : ''}
-                            </div>
-                            <div class="lfm-stat-box">
-                                <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Artist Scrobbles</span></div>
-                                <div class="lfm-stat-value">${Number(artistTotal).toLocaleString()}</div>
-                                ${(username && userArtistCount !== undefined) ? `<div class="lfm-stat-sub">You: ${Number(userArtistCount).toLocaleString()}</div>` : ''}
-                            </div>
+                            ${statsHtml}
                         </div>
 
                         <div class="lfm-tags-container">
-                            ${trackTags.length > 0 ? `
-                                <div>
-                                    <div class="tag-section-header">Track Tags</div>
-                                    <div class="lfm-tags">${trackTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}</div>
-                                </div>
-                            ` : ''}
-                            
-                            ${artistTags.length > 0 ? `
-                                <div>
-                                    <div class="tag-section-header">Artist Tags</div>
-                                    <div class="lfm-tags">${artistTags.map(t => `<span class="lfm-tag">${t.name}</span>`).join('')}</div>
-                                </div>
-                            ` : ''}
+                            ${tagsHtml}
                         </div>
                     </div>
 
-                    <div class="lfm-footer">
-                        <button id="lfm-comments-toggle-btn" class="main-buttons-button main-button-secondary" style="background: transparent; border: 1px solid #555; color: white; padding: 8px 16px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-                            ${isCommentsCollapsedInitial ? 'Show Comments' : 'Hide Comments'}
-                        </button>
+                    <div class="lfm-footer" style="justify-content: flex-start;">
                         <a href="${trackUrl}" target="_blank" class="lfm-btn">
                             View on Last.fm 
                             ${externalLinkIconSvg}
                         </a>
                     </div>
                 </div>
-
                 <div class="lfm-comments-panel ${isCommentsCollapsedInitial ? 'collapsed' : ''}">
                     <div class="lfm-comments-header">
                         <h2 style="font-size: 18px; color: white; margin: 0; font-weight: 700;">Shoutbox</h2>
+                        <select id="lfm-comments-sort-select" style="position: absolute; bottom: 10px; left: 20px; background: transparent; color: rgba(255,255,255,0.6); border: none; outline: none; font-size: 10px; cursor: pointer; text-transform: uppercase; font-weight: 600; padding: 0;">
+                            <option value="popular">Recently Popular</option>
+                            <option value="newest">Newest</option>
+                        </select>
                     </div>
                     <div class="lfm-comments-body">
                         <ul class="lfm-comment-list"></ul>
                         <div class="lfm-comments-loader" style="display:none; padding:20px; justify-content:center;"><div class="loader"></div></div>
                     </div>
+                    <a href="${trackUrl}/+shoutbox" target="_blank" class="lfm-fab-add-comment" title="Add a Shout">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </a>
                 </div>
+            </div>
             </div>
           `;
 
@@ -32911,7 +33210,7 @@
           if (fixBtnHeader) {
               fixBtnHeader.onclick = triggerFixMatch;
               fixBtnHeader.onmouseover = () => fixBtnHeader.style.color = '#fff';
-              fixBtnHeader.onmouseout = () => fixBtnHeader.style.color = '#b3b3b3';
+              fixBtnHeader.onmouseout = () => fixBtnHeader.style.color = 'rgba(255,255,255,0.6)';
           }
 
           const setUserBtn = modalContainer.querySelector('#set-user-btn');
@@ -32927,6 +33226,7 @@
           const commentsBody = modalContainer.querySelector('.lfm-comments-body');
           const commentList = modalContainer.querySelector('.lfm-comment-list');
           const commentsLoader = modalContainer.querySelector('.lfm-comments-loader');
+          const sortSelect = modalContainer.querySelector('#lfm-comments-sort-select');
 
           const formatShoutDate = (dateText) => {
               if (!dateText) return '';
@@ -32946,6 +33246,16 @@
                   const hasReplies = c.replies && c.replies.length > 0;
                   const repliesClass = level === 0 ? 'replies-level-0' : 'replies-level-deep';
                   const userUrl = `https://www.last.fm/user/${encodeURIComponent(c.username)}`;
+
+                  let replyHtml = '';
+                  if (c.replyUrl) {
+                      const fullReplyUrl = c.replyUrl.startsWith('http') ? c.replyUrl : `https://www.last.fm${c.replyUrl}`;
+                      replyHtml = `
+                          <a href="${fullReplyUrl}" target="_blank" style="color: rgba(255,255,255,0.4); display: flex; align-items: center; transition: color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.4)'" title="Reply on Last.fm">
+                              ${replyIconSvg}
+                          </a>
+                      `;
+                  }
                   
                   html += `
                       <li class="${isReply ? 'reply-item' : 'comment-item'}">
@@ -32959,14 +33269,17 @@
                               <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; padding-bottom: 2px;">
                                   <div style="display: flex; align-items: baseline; gap: 8px;">
                                       <a href="${userUrl}" target="_blank" style="color: white; font-weight: 600; font-size: 13px; word-break: break-all; text-decoration: none;">${c.username}</a>
-                                      <span style="color: #888; font-size: 11px; white-space: nowrap;">${dateStr}</span>
+                                      <span style="color: rgba(255,255,255,0.5); font-size: 11px; white-space: nowrap;">${dateStr}</span>
                                   </div>
-                                  <div style="color: #ddd; font-size: 13px; line-height: 1.4; margin-top: 2px; word-break: break-word;">
+                                  <div style="color: rgba(255,255,255,0.85); font-size: 13px; line-height: 1.4; margin-top: 2px; word-break: break-word;">
                                       ${c.body}
                                   </div>
-                                  <div style="display: flex; align-items: center; gap: 4px; margin-top: 6px;">
-                                      ${thumbsUpIconSvg}
-                                      <span style="color: #888; font-size: 12px; font-weight: 500;">${c.likes || 0}</span>
+                                  <div style="display: flex; align-items: center; gap: 9px; margin-top: 6px;">
+                                      ${replyHtml}
+                                      <div style="display: flex; align-items: center; gap: 4px; color: rgba(255,255,255,0.5);">
+                                          ${thumbsUpIconSvg}
+                                          <span style="font-size: 12px; font-weight: 500;">${c.likes || 0}</span>
+                                      </div>
                                   </div>
                               </div>
                           </div>
@@ -32982,10 +33295,16 @@
               isLoadingComments = true;
               commentsLoader.style.display = 'flex';
 
-              const result = await fetchLastFmShoutbox(artistName, trackName, currentPage);
+              let result;
+              if (currentPage === 1 && initialCommentsPromise && currentSortMode === 'popular') {
+                  result = await initialCommentsPromise;
+                  initialCommentsPromise = null;
+              } else {
+                  result = await fetchLastFmShoutbox(lfmArtist, isArtistContext ? "" : lfmTrack, currentPage, currentSortMode);
+              }
               
               if (result.error === "session_expired") {
-                  commentList.innerHTML = '<div style="color: #b3b3b3; text-align: center; padding: 20px; font-size: 13px; font-style: italic; line-height: 1.5;">Shoutbox connection expired.</div>';
+                  commentList.innerHTML = '<div style="color: rgba(255,255,255,0.6); text-align: center; padding: 20px; font-size: 13px; font-style: italic; line-height: 1.5;">Shoutbox connection expired.</div>';
                   hasNextPage = false;
                   commentsLoader.style.display = 'none';
                   isLoadingComments = false;
@@ -32997,7 +33316,7 @@
               currentPage++;
 
               if (commentsData.length === 0 && currentPage === 2) {
-                  commentList.innerHTML = '<div style="color: #888; text-align: center; padding: 20px; font-size: 13px;">No shouts found for this track.</div>';
+                  commentList.innerHTML = '<div style="color: rgba(255,255,255,0.4); text-align: center; padding: 20px; font-size: 13px;">No shouts found.</div>';
               } else if (result.comments.length > 0) {
                   commentList.insertAdjacentHTML('beforeend', buildCommentsHtml(result.comments));
               }
@@ -33005,6 +33324,24 @@
               commentsLoader.style.display = 'none';
               isLoadingComments = false;
           };
+
+          if (sortSelect) {
+              const updateSelectWidth = () => {
+                  sortSelect.style.width = sortSelect.value === 'newest' ? '62px' : '119px';
+              };
+              updateSelectWidth();
+              
+              sortSelect.addEventListener('change', (e) => {
+                  updateSelectWidth();
+                  currentSortMode = e.target.value;
+                  currentPage = 1;
+                  hasNextPage = true;
+                  commentsData = [];
+                  commentList.innerHTML = '';
+                  initialCommentsPromise = null;
+                  loadComments();
+              });
+          }
 
           toggleBtn.addEventListener('click', () => {
               const currentlyCollapsed = localStorage.getItem(STORAGE_KEY_LFM_COMMENTS_COLLAPSED) === 'true';
@@ -33015,11 +33352,9 @@
               if (willBeCollapsed) {
                   modalContainer.style.width = '640px';
                   commentsPanel.classList.add('collapsed');
-                  toggleBtn.textContent = 'Show Comments';
               } else {
                   modalContainer.style.width = '1040px';
                   commentsPanel.classList.remove('collapsed');
-                  toggleBtn.textContent = 'Hide Comments';
                   
                   if (commentsData.length === 0 && hasNextPage) {
                       loadComments();
@@ -33081,12 +33416,40 @@
               if (track) showLastFmTrackDetailsModal(track);
               else showNotification("Could not fetch track details", true);
           },
-          (uris) => uris.length === 1 && (uris[0].startsWith("spotify:track:") || Spicetify.URI.isLocal(uris[0])),
+          (uris) => {
+              if (!uris || uris.length !== 1) return false;
+              try { return uris[0].startsWith("spotify:track:") || Spicetify.URI.isLocal(uris[0]); } catch(e) { return false; }
+          },
           "lastfm",
           lastFmIconSvg
       );
   }
 
+  function updateLastFmArtistContextMenu() {
+      lastFmArtistContextMenuItem = toggleContextMenuItem(
+          showLastFmArtistContextMenu,
+          lastFmArtistContextMenuItem,
+          "Last.fm Details",
+          async (uris) => {
+              const uri = uris[0];
+              const { sourceName } = await fetchSourceNameAndArtist(uri);
+              const artistInfo = {
+                  uri: uri,
+                  name: "",
+                  artistName: sourceName,
+                  artists: [{ name: sourceName, uri: uri }]
+              };
+              showLastFmTrackDetailsModal(artistInfo, 'artist');
+          },
+          (uris) => {
+              if (!uris || uris.length !== 1) return false;
+              try { return uris[0].startsWith("spotify:artist:"); } catch(e) { return false; }
+          },
+          "lastfm",
+          lastFmIconSvg
+      );
+  }
+  
   function updateArtistDiscographyContextMenu() {
       artistDiscographyContextMenuItem = toggleContextMenuItem(
           showArtistDiscographyContextMenu,
@@ -33102,7 +33465,10 @@
               closeAllMenus();
               enqueueDiscographyJob(artistUri, artistDiscographySortType);
           },
-          (uris) => uris.length === 1 && (Spicetify.URI.isArtist(uris[0]) || uris[0].startsWith("spotify:artist:")),
+          (uris) => {
+              if (!uris || uris.length !== 1) return false;
+              try { return uris[0].startsWith("spotify:artist:"); } catch(e) { return false; }
+          },
           "album"
       );
   }
@@ -35898,6 +36264,7 @@
   displayGenreTags();
   prefetchNextTrackData();
   updateLastFmContextMenu();
+  updateLastFmArtistContextMenu();
   updateGenresContextMenu();
   updateArtistDiscographyContextMenu();
   updateShuffleContextMenu();
