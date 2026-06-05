@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.80.1";
+  const SORT_PLAY_VERSION = "5.81.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -126,6 +126,7 @@
   const STORAGE_KEY_MATCH_WHOLE_WORD = "sort-play-match-whole-word";
   const STORAGE_KEY_CHAT_CUSTOM_NAME = "sp-chat-custom-name";
   const STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION = "sort-play-auto-hide-discography-notification";
+  const STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED = "sort-play-range-exclude-unlistened";
 
   const SYNCABLE_SETTINGS_KEYS = [
     STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
@@ -178,7 +179,8 @@
     STORAGE_KEY_ARTIST_KEYWORDS, STORAGE_KEY_MATCH_WHOLE_WORD,
     STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE, STORAGE_KEY_ACTIVE_RANGE_FILTER, 
     STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
-    STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR
+    STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR,
+    STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED
   ];
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
@@ -261,6 +263,7 @@
   let autoUpdateGenreModal = false;
   let autoHideDiscographyNotification = false;
   let genreSeparator = ',';
+  let rangeExcludeUnlistened = false;
   let isProcessing = false;
   let isDiscoProcessing = false;
   let isMultiDiscoMode = false;
@@ -324,6 +327,10 @@
   const inFlightAlbumRequests = {};
   const VARIANT_TO_MAIN_GENRE_MAP = {};
   const VARIANT_TO_MAIN_COUNTRY_MAP = {};
+  const shoutboxCache = new Map();
+  const lfmDetailsCache = new Map();
+  const spotifyImageCache = new Map();
+  const dominantColorCache = new Map();
 
   const CACHE_EXPIRE_PLAYCOUNTS = 6 * 60 * 60 * 1000; 
   const CACHE_EXPIRE_PERSONAL_SCROBBLES = 30 * 60 * 1000;
@@ -333,6 +340,9 @@
   const CACHE_EXPIRE_PALETTE = null;
   const CACHE_EXPIRE_METADATA = 24 * 60 * 60 * 1000; 
   const CACHE_EXPIRE_GENRES = 7 * 24 * 60 * 60 * 1000;
+  const CACHE_EXPIRE_SHOUTBOX = 60 * 60 * 1000;
+  const CACHE_EXPIRE_MODAL_ASSETS = 60 * 60 * 1000;
+  const CACHE_EXPIRE_LFM_DETAILS = 30 * 1000;
 
   const LFM_GATEWAY_URL = "https://gateway.niko2nio2.workers.dev/?url=";
   const LFM_SHOUTBOX_GATEWAY_URL = "https://shoutbox.niko2nio2.workers.dev/";
@@ -1850,6 +1860,7 @@
     "\\(ReleaseDate\\)",
     "\\(Scrobbles\\)",
     "\\(My Scrobbles\\)",
+    "\\(My Scrobbles: .*\\)",
     "\\(LFM My Scrobbles\\)",
     "\\(LFM Scrobbles\\)",
     "\\(Last Scrobbled\\)",
@@ -1996,6 +2007,7 @@
     releaseDate: false,
     scrobbles: false,
     personalScrobbles: false,
+    personalScrobblesRange: false,
     lastScrobbled: false,
     averageColor: false,
     energyWave: false,
@@ -2120,6 +2132,7 @@
     autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
     autoHideDiscographyNotification = localStorage.getItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION) === "true";
     genreSeparator = localStorage.getItem(STORAGE_KEY_GENRE_SEPARATOR) || ',';
+    rangeExcludeUnlistened = localStorage.getItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED) === "true";
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -2208,6 +2221,7 @@
     localStorage.setItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL, autoUpdateGenreModal);
     localStorage.setItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, autoHideDiscographyNotification);
     localStorage.setItem(STORAGE_KEY_GENRE_SEPARATOR, genreSeparator);
+    localStorage.setItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, rangeExcludeUnlistened);
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
 
     for (const sortType in sortOrderState) {
@@ -2332,7 +2346,8 @@
           [STORAGE_KEY_FILTER_ARTIST]: "true",
           [STORAGE_KEY_MATCH_WHOLE_WORD]: "false",
           [STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION]: "false",
-          [STORAGE_KEY_GENRE_SEPARATOR]: ","
+          [STORAGE_KEY_GENRE_SEPARATOR]: ",",
+          [STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED]: "false"
         };
     
         if (key === STORAGE_KEY_NP_CONFIG) {
@@ -2531,6 +2546,7 @@
     return localStorage.getItem(STORAGE_KEY_LASTFM_USERNAME);
   }
 
+  
   function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", onSave, onCancel = null }) {
     const overlay = document.createElement("div");
     overlay.className = "sort-play-font-scope";
@@ -8267,7 +8283,290 @@
         });
     });
   }
+  
+  function showScrobblesRangeModal() {
+      return new Promise((resolve) => {
+          const overlay = document.createElement("div");
+          overlay.id = "sort-play-range-overlay";
+          overlay.className = "sort-play-font-scope";
+          overlay.style.cssText = `
+              position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+              background-color: rgba(0, 0, 0, 0.7);
+              backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+              z-index: 2002; display: flex; justify-content: center; align-items: center;
+              opacity: 0; transition: opacity 0.2s ease;
+          `;
 
+          const currentYear = new Date().getFullYear();
+          
+          const modal = document.createElement("div");
+          modal.className = "main-embedWidgetGenerator-container";
+          modal.style.cssText = `
+              width: 420px !important; display: flex; flex-direction: column;
+              border-radius: 24px; background-color: #181818 !important; border: 1px solid #282828;
+              max-width: 95vw; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+          `;
+
+          modal.innerHTML = `
+              <style>
+                  .sp-range-header-container { padding: 24px 24px 16px; border-bottom: 1px solid #282828; flex-shrink: 0; }
+                  .sp-range-body { padding: 16px 24px 20px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 transparent; max-height: 60vh; }
+                  .sp-preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+                  .sp-preset-btn { background-color: transparent; border: 1px solid #444; color: #b3b3b3; padding: 8px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; font-family: inherit; text-align: center; }
+                  .sp-preset-btn:hover { border-color: #888; color: white; background-color: rgba(255,255,255,0.05); }
+                  .sp-preset-btn.active { background-color: rgba(30, 215, 96, 0.1); border-color: #1ED760; color: #1ed760; font-weight: 600; }
+                  .sp-range-divider { display: flex; align-items: center; color: #888; font-size: 11px; text-transform: uppercase; font-weight: 700; margin: 4px 0; letter-spacing: 0.5px; }
+                  .sp-range-divider::before, .sp-range-divider::after { content: ""; flex: 1; border-bottom: 1px solid #333; }
+                  .sp-range-divider::before { margin-right: 10px; }
+                  .sp-range-divider::after { margin-left: 10px; }
+                  .sp-custom-dates { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+                  .sp-date-input { background: #181818; border: 1px solid #444; color: white; padding: 8px 10px; border-radius: 6px; font-family: inherit; font-size: 13px; flex: 1; color-scheme: dark; cursor: text; transition: border-color 0.2s; width: 100%; min-width: 0; }
+                  .sp-date-input:focus { border-color: #1ed760; outline: none; }
+                  .sp-date-separator { color: #666; font-weight: bold; font-size: 14px; }
+                  .sp-range-switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+                  .sp-range-switch input { opacity: 0; width: 0; height: 0; }
+                  .sp-range-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; transition: .2s; border-radius: 20px; }
+                  .sp-range-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
+                  .sp-range-switch input:checked + .sp-range-slider { background-color: #1DB954; }
+                  .sp-range-switch input:checked + .sp-range-slider:before { transform: translateX(16px); }
+                  .tooltip-container { position: relative; display: inline-block; vertical-align: middle; margin-left: 2px; }
+                  .custom-tooltip { visibility: hidden; position: absolute; z-index: 1000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 13px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; font-weight: normal; text-transform: none; cursor: default; }
+                  .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+                  .tooltip-container:hover .custom-tooltip { visibility: visible; }
+                  .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
+                  .main-buttons-button.main-button-primary:hover { background-color: #3BE377; }
+                  .main-buttons-button.main-button-secondary { background-color: #333333; color: white; transition: background-color 0.1s ease; }
+                  .main-buttons-button.main-button-secondary:hover { background-color: #444444; }
+                  .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+                  .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+              </style>
+
+              <div class="sp-range-header-container">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                      <h1 class="main-trackCreditsModal-title" style="margin: 0;"><span style="font-size: 22px; font-weight: 700; color: white;">My Scrobbles Range</span></h1>
+                      <button class="main-trackCreditsModal-closeBtn" id="sp-range-close-x" aria-label="Close">
+                          ${closeModalIcon20Svg}
+                      </button>
+                  </div>
+                  <p style="color: #b3b3b3; font-size: 13px; margin: 8px 0 0 0; line-height: 1.4;">Sort tracks by your scrobbles within a specific date range.</p>
+              </div>
+              
+              <div class="main-trackCreditsModal-mainSection sp-range-body">
+                  <div class="sp-preset-grid">
+                      <button class="sp-preset-btn" data-preset="7">Last 7 days</button>
+                      <button class="sp-preset-btn" data-preset="14">Last 14 days</button>
+                      
+                      <button class="sp-preset-btn" data-preset="30">Last 30 days</button>
+                      <button class="sp-preset-btn" data-preset="60">Last 60 days</button>
+                      
+                      <button class="sp-preset-btn" data-preset="90">Last 90 days</button>
+                      <button class="sp-preset-btn" data-preset="180">Last 180 days</button>
+                      
+                      <button class="sp-preset-btn" data-preset="365">Last 365 days</button>
+                      <button class="sp-preset-btn active" data-preset="all">All time</button>
+                  </div>
+
+                  <div class="sp-range-divider"><span>Years</span></div>
+
+                  <div class="sp-preset-grid">
+                      <button class="sp-preset-btn" data-preset="y_${currentYear - 3}">${currentYear - 3}</button>
+                      <button class="sp-preset-btn" data-preset="y_${currentYear - 2}">${currentYear - 2}</button>
+                      <button class="sp-preset-btn" data-preset="y_${currentYear - 1}">${currentYear - 1}</button>
+                      <button class="sp-preset-btn" data-preset="y_${currentYear}">${currentYear}</button>
+                  </div>
+
+                  <div class="sp-range-divider"><span>Custom Date</span></div>
+
+                  <div class="sp-custom-dates">
+                      <input type="date" id="sp-range-from" class="sp-date-input" title="From Date">
+                      <span class="sp-date-separator">→</span>
+                      <input type="date" id="sp-range-to" class="sp-date-input" title="To Date">
+                  </div>
+                  <div id="sp-custom-range-summary" style="display: none; margin-top: 8px; text-align: center;">
+                      <span id="sp-range-display-title" style="color: #1ed760; font-size: 13px; font-weight: 500;"></span>
+                  </div>
+              </div>
+
+              <div class="main-trackCreditsModal-originalCredits" style="padding: 14px 24px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                  <label style="color: #c1c1c1; font-size: 13px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                      <div class="sp-range-switch">
+                          <input type="checkbox" id="sp-range-exclude-toggle" ${rangeExcludeUnlistened ? 'checked' : ''}>
+                          <span class="sp-range-slider"></span>
+                      </div>
+                      <div style="display: flex; align-items: center;">
+                          Exclude unlistened
+                          <span class="tooltip-container">
+                              ${infoIconSvg.replace('margin-bottom: 4px;', 'margin-bottom: 2px;')}
+                              <span class="custom-tooltip">Excludes tracks that haven't been played within the selected date range.</span>
+                          </span>
+                      </div>
+                  </label>
+                  <div style="display: flex; gap: 10px;">
+                      <button id="sp-range-cancel-btn" class="main-buttons-button main-button-secondary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none;">Cancel</button>
+                      <button id="sp-range-apply-btn" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; cursor: pointer; border: none; color: black;">Apply</button>
+                  </div>
+              </div>
+          `;
+          
+          document.body.appendChild(overlay);
+          overlay.appendChild(modal);
+
+          requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                  overlay.style.opacity = "1";
+              });
+          });
+
+          const displayTitle = modal.querySelector('#sp-range-display-title');
+          const summaryBox = modal.querySelector('#sp-custom-range-summary');
+          const fromInput = modal.querySelector('#sp-range-from');
+          const toInput = modal.querySelector('#sp-range-to');
+          let activePreset = 'all';
+
+          const updateActivePreset = (presetId, label) => {
+              activePreset = presetId;
+              displayTitle.innerText = label;
+              
+              if (summaryBox) {
+                  summaryBox.style.display = presetId === 'custom' ? 'block' : 'none';
+              }
+              
+              modal.querySelectorAll('.sp-preset-btn').forEach(btn => btn.classList.remove('active'));
+              if (presetId !== 'custom') {
+                  const activeBtn = modal.querySelector(`.sp-preset-btn[data-preset="${presetId}"]`);
+                  if (activeBtn) activeBtn.classList.add('active');
+              }
+          };
+
+          const setDateInputs = (offsetDays) => {
+              const to = new Date();
+              const from = new Date();
+              from.setDate(to.getDate() - offsetDays);
+              toInput.value = to.toISOString().split('T')[0];
+              fromInput.value = from.toISOString().split('T')[0];
+          };
+
+          const savedStateStr = localStorage.getItem('sort-play-last-scrobble-range');
+          if (savedStateStr) {
+              try {
+                  const savedState = JSON.parse(savedStateStr);
+                  if (savedState.preset) {
+                      fromInput.value = savedState.from || '';
+                      toInput.value = savedState.to || '';
+                      updateActivePreset(savedState.preset, savedState.label || 'All time');
+                      
+                      if (savedState.preset !== 'all' && savedState.preset !== 'custom' && !savedState.preset.startsWith('y_')) {
+                          setDateInputs(parseInt(savedState.preset, 10));
+                      }
+                  }
+              } catch(e) {}
+          }
+
+          modal.querySelectorAll('.sp-preset-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                  const preset = e.target.dataset.preset;
+                  const text = e.target.innerText;
+                  updateActivePreset(preset, text);
+
+                  if (preset === 'all') {
+                      fromInput.value = '';
+                      toInput.value = '';
+                  } else if (preset.startsWith('y_')) {
+                      const year = preset.split('_')[1];
+                      fromInput.value = `${year}-01-01`;
+                      toInput.value = `${year}-12-31`;
+                  } else {
+                      setDateInputs(parseInt(preset, 10));
+                  }
+              });
+          });
+
+          const onCustomDateChange = () => {
+              if (fromInput.value || toInput.value) {
+                  const formatDate = (dateString, isEndOfDay) => {
+                      if (!dateString) return '...';
+                      const date = new Date(dateString + (isEndOfDay ? 'T23:59:59' : 'T00:00:00'));
+                      return isNaN(date.getTime()) ? '...' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+                  };
+                  const fromStr = formatDate(fromInput.value, false);
+                  const toStr = formatDate(toInput.value, true);
+                  updateActivePreset('custom', `${fromStr} to ${toStr}`);
+              }
+          };
+
+          fromInput.addEventListener('change', onCustomDateChange);
+          toInput.addEventListener('change', onCustomDateChange);
+
+          const closeAndResolve = (result) => {
+              overlay.style.opacity = "0";
+              setTimeout(() => {
+                  overlay.remove();
+                  resolve(result);
+              }, 200);
+          };
+
+          modal.querySelector('#sp-range-close-x').addEventListener('click', () => closeAndResolve(null));
+          modal.querySelector('#sp-range-cancel-btn').addEventListener('click', () => closeAndResolve(null));
+          overlay.addEventListener('click', (e) => { if (e.target === overlay) closeAndResolve(null); });
+
+          modal.querySelector('#sp-range-apply-btn').addEventListener('click', () => {
+              const saveState = (finalLabel) => {
+                  localStorage.setItem('sort-play-last-scrobble-range', JSON.stringify({
+                      preset: activePreset,
+                      from: fromInput.value,
+                      to: toInput.value,
+                      label: finalLabel
+                  }));
+              };
+
+              if (activePreset === 'all') {
+                  rangeExcludeUnlistened = modal.querySelector('#sp-range-exclude-toggle').checked;
+                  saveSettings();
+                  saveState('All time');
+                  closeAndResolve({ type: 'all_time', excludeUnlistened: rangeExcludeUnlistened });
+                  return;
+              }
+
+              let fromDate, toDate, label;
+
+              if (activePreset !== 'custom') {
+                  label = displayTitle.innerText;
+              }
+
+              if (!fromInput.value || !toInput.value) {
+                  showNotification("Please select both a start and end date.", true);
+                  return;
+              }
+
+              fromDate = new Date(fromInput.value + 'T00:00:00');
+              toDate = new Date(toInput.value + 'T23:59:59');
+
+              if (fromDate > toDate) {
+                  showNotification("Start date must be before end date.", true);
+                  return;
+              }
+
+              if (activePreset === 'custom') {
+                  const fromStr = fromDate.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+                  const toStr = toDate.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+                  label = `${fromStr} to ${toStr}`;
+              }
+
+              rangeExcludeUnlistened = modal.querySelector('#sp-range-exclude-toggle').checked;
+              saveSettings();
+              saveState(label);
+
+              closeAndResolve({
+                  type: 'range',
+                  from: fromDate.getTime(),
+                  to: toDate.getTime(),
+                  label: label,
+                  excludeUnlistened: rangeExcludeUnlistened
+              });
+          });
+      });
+  }
+  
   async function showConfirmationModal({ title, description, confirmText, cancelText, neutralText }) {
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
@@ -10594,6 +10893,7 @@
           "releaseDate",
           "scrobbles",
           "personalScrobbles",
+          "personalScrobblesRange",
           "lastScrobbled",
           "shuffle",
           "averageColor",
@@ -10634,6 +10934,7 @@
           releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
           scrobbles: { fullName: "Last.fm global scrobbles", shortName: "Scrobbles" },
           personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
+          personalScrobblesRange: { fullName: "Last.fm personal scrobbles (Range)", shortName: "My Scrobbles" },
           lastScrobbled: { fullName: "your last scrobbled date", shortName: "Last Scrobbled" },
           shuffle: { fullName: useEnergyWaveShuffle ? "random order with Vibe & Flow" : "random order", shortName: "Shuffle" },
           averageColor: { fullName: "album color", shortName: "Color" },
@@ -18106,7 +18407,7 @@
         const sortByParent = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent');
         const shuffleItem = buttonStyles.menuItems.find(i => i.sortType === 'shuffle');
         
-        const sortChildren = [...sortByParent.children];
+        const sortChildren = [...sortByParent.children].filter(child => child.sortType !== 'personalScrobblesRange');
         const releaseDateIndex = sortChildren.findIndex(item => item.sortType === 'releaseDate');
         
         if (releaseDateIndex !== -1) {
@@ -23706,6 +24007,29 @@
           { backgroundColor: "transparent", color: "white", text: "Release Date", sortType: "releaseDate", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Scrobbles", sortType: "scrobbles", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "My Scrobbles", sortType: "personalScrobbles", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "Scrobble Range", sortType: "personalScrobblesRange", hasInnerButton: true, onClick: async function(event) {
+              event.stopPropagation();
+              if (!loadLastFmUsername()) {
+                  showNotification("Please set your Last.fm username in settings first.", true);
+                  return;
+              }
+              
+              menuButtons.forEach((btn) => {
+                  if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                      btn.style.backgroundColor = "transparent";
+                  }
+              });
+              closeAllMenus();
+
+              const rangeConfig = await showScrobblesRangeModal();
+              if (!rangeConfig) return; 
+
+              if (rangeConfig.type === 'all_time') {
+                  await handleSortAndCreatePlaylist("personalScrobbles", { rangeConfig });
+              } else {
+                  await handleSortAndCreatePlaylist("personalScrobblesRange", { rangeConfig });
+              }
+          }},
           { backgroundColor: "transparent", color: "white", text: "Last Scrobbled", sortType: "lastScrobbled", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Liked Status", sortType: "sortByLiked", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Energy Wave", sortType: "energyWave", hasInnerButton: true },
@@ -29436,13 +29760,26 @@
 
             sortedTracks = [...sortedTracksWithData, ...tracksWithoutData];
 
-        } else if (sortType === "scrobbles" || sortType === "personalScrobbles") {
+        } else if (sortType === "scrobbles" || sortType === "personalScrobbles" || sortType === "personalScrobblesRange") {
             try {
-                const tracksWithScrobbles = await handleScrobblesSorting(
-                  tracksWithPopularity,
-                  sortType,
-                  (progress) => { updateProgressText(`${80 + Math.floor(progress * 0.20)}%`); }
-                );
+                let tracksWithScrobbles;
+                if (sortType === "personalScrobblesRange") {
+                    tracksWithScrobbles = await handlePersonalScrobblesRangeSorting(
+                        tracksWithPopularity,
+                        options.rangeConfig || {},
+                        (msg) => { updateProgressText(msg); }
+                    );
+                } else {
+                    tracksWithScrobbles = await handleScrobblesSorting(
+                      tracksWithPopularity,
+                      sortType,
+                      (progress) => { updateProgressText(`${80 + Math.floor(progress * 0.20)}%`); }
+                    );
+                }
+
+                if ((sortType === 'personalScrobbles' || sortType === 'personalScrobblesRange') && options.rangeConfig && options.rangeConfig.excludeUnlistened) {
+                    tracksWithScrobbles = tracksWithScrobbles.filter(t => (t.personalScrobbles ?? 0) > 0);
+                }
 
                 const deduplicationResult = await deduplicateTracks(
                     tracksWithScrobbles, 
@@ -29453,7 +29790,7 @@
                 uniqueTracks = deduplicationResult.unique;
                 removedTracks = deduplicationResult.removed;
 
-                if (sortType === 'personalScrobbles') {
+                if (sortType === 'personalScrobbles' || sortType === 'personalScrobblesRange') {
                     const hasAnyScrobbles = uniqueTracks.some(t => typeof t.personalScrobbles === 'number' && t.personalScrobbles > 0);
                     if (!hasAnyScrobbles && uniqueTracks.length > 0) {
                         throw new Error("No personal scrobbles found for any tracks in this list.");
@@ -29469,10 +29806,12 @@
                         if (valA === valB) {
                              return a.originalIndex - b.originalIndex;
                         }
+                        
+                        const isDesc = sortType === 'personalScrobblesRange' 
+                            ? sortOrderState.personalScrobblesRange 
+                            : sortOrderState.personalScrobbles;
 
-                        return sortOrderState.personalScrobbles 
-                            ? valA - valB 
-                            : valB - valA;
+                        return isDesc ? valA - valB : valB - valA;
                     });
                 } else { 
                     const tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
@@ -29554,7 +29893,14 @@
         while (suffixPattern.test(finalSourceName)) {
           finalSourceName = finalSourceName.replace(suffixPattern, "");
         }
-        const sortTypeInfo = getSortTypeInfo(sortType);
+        let sortTypeInfo = getSortTypeInfo(sortType);
+
+        if (sortType === 'personalScrobblesRange' && options.rangeConfig && options.rangeConfig.label) {
+            sortTypeInfo = {
+                shortName: `My Scrobbles: ${options.rangeConfig.label}`,
+                fullName: `Last.fm personal scrobbles (${options.rangeConfig.label})`
+            };
+        }
 
         const filterOnlyTypes = [
             'deduplicateOnly', 'filterOnePerArtist', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 
@@ -31879,6 +32225,100 @@
     return scrobblesMap;
   }
 
+  async function fetchLfmScrobblesInRange(username, fromTs, toTs) {
+      const params = new URLSearchParams({
+          method: 'user.getweeklytrackchart',
+          user: username,
+          from: Math.floor(fromTs).toString(),
+          to: Math.floor(toTs).toString(),
+          format: 'json'
+      });
+
+      let response;
+      try {
+          response = await fetchLfmWithGateway(params);
+      } catch (e) {
+          console.warn(`LFM fetch failed for range ${fromTs}-${toTs}`, e);
+          return new Map();
+      }
+
+      if (!response.ok) return new Map();
+      
+      let data;
+      try { data = await response.json(); } catch(e) { return new Map(); }
+
+      if (data.error) {
+          console.warn(`LFM API Error: ${data.message}`);
+          return new Map();
+      }
+
+      const tracks = data.weeklytrackchart?.track || [];
+      const trackArray = Array.isArray(tracks) ? tracks : [tracks];
+
+      if (trackArray.length >= 1000 && (toTs - fromTs) > 86400) {
+          const midTs = Math.floor((fromTs + toTs) / 2);
+          const [leftMap, rightMap] = await Promise.all([
+              fetchLfmScrobblesInRange(username, fromTs, midTs),
+              fetchLfmScrobblesInRange(username, midTs + 1, toTs)
+          ]);
+
+          const merged = new Map(leftMap);
+          for (const [key, count] of rightMap.entries()) {
+              merged.set(key, (merged.get(key) || 0) + count);
+          }
+          return merged;
+      }
+
+      const map = new Map();
+      trackArray.forEach(t => {
+          const artist = t.artist["#text"]?.toLowerCase().trim();
+          const track = t.name?.toLowerCase().trim();
+          if (artist && track) {
+              const key = `${artist}|${track}`;
+              map.set(key, parseInt(t.playcount, 10) || 0);
+          }
+      });
+
+      return map;
+  }
+
+  async function handlePersonalScrobblesRangeSorting(tracks, rangeConfig, updateProgress) {
+      const username = loadLastFmUsername();
+      if (!username) throw new Error('Last.fm username required for personal scrobbles sorting');
+      if (!tracks || tracks.length === 0) return [];
+      if (!rangeConfig || !rangeConfig.from || !rangeConfig.to) return tracks.map(t => ({...t, personalScrobbles: 0}));
+
+      updateProgress("LFM Range...");
+      
+      const fromTs = Math.floor(rangeConfig.from / 1000);
+      const toTs = Math.floor(rangeConfig.to / 1000);
+      
+      const lfmMap = await fetchLfmScrobblesInRange(username, fromTs, toTs);
+      
+      updateProgress("Matching Tracks...");
+
+      const overrides = getLfmOverrides();
+
+      const results = tracks.map(track => {
+          const trackId = track.uri ? track.uri.split(":")[2] : (track.track ? track.track.id : null);
+          const override = trackId ? overrides[trackId] : null;
+
+          let artistName = override ? override.artist : getPrimaryArtistName(track);
+          let trackName = override ? override.track : (track.name ? track.name.trim() : null);
+          
+          let playCount = 0;
+          if (artistName && trackName) {
+              const key = `${artistName.toLowerCase().trim()}|${trackName.toLowerCase().trim()}`;
+              playCount = lfmMap.get(key) || 0;
+          }
+
+          return { ...track, personalScrobbles: playCount, id: trackId };
+      });
+
+      updateProgress("100%");
+      return results;
+  }
+  
   menuButtons.forEach((element) => {
     if (element.tagName.toLowerCase() === "div") {
         return;
@@ -32578,6 +33018,16 @@
   }
 
   async function fetchLastFmShoutbox(artistRaw, trackRaw, targetPage = 1, sortMode = 'popular') {
+      const cacheKey = `${artistRaw}|${trackRaw}|${targetPage}|${sortMode}`;
+      if (shoutboxCache.has(cacheKey)) {
+          const cached = shoutboxCache.get(cacheKey);
+          if (Date.now() - cached.ts < CACHE_EXPIRE_SHOUTBOX) {
+              return { ...cached.data, fromCache: true };
+          } else {
+              shoutboxCache.delete(cacheKey);
+          }
+      }
+
       const params = new URLSearchParams({
           artist: artistRaw,
           track: trackRaw,
@@ -32589,24 +33039,24 @@
           const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${params.toString()}`);
           
           if (response.status === 401 || response.status === 403) {
-              return { page: targetPage, hasNextPage: false, comments: [], error: "session_expired" };
+              return { page: targetPage, hasNextPage: false, comments: [], error: "session_expired", fromCache: false };
           }
 
           if (!response.ok) {
-              return { page: targetPage, hasNextPage: false, comments: [] };
+              return { page: targetPage, hasNextPage: false, comments: [], fromCache: false };
           }
 
           const html = await response.text();
           
           if (html === "SESSION_EXPIRED") {
-              return { page: targetPage, hasNextPage: false, comments: [], error: "session_expired" };
+              return { page: targetPage, hasNextPage: false, comments: [], error: "session_expired", fromCache: false };
           }
 
           const doc = new DOMParser().parseFromString(html, "text/html");
           const rootList = doc.querySelector('.shoutbox > ul.shout-list, .shouts-container > ul.shout-list, ul.shout-list');
 
           if (!rootList) {
-              return { page: targetPage, hasNextPage: false, comments: [] };
+              return { page: targetPage, hasNextPage: false, comments: [], fromCache: false };
           }
 
           function parseCommentNode(li) {
@@ -32675,18 +33125,32 @@
 
           const hasNextPage = !!doc.querySelector('.pagination-next, [data-pagination-next-link], [rel="next"]');
 
-          return {
+          const result = {
               page: targetPage,
               hasNextPage,
               comments: commentsData
           };
 
+          shoutboxCache.set(cacheKey, { ts: Date.now(), data: result });
+
+          return { ...result, fromCache: false };
+
       } catch (error) {
-          return { page: targetPage, hasNextPage: false, comments: [] };
+          return { page: targetPage, hasNextPage: false, comments: [], fromCache: false };
       }
   }
   
   async function fetchLastFmExtendedInfo(artist, track, username, trackId) {
+      const cacheKey = `${artist}|${track}|${username}|${trackId}`;
+      if (lfmDetailsCache.has(cacheKey)) {
+          const cached = lfmDetailsCache.get(cacheKey);
+          if (Date.now() - cached.ts < CACHE_EXPIRE_LFM_DETAILS) {
+              return cached.data;
+          } else {
+              lfmDetailsCache.delete(cacheKey);
+          }
+      }
+
       const results = {
           track: null,
           artist: null,
@@ -32740,10 +33204,11 @@
       }));
 
       await Promise.all(promises);
+      lfmDetailsCache.set(cacheKey, { ts: Date.now(), data: results });
       return results;
   }
 
-  function showLastFmTrackDetailsModal(trackInfo, contextType = 'track') {
+  function showLastFmDetailsModal(trackInfo, contextType = 'track') {
       const existing = document.getElementById("sort-play-lfm-details-overlay");
       if (existing) existing.remove();
 
@@ -32819,18 +33284,27 @@
       
       let spotifyImagePromise = Promise.resolve(null);
       if (trackUri) {
-          if (isArtistContext && trackUri.startsWith("spotify:artist:")) {
-              const artistId = trackUri.split(":")[2];
-              spotifyImagePromise = getArtistImageUrl(artistId).catch(() => null);
-          } else if (!isArtistContext && trackUri.startsWith("spotify:track:")) {
-              spotifyImagePromise = fetchInternalTrackMetadata(trackId).then(meta => {
-                 if (meta && meta.album && meta.album.images && meta.album.images.length > 0) {
-                     return meta.album.images[0].url;
-                 }
-                 return null;
-              }).catch(err => {
-                  return null;
-              });
+          if (spotifyImageCache.has(trackUri) && Date.now() - spotifyImageCache.get(trackUri).ts < CACHE_EXPIRE_MODAL_ASSETS) {
+              spotifyImagePromise = Promise.resolve(spotifyImageCache.get(trackUri).data);
+          } else {
+              if (isArtistContext && trackUri.startsWith("spotify:artist:")) {
+                  const artistId = trackUri.split(":")[2];
+                  spotifyImagePromise = getArtistImageUrl(artistId).then(url => {
+                      if (url) spotifyImageCache.set(trackUri, { ts: Date.now(), data: url });
+                      return url;
+                  }).catch(() => null);
+              } else if (!isArtistContext && trackUri.startsWith("spotify:track:")) {
+                  spotifyImagePromise = fetchInternalTrackMetadata(trackId).then(meta => {
+                     if (meta && meta.album && meta.album.images && meta.album.images.length > 0) {
+                         const url = meta.album.images[0].url;
+                         spotifyImageCache.set(trackUri, { ts: Date.now(), data: url });
+                         return url;
+                     }
+                     return null;
+                  }).catch(err => {
+                      return null;
+                  });
+              }
           }
       }
 
@@ -32842,7 +33316,7 @@
               const displayTitle = trackInfo.songTitle || trackInfo.name || "Unknown Track";
               showLastFmOverrideModal(trackId, displayTitle, () => {
                   closeModal();
-                  showLastFmTrackDetailsModal(trackInfo, contextType);
+                  showLastFmDetailsModal(trackInfo, contextType);
               });
           };
 
@@ -32897,6 +33371,12 @@
           }
 
           const getDominantColor = (src) => {
+              if (dominantColorCache.has(src)) {
+                  const cached = dominantColorCache.get(src);
+                  if (Date.now() - cached.ts < CACHE_EXPIRE_MODAL_ASSETS) {
+                      return Promise.resolve(cached.data);
+                  }
+              }
               return new Promise((resolve) => {
                   const img = new Image();
                   img.crossOrigin = 'Anonymous';
@@ -32914,7 +33394,9 @@
                               count++;
                           }
                           if(count === 0) return resolve([40, 40, 40]);
-                          resolve([Math.round(r/count), Math.round(g/count), Math.round(b/count)]);
+                          const result = [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
+                          dominantColorCache.set(src, { ts: Date.now(), data: result });
+                          resolve(result);
                       } catch(e) { resolve([40, 40, 40]); }
                   };
                   img.onerror = () => resolve([40, 40, 40]);
@@ -33143,6 +33625,14 @@
               #lfm-comments-sort-select { transition: color 0.2s; }
               #lfm-comments-sort-select:hover { color: #fff !important; }
               #lfm-comments-sort-select option { background: rgb(${bgR}, ${bgG}, ${bgB}); color: #fff; }
+              
+              @keyframes slideDownShout {
+                  0% { opacity: 0; transform: translateY(-15px); }
+                  100% { opacity: 1; transform: translateY(0); }
+              }
+              .comment-item.fresh, .reply-item.fresh {
+                  animation: slideDownShout 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+              }
             </style>
 
             <div class="lfm-fade-in-wrapper">
@@ -33237,8 +33727,9 @@
               return dateText.replace(/\s?\d{1,2}:\d{2}[ap]m/i, '').trim();
           };
 
-          const buildCommentsHtml = (commentsArray, level = 0) => {
+          const buildCommentsHtml = (commentsArray, level = 0, isFresh = false) => {
               let html = '';
+              const animationClass = isFresh ? ' fresh' : '';
               commentsArray.forEach(c => {
                   const dateStr = formatShoutDate(c.dateText);
                   const avatarStr = c.avatar || 'https://lastfm.freetls.fastly.net/i/u/avatar70s/818148bf682d429dc215c1705eb27b98.png';
@@ -33260,7 +33751,7 @@
                   }
                   
                   html += `
-                      <li class="${isReply ? 'reply-item' : 'comment-item'}">
+                      <li class="${isReply ? 'reply-item' : 'comment-item'}${animationClass}">
                           <div class="comment-content">
                               <div class="avatar-col" style="width: ${avatarSize}px;">
                                   <a href="${userUrl}" target="_blank" style="display: flex; position: relative; z-index: 2;">
@@ -33285,7 +33776,7 @@
                                   </div>
                               </div>
                           </div>
-                          ${hasReplies ? `<ul class="comment-thread-replies ${repliesClass}">${buildCommentsHtml(c.replies, level + 1)}</ul>` : ''}
+                          ${hasReplies ? `<ul class="comment-thread-replies ${repliesClass}">${buildCommentsHtml(c.replies, level + 1, isFresh)}</ul>` : ''}
                       </li>
                   `;
               });
@@ -33317,10 +33808,12 @@
               hasNextPage = result.hasNextPage;
               currentPage++;
 
+              const isFresh = !result.fromCache;
+
               if (commentsData.length === 0 && currentPage === 2) {
                   commentList.innerHTML = '<div style="color: rgba(255,255,255,0.4); text-align: center; padding: 20px; font-size: 13px;">No shouts found.</div>';
               } else if (result.comments.length > 0) {
-                  commentList.insertAdjacentHTML('beforeend', buildCommentsHtml(result.comments));
+                  commentList.insertAdjacentHTML('beforeend', buildCommentsHtml(result.comments, 0, isFresh));
               }
 
               commentsLoader.style.display = 'none';
@@ -33415,7 +33908,7 @@
                       track.albumName = track.album?.name;
                   }
               }
-              if (track) showLastFmTrackDetailsModal(track);
+              if (track) showLastFmDetailsModal(track);
               else showNotification("Could not fetch track details", true);
           },
           (uris) => {
@@ -33441,7 +33934,7 @@
                   artistName: sourceName,
                   artists: [{ name: sourceName, uri: uri }]
               };
-              showLastFmTrackDetailsModal(artistInfo, 'artist');
+              showLastFmDetailsModal(artistInfo, 'artist');
           },
           (uris) => {
               if (!uris || uris.length !== 1) return false;
@@ -33815,7 +34308,7 @@
                             dataElement.onclick = (e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                showLastFmTrackDetailsModal({
+                                showLastFmDetailsModal({
                                     name: localTrackInfo.name,
                                     artistName: localTrackInfo.artistName,
                                     artists: localTrackInfo.artists
@@ -34018,7 +34511,7 @@
                     dataElement.onclick = (e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        showLastFmTrackDetailsModal({
+                        showLastFmDetailsModal({
                             name: trackInfo.name,
                             artistName: trackInfo.artistName,
                             artists: trackInfo.artists,
@@ -34114,7 +34607,7 @@
                             dEl.onclick = (e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                showLastFmTrackDetailsModal({
+                                showLastFmDetailsModal({
                                     name: t.name,
                                     artistName: t.artists[0]?.name,
                                     artists: t.artists,
