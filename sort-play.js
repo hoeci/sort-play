@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.81.0";
+  const SORT_PLAY_VERSION = "5.82.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -332,6 +332,9 @@
   const spotifyImageCache = new Map();
   const dominantColorCache = new Map();
 
+  let notificationHistoryCache = [];
+  const MAX_NOTIFICATION_HISTORY = 100;
+
   const CACHE_EXPIRE_PLAYCOUNTS = 6 * 60 * 60 * 1000; 
   const CACHE_EXPIRE_PERSONAL_SCROBBLES = 30 * 60 * 1000;
   const CACHE_EXPIRE_GLOBAL_SCROBBLES = 2 * 24 * 60 * 60 * 1000; 
@@ -446,6 +449,7 @@
   const chatUploadIconSvg = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
   const chatDotsIconSvg = `<svg viewBox="0 0 24 24"><path d="M12 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 7zm0 2a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 9zm0 6a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 15z"/></svg>`;
   const closeIcon24Svg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
+  const historyIconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C9.61061 4 7.46589 5.04751 6 6.70835C5.91595 6.80358 5.83413 6.90082 5.75463 7M12 8V12L14.5 14.5M5.75391 4.00391V7.00391H8.75391" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const addPillIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2H9v6a1 1 0 1 1-2 0V9H1a1 1 0 0 1 0-2h6V1a1 1 0 0 1 1-1z"/></svg>`;
   const minimizeIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const restoreWindowIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -1295,16 +1299,16 @@
     db: null,
     mem: {},
     init: () => new Promise((resolve, reject) => {
-        const request = indexedDB.open("SortPlayDB", 10);
+        const request = indexedDB.open("SortPlayDB", 11);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres'].forEach(store => {
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres', 'notificationHistory'].forEach(store => {
                 if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
             });
         };
         request.onsuccess = (e) => {
             idb.db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres'].forEach(s => idb.mem[s] = new Map());
+            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres', 'notificationHistory'].forEach(s => idb.mem[s] = new Map());
             resolve();
         };
         request.onerror = (e) => reject(e);
@@ -1580,6 +1584,24 @@
 
       const isSticky = type === 'sticky';
       if (isSticky && arguments.length < 3) duration = 0;
+
+      if (notificationHistoryCache.length > 0 && notificationHistoryCache[0].text === text && notificationHistoryCache[0].type === type) {
+          notificationHistoryCache[0].timestamp = Date.now();
+          notificationHistoryCache[0].count = (notificationHistoryCache[0].count || 1) + 1;
+      } else {
+          const notifEntry = {
+              id: Date.now() + Math.random(),
+              text: text,
+              type: type,
+              timestamp: Date.now(),
+              count: 1
+          };
+          notificationHistoryCache.unshift(notifEntry);
+          if (notificationHistoryCache.length > MAX_NOTIFICATION_HISTORY) {
+              notificationHistoryCache.pop();
+          }
+      }
+      idb.set('notificationHistory', 'logs', notificationHistoryCache);
 
       const container = isSticky ? stickyNotificationContainer : normalNotificationContainer;
       const toast = document.createElement('div');
@@ -2733,6 +2755,7 @@
 
   function showSettingsModal() {
     const abortController = new AbortController();
+    let notifHoverTimeout = null;
     const overlay = document.createElement("div");
     overlay.id = "sort-play-settings-overlay";
     overlay.style.cssText = `
@@ -2762,6 +2785,7 @@
 
     const closeModal = () => {
         abortController.abort();
+        clearTimeout(notifHoverTimeout);
         overlay.style.opacity = "0";
         
         const chatPanel = document.getElementById('sort-play-chat-panel');
@@ -2788,9 +2812,21 @@
     const headerHtml = `
       <div class="main-trackCreditsModal-header" style="padding: 29px 32px 19px 32px !important; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
           <h1 class="main-trackCreditsModal-title"><span style='font-size: 30px; color: white;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span></h1>
-          <button class="main-trackCreditsModal-closeBtn" id="closeSettingsModal" aria-label="Close" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center;">
-            ${closeModalIcon20Svg}
-          </button>
+          <div style="display: flex; align-items: center; position: relative; gap: 14px;">
+              <button id="notificationHistoryBtn" title="Notification History" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center; transition: color 0.2s ease;">
+                  ${historyIconSvg}
+              </button>
+              <button class="main-trackCreditsModal-closeBtn" id="closeSettingsModal" aria-label="Close" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center;">
+                ${closeModalIcon20Svg}
+              </button>
+              <div id="notificationHistoryDropdown" class="sp-notification-history-dropdown">
+                  <div class="sp-notif-history-header-wrapper">
+                      <div class="sp-notif-history-header">Notification History</div>
+                      <button id="clearNotifHistoryBtn" class="sp-notif-clear-btn" title="Clear History">Clear</button>
+                  </div>
+                  <div class="sp-notif-history-list"></div>
+              </div>
+          </div>
       </div>
     `;
 
@@ -2862,6 +2898,25 @@
       .sort-play-settings .github-link-container { display: flex; justify-content: center; margin-top: 10px; padding-bottom: 10px; }
       .sort-play-settings .github-link-container a { color: #1ED760; font-size: 14px; text-decoration: none; }
       .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+      .sp-notification-history-dropdown { position: absolute; top: 100%; right: 0; width: 320px; background-color: #282828; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #3e3e3e; display: flex; flex-direction: column; z-index: 2005; opacity: 0; visibility: hidden; transform: translateY(-10px); transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s; pointer-events: none; }
+      .sp-notification-history-dropdown.visible { opacity: 1; visibility: visible; transform: translateY(10px); pointer-events: auto; }
+      .sp-notif-history-header-wrapper { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #3e3e3e; }
+      .sp-notif-history-header { font-weight: 700; font-size: 14px; color: white; }
+      .sp-notif-clear-btn { background: transparent; border: none; color: #888; cursor: pointer; font-size: 12px; font-weight: 500; transition: color 0.2s; padding: 0; }
+      .sp-notif-clear-btn:hover { color: #f15e6c; }
+      .sp-notif-history-list { max-height: 350px; overflow-y: auto; padding: 8px 0; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+      .sp-notif-history-list::-webkit-scrollbar { width: 6px; }
+      .sp-notif-history-list::-webkit-scrollbar-thumb { background-color: #555; border-radius: 3px; }
+      .sp-notif-item { padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; border-left: 3px solid transparent; }
+      .sp-notif-item:hover { background-color: rgba(255,255,255,0.05); }
+      .sp-notif-item.info { border-left-color: #2e77d0; }
+      .sp-notif-item.error { border-left-color: #e91429; }
+      .sp-notif-item.warning { border-left-color: #FFC107; }
+      .sp-notif-item.sticky { border-left-color: #1db954; }
+      .sp-notif-time { font-size: 11px; color: #888; }
+      .sp-notif-text { font-size: 13px; color: #e0e0e0; line-height: 1.4; word-wrap: break-word; }
+      .sp-notif-empty { padding: 20px; text-align: center; color: #888; font-size: 13px; font-style: italic; }
+      #notificationHistoryBtn:hover, #notificationHistoryBtn.active { color: #ffffff !important; }
     </style>
     ${headerHtml}
     <div class="main-trackCreditsModal-mainSection">
@@ -4404,9 +4459,91 @@
     setupSettingsButtonToggle(albumLastScrobbledSettingsBtn, albumLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== albumLastScrobbledDropdownContainer));
     setupSettingsButtonToggle(artistLastScrobbledSettingsBtn, artistLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== artistLastScrobbledDropdownContainer));
 
+    const notifBtn = modalContainer.querySelector("#notificationHistoryBtn");
+    const notifDropdown = modalContainer.querySelector("#notificationHistoryDropdown");
+    const notifList = modalContainer.querySelector(".sp-notif-history-list");
+    const clearNotifBtn = modalContainer.querySelector("#clearNotifHistoryBtn");
+    let isNotifDropdownLocked = false;
+
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
+        
+        if (notifBtn && notifDropdown && !notifBtn.contains(event.target) && !notifDropdown.contains(event.target)) {
+            isNotifDropdownLocked = false;
+            notifDropdown.classList.remove('visible');
+            notifBtn.classList.remove('active');
+        }
     }, { signal: abortController.signal });
+
+    const renderNotifHistory = () => {
+        if (notificationHistoryCache.length === 0) {
+            notifList.innerHTML = '<div class="sp-notif-empty">No notifications yet.</div>';
+            return;
+        }
+        
+        notifList.innerHTML = notificationHistoryCache.map(notif => {
+            const date = new Date(notif.timestamp);
+            const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const dateStr = date.toLocaleDateString();
+            
+            let typeClass = 'info';
+            if (notif.type === 'error') typeClass = 'error';
+            if (notif.type === 'warning') typeClass = 'warning';
+            if (notif.type === 'sticky') typeClass = 'sticky';
+
+            const badgeHtml = notif.count && notif.count > 1 
+                ? `<span style="background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 6px; vertical-align: middle;">x${notif.count}</span>` 
+                : '';
+
+            return `
+                <div class="sp-notif-item ${typeClass}">
+                    <div class="sp-notif-time">${dateStr} • ${timeStr}</div>
+                    <div class="sp-notif-text">${notif.text}${badgeHtml}</div>
+                </div>
+            `;
+        }).join('');
+    };
+
+    const showNotifDropdown = () => {
+        clearTimeout(notifHoverTimeout);
+        if (!notifDropdown.classList.contains('visible')) {
+            renderNotifHistory();
+            notifDropdown.classList.add('visible');
+            notifBtn.classList.add('active');
+        }
+    };
+
+    const hideNotifDropdown = () => {
+        if (isNotifDropdownLocked) return;
+        clearTimeout(notifHoverTimeout);
+        notifHoverTimeout = setTimeout(() => {
+            notifDropdown.classList.remove('visible');
+            notifBtn.classList.remove('active');
+        }, 500);
+    };
+
+    clearNotifBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        notificationHistoryCache = [];
+        idb.set('notificationHistory', 'logs', notificationHistoryCache);
+        renderNotifHistory();
+    });
+
+    notifBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isNotifDropdownLocked = !isNotifDropdownLocked;
+        if (isNotifDropdownLocked) {
+            showNotifDropdown();
+        } else {
+            notifDropdown.classList.remove('visible');
+            notifBtn.classList.remove('active');
+        }
+    });
+
+    notifBtn.addEventListener('mouseenter', showNotifDropdown);
+    notifBtn.addEventListener('mouseleave', hideNotifDropdown);
+    notifDropdown.addEventListener('mouseenter', showNotifDropdown);
+    notifDropdown.addEventListener('mouseleave', hideNotifDropdown);
   }
 
   function createAndInitializeChatPanel() {
@@ -8652,6 +8789,123 @@
     console.error(`[Sort-Play] ${context}:`, error);
   }
 
+const getDominantColor = (src) => {
+      if (!src) return Promise.resolve([40, 40, 40]);
+      if (dominantColorCache.has(src)) {
+          const cached = dominantColorCache.get(src);
+          if (Date.now() - cached.ts < CACHE_EXPIRE_MODAL_ASSETS) {
+              return Promise.resolve(cached.data);
+          }
+      }
+      return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = 50; canvas.height = 50;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, 50, 50);
+              try {
+                  const data = ctx.getImageData(0, 0, 50, 50).data;
+                  let r = 0, g = 0, b = 0, count = 0;
+                  for (let i = 0; i < data.length; i += 4) {
+                      if (data[i+3] < 128) continue;
+                      r += data[i]; g += data[i+1]; b += data[i+2];
+                      count++;
+                  }
+                  if(count === 0) return resolve([40, 40, 40]);
+                  const result = [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
+                  dominantColorCache.set(src, { ts: Date.now(), data: result });
+                  resolve(result);
+              } catch(e) { resolve([40, 40, 40]); }
+          };
+          img.onerror = () => resolve([40, 40, 40]);
+          img.src = src;
+      });
+  };
+
+  function updateGenreModalBackground(container, coverUrl, r, g, b) {
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      
+      let cR = r, cG = g, cB = b;
+      let bgR = Math.round(r * 0.15);
+      let bgG = Math.round(g * 0.15);
+      let bgB = Math.round(b * 0.15);
+
+      if (brightness < 80) {
+          cR = Math.min(255, r + 60);
+          cG = Math.min(255, g + 60);
+          cB = Math.min(255, b + 60);
+          
+          bgR = Math.round(cR * 0.15);
+          bgG = Math.round(cG * 0.15);
+          bgB = Math.round(cB * 0.15);
+      }
+
+      if (bgR < 18 && bgG < 18 && bgB < 18) {
+          bgR = 18; bgG = 18; bgB = 18;
+      }
+
+      container.style.backgroundColor = `rgb(${bgR}, ${bgG}, ${bgB})`;
+      container.style.borderColor = 'rgba(255,255,255,0.1)';
+
+      const bgUrl = coverUrl ? `url('${coverUrl}')` : 'none';
+
+      const newBgWrapper = document.createElement('div');
+      newBgWrapper.className = 'sp-genre-bg-layer';
+      newBgWrapper.style.cssText = `
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          z-index: 0;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          overflow: hidden;
+          border-radius: 30px;
+      `;
+
+      const layerCss = `
+          position: absolute;
+          top: -50px; left: -50px; right: -50px; bottom: -50px;
+          background-image: 
+              linear-gradient(rgba(${bgR}, ${bgG}, ${bgB}, 0.70), rgba(${bgR}, ${bgG}, ${bgB}, 0.70)),
+              ${bgUrl};
+          background-size: cover;
+          background-position: top center;
+          background-repeat: no-repeat;
+      `;
+
+      const unblurred = document.createElement('div');
+      unblurred.style.cssText = layerCss + `z-index: 1;`;
+      
+      const blurred = document.createElement('div');
+      blurred.style.cssText = layerCss + `z-index: 2; filter: blur(20px);`;
+
+      newBgWrapper.appendChild(unblurred);
+      newBgWrapper.appendChild(blurred);
+      
+      const oldBgs = container.querySelectorAll('.sp-genre-bg-layer');
+      const lastOldBg = oldBgs.length > 0 ? oldBgs[oldBgs.length - 1] : null;
+      
+      if (lastOldBg && lastOldBg.nextSibling) {
+          container.insertBefore(newBgWrapper, lastOldBg.nextSibling);
+      } else {
+          container.insertBefore(newBgWrapper, container.firstChild);
+      }
+      
+      requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+              newBgWrapper.style.opacity = '1';
+          });
+      });
+
+      oldBgs.forEach(oldBg => {
+          if (oldBg !== newBgWrapper) {
+              setTimeout(() => oldBg.remove(), 200);
+          }
+      });
+  }
+
   function showGenreDetailsModal(genreMapOrPromise, trackName, artistName, coverUrl) {
       const trackIdKey = `${trackName}|${artistName}`;
       const existing = document.getElementById("sort-play-genre-details-window");
@@ -8699,35 +8953,77 @@
           }
           
           existing.dataset.trackId = trackIdKey;
-          
-          let coverImg = existing.querySelector('.sp-genre-cover');
-          if (coverUrl) {
-              if (coverImg) {
-                  coverImg.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-                  requestAnimationFrame(() => {
-                      coverImg.src = coverUrl;
-                  });
-                  coverImg.style.display = '';
-              } else {
-                  const infoDiv = existing.querySelector('.sp-genre-info');
-                  if (infoDiv) {
-                      coverImg = document.createElement('img');
-                      coverImg.className = 'sp-genre-cover';
-                      coverImg.src = coverUrl;
-                      infoDiv.parentNode.insertBefore(coverImg, infoDiv);
-                  }
-              }
-          } else if (coverImg) {
-              coverImg.style.display = 'none';
-          }
-
-          const trackEl = existing.querySelector('.sp-genre-track');
-          if (trackEl) { trackEl.textContent = trackName; trackEl.title = trackName; }
-          
-          const artistEl = existing.querySelector('.sp-genre-artist');
-          if (artistEl) { artistEl.textContent = artistName; artistEl.title = artistName; }
 
           const contentArea = existing.querySelector('#sp-genre-content-area');
+
+          const updateModalContent = () => {
+              const trackEl = existing.querySelector('.sp-genre-track');
+              if (trackEl) { trackEl.textContent = trackName; trackEl.title = trackName; }
+              
+              const artistEl = existing.querySelector('.sp-genre-artist');
+              if (artistEl) { artistEl.textContent = artistName; artistEl.title = artistName; }
+          };
+
+          let coverWrapper = existing.querySelector('.sp-genre-cover-wrapper');
+          let oldCovers = existing.querySelectorAll('.sp-genre-cover');
+
+          if (coverUrl) {
+              if (coverWrapper) {
+                  coverWrapper.style.display = '';
+                  const newCoverImg = document.createElement('img');
+                  newCoverImg.className = 'sp-genre-cover';
+                  newCoverImg.style.opacity = '0';
+                  
+                  const startTransitions = () => {
+                      if (existing.dataset.trackId !== trackIdKey) return;
+                      
+                      updateModalContent();
+                      
+                      requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                              newCoverImg.style.opacity = '1';
+                          });
+                      });
+                      
+                      setTimeout(() => {
+                          if (existing.dataset.trackId === trackIdKey) {
+                              oldCovers.forEach(img => img.remove());
+                          } else {
+                              newCoverImg.remove();
+                          }
+                      }, 200);
+
+                      getDominantColor(coverUrl).then(([r, g, b]) => {
+                          if (existing.dataset.trackId === trackIdKey) {
+                              updateGenreModalBackground(existing, coverUrl, r, g, b);
+                          }
+                      });
+                  };
+
+                  newCoverImg.onload = startTransitions;
+                  newCoverImg.onerror = startTransitions;
+                  newCoverImg.src = coverUrl;
+                  
+                  coverWrapper.appendChild(newCoverImg);
+                  
+                  if (newCoverImg.complete && newCoverImg.naturalWidth > 0) {
+                      newCoverImg.onload = null;
+                      newCoverImg.onerror = null;
+                      startTransitions();
+                  }
+              } else {
+                  updateModalContent();
+                  getDominantColor(coverUrl).then(([r, g, b]) => {
+                      if (existing.dataset.trackId === trackIdKey) {
+                          updateGenreModalBackground(existing, coverUrl, r, g, b);
+                      }
+                  });
+              }
+          } else {
+              if (coverWrapper) coverWrapper.style.display = 'none';
+              oldCovers.forEach(img => img.remove());
+              updateModalContent();
+          }
 
           const transitionToContent = (newHtml, callback) => {
               const rect = existing.getBoundingClientRect();
@@ -8800,7 +9096,7 @@
               contentArea.innerHTML = `
                   <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 100px; gap: 15px;">
                       <div class="loader"></div>
-                      <span style="color: #b3b3b3; font-size: 14px; font-weight: 500;">Fetching Genres...</span>
+                      <span style="color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 500;">Fetching Genres...</span>
                   </div>
               `;
           };
@@ -8813,7 +9109,7 @@
               }).catch(err => {
                   if (existing.dataset.trackId !== trackIdKey) return;
                   console.error("[Sort-Play] Failed to fetch genres for modal", err);
-                  transitionToContent('<div style="color: #f15e6c; text-align: center; padding: 40px 20px;">Failed to load genres.</div>');
+                  transitionToContent('<div style="color: rgba(241,94,108,0.9); text-align: center; padding: 40px 20px;">Failed to load genres.</div>');
               });
           } else {
               transitionToContent(existing._renderContentHtml(genreMapOrPromise, true), () => existing._bindEvents());
@@ -8858,15 +9154,19 @@
           display: flex;
           flex-direction: column;
           background-color: #181818;
-          border: 1px solid #333;
+          border: 1px solid rgba(255,255,255,0.1);
           border-radius: 30px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+          box-shadow: 0 10px 60px rgba(0,0,0,0.8);
           overflow: hidden;
           pointer-events: auto;
           opacity: 0;
           animation: sp-window-drop 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
-          transition: height 0.3s ease;
+          transition: height 0.3s ease, background-color 0.4s ease, border-color 0.4s ease;
       `;
+      
+      getDominantColor(coverUrl).then(([r, g, b]) => {
+          updateGenreModalBackground(modalContainer, coverUrl, r, g, b);
+      });
 
       const smallCopyIcon = copyIconSVG.replace('width="16px"', 'width="12px"').replace('height="16px"', 'height="12px"');
 
@@ -8934,13 +9234,13 @@
                   });
 
                   contentHtml += `
-                      <div style="margin-bottom: 24px;">
-                          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 6px;">
-                              <div style="color: #777777; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-                                  ${category}
-                              </div>
-                          </div>
-                          <div style="display: flex; flex-wrap: wrap; gap: 6px;">`;
+                        <div style="margin-bottom: 24px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
+                                <div style="color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                                    ${category}
+                                </div>
+                            </div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;">`;
                   
                   if (genres.length > 0) {
                       contentHtml += genres.map(g => {
@@ -8954,15 +9254,15 @@
                           globalTagIndex++;
 
                           return `
-                            <div class="genre-detail-tag ${animClass}" data-genre="${g.name}" title="Source: ${tooltip}" style="background: #2a2a2a; color: #eee; padding: 4px 6px 4px 12px; border-radius: 15px; font-size: 13px; cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent; user-select: none; display: flex; align-items: center; gap: 8px; ${delayStyle}">
+                            <div class="genre-detail-tag ${animClass}" data-genre="${g.name}" title="Source: ${tooltip}" style="background: rgba(255,255,255,0.08); color: #fff; padding: 4px 6px 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.05); user-select: none; display: flex; align-items: center; gap: 8px; ${delayStyle}">
                                 <span class="genre-text">${titleCase}</span>${scoreHtml}
-                                <button class="genre-copy-btn" title="Copy" style="background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.2s;">
+                                <button class="genre-copy-btn" title="Copy" style="background: transparent; border: none; color: rgba(255,255,255,0.6); cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.2s;">
                                     ${smallCopyIcon}
                                 </button>
                             </div>`;
                       }).join('');
                   } else {
-                      contentHtml += `<span style="color: #555; font-size: 13px; font-style: italic; padding-left: 2px;">No genres found</span>`;
+                      contentHtml += `<span style="color: rgba(255,255,255,0.5); font-size: 13px; font-style: italic; padding-left: 2px;">No genres found</span>`;
                   }
 
                   contentHtml += `
@@ -8973,7 +9273,7 @@
           });
 
           if (contentHtml === '') {
-              contentHtml = '<div style="color: #b3b3b3; text-align: center; padding: 40px 20px;">No genres found for this track.</div>';
+              contentHtml = '<div style="color: rgba(255,255,255,0.5); text-align: center; padding: 40px 20px;">No genres found for this track.</div>';
           }
           
           return contentHtml;
@@ -8987,26 +9287,30 @@
             @keyframes sp-tag-pop { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
             .genre-detail-tag.animated { animation: sp-tag-pop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; opacity: 0; }
             .docked-bottom { flex-direction: column-reverse !important; }
-            .docked-bottom .sp-genre-header { border-bottom: none !important; border-top: 1px solid #282828 !important; }
-            .sp-genre-header { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #282828; background-color: #181818; cursor: move; user-select: none; }
-            .sp-genre-cover { width: 56px; height: 56px; border-radius: 4px; object-fit: cover; margin-right: 16px; background-color: #282828; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
-            .sp-genre-info { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
-            .sp-genre-all-title { font-size: 11px; font-weight: 700; color: #b3b3b3; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-            .sp-genre-track { font-size: 18px; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-            .sp-genre-artist { font-size: 14px; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            .sp-window-controls { display: flex; gap: 8px; align-items: center; padding-left: 12px; }
-            .sp-control-btn { background: none; border: none; color: #b3b3b3; cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background-color 0.2s; }
+            .docked-bottom .sp-genre-header { border-bottom: none !important; border-top: 1px solid rgba(255,255,255,0.08) !important; }
+            .sp-genre-header { display: flex; align-items: center; padding: 16px 20px; background-color: transparent; border-bottom: 1px solid rgba(255,255,255,0.08); cursor: move; user-select: none; position: relative; z-index: 2; }
+            .sp-genre-cover-wrapper { position: relative; width: 56px; height: 56px; margin-right: 16px; flex-shrink: 0; z-index: 2; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+            .sp-genre-cover { width: 100%; height: 100%; border-radius: 4px; object-fit: cover; background-color: rgba(255,255,255,0.1); position: absolute; top: 0; left: 0; transition: opacity 0.2s ease; }
+            .sp-genre-info { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; position: relative; z-index: 2; }
+            .sp-genre-all-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+            .sp-genre-track { font-size: 18px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+            .sp-genre-artist { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,0.2); }
+            .sp-window-controls { display: flex; gap: 8px; align-items: center; padding-left: 12px; position: relative; z-index: 2; }
+            .sp-control-btn { background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background-color 0.2s; }
             .sp-control-btn:hover { color: white; background-color: rgba(255,255,255,0.1); }
-            .sp-window-content { padding: 24px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 transparent; background-color: #181818; flex-grow: 1; }
+            .sp-window-content { padding: 24px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; background-color: transparent; flex-grow: 1; position: relative; z-index: 2; }
+            .sp-window-content { padding: 24px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; background-color: rgba(0, 0, 0, 0.4); flex-grow: 1; position: relative; z-index: 2; }
             .minimized .sp-window-content { display: none; }
             .minimized .sp-genre-header { border-bottom: none !important; border-top: none !important; }
             .minimized { height: auto !important; max-height: none !important; }
             .sp-window-content::-webkit-scrollbar { width: 8px; }
             .sp-window-content::-webkit-scrollbar-track { background: transparent; }
-            .sp-window-content::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
+            .sp-window-content::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15); border-radius: 4px; }
           </style>
           <div class="sp-genre-header">
-              ${coverUrl ? `<img src="${coverUrl}" class="sp-genre-cover" />` : ''}
+              <div class="sp-genre-cover-wrapper" style="${coverUrl ? '' : 'display: none;'}">
+                  ${coverUrl ? `<img src="${coverUrl}" class="sp-genre-cover" />` : ''}
+              </div>
               <div class="sp-genre-info">
                   <div class="sp-genre-all-title">All Genres</div>
                   <div class="sp-genre-track" title="${trackName}">${trackName}</div>
@@ -9035,12 +9339,12 @@
       const bindEvents = () => {
           modalContainer.querySelectorAll('.genre-detail-tag').forEach(tag => {
               tag.addEventListener('mouseenter', () => {
-                  tag.style.background = '#3e3e3e';
-                  tag.style.borderColor = '#555';
+                  tag.style.background = 'rgba(255,255,255,0.15)';
+                  tag.style.borderColor = 'rgba(255,255,255,0.2)';
               });
               tag.addEventListener('mouseleave', () => {
-                  tag.style.background = '#2a2a2a';
-                  tag.style.borderColor = 'transparent';
+                  tag.style.background = 'rgba(255,255,255,0.08)';
+                  tag.style.borderColor = 'rgba(255,255,255,0.05)';
               });
               
               tag.addEventListener('click', (e) => {
@@ -9075,7 +9379,7 @@
               });
               btn.addEventListener('mouseleave', () => {
                   btn.style.backgroundColor = 'transparent';
-                  btn.style.color = '#b3b3b3';
+                  btn.style.color = 'rgba(255,255,255,0.6)';
               });
 
               btn.addEventListener('click', (e) => {
@@ -9099,7 +9403,7 @@
           contentArea.innerHTML = `
               <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100px; gap: 15px; margin-top: 20px;">
                   <div class="loader"></div>
-                  <span style="color: #b3b3b3; font-size: 14px; font-weight: 500;">Fetching Genres...</span>
+                  <span style="color: rgba(255,255,255,0.7); font-size: 14px; font-weight: 500;">Fetching Genres...</span>
               </div>
           `;
           genreMapOrPromise.then(genreMap => {
@@ -9110,7 +9414,7 @@
           }).catch(err => {
               if (modalContainer.dataset.trackId !== trackIdKey) return;
               console.error("[Sort-Play] Failed to fetch genres for modal", err);
-              contentArea.innerHTML = '<div style="color: #f15e6c; text-align: center; padding: 40px 20px;">Failed to load genres.</div>';
+              contentArea.innerHTML = '<div style="color: rgba(241,94,108,0.9); text-align: center; padding: 40px 20px;">Failed to load genres.</div>';
               enforceBoundaries(modalContainer);
           });
       } else {
@@ -9136,13 +9440,8 @@
           
           modalContainer.style.left = `${newLeft}px`;
           modalContainer.style.top = `${newTop}px`;
-
-          if (newTop + rect.height > vH - 150) {
-              const nB = Math.max(10, vH - (newTop + rect.height));
-              modalContainer.style.bottom = `${nB}px`;
-              modalContainer.style.top = 'auto';
-              modalContainer.classList.add('docked-bottom');
-          }
+          modalContainer.style.bottom = 'auto';
+          modalContainer.classList.remove('docked-bottom');
       });
 
       const closeModal = () => modalContainer.remove();
@@ -9331,7 +9630,7 @@
               if (track) {
                   const fetchPromise = fetchDisplayGenres(track);
                   const artistName = track.artists?.[0]?.name || "Unknown Artist";
-                  const coverUrl = track.album?.images?.[0]?.url || "";
+                  const coverUrl = track.album?.images?.length > 1 ? (track.album.images[1]?.url || track.album.images[0]?.url) : (track.album?.images?.[0]?.url || "");
                   showGenreDetailsModal(fetchPromise, track.name, artistName, coverUrl);
               } else {
                   showNotification("Could not fetch track details", true);
@@ -10010,7 +10309,7 @@
         genreContainer._trackName = track.metadata?.title || track.name || "Unknown Track";
         genreContainer._artistName = track.metadata?.artist_name || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
         const images = track.metadata?.image_url ? null : (track.album?.images || []);
-        genreContainer._coverUrl = track.metadata?.image_url || (images && images.length > 0 ? (images[2]?.url || images[0]?.url) : "");
+        genreContainer._coverUrl = track.metadata?.image_url || (images && images.length > 1 ? (images[1]?.url || images[0]?.url) : (images?.[0]?.url || ""));
         
         const liveTrack = Spicetify.Player.data?.item;
         if (!liveTrack || liveTrack.uri !== currentUriAtStart) {
@@ -33370,52 +33669,27 @@
               }
           }
 
-          const getDominantColor = (src) => {
-              if (dominantColorCache.has(src)) {
-                  const cached = dominantColorCache.get(src);
-                  if (Date.now() - cached.ts < CACHE_EXPIRE_MODAL_ASSETS) {
-                      return Promise.resolve(cached.data);
-                  }
-              }
-              return new Promise((resolve) => {
-                  const img = new Image();
-                  img.crossOrigin = 'Anonymous';
-                  img.onload = () => {
-                      const canvas = document.createElement('canvas');
-                      canvas.width = 50; canvas.height = 50;
-                      const ctx = canvas.getContext('2d');
-                      ctx.drawImage(img, 0, 0, 50, 50);
-                      try {
-                          const data = ctx.getImageData(0, 0, 50, 50).data;
-                          let r = 0, g = 0, b = 0, count = 0;
-                          for (let i = 0; i < data.length; i += 4) {
-                              if (data[i+3] < 128) continue;
-                              r += data[i]; g += data[i+1]; b += data[i+2];
-                              count++;
-                          }
-                          if(count === 0) return resolve([40, 40, 40]);
-                          const result = [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
-                          dominantColorCache.set(src, { ts: Date.now(), data: result });
-                          resolve(result);
-                      } catch(e) { resolve([40, 40, 40]); }
-                  };
-                  img.onerror = () => resolve([40, 40, 40]);
-                  img.src = src;
-              });
-          };
-
           const [r, g, b] = await getDominantColor(albumImage);
-          const bgR = Math.round(r * 0.1);
-          const bgG = Math.round(g * 0.1);
-          const bgB = Math.round(b * 0.1);
           const brightness = (r * 299 + g * 587 + b * 114) / 1000;
           const fabTextColor = brightness > 140 ? '#000000' : '#ffffff';
           
           let cR = r, cG = g, cB = b;
+          let bgR = Math.round(r * 0.1);
+          let bgG = Math.round(g * 0.1);
+          let bgB = Math.round(b * 0.1);
+          
           if (brightness < 80) {
               cR = Math.min(255, r + 60);
               cG = Math.min(255, g + 60);
               cB = Math.min(255, b + 60);
+              
+              bgR = Math.round(cR * 0.15);
+              bgG = Math.round(cG * 0.15);
+              bgB = Math.round(cB * 0.15);
+          }
+          
+          if (bgR < 18 && bgG < 18 && bgB < 18) {
+              bgR = 18; bgG = 18; bgB = 18;
           }
           
           const lineR = Math.min(255, bgR + 35);
@@ -33536,18 +33810,24 @@
                   z-index: 1;
                   overflow: hidden;
               }
-              .lfm-main-panel::before {
+              .lfm-main-panel::before, .lfm-main-panel::after {
                   content: '';
                   position: absolute;
-                  top: -20px; left: -20px; right: -20px; bottom: -20px;
+                  top: -24px; left: -24px; right: -24px; bottom: -24px;
                   background-image: 
-                      linear-gradient(to bottom, rgba(${r}, ${g}, ${b}, 0.65) -35%, rgba(${bgR}, ${bgG}, ${bgB}, 0.9) 45%, rgb(${bgR}, ${bgG}, ${bgB}) 100%),
+                      linear-gradient(to bottom, rgba(${cR}, ${cG}, ${cB}, 0.65) -35%, rgba(${bgR}, ${bgG}, ${bgB}, 0.9) 45%, rgb(${bgR}, ${bgG}, ${bgB}) 100%),
                       url('${albumImage}');
                   background-size: cover;
                   background-position: top center;
                   background-repeat: no-repeat;
+              }
+              .lfm-main-panel::before {
+                  z-index: -2;
+              }
+              .lfm-main-panel::after {
                   filter: blur(12px);
                   z-index: -1;
+                  transform: scale(1.01);
               }
 
               .lfm-header { display: flex; padding: 30px 24px 24px; background: transparent !important; gap: 24px; align-items: flex-start; flex-shrink: 0; border: none !important; }
@@ -33567,7 +33847,7 @@
                   padding-bottom: 6px; margin-bottom: -6px; 
                   padding-right: 8px; 
               }
-              .lfm-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px; background-color: transparent !important; flex: 1; overflow-y: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+              .lfm-body { padding: 0 24px 24px; display: flex; flex-direction: column; gap: 20px; background-color: transparent !important; flex: 1;  min-height: 0; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
               .lfm-body::-webkit-scrollbar { width: 8px; }
               .lfm-body::-webkit-scrollbar-track { background: transparent; }
               .lfm-body::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15); border-radius: 4px; }
@@ -33584,12 +33864,12 @@
               .tag-section-header { font-size: 12px; color: rgba(255,255,255,0.6) !important; text-transform: uppercase; font-weight: 700; margin-left: 4px; margin-bottom: 8px; }
               .lfm-tags { display: flex; flex-wrap: wrap; gap: 8px; }
               
-              .lfm-tag { background: rgba(255,255,255,0.08) !important; color: #fff !important; padding: 6px 14px !important; border-radius: 16px !important; font-size: 13px !important; font-weight: 500 !important; border: 1px solid rgba(255,255,255,0.05) !important; transition: all 0.2s; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+              .lfm-tag { background: rgba(255,255,255,0.08) !important; color: #fff !important; padding: 6px 14px !important; border-radius: 16px !important; font-size: 13px !important; font-weight: 500 !important; border: 1px solid rgba(255,255,255,0.05) !important; transition: all 0.2s; }
               .lfm-tag:hover { background-color: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.2) !important; }
               
               .lfm-footer { padding: 20px 24px; border-top: 1px solid rgba(255,255,255,0.08) !important; display: flex; justify-content: space-between; align-items: center; background: transparent !important; flex-shrink: 0; }
               
-              .lfm-btn { background-color: rgb(${r}, ${g}, ${b}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: 10px 24px !important; border-radius: 24px !important; font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, filter 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+              .lfm-btn { background-color: rgb(${cR}, ${cG}, ${cB}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; padding: 10px 24px !important; border-radius: 24px !important; font-weight: 700 !important; font-size: 14px !important; cursor: pointer !important; text-decoration: none !important; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, filter 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
               .lfm-btn:hover { filter: brightness(1.2); transform: scale(1.03); }
               
               .lfm-comments-panel { width: 400px; flex-shrink: 0; border-left: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; height: 100%; background-color: rgb(${bgR}, ${bgG}, ${bgB}); background-image: linear-gradient(180deg, rgba(${cR}, ${cG}, ${cB}, 0.22) 0%, rgba(${cR}, ${cG}, ${cB}, 0.09) 35%, rgba(${cR}, ${cG}, ${cB}, 0.02) 70%, rgb(${bgR}, ${bgG}, ${bgB}) 100%); transition: opacity 0.3s; opacity: 1; }
@@ -33599,7 +33879,7 @@
               .lfm-comments-body::-webkit-scrollbar { width: 6px; }
               .lfm-comments-body::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15); border-radius: 3px; }
               
-              .lfm-fab-add-comment { position: absolute; bottom: 24px; right: 24px; width: 46px; height: 46px; background-color: rgb(${r}, ${g}, ${b}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s, filter 0.2s; z-index: 10; text-decoration: none; }
+              .lfm-fab-add-comment { position: absolute; bottom: 24px; right: 24px; width: 46px; height: 46px; background-color: rgb(${cR}, ${cG}, ${cB}) !important; color: ${fabTextColor} !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: transform 0.2s, filter 0.2s; z-index: 10; text-decoration: none; }
               .lfm-fab-add-comment:hover { transform: scale(1.03); filter: brightness(1.2); color: ${fabTextColor} !important; }
               .lfm-fab-add-comment svg { stroke: currentColor !important; color: ${fabTextColor} !important; }
               
@@ -33619,7 +33899,7 @@
               .top-right-controls { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; z-index: 10; }
               
               .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex; align-items: center; justify-content: center; transition: background 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-              .top-icon-btn:hover { background: rgba(${r}, ${g}, ${b}, 0.6) !important; border-color: rgba(255,255,255,0.3) !important; }
+              .top-icon-btn:hover { background: rgba(${cR}, ${cG}, ${cB}, 0.6) !important; border-color: rgba(255,255,255,0.3) !important; }
               .top-icon-btn svg { width: 17px !important; height: 17px !important; }
               
               #lfm-comments-sort-select { transition: color 0.2s; }
@@ -36717,6 +36997,12 @@
   await idb.init();
   await idb.clear('personalScrobbles');
   await migrateJobHistoryToIdb();
+  
+  const savedHistory = await idb.get('notificationHistory', 'logs');
+  if (savedHistory) {
+      notificationHistoryCache = savedHistory;
+  }
+  
   loadSettings();
   fetchUserMarket();
   cleanupLegacyCache();
@@ -36747,7 +37033,7 @@
                   const artistName = track.metadata?.artist_name || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
                   const trackName = track.metadata?.title || track.name || "Unknown Track";
                   const images = track.metadata?.image_url ? null : (track.album?.images || []);
-                  const coverUrl = track.metadata?.image_url || (images && images.length > 0 ? (images[2]?.url || images[0]?.url) : "");
+                  const coverUrl = track.metadata?.image_url || (images && images.length > 1 ? (images[1]?.url || images[0]?.url) : (images?.[0]?.url || ""));
                   
                   showGenreDetailsModal(fetchPromise, trackName, artistName, coverUrl);
               }
