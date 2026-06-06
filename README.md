@@ -2,7 +2,7 @@
 
 <img src="https://github.com/user-attachments/assets/52d8dea1-2fe3-46ba-a201-817cf7a31408" alt="Sort-Play Showcase" width="100%">
 
-# Sort-Play: The Ultimate Spotify Toolkit
+# [Sort-Play: The Ultimate Spotify Toolkit](https://github.com/hoeci/sort-play)
 
 *A Spicetify extension that adds powerful sorting, filtering, UI features, and more to the Spotify desktop client.*
 

@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.82.0";
+  const SORT_PLAY_VERSION = "5.83.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -15952,7 +15952,8 @@ const getDominantColor = (src) => {
                     info: 'Playlist',
                     coverUrl: images.length ? (images[images.length - 1] || images[0]).url : item.imageUrl,
                     type: 'playlist',
-                    totalTracks: item.totalLength ?? item.trackCount ?? item.tracks?.totalCount
+                    totalTracks: item.totalLength ?? item.trackCount ?? item.tracks?.totalCount,
+                    addedAt: item.addedAt ? new Date(item.addedAt).getTime() : 0
                 };
             }
 
@@ -15966,7 +15967,8 @@ const getDominantColor = (src) => {
                         info: 'Playlist',
                         coverUrl: fetchedImages.length ? (fetchedImages[fetchedImages.length - 1] || fetchedImages[0]).url : null,
                         type: 'playlist',
-                        totalTracks: meta.totalLength
+                        totalTracks: meta.totalLength,
+                        addedAt: item.addedAt ? new Date(item.addedAt).getTime() : 0
                     };
                 } catch (e) {
                     console.warn(`Sort-Play: Could not fetch metadata for playlist ${item.name}`, e);
@@ -15975,7 +15977,8 @@ const getDominantColor = (src) => {
                         name: item.name,
                         info: 'Playlist',
                         coverUrl: null,
-                        type: 'playlist'
+                        type: 'playlist',
+                        addedAt: item.addedAt ? new Date(item.addedAt).getTime() : 0
                     };
                 }
             };
@@ -15995,7 +15998,8 @@ const getDominantColor = (src) => {
                     name: item.name,
                     info: 'Folder',
                     type: 'folder',
-                    children: children
+                    children: children,
+                    addedAt: item.addedAt ? new Date(item.addedAt).getTime() : 0
                 };
             }
             return null;
@@ -16003,6 +16007,61 @@ const getDominantColor = (src) => {
 
         const rootPromises = rootlist.items.map(item => processItem(item));
         const hierarchy = (await Promise.all(rootPromises)).filter(Boolean);
+
+        const specialCollections = [];
+        let pinnedUris = new Set();
+        
+        try {
+            const libSidebar = await Spicetify.Platform.LibraryAPI.getContents({ limit: 100 });
+            
+            libSidebar.items.forEach(i => {
+                if (i.pinned) pinnedUris.add(i.uri);
+            });
+            
+            const likedItem = libSidebar.items.find(i => i.uri === 'spotify:collection:tracks');
+            if (likedItem) {
+                specialCollections.push({
+                    uri: likedItem.uri,
+                    name: likedItem.name || "Liked Songs",
+                    info: "Playlist",
+                    coverUrl: likedItem.images?.[0]?.url || "https://misc.scdn.co/liked-songs/liked-songs-64.png",
+                    type: "playlist",
+                    totalTracks: likedItem.trackCount || 'N/A',
+                    addedAt: Date.now() + 2000,
+                    isPinned: likedItem.pinned
+                });
+            } else {
+                specialCollections.push({
+                    uri: "spotify:collection:tracks",
+                    name: "Liked Songs",
+                    info: "Playlist",
+                    coverUrl: "https://misc.scdn.co/liked-songs/liked-songs-64.png",
+                    type: "playlist",
+                    totalTracks: 'N/A',
+                    addedAt: Date.now() + 2000,
+                    isPinned: true
+                });
+            }
+        } catch(e) {
+            specialCollections.push({
+                uri: "spotify:collection:tracks",
+                name: "Liked Songs",
+                info: "Playlist",
+                coverUrl: "https://misc.scdn.co/liked-songs/liked-songs-64.png",
+                type: "playlist",
+                totalTracks: 'N/A',
+                addedAt: Date.now() + 2000,
+                isPinned: true
+            });
+        }
+        
+        const applyPinned = (items) => {
+            items.forEach(item => {
+                if (pinnedUris.has(item.uri)) item.isPinned = true;
+                if (item.children) applyPinned(item.children);
+            });
+        };
+        applyPinned(hierarchy);
 
         const fetchAlbumsInternal = async () => {
             const resolvedAlbumsInternal = [];
@@ -16018,7 +16077,8 @@ const getDominantColor = (src) => {
                         info: `Album by ${item.artists ? item.artists.map(a => a.name).join(', ') : 'Unknown'}`,
                         coverUrl: imageUrl,
                         type: 'album',
-                        totalTracks: item.trackCount ?? item.tracks?.totalCount
+                        totalTracks: item.trackCount ?? item.tracks?.totalCount,
+                        isPinned: item.pinned || false
                     });
                 });
             } catch (e) {
@@ -16028,7 +16088,7 @@ const getDominantColor = (src) => {
         };
 
         let resolvedAlbums = await fetchAlbumsInternal();
-        return [...hierarchy, ...resolvedAlbums];
+        return [...specialCollections, ...hierarchy, ...resolvedAlbums];
 
     } catch (error) {
         console.error("Failed to fetch user library:", error);
@@ -16050,7 +16110,7 @@ const getDominantColor = (src) => {
     const modalContainer = document.createElement("div");
     modalContainer.className = "main-embedWidgetGenerator-container";
     modalContainer.style.cssText = `
-        width: ${isDynamic ? '950px' : '490px'} !important; display: flex; flex-direction: column;
+        width: ${isDynamic ? '68vw' : '490px'} !important; max-height: 95vh; display: flex; flex-direction: column;
         border-radius: 20px; background-color: #181818 !important; border: 1px solid #282828;
         max-width: 95vw;
     `;
@@ -16063,17 +16123,27 @@ const getDominantColor = (src) => {
     let globalSearchResults = { playlists: [], albums: [], artists: [] };
     const sourceDataCache = new Map();
     const manuallyAddedUris = new Set();
+    const expandedFolders = new Set();
 
     modalContainer.innerHTML = `
         <style>
-          #user-library-container { margin-top: 8px; background-color: #282828; border-radius: 6px; padding: 8px; height: 300px; max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+          .sp-custom-select-wrapper { position: relative; display: inline-block; }
+          .sp-custom-select-btn { background: transparent; color: rgba(255,255,255,0.6); border: none; outline: none; font-size: 11px; cursor: pointer; text-transform: uppercase; font-weight: 700; display: flex; align-items: center; gap: 4px; padding: 0; transition: color 0.2s; }
+          .sp-custom-select-btn:hover { color: #fff; }
+          .sp-custom-select-btn svg { width: 14px; height: 14px; fill: currentColor; }
+          .sp-custom-select-menu { display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; background-color: #282828; min-width: 140px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.4); z-index: 10001; border-radius: 4px; padding: 4px 0; border: 1px solid #3e3e3e; }
+          .sp-custom-select-menu.visible { display: block; }
+          .sp-custom-select-option { color: #b3b3b3; padding: 8px 12px; text-decoration: none; display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-size: 13px; font-weight: 500; text-transform: none; margin: 0; height: auto; border-radius: 0; }
+          .sp-custom-select-option:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
+          .sp-custom-select-option.selected { color: #1ed760; background-color: rgba(30, 215, 96, 0.1); }
+          #user-library-container { scrollbar-width: thin; scrollbar-color: #535353 #282828; }
           #user-library-container::-webkit-scrollbar { width: 8px; }
-          #user-library-container::-webkit-scrollbar-track { background: #282828; }
+          #user-library-container::-webkit-scrollbar-track { background: transparent; }
           #user-library-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
-          .dynamic-cols-wrapper { display: flex; gap: 12px; margin-top: 8px; height: 350px; }
+          .dynamic-cols-wrapper { display: flex; gap: 12px; margin-top: 8px; height: 50vh; }
           .dynamic-col { flex: 1; display: flex; flex-direction: column; background-color: #282828; border-radius: 6px; overflow: hidden; }
           .dynamic-col-header { padding: 10px; font-weight: bold; text-align: center; border-bottom: 1px solid #3e3e3e; color: #fff; background-color: #2a2a2a; flex-shrink: 0; font-size: 14px; letter-spacing: 0.5px; }
-          .dynamic-col-content { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+          .dynamic-col-content { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
           .dynamic-col-content::-webkit-scrollbar { width: 8px; }
           .dynamic-col-content::-webkit-scrollbar-track { background: transparent; }
           .dynamic-col-content::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
@@ -16092,7 +16162,8 @@ const getDominantColor = (src) => {
           .folder-header.selected { background-color: #3a4f3a; border: 1px solid #1ed760; }
           .folder-children { margin-left: 24px; display: none; border-left: 1px solid #444; }
           .folder-children.expanded { display: block; }
-          .caret-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-right: -5px; }
+          .caret-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-right: -5px; position: relative; }
+          .caret-btn::after { content: ''; position: absolute; top: -4px; bottom: -4px; left: -4px; right: -8px; z-index: 2; }
           .caret-icon { transition: transform 0.2s; }
           .caret-icon.rotated { transform: rotate(90deg); }
           .main-buttons-button.main-button-primary { background-color: #1ED760; color: black; transition: background-color 0.1s ease; }
@@ -16120,7 +16191,7 @@ const getDominantColor = (src) => {
             <p style="color: #b3b3b3; font-size: 14px; margin: 0 0 12px;">${descriptionText}</p>
             
             <div class="input-wrapper" style="${isDynamic ? 'z-index: 10; margin-bottom: 8px;' : ''}">
-                <input type="text" id="source-url-input" placeholder="Search library or paste link..." autocomplete="off">
+                <input type="text" id="source-url-input" placeholder="Search or paste link(s) separated by comma..." autocomplete="off">
                 <button id="source-clear-btn" title="Clear">&times;</button>
                 <button id="source-add-btn" title="Add Link">
                     ${addLinkIconSvg}
@@ -16132,27 +16203,54 @@ const getDominantColor = (src) => {
             ${isDynamic ? `
             <div class="dynamic-cols-wrapper">
                 <div class="dynamic-col">
-                    <div class="dynamic-col-header">Playlists</div>
+                    <div class="dynamic-col-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Playlists</span>
+                        <div class="sp-custom-select-wrapper" id="dyn-playlists-sort">
+                            <button class="sp-custom-select-btn"><span>Custom Order</span><svg viewBox="0 0 16 16"><path d="M3 6l5 5.5L13 6z"></path></svg></button>
+                            <div class="sp-custom-select-menu"></div>
+                        </div>
+                    </div>
                     <div class="dynamic-col-content" id="col-playlists">
                         <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading...</div>
                     </div>
                 </div>
                 <div class="dynamic-col">
-                    <div class="dynamic-col-header">Albums</div>
+                    <div class="dynamic-col-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Albums</span>
+                        <div class="sp-custom-select-wrapper" id="dyn-albums-sort">
+                            <button class="sp-custom-select-btn"><span>Recent</span><svg viewBox="0 0 16 16"><path d="M3 6l5 5.5L13 6z"></path></svg></button>
+                            <div class="sp-custom-select-menu"></div>
+                        </div>
+                    </div>
                     <div class="dynamic-col-content" id="col-albums">
                         <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading...</div>
                     </div>
                 </div>
                 <div class="dynamic-col">
-                    <div class="dynamic-col-header">Followed Artists</div>
+                    <div class="dynamic-col-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>Artists</span>
+                        <div class="sp-custom-select-wrapper" id="dyn-artists-sort">
+                            <button class="sp-custom-select-btn"><span>Custom Order</span><svg viewBox="0 0 16 16"><path d="M3 6l5 5.5L13 6z"></path></svg></button>
+                            <div class="sp-custom-select-menu"></div>
+                        </div>
+                    </div>
                     <div class="dynamic-col-content" id="col-artists">
                         <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading...</div>
                     </div>
                 </div>
             </div>
             ` : `
-            <div id="user-library-container">
-                <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading Library...</div>
+            <div id="user-library-wrapper" style="margin-top: 8px; background-color: #282828; border-radius: 6px; display: flex; flex-direction: column; height: 45vh; overflow: hidden;">
+                <div class="list-sort-header" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: #2a2a2a; border-bottom: 1px solid #3e3e3e;">
+                    <span style="font-size: 13px; color: #fff; font-weight: bold;">Playlists</span>
+                    <div class="sp-custom-select-wrapper" id="global-sort-select">
+                        <button class="sp-custom-select-btn"><span>Custom Order</span><svg viewBox="0 0 16 16"><path d="M3 6l5 5.5L13 6z"></path></svg></button>
+                        <div class="sp-custom-select-menu"></div>
+                    </div>
+                </div>
+                <div id="user-library-container" style="flex: 1; overflow-y: auto; padding: 8px;">
+                    <div style="text-align: center; color: #b3b3b3; font-size: 14px; padding: 20px 0;">Loading Library...</div>
+                </div>
             </div>
             `}
         </div>
@@ -16169,6 +16267,84 @@ const getDominantColor = (src) => {
     const clearButton = modalContainer.querySelector('#source-clear-btn');
     const addButton = modalContainer.querySelector('#source-add-btn');
     const addedSourcesList = modalContainer.querySelector('#added-sources-list');
+
+    const sortDropdownOptions = {
+        playlists: [
+            { val: 'recently-added', text: 'Recently Added' },
+            { val: 'custom', text: 'Custom Order' },
+            { val: 'alphabetical', text: 'A-Z' },
+            { val: 'folders-first', text: 'Folders First' },
+            { val: 'playlists-first', text: 'Playlists First' }
+        ],
+        albums: [
+            { val: 'recent', text: 'Recent' },
+            { val: 'alphabetical', text: 'A-Z' }
+        ],
+        artists: [
+            { val: 'custom', text: 'Custom Order' },
+            { val: 'alphabetical', text: 'A-Z' },
+            { val: 'reverse-alphabetical', text: 'Z-A' }
+        ]
+    };
+
+    const setupCustomDropdown = (wrapper, options, storageKey, defaultVal, onChangeCallback) => {
+        if (!wrapper) return;
+        const btn = wrapper.querySelector('.sp-custom-select-btn');
+        const menu = wrapper.querySelector('.sp-custom-select-menu');
+        const btnText = btn.querySelector('span');
+        
+        let currentVal = localStorage.getItem(storageKey) || defaultVal;
+        
+        const updateUI = (val) => {
+            const opt = options.find(o => o.val === val) || options[0];
+            btnText.textContent = opt.text;
+            menu.innerHTML = options.map(o => 
+                `<button class="sp-custom-select-option ${o.val === val ? 'selected' : ''}" data-val="${o.val}">${o.text}</button>`
+            ).join('');
+            
+            menu.querySelectorAll('.sp-custom-select-option').forEach(optBtn => {
+                optBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const newVal = optBtn.dataset.val;
+                    localStorage.setItem(storageKey, newVal);
+                    updateUI(newVal);
+                    menu.classList.remove('visible');
+                    onChangeCallback(newVal);
+                });
+            });
+        };
+        
+        updateUI(currentVal);
+        
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.querySelectorAll('.sp-custom-select-menu.visible').forEach(m => {
+                if (m !== menu) m.classList.remove('visible');
+            });
+            menu.classList.toggle('visible');
+        });
+    };
+
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.sp-custom-select-menu.visible').forEach(m => m.classList.remove('visible'));
+    });
+
+    setupCustomDropdown(modalContainer.querySelector('#global-sort-select'), sortDropdownOptions.playlists, 'sort-play-library-sort-global', 'custom', () => {
+        const libraryContainer = modalContainer.querySelector('#user-library-container');
+        if (libraryContainer) renderTree(libraryData, libraryContainer, searchInput.value.trim(), 0, false, 'root-playlists');
+    });
+
+    setupCustomDropdown(modalContainer.querySelector('#dyn-playlists-sort'), sortDropdownOptions.playlists, 'sort-play-library-sort-global', 'custom', () => {
+        renderDynamicColumns(searchInput.value.trim());
+    });
+
+    setupCustomDropdown(modalContainer.querySelector('#dyn-albums-sort'), sortDropdownOptions.albums, 'sort-play-library-sort-albums', 'recent', () => {
+        renderDynamicColumns(searchInput.value.trim());
+    });
+
+    setupCustomDropdown(modalContainer.querySelector('#dyn-artists-sort'), sortDropdownOptions.artists, 'sort-play-library-sort-artists', 'custom', () => {
+        renderDynamicColumns(searchInput.value.trim());
+    });
 
     const processUri = async (uri) => {
         if (sourceDataCache.has(uri)) return sourceDataCache.get(uri);
@@ -16336,7 +16512,7 @@ const getDominantColor = (src) => {
         }
     };
 
-    const renderTree = (items, container, filterText = '', limit = 0, append = false) => {
+    const renderTree = (items, container, filterText = '', limit = 0, append = false, contextType = 'root-playlists') => {
         if (!append) container.innerHTML = '';
         
         if (items.length === 0 && !append) {
@@ -16346,8 +16522,29 @@ const getDominantColor = (src) => {
 
         let renderedCount = 0;
 
-        const processList = (list, parentEl) => {
-            for (const item of list) {
+        const processList = (list, parentEl, currentContext) => {
+            let displayItems = [...list];
+            let currentSort = 'custom';
+            
+            if (currentContext === 'root-playlists') currentSort = localStorage.getItem('sort-play-library-sort-global') || 'custom';
+            else if (currentContext === 'folder') currentSort = localStorage.getItem('sort-play-library-sort-folder') || 'custom';
+            else if (currentContext === 'albums') currentSort = localStorage.getItem('sort-play-library-sort-albums') || 'recent';
+            else if (currentContext === 'artists') currentSort = localStorage.getItem('sort-play-library-sort-artists') || 'custom';
+            else if (currentContext === 'global-search') currentSort = 'custom';
+            
+            if (currentSort === 'alphabetical') displayItems.sort((a,b) => a.name.localeCompare(b.name));
+            else if (currentSort === 'reverse-alphabetical') displayItems.sort((a,b) => b.name.localeCompare(a.name));
+            else if (currentSort === 'folders-first') displayItems.sort((a,b) => (a.type === 'folder' && b.type !== 'folder' ? -1 : (a.type !== 'folder' && b.type === 'folder' ? 1 : 0)));
+            else if (currentSort === 'playlists-first') displayItems.sort((a,b) => (a.type === 'folder' && b.type !== 'folder' ? 1 : (a.type !== 'folder' && b.type === 'folder' ? -1 : 0)));
+            else if (currentSort === 'recently-added') displayItems.sort((a,b) => (b.addedAt || 0) - (a.addedAt || 0));
+
+            if (currentSort === 'custom') {
+                const pinned = displayItems.filter(i => i.isPinned);
+                const unpinned = displayItems.filter(i => !i.isPinned);
+                displayItems = [...pinned, ...unpinned];
+            }
+
+            for (const item of displayItems) {
                 if (limit > 0 && renderedCount >= limit) break;
 
                 const matchesFilter = !filterText || item.name.toLowerCase().includes(filterText.toLowerCase());
@@ -16381,6 +16578,34 @@ const getDominantColor = (src) => {
                     const childrenContainer = document.createElement('div');
                     childrenContainer.className = 'folder-children';
 
+                    if (item.children && item.children.length > 0) {
+                        const folderSortWrapper = document.createElement('div');
+                        folderSortWrapper.className = 'list-sort-header folder-sort-header';
+                        folderSortWrapper.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; margin-bottom: 4px; border-bottom: 1px solid #3e3e3e; background: rgba(0,0,0,0.15); border-radius: 4px;';
+                        folderSortWrapper.innerHTML = `
+                            <span style="font-size: 10px; color: #888; font-weight: bold; text-transform: uppercase;">Folder Content</span>
+                            <div class="sp-custom-select-wrapper folder-sort-select-wrapper">
+                                <button class="sp-custom-select-btn"><span>Custom Order</span><svg viewBox="0 0 16 16"><path d="M3 6l5 5.5L13 6z"></path></svg></button>
+                                <div class="sp-custom-select-menu"></div>
+                            </div>
+                        `;
+                        setupCustomDropdown(folderSortWrapper.querySelector('.folder-sort-select-wrapper'), [
+                            { val: 'custom', text: 'Custom Order' },
+                            { val: 'alphabetical', text: 'A-Z' },
+                            { val: 'recently-added', text: 'Recently Added' }
+                        ], 'sort-play-library-sort-folder', 'custom', () => {
+                            if (isDynamic) renderDynamicColumns(searchInput.value.trim());
+                            else {
+                                const libraryContainer = modalContainer.querySelector('#user-library-container');
+                                renderTree(libraryData, libraryContainer, searchInput.value.trim(), 0, false, 'root-playlists');
+                            }
+                        });
+                        childrenContainer.appendChild(folderSortWrapper);
+                    }
+
+                    const innerItemsContainer = document.createElement('div');
+                    childrenContainer.appendChild(innerItemsContainer);
+
                     const caretBtn = header.querySelector('.caret-btn');
                     const caretIcon = caretBtn.querySelector('.caret-icon');
                     
@@ -16390,11 +16615,13 @@ const getDominantColor = (src) => {
                         if (isExpanded) {
                             childrenContainer.classList.remove('expanded');
                             caretIcon.classList.remove('rotated');
+                            expandedFolders.delete(item.uri);
                         } else {
                             childrenContainer.classList.add('expanded');
                             caretIcon.classList.add('rotated');
-                            if (!childrenContainer.hasChildNodes()) {
-                                processList(item.children, childrenContainer);
+                            expandedFolders.add(item.uri);
+                            if (!innerItemsContainer.hasChildNodes()) {
+                                processList(item.children, innerItemsContainer, 'folder');
                             }
                         }
                     };
@@ -16402,14 +16629,15 @@ const getDominantColor = (src) => {
                     caretBtn.addEventListener('click', toggleExpand);
 
                     header.addEventListener('click', (e) => {
-                        if (e.target.closest('.caret-btn')) return;
+                        if (e.target.closest('.caret-btn') || e.target.closest('select')) return;
                         toggleSelection(item, header);
                     });
                     
-                    if (filterText) {
+                    if (filterText || expandedFolders.has(item.uri)) {
                         childrenContainer.classList.add('expanded');
                         caretIcon.classList.add('rotated');
-                        processList(item.children, childrenContainer);
+                        expandedFolders.add(item.uri);
+                        processList(item.children, innerItemsContainer, 'folder');
                     }
 
                     folderDiv.appendChild(header);
@@ -16443,7 +16671,7 @@ const getDominantColor = (src) => {
             }
         };
 
-        processList(items, container);
+        processList(items, container, contextType);
     };
 
     const renderDynamicColumns = (filterText) => {
@@ -16451,9 +16679,9 @@ const getDominantColor = (src) => {
         const colAlbums = modalContainer.querySelector('#col-albums');
         const colArtists = modalContainer.querySelector('#col-artists');
         
-        if (colPlaylists) renderTree(playlistsData, colPlaylists, filterText, 0);
-        if (colAlbums) renderTree(albumsData, colAlbums, filterText, 0);
-        if (colArtists) renderTree(artistsData, colArtists, filterText, 0);
+        if (colPlaylists) renderTree(playlistsData, colPlaylists, filterText, 0, false, 'root-playlists');
+        if (colAlbums) renderTree(albumsData, colAlbums, filterText, 0, false, 'albums');
+        if (colArtists) renderTree(artistsData, colArtists, filterText, 0, false, 'artists');
         
         if (filterText && (globalSearchResults.playlists.length > 0 || globalSearchResults.albums.length > 0 || globalSearchResults.artists.length > 0)) {
             const appendGlobal = (globalItems, container) => {
@@ -16462,7 +16690,7 @@ const getDominantColor = (src) => {
                 divider.className = 'global-search-divider';
                 divider.innerHTML = `<span>Global Search</span>`;
                 container.appendChild(divider);
-                renderTree(globalItems, container, '', 15, true); 
+                renderTree(globalItems, container, '', 15, true, 'global-search'); 
             };
             
             appendGlobal(globalSearchResults.playlists, colPlaylists);
@@ -16588,7 +16816,7 @@ const getDominantColor = (src) => {
             }
         } else {
             const libraryContainer = modalContainer.querySelector('#user-library-container');
-            if (libraryContainer) renderTree(libraryData, libraryContainer, text, 0);
+            if (libraryContainer) renderTree(libraryData, libraryContainer, text, 0, false, 'root-playlists');
         }
     });
 
@@ -16603,48 +16831,44 @@ const getDominantColor = (src) => {
             renderDynamicColumns('');
         } else {
             const libraryContainer = modalContainer.querySelector('#user-library-container');
-            if (libraryContainer) renderTree(libraryData, libraryContainer, '', 0);
+            if (libraryContainer) renderTree(libraryData, libraryContainer, '', 0, false, 'root-playlists');
         }
         searchInput.focus();
     });
 
     addButton.addEventListener('click', async () => {
-        let url = searchInput.value.trim();
-        if (!url) return;
+        let rawInput = searchInput.value.trim();
+        if (!rawInput) return;
 
-        if (!url.startsWith('http') && !url.startsWith('spotify:') && url.includes('spotify.com')) {
-            url = 'https://' + url;
-        }
+        const urls = rawInput.split(',').map(u => u.trim()).filter(Boolean);
         
-        try {
-            const uriObj = Spicetify.URI.fromString(url);
-            const uri = uriObj.toURI();
+        addButton.disabled = true;
+        const originalText = addButton.innerHTML;
+        addButton.innerHTML = '<div class="loader" style="width:14px;height:14px;border-width:2px;"></div>';
+        
+        let hasError = false;
+        let addedCount = 0;
+        let alreadySelectedCount = 0;
 
-            if (uri.includes('start-group') || uri.includes(':folder:')) {
-                showNotification("Cannot add folders via link. Please select it from the library list below.", 'warning');
-                return;
+        for (let url of urls) {
+            if (!url.startsWith('http') && !url.startsWith('spotify:') && url.includes('spotify.com')) {
+                url = 'https://' + url;
             }
-            
-            if (selectedSources.has(uri)) {
-                 showNotification("Source already selected.", 'warning');
-                 searchInput.value = '';
-                 addButton.style.display = 'none';
-                 clearButton.style.display = 'none';
-                 clearButton.style.right = '10px';
-                 searchInput.style.paddingRight = '35px';
-                 if (isDynamic) renderDynamicColumns('');
-                 else {
-                     const libraryContainer = modalContainer.querySelector('#user-library-container');
-                     if (libraryContainer) renderTree(libraryData, libraryContainer, '');
-                 }
-                 return;
-            }
-
-            addButton.disabled = true;
-            const originalText = addButton.innerHTML;
-            addButton.innerHTML = '<div class="loader" style="width:14px;height:14px;border-width:2px;"></div>';
             
             try {
+                const uriObj = Spicetify.URI.fromString(url);
+                const uri = uriObj.toURI();
+
+                if (uri.includes('start-group') || uri.includes(':folder:')) {
+                    showNotification("Cannot add folders via link. Please select it from the library list below.", 'warning');
+                    continue;
+                }
+                
+                if (selectedSources.has(uri)) {
+                    alreadySelectedCount++;
+                    continue;
+                }
+
                 const data = await processUri(uri);
                 
                 if (!data || !data.name) {
@@ -16653,30 +16877,40 @@ const getDominantColor = (src) => {
 
                 selectedSources.add(uri);
                 manuallyAddedUris.add(uri);
-                renderAddedSourcesList();
+                addedCount++;
                 
                 const libEl = modalContainer.querySelector(`[data-uri="${uri}"]`);
                 if (libEl) libEl.classList.add('selected');
 
-                searchInput.value = '';
-                addButton.style.display = 'none';
-                clearButton.style.display = 'none';
-                clearButton.style.right = '10px';
-                searchInput.style.paddingRight = '35px';
-                if (isDynamic) renderDynamicColumns('');
-                else {
-                    const libraryContainer = modalContainer.querySelector('#user-library-container');
-                    if (libraryContainer) renderTree(libraryData, libraryContainer, '');
-                }
             } catch (e) {
-                showNotification("Invalid source or fetch failed.", true);
-            } finally {
-                addButton.disabled = false;
-                addButton.innerHTML = originalText;
+                 hasError = true;
             }
-        } catch (e) {
-             showNotification("Invalid Spotify link.", true);
         }
+
+        if (alreadySelectedCount > 0 && addedCount === 0 && !hasError) {
+             showNotification("Source(s) already selected.", 'warning');
+        }
+
+        if (addedCount > 0 || alreadySelectedCount > 0) {
+            if (addedCount > 0) renderAddedSourcesList();
+            searchInput.value = '';
+            addButton.style.display = 'none';
+            clearButton.style.display = 'none';
+            clearButton.style.right = '10px';
+            searchInput.style.paddingRight = '35px';
+            if (isDynamic) renderDynamicColumns('');
+            else {
+                const libraryContainer = modalContainer.querySelector('#user-library-container');
+                if (libraryContainer) renderTree(libraryData, libraryContainer, '', 0, false, 'root-playlists');
+            }
+        }
+        
+        if (hasError) {
+            showNotification("One or more invalid links or fetch failed.", true);
+        }
+
+        addButton.disabled = false;
+        addButton.innerHTML = originalText;
     });
 
     const closeModal = (isConfirmed = false) => {
@@ -16746,7 +16980,7 @@ const getDominantColor = (src) => {
                 renderDynamicColumns('');
             } else {
                 const libraryContainer = modalContainer.querySelector('#user-library-container');
-                if (libraryContainer) renderTree(libraryData, libraryContainer, '', 0);
+                if (libraryContainer) renderTree(libraryData, libraryContainer, '', 0, false, 'root-playlists');
             }
         } else {
             if (isDynamic) {
@@ -16766,7 +17000,7 @@ const getDominantColor = (src) => {
         }
     }
   }
-
+  
   async function showDynamicGenreFilterModal(sources, currentFilters, onScanComplete = null) {
     if (!genrePlaylistsCache) {
         genrePlaylistsCache = await getGenreMapping();
