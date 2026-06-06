@@ -32,6 +32,7 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 *   **Release Date:** The track's official album release date.
 *   **Last.fm Scrobbles:** The track's total global scrobbles on Last.fm.
 *   **My Scrobbles:** Your personal scrobble count for each track (requires Last.fm username).
+*   **Scrobble Range:** Sort tracks by your personal scrobbles within a specific custom date range (requires Last.fm username).
 *   **Last Scrobbled:** The date you personally last scrobbled a track (requires Last.fm username).
 *   **Energy Wave:** Creates a dynamic listening journey by arranging tracks to smoothly transition through different energy levels and moods.
 *   **Album Color:** The dominant color of the album artwork, with modes for perceptual grouping or a pure hue gradient.
@@ -93,6 +94,7 @@ Enhance your music views with more information.
 Access tools directly from Spotify's native right-click menus.
 *   **Track Menu: Show Genres:** Instantly view detailed, multi-source genre tags for any track in a popup window.
 *   **Track Menu: Last.fm Details:** View Last.fm listeners, scrobbles, track tags, and Shoutbox comments directly inside Spotify.
+*   **Artist Menu: Last.fm Details:** View global listeners, total scrobbles, and top community tags for any artist.
 *   **Artist Menu: Create Discography:** Generate a fully sorted and deduplicated discography playlist right from an artist's context menu.
 *   **All Menus: Shuffle & Play:** Instantly shuffle and play any playlist, album, or artist (with optional Vibe & Flow) directly from the right-click menu.
 </details>
