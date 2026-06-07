@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.84.1";
+  const SORT_PLAY_VERSION = "5.85.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -37,6 +37,7 @@
   const STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU = "sort-play-show-artist-discography-context-menu";
   const STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU = "sort-play-show-shuffle-context-menu";
   const STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE = "sort-play-artist-discography-sort-type";
+  const STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_DIRECTION = "sort-play-artist-discography-sort-direction";
   const STORAGE_KEY_GENRE_FILTER_SORT = "sort-play-genre-filter-sort";
   const STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2 = "sort-play-user-system-instruction-v2";
   const STORAGE_KEY_ADD_TO_QUEUE = "sort-play-add-to-queue";
@@ -137,7 +138,7 @@
     STORAGE_KEY_CHAT_PANEL_VISIBLE, STORAGE_KEY_LASTFM_USERNAME,
     STORAGE_KEY_SHOW_LASTFM_CONTEXT_MENU, STORAGE_KEY_SHOW_LASTFM_ARTIST_CONTEXT_MENU, STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU,
     STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU,
-    STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, STORAGE_KEY_GENRE_FILTER_SORT,
+    STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_DIRECTION, STORAGE_KEY_GENRE_FILTER_SORT,
     STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2, STORAGE_KEY_ADD_TO_QUEUE,
     STORAGE_KEY_CREATE_PLAYLIST, STORAGE_KEY_SORT_CURRENT_PLAYLIST,
     STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT,
@@ -303,6 +304,7 @@
   let showArtistDiscographyContextMenu = false;
   let showShuffleContextMenu = true;
   let artistDiscographySortType = 'releaseDate';
+  let artistDiscographySortDirection = 'standard';
   let artistDiscographyDeduplicationMode = 'default';
   let showArtistDiscographyDuplicateWarning = true;
   let artistDiscographyContextMenuItem = null;
@@ -2141,6 +2143,7 @@
     const showShuffleContextMenuStored = localStorage.getItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU);
     showShuffleContextMenu = showShuffleContextMenuStored === null ? true : showShuffleContextMenuStored === "true";
     artistDiscographySortType = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE) || 'releaseDate';
+    artistDiscographySortDirection = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_DIRECTION) || 'standard';
     artistDiscographyDeduplicationMode = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE) || 'default';
     const showDupWarningStored = localStorage.getItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL);
     showArtistDiscographyDuplicateWarning = showDupWarningStored === null ? true : showDupWarningStored === "true";
@@ -2230,6 +2233,7 @@
     localStorage.setItem(STORAGE_KEY_SHOW_GENRES_CONTEXT_MENU, showGenresContextMenu);
     localStorage.setItem(STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU, showArtistDiscographyContextMenu);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE, artistDiscographySortType);
+    localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_DIRECTION, artistDiscographySortDirection);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE, artistDiscographyDeduplicationMode);
     localStorage.setItem(STORAGE_KEY_ARTIST_DISCOGRAPHY_SHOW_DUP_MODAL, showArtistDiscographyDuplicateWarning);
     localStorage.setItem(STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU, showShuffleContextMenu);
@@ -2288,6 +2292,7 @@
           [STORAGE_KEY_SHOW_ARTIST_DISCOGRAPHY_CONTEXT_MENU]: "false",
           [STORAGE_KEY_SHOW_SHUFFLE_CONTEXT_MENU]: "true",
           [STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_TYPE]: "releaseDate",
+          [STORAGE_KEY_ARTIST_DISCOGRAPHY_SORT_DIRECTION]: "standard",
           [STORAGE_KEY_GENRE_FILTER_SORT]: "default",
           [STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2]: DEFAULT_USER_SYSTEM_INSTRUCTION_v2,
           [STORAGE_KEY_ADD_TO_QUEUE]: "false",
@@ -2573,7 +2578,7 @@
   }
 
   
-  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", dropdownOptions = null, toggleOptions = null, onSave, onCancel = null }) {
+  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", dropdownOptions = null, secondaryDropdownOptions = null, secondaryInputLabel = "", secondaryInputValue = "", toggleOptions = null, onSave, onCancel = null, onPrimaryChange = null }) {
     const overlay = document.createElement("div");
     overlay.className = "sort-play-font-scope";
     overlay.style.cssText = `
@@ -2626,6 +2631,16 @@
                 ${dropdownOptions.map(opt => `<option value="${opt.value}" ${opt.value === inputValue ? 'selected' : ''}>${opt.label}</option>`).join('')}
             </select>
         `;
+        if (secondaryDropdownOptions) {
+            inputHtml += `
+                <div id="sp-simple-secondary-wrapper" style="margin-top: 15px; display: flex; flex-direction: column; gap: 5px;">
+                    ${secondaryInputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${secondaryInputLabel}</label>` : ''}
+                    <select id="sp-simple-secondary-input" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; font-family: inherit; cursor: pointer; outline: none;">
+                        ${secondaryDropdownOptions.map(opt => `<option value="${opt.value}" ${opt.value === secondaryInputValue ? 'selected' : ''}>${opt.label}</option>`).join('')}
+                    </select>
+                </div>
+            `;
+        }
     } else {
         inputHtml = `
             ${inputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${inputLabel}</label>` : ''}
@@ -2664,7 +2679,15 @@
     overlay.appendChild(modalContainer);
     
     const inputField = modalContainer.querySelector("#sp-simple-input");
+    const secondaryInputField = modalContainer.querySelector("#sp-simple-secondary-input");
     if (inputField && inputType !== "hidden") inputField.focus();
+
+    if (inputField && onPrimaryChange) {
+        inputField.addEventListener('change', (e) => {
+            onPrimaryChange(e.target.value, secondaryInputField);
+        });
+        onPrimaryChange(inputField.value, secondaryInputField);
+    }
 
     const closeModal = () => overlay.remove();
 
@@ -2680,6 +2703,12 @@
             toggleOptions.forEach(opt => {
                 results[opt.id] = modalContainer.querySelector(`#sp-toggle-${opt.id}`).checked;
             });
+            onSave(results, saveButton, closeModal);
+        } else if (dropdownOptions && secondaryDropdownOptions) {
+            const results = {
+                primary: inputField.value.trim(),
+                secondary: modalContainer.querySelector("#sp-simple-secondary-input").value.trim()
+            };
             onSave(results, saveButton, closeModal);
         } else {
             onSave(inputField.value.trim(), saveButton, closeModal);
@@ -4133,8 +4162,8 @@
     artistDiscographySettingsBtn.addEventListener("click", () => {
         if (!artistDiscographySettingsBtn.disabled) {
             showSimpleInputModal({
-                title: "Discography Sort Order",
-                descriptionHtml: "Choose the default track order for discographies created via the artist menu.",
+                title: "Discography Sort Options",
+                descriptionHtml: "Choose the default sort order and direction for discographies created via the artist menu.",
                 inputLabel: "Sort Order",
                 inputValue: artistDiscographySortType,
                 dropdownOptions: [
@@ -4150,8 +4179,36 @@
                     { value: 'danceability', label: 'Danceability' },
                     { value: 'valence', label: 'Valence' }
                 ],
-                onSave: (val, saveBtn, closeModal) => {
-                    artistDiscographySortType = val;
+                secondaryInputLabel: "Sort Direction",
+                secondaryInputValue: artistDiscographySortDirection,
+                secondaryDropdownOptions: [
+                    { value: 'standard', label: 'Standard' },
+                    { value: 'reversed', label: 'Reversed' }
+                ],
+                onPrimaryChange: (primaryValue, secondarySelect) => {
+                    if (!secondarySelect) return;
+                    const wrapper = document.getElementById("sp-simple-secondary-wrapper");
+                    if (primaryValue === 'shuffle') {
+                        if (wrapper) wrapper.style.display = 'none';
+                    } else {
+                        if (wrapper) wrapper.style.display = 'flex';
+                        const standardOpt = secondarySelect.options[0];
+                        const reversedOpt = secondarySelect.options[1];
+                        if (primaryValue.includes('Date') || primaryValue === 'lastScrobbled') {
+                            standardOpt.text = "Newest to Oldest";
+                            reversedOpt.text = "Oldest to Newest";
+                        } else if (primaryValue === 'averageColor') {
+                            standardOpt.text = "Standard";
+                            reversedOpt.text = "Reversed";
+                        } else {
+                            standardOpt.text = "Highest to Lowest";
+                            reversedOpt.text = "Lowest to Highest";
+                        }
+                    }
+                },
+                onSave: (vals, saveBtn, closeModal) => {
+                    artistDiscographySortType = vals.primary;
+                    artistDiscographySortDirection = vals.secondary;
                     saveSettings();
                     closeModal();
                 }
@@ -15227,6 +15284,7 @@ const getDominantColor = (src) => {
   
   async function executeSortOperation(config) {
     const { sortType, sources, deduplicate, isHeadless = false, preFetchedTracks = null, limitEnabled = false, additionalTracksToInclude = [], filters = {} } = config;
+    const isAscending = config.sortDirection ? config.sortDirection === 'reversed' : !!sortOrderState[sortType];
 
     let combinedTracks;
     let newUsedUrisBySource = {};
@@ -16566,6 +16624,32 @@ const getDominantColor = (src) => {
                 coverUrl: u.coverArt.sources?.[0]?.url || null,
                 isStatic: true,
                 totalTracks: u.tracksV2 ? u.tracksV2.totalCount : u.tracks.totalCount
+            });
+        } else if (isLikedSongsPage(newUri)) {
+            let totalTracks = 'N/A';
+            try {
+                const likedSongs = await getLikedSongs();
+                totalTracks = likedSongs.length;
+            } catch(e) {}
+            Object.assign(newSourceData, {
+                name: "Liked Songs",
+                info: "Your collection",
+                coverUrl: "https://misc.scdn.co/liked-songs/liked-songs-64.png",
+                isStatic: true,
+                totalTracks: totalTracks
+            });
+        } else if (isLocalFilesPage(newUri)) {
+            let totalTracks = 'N/A';
+            try {
+                const localTracks = await getLocalFilesTracks();
+                totalTracks = localTracks.length;
+            } catch(e) {}
+            Object.assign(newSourceData, {
+                name: "Local Files",
+                info: "Your local files",
+                coverUrl: "https://i.imgur.com/33q4t4k.png",
+                isStatic: true,
+                totalTracks: totalTracks
             });
         }
         
@@ -18791,15 +18875,18 @@ const getDominantColor = (src) => {
         });
 
         const sortByParent = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent');
-        const allSortOptions = sortByParent.children.flatMap(opt => (opt.type === 'parent' && opt.children) ? opt.children : opt);
+        const shuffleItem = buttonStyles.menuItems.find(i => i.sortType === 'shuffle');
+        const allSortOptions = [...sortByParent.children.flatMap(opt => (opt.type === 'parent' && opt.children) ? opt.children : opt), shuffleItem];
         const sortTypeMap = allSortOptions.reduce((acc, item) => {
-            if (item.sortType) {
+            if (item && item.sortType) {
                 acc[item.sortType] = item.text;
             }
             return acc;
         }, {});
 
-        let jobsHtml = jobs.map(job => `
+        let jobsHtml = jobs.map(job => {
+            const isReversedText = job.sortDirection === 'reversed' && job.sortType !== 'shuffle' ? ' (Reversed)' : '';
+            return `
             <div class="job-item ${job.isDeleted ? 'deleted' : ''}" data-job-id="${job.id}">
             <div class="job-cover-art-container">
                 <img 
@@ -18811,7 +18898,7 @@ const getDominantColor = (src) => {
             </div>
                 <div class="job-details">
                     <span class="job-source-name" title="${job.targetPlaylistName || job.sourceName}">${job.targetPlaylistName || job.sourceName}</span>
-                    <span class="job-info">${sortTypeMap[job.sortType] || 'Unknown Sort'} &bull; ${scheduleMap[job.schedule] || 'Custom'}</span>
+                    <span class="job-info">${sortTypeMap[job.sortType] || 'Unknown Sort'}${isReversedText} &bull; ${scheduleMap[job.schedule] || 'Custom'}</span>
                     <div class="job-status-line">
                         <span class="job-last-run">Last run: ${formatTimeAgo(job.lastRun)}</span>
                         <span class="job-deleted-status">${job.isDeleted ? '• Playlist not in library' : ''}</span>
@@ -18825,7 +18912,8 @@ const getDominantColor = (src) => {
                     </button>
                 </div>
             </div>
-        `).join('');
+        `;
+        }).join('');
 
         if (jobs.length === 0) {
             jobsHtml = `<div class="no-jobs-message">No dynamic playlists scheduled.</div>`;
@@ -19089,6 +19177,7 @@ const getDominantColor = (src) => {
         let currentUpdateFromSource = isEditing ? jobToEdit.updateFromSource : (localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === null ? true : localStorage.getItem(STORAGE_KEY_DYNAMIC_UPDATE_SOURCE) === 'true');
         
         const savedSortType = localStorage.getItem(STORAGE_KEY_DYNAMIC_SORT_TYPE) || 'playCount';
+        const savedSortDirection = localStorage.getItem('sort-play-dynamic-sort-direction') || 'standard';
         const savedSchedule = localStorage.getItem(STORAGE_KEY_DYNAMIC_SCHEDULE) || '86400000';
 
         const sortByParent = buttonStyles.menuItems.find(i => i.sortType === 'sortByParent');
@@ -19252,6 +19341,13 @@ const getDominantColor = (src) => {
                                 <span class="description">Sort Method</span>
                                 <select id="sort-type-select" class="form-select">${sortOptions}</select>
                             </div>
+                            <div class="setting-row" id="sort-direction-row">
+                                <span class="description">Sort Direction</span>
+                                <select id="sort-direction-select" class="form-select">
+                                    <option value="standard" ${ (isEditing ? jobToEdit.sortDirection : savedSortDirection) !== 'reversed' ? 'selected' : ''}>Standard</option>
+                                    <option value="reversed" ${ (isEditing ? jobToEdit.sortDirection : savedSortDirection) === 'reversed' ? 'selected' : ''}>Reversed</option>
+                                </select>
+                            </div>
                             <div class="setting-row" style="align-items: start;">
                                 <span class="description" style="padding-top: 8px;">Update Schedule</span>
                                 <div style="display: flex; flex-direction: column; align-items: flex-end;">
@@ -19340,6 +19436,8 @@ const getDominantColor = (src) => {
         const updateModeSelect = modalContainer.querySelector('#update-mode-select');
         const sortTypeRow = modalContainer.querySelector('#sort-type-row');
         const sortTypeSelectUI = modalContainer.querySelector('#sort-type-select');
+        const sortDirectionRow = modalContainer.querySelector('#sort-direction-row');
+        const sortDirectionSelectUI = modalContainer.querySelector('#sort-direction-select');
         const updateSourceRow = modalContainer.querySelector('#update-source-row');
         const updateSourceToggle = modalContainer.querySelector('#update-source-toggle');
         const deduplicateToggle = modalContainer.querySelector('#deduplicate-toggle');
@@ -19427,9 +19525,13 @@ const getDominantColor = (src) => {
             if (updateModeSelect.value === 'append') {
                 sortTypeRow.classList.add('disabled');
                 sortTypeSelectUI.disabled = true;
+                sortDirectionRow.classList.add('disabled');
+                sortDirectionSelectUI.disabled = true;
             } else {
                 sortTypeRow.classList.remove('disabled');
                 sortTypeSelectUI.disabled = false;
+                sortDirectionRow.classList.remove('disabled');
+                sortDirectionSelectUI.disabled = false;
             }
     
             if (updateModeSelect.value === 'replace') {
@@ -19730,6 +19832,36 @@ const getDominantColor = (src) => {
         
         modalContainer.querySelector('#sort-type-select').addEventListener('change', (e) => localStorage.setItem(STORAGE_KEY_DYNAMIC_SORT_TYPE, e.target.value));
         scheduleSelect.addEventListener('change', (e) => localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, e.target.value));
+        sortDirectionSelectUI.addEventListener('change', (e) => localStorage.setItem('sort-play-dynamic-sort-direction', e.target.value));
+        
+        const updateSortDirectionVisibility = () => {
+            const currentSortType = sortTypeSelectUI.value;
+            if (currentSortType === 'shuffle') {
+                sortDirectionRow.style.display = 'none';
+            } else {
+                sortDirectionRow.style.display = 'flex';
+                const standardOpt = sortDirectionSelectUI.options[0];
+                const reversedOpt = sortDirectionSelectUI.options[1];
+                if (currentSortType.includes('Date') || currentSortType === 'lastScrobbled') {
+                    standardOpt.text = "Newest to Oldest";
+                    reversedOpt.text = "Oldest to Newest";
+                } else if (currentSortType === 'averageColor') {
+                    standardOpt.text = "Standard";
+                    reversedOpt.text = "Reversed";
+                } else if (currentSortType === 'sortByLiked') {
+                    standardOpt.text = "Liked First";
+                    reversedOpt.text = "Unliked First";
+                } else if (currentSortType === 'energyWave') {
+                    standardOpt.text = "Standard Flow";
+                    reversedOpt.text = "Reversed Flow";
+                } else {
+                    standardOpt.text = "Highest to Lowest";
+                    reversedOpt.text = "Lowest to Highest";
+                }
+            }
+        };
+        sortTypeSelectUI.addEventListener('change', updateSortDirectionVisibility);
+        updateSortDirectionVisibility();
         
         let previousScheduleValue = scheduleSelect.value;
         
@@ -19858,6 +19990,7 @@ const getDominantColor = (src) => {
                 targetPlaylistName: modalContainer.querySelector('#playlist-name-input').value.trim(),
                 updateMode: modalContainer.querySelector('#update-mode-select').value,
                 sortType: modalContainer.querySelector('#sort-type-select').value,
+                sortDirection: sortDirectionSelectUI.value,
                 deduplicate: currentDeduplicate,
                 updateFromSource: currentUpdateFromSource,
                 schedule: isNaN(parseInt(scheduleValue)) ? scheduleValue : parseInt(scheduleValue),
@@ -23250,6 +23383,7 @@ const getDominantColor = (src) => {
 
       const fetchTracks = async () => {
           const albumIds = Array.from(allAlbumMetadata.keys());
+          const targetArtistId = artistUri.split(':')[2];
           const BATCH_SIZE = 50;
           
           for (let i = 0; i < albumIds.length; i += BATCH_SIZE) {
@@ -23260,9 +23394,7 @@ const getDominantColor = (src) => {
                   const tracks = await getAlbumTracks(id);
                   
                   return tracks.filter(track => {
-                      const hasArtistUri = track.artistUris && track.artistUris.includes(artistUri);
-                      const hasArtistName = track.allArtists && track.allArtists.includes(artistName);
-                      return hasArtistUri || hasArtistName;
+                      return track.artistUris && track.artistUris.some(uri => uri && uri.includes(targetArtistId));
                   }).map(track => {
                       if (track.track && track.track.album) {
                           track.track.album.album_type = meta.type;
@@ -23471,13 +23603,12 @@ const getDominantColor = (src) => {
       const allAlbumIdArray = Array.from(allAlbumMetadata.keys());
 
       const fetchTracks = async () => {
+          const targetArtistId = artistUri.split(':')[2];
           const promises = allAlbumIdArray.map(async (id) => {
               const meta = allAlbumMetadata.get(id);
               const tracks = await getAlbumTracks(id);
               return tracks.filter(track => {
-                  const hasArtistUri = track.artistUris && track.artistUris.includes(artistUri);
-                  const hasArtistName = track.allArtists && track.allArtists.includes(artistName);
-                  return hasArtistUri || hasArtistName;
+                  return track.artistUris && track.artistUris.some(uri => uri && uri.includes(targetArtistId));
               }).map(track => ({
                   ...track,
                   album_type: meta.type || 'album' 
@@ -29438,7 +29569,7 @@ const getDominantColor = (src) => {
           return;
       }
 
-      const { artistUri, sortType } = discographyQueue.shift();
+      const { artistUri, sortType, sortDirection } = discographyQueue.shift();
       
       let progressUpdater = {
           update: (msg) => {
@@ -29464,6 +29595,7 @@ const getDominantColor = (src) => {
       handleSortAndCreatePlaylist(sortType, { 
           sourceUri: artistUri, 
           isHeadless: true, 
+          sortDirection: sortDirection,
           progressCallback: (msg) => progressUpdater.update(msg)
       }).then(() => {
           activeDiscographyJobs.delete(artistUri);
@@ -29477,17 +29609,18 @@ const getDominantColor = (src) => {
       processDiscographyQueue();
   }
 
-  function enqueueDiscographyJob(artistUri, sortType) {
+  function enqueueDiscographyJob(artistUri, sortType, sortDirection = 'standard') {
       if (activeDiscographyJobs.has(artistUri) || discographyQueue.some(j => j.artistUri === artistUri)) {
           showNotification("Already processing this artist.", "warning");
           return;
       }
-      discographyQueue.push({ artistUri, sortType });
+      discographyQueue.push({ artistUri, sortType, sortDirection });
       processDiscographyQueue();
   }
 
   async function handleSortAndCreatePlaylist(sortType, options = {}) {
     const { isHeadless = false, progressCallback = null } = options;
+    const isAscending = options.sortDirection ? options.sortDirection === 'reversed' : !!sortOrderState[sortType];
 
     const updateProgressText = (msg) => {
         if (progressCallback) progressCallback(msg);
@@ -29785,7 +29918,7 @@ const getDominantColor = (src) => {
       if (sortType === "lastScrobbled") {
           try {
               const result = await handleLastScrobbledSorting(
-                tracks, (progress) => { updateProgressText(`${progress}%`); }
+                tracks, (progress) => { updateProgressText(`${progress}%`); }, isAscending
               );
               sortedTracks = result.sortedTracks;
               removedTracks = result.removedTracks;
@@ -29909,7 +30042,7 @@ const getDominantColor = (src) => {
           removedTracks = deduplicationResult.removed;
 
           if (sortType === "playCount" || sortType === "popularity" || sortType === "releaseDate" || sortType === "trueReleaseDate") {
-            sortedTracks = applyStandardSort(uniqueTracks, sortType);
+            sortedTracks = applyStandardSort(uniqueTracks, sortType, isAscending);
           } else if (sortType === "shuffle") {
             const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
 
@@ -29942,7 +30075,7 @@ const getDominantColor = (src) => {
                   .sort((a, b) => {
                       const analysisA = a.averageColor;
                       const analysisB = b.averageColor;
-                      const sortOrder = sortOrderState.averageColor ? -1 : 1;
+                      const sortOrder = isAscending ? -1 : 1;
 
                       if (colorSortMode === 'perceptual') {
                           if (analysisA.isMonochrome && !analysisB.isMonochrome) return -1;
@@ -30107,7 +30240,7 @@ const getDominantColor = (src) => {
                     const valB = isLikedB ? 1 : 0;
 
                     if (valA !== valB) {
-                        return sortOrderState.sortByLiked ? valA - valB : valB - valA;
+                        return isAscending ? valA - valB : valB - valA;
                     }
                     return originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri);
                 });
@@ -30157,7 +30290,7 @@ const getDominantColor = (src) => {
                   return true;
               });
 
-              if (isGroupingSort && sortOrderState[sortType]) {
+              if (isGroupingSort && isAscending) {
                   sortedTracks = filteredTracks.sort((a, b) => {
                       const albumA = (a.albumName || "").toLowerCase();
                       const albumB = (b.albumName || "").toLowerCase();
@@ -30182,7 +30315,7 @@ const getDominantColor = (src) => {
                 return type === 'album' || isEP || isCompilation;
             });
 
-            if (sortOrderState.filterAlbumsEPsCompilations) {
+            if (isAscending) {
                 sortedTracks = filteredTracks.sort((a, b) => {
                     const albumA = (a.albumName || "").toLowerCase();
                     const albumB = (b.albumName || "").toLowerCase();
@@ -30212,7 +30345,7 @@ const getDominantColor = (src) => {
                 return (type === 'album' || type === 'single' || isEP) && !isCompilation;
             });
 
-            if (sortOrderState.filterAlbumsEPsSingles) {
+            if (isAscending) {
                 sortedTracks = filteredTracks.sort((a, b) => {
                     const albumA = (a.albumName || "").toLowerCase();
                     const albumB = (b.albumName || "").toLowerCase();
@@ -30241,7 +30374,7 @@ const getDominantColor = (src) => {
                 return (type === 'album' || isEP) && !isCompilation;
             });
 
-            if (sortOrderState.filterAlbumsEPs) {
+            if (isAscending) {
                 sortedTracks = filteredTracks.sort((a, b) => {
                     const albumA = (a.albumName || "").toLowerCase();
                     const albumB = (b.albumName || "").toLowerCase();
@@ -30455,7 +30588,7 @@ const getDominantColor = (src) => {
 
             missingDataCount = tracksWithoutData.length;
 
-            if (sortOrderState.energyWave) {
+            if (isAscending) {
                 journeySortedTracks.reverse();
             }
 
@@ -30490,7 +30623,7 @@ const getDominantColor = (src) => {
             const sortedTracksWithData = tracksWithData.sort((a, b) => {
                 const valA = a[sortType] || 0;
                 const valB = b[sortType] || 0;
-                return sortOrderState[sortType] ? valA - valB : valB - valA;
+                return isAscending ? valA - valB : valB - valA;
             });
 
             sortedTracks = [...sortedTracksWithData, ...tracksWithoutData];
@@ -30542,11 +30675,7 @@ const getDominantColor = (src) => {
                              return a.originalIndex - b.originalIndex;
                         }
                         
-                        const isDesc = sortType === 'personalScrobblesRange' 
-                            ? sortOrderState.personalScrobblesRange 
-                            : sortOrderState.personalScrobbles;
-
-                        return isDesc ? valA - valB : valB - valA;
+                        return isAscending ? valA - valB : valB - valA;
                     });
                 } else { 
                     const tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
@@ -30560,9 +30689,7 @@ const getDominantColor = (src) => {
                              return a.originalIndex - b.originalIndex;
                         }
 
-                        return sortOrderState.scrobbles 
-                            ? valA - valB 
-                            : valB - valA;
+                        return isAscending ? valA - valB : valB - valA;
                     });
                 }
                 updateProgressText("100%");
@@ -30575,7 +30702,7 @@ const getDominantColor = (src) => {
         } else if (sortType === "lastScrobbled") { 
             try {
                 const result = await handleLastScrobbledSorting(
-                    tracks, (progress) => { updateProgressText(`${progress}%`); }
+                    tracks, (progress) => { updateProgressText(`${progress}%`); }, isAscending
                 );
                 sortedTracks = result.sortedTracks;
                 removedTracks = result.removedTracks;
@@ -30702,7 +30829,7 @@ const getDominantColor = (src) => {
                 updateProgressText("Saving...");
 
                 const isGroupingSort = ['filterAlbums', 'filterAlbumsEPs', 'filterAlbumsCompilations', 'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles'].includes(sortType);
-                const isOrderChanged = isGroupingSort && sortOrderState[sortType];
+                const isOrderChanged = isGroupingSort && isAscending;
 
                 if (filterOnlyTypes.includes(sortType) && !isOrderChanged) {
                     const keptUids = new Set(sortedTracks.map(t => t.uid));
@@ -31716,20 +31843,21 @@ const getDominantColor = (src) => {
     "filterOnePerArtist"
   ];
 
-  function applyStandardSort(uniqueTracks, sortType) {
+  function applyStandardSort(uniqueTracks, sortType, isAscending) {
+    const isAsc = isAscending !== undefined ? isAscending : !!sortOrderState[sortType];
     if (sortType === "playCount") {
         const getVal = (t) => (t.playCount === "N/A" || t.playCount == null) ? -1 : Number(t.playCount);
-        return [...uniqueTracks].sort((a, b) => sortOrderState.playCount ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
+        return [...uniqueTracks].sort((a, b) => isAsc ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
     } else if (sortType === "popularity") {
         const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
-        return [...uniqueTracks].sort((a, b) => sortOrderState.popularity ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
+        return [...uniqueTracks].sort((a, b) => isAsc ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
     } else if (sortType === "releaseDate" || sortType === "trueReleaseDate") {
         return [...uniqueTracks].sort((a, b) => {
             const valAStr = sortType === "trueReleaseDate" ? a.trueReleaseDate : a.releaseDate;
             const valBStr = sortType === "trueReleaseDate" ? b.trueReleaseDate : b.releaseDate;
             const valA = valAStr ? new Date(valAStr).getTime() : 0;
             const valB = valBStr ? new Date(valBStr).getTime() : 0;
-            const dateComparison = sortOrderState[sortType] ? valA - valB : valB - valA;
+            const dateComparison = isAsc ? valA - valB : valB - valA;
             if (dateComparison !== 0) return dateComparison;
             const albumCompare = (a.albumName || "").toLowerCase().localeCompare((b.albumName || "").toLowerCase());
             if (albumCompare !== 0) return albumCompare;
@@ -32836,7 +32964,8 @@ const getDominantColor = (src) => {
     return results;
   }
 
-  async function handleLastScrobbledSorting(tracks, updateProgress) {
+  async function handleLastScrobbledSorting(tracks, updateProgress, isAscending) {
+    const isAsc = isAscending !== undefined ? isAscending : !!sortOrderState.lastScrobbled;
     const lastFmUsername = loadLastFmUsername();
     if (!lastFmUsername) {
       throw new Error('Last.fm username required for this sorting type');
@@ -32886,7 +33015,7 @@ const getDominantColor = (src) => {
     const unscrobbledTracks = uniqueTracks.filter(track => track.lastScrobbledTimestamp === 0);
 
     const sortedScrobbledTracks = scrobbledTracks.sort((a, b) => {
-        if (sortOrderState.lastScrobbled) {
+        if (isAsc) {
             return a.lastScrobbledTimestamp - b.lastScrobbledTimestamp;
         }
         return b.lastScrobbledTimestamp - a.lastScrobbledTimestamp;
@@ -34690,7 +34819,7 @@ const getDominantColor = (src) => {
                   }
               });
               closeAllMenus();
-              enqueueDiscographyJob(artistUri, artistDiscographySortType);
+              enqueueDiscographyJob(artistUri, artistDiscographySortType, artistDiscographySortDirection);
           },
           (uris) => {
               if (!uris || uris.length !== 1) return false;
