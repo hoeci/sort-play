@@ -30,9 +30,10 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 *   **Global Play Count:** The track's total play count on Spotify.
 *   **Popularity:** Spotify's internal 0-100 popularity index.
 *   **Release Date:** The track's official album release date.
+*   **True Release Date:** The track's actual historical debut. Automatically bypasses later re-issues, compilations, and remasters to find the original release date, while preserving accurate dates for live tracks and remixes.
 *   **Last.fm Scrobbles:** The track's total global scrobbles on Last.fm.
 *   **My Scrobbles:** Your personal scrobble count for each track (requires Last.fm username).
-*   **Scrobble Range:** Sort tracks by your personal scrobbles within a specific custom date range (requires Last.fm username).
+*   **Scrobble Range:** Your personal scrobbles within a specific custom date range (requires Last.fm username).
 *   **Last Scrobbled:** The date you personally last scrobbled a track (requires Last.fm username).
 *   **Energy Wave:** Creates a dynamic listening journey by arranging tracks to smoothly transition through different energy levels and moods.
 *   **Album Color:** The dominant color of the album artwork, with modes for perceptual grouping or a pure hue gradient.
