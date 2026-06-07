@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.83.0";
+  const SORT_PLAY_VERSION = "5.84.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -184,6 +184,7 @@
   ];
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
+    { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", requiresCustomKey: false },
     { id: "gemini-3-flash-preview", label: "Gemini 3 Flash", requiresCustomKey: false },
     { id: "gemini-3.1-flash-lite-preview", label: "Gemini 3 Flash-Lite", requiresCustomKey: false }
   ];
@@ -1299,16 +1300,16 @@
     db: null,
     mem: {},
     init: () => new Promise((resolve, reject) => {
-        const request = indexedDB.open("SortPlayDB", 11);
+        const request = indexedDB.open("SortPlayDB", 14);
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres', 'notificationHistory'].forEach(store => {
+            ['playCounts', 'releaseDates', 'trueReleaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres', 'notificationHistory'].forEach(store => {
                 if (!db.objectStoreNames.contains(store)) db.createObjectStore(store);
             });
         };
         request.onsuccess = (e) => {
             idb.db = e.target.result;
-            ['playCounts', 'releaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres', 'notificationHistory'].forEach(s => idb.mem[s] = new Map());
+            ['playCounts', 'releaseDates', 'trueReleaseDates', 'scrobbles', 'personalScrobbles', 'lastScrobbledDates', 'palettes', 'aiData', 'trackMetadata', 'generatedCovers', 'jobHistory', 'staticData', 'artistGenres', 'lastfmArtistTags', 'lastfmTrackTags', 'deezerGenres', 'notificationHistory'].forEach(s => idb.mem[s] = new Map());
             resolve();
         };
         request.onerror = (e) => reject(e);
@@ -1880,6 +1881,7 @@
     "\\(PlayCount\\)",
     "\\(Popularity\\)",
     "\\(ReleaseDate\\)",
+    "\\(True Date\\)",
     "\\(Scrobbles\\)",
     "\\(My Scrobbles\\)",
     "\\(My Scrobbles: .*\\)",
@@ -2027,6 +2029,7 @@
     playCount: false,
     popularity: false,
     releaseDate: false,
+    trueReleaseDate: false,
     scrobbles: false,
     personalScrobbles: false,
     personalScrobblesRange: false,
@@ -2442,6 +2445,7 @@
     let format = 'raw';
     switch (selectedNowPlayingDataType) {
         case 'releaseDate': format = selectedNowPlayingDateFormat; break;
+        case 'trueReleaseDate': format = selectedNowPlayingDateFormat; break;
         case 'playCount': format = selectedNowPlayingPlayCountFormat; break;
         case 'tempo': format = selectedNowPlayingTempoFormat; break;
         case 'energy': format = selectedNowPlayingEnergyFormat; break;
@@ -2834,6 +2838,7 @@
         ${includePlayCount ? `<option value="playCount" ${selectedValue === 'playCount' ? 'selected' : ''}>Play Count</option>` : ''}
         <option value="popularity" ${selectedValue === 'popularity' ? 'selected' : ''}>Popularity</option>
         <option value="releaseDate" ${selectedValue === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+        <option value="trueReleaseDate" ${selectedValue === 'trueReleaseDate' ? 'selected' : ''}>True Release Date</option>
         <option value="scrobbles" ${selectedValue === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
         <option value="personalScrobbles" ${selectedValue === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
         <option value="lastScrobbled" ${selectedValue === 'lastScrobbled' ? 'selected' : ''}>Last Scrobbled</option>
@@ -3310,6 +3315,7 @@
                 <option value="playCount" ${artistDiscographySortType === 'playCount' ? 'selected' : ''}>Play Count</option>
                 <option value="popularity" ${artistDiscographySortType === 'popularity' ? 'selected' : ''}>Popularity</option>
                 <option value="releaseDate" ${artistDiscographySortType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
+                <option value="trueReleaseDate" ${artistDiscographySortType === 'trueReleaseDate' ? 'selected' : ''}>True Release Date</option>
                 <option value="scrobbles" ${artistDiscographySortType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
                 <option value="personalScrobbles" ${artistDiscographySortType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
                 <option value="shuffle" ${artistDiscographySortType === 'shuffle' ? 'selected' : ''}>Shuffle</option>
@@ -4203,7 +4209,7 @@
     }, 50);
 
     const updateColumnSettingsVisibility = (isShown, type, dateBtn, dateDrop, scrobbleBtn, scrobbleDrop, keyBtn, keyDrop, lastScrobbleBtn, lastScrobbleDrop) => {
-        const showDateSettings = isShown && type === 'releaseDate';
+        const showDateSettings = isShown && (type === 'releaseDate' || type === 'trueReleaseDate');
         dateBtn.style.display = showDateSettings ? 'flex' : 'none';
         dateBtn.disabled = !showDateSettings;
         if (!showDateSettings) dateDrop.style.display = 'none';
@@ -4463,13 +4469,11 @@
     const notifDropdown = modalContainer.querySelector("#notificationHistoryDropdown");
     const notifList = modalContainer.querySelector(".sp-notif-history-list");
     const clearNotifBtn = modalContainer.querySelector("#clearNotifHistoryBtn");
-    let isNotifDropdownLocked = false;
 
     document.addEventListener('click', (event) => {
         allDropdowns.forEach(d => d.style.display = 'none');
         
         if (notifBtn && notifDropdown && !notifBtn.contains(event.target) && !notifDropdown.contains(event.target)) {
-            isNotifDropdownLocked = false;
             notifDropdown.classList.remove('visible');
             notifBtn.classList.remove('active');
         }
@@ -4504,24 +4508,6 @@
         }).join('');
     };
 
-    const showNotifDropdown = () => {
-        clearTimeout(notifHoverTimeout);
-        if (!notifDropdown.classList.contains('visible')) {
-            renderNotifHistory();
-            notifDropdown.classList.add('visible');
-            notifBtn.classList.add('active');
-        }
-    };
-
-    const hideNotifDropdown = () => {
-        if (isNotifDropdownLocked) return;
-        clearTimeout(notifHoverTimeout);
-        notifHoverTimeout = setTimeout(() => {
-            notifDropdown.classList.remove('visible');
-            notifBtn.classList.remove('active');
-        }, 500);
-    };
-
     clearNotifBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         notificationHistoryCache = [];
@@ -4531,19 +4517,16 @@
 
     notifBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        isNotifDropdownLocked = !isNotifDropdownLocked;
-        if (isNotifDropdownLocked) {
-            showNotifDropdown();
-        } else {
+        const isVisible = notifDropdown.classList.contains('visible');
+        if (isVisible) {
             notifDropdown.classList.remove('visible');
             notifBtn.classList.remove('active');
+        } else {
+            renderNotifHistory();
+            notifDropdown.classList.add('visible');
+            notifBtn.classList.add('active');
         }
     });
-
-    notifBtn.addEventListener('mouseenter', showNotifDropdown);
-    notifBtn.addEventListener('mouseleave', hideNotifDropdown);
-    notifDropdown.addEventListener('mouseenter', showNotifDropdown);
-    notifDropdown.addEventListener('mouseleave', hideNotifDropdown);
   }
 
   function createAndInitializeChatPanel() {
@@ -7166,6 +7149,7 @@
 
     const DATA_TYPES = [
         { value: 'releaseDate', label: 'Release Date' },
+        { value: 'trueReleaseDate', label: 'True Release Date' },
         { value: 'playCount', label: 'Play Count' },
         { value: 'popularity', label: 'Popularity' },
         { value: 'scrobbles', label: 'Scrobbles' },
@@ -7180,6 +7164,12 @@
 
     const FORMAT_OPTIONS = {
         releaseDate: [
+            { value: 'YYYY', label: 'YYYY' },
+            { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
+            { value: 'MM-DD-YYYY', label: 'MM-DD-YYYY' },
+            { value: 'MMM D, YYYY', label: 'Month D, YYYY' }
+        ],
+        trueReleaseDate: [
             { value: 'YYYY', label: 'YYYY' },
             { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
             { value: 'MM-DD-YYYY', label: 'MM-DD-YYYY' },
@@ -10190,22 +10180,25 @@ const getDominantColor = (src) => {
 
               if (typesNeeded.has('releaseDate')) {
                   getTrackDetailsWithReleaseDate(mockTrackObj).catch(() => {});
-              } 
+              }
+              if (typesNeeded.has('trueReleaseDate')) {
+                  getTrackDetailsWithTrueReleaseDate(mockTrackObj).catch(() => {});
+              }
               if (typesNeeded.has('playCount') && albumId) {
                   getTrackDetailsWithPlayCount(mockTrackObj).catch(() => {});
-              } 
+              }
               if (typesNeeded.has('popularity')) {
                   fetchInternalTrackMetadata(trackId).catch(() => {});
-              } 
+              }
               if (typesNeeded.has('scrobbles')) {
                   getTrackDetailsWithScrobbles(mockTrackObj, true).catch(() => {});
-              } 
+              }
               if (typesNeeded.has('personalScrobbles')) {
                   getTrackDetailsWithPersonalScrobbles(mockTrackObj, true).catch(() => {});
-              } 
+              }
               if (typesNeeded.has('lastScrobbled')) {
                   getTrackDetailsWithLastScrobbled(mockTrackObj, true).catch(() => {});
-              } 
+              }
               
               const audioFeatureTypes = ['tempo', 'energy', 'danceability', 'valence', 'key'];
               if ([...typesNeeded].some(t => audioFeatureTypes.includes(t))) {
@@ -10781,6 +10774,7 @@ const getDominantColor = (src) => {
       let val = null;
       switch (type) {
           case 'releaseDate': val = dataObj.releaseDate; break;
+          case 'trueReleaseDate': val = dataObj.trueReleaseDate; break;
           case 'playCount': val = dataObj.playCount; break;
           case 'popularity': val = dataObj.popularity; break;
           case 'scrobbles': val = dataObj.scrobbles; break;
@@ -10799,6 +10793,7 @@ const getDominantColor = (src) => {
       switch (type) {
           case 'playCount': return formatPlayCount(val, format);
           case 'releaseDate': return formatReleaseDate(val, format);
+          case 'trueReleaseDate': return formatReleaseDate(val, format);
           case 'popularity': return formatPopularity(val, format);
           case 'scrobbles': return formatScrobbles(val, format);
           case 'personalScrobbles': return formatPersonalScrobbles(val, format);
@@ -10886,6 +10881,16 @@ const getDominantColor = (src) => {
                 }).then(d => dataContext.releaseDate = d));
             }
 
+            if (typesNeeded.has('trueReleaseDate')) {
+                promises.push(getTrackDetailsWithTrueReleaseDate({
+                    uri: track.uri,
+                    albumUri: track.album.uri,
+                    name: track.name,
+                    artists: track.artists,
+                    track: { external_ids: {} } 
+                }).then(d => dataContext.trueReleaseDate = d));
+            }
+            
             if (typesNeeded.has('playCount')) {
                 promises.push(getTrackDetailsWithPlayCount({
                     track: { id: trackId, album: { id: track.album.uri.split(":")[2] } },
@@ -11190,6 +11195,7 @@ const getDominantColor = (src) => {
           "playCount",
           "popularity",
           "releaseDate",
+          "trueReleaseDate",
           "scrobbles",
           "personalScrobbles",
           "personalScrobblesRange",
@@ -11231,6 +11237,7 @@ const getDominantColor = (src) => {
           playCount: { fullName: "play count", shortName: "PlayCount" },
           popularity: { fullName: "popularity", shortName: "Popularity" },
           releaseDate: { fullName: "release date", shortName: "ReleaseDate" },
+          trueReleaseDate: { fullName: "true release date", shortName: "True Date" },
           scrobbles: { fullName: "Last.fm global scrobbles", shortName: "Scrobbles" },
           personalScrobbles: { fullName: "Last.fm personal scrobbles", shortName: "My Scrobbles" },
           personalScrobblesRange: { fullName: "Last.fm personal scrobbles (Range)", shortName: "My Scrobbles" },
@@ -12475,6 +12482,167 @@ const getDominantColor = (src) => {
       return { ...track, averageColor: analysisData };
   }
 
+  async function getTrackDetailsWithTrueReleaseDate(track) {
+    const trackId = track.uri.split(":")[2];
+    
+    if (Spicetify.URI.isLocal(track.uri)) {
+        return { ...track, trueReleaseDate: null };
+    }
+
+    const cached = await idb.get('trueReleaseDates', trackId, CACHE_EXPIRE_RELEASE_DATE);
+    if (cached && typeof cached === 'object' && cached.date !== undefined) {
+        return { ...track, trueReleaseDate: cached.date, trackNumber: cached.trackNumber };
+    }
+
+    let targetIsrc = track.track?.external_ids?.isrc || track.external_ids?.isrc;
+    let targetDate = track.releaseDate || track.album?.release_date || track.track?.album?.release_date;
+    let targetPlaycount = (track.playCount && track.playCount !== "N/A") ? Number(track.playCount) : 0;
+
+    if (!targetIsrc || !targetDate) {
+        try {
+            const meta = await fetchInternalTrackMetadata(trackId);
+            if (meta) {
+                if (!targetIsrc) targetIsrc = meta.external_ids?.isrc;
+                if (!targetDate) targetDate = meta.album?.release_date;
+            }
+        } catch(e) {}
+    }
+
+    if (!targetPlaycount) {
+        try {
+            const pcRes = await fetchPlayCountsBatchNew([track.uri]);
+            targetPlaycount = pcRes.get(track.uri) || 0;
+        } catch(e) {}
+    }
+
+    const rawTrackName = track.songTitle || track.name || "";
+    const cleanName = getCleanTitle(rawTrackName);
+    
+    let artistName = getPrimaryArtistName(track);
+    if (!artistName && track.artists && track.artists.length > 0) {
+        artistName = track.artists[0]?.name;
+    }
+    artistName = artistName || "";
+    const safeArtistName = artistName.replace(/"/g, '\\"');
+
+    const versionRegexStr = "(?:\\(|\\[|-).*?\\b";
+    const isLive = new RegExp(versionRegexStr + "live\\b.*?(?:\\)|\\]|$)", "i").test(rawTrackName);
+    const isRemix = new RegExp(versionRegexStr + "remix\\b.*?(?:\\)|\\]|$)", "i").test(rawTrackName);
+    const isAcoustic = new RegExp(versionRegexStr + "acoustic\\b.*?(?:\\)|\\]|$)", "i").test(rawTrackName);
+    const isDemo = new RegExp(versionRegexStr + "demo\\b.*?(?:\\)|\\]|$)", "i").test(rawTrackName);
+
+    let searchName = cleanName;
+    if (isLive) searchName += " live";
+    if (isRemix) searchName += " remix";
+    if (isAcoustic) searchName += " acoustic";
+    if (isDemo) searchName += " demo";
+
+    let targetYear = new Date().getFullYear();
+    if (targetDate) {
+        const d = new Date(targetDate);
+        if (!isNaN(d.getTime())) targetYear = d.getFullYear();
+    }
+
+    const queries = [];
+    queries.push(`track:"${searchName}" artist:"${safeArtistName}"`);
+    
+    if (targetYear > 1980) {
+        queries.push(`track:"${searchName}" artist:"${safeArtistName}" year:1900-${targetYear - 1}`);
+    }
+
+    const searchPromises = queries.map(query => {
+        return searchTracks(query, 50).catch(() => ({ tracks: { items: [] } }));
+    });
+
+    const searchResultsArray = await Promise.all(searchPromises);
+
+    let allItems = [];
+    searchResultsArray.forEach(res => {
+        if (res && res.tracks && res.tracks.items) {
+            allItems.push(...res.tracks.items);
+        }
+    });
+
+    let finalDate = targetDate;
+    const trackNumber = track.trackNumber || 0;
+
+    if (allItems.length > 0) {
+        const itemUris = [...new Set(allItems.map(i => i.uri))];
+        const itemIds = itemUris.map(u => u.split(":")[2]);
+
+        const MAX_META_CONCURRENCY = 50;
+        const metaMap = new Map();
+        for (let i = 0; i < itemIds.length; i += MAX_META_CONCURRENCY) {
+            const batch = itemIds.slice(i, i + MAX_META_CONCURRENCY);
+            const metaBatch = await Promise.all(batch.map(id => fetchInternalTrackMetadata(id).catch(() => null)));
+            metaBatch.forEach(m => { if (m) metaMap.set(m.id, m); });
+        }
+
+        const playsMap = await fetchPlayCountsBatchNew(itemUris).catch(() => new Map());
+
+        let bestDate = targetDate;
+        let bestTime = targetDate ? new Date(targetDate).getTime() : Infinity;
+
+        const targetArtistIds = (track.artists || []).map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)).filter(Boolean);
+        const targetArtistNames = (track.artists || []).map(a => a.name.toLowerCase().trim());
+        if (targetArtistNames.length === 0 && artistName) targetArtistNames.push(artistName.toLowerCase().trim());
+
+        itemUris.forEach(uri => {
+            const id = uri.split(":")[2];
+            const meta = metaMap.get(id);
+            const playcount = playsMap.get(uri) || 0;
+
+            if (!meta || !meta.album || !meta.album.release_date) return;
+
+            const metaName = meta.name || "";
+            const metaCleanName = getCleanTitle(metaName);
+            
+            const metaIsLive = new RegExp(versionRegexStr + "live\\b.*?(?:\\)|\\]|$)", "i").test(metaName);
+            const metaIsRemix = new RegExp(versionRegexStr + "remix\\b.*?(?:\\)|\\]|$)", "i").test(metaName);
+            const metaIsAcoustic = new RegExp(versionRegexStr + "acoustic\\b.*?(?:\\)|\\]|$)", "i").test(metaName);
+            const metaIsDemo = new RegExp(versionRegexStr + "demo\\b.*?(?:\\)|\\]|$)", "i").test(metaName);
+
+            if (isLive !== metaIsLive) return;
+            if (isRemix !== metaIsRemix) return;
+            if (isAcoustic !== metaIsAcoustic) return;
+            if (isDemo !== metaIsDemo) return;
+
+            let isrcMatch = (targetIsrc && meta.external_ids?.isrc === targetIsrc);
+            let playMatch = (targetPlaycount > 0 && playcount === targetPlaycount);
+            
+            let softMatch = false;
+            if (metaCleanName === cleanName) {
+                const metaArtistIds = (meta.artists || []).map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)).filter(Boolean);
+                
+                if (targetArtistIds.length > 0 && metaArtistIds.length > 0) {
+                    softMatch = targetArtistIds.some(id => metaArtistIds.includes(id));
+                } else {
+                    const metaArtistNames = (meta.artists || []).map(a => a.name.toLowerCase().trim());
+                    softMatch = targetArtistNames.some(ta => metaArtistNames.includes(ta));
+                }
+            }
+            
+            if (isrcMatch || playMatch || softMatch) {
+                const mTime = new Date(meta.album.release_date).getTime();
+                if (!isNaN(mTime) && mTime < bestTime) {
+                    bestTime = mTime;
+                    bestDate = meta.album.release_date;
+                }
+            }
+        });
+
+        if (bestDate) {
+            finalDate = bestDate;
+        }
+    }
+
+    if (finalDate) {
+        await idb.set('trueReleaseDates', trackId, { date: finalDate, trackNumber: trackNumber });
+    }
+
+    return { ...track, trueReleaseDate: finalDate, trackNumber: trackNumber };
+  }
+  
   async function getTrackDetailsWithReleaseDateForFilter(track) {
     const trackWithStandardReleaseDate = await getTrackDetailsWithReleaseDate(track);
     
@@ -12674,31 +12842,20 @@ const getDominantColor = (src) => {
         const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
             tracks,
             (progress) => {
-                mainButton.innerText = `${Math.floor(progress * 0.25)}%`;
+                mainButton.innerText = `${Math.floor(progress * 0.33)}%`;
             }
         );
 
-        const tracksWithIds = await processBatchesWithDelay(
-          tracksWithPlayCounts,
-          50,
-          500,
-          (progress) => {
-            mainButton.innerText = `${25 + Math.floor(progress * 0.25)}%`; 
-          },
-          collectTrackIdsForPopularity 
-        );
         const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-            tracksWithIds,
+            tracksWithPlayCounts,
             (progress) => {
-              mainButton.innerText = `${50 + Math.floor(progress * 0.25)}%`; 
+              mainButton.innerText = `${33 + Math.floor(progress * 0.33)}%`; 
             }
         );
-        const tracksWithReleaseDates = await processBatchesWithDelay(
+        const tracksWithReleaseDates = await processReleaseDatesConcurrently(
             tracksWithPopularity,
-            50,
-            500,
             (progress) => {
-                mainButton.innerText = `${75 + Math.floor(progress * 0.25)}%`;
+                mainButton.innerText = `${66 + Math.floor(progress * 0.34)}%`;
             },
             getTrackDetailsWithReleaseDateForFilter 
         );
@@ -13418,7 +13575,7 @@ const getDominantColor = (src) => {
             if (valueA === "N/A") valueA = -Infinity;
             if (valueB === "N/A") valueB = -Infinity;
 
-            if (sortKey === 'releaseDate') {
+            if (sortKey === 'releaseDate' || sortKey === 'trueReleaseDate') {
                 const dateA = valueA ? new Date(valueA).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
                 const dateB = valueB ? new Date(valueB).getTime() : (direction === 'ascending' ? Infinity : -Infinity);
                 
@@ -14344,6 +14501,7 @@ const getDominantColor = (src) => {
                     <option value="playCount">Play Count</option>
                     <option value="popularity">Popularity</option>
                     <option value="releaseDate">Release Date</option>
+                    <option value="trueReleaseDate">True Release Date</option>
                     <option value="shuffle">Shuffle</option>
                 </select>
                 <button id="customFilterCreatePlaylist">Create Playlist</button>
@@ -14918,8 +15076,14 @@ const getDominantColor = (src) => {
                 sortedTracksForPlaylist = [...tracks].filter(track => !track.isRemoved);
             } else if (selectedSortType === "shuffle") {
                 sortedTracksForPlaylist = shuffleArray(filteredTracks);
-            }
-            else {
+            } else if (selectedSortType === "trueReleaseDate") {
+                mainButton.innerText = "0%";
+                const tracksWithTrueReleaseDates = await processTrueReleaseDatesConcurrently(
+                    filteredTracks,
+                    (progress) => { mainButton.innerText = `${progress}%`; }
+                );
+                sortedTracksForPlaylist = sortTracks(tracksWithTrueReleaseDates, selectedSortType, sortOrderState[selectedSortType] ? "ascending" : "descending");
+            } else {
                 sortedTracksForPlaylist = sortTracks(filteredTracks, selectedSortType, sortOrderState[selectedSortType] ? "ascending" : "descending");
             }
             mainButton.innerText = "100%";
@@ -15322,13 +15486,12 @@ const getDominantColor = (src) => {
     }
 
     if (filters.minPopularity || filters.maxPopularity || filters.minYear || filters.maxYear || filters.releasedWithinDays) {
-        if (!isHeadless) mainButton.innerText = "Filtering Meta...";
-        const tracksWithIds = await processBatchesWithDelay(filteredTracks, 50, 500, () => {}, collectTrackIdsForPopularity);
-        let metaTracks = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
-        
-        if (filters.minYear || filters.maxYear || filters.releasedWithinDays) {
-            metaTracks = await processBatchesWithDelay(metaTracks, 50, 500, () => {}, getTrackDetailsWithReleaseDate);
-        }
+      if (!isHeadless) mainButton.innerText = "Filtering Meta...";
+      let metaTracks = await fetchPopularityForMultipleTracks(filteredTracks, () => {});
+      
+      if (filters.minYear || filters.maxYear || filters.releasedWithinDays) {
+          metaTracks = await processReleaseDatesConcurrently(metaTracks, () => {}, getTrackDetailsWithReleaseDate);
+      }
         
         filteredTracks = metaTracks.filter(t => {
             if (filters.minPopularity || filters.maxPopularity) {
@@ -15463,12 +15626,13 @@ const getDominantColor = (src) => {
     }
 
     const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks);
-    const tracksWithIds = await processBatchesWithDelay(tracksWithPlayCounts, 50, 500, () => {}, collectTrackIdsForPopularity);
-    const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
+    const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithPlayCounts, () => {});
 
     let tracksForProcessing = tracksWithPopularity;
     if (sortType === "releaseDate") {
-        tracksForProcessing = await processBatchesWithDelay(tracksWithPopularity, 50, 500, () => {}, getTrackDetailsWithReleaseDate);
+        tracksForProcessing = await processReleaseDatesConcurrently(tracksWithPopularity, () => {}, getTrackDetailsWithReleaseDate);
+    } else if (sortType === "trueReleaseDate") {
+        tracksForProcessing = await processTrueReleaseDatesConcurrently(tracksWithPopularity, () => {});
     }
 
     const audioFeatureSortTypes = ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'];
@@ -15511,10 +15675,14 @@ const getDominantColor = (src) => {
             });
             break;
         case "releaseDate":
+        case "trueReleaseDate":
             sortedTracks = uniqueTracks.sort((a, b) => {
-                const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-                const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-                if (valA !== valB) return valB - valA;
+                const valAStr = sortType === "trueReleaseDate" ? a.trueReleaseDate : a.releaseDate;
+                const valBStr = sortType === "trueReleaseDate" ? b.trueReleaseDate : b.releaseDate;
+                const valA = valAStr ? new Date(valAStr).getTime() : 0;
+                const valB = valBStr ? new Date(valBStr).getTime() : 0;
+                const dateComparison = sortOrderState[sortType] ? valA - valB : valB - valA;
+                if (dateComparison !== 0) return dateComparison;
 
                 const albumA = (a.albumName || "").toLowerCase();
                 const albumB = (b.albumName || "").toLowerCase();
@@ -20333,6 +20501,7 @@ const getDominantColor = (src) => {
                             <option value="playCount">Play Count</option>
                             <option value="popularity">Popularity</option>
                             <option value="releaseDate">Release Date</option>
+                            <option value="trueReleaseDate">True Release Date</option>
                             <option value="shuffle">Shuffle</option>
                             <option value="scrobbles">Scrobbles</option>
                             <option value="personalScrobbles">My Scrobbles</option>
@@ -20889,46 +21058,48 @@ const getDominantColor = (src) => {
         setButtonProcessing(true);
         mainButton.innerHTML = "100%";
         await createAndPopulatePlaylist(sortedTracks, playlistName, playlistDescription);
-      } else if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate") {
+      } else if (sortType === "playCount" || sortType === "popularity" || sortType === "shuffle" || sortType === "releaseDate" || sortType === "trueReleaseDate") {
           setButtonProcessing(true);
           mainButton.innerHTML = "0%";
     
           const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
               filteredTracks,
               (progress) => {
-                  mainButton.innerText = `${Math.floor(progress * 0.20)}%`;
+                  mainButton.innerText = `${Math.floor(progress * 0.33)}%`;
               }
           );
-          const tracksWithIds = await processBatchesWithDelay(
-              tracksWithPlayCounts,
-              50,
-              500,
-              (progress) => {
-                  mainButton.innerText = `${20 + Math.floor(progress * 0.20)}%`;
-              },
-              collectTrackIdsForPopularity
-          );
           const tracksWithPopularity = await fetchPopularityForMultipleTracks(
-              tracksWithIds,
+              tracksWithPlayCounts,
               (progress) => {
-                  mainButton.innerText = `${40 + Math.floor(progress * 0.20)}%`;
+                  mainButton.innerText = `${33 + Math.floor(progress * 0.33)}%`;
               }
           );
     
           let uniqueTracks;
     
           if (sortType === "releaseDate") {
-              const tracksWithReleaseDates = await processBatchesWithDelay(
+              const tracksWithReleaseDates = await processReleaseDatesConcurrently(
                   tracksWithPopularity,
-                  50,
-                  500,
                   (progress) => {
-                      mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
+                      mainButton.innerText = `${66 + Math.floor(progress * 0.34)}%`;
                   },
                   getTrackDetailsWithReleaseDate
               );
               uniqueTracks = (await deduplicateTracks(
                   tracksWithReleaseDates, 
+                  false, 
+                  false,
+                  (progress) => { mainButton.innerText = `Dedup ${progress}%`; }
+              )).unique;
+          } else if (sortType === "trueReleaseDate") {
+              const tracksWithTrueReleaseDates = await processTrueReleaseDatesConcurrently(
+                  tracksWithPopularity,
+                  (progress) => {
+                      mainButton.innerText = `${60 + Math.floor(progress * 0.20)}%`;
+                  }
+              );
+              uniqueTracks = (await deduplicateTracks(
+                  tracksWithTrueReleaseDates, 
                   false, 
                   false,
                   (progress) => { mainButton.innerText = `Dedup ${progress}%`; }
@@ -23951,12 +24122,37 @@ const getDominantColor = (src) => {
     return refreshedTracks;
   }
   
-  async function collectTrackIdsForPopularity(track) {
-    const trackId = track.uri.split(":")[2];
-    return {
-      ...track,
-      trackId: trackId,
-    };
+  async function processReleaseDatesConcurrently(tracks, updateProgress = () => {}, fetchFunction = getTrackDetailsWithReleaseDate) {
+    const trackIds = tracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean);
+    const cachedMap = await idb.getMany('releaseDates', trackIds, CACHE_EXPIRE_RELEASE_DATE);
+    
+    let processedCount = 0;
+    const CONCURRENCY_LIMIT = 10;
+    const queue = tracks.map((track, index) => ({ track, index }));
+    const results = new Array(tracks.length);
+    
+    const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
+        while (queue.length > 0) {
+            const { track, index } = queue.shift();
+            const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+            
+            let cached = trackId ? cachedMap.get(trackId) : null;
+            
+            if (cached && typeof cached === 'object' && cached.trackNumber !== undefined && !Spicetify.URI.isLocal(track.uri)) {
+                results[index] = { ...track, releaseDate: cached.date, trackNumber: cached.trackNumber };
+            } else {
+                results[index] = await fetchFunction(track);
+            }
+            
+            processedCount++;
+            if (processedCount % 20 === 0 || processedCount === tracks.length) {
+                updateProgress(Math.floor((processedCount / tracks.length) * 100));
+            }
+        }
+    });
+    
+    await Promise.all(workers);
+    return results;
   }
 
   async function fetchPopularityForMultipleTracks(
@@ -24538,6 +24734,7 @@ const getDominantColor = (src) => {
           { backgroundColor: "transparent", color: "white", text: "Play Count", sortType: "playCount", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Popularity", sortType: "popularity", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Release Date", sortType: "releaseDate", hasInnerButton: true },
+          { backgroundColor: "transparent", color: "white", text: "True Release Date", sortType: "trueReleaseDate", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Scrobbles", sortType: "scrobbles", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "My Scrobbles", sortType: "personalScrobbles", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Scrobble Range", sortType: "personalScrobblesRange", hasInnerButton: true, onClick: async function(event) {
@@ -25667,6 +25864,37 @@ const getDominantColor = (src) => {
     return results;
   }
 
+  async function processTrueReleaseDatesConcurrently(tracks, updateProgress = () => {}) {
+    const trackIds = tracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean);
+    const cachedMap = await idb.getMany('trueReleaseDates', trackIds, CACHE_EXPIRE_RELEASE_DATE);
+
+    let processedCount = 0;
+    const CONCURRENCY_LIMIT = 10;
+    const queue = tracks.map((track, index) => ({ track, index }));
+    const results = new Array(tracks.length);
+    const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
+        while (queue.length > 0) {
+            const { track, index } = queue.shift();
+            const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+
+            let cached = trackId ? cachedMap.get(trackId) : null;
+            if (cached && typeof cached === 'object' && cached.date !== undefined && !Spicetify.URI.isLocal(track.uri)) {
+                results[index] = { ...track, trueReleaseDate: cached.date, trackNumber: cached.trackNumber };
+            } else {
+                results[index] = await getTrackDetailsWithTrueReleaseDate(track);
+                await new Promise(r => setTimeout(r, 100));
+            }
+
+            processedCount++;
+            if (processedCount % 10 === 0 || processedCount === tracks.length) {
+                updateProgress(Math.floor((processedCount / tracks.length) * 100));
+            }
+        }
+    });
+    await Promise.all(workers);
+    return results;
+  }
+
   async function replacePlaylistTracks(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const validUris = trackUris.filter(uri => typeof uri === 'string' && (uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(uri)));
     const playlistUri = `spotify:playlist:${playlistId}`;
@@ -25904,8 +26132,7 @@ const getDominantColor = (src) => {
     if (isArtistPage) {
       const refreshedTracks = await refreshTrackAlbumInfo(tracks);
       const tracksWithPlayCounts = await enrichTracksWithPlayCounts(refreshedTracks);
-      const tracksWithIds = await processBatchesWithDelay(tracksWithPlayCounts, 50, 500, () => {}, collectTrackIdsForPopularity);
-      const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithIds, () => {});
+      const tracksWithPopularity = await fetchPopularityForMultipleTracks(tracksWithPlayCounts, () => {});
       const { unique: uniqueTracks } = await deduplicateTracks(
           tracksWithPopularity, 
           false, 
@@ -28347,12 +28574,10 @@ const getDominantColor = (src) => {
         let finalPoolTracks = albumFilteredPool;
         
         if (loadLastFmUsername()) {
-             const poolWithScrobbles = await processBatchesWithDelay(
+             const poolWithScrobbles = await handleScrobblesSorting(
                 albumFilteredPool, 
-                50, 
-                200, 
-                (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; },
-                getTrackDetailsWithPersonalScrobbles
+                'personalScrobbles', 
+                (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; }
             );
 
             const unlistenedTracks = poolWithScrobbles.filter(t => !t.personalScrobbles || t.personalScrobbles === 0);
@@ -28927,12 +29152,10 @@ const getDominantColor = (src) => {
         });
 
         updateProgress("History...");
-        const poolWithScrobbles = await processBatchesWithDelay(
+        const poolWithScrobbles = await handleScrobblesSorting(
             likedFilteredPool, 
-            50, 
-            200, 
-            (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; },
-            getTrackDetailsWithPersonalScrobbles
+            'personalScrobbles', 
+            (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; }
         );
 
         const unlistenedTracks = poolWithScrobbles.filter(t => !t.personalScrobbles || t.personalScrobbles === 0);
@@ -29635,10 +29858,15 @@ const getDominantColor = (src) => {
         if (BASIC_SORT_TYPES.includes(sortType)) {
           let tracksForDeduplication;
           if (sortType === "releaseDate") {
-            const tracksWithReleaseDates = await processBatchesWithDelay(
-              tracksWithPopularity, 50, 500, (progress) => { updateProgressText(`${Math.floor(progress * 0.80)}%`); }, getTrackDetailsWithReleaseDate
+            const tracksWithReleaseDates = await processReleaseDatesConcurrently(
+              tracksWithPopularity, (progress) => { updateProgressText(`${Math.floor(progress * 0.80)}%`); }, getTrackDetailsWithReleaseDate
             );
             tracksForDeduplication = tracksWithReleaseDates;
+          } else if (sortType === "trueReleaseDate") {
+            const tracksWithTrueReleaseDates = await processTrueReleaseDatesConcurrently(
+              tracksWithPopularity, (progress) => { updateProgressText(`${Math.floor(progress * 0.80)}%`); }
+            );
+            tracksForDeduplication = tracksWithTrueReleaseDates;
           } else if (sortType === "averageColor") {
               const albumIds = [...new Set(tracksWithPopularity.map(t => t.albumId || t.track?.album?.id).filter(Boolean))];
               const bulkPalettes = await idb.getMany('palettes', albumIds);
@@ -29655,28 +29883,16 @@ const getDominantColor = (src) => {
                   }
               }
 
-              let tracksWithColor = [];
+              let tracksWithColor = [...cachedTracks];
               const totalColorTracks = tracksWithPopularity.length;
-
-              if (cachedTracks.length > 0) {
-                  const cachedResults = await processBatchesWithDelay(
-                      cachedTracks, 50, 500,
-                      (progress) => {
-                          const overallProgress = (cachedTracks.length / totalColorTracks) * progress;
-                          updateProgressText(`${60 + Math.floor(overallProgress * 0.40)}%`);
-                      },
-                      getTrackDetailsWithPaletteAnalysis
-                  );
-                  tracksWithColor.push(...cachedResults);
-              }
 
               if (uncachedTracks.length > 0) {
                   const uncachedResults = await processBatchesWithDelay(
                       uncachedTracks, 15, 1500,
                       (progress) => {
-                          const cachedPortion = (cachedTracks.length / totalColorTracks) * 40;
-                          const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress * 0.40;
-                          updateProgressText(`${60 + Math.floor(cachedPortion + uncachedPortion)}%`);
+                          const cachedPortion = (cachedTracks.length / totalColorTracks) * 100;
+                          const uncachedPortion = (uncachedTracks.length / totalColorTracks) * progress;
+                          updateProgressText(`${60 + Math.floor((cachedPortion + uncachedPortion) * 0.40)}%`);
                       },
                       getTrackDetailsWithPaletteAnalysis
                   );
@@ -29706,7 +29922,7 @@ const getDominantColor = (src) => {
           uniqueTracks = deduplicationResult.unique;
           removedTracks = deduplicationResult.removed;
 
-          if (sortType === "playCount" || sortType === "popularity" || sortType === "releaseDate") {
+          if (sortType === "playCount" || sortType === "popularity" || sortType === "releaseDate" || sortType === "trueReleaseDate") {
             sortedTracks = applyStandardSort(uniqueTracks, sortType);
           } else if (sortType === "shuffle") {
             const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
@@ -30772,13 +30988,23 @@ const getDominantColor = (src) => {
 
   function getCleanTitle(rawTitle) {
       if (!rawTitle) return "";
-      return rawTitle
+      let clean = rawTitle
           .toLowerCase()
           .replace(VERSION_REGEX_REPLACE, '')
           .replace(/['’ʼ]/g, "'")
           .replace(/[^a-z0-9\s]/g, '')
           .replace(/\s+/g, ' ')
           .trim();
+          
+      if (!clean) {
+          clean = rawTitle
+            .toLowerCase()
+            .replace(/['’ʼ]/g, "'")
+            .replace(/[^a-z0-9\s]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+      }
+      return clean;
   }
 
   function getCamelotKey(features) {
@@ -31495,7 +31721,7 @@ const getDominantColor = (src) => {
   }
 
   const BASIC_SORT_TYPES = [
-    "playCount", "popularity", "shuffle", "releaseDate", "averageColor", 
+    "playCount", "popularity", "shuffle", "releaseDate", "trueReleaseDate", "averageColor", 
     "deduplicateOnly", "filterLiked", "keepLiked", "sortByLiked", 
     "filterSingles", "filterEPs", "filterSinglesEPs", "filterAlbumsEPs", 
     "filterAlbums", "filterAlbumsCompilations", "filterAlbumsEPsCompilations", 
@@ -31511,11 +31737,13 @@ const getDominantColor = (src) => {
     } else if (sortType === "popularity") {
         const getVal = (t) => (t.popularity == null) ? -1 : Number(t.popularity);
         return [...uniqueTracks].sort((a, b) => sortOrderState.popularity ? getVal(a) - getVal(b) : getVal(b) - getVal(a));
-    } else if (sortType === "releaseDate") {
+    } else if (sortType === "releaseDate" || sortType === "trueReleaseDate") {
         return [...uniqueTracks].sort((a, b) => {
-            const valA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-            const valB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-            const dateComparison = sortOrderState.releaseDate ? valA - valB : valB - valA;
+            const valAStr = sortType === "trueReleaseDate" ? a.trueReleaseDate : a.releaseDate;
+            const valBStr = sortType === "trueReleaseDate" ? b.trueReleaseDate : b.releaseDate;
+            const valA = valAStr ? new Date(valAStr).getTime() : 0;
+            const valB = valBStr ? new Date(valBStr).getTime() : 0;
+            const dateComparison = sortOrderState[sortType] ? valA - valB : valB - valA;
             if (dateComparison !== 0) return dateComparison;
             const albumCompare = (a.albumName || "").toLowerCase().localeCompare((b.albumName || "").toLowerCase());
             if (albumCompare !== 0) return albumCompare;
@@ -32146,13 +32374,17 @@ const getDominantColor = (src) => {
     const versionRegex = new RegExp(`[\\(\\[\\-]?\\s*(${versionKeywords.join('|')})\\s*[\\)\\]\\-]?`, 'i');
 
     const getCleanTitleLocal = (rawTitle) => {
-        return rawTitle
+        let clean = rawTitle
             .toLowerCase()
             .replace(versionRegex, '')
             .replace(/['’ʼ]/g, "'")
             .replace(/[^a-z0-9\s]/g, '')
             .replace(/\s+/g, ' ')
             .trim();
+        if (!clean) {
+            clean = rawTitle.toLowerCase().replace(/['’ʼ]/g, "'").replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+        }
+        return clean;
     };
     
     const getNormalizedTitle = (rawTitle) => {
@@ -32194,7 +32426,7 @@ const getDominantColor = (src) => {
             if (isCompA && !isCompB) return 1;
             if (!isCompA && isCompB) return -1;
 
-            if (sortType === 'releaseDate') {
+            if (sortType === 'releaseDate' || sortType === 'trueReleaseDate') {
                 const isAlbumA = typeA === 'album';
                 const isAlbumB = typeB === 'album';
 
@@ -34065,7 +34297,7 @@ const getDominantColor = (src) => {
               }
 
               .lfm-header { display: flex; padding: 30px 24px 24px; background: transparent !important; gap: 24px; align-items: flex-start; flex-shrink: 0; border: none !important; }
-              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-radius: 4px; object-fit: cover; flex-shrink: 0; }
+              .lfm-cover { width: 140px; height: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); border-radius: 15px; object-fit: cover; flex-shrink: 0; }
               .lfm-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; height: 140px; padding-right: 10px; }
               .lfm-title { display: flex; align-items: center; font-size: 26px; font-weight: 800; color: white !important; line-height: 1.2; margin-bottom: 2px; }
               .lfm-title-text { 
@@ -34087,7 +34319,7 @@ const getDominantColor = (src) => {
               .lfm-body::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15); border-radius: 4px; }
               .lfm-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
               
-              .lfm-stat-box { background: rgba(255, 255, 255, 0.05) !important; border-radius: 8px !important; padding: 16px 20px !important; display: flex; flex-direction: column; justify-content: center; gap: 6px; border: 1px solid rgba(255,255,255,0.08) !important; transition: all 0.2s; min-height: 85px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+              .lfm-stat-box { background: rgba(255, 255, 255, 0.05) !important; border-radius: 15px !important; padding: 16px 20px !important; display: flex; flex-direction: column; justify-content: center; gap: 6px; border: 1px solid rgba(255,255,255,0.08) !important; transition: all 0.2s; min-height: 85px; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
               .lfm-stat-box:hover { background: rgba(255, 255, 255, 0.08) !important; border-color: rgba(255, 255, 255, 0.15) !important; }
               .lfm-stat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; color: #ccc; }
               .lfm-stat-label { font-size: 11px; color: rgba(255,255,255,0.7) !important; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; }
@@ -34503,6 +34735,7 @@ const getDominantColor = (src) => {
         { value: 'playCount', label: 'Play Count' },
         { value: 'popularity', label: 'Popularity' },
         { value: 'releaseDate', label: 'Release Date', hasSettings: true, getHtml: getDateFormatDropdownHtml, datasetKey: 'format', updateVar: v => releaseDateFormat = v },
+        { value: 'trueReleaseDate', label: 'True Release Date', hasSettings: true, getHtml: getDateFormatDropdownHtml, datasetKey: 'format', updateVar: v => releaseDateFormat = v },
         { value: 'scrobbles', label: 'Scrobbles' },
         { value: 'personalScrobbles', label: 'My Scrobbles', hasSettings: true, getHtml: getMyScrobblesDropdownHtml, datasetKey: 'mode', updateVar: v => myScrobblesDisplayMode = v },
         { value: 'lastScrobbled', label: 'Last Scrobbled', hasSettings: true, getHtml: getLastScrobbledDropdownHtml, datasetKey: 'format', updateVar: v => lastScrobbledFormat = v },
@@ -34932,7 +35165,7 @@ const getDominantColor = (src) => {
         const batch = spotifyTracksToProcess.slice(i, i + BATCH_SIZE);
         const batchIds = batch.map(item => item.id);
         
-        const dataMap = { playCounts: null, releaseDates: null, scrobbles: null, personal: null, ai: null, metadata: null, lastScrobbled: null };
+        const dataMap = { playCounts: null, releaseDates: null, trueReleaseDates: null, scrobbles: null, personal: null, ai: null, metadata: null, lastScrobbled: null };
         const fetchPromises = [];
 
         if (columnConfigs.some(c => c.type === 'playCount')) {
@@ -34940,6 +35173,9 @@ const getDominantColor = (src) => {
         }
         if (columnConfigs.some(c => c.type === 'releaseDate')) {
             fetchPromises.push(idb.getMany('releaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.releaseDates = res));
+        }
+        if (columnConfigs.some(c => c.type === 'trueReleaseDate')) {
+            fetchPromises.push(idb.getMany('trueReleaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.trueReleaseDates = res));
         }
         if (columnConfigs.some(c => c.type === 'scrobbles')) {
             fetchPromises.push(idb.getMany('scrobbles', batchIds, CACHE_EXPIRE_GLOBAL_SCROBBLES).then(res => dataMap.scrobbles = res));
@@ -35001,6 +35237,10 @@ const getDominantColor = (src) => {
                 if (config.type === 'playCount' && dataMap.playCounts) val = dataMap.playCounts.get(id);
                 else if (config.type === 'releaseDate' && dataMap.releaseDates) {
                     const cached = dataMap.releaseDates.get(id);
+                    val = (cached && typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
+                }
+                else if (config.type === 'trueReleaseDate' && dataMap.trueReleaseDates) {
+                    const cached = dataMap.trueReleaseDates.get(id);
                     val = (cached && typeof cached === 'object' && cached.date !== undefined) ? cached.date : cached;
                 }
                 else if (config.type === 'scrobbles' && dataMap.scrobbles) val = dataMap.scrobbles.get(id);
@@ -35112,6 +35352,13 @@ const getDominantColor = (src) => {
                         } else if (c.type === 'releaseDate') {
                             updateDisplay(dEl, t.album.release_date, c.type);
                             if (t.album.release_date) await setCachedReleaseDate(t.id, t.album.release_date);
+                        } else if (c.type === 'trueReleaseDate') {
+                            const trackObjForFetch = {
+                                id: t.id, trackId: t.id, albumId: t.album?.id, name: t.name, uri: t.uri, artists: t.artists, track: t, playCount: dataMap.playCounts?.get(t.id) || "N/A"
+                            };
+                            const r = await getTrackDetailsWithTrueReleaseDate(trackObjForFetch);
+                            if (el.dataset.spColTypes !== expectedCols) return;
+                            updateDisplay(dEl, r?.trueReleaseDate, c.type);
                         } else if (c.type === 'popularity') {
                             updateDisplay(dEl, t.popularity, c.type);
                         } else if (c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled') {
@@ -35281,7 +35528,7 @@ const getDominantColor = (src) => {
         } else {
              displayValue = "Err";
         }
-    } else if (type === 'releaseDate') {
+    } else if (type === 'releaseDate' || type === 'trueReleaseDate') {
         displayValue = formatReleaseDate(value, releaseDateFormat);
     } else if (type === 'djInfo') {
         if (value && typeof value === 'object') {
@@ -35442,7 +35689,7 @@ const getDominantColor = (src) => {
     const secondHeaderTextSpan = existingSecondHeaderColumn?.querySelector("span");
 
     const expectedHeaderText = {
-        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date",
+        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date", 'trueReleaseDate': "True Date",
         'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
         'lastScrobbled': "Last Played", 'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
         'danceability': "Dance", 'valence': "Valence"
@@ -35450,7 +35697,7 @@ const getDominantColor = (src) => {
     const columnTypeChanged = existingHeaderColumn && headerTextSpan?.innerText !== expectedHeaderText;
 
     const expectedSecondHeaderText = {
-        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date",
+        'playCount': "Plays", 'popularity': "Popularity", 'releaseDate': "Rel. Date", 'trueReleaseDate': "True Date",
         'scrobbles': "Scrobbles", 'personalScrobbles': myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles",
         'lastScrobbled': "Last Played", 'djInfo': "DJ Info", 'key': "Key", 'tempo': "BPM", 'energy': "Energy",
         'danceability': "Dance", 'valence': "Valence"
@@ -35825,6 +36072,7 @@ const getDominantColor = (src) => {
             case 'playCount': expectedHeaderText = "Plays"; break;
             case 'popularity': expectedHeaderText = "Popularity"; break;
             case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
+            case 'trueReleaseDate': expectedHeaderText = "True Date"; break;
             case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
             case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
             case 'lastScrobbled': expectedHeaderText = "Last Played"; break;
@@ -36001,6 +36249,7 @@ const getDominantColor = (src) => {
             case 'playCount': expectedHeaderText = "Plays"; break;
             case 'popularity': expectedHeaderText = "Popularity"; break;
             case 'releaseDate': expectedHeaderText = "Rel. Date"; break;
+            case 'trueReleaseDate': expectedHeaderText = "True Date"; break;
             case 'scrobbles': expectedHeaderText = "Scrobbles"; break;
             case 'personalScrobbles': expectedHeaderText = myScrobblesDisplayMode === 'sign' ? "Listened" : "My Scrobbles"; break;
             case 'lastScrobbled': expectedHeaderText = "Last Played"; break;
