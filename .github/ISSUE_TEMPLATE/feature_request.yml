@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an idea for Sort-Play
+title: "[Feature Request] "
+labels: []
+assignees: []
+body:
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Write your request here.
+      placeholder: Describe the idea or feature you would like to see...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        <sub>Idea for [Sort-Play](https://github.com/hoeci/sort-play)</sub>
