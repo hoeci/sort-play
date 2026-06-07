@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.84.0";
+  const SORT_PLAY_VERSION = "5.84.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -2573,7 +2573,7 @@
   }
 
   
-  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", onSave, onCancel = null }) {
+  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", dropdownOptions = null, toggleOptions = null, onSave, onCancel = null }) {
     const overlay = document.createElement("div");
     overlay.className = "sort-play-font-scope";
     overlay.style.cssText = `
@@ -2596,7 +2596,46 @@
         box-shadow: 0 10px 40px rgba(0,0,0,0.5);
     `;
 
+    const toggleCss = toggleOptions ? `
+      <style>
+        .sp-simple-switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+        .sp-simple-switch input { opacity: 0; width: 0; height: 0; }
+        .sp-simple-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+        .sp-simple-slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+        .sp-simple-switch input:checked + .sp-simple-slider { background-color: #1DB954; }
+        .sp-simple-switch input:checked + .sp-simple-slider:before { transform: translateX(16px); }
+        .sp-simple-toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+      </style>
+    ` : '';
+
+    let inputHtml = '';
+    if (toggleOptions) {
+        inputHtml = toggleOptions.map(opt => `
+            <div class="sp-simple-toggle-row">
+                <label style="color: #c1c1c1; font-size: 16px;">${opt.label}</label>
+                <label class="sp-simple-switch">
+                    <input type="checkbox" id="sp-toggle-${opt.id}" ${opt.checked ? 'checked' : ''}>
+                    <span class="sp-simple-slider"></span>
+                </label>
+            </div>
+        `).join('');
+    } else if (dropdownOptions) {
+        inputHtml = `
+            ${inputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${inputLabel}</label>` : ''}
+            <select id="sp-simple-input" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; font-family: inherit; cursor: pointer; outline: none;">
+                ${dropdownOptions.map(opt => `<option value="${opt.value}" ${opt.value === inputValue ? 'selected' : ''}>${opt.label}</option>`).join('')}
+            </select>
+        `;
+    } else {
+        inputHtml = `
+            ${inputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${inputLabel}</label>` : ''}
+            <input type="${inputType}" id="sp-simple-input" value="${inputValue}" placeholder="${inputPlaceholder}"
+                   style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; font-family: inherit; outline: none;">
+        `;
+    }
+
     modalContainer.innerHTML = `
+      ${toggleCss}
       <div class="main-trackCreditsModal-header" style="padding: 27px 32px 0px !important; border-bottom: none;">
           <h1 class="main-trackCreditsModal-title" style="margin: 0;"><span style='font-size: 25px; color: white;'>${title}</span></h1>
       </div>
@@ -2604,9 +2643,7 @@
           <div style="display: flex; flex-direction: column; gap: 15px;">
             ${descriptionHtml ? `<div style="color: #b3b3b3; font-size: 14px; margin: 0; line-height: 1.4;">${descriptionHtml}</div>` : ''}
             <div style="display: flex; flex-direction: column; gap: 5px;">
-              ${inputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${inputLabel}</label>` : ''}
-              <input type="${inputType}" id="sp-simple-input" value="${inputValue}" placeholder="${inputPlaceholder}"
-                    style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; font-family: inherit;">
+              ${inputHtml}
               ${subtextHtml ? `<div style="margin-top: 2px;">${subtextHtml}</div>` : ''}
             </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 5px;">
@@ -2627,7 +2664,7 @@
     overlay.appendChild(modalContainer);
     
     const inputField = modalContainer.querySelector("#sp-simple-input");
-    inputField.focus();
+    if (inputField && inputType !== "hidden") inputField.focus();
 
     const closeModal = () => overlay.remove();
 
@@ -2637,11 +2674,22 @@
     addHoverEffect(saveButton, "#1ED760", "#3BE377");
     addHoverEffect(cancelButton, "#333333", "#444444");
 
-    saveButton.addEventListener("click", () => onSave(inputField.value.trim(), saveButton, closeModal));
+    saveButton.addEventListener("click", () => {
+        if (toggleOptions) {
+            const results = {};
+            toggleOptions.forEach(opt => {
+                results[opt.id] = modalContainer.querySelector(`#sp-toggle-${opt.id}`).checked;
+            });
+            onSave(results, saveButton, closeModal);
+        } else {
+            onSave(inputField.value.trim(), saveButton, closeModal);
+        }
+    });
+
     cancelButton.addEventListener("click", () => { closeModal(); if (onCancel) onCancel(); });
     overlay.addEventListener("click", (e) => { if (e.target === overlay) { closeModal(); if (onCancel) onCancel(); } });
   }
-
+  
   function showLastFmUsernameModal(onSuccess = null) {
     showSimpleInputModal({
         title: "Last.fm Username",
@@ -3311,19 +3359,9 @@
             </span>
         </label>
         <div class="col action">
-            <select id="artistDiscographySortSelect" style="max-width: 140px; margin-right: 5px;">
-                <option value="playCount" ${artistDiscographySortType === 'playCount' ? 'selected' : ''}>Play Count</option>
-                <option value="popularity" ${artistDiscographySortType === 'popularity' ? 'selected' : ''}>Popularity</option>
-                <option value="releaseDate" ${artistDiscographySortType === 'releaseDate' ? 'selected' : ''}>Release Date</option>
-                <option value="trueReleaseDate" ${artistDiscographySortType === 'trueReleaseDate' ? 'selected' : ''}>True Release Date</option>
-                <option value="scrobbles" ${artistDiscographySortType === 'scrobbles' ? 'selected' : ''}>Scrobbles</option>
-                <option value="personalScrobbles" ${artistDiscographySortType === 'personalScrobbles' ? 'selected' : ''}>My Scrobbles</option>
-                <option value="shuffle" ${artistDiscographySortType === 'shuffle' ? 'selected' : ''}>Shuffle</option>
-                <option value="tempo" ${artistDiscographySortType === 'tempo' ? 'selected' : ''}>Tempo</option>
-                <option value="energy" ${artistDiscographySortType === 'energy' ? 'selected' : ''}>Energy</option>
-                <option value="danceability" ${artistDiscographySortType === 'danceability' ? 'selected' : ''}>Danceability</option>
-                <option value="valence" ${artistDiscographySortType === 'valence' ? 'selected' : ''}>Valence</option>
-            </select>
+            <button id="artistDiscographySettingsBtn" class="column-settings-button" title="Configure Discography Sort">
+                ${settingsSvg}
+            </button>
             <label class="switch">
                 <input type="checkbox" id="showArtistDiscographyContextMenuToggle" ${showArtistDiscographyContextMenu ? 'checked' : ''}>
                 <span class="sliderx"></span>
@@ -3771,7 +3809,7 @@
     const showLastFmArtistContextMenuToggle = modalContainer.querySelector("#showLastFmArtistContextMenuToggle");
     const showArtistDiscographyContextMenuToggle = modalContainer.querySelector("#showArtistDiscographyContextMenuToggle");
     const showShuffleContextMenuToggle = modalContainer.querySelector("#showShuffleContextMenuToggle");
-    const artistDiscographySortSelect = modalContainer.querySelector("#artistDiscographySortSelect");
+    const artistDiscographySettingsBtn = modalContainer.querySelector("#artistDiscographySettingsBtn");
     const artistDiscographyDedupModeSelect = modalContainer.querySelector("#artistDiscographyDedupModeSelect");
     const showArtistDiscographyDuplicateWarningToggle = modalContainer.querySelector("#showArtistDiscographyDuplicateWarningToggle");
     const addToQueueToggle = modalContainer.querySelector("#addToQueueToggle");
@@ -3817,7 +3855,22 @@
     
     likeButtonSettingsBtn.addEventListener("click", () => {
         if (!likeButtonSettingsBtn.disabled) {
-            showLikeButtonSettingsModal();
+            showSimpleInputModal({
+                title: "Like Button Locations",
+                toggleOptions: [
+                    { id: 'trackRows', label: 'Track Rows', checked: likeButtonConfig.trackRows },
+                    { id: 'nowPlayingBar', label: 'Now Playing Bar (Bottom)', checked: likeButtonConfig.nowPlayingBar },
+                    { id: 'nowPlayingView', label: 'Now Playing View (Sidebar)', checked: likeButtonConfig.nowPlayingView }
+                ],
+                onSave: (results, saveBtn, closeModal) => {
+                    likeButtonConfig.trackRows = results.trackRows;
+                    likeButtonConfig.nowPlayingBar = results.nowPlayingBar;
+                    likeButtonConfig.nowPlayingView = results.nowPlayingView;
+                    saveSettings();
+                    document.dispatchEvent(new CustomEvent('sortPlay_likeButtonConfigChanged'));
+                    closeModal();
+                }
+            });
         }
     });
     
@@ -4069,18 +4122,45 @@
         saveSettings();
     });
 
+    artistDiscographySettingsBtn.disabled = !showArtistDiscographyContextMenuToggle.checked;
+
     showArtistDiscographyContextMenuToggle.addEventListener("change", () => {
         showArtistDiscographyContextMenu = showArtistDiscographyContextMenuToggle.checked;
+        artistDiscographySettingsBtn.disabled = !showArtistDiscographyContextMenu;
         saveSettings();
+    });
+
+    artistDiscographySettingsBtn.addEventListener("click", () => {
+        if (!artistDiscographySettingsBtn.disabled) {
+            showSimpleInputModal({
+                title: "Discography Sort Order",
+                descriptionHtml: "Choose the default track order for discographies created via the artist menu.",
+                inputLabel: "Sort Order",
+                inputValue: artistDiscographySortType,
+                dropdownOptions: [
+                    { value: 'playCount', label: 'Play Count' },
+                    { value: 'popularity', label: 'Popularity' },
+                    { value: 'releaseDate', label: 'Release Date' },
+                    { value: 'trueReleaseDate', label: 'True Release Date' },
+                    { value: 'scrobbles', label: 'Scrobbles' },
+                    { value: 'personalScrobbles', label: 'My Scrobbles' },
+                    { value: 'shuffle', label: 'Shuffle' },
+                    { value: 'tempo', label: 'Tempo' },
+                    { value: 'energy', label: 'Energy' },
+                    { value: 'danceability', label: 'Danceability' },
+                    { value: 'valence', label: 'Valence' }
+                ],
+                onSave: (val, saveBtn, closeModal) => {
+                    artistDiscographySortType = val;
+                    saveSettings();
+                    closeModal();
+                }
+            });
+        }
     });
 
     showShuffleContextMenuToggle.addEventListener("change", () => {
         showShuffleContextMenu = showShuffleContextMenuToggle.checked;
-        saveSettings();
-    });
-
-    artistDiscographySortSelect.addEventListener("change", () => {
-        artistDiscographySortType = artistDiscographySortSelect.value;
         saveSettings();
     });
 
@@ -6977,100 +7057,6 @@
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
 
-  function showLikeButtonSettingsModal() {
-      const overlay = document.createElement("div");
-      overlay.id = "sort-play-like-button-overlay";
-      overlay.style.cssText = `
-          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-          background-color: rgba(0, 0, 0, 0.7); z-index: 2005;
-          display: flex; justify-content: center; align-items: center;
-      `;
-
-      const modalContainer = document.createElement("div");
-      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
-      modalContainer.style.cssText = `
-          width: 440px !important;
-          border-radius: 30px;
-          background-color: #181818 !important;
-          border: 2px solid #282828;
-          display: flex;
-          flex-direction: column;
-      `;
-
-      modalContainer.innerHTML = `
-        <style>
-          .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; }
-          .setting-label { color: #c1c1c1; font-size: 16px; font-weight: 500; }
-          .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
-          .switch input { opacity: 0; width: 0; height: 0; }
-          .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
-          .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
-          input:checked + .sliderx { background-color: #1DB954; }
-          input:checked + .sliderx:before { transform: translateX(16px); }
-        </style>
-        <div class="main-trackCreditsModal-header" style="padding: 27px 32px 12px !important;">
-            <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Like Button Locations</span></h1>
-        </div>
-        <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px 25px !important;">
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                <div class="setting-row">
-                    <label class="setting-label" for="lbTrackRowsToggle">Track Rows</label>
-                    <label class="switch">
-                        <input type="checkbox" id="lbTrackRowsToggle" ${likeButtonConfig.trackRows ? 'checked' : ''}>
-                        <span class="sliderx"></span>
-                    </label>
-                </div>
-                <div class="setting-row">
-                    <label class="setting-label" for="lbNowPlayingBarToggle">Now Playing Bar (Bottom)</label>
-                    <label class="switch">
-                        <input type="checkbox" id="lbNowPlayingBarToggle" ${likeButtonConfig.nowPlayingBar ? 'checked' : ''}>
-                        <span class="sliderx"></span>
-                    </label>
-                </div>
-                <div class="setting-row">
-                    <label class="setting-label" for="lbNowPlayingViewToggle">Now Playing View (Sidebar)</label>
-                    <label class="switch">
-                        <input type="checkbox" id="lbNowPlayingViewToggle" ${likeButtonConfig.nowPlayingView ? 'checked' : ''}>
-                        <span class="sliderx"></span>
-                    </label>
-                </div>
-                <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-                    <button id="doneLikeButtonLocations" class="main-buttons-button main-button-primary" style="padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease;">
-                      Done
-                    </button>
-                </div>
-            </div>
-        </div>
-      `;
-      
-      document.body.appendChild(overlay);
-      overlay.appendChild(modalContainer);
-
-      const closeModal = () => overlay.remove();
-
-      const lbTrackRowsToggle = modalContainer.querySelector("#lbTrackRowsToggle");
-      const lbNowPlayingBarToggle = modalContainer.querySelector("#lbNowPlayingBarToggle");
-      const lbNowPlayingViewToggle = modalContainer.querySelector("#lbNowPlayingViewToggle");
-      const doneButton = modalContainer.querySelector("#doneLikeButtonLocations");
-
-      const updateVarsAndSave = () => {
-          likeButtonConfig.trackRows = lbTrackRowsToggle.checked;
-          likeButtonConfig.nowPlayingBar = lbNowPlayingBarToggle.checked;
-          likeButtonConfig.nowPlayingView = lbNowPlayingViewToggle.checked;
-          saveSettings();
-          document.dispatchEvent(new CustomEvent('sortPlay_likeButtonConfigChanged'));
-      };
-      
-      lbTrackRowsToggle.addEventListener("change", updateVarsAndSave);
-      lbNowPlayingBarToggle.addEventListener("change", updateVarsAndSave);
-      lbNowPlayingViewToggle.addEventListener("change", updateVarsAndSave);
-
-      doneButton.addEventListener("click", closeModal);
-      addHoverEffect(doneButton, "#1ED760", "#3BE377");
-
-      overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
-  }
-  
   function showEnergyWaveSettingsModal() {
     showSimpleInputModal({
         title: "Vibe & Flow Config",
