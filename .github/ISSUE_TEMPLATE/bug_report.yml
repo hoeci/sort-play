@@ -1,0 +1,19 @@
+name: Bug report
+description: Report an issue or bug in Sort-Play
+title: "[Bug] "
+labels: []
+assignees: []
+body:
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Bug Description
+      description: Write your report here.
+      placeholder: Tell us what went wrong...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        <sub>Feedback for [Sort-Play](https://github.com/hoeci/sort-play)</sub>
