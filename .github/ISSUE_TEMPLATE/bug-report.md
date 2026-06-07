@@ -1,7 +1,7 @@
 ---
 name: Bug report
 about: Report an issue or bug in Sort-Play
-title: "[BUG] "
+title: "[Bug] "
 labels: ''
 assignees: ''
 
