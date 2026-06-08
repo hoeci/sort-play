@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.85.0";
+  const SORT_PLAY_VERSION = "5.85.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -12540,6 +12540,7 @@ const getDominantColor = (src) => {
     let targetIsrc = track.track?.external_ids?.isrc || track.external_ids?.isrc;
     let targetDate = track.releaseDate || track.album?.release_date || track.track?.album?.release_date;
     let targetPlaycount = (track.playCount && track.playCount !== "N/A") ? Number(track.playCount) : 0;
+    let targetDuration = track.durationMs || track.durationMilis || track.track?.duration_ms || 0;
 
     if (!targetIsrc || !targetDate) {
         try {
@@ -12657,11 +12658,23 @@ const getDominantColor = (src) => {
             if (metaCleanName === cleanName) {
                 const metaArtistIds = (meta.artists || []).map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)).filter(Boolean);
                 
+                let artistMatch = false;
                 if (targetArtistIds.length > 0 && metaArtistIds.length > 0) {
-                    softMatch = targetArtistIds.some(id => metaArtistIds.includes(id));
+                    artistMatch = targetArtistIds.some(id => metaArtistIds.includes(id));
                 } else {
                     const metaArtistNames = (meta.artists || []).map(a => a.name.toLowerCase().trim());
-                    softMatch = targetArtistNames.some(ta => metaArtistNames.includes(ta));
+                    artistMatch = targetArtistNames.some(ta => metaArtistNames.includes(ta));
+                }
+
+                if (artistMatch) {
+                    if (targetDuration > 0 && meta.duration_ms) {
+                        const durationDiff = Math.abs(targetDuration - meta.duration_ms);
+                        if (durationDiff <= 3500) {
+                            softMatch = true;
+                        }
+                    } else {
+                        softMatch = true;
+                    }
                 }
             }
             
