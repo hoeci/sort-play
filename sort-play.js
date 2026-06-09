@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.86.0";
+  const SORT_PLAY_VERSION = "5.86.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -8013,6 +8013,7 @@
 
     const cachedCounts = JSON.parse(localStorage.getItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS) || '{}');
     let dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
+    const dedicatedPlaylistMeta = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
     const jobs = getDedicatedJobs();
     
     jobs.forEach(job => {
@@ -8073,6 +8074,20 @@
             const badgeHtml = getBadgeHtml(behavior, card.id);
             const allowSettings = card.id !== 'tastemakerProfile' && !isBroken;
 
+            let displayTitle = card.name;
+            let displayThumbnail = card.thumbnailUrl;
+            let isCustomCover = false;
+
+            const cachedMeta = dedicatedPlaylistMeta[card.id];
+            if ((behavior === 'replace' || behavior === 'autoUpdate') && cachedMeta) {
+                if (cachedMeta.name) displayTitle = cachedMeta.name;
+                if (cachedMeta.imageUrl && !isDefaultMosaicCover(cachedMeta.imageUrl)) {
+                    displayThumbnail = cachedMeta.imageUrl;
+                    isCustomCover = true;
+                }
+            }
+            const customCoverClass = isCustomCover ? 'has-custom-cover' : '';
+
             const autoBtnContent = behavior === 'autoUpdate' 
                 ? `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}` 
                 : `Auto`;
@@ -8083,15 +8098,15 @@
             const countText = hasCached ? cachedCount.toLocaleString() : '';
 
             return `
-                <div class="slim-card ${isBroken ? 'broken-card' : ''}" data-id="${card.id}" data-name="${card.name}" style="--overlay-color: ${rgbColor};">
-                    <div class="card-bg" style="background-image: url('${card.thumbnailUrl}');"></div>
+                <div class="slim-card ${isBroken ? 'broken-card' : ''} ${customCoverClass}" data-id="${card.id}" data-name="${card.name}" style="--overlay-color: ${rgbColor};">
+                    <div class="card-bg" style="background-image: url('${displayThumbnail}');"></div>
                     <div class="card-overlay"></div>
                     ${isBroken ? `<div class="broken-overlay"><span>Unavailable</span></div>` : ''}
                     
                     <div class="card-content-wrapper" style="padding-bottom: 14px;">
                         <div class="card-text">
                             <div class="card-title-row">
-                                <span class="card-title">${card.name}</span>
+                                <span class="card-title" title="${displayTitle}">${displayTitle}</span>
                                 ${card.version ? `<span class="card-version-tag">${card.version}</span>` : ''}
                                 <span class="badge-container">${badgeHtml}</span>
                             </div>
@@ -8240,6 +8255,11 @@
         .slim-card.broken-card .card-bg { filter: grayscale(100%) contrast(120%) brightness(40%) !important; transform: none !important; }
         .slim-card.broken-card .card-overlay::before, .slim-card.broken-card .card-overlay::after { display: none !important; }
         .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+        .slim-card.has-custom-cover .card-bg { filter: grayscale(0.1) brightness(0.5) contrast(1.05); background-position: center center !important; background-size: cover !important; }
+        .slim-card.has-custom-cover .card-overlay::before { background: linear-gradient(90deg, rgba(var(--overlay-color), 0.15) 0%, rgba(0,0,0,0.45) 100%); opacity: 1; }
+        .slim-card.has-custom-cover .card-title { text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.8); padding: 6px 4px; margin: -6px -4px; }
+        .slim-card.has-custom-cover .card-desc { text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 8px rgba(0,0,0,0.8); color: #fff; opacity: 0.95; padding: 4px; margin: -4px; }
+        .slim-card.has-custom-cover .global-stats { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.9)) drop-shadow(0 0 6px rgba(0,0,0,0.8)); }
       </style>
 
       <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
@@ -8261,6 +8281,76 @@
             overlay.style.opacity = "1";
         });
     });
+
+    (async () => {
+        const dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
+        for (const [cardId, uri] of Object.entries(dedicatedPlaylistMap)) {
+            const behavior = dedicatedPlaylistBehavior[cardId] || 'createOnce';
+            if (behavior === 'replace' || behavior === 'autoUpdate') {
+                Spicetify.Platform.PlaylistAPI.getMetadata(uri).then(meta => {
+                    if (meta) {
+                        const cardEl = modalContainer.querySelector(`.slim-card[data-id="${cardId}"]`);
+                        let cacheNeedsUpdate = false;
+                        let newName = meta.name;
+                        let newImage = meta.images && meta.images.length > 0 ? meta.images[0].url : null;
+                        
+                        const cached = dedicatedPlaylistMeta[cardId] || {};
+                        
+                        if (newName && cached.name !== newName) {
+                            cacheNeedsUpdate = true;
+                            if (cardEl) {
+                                const titleEl = cardEl.querySelector('.card-title');
+                                if (titleEl) {
+                                    titleEl.innerText = newName;
+                                    titleEl.title = newName;
+                                }
+                            }
+                        }
+                        
+                        if (newImage && cached.imageUrl !== newImage) {
+                            cacheNeedsUpdate = true;
+                            if (cardEl) {
+                                const bgEl = cardEl.querySelector('.card-bg');
+                                if (bgEl) {
+                                    const isCustom = !isDefaultMosaicCover(newImage);
+                                    const targetImage = isCustom ? newImage : (playlistCardsData.flatMap(s => s.cards).find(c => c.id === cardId)?.thumbnailUrl || '');
+                                    
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const newBg = document.createElement('div');
+                                        newBg.className = 'card-bg';
+                                        newBg.style.backgroundImage = `url('${targetImage}')`;
+                                        newBg.style.opacity = '0';
+                                        newBg.style.transition = 'opacity 0.15s ease, transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                                        
+                                        cardEl.insertBefore(newBg, bgEl.nextSibling);
+                                        
+                                        if (isCustom) cardEl.classList.add('has-custom-cover');
+                                        else cardEl.classList.remove('has-custom-cover');
+                                        
+                                        void newBg.offsetWidth;
+                                        newBg.style.opacity = '1';
+                                        
+                                        setTimeout(() => {
+                                            bgEl.remove();
+                                        }, 150);
+                                    };
+                                    img.src = targetImage;
+                                }
+                            }
+                        }
+
+                        if (cacheNeedsUpdate) {
+                            dedicatedPlaylistMeta[cardId] = { name: newName, imageUrl: newImage };
+                            localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
+                        }
+                    }
+                }).catch(e => {
+                    console.warn(`Sort-Play: Could not fetch custom linked playlist info for ${cardId}`, e);
+                });
+            }
+        }
+    })();
 
     const animateValue = (obj, start, end, duration) => {
         if (start === end) return;
@@ -27135,24 +27225,51 @@ const getDominantColor = (src) => {
                 const playlistId = playlistUri.split(':')[2];
 
                 try {
-                    await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, {
-                        name: finalPlaylistName,
-                        description: description
-                    });
-                } catch (updateError) {
-                }
+                    const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(playlistUri);
+                    let requestBody = {};
 
-                if (setDedicatedPlaylistCovers) {
-                    (async () => {
-                        try {
-                            const user = await Spicetify.Platform.UserAPI.getUser();
-                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                            const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
-                            setPlaylistImage(playlistId, coverBase64);
-                        } catch (coverError) {
-                            console.error("Failed to update custom playlist cover:", coverError);
+                    let shouldUpdateDescription = true;
+                    if (!overwriteCustomDescription) {
+                        let currentDesc = meta.description || "";
+                        if (currentDesc) {
+                            const textArea = document.createElement("textarea");
+                            textArea.innerHTML = currentDesc;
+                            currentDesc = textArea.value;
                         }
-                    })();
+                        if (currentDesc.trim() !== "" && !currentDesc.includes("Sort-Play")) {
+                            shouldUpdateDescription = false;
+                        }
+                    }
+
+                    if (shouldUpdateDescription && meta.description !== description) {
+                        requestBody.description = description;
+                    }
+
+                    if (Object.keys(requestBody).length > 0) {
+                        await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, requestBody);
+                    }
+
+                    if (setDedicatedPlaylistCovers) {
+                        let hasCustomCover = false;
+                        if (meta.images && meta.images.length > 0) {
+                            hasCustomCover = !isDefaultMosaicCover(meta.images[0].url);
+                        }
+                        
+                        if (!hasCustomCover) {
+                            (async () => {
+                                try {
+                                    const user = await Spicetify.Platform.UserAPI.getUser();
+                                    const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                                    const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
+                                    setPlaylistImage(playlistId, coverBase64);
+                                } catch (coverError) {
+                                    console.error("Failed to update custom playlist cover:", coverError);
+                                }
+                            })();
+                        }
+                    }
+                } catch (updateError) {
+                    console.warn("Sort-Play: Failed to check/update dedicated playlist metadata:", updateError);
                 }
 
                 await movePlaylistToTop(playlistUri);
