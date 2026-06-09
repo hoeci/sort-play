@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.85.1";
+  const SORT_PLAY_VERSION = "5.86.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -202,6 +202,9 @@
   let showAlbumColumn = false;
   let showArtistColumn = false; 
   let removeDateAdded = false;
+  let hasNewUpdate = false;
+  let cachedCommits = null;
+  let lastCommitFetch = 0;
   let addToQueueEnabled = false; 
   let createPlaylistAfterSort = true; 
   let sortCurrentPlaylistEnabled = false;
@@ -2065,6 +2068,10 @@
     selectedArtistColumnType = localStorage.getItem(STORAGE_KEY_SELECTED_ARTIST_COLUMN_TYPE) || "releaseDate"; 
     releaseDateFormat = localStorage.getItem(STORAGE_KEY_RELEASE_DATE_FORMAT) || 'YYYY-MM-DD';
     removeDateAdded = localStorage.getItem(STORAGE_KEY_REMOVE_DATE_ADDED) === "true";
+    const lastVersion = localStorage.getItem("sort-play-last-version");
+    if (lastVersion !== SORT_PLAY_VERSION) {
+        hasNewUpdate = true;
+    }
     includeSongStats = localStorage.getItem(STORAGE_KEY_INCLUDE_SONG_STATS) !== "false";
     includeLyrics = localStorage.getItem(STORAGE_KEY_INCLUDE_LYRICS) === "true";
     selectedAiModel = localStorage.getItem(STORAGE_KEY_AI_MODEL) || DEFAULT_AI_MODEL;
@@ -2892,7 +2899,13 @@
 
     const headerHtml = `
       <div class="main-trackCreditsModal-header" style="padding: 29px 32px 19px 32px !important; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 30px; color: white;'>Sort-Play Settings <span class='version-tag'>v${SORT_PLAY_VERSION}</span></span></h1>
+          <h1 class="main-trackCreditsModal-title" style="display: flex; align-items: center;">
+              <span style='font-size: 30px; color: white;'>Sort-Play Settings</span>
+              <span class='version-tag' id="sortPlayVersionTag" title="View Update History & Changelog">
+                  v${SORT_PLAY_VERSION}
+                  ${hasNewUpdate ? `<div class="version-dot" id="sortPlayVersionDot"></div>` : ''}
+              </span>
+          </h1>
           <div style="display: flex; align-items: center; position: relative; gap: 14px;">
               <button id="notificationHistoryBtn" title="Notification History" style="background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; display: flex; align-items: center; transition: color 0.2s ease;">
                   ${historyIconSvg}
@@ -2975,7 +2988,9 @@
       .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
       .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
       .tooltip-container:hover .custom-tooltip { visibility: visible; }
-      .version-tag { font-size: 14px; color: #888; margin-left: 12px; vertical-align: middle; }
+      .version-tag { font-size: 13px; color: #b3b3b3; margin-left: 12px; vertical-align: middle; background: rgba(255,255,255,0.05); padding: 3px 10px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; position: relative; border: 1px solid transparent; user-select: none; }
+      .version-tag:hover { background: rgba(255,255,255,0.1); color: white; border-color: rgba(255,255,255,0.2); }
+      .version-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; background-color: #1ed760; border-radius: 50%; box-shadow: 0 0 8px rgba(30,215,96,0.6); border: 2px solid #181818; pointer-events: none; }
       .sort-play-settings .switch.disabled .sliderx { opacity: 0.5; cursor: not-allowed; }
       .sort-play-settings .github-link-container { display: flex; justify-content: center; margin-top: 10px; padding-bottom: 10px; }
       .sort-play-settings .github-link-container a { color: #1ED760; font-size: 14px; text-decoration: none; }
@@ -3794,7 +3809,16 @@
     preventDragCloseModal(abortController.signal);
 
     modalContainer.querySelector("#closeSettingsModal").addEventListener("click", closeModal);
-
+    const versionTagBtn = modalContainer.querySelector("#sortPlayVersionTag");
+    if (versionTagBtn) {
+        versionTagBtn.addEventListener("click", () => {
+            hasNewUpdate = false;
+            localStorage.setItem("sort-play-last-version", SORT_PLAY_VERSION);
+            const dot = modalContainer.querySelector("#sortPlayVersionDot");
+            if (dot) dot.remove();
+            showUpdateHistoryModal();
+        });
+    }
     const showAdditionalColumnToggle = modalContainer.querySelector("#showAdditionalColumnToggle");
     const showAlbumColumnToggle = modalContainer.querySelector("#showAlbumColumnToggle");
     const showArtistColumnToggle = modalContainer.querySelector("#showArtistColumnToggle");
@@ -4664,6 +4688,214 @@
             notifBtn.classList.add('active');
         }
     });
+  }
+
+  async function showUpdateHistoryModal() {
+      const VERSION_CHECK_URL = "https://sp-version.niko2nio2.workers.dev";
+
+      const overlay = document.createElement("div");
+      overlay.id = "sort-play-update-history-overlay";
+      overlay.className = "sort-play-font-scope";
+      overlay.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background-color: rgba(0, 0, 0, 0.7); z-index: 3000;
+          display: flex; justify-content: center; align-items: center;
+          backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+          opacity: 0; transition: opacity 0.2s ease;
+      `;
+
+      const modalContainer = document.createElement("div");
+      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+      modalContainer.style.cssText = `
+          width: 600px !important; max-width: 90vw; height: 75vh;
+          border-radius: 24px; overflow: hidden; 
+          background-color: #181818 !important; border: 1px solid #282828;
+          display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      `;
+
+      modalContainer.innerHTML = `
+          <style>
+              .uh-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+              .uh-title { font-size: 24px; font-weight: 700; color: white; margin: 0; }
+              .uh-subtitle { font-size: 13px; color: #1ed760; font-weight: 600; margin-left: 10px; background: rgba(30,215,96,0.1); padding: 2px 8px; border-radius: 12px; }
+              .uh-body { padding: 24px 32px; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+              .uh-body::-webkit-scrollbar { width: 8px; }
+              .uh-body::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; border: 2px solid #181818; }
+              
+              .uh-update-banner { background: rgba(30, 215, 96, 0.15); border: 1px solid #1ed760; border-radius: 8px; padding: 12px 16px; margin: 20px 32px 0; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+              .uh-update-text { color: white; font-size: 14px; font-weight: 500; }
+              .uh-update-text span { color: #1ed760; font-weight: 700; }
+              .uh-restart-btn { background: #1ed760; color: black; border: none; border-radius: 16px; padding: 6px 16px; font-weight: 700; font-size: 12px; cursor: pointer; text-transform: uppercase; transition: transform 0.1s, filter 0.2s; }
+              .uh-restart-btn:hover { filter: brightness(1.1); transform: scale(1.04); }
+
+              .timeline-container { position: relative; padding-left: 20px; border-left: 2px solid #333; margin-top: 10px; margin-left: 10px; padding-bottom: 20px;}
+              .commit-item { position: relative; margin-bottom: 30px; }
+              .commit-item::before { content: ''; position: absolute; left: -27px; top: 4px; width: 12px; height: 12px; background: #555; border-radius: 50%; box-shadow: 0 0 0 4px #181818; transition: background 0.3s; }
+              .commit-item:first-child::before { background: #1ed760; box-shadow: 0 0 0 4px #181818, 0 0 10px rgba(30,215,96,0.5); }
+              .commit-item:hover::before { background: #1ed760; }
+              
+              .commit-header { display: flex; flex-direction: column; margin-bottom: 8px; }
+              .commit-title { font-size: 16px; color: white; font-weight: 600; line-height: 1.3; }
+              .commit-date { font-size: 12px; color: #888; margin-top: 4px; }
+              .commit-body { font-size: 13.5px; color: #ccc; line-height: 1.6; margin: 0; padding-left: 16px; list-style-type: disc; }
+              .commit-body li { margin-bottom: 4px; }
+              .commit-footer { margin-top: 10px; }
+              .commit-hash { font-family: monospace; font-size: 11px; background: #282828; padding: 3px 8px; border-radius: 6px; color: #1ed760; text-decoration: none; border: 1px solid #333; transition: all 0.2s; }
+              .commit-hash:hover { background: #333; border-color: #1ed760; }
+              
+              .loader-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 16px; color: #888; }
+          </style>
+          
+          <div class="uh-header">
+              <div style="display: flex; align-items: center;">
+                  <h2 class="uh-title">Update History</h2>
+                  <span class="uh-subtitle">v${SORT_PLAY_VERSION}</span>
+              </div>
+              <button class="main-trackCreditsModal-closeBtn" id="closeUhModalX" aria-label="Close" style="background: transparent; border: none; color: #b3b3b3; cursor: pointer;">
+                  ${closeModalIcon20Svg}
+              </button>
+          </div>
+
+          <div id="uh-banner-container"></div>
+          
+          <div class="uh-body" id="uh-body-content">
+              <div class="loader-container">
+                  <div class="loader"></div>
+                  <span>Fetching latest updates...</span>
+              </div>
+          </div>
+      `;
+      
+      document.body.appendChild(overlay);
+      overlay.appendChild(modalContainer);
+      
+      requestAnimationFrame(() => {
+          overlay.style.opacity = "1";
+      });
+
+      const close = () => {
+          overlay.style.opacity = "0";
+          setTimeout(() => overlay.remove(), 200);
+      };
+      
+      modalContainer.querySelector("#closeUhModalX").onclick = close;
+      overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+      const bodyContent = modalContainer.querySelector("#uh-body-content");
+      const bannerContainer = modalContainer.querySelector("#uh-banner-container");
+
+      let serverTimeOffset = 0; 
+
+      const getTimeAgo = (dateString) => {
+          const trueNow = Date.now() + serverTimeOffset;
+          const diffMs = Math.max(0, trueNow - new Date(dateString).getTime());
+          const diffHour = Math.floor(diffMs / (1000 * 60 * 60));
+          const diffDay = Math.floor(diffHour / 24);
+
+          if (diffHour < 1) {
+              const diffMin = Math.floor(diffMs / (1000 * 60));
+              return diffMin <= 1 ? 'Just now' : `${diffMin} mins ago`;
+          }
+          if (diffHour < 48) return diffHour === 1 ? '1 hour ago' : `${diffHour} hours ago`;
+          return `${diffDay} days ago`;
+      };
+
+      const checkVersion = async () => {
+          try {
+              const res = await fetch(VERSION_CHECK_URL);
+              const data = await res.json();
+              if (data && data.version && data.version !== SORT_PLAY_VERSION) {
+                  bannerContainer.innerHTML = `
+                      <div class="uh-update-banner">
+                          <span class="uh-update-text">A new version <span>(v${data.version})</span> is available!</span>
+                          <button class="uh-restart-btn" id="uh-restart-spotify">Restart Spotify</button>
+                      </div>
+                  `;
+                  modalContainer.querySelector("#uh-restart-spotify").onclick = () => location.reload();
+              }
+          } catch(e) {
+              console.warn("Failed to check for Sort-Play updates:", e);
+          }
+      };
+
+      const renderCommits = (commits) => {
+          if (!commits || commits.length === 0) {
+              bodyContent.innerHTML = `<div class="loader-container"><span>No recent updates found.</span></div>`;
+              return;
+          }
+
+          let html = '<div class="timeline-container">';
+          
+          commits.forEach(c => {
+              const lines = c.commit.message.split('\n').map(l => l.trim()).filter(l => l);
+              const title = lines[0] || "Update";
+              const bodyLines = lines.slice(1).map(l => {
+                  return l.replace(/^[-*]\s*/, '').trim();
+              }).filter(l => l);
+              
+              const timeAgo = getTimeAgo(c.commit.author.date);
+              
+              html += `
+                  <div class="commit-item">
+                      <div class="commit-header">
+                          <span class="commit-title">${title}</span>
+                          <span class="commit-date">${timeAgo}</span>
+                      </div>
+                      ${bodyLines.length > 0 ? `
+                      <ul class="commit-body">
+                          ${bodyLines.map(line => `<li>${line}</li>`).join('')}
+                      </ul>
+                      ` : ''}
+                      <div class="commit-footer">
+                          <a href="${c.html_url}" target="_blank" class="commit-hash" title="View commit on GitHub">${c.sha.substring(0, 7)}</a>
+                      </div>
+                  </div>
+              `;
+          });
+          
+          html += '</div>';
+          
+          html += `
+              <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #333;">
+                  <a href="https://github.com/hoeci/sort-play/commits/main/sort-play.js" target="_blank" style="color: #b3b3b3; font-size: 13px; text-decoration: none; transition: color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='#b3b3b3'">
+                      View full history on GitHub ↗
+                  </a>
+              </div>
+          `;
+          
+          bodyContent.innerHTML = html;
+      };
+
+      const now = Date.now();
+      checkVersion();
+
+      if (cachedCommits && (now - lastCommitFetch < 5 * 60 * 1000)) {
+          renderCommits(cachedCommits);
+      } else {
+          try {
+              const response = await fetch('https://api.github.com/repos/hoeci/sort-play/commits?path=sort-play.js&per_page=15');
+              if (!response.ok) throw new Error("Failed to fetch");
+              
+              const serverDateStr = response.headers.get('Date');
+              if (serverDateStr) {
+                  const serverTime = new Date(serverDateStr).getTime();
+                  serverTimeOffset = serverTime - Date.now();
+              }
+              
+              const data = await response.json();
+              cachedCommits = data;
+              lastCommitFetch = now;
+              renderCommits(data);
+          } catch (error) {
+              console.error("Failed to fetch update history:", error);
+              bodyContent.innerHTML = `
+                  <div class="loader-container">
+                      <span style="color: #f15e6c;">Failed to load update history.</span>
+                      <a href="https://github.com/hoeci/sort-play/commits/main/sort-play.js" target="_blank" style="color: #1ed760; text-decoration: none;">View on GitHub instead</a>
+                  </div>
+              `;
+          }
+      }
   }
 
   function createAndInitializeChatPanel() {
@@ -8939,8 +9171,8 @@ const getDominantColor = (src) => {
       });
   }
 
-  function showGenreDetailsModal(genreMapOrPromise, trackName, artistName, coverUrl) {
-      const trackIdKey = `${trackName}|${artistName}`;
+  function showGenreDetailsModal(genreMapOrPromise, trackName, artistName, coverUrl, trackUri = null) {
+      const trackIdKey = trackUri || `${trackName}|${artistName}`;
       const existing = document.getElementById("sort-play-genre-details-window");
 
       const enforceBoundaries = (element) => {
@@ -9664,7 +9896,7 @@ const getDominantColor = (src) => {
                   const fetchPromise = fetchDisplayGenres(track);
                   const artistName = track.artists?.[0]?.name || "Unknown Artist";
                   const coverUrl = track.album?.images?.length > 1 ? (track.album.images[1]?.url || track.album.images[0]?.url) : (track.album?.images?.[0]?.url || "");
-                  showGenreDetailsModal(fetchPromise, track.name, artistName, coverUrl);
+                  showGenreDetailsModal(fetchPromise, track.name, artistName, coverUrl, track.uri);
               } else {
                   showNotification("Could not fetch track details", true);
               }
@@ -10321,7 +10553,7 @@ const getDominantColor = (src) => {
                 e.preventDefault();
                 e.stopPropagation();
                 if (genreContainer._genreMap && genreContainer._genreMap.size > 0) {
-                    showGenreDetailsModal(genreContainer._genreMap, genreContainer._trackName, genreContainer._artistName, genreContainer._coverUrl);
+                    showGenreDetailsModal(genreContainer._genreMap, genreContainer._trackName, genreContainer._artistName, genreContainer._coverUrl, genreContainer._trackUri);
                 }
             });
         }
@@ -10341,16 +10573,18 @@ const getDominantColor = (src) => {
         }
 
         const genreSourcesMap = await fetchDisplayGenres(track);
-        genreContainer._genreMap = genreSourcesMap;
-        genreContainer._trackName = track.metadata?.title || track.name || "Unknown Track";
-        genreContainer._artistName = track.metadata?.artist_name || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
-        const images = track.metadata?.image_url ? null : (track.album?.images || []);
-        genreContainer._coverUrl = track.metadata?.image_url || (images && images.length > 1 ? (images[1]?.url || images[0]?.url) : (images?.[0]?.url || ""));
         
         const liveTrack = Spicetify.Player.data?.item;
         if (!liveTrack || liveTrack.uri !== currentUriAtStart) {
             return;
         }
+
+        genreContainer._genreMap = genreSourcesMap;
+        genreContainer._trackName = track.metadata?.title || track.name || "Unknown Track";
+        genreContainer._artistName = track.metadata?.artist_name || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
+        const images = track.metadata?.image_url ? null : (track.album?.images || []);
+        genreContainer._coverUrl = track.metadata?.image_url || (images && images.length > 1 ? (images[1]?.url || images[0]?.url) : (images?.[0]?.url || ""));
+        genreContainer._trackUri = track.uri;
 
         if (genreSourcesMap.size === 0) {
             genreContainer.innerHTML = "";
@@ -10363,104 +10597,74 @@ const getDominantColor = (src) => {
         const genreItems = Array.from(genreSourcesMap.values());
 
         const getSpotifyTrackScore = (sources) => {
+            let maxScore = -1;
             for (const s of sources) {
                 const match = s.match(/Spotify Track \((\d+(\.\d+)?)%\)/);
-                if (match) return parseFloat(match[1]);
+                if (match) {
+                    const score = parseFloat(match[1]);
+                    if (score > maxScore) maxScore = score;
+                }
             }
-            return -1;
+            return maxScore;
         };
 
-        const hasSourcePrefix = (sources, prefix) => {
-            for (const s of sources) if (s.startsWith(prefix)) return true;
-            return false;
-        };
-
-        let highestSpotifyTrackScore = -1;
+        let maxSpotifyScoreOverall = -1;
         genreItems.forEach(item => {
             const score = getSpotifyTrackScore(item.sources);
-            if (score > highestSpotifyTrackScore) highestSpotifyTrackScore = score;
+            if (score > maxSpotifyScoreOverall) maxSpotifyScoreOverall = score;
         });
 
         const validGenreItems = genreItems.filter(item => {
-            if (item.sources.size === 1) {
-                const score = getSpotifyTrackScore(item.sources);
-                if (score !== -1) {
-                    if (score < 8) return false;
-                    if (score < 20 && highestSpotifyTrackScore >= 20) return false;
+            let onlySpotifyTrack = true;
+            for (const s of item.sources) {
+                if (!s.startsWith('Spotify Track')) {
+                    onlySpotifyTrack = false;
+                    break;
                 }
+            }
+            
+            if (onlySpotifyTrack) {
+                const score = getSpotifyTrackScore(item.sources);
+                if (maxSpotifyScoreOverall > 0 && score !== -1 && score < 1) return false;
             }
             return true;
         });
 
-        const multiSource = [];
-        const spotifyHigh = [];
-        const spotifyMid = [];
-        const spotifyLow = [];
-        const lastFmTrack = [];
-        const lastFmArtist = [];
-        const deezer = [];
-        const spotifyArtist = [];
-        const others = [];
-
-        validGenreItems.forEach(item => {
-            const score = getSpotifyTrackScore(item.sources);
-            if (item.sources.size > 1) {
-                multiSource.push(item);
-            } else if (score >= 75) {
-                spotifyHigh.push(item);
-            } else if (score >= 50 && score < 75) {
-                spotifyMid.push(item);
-            } else if (score >= 20 && score < 50) {
-                spotifyLow.push(item);
-            } else if (hasSourcePrefix(item.sources, 'Last.fm Track')) {
-                lastFmTrack.push(item);
-            } else if (hasSourcePrefix(item.sources, 'Last.fm Artist')) {
-                lastFmArtist.push(item);
-            } else if (hasSourcePrefix(item.sources, 'Deezer')) {
-                deezer.push(item);
-            } else if (hasSourcePrefix(item.sources, 'Spotify Artist')) {
-                spotifyArtist.push(item);
-            } else {
-                others.push(item);
-            }
-        });
-
-        multiSource.sort((a, b) => b.sources.size - a.sources.size);
-        spotifyHigh.sort((a, b) => getSpotifyTrackScore(b.sources) - getSpotifyTrackScore(a.sources));
-        spotifyMid.sort((a, b) => getSpotifyTrackScore(b.sources) - getSpotifyTrackScore(a.sources));
-        spotifyLow.sort((a, b) => getSpotifyTrackScore(b.sources) - getSpotifyTrackScore(a.sources));
-
-        const orderedGenres = [];
-        const added = new Set();
-
-        const addItems = (items, limit = Infinity) => {
-            let count = 0;
-            for (const item of items) {
-                if (count >= limit) break;
-                if (!added.has(item.name)) {
-                    orderedGenres.push(item);
-                    added.add(item.name);
-                    count++;
+        const getPriorityScore = (item) => {
+            let score = 0;
+            const spScore = getSpotifyTrackScore(item.sources);
+            
+            if (spScore !== -1) {
+                if (maxSpotifyScoreOverall === 0) {
+                    score += 25; 
+                } else {
+                    score += spScore; 
                 }
             }
+
+            const uniqueSourceTypes = new Set();
+            item.sources.forEach(source => {
+                if (source.startsWith('Spotify Track')) uniqueSourceTypes.add('Spotify Track');
+                else if (source.startsWith('Last.fm Track')) uniqueSourceTypes.add('Last.fm Track');
+                else if (source.startsWith('Deezer')) uniqueSourceTypes.add('Deezer');
+                else if (source.startsWith('Last.fm Artist')) uniqueSourceTypes.add('Last.fm Artist');
+                else if (source.startsWith('Spotify Artist')) uniqueSourceTypes.add('Spotify Artist');
+                else uniqueSourceTypes.add(source); 
+            });
+
+            if (uniqueSourceTypes.has('Last.fm Track')) score += 50;
+            if (uniqueSourceTypes.has('Deezer')) score += 45;
+            if (uniqueSourceTypes.has('Last.fm Artist')) score += 25;
+            if (uniqueSourceTypes.has('Spotify Artist')) score += 20;
+            
+            if (uniqueSourceTypes.size > 1) {
+                score += ((uniqueSourceTypes.size - 1) * 35);
+            }
+
+            return score;
         };
 
-        addItems(multiSource);
-        
-        addItems(spotifyHigh, 2);
-        addItems(lastFmTrack, 1);
-        addItems(lastFmArtist, 1);
-        addItems(spotifyLow, 2);
-        addItems(deezer, 1);
-
-        addItems(spotifyHigh);
-        addItems(lastFmTrack);
-        addItems(lastFmArtist);
-        addItems(spotifyLow);
-        addItems(deezer);
-        addItems(spotifyMid);
-        addItems(spotifyArtist);
-        addItems(others);
+        const orderedGenres = validGenreItems.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
         
         const genreLinks = orderedGenres.map(item => {
             const rawName = item.name;
@@ -37646,7 +37850,7 @@ const getDominantColor = (src) => {
                   const images = track.metadata?.image_url ? null : (track.album?.images || []);
                   const coverUrl = track.metadata?.image_url || (images && images.length > 1 ? (images[1]?.url || images[0]?.url) : (images?.[0]?.url || ""));
                   
-                  showGenreDetailsModal(fetchPromise, trackName, artistName, coverUrl);
+                  showGenreDetailsModal(fetchPromise, trackName, artistName, coverUrl, track.uri);
               }
           }
       }
