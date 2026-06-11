@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.87.0";
+  const SORT_PLAY_VERSION = "5.87.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -37833,7 +37833,9 @@ const getDominantColor = (src) => {
                     continue;
                 }
     
-                const nativeLikeButton = nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]');
+                const nativeLikeButton = nowPlayingWidget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button') || 
+                                         nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
+                                         nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
                 if (!nativeLikeButton || !nativeLikeButton.parentNode) {
                     console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native like button not found or has no parent`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -37856,7 +37858,9 @@ const getDominantColor = (src) => {
                     container = document.createElement("div");
                     container.className = "likeControl-wrapper";
                     
-                    const currentNativeLikeButton = nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]');
+                    const currentNativeLikeButton = nowPlayingWidget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button') || 
+                                                    nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
+                                                    nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
                     if (!currentNativeLikeButton || !currentNativeLikeButton.parentNode) {
                         console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native button parent disappeared before insertion`);
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -37875,7 +37879,9 @@ const getDominantColor = (src) => {
                 }
                 
                 try {
-                    const currentNativeLikeButton = nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]');
+                    const currentNativeLikeButton = nowPlayingWidget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button') || 
+                                                    nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
+                                                    nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
                     if (!currentNativeLikeButton) {
                         console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native button disappeared before render`);
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -37953,7 +37959,11 @@ const getDominantColor = (src) => {
                 continue;
             }
     
-            const addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1, .main-nowPlayingWidget-plusButtonWrapper');
+            let addToPlaylistButtonWrapper = nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1, .main-nowPlayingWidget-plusButtonWrapper');
+            if (!addToPlaylistButtonWrapper) {
+                const fallbackBtn = nowPlayingView.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
+                if (fallbackBtn) addToPlaylistButtonWrapper = fallbackBtn.parentElement;
+            }
             if (!addToPlaylistButtonWrapper || !addToPlaylistButtonWrapper.parentElement) {
                 console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Add to playlist button wrapper not found or has no parent`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -37961,7 +37971,10 @@ const getDominantColor = (src) => {
                 continue;
             }
     
-            const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button, .main-nowPlayingWidget-plusButtonWrapper button');
+            const templateButton = nowPlayingView.querySelector('button[aria-label="Copy link to Song"]') || 
+                                   nowPlayingView.querySelector('.CAVVGuPYPRDhrbGiFOc1 button, .main-nowPlayingWidget-plusButtonWrapper button') || 
+                                   nowPlayingView.querySelector('button[aria-checked="false"], button[aria-checked="true"]') ||
+                                   nowPlayingView.querySelector('button[data-encore-id="buttonTertiary"]');
             if (!templateButton) {
                 console.warn(`[Sort-Play Like Button NPV] Retry ${i + 1}: Template button not found`);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -38082,7 +38095,8 @@ const getDominantColor = (src) => {
             return;
         }
         
-        let entryPoint = actionButtonsContainer.querySelector('button[aria-label*="Add to playlist"], button[aria-label*="Liked Songs"]');
+        let entryPoint = actionButtonsContainer.querySelector('button[aria-label*="Add to playlist"], button[aria-label*="Liked Songs"]') ||
+                         actionButtonsContainer.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
         if (!entryPoint) {
             entryPoint = actionButtonsContainer.querySelector("button:not(:last-of-type)");
         }
