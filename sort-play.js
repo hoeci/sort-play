@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.87.1";
+  const SORT_PLAY_VERSION = "5.88.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -128,6 +128,7 @@
   const STORAGE_KEY_CHAT_CUSTOM_NAME = "sp-chat-custom-name";
   const STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION = "sort-play-auto-hide-discography-notification";
   const STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED = "sort-play-range-exclude-unlistened";
+  const STORAGE_KEY_TASTE_PROFILE = "sort-play-taste-profile";
 
   const SYNCABLE_SETTINGS_KEYS = [
     STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
@@ -338,6 +339,13 @@
   const spotifyImageCache = new Map();
   const dominantColorCache = new Map();
 
+  let cachedTasteProfile = null;
+  let cachedTasteProfileTimestamp = 0;
+  const TASTE_PROFILE_VERSION = "1";
+  const TASTE_PROFILE_UPDATE_INTERVAL = 24 * 60 * 60 * 1000;
+  const TASTE_PROFILE_FULL_REBUILD_INTERVAL = 30 * 24 * 60 * 60 * 1000;
+  let isBuildingTasteProfile = false;
+
   let notificationHistoryCache = [];
   const MAX_NOTIFICATION_HISTORY = 100;
 
@@ -493,8 +501,8 @@
   function getSortArrowSvg(reverse) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("viewBox", "0 0 16 16");
-    svg.setAttribute("width", "50%");
-    svg.setAttribute("height", "50%");
+    svg.setAttribute("width", "45%");
+    svg.setAttribute("height", "45%");
     svg.style.fill = '#ffffffe6'; 
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("d", reverse ? ICON_PATHS.sortAsc : ICON_PATHS.sortDesc);
@@ -982,6 +990,267 @@
       closeButton.addEventListener('click', (e) => {
         Spicetify.PopupModal.hide();
       }, { signal });
+    }
+  }
+
+  const spMath = {
+    dot: (a, b) => a.reduce((sum, val, i) => sum + val * b[i], 0),
+    norm: (a) => Math.sqrt(a.reduce((sum, val) => sum + val * val, 0)),
+    normalize: (vec) => {
+      const n = spMath.norm(vec);
+      return n === 0 ? vec.map(() => 0) : vec.map(v => v / n);
+    },
+    mean: (data) => {
+      if (data.length === 0) return [];
+      const d = data[0].length;
+      const n = data.length;
+      const mu = new Array(d).fill(0);
+      for(let i=0; i<n; i++){
+          for(let j=0; j<d; j++) mu[j] += data[i][j];
+      }
+      return mu.map(x => x / n);
+    },
+    covariance: (centeredData) => {
+      const n = centeredData.length;
+      const d = centeredData[0].length;
+      const cov = Array.from({length: d}, () => new Array(d).fill(0));
+      for (let i = 0; i < n; i++) {
+          for (let r = 0; r < d; r++) {
+              for (let c = 0; c < d; c++) {
+                  cov[r][c] += (centeredData[i][r] * centeredData[i][c]) / (n - 1);
+              }
+          }
+      }
+      return cov;
+    },
+    powerIteration: (matrix, iters = 100) => {
+      const n = matrix.length;
+      let vec = spMath.normalize(new Array(n).fill(0).map(() => Math.random() - 0.5));
+      for (let i = 0; i < iters; i++) {
+          const nextVec = new Array(n).fill(0);
+          for (let r = 0; r < n; r++) {
+              for (let c = 0; c < n; c++) {
+                  nextVec[r] += matrix[r][c] * vec[c];
+              }
+          }
+          vec = spMath.normalize(nextVec);
+      }
+      return vec;
+    },
+    pca: (data, targetVariance = 0.85, maxDims = 10) => {
+      if (!data || data.length === 0) return { projected: [], components: [], mu: [] };
+      const d = data[0].length;
+      const n = data.length;
+      const maxComponents = Math.min(n - 1, d, maxDims);
+      if (maxComponents <= 0) return { projected: data.map(() => []), components: [], mu: new Array(d).fill(0) };
+
+      const mu = spMath.mean(data);
+      const centered = data.map(v => v.map((x, i) => x - mu[i]));
+      let matrix = spMath.covariance(centered);
+      
+      const totalVar = matrix.reduce((sum, row, i) => sum + row[i], 0);
+      if (totalVar <= 1e-10) return { projected: data.map(() => new Array(1).fill(0)), components: [new Array(d).fill(1/Math.sqrt(d))], mu };
+
+      const components = [];
+      let explainedVar = 0;
+      
+      for (let i = 0; i < maxComponents; i++) {
+          let vec = spMath.powerIteration(matrix);
+          components.push(vec);
+          const lambda = spMath.dot(vec, matrix.map(row => spMath.dot(row, vec)));
+          explainedVar += lambda;
+          matrix = matrix.map((row, r) => row.map((val, c) => val - lambda * vec[r] * vec[c]));
+          if (explainedVar / totalVar >= targetVariance) break;
+      }
+      
+      const projected = centered.map(v => components.map(c => spMath.dot(v, c)));
+      return { projected, components, mu };
+    },
+    pmi: (jointProb, probA, probB) => {
+      if (jointProb <= 0 || probA <= 0 || probB <= 0) return 0;
+      return Math.max(0, Math.log2(jointProb / (probA * probB)));
+    },
+    getNormalizedEntropy: (distribution) => {
+      if (!distribution || distribution.length < 2) return 0;
+      let sum = distribution.reduce((a, b) => a + b, 0);
+      if (sum === 0) return 0;
+      let entropy = 0;
+      for (const p of distribution) {
+          const prob = p / sum;
+          if (prob > 0) entropy -= prob * Math.log2(prob);
+      }
+      return entropy / Math.log2(distribution.length);
+    },
+    cosineSimilarity: (vecA, vecB) => {
+      const dotProduct = spMath.dot(vecA, vecB);
+      const normA = spMath.norm(vecA);
+      const normB = spMath.norm(vecB);
+      if (normA === 0 || normB === 0) return 0;
+      return dotProduct / (normA * normB);
+    },
+    clamp: (val, min, max) => Math.min(Math.max(val, min), max)
+  };
+
+  const spKDE = {
+    gaussianKernel: (u) => Math.exp(-0.5 * u * u) / Math.sqrt(2 * Math.PI),
+    estimate1D: (dataWeights, bandwidth, bins = 20, minVal = 0, maxVal = 1) => {
+      const densities = new Array(bins).fill(0);
+      const range = maxVal - minVal;
+      for (let b = 0; b < bins; b++) {
+          const x = minVal + ((b + 0.5) / bins) * range;
+          let density = 0;
+          let sumWeight = 0;
+          for (const item of dataWeights) {
+              const v = item.val;
+              const u = (x - v) / bandwidth;
+              const uLeft = (x - (2 * minVal - v)) / bandwidth;
+              const uRight = (x - (2 * maxVal - v)) / bandwidth;
+              density += item.weight * (spKDE.gaussianKernel(u) + spKDE.gaussianKernel(uLeft) + spKDE.gaussianKernel(uRight));
+              sumWeight += item.weight;
+          }
+          densities[b] = sumWeight > 0 ? density / (sumWeight * bandwidth) : 0;
+      }
+      return densities;
+    },
+    estimate2D: (dataWeights, bandwidth, bins = 20, minVal = 0, maxVal = 1) => {
+      const grid = Array.from({length: bins}, () => new Array(bins).fill(0));
+      const range = maxVal - minVal;
+      for (let bx = 0; bx < bins; bx++) {
+          const x = minVal + ((bx + 0.5) / bins) * range;
+          for (let by = 0; by < bins; by++) {
+              const y = minVal + ((by + 0.5) / bins) * range;
+              let density = 0;
+              let sumWeight = 0;
+              for (const item of dataWeights) {
+                  const vx = item.x, vy = item.y;
+                  const ux = (x - vx) / bandwidth;
+                  const uxL = (x - (2 * minVal - vx)) / bandwidth;
+                  const uxR = (x - (2 * maxVal - vx)) / bandwidth;
+                  const kX = spKDE.gaussianKernel(ux) + spKDE.gaussianKernel(uxL) + spKDE.gaussianKernel(uxR);
+
+                  const uy = (y - vy) / bandwidth;
+                  const uyL = (y - (2 * minVal - vy)) / bandwidth;
+                  const uyR = (y - (2 * maxVal - vy)) / bandwidth;
+                  const kY = spKDE.gaussianKernel(uy) + spKDE.gaussianKernel(uyL) + spKDE.gaussianKernel(uyR);
+
+                  density += item.weight * kX * kY;
+                  sumWeight += item.weight;
+              }
+              grid[bx][by] = sumWeight > 0 ? density / (sumWeight * bandwidth * bandwidth) : 0;
+          }
+      }
+      return grid;
+    }
+  };
+
+  class spDiagonalGMM {
+    constructor(k, maxIters = 50, tol = 1e-4) {
+      this.k = k;
+      this.maxIters = maxIters;
+      this.tol = tol;
+      this.bic = Infinity;
+    }
+    fit(data) {
+      const n = data.length;
+      if (n === 0) return false;
+      const d = data[0].length;
+      if (n < this.k) this.k = 1;
+      
+      this.means = [];
+      this.vars = [];
+      this.weights = new Array(this.k).fill(1/this.k);
+      
+      const shuffled = [...data].sort(() => 0.5 - Math.random());
+      for (let i = 0; i < this.k; i++) {
+          this.means.push([...shuffled[i]]);
+          this.vars.push(new Array(d).fill(0.05));
+      }
+      
+      let logLikelihood = -Infinity;
+      
+      for (let iter = 0; iter < this.maxIters; iter++) {
+          const resps = [];
+          let iterLL = 0;
+          for (let i = 0; i < n; i++) {
+              const row = [];
+              let maxLogP = -Infinity;
+              for (let j = 0; j < this.k; j++) {
+                  let logP = Math.log(this.weights[j] + 1e-10);
+                  for (let dim = 0; dim < d; dim++) {
+                      const diff = data[i][dim] - this.means[j][dim];
+                      const var_ = this.vars[j][dim] + 1e-6;
+                      logP += -0.5 * Math.log(2 * Math.PI * var_) - (diff * diff) / (2 * var_);
+                  }
+                  row.push(logP);
+                  if (logP > maxLogP) maxLogP = logP;
+              }
+              let sumP = 0;
+              for (let j = 0; j < this.k; j++) {
+                  row[j] = Math.exp(row[j] - maxLogP);
+                  sumP += row[j];
+              }
+              iterLL += maxLogP + Math.log(sumP + 1e-10);
+              
+              if (sumP === 0) {
+                  for (let j = 0; j < this.k; j++) row[j] = 1 / this.k;
+              } else {
+                  for (let j = 0; j < this.k; j++) row[j] /= sumP;
+              }
+              resps.push(row);
+          }
+          
+          if (Math.abs(iterLL - logLikelihood) < this.tol) break;
+          logLikelihood = iterLL;
+          
+          const Nk = new Array(this.k).fill(1e-10);
+          for (let i = 0; i < n; i++) {
+              for (let j = 0; j < this.k; j++) Nk[j] += resps[i][j];
+          }
+          
+          for (let j = 0; j < this.k; j++) {
+              this.weights[j] = Nk[j] / n;
+              for (let dim = 0; dim < d; dim++) {
+                  let sumMu = 0;
+                  for (let i = 0; i < n; i++) sumMu += resps[i][j] * data[i][dim];
+                  this.means[j][dim] = sumMu / Nk[j];
+                  
+                  let sumVar = 0;
+                  for (let i = 0; i < n; i++) {
+                      const diff = data[i][dim] - this.means[j][dim];
+                      sumVar += resps[i][j] * diff * diff;
+                  }
+                  this.vars[j][dim] = Math.max(1e-6, sumVar / Nk[j]);
+              }
+          }
+      }
+      
+      const numParams = this.k * d + this.k * d + (this.k - 1);
+      this.bic = -2 * logLikelihood + numParams * Math.log(n);
+      return true;
+    }
+    predict(vector) {
+      const d = vector.length;
+      const resps = [];
+      let maxLogP = -Infinity;
+      for (let j = 0; j < this.k; j++) {
+          let logP = Math.log(this.weights[j] + 1e-10);
+          for (let dim = 0; dim < d; dim++) {
+              const diff = vector[dim] - this.means[j][dim];
+              const var_ = this.vars[j][dim] + 1e-6;
+              logP += -0.5 * Math.log(2 * Math.PI * var_) - (diff * diff) / (2 * var_);
+          }
+          resps.push(logP);
+          if (logP > maxLogP) maxLogP = logP;
+      }
+      let sumP = 0;
+      for (let j = 0; j < this.k; j++) {
+          resps[j] = Math.exp(resps[j] - maxLogP);
+          sumP += resps[j];
+      }
+      if (sumP === 0) {
+          return new Array(this.k).fill(1 / this.k);
+      }
+      return resps.map(p => p / sumP);
     }
   }
   
@@ -2043,6 +2312,7 @@
   ];
 
   let sortOrderState = {
+    tasteMatch: false,
     playCount: false,
     popularity: false,
     releaseDate: false,
@@ -10172,27 +10442,44 @@ const getDominantColor = (src) => {
           .replace(/\s+/g, ' ');
   }
 
+  let isCountryOnly_Set = null;
   function isCountryOnly(tag) {
       if (!tag) return false;
       const lowerTag = tag.toLowerCase().trim();
-      const mainCountries = Object.keys(COUNTRY_MAPPINGS);
-      if (mainCountries.includes(lowerTag)) return true;
-      for (const variants of Object.values(COUNTRY_MAPPINGS)) {
-          if (variants.includes(lowerTag)) return true;
+
+      if (!isCountryOnly_Set) {
+          isCountryOnly_Set = new Set();
+          Object.keys(COUNTRY_MAPPINGS).forEach(c => isCountryOnly_Set.add(c.toLowerCase().trim()));
+          Object.values(COUNTRY_MAPPINGS).forEach(variants => {
+              variants.forEach(v => isCountryOnly_Set.add(v.toLowerCase().trim()));
+          });
       }
-      return false;
+      
+      return isCountryOnly_Set.has(lowerTag);
   }
 
+  let isWhitelistedGenre_MappedSet = null;
   function isWhitelistedGenre(tag, genreMap) {
       if (!tag) return false;
       const normalizedTag = normalizeGenre(tag);
       
-      const isMapped = Object.keys(GENRE_MAPPINGS).some(g => normalizeGenre(g) === normalizedTag) || 
-                      Object.values(GENRE_MAPPINGS).some(variants => 
-                          variants.some(v => normalizeGenre(v) === normalizedTag)
-                      );
+      if (!isWhitelistedGenre_MappedSet) {
+          isWhitelistedGenre_MappedSet = new Set();
+          Object.keys(GENRE_MAPPINGS).forEach(g => isWhitelistedGenre_MappedSet.add(normalizeGenre(g)));
+          Object.values(GENRE_MAPPINGS).forEach(variants => {
+              variants.forEach(v => isWhitelistedGenre_MappedSet.add(normalizeGenre(v)));
+          });
+      }
       
-      const isInJson = genreMap ? genreMap.some(p => normalizeGenre(p.genre) === normalizedTag) : false;
+      const isMapped = isWhitelistedGenre_MappedSet.has(normalizedTag);
+      
+      let isInJson = false;
+      if (genreMap) {
+          if (!genreMap._normalizedSet) {
+              genreMap._normalizedSet = new Set(genreMap.map(p => normalizeGenre(p.genre)));
+          }
+          isInJson = genreMap._normalizedSet.has(normalizedTag);
+      }
       
       return isMapped || isInJson;
   }
@@ -10214,9 +10501,20 @@ const getDominantColor = (src) => {
               response.extension.forEach(ext => {
                   if (ext.extensionKind === 6 && ext.entityExtension && ext.entityExtension[0] && ext.entityExtension[0].extensionData) {
                       const text = new TextDecoder().decode(ext.entityExtension[0].extensionData.value);
-                      const matches = text.match(/[A-Za-z0-9 _-]{3,}/g);
-                      if (matches) {
-                          concepts = matches.filter(s => !s.startsWith('spotify') && !s.match(/^[a-zA-Z0-9]{20,}$/) && s !== 'concept');
+                      const rawMatches = text.match(/[A-Za-z0-9 _\-\&']{3,}/g);
+                      if (rawMatches) {
+                          const matches = rawMatches.filter(s => {
+                              const l = s.toLowerCase();
+                              return !l.startsWith('spotify') && !l.startsWith('&spotify') && l !== 'concept';
+                          });
+                          for (let j = 0; j < matches.length; j++) {
+                              if (/^[a-zA-Z0-9]{22}$/.test(matches[j]) && j > 0) {
+                                  const concept = matches[j - 1].toLowerCase().trim();
+                                  if (concept !== 'track') {
+                                      concepts.push(concept);
+                                  }
+                              }
+                          }
                       }
                   }
                   if (ext.extensionKind === 28 && ext.entityExtension && ext.entityExtension[0] && ext.entityExtension[0].extensionData) {
@@ -10270,9 +10568,20 @@ const getDominantColor = (src) => {
                               
                               if (kind === 6) {
                                   const text = new TextDecoder().decode(item.extensionData.value);
-                                  const matches = text.match(/[A-Za-z0-9 _-]{3,}/g);
-                                  if (matches) {
-                                      res.concepts = matches.filter(s => !s.startsWith('spotify') && !s.match(/^[a-zA-Z0-9]{20,}$/) && s !== 'concept');
+                                  const rawMatches = text.match(/[A-Za-z0-9 _\-\&']{3,}/g);
+                                  if (rawMatches) {
+                                      const matches = rawMatches.filter(s => {
+                                          const l = s.toLowerCase();
+                                          return !l.startsWith('spotify') && !l.startsWith('&spotify') && l !== 'concept';
+                                      });
+                                      for (let j = 0; j < matches.length; j++) {
+                                          if (/^[a-zA-Z0-9]{22}$/.test(matches[j]) && j > 0) {
+                                              const concept = matches[j - 1].toLowerCase().trim();
+                                              if (concept !== 'track') {
+                                                  res.concepts.push(concept);
+                                              }
+                                          }
+                                      }
                                   }
                               } else if (kind === 28) {
                                   const buffer = new Uint8Array(Object.values(item.extensionData.value)).buffer;
@@ -11602,7 +11911,8 @@ const getDominantColor = (src) => {
   }
 
   function isDirectSortType(sortType) {
-      const directSortTypes = [
+     const directSortTypes = [
+          "tasteMatch",
           "playCount",
           "popularity",
           "releaseDate",
@@ -11681,6 +11991,7 @@ const getDominantColor = (src) => {
           valence: { fullName: "valence", shortName: "Valence" },
           acousticness: { fullName: "acousticness", shortName: "Acousticness" },
           instrumentalness: { fullName: "instrumentalness", shortName: "Instrumentalness" },
+          tasteMatch: { fullName: "taste profile match", shortName: "Taste Match" },
           aiPick: { fullName: "AI recommendation", shortName: "AI Pick" },
           default: { fullName: "default order", shortName: "Default" },
           current: { fullName: "current order", shortName: "Current" }
@@ -16029,10 +16340,9 @@ const getDominantColor = (src) => {
         if (!isHeadless) mainButton.innerText = "Filtering Genres...";
         const { selectedGenres, excludedGenres, matchAllGenres: jobMatchAll } = filters.genreFilterSettings;
         
-        
         const { trackGenreMap } = await fetchAllTrackGenres(
             filteredTracks, 
-            (progress) => { if (!isHeadless) mainButton.innerText = `Genres ${progress}`; }
+            isHeadless ? () => {} : null
         );
 
         filteredTracks = filterTracksByGenres(
@@ -16153,6 +16463,33 @@ const getDominantColor = (src) => {
         case "shuffle":
             sortedTracks = shuffleArray(uniqueTracks);
             break;
+        case "tasteMatch": {
+            const updateProgressText = (msg) => {
+                if (!isHeadless) mainButton.innerText = msg;
+            };
+            
+            const { trackGenreMap } = await fetchAllTrackGenres(uniqueTracks, updateProgressText);
+            
+            updateProgressText("Audio...");
+            const trackIds = uniqueTracks.map(t => t.trackId || (t.uri ? t.uri.split(":")[2] : null)).filter(Boolean);
+            const allStats = await getBatchTrackStats(trackIds, p => updateProgressText(`Audio ${Math.floor(p)}%`));
+            
+            const tracksWithAllData = uniqueTracks.map(track => {
+                const id = track.trackId || (track.uri ? track.uri.split(":")[2] : null);
+                return {
+                    ...track,
+                    genres: trackGenreMap.get(track.uri) || [],
+                    features: allStats[id] || null
+                };
+            });
+            
+            const scoredTracks = await evaluateTasteMatch(tracksWithAllData, updateProgressText);
+            
+            sortedTracks = scoredTracks.sort((a, b) => {
+                return isAscending ? a.calibratedTasteMatch - b.calibratedTasteMatch : b.calibratedTasteMatch - a.calibratedTasteMatch;
+            });
+            break;
+        }
         default:
             sortedTracks = uniqueTracks;
             break;
@@ -20477,7 +20814,7 @@ const getDominantColor = (src) => {
     "bachata": ["bachata", "bachata dominicana"],
     "bebop": ["bebop", "bop", "post-bop"],
     "black metal": ["atmospheric black metal", "black metal", "blackgaze", "cascadian black metal", "melodic black metal", "metal noir quebecois", "pagan black metal", "raw black metal", "symphonic black metal", "viking metal"],
-    "blues": ["blues", "blues'", "bluesier", "bluesiest", "bluesmusic", "bluesy", "punk blues"],
+    "blues": ["blues", "blues'", "bluesier", "bluesiest", "bluesmusic", "bluesy", "jazz blues", "punk blues"],
     "blues rock": ["blues rock", "british blues", "electric blues"],
     "bollywood pop": ["bollywood pop", "classic bollywood", "desi pop", "filmi", "kollywood", "modern bollywood", "mollywood", "sandalwood", "tollywood", "bollywood"],
     "bossa nova": ["bossa nova", "bossa nova cover", "bossa nova jazz", "samba-jazz"],
@@ -20488,12 +20825,12 @@ const getDominantColor = (src) => {
     "christian metal": ["christian death metal", "christian metal", "christian metalcore", "unblack metal"],
     "christian rock": ["christian alternative rock", "christian rock", "christian indie"],
     "city pop": ["city pop", "japanese funk", "japanese soul", "shibuya-kei"],
-    "classic rock": ["album rock", "classic rock", "soft rock", "southern rock"],
-    "classical": ["baroque", "baroque's", "classic", "classical", "classical music", "classical's", "classics", "orchestra", "orchestral", "orchestral music", "orchestras", "symphonic", "symphonies", "symphony"],
+    "classic rock": ["album rock", "aor", "classic rock", "soft rock", "southern rock"],
+    "classical": ["baroque", "baroque's", "classic", "classical", "classical music", "classical's", "classics", "minimalism", "orchestra", "orchestral", "orchestral music", "orchestras", "symphonic", "symphonies", "symphony"],
     "conscious hip hop": ["conscious hip hop", "political hip hop", "rap conscient", "underground hip hop"],
     "contemporary r&b": ["contemporary r and b", "contemporary r&b", "contemporary rhythm and blues", "contemporary rnb", "modern r&b", "modern rnb"],
     "corridos tumbados": ["corridos alternativos", "corridos belicos", "corridos tumbados", "sad sierreno", "sierreno"],
-    "country": ["country", "country & western music", "country music", "country's", "countrymusic"],
+    "country": ["country", "country & western music", "country blues", "country music", "country's", "countrymusic"],
     "cumbia": ["cumbia", "cumbia 420", "cumbia andina mexicana", "cumbia boliviana", "cumbia chilena", "cumbia del sureste", "cumbia lagunera", "cumbia peruana", "cumbia pop", "cumbia ranchera", "cumbia salvadorena", "cumbia santafesina", "cumbia sonidera", "cumbia uruguaya", "cumbia villera", "nu-cumbia", "tecnocumbia"],
     "dance": ["dance", "dance's", "dances", "dancey"],
     "dark wave": ["coldwave", "dark wave", "gothic", "gothic americana", "neoclassical darkwave"],
@@ -20505,7 +20842,7 @@ const getDominantColor = (src) => {
     "drill": ["aussie drill", "bronx drill", "brooklyn drill", "chicago drill", "classical drill", "drill", "drill chileno", "drill espanol", "drill francais", "drill tuga", "florida drill", "german drill", "melodic drill", "ny drill", "uk drill"],
     "drone": ["drone", "drone's", "dronemusic", "drones"],
     "drum and bass": ["d&b", "dnb", "drum & bass", "drum and bass", "drum n bass", "drumandbass", "Drum'n'bass"],
-    "dubstep": ["brostep", "drumstep", "dub step", "dub-step", "dubstep", "dubstep's", "dubstepmusic"],
+    "dubstep": ["brostep", "chillstep", "drumstep", "dub step", "dub-step", "dubstep", "dubstep's", "dubstepmusic"],
     "east coast hip hop": ["boom bap", "east coast hip hop", "hardcore hip hop"],
     "edm": ["edm", "edm music", "edm's", "edmmusic", "electronic dance", "electronic dance music"],
     "electro swing": ["electro swing", "swing house"],
@@ -20523,7 +20860,7 @@ const getDominantColor = (src) => {
     "funk": ["funk", "funk's", "funkier", "funkiest", "funkmusic", "funky"],
     "funk carioca": ["brega funk", "funk 150 bpm", "funk carioca", "funk mandelao", "funk mtg", "funk ostentacao", "funk paulista", "funk viral", "mega funk", "rave funk"],
     "future bass": ["future bass", "future bass's", "futurebass", "futurebassmusic"],
-    "gangster rap": ["chicano rap", "crunk", "dirty south rap", "g funk", "gangster rap", "hardcore hip hop", "houston rap", "memphis hip hop", "west coast rap"],
+    "gangster rap": ["chicano rap", "crunk", "dirty south rap", "g funk", "gangster rap", "hardcore hip hop", "houston rap", "memphis hip hop", "southern hip hop", "west coast rap"],
     "garage rock": ["freakbeat", "garage psych", "garage rock", "garage rock revival", "protopunk", "punk blues"],
     "german hip hop": ["frauenrap", "german alternative rap", "german cloud rap", "german hip hop", "german underground rap", "oldschool deutschrap"],
     "german pop": ["deutschrock", "german pop", "neue deutsche welle", "ostrock"],
@@ -20537,14 +20874,14 @@ const getDominantColor = (src) => {
     "hard bop": ["bebop", "bop", "hard bop", "post-bop", "soul jazz"],
     "hard rock": ["glam metal", "hard rock", "hard rock music", "hard rock's", "hard-rock", "hardrock", "hardrockmusic"],
     "hardcore punk": ["crust punk", "d-beat", "hardcore punk", "melodic hardcore", "nyhc", "powerviolence", "skate punk", "straight edge", "youth crew"],
-    "hardstyle": ["euphoric hardstyle", "gabber", "hard dance", "hardcore", "hardstyle", "jumpstyle", "rawstyle", "uptempo hardcore"],
+    "hardstyle": ["euphoric hardstyle", "gabber", "hard dance", "hardcore", "hardcore techno", "hardstyle", "jumpstyle", "rawstyle", "uptempo hardcore"],
     "heavy metal": ["hard rock", "heavy metal", "nwobhm", "traditional heavy metal"],
     "hip hop": ["hip hop", "hip hop's", "hip-hop", "hip-hop music", "hip-hops", "hiphop"],
-    "house": ["deep house", "house", "house music", "house's", "housemusic"],
+    "house": ["deep house", "electro house", "house", "house music", "house's", "housemusic"],
     "idm": ["ambient idm", "braindance", "drill and bass", "fluxwork", "glitch", "glitch hop", "idm", "intelligent dance music", "wonky"],
     "indie": ["indie", "indie's", "indiemusic", "indies"],
     "indie folk": ["chamber folk", "folk-pop", "freak folk", "indie anthem-folk", "indie folk", "new americana", "stomp and holler"],
-    "indie pop": ["alt pop", "bedroom pop", "indie pop", "indie poptimism", "shimmer pop", "twee pop"],
+    "indie pop": ["alt pop", "alternative pop", "bedroom pop", "indie pop", "indie poptimism", "shimmer pop", "twee pop"],
     "indietronica": ["indie psych-pop", "indietronica", "metropopolis"],
     "industrial": ["aggrotech", "ebm", "electro-industrial", "industrial", "industrial rock", "martial industrial", "power noise", "industrial metal"],
     "instrumental": ["instrumental", "instrumental's", "instrumentalmusic", "instrumentals", "no vocals"],
@@ -20574,8 +20911,8 @@ const getDominantColor = (src) => {
     "persian rock": ["iranian metal", "iranian rock", "persian metal", "persian rock"],
     "persian traditional": ["classical persian", "iranian traditional", "persian traditional", "sonati"],
     "phonk": ["aggressive phonk", "cowbell", "drift phonk", "gym phonk", "memphis phonk", "phonk"],
-    "piano": ["piano", "piano cover", "piano music", "solo piano"],
-    "pop": ["alt pop", "folk-pop", "pop", "pop music", "pop's", "popmusic", "pops"],
+    "piano": ["classical piano", "piano", "piano cover", "piano music", "solo piano"],
+    "pop": ["alt pop", "bubblegum pop", "dance pop", "folk-pop", "pop", "pop music", "pop's", "popmusic", "pops"],
     "pop punk": ["anthem emo", "easycore", "neon pop punk", "pop punk", "socal pop punk"],
     "pop rap": ["commercial rap", "mainstream rap", "melodic rap", "pop rap", "radio rap", "rap pop"],
     "pop rock": ["britpop", "pop rock", "pop rock music", "pop rock's", "pop-rock", "poprock", "poprockmusic", "power pop"],
@@ -20588,7 +20925,7 @@ const getDominantColor = (src) => {
     "punk": ["punk", "punk's", "punkmusic", "punks", "punky"],
     "r&b": ["neo soul", "r & b", "r and b", "r&b", "r&b's", "rhythm & blues", "rhythm and blues", "rnb", "rnb's", "trap soul"],
     "rap": ["rap", "rapper", "rappers", "raps"],
-    "reggae": ["reggae", "reggae music", "reggae's", "reggaemusic"],
+    "reggae": ["reggae", "reggae music", "reggae's", "reggaemusic", "roots reggae"],
     "reggaeton": ["dembow", "neoperreo", "perreo", "pop reggaeton", "reggaeton", "reggaeton chileno", "reggaeton colombiano", "reggaeton flow", "reggaeton mexicano"],
     "regional mexican": ["banda", "banda sinaloense", "corrido", "grupera", "mariachi", "musica mexicana", "norteno", "norteno-sax", "ranchera", "regional mexican", "tejano"],
     "rock": ["power pop", "rock", "rock music", "rock's", "rockin", "rockin'", "rockmusic", "rocks"],
@@ -20597,14 +20934,14 @@ const getDominantColor = (src) => {
     "scandinavian pop": ["classic swedish pop", "danish pop", "dansband", "finnish pop", "iskelma", "norwegian pop", "scandipop", "swedish pop"],
     "sertanejo": ["agronejo", "sertanejo", "sertanejo pop", "sertanejo tradicional", "sertanejo universitario"],
     "singer-songwriter": ["acoustic pop", "cantautor", "canzone d'autore", "gen z singer-songwriter", "liedermacher", "lilith", "neo mellow", "singer-songwriter"],
-    "soul": ["neo soul", "soul", "soul music", "soul's", "soulful", "soulmusic", "souly"],
+    "soul": ["motown", "neo soul", "soul", "soul funk", "soul music", "soul's", "soulful", "soulmusic", "souly"],
     "soundtrack": ["film music", "film score", "game music", "game score", "movie music", "original motion picture soundtrack", "original score", "original soundtrack", "ost", "score", "soundtrack", "theme music", "tv music"],
     "sufi music": ["ghazal", "indian instrumental", "qawwali", "sufi music"],
-    "swing": ["big band", "swing"],
+    "swing": ["big band", "swing", "swing music"],
     "symphonic metal": ["gothic symphonic metal", "symphonic metal", "symphonic power metal"],
     "synthpop": ["electropop", "synth pop", "synth-pop", "synthpop", "neo-synthpop"],
     "synthwave": ["futuresynth", "outrun", "retrowave", "synth wave", "synth-wave", "synthwave", "synthwave's"],
-    "techno": ["tech", "techno", "techno music", "techno's", "technomusic"],
+    "techno": ["minimal techno", "tech", "techno", "techno music", "techno's", "technomusic"],
     "trance": ["psytrance", "trance", "trance music", "trance's", "trancemusic", "trancing"],
     "trap": ["atl trap", "cloud rap", "dark trap", "desi trap", "emo trap", "melodic rap", "plugg", "pluggnb", "rage rap", "sad rap", "trap", "trap brasileiro", "trap carioca", "trap queen", "trap soul", "viral rap"],
     "trip hop": ["trip hop", "trip hop's", "trip hops", "triphop", "triphopmusic"],
@@ -20617,7 +20954,7 @@ const getDominantColor = (src) => {
     "vocal jazz": ["crooner", "jazz singing", "lounge music", "vocal jazz"],
     "west coast hip hop": ["g funk", "g-funk", "west coast hip hop", "west coast rap"],
     "christian pop": ["christian pop", "ccm", "deep ccm", "christian music"],
-    "worship": ["worship", "worship pop", "pop worship", "anthem worship", "praise", "adoracao", "louvor"],
+    "worship": ["worship", "worship pop", "pop worship", "anthem worship", "praise", "adoracao", "louvor", "devotional"],
     "arabic pop": ["arabic pop", "dabke", "egyptian pop", "iraqi pop", "khaliji", "lebanese pop", "maghreb pop", "raï", "shaabi", "arabic hip hop"],
     "balkan": ["balkan brass", "chalga", "manele", "tallava", "turbo-folk", "yugoslav rock"],
     "bluegrass": ["bluegrass", "jamgrass", "old-time", "progressive bluegrass"],
@@ -20645,7 +20982,7 @@ const getDominantColor = (src) => {
     "russian pop": ["russian dance", "russian hip hop", "russian pop", "russian rock"],
     "soca": ["calypso", "chutney", "soca"],
     "vallenato": ["vallenato", "vallenato moderno"],
-    "americana": ["americana", "alternative country", "roots rock", "southern gothic", "stomp and holler"],
+    "americana": ["americana", "alternative country", "country rock", "roots rock", "southern gothic", "stomp and holler"],
     "chiptune": ["8-bit", "bitpop", "chiptune"],
     "enka": ["enka", "japanese traditional"],
     "fado": ["fado", "fado de coimbra", "fado de lisboa", "portuguese folk"],
@@ -20673,7 +21010,7 @@ const getDominantColor = (src) => {
     "moombahton": ["moombahton", "moombahcore"],
     "nightcore": ["nightcore", "sped up"],
     "christmas": ["christmas", "christmas pop", "holiday", "carols"],
-    "jazz fusion": ["jazz fusion", "fusion", "jazz rock", "electric jazz"],
+    "jazz fusion": ["jazz fusion", "fusion", "jazz funk", "jazz rock", "electric jazz"],
     "psytrance": ["psytrance", "psychedelic trance", "goa trance", "dark psytrance", "forest psy"],
     "sea shanties": ["sea shanty", "shanty", "maritime"],
     "surf rock": ["surf rock", "surf music", "instrumental surf"],
@@ -20703,6 +21040,11 @@ const getDominantColor = (src) => {
     "axé": ["axé", "samba-reggae"],
     "hyperpop": ["hyperpop", "digicore", "glitchcore", "dariacore"],
     "ballad": ["ballad", "power ballad", "piano ballad", "pop ballad", "sentimental"],
+    "alternative hip hop": ["alternative hip hop", "alt hip hop"],
+    "folk rock": ["folk rock", "folk-rock"],
+    "funk rock": ["funk rock"],
+    "indie rock": ["indie rock", "indierock", "indie-rock"],
+    "rock en espanol": ["rock en espa", "rock en espanol", "latin rock", "rock latino"],
   };
 
   const COUNTRY_MAPPINGS = {
@@ -22693,7 +23035,6 @@ const getDominantColor = (src) => {
             
             batch.forEach(uri => {
                 const nativeGenres = nativeGenresMap.get(uri) || [];
-                
                 const validNative = nativeGenres.filter(g => {
                     const name = g.name.toLowerCase();
                     return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
@@ -22716,6 +23057,7 @@ const getDominantColor = (src) => {
             });
             processedNative += batch.length;
             updateProgress(`Genres ${Math.round((processedNative / urisToFetchNative.length) * 100)}%`);
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
     }
 
@@ -25231,37 +25573,50 @@ const getDominantColor = (src) => {
         children: [
           { backgroundColor: "transparent", color: "white", text: "Play Count", sortType: "playCount", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Popularity", sortType: "popularity", hasInnerButton: true },
+          { type: "divider" },
           { backgroundColor: "transparent", color: "white", text: "Release Date", sortType: "releaseDate", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "True Release Date", sortType: "trueReleaseDate", hasInnerButton: true },
-          { backgroundColor: "transparent", color: "white", text: "Scrobbles", sortType: "scrobbles", hasInnerButton: true },
-          { backgroundColor: "transparent", color: "white", text: "My Scrobbles", sortType: "personalScrobbles", hasInnerButton: true },
-          { backgroundColor: "transparent", color: "white", text: "Scrobble Range", sortType: "personalScrobblesRange", hasInnerButton: true, onClick: async function(event) {
-              event.stopPropagation();
-              if (!loadLastFmUsername()) {
-                  showNotification("Please set your Last.fm username in settings first.", true);
-                  return;
-              }
-              
-              menuButtons.forEach((btn) => {
-                  if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
-                      btn.style.backgroundColor = "transparent";
+          { type: "divider" },
+          {
+            type: "parent",
+            text: "Last.fm Stats",
+            sortType: "lfmStatsParent",
+            children: [
+              { backgroundColor: "transparent", color: "white", text: "Scrobbles", sortType: "scrobbles", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "My Scrobbles", sortType: "personalScrobbles", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "Scrobble Range", sortType: "personalScrobblesRange", hasInnerButton: true, onClick: async function(event) {
+                  event.stopPropagation();
+                  if (!loadLastFmUsername()) {
+                      showNotification("Please set your Last.fm username in settings first.", true);
+                      return;
                   }
-              });
-              closeAllMenus();
+                  
+                  menuButtons.forEach((btn) => {
+                      if (btn.tagName.toLowerCase() === 'button' && !btn.disabled) {
+                          btn.style.backgroundColor = "transparent";
+                      }
+                  });
+                  closeAllMenus();
 
-              const rangeConfig = await showScrobblesRangeModal();
-              if (!rangeConfig) return; 
+                  const rangeConfig = await showScrobblesRangeModal();
+                  if (!rangeConfig) return; 
 
-              if (rangeConfig.type === 'all_time') {
-                  await handleSortAndCreatePlaylist("personalScrobbles", { rangeConfig });
-              } else {
-                  await handleSortAndCreatePlaylist("personalScrobblesRange", { rangeConfig });
-              }
-          }},
-          { backgroundColor: "transparent", color: "white", text: "Last Scrobbled", sortType: "lastScrobbled", hasInnerButton: true },
-          { backgroundColor: "transparent", color: "white", text: "Liked Status", sortType: "sortByLiked", hasInnerButton: true },
+                  if (rangeConfig.type === 'all_time') {
+                      await handleSortAndCreatePlaylist("personalScrobbles", { rangeConfig });
+                  } else {
+                      await handleSortAndCreatePlaylist("personalScrobblesRange", { rangeConfig });
+                  }
+              }},
+              { backgroundColor: "transparent", color: "white", text: "Last Scrobbled", sortType: "lastScrobbled", hasInnerButton: true },
+            ]
+          },
+          { type: "divider" },
+          { backgroundColor: "transparent", color: "white", text: "Taste Match", sortType: "tasteMatch", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Energy Wave", sortType: "energyWave", hasInnerButton: true },
+          { type: "divider" },
+          { backgroundColor: "transparent", color: "white", text: "Liked Status", sortType: "sortByLiked", hasInnerButton: true },
           { backgroundColor: "transparent", color: "white", text: "Album Color", sortType: "averageColor", hasInnerButton: true },
+          { type: "divider" },
           {
             type: "parent",
             text: "Audio Features",
@@ -25646,6 +26001,19 @@ const getDominantColor = (src) => {
   menuContainer.style.backdropFilter = "blur(8px)";
   menuContainer.classList.add('main-contextMenu-menu', 'encore-dark-theme', 'encore-layout-themes', 'sort-play-font-scope');
   
+  const parseAndResizeIcon = (svgString) => {
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = svgString.trim();
+    const icon = tempDiv.firstElementChild;
+    if (icon && icon.tagName.toLowerCase() === 'svg') {
+      const w = icon.getAttribute('width');
+      const h = icon.getAttribute('height');
+      if (w) icon.setAttribute('width', `${parseFloat(w) - 1}${w.includes('px') ? 'px' : ''}`);
+      if (h) icon.setAttribute('height', `${parseFloat(h) - 1}${h.includes('px') ? 'px' : ''}`);
+    }
+    return icon;
+  };
+
   const menuButtons = buttonStyles.menuItems.map((style) => {
     if (style.type === "divider") {
       const divider = document.createElement("hr");
@@ -25697,10 +26065,8 @@ const getDominantColor = (src) => {
         iconSvgString = sortIconSvg;
       }
       
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = iconSvgString.trim();
-      const icon = tempDiv.firstElementChild;
-      leftContainer.appendChild(icon);
+      const icon = parseAndResizeIcon(iconSvgString);
+      if (icon) leftContainer.appendChild(icon);
 
       const buttonTextSpan = document.createElement("span");
       buttonTextSpan.innerText = style.text;
@@ -25796,10 +26162,8 @@ const getDominantColor = (src) => {
         iconSvgString = sortIconSvg;
       }
       
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = iconSvgString.trim();
-      const icon = tempDiv.firstElementChild;
-      button.appendChild(icon);
+      const icon = parseAndResizeIcon(iconSvgString);
+      if (icon) button.appendChild(icon);
 
       const buttonTextSpan = document.createElement("span");
       buttonTextSpan.innerText = style.text;
@@ -27692,6 +28056,1145 @@ const getDominantColor = (src) => {
     return knownArtistIds;
   }
   
+  function getHierarchicalTokens(genreStr) {
+      const tokens = [];
+      if (!genreStr) return tokens;
+      const full = genreStr.trim();
+      tokens.push({ name: full, weight: 1.0 });
+      
+      const words = full.split(/\s+/);
+      if (words.length > 1) {
+          words.forEach(w => {
+              if (w.length > 2) tokens.push({ name: w, weight: 0.2 });
+          });
+          if (words.length > 2) {
+              tokens.push({ name: words.slice(1).join(' '), weight: 0.4 });
+              tokens.push({ name: words.slice(0, -1).join(' '), weight: 0.4 });
+          }
+      }
+      return tokens;
+  }
+
+  const softGte = (val, t, m = 0.15) => spMath.clamp((val - (t - m)) / (2 * m), 0, 1);
+  const softLte = (val, t, m = 0.15) => spMath.clamp(((t + m) - val) / (2 * m), 0, 1);
+
+  const TASTE_ARCHETYPES = [
+    { id: 'dark_intensity', affinity: (f) => softGte(f.energy, 0.6) * softLte(f.valence, 0.4) },
+    { id: 'euphoric', affinity: (f) => softGte(f.energy, 0.6) * softGte(f.valence, 0.6) },
+    { id: 'melancholic', affinity: (f) => softLte(f.energy, 0.4) * softLte(f.valence, 0.4) },
+    { id: 'warm_acoustic', affinity: (f) => softLte(f.energy, 0.5) * softGte(f.acousticness, 0.6) },
+    { id: 'club_banger', affinity: (f) => softGte(f.energy, 0.6) * softGte(f.danceability, 0.7) },
+    { id: 'chill_groove', affinity: (f) => softLte(f.energy, 0.5) * softGte(f.danceability, 0.6) },
+    { id: 'lyrical_heavy', affinity: (f) => softGte(f.speechiness, 0.4) * softLte(f.instrumentalness, 0.2) },
+    { id: 'pure_instrumental', affinity: (f) => softGte(f.instrumentalness, 0.8) }
+  ];
+
+  async function buildWeightedTasteCorpus(updateProgress, cachedEnrichedData = new Map(), needFullRebuild = false) {
+      updateProgress("History...");
+      const [topLong, topMed, topShort, allLikedSongs] = await Promise.all([
+          getTopItems('tracks', 'long_term', 250),
+          getTopItems('tracks', 'medium_term', 150),
+          getTopItems('tracks', 'short_term', 100),
+          getLikedSongs()
+      ]);
+
+      let likedSongs = allLikedSongs;
+      if (likedSongs.length > 10000) {
+          likedSongs = shuffleArray(likedSongs).slice(0, 10000);
+      }
+
+      const trackMap = new Map();
+      const likedUris = new Set();
+      const now = Date.now();
+
+      likedSongs.forEach(t => {
+          likedUris.add(t.uri);
+          const daysAgo = (now - new Date(t.addedAt || now).getTime()) / 86400000;
+          const recencyDecay = 0.5 + 0.5 * Math.exp(-daysAgo / 365);
+          trackMap.set(t.uri, { track: t, pools: 1, baseWeight: 1.0 * recencyDecay });
+      });
+
+      const topTrackUris = new Set();
+      const processTopPool = (tracks, baseMult, maxRank) => {
+          tracks.forEach((t, i) => {
+              topTrackUris.add(t.uri);
+              const rankMult = Math.exp(-i / (maxRank * 0.5));
+              const weight = baseMult * rankMult;
+              if (trackMap.has(t.uri)) {
+                  const entry = trackMap.get(t.uri);
+                  entry.pools += 1;
+                  entry.baseWeight += weight;
+              } else {
+                  trackMap.set(t.uri, { track: t, pools: 1, baseWeight: weight });
+              }
+          });
+      };
+
+      processTopPool(topLong, 2.0, 250);
+      processTopPool(topMed, 1.5, 150);
+      processTopPool(topShort, 1.2, 100);
+
+      const corpus = [];
+      for (const [uri, entry] of trackMap.entries()) {
+          if (Spicetify.URI.isLocal(uri)) continue;
+          const overlapBonus = 1.0 + 0.15 * (entry.pools - 1);
+          const likedMult = likedUris.has(uri) ? 1.0 : 0.6;
+          const finalWeight = entry.baseWeight * overlapBonus * likedMult;
+          corpus.push({ track: entry.track, weight: finalWeight, isTopTrack: topTrackUris.has(uri) });
+      }
+
+      const itemsToEnrich = [];
+      const validCachedItems = new Map();
+
+      for (const item of corpus) {
+          const uri = item.track.uri;
+          if (needFullRebuild || item.isTopTrack || !cachedEnrichedData.has(uri)) {
+              itemsToEnrich.push(item);
+          } else {
+              validCachedItems.set(uri, cachedEnrichedData.get(uri));
+          }
+      }
+
+      let stats = {};
+      const playCounts = new Map();
+      const nativeGenres = new Map();
+
+      if (itemsToEnrich.length > 0) {
+          updateProgress("Details...");
+          const trackIdsToEnrich = itemsToEnrich.map(c => c.track.id || c.track.uri.split(':')[2]);
+          stats = await getBatchTrackStats(trackIdsToEnrich, (p) => updateProgress(`Stats ${Math.floor(p)}%`));
+          
+          updateProgress("Plays...");
+          const urisToFetch = itemsToEnrich.map(c => c.track.uri);
+          
+          for (let i = 0; i < urisToFetch.length; i += 500) {
+              const batch = urisToFetch.slice(i, i + 500);
+              const res = await fetchPlayCountsBatchNew(batch);
+              res.forEach((v, k) => playCounts.set(k, v));
+              updateProgress(`Plays ${Math.floor((i / urisToFetch.length) * 100)}%`);
+              await new Promise(r => setTimeout(r, 100));
+          }
+
+          updateProgress("Genres...");
+          for (let i = 0; i < urisToFetch.length; i += 500) {
+              const batch = urisToFetch.slice(i, i + 500);
+              const res = await fetchNativeSpotifyTrackGenresBatch(batch);
+              res.forEach((v, k) => nativeGenres.set(k, v));
+              updateProgress(`Genres ${Math.floor((i / urisToFetch.length) * 100)}%`);
+              await new Promise(r => setTimeout(r, 100));
+          }
+      }
+
+      let totalWeight = 0;
+      const enrichedCorpus = [];
+      const newCachedEnrichedData = new Map();
+      
+      for (const item of corpus) {
+          const uri = item.track.uri;
+          
+          if (validCachedItems.has(uri)) {
+              const cachedData = validCachedItems.get(uri);
+              item.features = cachedData.features;
+              item.playCount = cachedData.playCount;
+              item.genres = cachedData.genres;
+              
+              enrichedCorpus.push(item);
+              totalWeight += item.weight;
+              newCachedEnrichedData.set(uri, cachedData);
+          } else {
+              const id = item.track.id || uri.split(':')[2];
+              const f = stats[id];
+              if (!f || f.energy === null) continue; 
+              
+              item.features = f;
+              item.playCount = playCounts.get(uri) || 0;
+              const ng = nativeGenres.get(uri) || [];
+              
+              const toMap = ng.map(g => ({name: g.name, source: 'spotify_track'}));
+              const mapped = mapAndNormalizeGenres(toMap);
+              
+              const expandedGenres = new Map();
+              mapped.forEach(m => {
+                  const orig = ng.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
+                  const baseScore = orig ? orig.score : 0.85;
+                  const hierTokens = getHierarchicalTokens(m.name);
+                  
+                  hierTokens.forEach(ht => {
+                      const currentScore = expandedGenres.get(ht.name) || 0;
+                      expandedGenres.set(ht.name, Math.max(currentScore, baseScore * ht.weight));
+                  });
+              });
+
+              item.genres = Array.from(expandedGenres.entries()).map(([name, score]) => ({ name, score }));
+              enrichedCorpus.push(item);
+              totalWeight += item.weight;
+              
+              newCachedEnrichedData.set(uri, {
+                  features: item.features,
+                  playCount: item.playCount,
+                  genres: item.genres
+              });
+          }
+      }
+
+      enrichedCorpus.forEach(item => item.weight /= totalWeight);
+      return { enrichedCorpus, updatedEnrichedData: newCachedEnrichedData };
+  }
+
+  function calculateAdaptiveWeights(profile, trackWeights) {
+      const getValDist = (obj) => Object.values(obj);
+      const entropies = {
+          genre: spMath.getNormalizedEntropy(getValDist(profile.genreProfile)),
+          vibe: spMath.getNormalizedEntropy(profile.vibe1D.energy),
+          archetype: spMath.getNormalizedEntropy(getValDist(profile.archetypes)),
+          streamCount: spMath.getNormalizedEntropy(profile.globalPlaysHist),
+          tempo: spMath.getNormalizedEntropy(profile.tempoHist),
+          key: spMath.getNormalizedEntropy(profile.keyDist)
+      };
+
+      const disc = {};
+      for(const k in entropies) disc[k] = Math.max(0, 1 - entropies[k]);
+
+      let weights = {
+          genre: 35,
+          vibe: 25,
+          archetype: 12,
+          streamCount: 13,
+          tempo: 10,
+          key: 5
+      };
+
+      for(const k in weights) {
+          weights[k] = weights[k] * (0.4 + 0.6 * disc[k]);
+      }
+
+      const jointXY = new Map();
+      const margX = new Map();
+      const margY = new Map();
+      let totalW = 0;
+      
+      trackWeights.forEach(tw => {
+          const f = tw.item.features;
+          if (!f || f.energy === null || f.valence === null) return;
+          
+          const energyTier = f.energy < 33 ? 'L' : f.energy < 66 ? 'M' : 'H';
+          const valenceTier = f.valence < 33 ? 'L' : f.valence < 66 ? 'M' : 'H';
+          const moodBucket = `${energyTier}${valenceTier}`;
+          
+          let archId = 'none';
+          let maxAff = 0;
+          const normF = { 
+              energy: f.energy/100, valence: f.valence/100, 
+              danceability: (f.danceability||50)/100, acousticness: (f.acousticness||50)/100,
+              speechiness: (f.speechiness||10)/100, instrumentalness: (f.instrumentalness||0)/100 
+          };
+          for (const arch of TASTE_ARCHETYPES) {
+              const aff = arch.affinity(normF);
+              if (aff > maxAff) { maxAff = aff; archId = arch.id; }
+          }
+          if (maxAff < 0.2) archId = 'none';
+          
+          const w = tw.weight;
+          totalW += w;
+          
+          margX.set(moodBucket, (margX.get(moodBucket) || 0) + w);
+          margY.set(archId, (margY.get(archId) || 0) + w);
+          
+          const jointKey = `${moodBucket}|${archId}`;
+          jointXY.set(jointKey, (jointXY.get(jointKey) || 0) + w);
+      });
+      
+      let mutualInformation = 0;
+      if (totalW > 0) {
+          jointXY.forEach((w, key) => {
+              const pXY = w / totalW;
+              const [x, y] = key.split('|');
+              const pX = margX.get(x) / totalW;
+              const pY = margY.get(y) / totalW;
+              if (pXY > 0 && pX > 0 && pY > 0) {
+                  mutualInformation += pXY * Math.log2(pXY / (pX * pY));
+              }
+          });
+      }
+      
+      const maxEntropy = Math.max(1e-9, Math.min(entropies.vibe, entropies.archetype));
+      const redundancy = mutualInformation / maxEntropy;
+      
+      if (redundancy > 0.5) {
+          weights.archetype *= (1.0 - 0.3 * redundancy);
+      }
+
+      if (entropies.key > 0.90) {
+          weights.key = 0;
+      }
+
+      let sum = Object.values(weights).reduce((a,b) => a + b, 0);
+      
+      if (sum > 0) {
+          for(const k in weights) weights[k] /= sum;
+      } else {
+          for(const k in weights) weights[k] = 1 / Object.keys(weights).length;
+      }
+
+      return weights;
+  }
+
+  function buildSingleClusterProfile(trackWeights, pmiMatrix) {
+      const cTfIdf = new Map();
+      trackWeights.forEach(tw => {
+          tw.item.tfidf.forEach((val, token) => {
+              cTfIdf.set(token, (cTfIdf.get(token) || 0) + val * tw.weight);
+          });
+      });
+      const topGenres = Array.from(cTfIdf.entries()).sort((a,b) => b[1] - a[1]).slice(0, 150);
+      const maxVal = topGenres.length > 0 ? topGenres[0][1] : 1;
+      const genreProfile = Object.fromEntries(topGenres.map(e => [e[0], e[1]/maxVal]));
+
+      const extract = (key, defaultVal) => trackWeights.map(tw => ({ val: (tw.item.features[key] !== null ? tw.item.features[key] / 100 : defaultVal), weight: tw.weight }));
+      const eData = extract('energy', 0.5);
+      const vData = extract('valence', 0.5);
+      const dData = extract('danceability', 0.5);
+      const aData = extract('acousticness', 0.5);
+      const sData = extract('speechiness', 0.1);
+      const iData = extract('instrumentalness', 0.0);
+      
+      const vibe1D = {
+          energy: spKDE.estimate1D(eData, 0.10),
+          valence: spKDE.estimate1D(vData, 0.10),
+          danceability: spKDE.estimate1D(dData, 0.10),
+          acousticness: spKDE.estimate1D(aData, 0.10),
+          speechiness: spKDE.estimate1D(sData, 0.10),
+          instrumentalness: spKDE.estimate1D(iData, 0.10)
+      };
+
+      const extract2D = (k1, def1, k2, def2) => trackWeights.map(tw => ({ 
+          x: (tw.item.features[k1] !== null ? tw.item.features[k1] / 100 : def1), 
+          y: (tw.item.features[k2] !== null ? tw.item.features[k2] / 100 : def2), 
+          weight: tw.weight 
+      }));
+      
+      const vibe2D = {
+          ev: spKDE.estimate2D(extract2D('energy', 0.5, 'valence', 0.5), 0.10),
+          ed: spKDE.estimate2D(extract2D('energy', 0.5, 'danceability', 0.5), 0.10),
+          ea: spKDE.estimate2D(extract2D('energy', 0.5, 'acousticness', 0.5), 0.10),
+          vd: spKDE.estimate2D(extract2D('valence', 0.5, 'danceability', 0.5), 0.10),
+          va: spKDE.estimate2D(extract2D('valence', 0.5, 'acousticness', 0.5), 0.10),
+          da: spKDE.estimate2D(extract2D('danceability', 0.5, 'acousticness', 0.5), 0.10),
+          ei: spKDE.estimate2D(extract2D('energy', 0.5, 'instrumentalness', 0.0), 0.10),
+          es: spKDE.estimate2D(extract2D('energy', 0.5, 'speechiness', 0.1), 0.10)
+      };
+
+      const teData = [];
+      trackWeights.forEach(tw => {
+          const t = tw.item.features.tempo;
+          const e = tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5;
+          if (t) {
+              teData.push({ x: spMath.clamp((t - 40) / 180, 0, 1), y: e, weight: tw.weight });
+              if (t / 2 >= 40) teData.push({ x: spMath.clamp((t / 2 - 40) / 180, 0, 1), y: e, weight: tw.weight * 0.3 });
+              if (t * 2 <= 220) teData.push({ x: spMath.clamp((t * 2 - 40) / 180, 0, 1), y: e, weight: tw.weight * 0.3 });
+          }
+      });
+      vibe2D.te = spKDE.estimate2D(teData, 0.11);
+
+      const archetypes = {};
+      TASTE_ARCHETYPES.forEach(arch => {
+          let affinitySum = 0;
+          trackWeights.forEach(tw => {
+              const normF = {
+                  energy: tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5,
+                  valence: tw.item.features.valence !== null ? tw.item.features.valence / 100 : 0.5,
+                  danceability: tw.item.features.danceability !== null ? tw.item.features.danceability / 100 : 0.5,
+                  acousticness: tw.item.features.acousticness !== null ? tw.item.features.acousticness / 100 : 0.5,
+                  speechiness: tw.item.features.speechiness !== null ? tw.item.features.speechiness / 100 : 0.1,
+                  instrumentalness: tw.item.features.instrumentalness !== null ? tw.item.features.instrumentalness / 100 : 0.0
+              };
+              affinitySum += tw.weight * arch.affinity(normF);
+          });
+          archetypes[arch.id] = affinitySum;
+      });
+      
+      let archNorm = spMath.norm(Object.values(archetypes));
+      if (archNorm > 0) {
+          Object.keys(archetypes).forEach(k => archetypes[k] /= archNorm);
+      }
+
+      const tempoData = [];
+      trackWeights.forEach(tw => {
+          const t = tw.item.features.tempo;
+          if (t) {
+              tempoData.push({ val: t, weight: tw.weight });
+              if (t / 2 >= 40) tempoData.push({ val: t / 2, weight: tw.weight * 0.3 });
+              if (t * 2 <= 220) tempoData.push({ val: t * 2, weight: tw.weight * 0.3 });
+          }
+      });
+      const tempoHist = spKDE.estimate1D(tempoData, 8.0, 36, 40, 220); 
+
+      const modeDist = [0, 0];
+      const keyDist = new Array(12).fill(0);
+      trackWeights.forEach(tw => {
+          const m = tw.item.features.mode;
+          const k = tw.item.features.key_raw;
+          if (m === 0 || m === 1) modeDist[m] += tw.weight;
+          if (k >= 0 && k < 12) keyDist[k] += tw.weight;
+      });
+
+      const logPlays = trackWeights.map(tw => ({ val: Math.log10((tw.item.playCount || 0) + 1), weight: tw.weight }));
+      const globalPlaysHist = spKDE.estimate1D(logPlays, 0.3, 40, 0, 10);
+      
+      const genrePlayMap = new Map();
+      trackWeights.forEach(tw => {
+          tw.item.genres.forEach(g => {
+              if (!genrePlayMap.has(g.name)) genrePlayMap.set(g.name, []);
+              genrePlayMap.get(g.name).push(tw.item.playCount || 0);
+          });
+      });
+      const genreMedians = {};
+      genrePlayMap.forEach((plays, gName) => {
+          if (plays.length === 0) {
+              genreMedians[gName] = 0;
+          } else {
+              plays.sort((a,b) => a - b);
+              genreMedians[gName] = plays[Math.floor(plays.length/2)];
+          }
+      });
+
+      const zScores = trackWeights.map(tw => {
+          let sumMedian = 0;
+          let c = 0;
+          tw.item.genres.forEach(g => {
+              if(genreMedians[g.name] !== undefined) { sumMedian += Math.log10(genreMedians[g.name]+1); c++; }
+          });
+          const expectedLog = c > 0 ? sumMedian / c : 5.0; 
+          const actualLog = Math.log10((tw.item.playCount || 0) + 1);
+          const z = (actualLog - expectedLog) / 1.5; 
+          return { val: z, weight: tw.weight };
+      });
+      const relativePlaysHist = spKDE.estimate1D(zScores, 0.3, 30, -3.0, 3.0);
+
+      const featureMeans = { e: 0, v: 0, d: 0, a: 0, s: 0, i: 0 };
+      const featureVars = { e: 0, v: 0, d: 0, a: 0, s: 0, i: 0 };
+      
+      trackWeights.forEach(tw => {
+          featureMeans.e += (tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5) * tw.weight;
+          featureMeans.v += (tw.item.features.valence !== null ? tw.item.features.valence / 100 : 0.5) * tw.weight;
+          featureMeans.d += (tw.item.features.danceability !== null ? tw.item.features.danceability / 100 : 0.5) * tw.weight;
+          featureMeans.a += (tw.item.features.acousticness !== null ? tw.item.features.acousticness / 100 : 0.5) * tw.weight;
+          featureMeans.s += (tw.item.features.speechiness !== null ? tw.item.features.speechiness / 100 : 0.1) * tw.weight;
+          featureMeans.i += (tw.item.features.instrumentalness !== null ? tw.item.features.instrumentalness / 100 : 0.0) * tw.weight;
+      });
+
+      trackWeights.forEach(tw => {
+          const diffE = (tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5) - featureMeans.e;
+          const diffV = (tw.item.features.valence !== null ? tw.item.features.valence / 100 : 0.5) - featureMeans.v;
+          const diffD = (tw.item.features.danceability !== null ? tw.item.features.danceability / 100 : 0.5) - featureMeans.d;
+          const diffA = (tw.item.features.acousticness !== null ? tw.item.features.acousticness / 100 : 0.5) - featureMeans.a;
+          const diffS = (tw.item.features.speechiness !== null ? tw.item.features.speechiness / 100 : 0.1) - featureMeans.s;
+          const diffI = (tw.item.features.instrumentalness !== null ? tw.item.features.instrumentalness / 100 : 0.0) - featureMeans.i;
+          
+          featureVars.e += (diffE * diffE) * tw.weight;
+          featureVars.v += (diffV * diffV) * tw.weight;
+          featureVars.d += (diffD * diffD) * tw.weight;
+          featureVars.a += (diffA * diffA) * tw.weight;
+          featureVars.s += (diffS * diffS) * tw.weight;
+          featureVars.i += (diffI * diffI) * tw.weight;
+      });
+      
+      for(let k in featureVars) featureVars[k] = Math.max(0.01, featureVars[k]);
+
+      let topLabelTokens = topGenres.slice(0, 3).map(g => g[0].replace(/\b\w/g, l => l.toUpperCase())).join(' / ');
+      if (!topLabelTokens) topLabelTokens = "Mixed Vibe";
+      let topArchetype = Object.entries(archetypes).sort((a,b) => b[1] - a[1])[0];
+      let labelArchetype = topArchetype && topArchetype[1] > 0.1 ? topArchetype[0].replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : "Balanced";
+      const clusterLabel = `${topLabelTokens} — ${labelArchetype}`;
+
+      const profile = {
+          label: clusterLabel,
+          genreProfile,
+          vibe1D,
+          vibe2D,
+          archetypes,
+          tempoHist,
+          modeDist,
+          keyDist,
+          globalPlaysHist,
+          relativePlaysHist,
+          genreMedians,
+          featureMeans,
+          featureVars
+      };
+
+      profile.adaptiveWeights = calculateAdaptiveWeights(profile, trackWeights);
+      return profile;
+  }
+
+  async function buildTasteProfileClusters(corpus, updateProgress) {
+      const df = new Map();
+      const docCount = corpus.length;
+      const safeDocCount = Math.max(docCount + 1, 10);
+
+      corpus.forEach(item => {
+          item.genres.forEach(g => {
+              df.set(g.name, (df.get(g.name) || 0) + 1);
+          });
+      });
+
+      const idf = new Map();
+      df.forEach((count, token) => {
+          idf.set(token, Math.log10(safeDocCount / count));
+      });
+
+      corpus.forEach(item => {
+          item.tfidf = new Map();
+          item.genres.forEach(g => {
+              item.tfidf.set(g.name, g.score * idf.get(g.name));
+          });
+      });
+
+      updateProgress("Mapping...");
+      const coOccur = new Map();
+      const tokenProb = new Map();
+      
+      corpus.forEach(item => {
+          const confMap = new Map(item.genres.map(g => [g.name, g.score]));
+          const tokens = Array.from(item.tfidf.keys());
+          tokens.forEach(tA => {
+              const confA = confMap.get(tA) || 0.85;
+              tokenProb.set(tA, (tokenProb.get(tA) || 0) + item.weight * confA);
+              if (!coOccur.has(tA)) coOccur.set(tA, new Map());
+              const mapA = coOccur.get(tA);
+              tokens.forEach(tB => {
+                  const confB = confMap.get(tB) || 0.85;
+                  mapA.set(tB, (mapA.get(tB) || 0) + item.weight * Math.min(confA, confB)); 
+              });
+          });
+      });
+
+      const pmiMatrixObj = {};
+      coOccur.forEach((mapA, tA) => {
+          let hasEntries = false;
+          const row = {};
+          mapA.forEach((joint, tB) => {
+              const pA = tokenProb.get(tA);
+              const pB = tokenProb.get(tB);
+              const pmi = spMath.pmi(joint, pA, pB);
+              if (pmi > 0.05) { 
+                  row[tB] = parseFloat(pmi.toFixed(3));
+                  hasEntries = true;
+              }
+          });
+          if (hasEntries) pmiMatrixObj[tA] = row;
+      });
+
+      const globalTfIdf = new Map();
+      corpus.forEach(item => {
+          item.tfidf.forEach((val, token) => {
+              globalTfIdf.set(token, (globalTfIdf.get(token) || 0) + val * item.weight);
+          });
+      });
+      const topTokens = Array.from(globalTfIdf.entries()).sort((a,b) => b[1] - a[1]).slice(0, 15).map(e => e[0]);
+
+      updateProgress("Clustering...");
+      await new Promise(r => setTimeout(r, 10));
+
+      const dataVectors = corpus.map(item => {
+          const vec = topTokens.map(t => item.tfidf.has(t) ? 1.0 : 0.0);
+          vec.push(item.features.energy !== null ? item.features.energy / 100 : 0.5);
+          vec.push(item.features.valence !== null ? item.features.valence / 100 : 0.5);
+          vec.push(item.features.danceability !== null ? item.features.danceability / 100 : 0.5);
+          vec.push(item.features.acousticness !== null ? item.features.acousticness / 100 : 0.5);
+          
+          const safePlayCount = Number(item.playCount) || 0;
+          vec.push(Math.log10(safePlayCount + 1) / 10.0); 
+          vec.push((item.features.tempo || 120) / 220.0); 
+          return vec;
+      });
+
+      const pcaResult = spMath.pca(dataVectors, 0.85, 10);
+      const projected = pcaResult.projected;
+
+      let bestGMM = null;
+      let bestBIC = Infinity;
+      
+      if (corpus.length < 5 || projected[0].length === 0) {
+          bestGMM = { k: 1, predict: () => [1.0] };
+      } else {
+          for (let k = 1; k <= 5; k++) {
+              const gmm = new spDiagonalGMM(k);
+              if (gmm.fit(projected)) {
+                  if (gmm.bic < bestBIC) {
+                      bestBIC = gmm.bic;
+                      bestGMM = gmm;
+                  }
+              }
+          }
+          if (!bestGMM) bestGMM = { k: 1, predict: () => [1.0] };
+      }
+
+      updateProgress("Profiles...");
+      const clusters = [];
+      for (let c = 0; c < bestGMM.k; c++) {
+          let clusterWeight = 0;
+          const trackWeights = corpus.map((item, i) => {
+              const resps = bestGMM.predict(projected[i]);
+              const w = item.weight * resps[c];
+              clusterWeight += w;
+              return { item, weight: w };
+          });
+
+          if (clusterWeight <= 0.0001) continue;
+          if (clusterWeight < 0.05 && bestGMM.k > 1) continue; 
+
+          trackWeights.forEach(tw => tw.weight /= clusterWeight);
+
+          const profile = buildSingleClusterProfile(trackWeights, pmiMatrixObj);
+          profile.mass = clusterWeight;
+          profile.trackCount = trackWeights.length;
+          clusters.push(profile);
+      }
+
+      return { clusters, pmiMatrix: pmiMatrixObj };
+  }
+
+  async function getOrBuildTasteProfile(force = false, updateProgress = () => {}) {
+      const savedProfile = await idb.get('staticData', STORAGE_KEY_TASTE_PROFILE);
+      
+      let needUpdate = force;
+      let needFullRebuild = force;
+      let cachedEnrichedDataMap = new Map();
+      let lastFullRebuildTs = 0;
+
+      if (savedProfile) {
+          const now = Date.now();
+          if (savedProfile.version !== TASTE_PROFILE_VERSION) {
+              needUpdate = true;
+              needFullRebuild = true;
+          } else {
+              lastFullRebuildTs = savedProfile.lastFullRebuildTs || 0;
+              if (now - savedProfile.ts > TASTE_PROFILE_UPDATE_INTERVAL) needUpdate = true;
+              if (now - lastFullRebuildTs > TASTE_PROFILE_FULL_REBUILD_INTERVAL) needFullRebuild = true;
+          }
+          
+          if (!needUpdate && !force) {
+              cachedTasteProfile = savedProfile.data;
+              cachedTasteProfileTimestamp = savedProfile.ts;
+              return cachedTasteProfile;
+          }
+          
+          if (savedProfile.enrichedLikedSongs && !needFullRebuild) {
+              const arr = savedProfile.enrichedLikedSongs;
+              if (Array.isArray(arr)) {
+                  arr.forEach(item => cachedEnrichedDataMap.set(item.uri, item.data));
+              }
+          }
+      } else {
+          needUpdate = true;
+          needFullRebuild = true;
+      }
+
+      if (isBuildingTasteProfile) {
+          while (isBuildingTasteProfile) await new Promise(r => setTimeout(r, 200));
+          return cachedTasteProfile;
+      }
+
+      isBuildingTasteProfile = true;
+      try {
+          const { enrichedCorpus, updatedEnrichedData } = await buildWeightedTasteCorpus(updateProgress, cachedEnrichedDataMap, needFullRebuild);
+          updateProgress("Mapping...");
+          const result = await buildTasteProfileClusters(enrichedCorpus, updateProgress);
+          
+          cachedTasteProfile = {
+              clusters: result.clusters,
+              pmiMatrix: result.pmiMatrix
+          };
+          cachedTasteProfileTimestamp = Date.now();
+          
+          const enrichedArr = [];
+          updatedEnrichedData.forEach((data, uri) => enrichedArr.push({ uri, data }));
+          
+          await idb.set('staticData', STORAGE_KEY_TASTE_PROFILE, { 
+              version: TASTE_PROFILE_VERSION,
+              ts: cachedTasteProfileTimestamp,
+              lastFullRebuildTs: needFullRebuild ? cachedTasteProfileTimestamp : lastFullRebuildTs,
+              data: cachedTasteProfile,
+              enrichedLikedSongs: enrichedArr
+          });
+          
+          return cachedTasteProfile;
+      } catch (err) {
+          console.error("Taste Profile build failed:", err);
+          throw err;
+      } finally {
+          isBuildingTasteProfile = false;
+      }
+  }
+  
+  function getDensityScore1D(hist, val, min, max) {
+        if (val == null || isNaN(val)) return 0;
+        const bins = hist.length;
+        const peak = Math.max(...hist, 1e-9);
+        let idx = Math.floor(((val - min) / (max - min)) * bins);
+        idx = spMath.clamp(idx, 0, bins - 1);
+        return (hist[idx] / peak) * 100;
+    }
+
+    function getDensityScore2D(grid, vx, vy, min, max) {
+        if (vx == null || vy == null || isNaN(vx) || isNaN(vy)) return 0;
+        const bins = grid.length;
+        let maxVal = 1e-9;
+        for(let i=0; i<bins; i++) for(let j=0; j<bins; j++) maxVal = Math.max(maxVal, grid[i][j]);
+        let ix = Math.floor(((vx - min) / (max - min)) * bins);
+        let iy = Math.floor(((vy - min) / (max - min)) * bins);
+        ix = spMath.clamp(ix, 0, bins - 1);
+        iy = spMath.clamp(iy, 0, bins - 1);
+        return (grid[ix][iy] / maxVal) * 100;
+    }
+
+    function buildContextProfile(tracks, likedUris = new Set(), likedIsrcs = new Set()) {
+        const totalCount = tracks.length;
+        if (totalCount === 0) return { isValid: false };
+
+        let hasAnyLiked = false;
+        for (const t of tracks) {
+            const isrc = t.track?.external_ids?.isrc || t.isrc;
+            if ((t.uri && likedUris.has(t.uri)) || (isrc && likedIsrcs.has(isrc))) {
+                hasAnyLiked = true;
+                break;
+            }
+        }
+
+        let totalWeight = 0;
+        const featureSums = { e: 0, v: 0, d: 0, a: 0, s: 0, i: 0 };
+        const genreCounts = new Map();
+        
+        const fData = { e: [], v: [], d: [], a: [], s: [], i: [] };
+
+        tracks.forEach(t => {
+            const f = t.features;
+            const isrc = t.track?.external_ids?.isrc || t.isrc;
+            const isLiked = (t.uri && likedUris.has(t.uri)) || (isrc && likedIsrcs.has(isrc));
+            
+            const weight = (hasAnyLiked && isLiked) ? 1.7 : 1.0;
+
+            if (f && f.energy !== null) {
+                const e = f.energy / 100;
+                const v = f.valence !== null ? f.valence / 100 : 0.5;
+                const d = f.danceability !== null ? f.danceability / 100 : 0.5;
+                const a = f.acousticness !== null ? f.acousticness / 100 : 0.5;
+                const s = f.speechiness !== null ? f.speechiness / 100 : 0.1;
+                const i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+
+                featureSums.e += e * weight;
+                featureSums.v += v * weight;
+                featureSums.d += d * weight;
+                featureSums.a += a * weight;
+                featureSums.s += s * weight;
+                featureSums.i += i * weight;
+                
+                fData.e.push({val: e, weight});
+                fData.v.push({val: v, weight});
+                fData.d.push({val: d, weight});
+                fData.a.push({val: a, weight});
+                fData.s.push({val: s, weight});
+                fData.i.push({val: i, weight});
+
+                totalWeight += weight;
+            }
+
+            if (t.genres && Array.isArray(t.genres)) {
+                t.genres.forEach(g => {
+                    genreCounts.set(g.name, (genreCounts.get(g.name) || 0) + ((g.score || 1) * weight));
+                });
+            }
+        });
+
+        if (totalWeight === 0) return { isValid: false };
+
+        const featureMeans = {
+            e: featureSums.e / totalWeight,
+            v: featureSums.v / totalWeight,
+            d: featureSums.d / totalWeight,
+            a: featureSums.a / totalWeight,
+            s: featureSums.s / totalWeight,
+            i: featureSums.i / totalWeight,
+        };
+
+        let totalVar = 0;
+        const calcVar = (key) => {
+            let sumSqDiff = 0;
+            fData[key].forEach(item => {
+                sumSqDiff += item.weight * Math.pow(item.val - featureMeans[key], 2);
+            });
+            return sumSqDiff / totalWeight;
+        };
+
+        totalVar += calcVar('e') + calcVar('v') + calcVar('d') + calcVar('a');
+        
+        const coherence = Math.max(0.0, Math.min(1.0, 1.0 - (totalVar / 0.25)));
+
+        const topGenres = Array.from(genreCounts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 50);
+        
+        const maxGenreVal = topGenres.length > 0 ? topGenres[0][1] : 1;
+        const genreProfile = {};
+        topGenres.forEach(([name, count]) => {
+            genreProfile[name] = count / maxGenreVal;
+        });
+
+        return { isValid: true, featureMeans, genreProfile, coherence };
+    }
+
+    function scoreTrackAgainstContext(track, context) {
+        if (!context.isValid) return 50;
+
+        let vibeScore = 50;
+        const f = track.features;
+        if (f && f.energy !== null) {
+            const e = f.energy / 100;
+            const v = f.valence !== null ? f.valence / 100 : 0.5;
+            const d = f.danceability !== null ? f.danceability / 100 : 0.5;
+            const a = f.acousticness !== null ? f.acousticness / 100 : 0.5;
+            const s = f.speechiness !== null ? f.speechiness / 100 : 0.1;
+            const i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+
+            const calcDist = (val, mean, weight = 1.0) => weight * Math.pow(val - mean, 2);
+            
+            let dist = calcDist(e, context.featureMeans.e, 1.5) +
+                       calcDist(v, context.featureMeans.v, 1.5) +
+                       calcDist(d, context.featureMeans.d, 1.0) +
+                       calcDist(a, context.featureMeans.a, 1.0) +
+                       calcDist(s, context.featureMeans.s, 0.5) +
+                       calcDist(i, context.featureMeans.i, 0.5);
+            
+            vibeScore = Math.max(0, 100 * Math.exp(-dist * 1.5));
+        }
+
+        let genreScore = 50;
+        if (track.genres && track.genres.length > 0) {
+            const trackTokens = {};
+            track.genres.forEach(g => {
+                const hierTokens = getHierarchicalTokens(g.name);
+                hierTokens.forEach(ht => {
+                    trackTokens[ht.name] = Math.max(trackTokens[ht.name] || 0, ht.weight);
+                });
+            });
+
+            const allKeys = Array.from(new Set([...Object.keys(trackTokens), ...Object.keys(context.genreProfile)]));
+            const vecA = allKeys.map(k => trackTokens[k] || 0);
+            const vecB = allKeys.map(k => context.genreProfile[k] || 0);
+            
+            genreScore = spMath.cosineSimilarity(vecA, vecB) * 100;
+        } else {
+            genreScore = vibeScore;
+        }
+
+        return (vibeScore * 0.6) + (genreScore * 0.4);
+    }
+
+    function scoreTrackAgainstCluster(track, cluster, pmiMatrix) {
+        let genreScore = 0, genreConf = 0.3, noveltyContrib = 0;
+        if (track.genres && track.genres.length > 0) {
+            const trackTokens = {};
+            track.genres.forEach(g => {
+                const hierTokens = getHierarchicalTokens(g.name);
+                hierTokens.forEach(ht => {
+                    trackTokens[ht.name] = Math.max(trackTokens[ht.name] || 0, ht.weight);
+                });
+            });
+            const expandedTokens = { ...trackTokens };
+            
+            Object.keys(trackTokens).forEach(T => {
+                let knownToProfile = cluster.genreProfile[T] > 0;
+                let maxPmiWithProfile = 0;
+
+                const pmiMap = pmiMatrix[T];
+                if (pmiMap) {
+                    Object.entries(pmiMap).forEach(([U, pmiVal]) => {
+                        const addedWeight = trackTokens[T] * pmiVal * 0.25;
+                        expandedTokens[U] = Math.min(1.0, (expandedTokens[U] || 0) + addedWeight);
+                        
+                        if (!knownToProfile && cluster.genreProfile[U] > 0) {
+                            maxPmiWithProfile = Math.max(maxPmiWithProfile, pmiVal);
+                        }
+                    });
+                }
+                if (!knownToProfile && maxPmiWithProfile > 0) {
+                    noveltyContrib += maxPmiWithProfile * 0.5;
+                }
+            });
+
+            const allKeys = Array.from(new Set([...Object.keys(expandedTokens), ...Object.keys(cluster.genreProfile)]));
+            const vecA = allKeys.map(k => expandedTokens[k] || 0);
+            const vecB = allKeys.map(k => cluster.genreProfile[k] || 0);
+            
+            genreScore = spMath.cosineSimilarity(vecA, vecB) * 100;
+            genreConf = track.genres.length >= 2 ? 1.0 : 0.75;
+        }
+
+        let vibeScore = 50, vibeConf = 0.3;
+        const f = track.features;
+        if (f && f.energy !== null && f.valence !== null && f.danceability !== null && f.acousticness !== null) {
+            const e = f.energy / 100, v = f.valence / 100, d = f.danceability / 100, 
+                  a = f.acousticness / 100, s = f.speechiness !== null ? f.speechiness / 100 : 0.1, 
+                  i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+
+            const getGaussianDistance = (val, mean, variance) => Math.exp(-Math.pow(val - mean, 2) / (2 * variance)) * 100;
+            
+            const distE = getGaussianDistance(e, cluster.featureMeans.e, cluster.featureVars.e);
+            const distV = getGaussianDistance(v, cluster.featureMeans.v, cluster.featureVars.v);
+            const distD = getGaussianDistance(d, cluster.featureMeans.d, cluster.featureVars.d);
+            const distA = getGaussianDistance(a, cluster.featureMeans.a, cluster.featureVars.a);
+            const distS = getGaussianDistance(s, cluster.featureMeans.s, cluster.featureVars.s);
+            const distI = getGaussianDistance(i, cluster.featureMeans.i, cluster.featureVars.i);
+
+            const mE = Math.max(getDensityScore1D(cluster.vibe1D.energy, e, 0, 1), distE);
+            const mV = Math.max(getDensityScore1D(cluster.vibe1D.valence, v, 0, 1), distV);
+            const mD = Math.max(getDensityScore1D(cluster.vibe1D.danceability, d, 0, 1), distD);
+            const mA = Math.max(getDensityScore1D(cluster.vibe1D.acousticness, a, 0, 1), distA);
+            const mS = Math.max(getDensityScore1D(cluster.vibe1D.speechiness, s, 0, 1), distS);
+            const mI = Math.max(getDensityScore1D(cluster.vibe1D.instrumentalness, i, 0, 1), distI);
+            const marginalScore = (mE + mV + mD + mA + mS + mI) / 6;
+
+            const jEV = getDensityScore2D(cluster.vibe2D.ev, e, v, 0, 1);
+            const jED = getDensityScore2D(cluster.vibe2D.ed, e, d, 0, 1);
+            const jEA = getDensityScore2D(cluster.vibe2D.ea, e, a, 0, 1);
+            const jVD = getDensityScore2D(cluster.vibe2D.vd, v, d, 0, 1);
+            const jVA = getDensityScore2D(cluster.vibe2D.va, v, a, 0, 1);
+            const jDA = getDensityScore2D(cluster.vibe2D.da, d, a, 0, 1);
+            const jEI = getDensityScore2D(cluster.vibe2D.ei, e, i, 0, 1);
+            const jES = getDensityScore2D(cluster.vibe2D.es, e, s, 0, 1);
+            
+            const avgDistJoint = (distE*distV + distE*distD + distE*distA + distV*distD + distV*distA + distD*distA + distE*distI + distE*distS) / (8 * 100); 
+            let jointScore = (jEV + jED + jEA + jVD + jVA + jDA + jEI + jES) / 8;
+            jointScore = Math.max(jointScore, avgDistJoint);
+
+            if (cluster.trackCount < 200) {
+                vibeScore = 0.7 * marginalScore + 0.3 * jointScore;
+            } else {
+                vibeScore = 0.4 * marginalScore + 0.6 * jointScore;
+            }
+            vibeConf = 1.0;
+        } else if (f && (f.energy !== null || f.valence !== null)) {
+            vibeConf = 0.6;
+            let sum = 0, count = 0;
+            if (f.energy !== null) { sum += getDensityScore1D(cluster.vibe1D.energy, f.energy/100, 0, 1); count++; }
+            if (f.valence !== null) { sum += getDensityScore1D(cluster.vibe1D.valence, f.valence/100, 0, 1); count++; }
+            if (f.danceability !== null) { sum += getDensityScore1D(cluster.vibe1D.danceability, f.danceability/100, 0, 1); count++; }
+            if (f.acousticness !== null) { sum += getDensityScore1D(cluster.vibe1D.acousticness, f.acousticness/100, 0, 1); count++; }
+            vibeScore = count > 0 ? sum / count : 0;
+        }
+
+        let archScore = 50, archConf = 0.3;
+        if (vibeConf >= 0.6) {
+            const normF = { 
+                energy: f.energy/100, valence: f.valence/100, 
+                danceability: (f.danceability||50)/100, acousticness: (f.acousticness||50)/100,
+                speechiness: (f.speechiness||10)/100, instrumentalness: (f.instrumentalness||0)/100 
+            };
+            
+            const trackArchVec = TASTE_ARCHETYPES.map(arch => arch.affinity(normF));
+            const profileArchVec = TASTE_ARCHETYPES.map(arch => cluster.archetypes[arch.id] || 0);
+            
+            const rawCos = spMath.cosineSimilarity(trackArchVec, profileArchVec);
+            archScore = Math.pow(rawCos, 3) * 100;
+            archConf = vibeConf;
+        }
+
+        let streamScore = 40, streamConf = 0.3;
+        if (track.playCount !== undefined && track.playCount !== null && track.playCount !== "N/A" && track.playCount > 0) {
+            const safePlayCount = Number(track.playCount) || 0;
+            const logPc = Math.log10(safePlayCount + 1);
+            const globalScore = getDensityScore1D(cluster.globalPlaysHist, logPc, 0, 10);
+            
+            let expectedLog = 5.0;
+            let matchCount = 0;
+            if (track.genres) {
+                let sumMedians = 0;
+                track.genres.forEach(g => {
+                    if (cluster.genreMedians[g.name] !== undefined) {
+                        sumMedians += Math.log10(cluster.genreMedians[g.name] + 1);
+                        matchCount++;
+                    }
+                });
+                if (matchCount > 0) expectedLog = sumMedians / matchCount;
+            }
+            
+            const zScore = (logPc - expectedLog) / 1.5;
+            const relativeScore = getDensityScore1D(cluster.relativePlaysHist, zScore, -3.0, 3.0);
+
+            streamScore = 0.6 * globalScore + 0.4 * relativeScore;
+            streamConf = 1.0;
+        }
+
+        let tempoScore = 50, tempoConf = 0.3;
+        if (f && f.tempo) {
+            const t = f.tempo;
+            const normT = spMath.clamp((t - 40) / 180, 0, 1);
+            const normTh = spMath.clamp((t/2 - 40) / 180, 0, 1);
+            const normTd = spMath.clamp((t*2 - 40) / 180, 0, 1);
+            const e = f.energy !== null ? f.energy / 100 : 0.5;
+            
+            const s1 = getDensityScore1D(cluster.tempoHist, t, 40, 220);
+            const s2 = t/2 >= 40 ? getDensityScore1D(cluster.tempoHist, t/2, 40, 220) : 0;
+            const s3 = t*2 <= 220 ? getDensityScore1D(cluster.tempoHist, t*2, 40, 220) : 0;
+            const kde1D = Math.max(s1, s2, s3);
+            
+            const te1 = getDensityScore2D(cluster.vibe2D.te, normT, e, 0, 1);
+            const te2 = t/2 >= 40 ? getDensityScore2D(cluster.vibe2D.te, normTh, e, 0, 1) : 0;
+            const te3 = t*2 <= 220 ? getDensityScore2D(cluster.vibe2D.te, normTd, e, 0, 1) : 0;
+            const kde2D = Math.max(te1, te2, te3);
+            
+            tempoScore = 0.4 * kde1D + 0.6 * kde2D;
+            tempoConf = 1.0; 
+        }
+
+        let keyScore = 50, keyConf = 0.0;
+        if (f && f.key_raw !== -1 && f.mode !== -1 && cluster.adaptiveWeights.key > 0) {
+            const tKey = f.key_raw, tMode = f.mode;
+            const compatMatrix = [1.0, 0.6, 0.6, 0.2, 0.2, 0.85, 0.2, 0.85, 0.2, 0.2, 0.6, 0.6]; 
+            let harmonicSum = 0;
+            let peakDist = Math.max(...cluster.keyDist, 1e-9);
+            for(let k=0; k<12; k++) {
+                const diff = Math.min(Math.abs(tKey - k), 12 - Math.abs(tKey - k));
+                harmonicSum += (cluster.keyDist[k] / peakDist) * (compatMatrix[diff] || 0.2);
+            }
+            let modePeak = Math.max(...cluster.modeDist, 1e-9);
+            const modeFactor = cluster.modeDist[tMode] / modePeak;
+            
+            keyScore = Math.min(100, harmonicSum * 100 * (0.7 + 0.3 * modeFactor));
+            keyConf = 1.0;
+        }
+
+        const scores = { 
+            genre: spMath.clamp(genreScore, 0, 100), 
+            vibe: spMath.clamp(vibeScore, 0, 100), 
+            archetype: spMath.clamp(archScore, 0, 100), 
+            streamCount: spMath.clamp(streamScore, 0, 100), 
+            tempo: spMath.clamp(tempoScore, 0, 100), 
+            key: spMath.clamp(keyScore, 0, 100) 
+        };
+        const confs = { genre: genreConf, vibe: vibeConf, archetype: archConf, streamCount: streamConf, tempo: tempoConf, key: keyConf };
+        
+        let rawSum = 0, weightSum = 0;
+        for (const dim in cluster.adaptiveWeights) {
+            const effectiveWeight = cluster.adaptiveWeights[dim] * confs[dim];
+            if (effectiveWeight > 0) {
+                rawSum += scores[dim] * effectiveWeight;
+                weightSum += effectiveWeight;
+            }
+        }
+        
+        const meanScore = weightSum > 0 ? rawSum / weightSum : 50.0;
+        
+        let maxDeviation = 0;
+        for (const dim in cluster.adaptiveWeights) {
+            if (confs[dim] > 0) {
+                const deviation = meanScore - scores[dim];
+                if (deviation > maxDeviation) maxDeviation = deviation;
+            }
+        }
+        
+        let penalty = 1.0;
+        if (maxDeviation > 25) {
+            penalty = Math.max(0.70, 1.0 - 0.30 * ((maxDeviation - 25) / 75));
+        }
+
+        return { rawScore: meanScore, penalty, noveltyContrib };
+    }
+
+    async function evaluateTasteMatch(tracks, updateProgress) {
+        const profile = await getOrBuildTasteProfile(false, updateProgress);
+        
+        if (!profile || !profile.clusters || profile.clusters.length === 0) {
+            return tracks.map(t => ({ ...t, tasteMatchScore: 50.0, calibratedTasteMatch: 50.0 }));
+        }
+
+        updateProgress("Library...");
+        const likedSongs = await getLikedSongs();
+        const likedUris = new Set(likedSongs.map(s => s.uri));
+
+        const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
+        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+        const likedIsrcs = new Set();
+        cachedLikedMetadata.forEach(meta => {
+            if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
+        });
+
+        updateProgress("Anchoring...");
+        const contextProfile = buildContextProfile(tracks, likedUris, likedIsrcs);
+
+        updateProgress("Matching...");
+        const scoredTracks = [];
+
+        for (let idx = 0; idx < tracks.length; idx++) {
+            if (idx % 100 === 0) {
+                updateProgress(`Scoring ${Math.floor((idx/tracks.length)*100)}%`);
+                await new Promise(r => setTimeout(r, 0));
+            }
+
+            const track = tracks[idx];
+            const clusterResults = profile.clusters.map(cluster => 
+                scoreTrackAgainstCluster(track, cluster, profile.pmiMatrix)
+            );
+
+            const clusterScores = clusterResults.map(r => r.rawScore * r.penalty);
+            const temperature = 5.0; 
+            const maxScore = Math.max(...clusterScores);
+            
+            let sumExp = 0;
+            for (const s of clusterScores) {
+                sumExp += Math.exp((s - maxScore) / temperature);
+            }
+            let aggregatedScore = maxScore + temperature * Math.log(sumExp);
+
+            const winningIdx = clusterScores.indexOf(maxScore);
+            const winningMass = profile.clusters[winningIdx].mass;
+            
+            const dampingFactor = Math.max(0.80, Math.min(1.0, 0.85 + 0.15 * Math.log10(Math.max(0.001, winningMass) * 100)));
+            aggregatedScore *= dampingFactor;
+
+            const noveltyContrib = clusterResults[winningIdx].noveltyContrib;
+            const noveltyBonus = Math.min(6, noveltyContrib * 2.0); 
+
+            if (aggregatedScore >= 55) {
+                aggregatedScore += noveltyBonus;
+            }
+
+            aggregatedScore = spMath.clamp(aggregatedScore, 0, 100);
+
+            if (contextProfile.isValid) {
+                const contextScore = scoreTrackAgainstContext(track, contextProfile);
+                
+                const contextWeight = 0.40 * contextProfile.coherence;
+                const globalWeight = 1.0 - contextWeight;
+
+                aggregatedScore = (aggregatedScore * globalWeight) + (contextScore * contextWeight);
+            }
+
+            scoredTracks.push({ ...track, tasteMatchScore: aggregatedScore });
+        }
+
+        const sortedByScore = [...scoredTracks].sort((a,b) => a.tasteMatchScore - b.tasteMatchScore);
+        const total = sortedByScore.length;
+        
+        if (total > 0) {
+            const minScore = sortedByScore[0].tasteMatchScore;
+            const maxScore = sortedByScore[total - 1].tasteMatchScore;
+            const range = Math.max(maxScore - minScore, 1);
+            
+            sortedByScore.forEach(t => {
+                const normalized = (t.tasteMatchScore - minScore) / range;
+                const stretchMin = Math.min(minScore, 20);
+                const stretchMax = Math.max(maxScore, 85);
+                const stretched = stretchMin + normalized * (stretchMax - stretchMin);
+                
+                t.calibratedTasteMatch = 0.7 * t.tasteMatchScore + 0.3 * stretched;
+            });
+        }
+
+        return scoredTracks;
+    }
+
   function calculateAudioStatistics(tracksWithFeatures) {
     const features = ['energy', 'valence', 'danceability', 'acousticness', 'tempo'];
     const stats = {
@@ -30270,7 +31773,7 @@ const getDominantColor = (src) => {
       let originalTracksForRemoval = [...tracks];
       let unconvertedLocalCount = 0;
       const directSortsToConvertLocalTracks = [
-        'playCount', 'popularity', 'releaseDate', 'averageColor', 
+        'tasteMatch', 'playCount', 'popularity', 'releaseDate', 'averageColor', 
         'energyWave', 'tempo', 'energy', 'danceability', 'valence', 
         'acousticness', 'instrumentalness', 'deduplicateOnly', 'filterOnePerArtist'
       ];
@@ -30350,7 +31853,7 @@ const getDominantColor = (src) => {
         if (isArtistPage) {
             tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType, progressCallback);
         }
-        else if (sortType === 'deduplicateOnly' || sortType === 'excludeByPlaylist' || sortType === 'filterOnePerArtist') {
+        else if (sortType === 'deduplicateOnly' || sortType === 'excludeByPlaylist' || sortType === 'filterOnePerArtist' || sortType === 'tasteMatch') {
             updateProgressText("Enriching...");
             
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
@@ -30457,6 +31960,28 @@ const getDominantColor = (src) => {
 
           if (sortType === "playCount" || sortType === "popularity" || sortType === "releaseDate" || sortType === "trueReleaseDate") {
             sortedTracks = applyStandardSort(uniqueTracks, sortType, isAscending);
+          } else if (sortType === "tasteMatch") {
+              const { trackGenreMap } = await fetchAllTrackGenres(uniqueTracks, updateProgressText);
+              
+              updateProgressText("Audio...");
+              const trackIds = uniqueTracks.map(t => t.trackId || t.uri.split(":")[2]).filter(Boolean);
+              const allStats = await getBatchTrackStats(trackIds, p => updateProgressText(`Audio ${Math.floor(p)}%`));
+              
+              const tracksWithAllData = uniqueTracks.map(track => {
+                  const id = track.trackId || track.uri.split(":")[2];
+                  return {
+                      ...track,
+                      genres: trackGenreMap.get(track.uri) || [],
+                      features: allStats[id] || null
+                  };
+              });
+              
+              const scoredTracks = await evaluateTasteMatch(tracksWithAllData, p => updateProgressText(p));
+              
+              sortedTracks = scoredTracks.sort((a, b) => {
+                  return isAscending ? a.calibratedTasteMatch - b.calibratedTasteMatch : b.calibratedTasteMatch - a.calibratedTasteMatch;
+              });
+              updateProgressText("100%");
           } else if (sortType === "shuffle") {
             const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
 
@@ -32248,7 +33773,7 @@ const getDominantColor = (src) => {
   }
 
   const BASIC_SORT_TYPES = [
-    "playCount", "popularity", "shuffle", "releaseDate", "trueReleaseDate", "averageColor", 
+    "tasteMatch", "playCount", "popularity", "shuffle", "releaseDate", "trueReleaseDate", "averageColor", 
     "deduplicateOnly", "filterLiked", "keepLiked", "sortByLiked", 
     "filterSingles", "filterEPs", "filterSinglesEPs", "filterAlbumsEPs", 
     "filterAlbums", "filterAlbumsCompilations", "filterAlbumsEPsCompilations", 
@@ -33589,7 +35114,7 @@ const getDominantColor = (src) => {
       
       const lfmMap = await fetchLfmScrobblesInRange(username, fromTs, toTs);
       
-      updateProgress("Matching Tracks...");
+      updateProgress("Matching...");
 
       const overrides = getLfmOverrides();
 
@@ -38327,6 +39852,12 @@ const getDominantColor = (src) => {
   await idb.clear('personalScrobbles');
   await migrateJobHistoryToIdb();
   
+  const savedProfile = await idb.get('staticData', STORAGE_KEY_TASTE_PROFILE);
+  if (savedProfile && savedProfile.version === TASTE_PROFILE_VERSION && (Date.now() - savedProfile.ts < TASTE_PROFILE_UPDATE_INTERVAL)) {
+      cachedTasteProfile = savedProfile.data;
+      cachedTasteProfileTimestamp = savedProfile.ts;
+  }
+
   const savedHistory = await idb.get('notificationHistory', 'logs');
   if (savedHistory) {
       notificationHistoryCache = savedHistory;
