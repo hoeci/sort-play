@@ -35,6 +35,7 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 *   **My Scrobbles:** Your personal scrobble count for each track (requires Last.fm username).
 *   **Scrobble Range:** Your personal scrobbles within a specific custom date range (requires Last.fm username).
 *   **Last Scrobbled:** The date you personally last scrobbled a track (requires Last.fm username).
+*   **Taste Match:** Sorts tracks by how well they align with your unique listening history and personal taste profile.
 *   **Energy Wave:** Creates a dynamic listening journey by arranging tracks to smoothly transition through different energy levels and moods.
 *   **Album Color:** The dominant color of the album artwork, with modes for perceptual grouping or a pure hue gradient.
 *   **Audio Features:**
@@ -59,7 +60,7 @@ Apply instant filters to your current view without opening complex menus.
 *   **Followed Artists:**
     *   **Followed (Main/Any):** Keep tracks where you follow the primary artist or any credited artist.
     *   **Not Followed:** Remove tracks by artists you already follow to find new music.
-*   **Release Type:** Isolate specific release formats. Options include **Albums**, **EPs**, **Singles**, **Compilations**, and various combinations (e.g., "Albums & EPs").
+*   **Release Type:** Isolate specific release formats. Options include Albums, EPs, Singles, Compilations, and various combinations (e.g., "Albums & EPs").
 *   **Remove Trashed:** Instantly remove songs you've banned using the Trashbin extension.
 *   **Exclude via Playlist:** Filter out tracks that already exist in another playlist of your choice.
 </details>
