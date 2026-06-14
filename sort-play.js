@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.88.1";
+  const SORT_PLAY_VERSION = "5.89.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -234,7 +234,7 @@
   let showLastFmArtistContextMenu = false;
   let chatPanelVisible = false;
   let showLikeButton = false;
-  let likeButtonConfig = { trackRows: true, nowPlayingBar: true, nowPlayingView: true };
+  let likeButtonConfig = { trackRows: true, nowPlayingBar: true, nowPlayingView: true, watchFeed: true };
   let showNowPlayingData = false;
   let nowPlayingConfig = {
     title: { enabled: true, items: [] },
@@ -2405,7 +2405,10 @@
     showLikeButton = localStorage.getItem(STORAGE_KEY_SHOW_LIKE_BUTTON) === "true";
     const storedLikeBtnConfig = localStorage.getItem(STORAGE_KEY_LIKE_BUTTON_CONFIG);
     if (storedLikeBtnConfig) {
-        try { likeButtonConfig = JSON.parse(storedLikeBtnConfig); } catch(e) {}
+        try { 
+            const parsed = JSON.parse(storedLikeBtnConfig); 
+            likeButtonConfig = { ...likeButtonConfig, ...parsed };
+        } catch(e) {}
     }
     useEnergyWaveShuffle = localStorage.getItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE) === "true";
     energyWaveShuffleLimit = parseInt(localStorage.getItem(STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT), 10) || 6000;
@@ -2648,7 +2651,7 @@
           [STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE]: "number",
           [STORAGE_KEY_KEY_DISPLAY_MODE]: "standard",
           [STORAGE_KEY_SHOW_LIKE_BUTTON]: "false",
-          [STORAGE_KEY_LIKE_BUTTON_CONFIG]: JSON.stringify({ trackRows: true, nowPlayingBar: true, nowPlayingView: true }),
+          [STORAGE_KEY_LIKE_BUTTON_CONFIG]: JSON.stringify({ trackRows: true, nowPlayingBar: true, nowPlayingView: true, watchFeed: true }),
           [STORAGE_KEY_LASTFM_AUTOCORRECT]: "false",
           [STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE]: "default",
           [STORAGE_KEY_LFM_OVERRIDES]: "{}",
@@ -4199,12 +4202,14 @@
                 toggleOptions: [
                     { id: 'trackRows', label: 'Track Rows', checked: likeButtonConfig.trackRows },
                     { id: 'nowPlayingBar', label: 'Now Playing Bar (Bottom)', checked: likeButtonConfig.nowPlayingBar },
-                    { id: 'nowPlayingView', label: 'Now Playing View (Sidebar)', checked: likeButtonConfig.nowPlayingView }
+                    { id: 'nowPlayingView', label: 'Now Playing View (Sidebar)', checked: likeButtonConfig.nowPlayingView },
+                    { id: 'watchFeed', label: 'Track Preview Feed', checked: likeButtonConfig.watchFeed }
                 ],
                 onSave: (results, saveBtn, closeModal) => {
                     likeButtonConfig.trackRows = results.trackRows;
                     likeButtonConfig.nowPlayingBar = results.nowPlayingBar;
                     likeButtonConfig.nowPlayingView = results.nowPlayingView;
+                    likeButtonConfig.watchFeed = results.watchFeed;
                     saveSettings();
                     document.dispatchEvent(new CustomEvent('sortPlay_likeButtonConfigChanged'));
                     closeModal();
@@ -39095,7 +39100,7 @@ const getDominantColor = (src) => {
         setTimeout(likeButton_initiateLikedSongs, 30000);
     }
 
-    const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16, dynamicSizeSelector = null }) {
+    const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16, dynamicSizeSelector = null, buttonStyle = { marginRight: "12px" } }) {
         const trackId = uri.replace("spotify:track:", "");
         const [currentSize, setCurrentSize] = Spicetify.React.useState(size);
         const [isrc, setISRC] = Spicetify.React.useState(null);
@@ -39287,7 +39292,7 @@ const getDominantColor = (src) => {
                     clearTimeout(tooltipTimeoutRef.current);
                     setIsTooltipVisible(false);
                 },
-                style: { marginRight: "12px" }
+                style: buttonStyle
             }, Spicetify.React.createElement("span", {
                 className: "Wrapper-sm-only Wrapper-small-only",
                 style: {
@@ -39301,6 +39306,7 @@ const getDominantColor = (src) => {
                 style: {
                     fill: (isLiked || hasISRCLiked) ? "var(--text-bright-accent)" : "var(--text-subdued)",
                     filter: isHovered ? 'brightness(1.1)' : 'none',
+                    transform: (hasISRCLiked && !isLiked) ? 'translateY(1px)' : 'none',
                     transition: 'filter 0.1s ease-in-out'
                 },
                 dangerouslySetInnerHTML: {
@@ -39421,7 +39427,8 @@ const getDominantColor = (src) => {
                         Spicetify.React.createElement(LikeButton, { 
                             uri: uri, 
                             key: uri, 
-                            classList: currentNativeLikeButton.className 
+                            classList: currentNativeLikeButton.className,
+                            buttonStyle: { marginRight: "0px" }
                         }), 
                         container
                     );
@@ -39436,7 +39443,6 @@ const getDominantColor = (src) => {
                     }
                     
                     container.dataset.renderedUri = uri;
-                    container.firstChild.style.marginRight = "0px";
                     
                     mountLikeButton_failedAttempts = 0;
                     mountLikeButton_isRunning = false;
@@ -39538,7 +39544,8 @@ const getDominantColor = (src) => {
                         key: uri,
                         classList: templateButton.className,
                         size: 21,
-                        dynamicSizeSelector: dynamicSizeSelector
+                        dynamicSizeSelector: dynamicSizeSelector,
+                        buttonStyle: { marginRight: "0px", marginLeft: "12px" }
                     }),
                     container
                 );
@@ -39553,8 +39560,6 @@ const getDominantColor = (src) => {
                 }
                 
                 container.dataset.renderedUri = uri;
-                container.firstChild.style.marginRight = "0px";
-                container.firstChild.style.marginLeft = "12px";
                 
                 return;
                 
@@ -39567,6 +39572,103 @@ const getDominantColor = (src) => {
         }
     }
     
+    async function mountLikeButtonWatchFeed() {
+        const MAX_RETRIES = 15;
+        let retryDelay = 250;
+    
+        const watchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
+        let container = watchFeedView ? watchFeedView.querySelector(".likeControl-wrapper-wf") : null;
+
+        if (likeButtonConfig.watchFeed === false || !watchFeedView) {
+            if (container) {
+                Spicetify.ReactDOM.unmountComponentAtNode(container);
+                container.remove();
+            }
+            return;
+        }
+    
+        for (let i = 0; i < MAX_RETRIES; i++) {
+            const currentWatchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
+            if (!currentWatchFeedView) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+    
+            const titleNode = currentWatchFeedView.querySelector('[data-flip-id^="wf-title-spotify:track:"]');
+            if (!titleNode) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+            
+            const uri = titleNode.getAttribute('data-flip-id').replace('wf-title-', '');
+
+            let templateButton = currentWatchFeedView.querySelector('button[aria-label="Add to playlist"]') || 
+                                 currentWatchFeedView.querySelector('button[aria-checked="true"]') ||
+                                 currentWatchFeedView.querySelector('button[data-testid="add-button"]');
+            
+            if (!templateButton || !templateButton.parentElement) {
+                console.warn(`[Sort-Play Like Button WF] Retry ${i + 1}: Template button not found`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+            
+            let container = currentWatchFeedView.querySelector(".likeControl-wrapper-wf");
+            if (!container) {
+                container = document.createElement("div");
+                container.className = "likeControl-wrapper-wf";
+                container.style.display = "contents";
+                try {
+                    templateButton.parentElement.appendChild(container);
+                } catch (error) {
+                    console.error(`[Sort-Play Like Button WF] Retry ${i + 1}: Failed to insert like button wrapper`, error);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    continue;
+                }
+            }
+    
+            if (container.dataset.renderedUri === uri && container.firstChild) {
+                return;
+            }
+    
+            try {
+                Spicetify.ReactDOM.render(
+                    Spicetify.React.createElement(LikeButton, {
+                        uri: uri,
+                        key: uri,
+                        classList: templateButton.className,
+                        size: 29,
+                        dynamicSizeSelector: null,
+                        buttonStyle: { marginRight: "0px", marginTop: "1px",display: "flex",alignItems: "center", justifyContent: "center"}
+                    }),
+                    container
+                );
+                
+                await new Promise(resolve => setTimeout(resolve, 50));
+                
+                if (!container.firstChild) {
+                    console.error(`[Sort-Play Like Button WF] Retry ${i + 1}: React render completed but no child element found`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    continue;
+                }
+                
+                container.dataset.renderedUri = uri;
+                
+                return;
+                
+            } catch (error) {
+                console.error(`[Sort-Play Like Button WF] Retry ${i + 1}: React render error`, error);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 2, 3000);
+                continue;
+            }
+        }
+    }
+
     (async function initialize() {
         await likeButton_initiateLikedSongs();
     
@@ -39578,10 +39680,12 @@ const getDominantColor = (src) => {
     
         await mountLikeButton();
         await mountLikeButtonNowPlayingView();
+        await mountLikeButtonWatchFeed();
     
         Spicetify.Player.addEventListener("songchange", () => {
             mountLikeButton();
             mountLikeButtonNowPlayingView();
+            mountLikeButtonWatchFeed();
         });
     })();
 
@@ -39673,7 +39777,7 @@ const getDominantColor = (src) => {
         if (likeButton_tracklistObserver) {
             likeButton_tracklistObserver.disconnect();
         }
-        const mainView = document.querySelector("main");
+        const mainView = document.querySelector(".Root__main-view") || document.querySelector("main") || document.body;
         if (!mainView) {
             setTimeout(likeButton_connectObserver, 250);
             return;
@@ -39682,6 +39786,7 @@ const getDominantColor = (src) => {
         likeButton_processTracklist(mainView);
         mountLikeButton();
         mountLikeButtonNowPlayingView();
+        mountLikeButtonWatchFeed();
     
         likeButton_tracklistObserver = new MutationObserver((mutations) => {
             if (document.querySelector(".main-nowPlayingWidget-nowPlaying") && !document.querySelector(".likeControl-wrapper")) {
@@ -39692,15 +39797,20 @@ const getDominantColor = (src) => {
             if (nowPlayingView) {
                 mountLikeButtonNowPlayingView();
             }
+
+            const watchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
+            if (watchFeedView) {
+                mountLikeButtonWatchFeed();
+            }
     
             for (const mutation of mutations) {
-                if (mutation.target.closest && mutation.target.closest('.likeControl-wrapper-npv')) {
+                if (mutation.target.closest && (mutation.target.closest('.likeControl-wrapper-npv') || mutation.target.closest('.likeControl-wrapper-wf'))) {
                     continue;
                 }
                 
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        if (node.classList && node.classList.contains('likeControl-wrapper-npv')) {
+                        if (node.classList && (node.classList.contains('likeControl-wrapper-npv') || node.classList.contains('likeControl-wrapper-wf'))) {
                             continue;
                         }
                         if (node.matches('.main-trackList-trackListRow, div[role="row"][aria-selected]')) {
@@ -39725,11 +39835,12 @@ const getDominantColor = (src) => {
             });
             document.querySelectorAll('.sort-play-like-button-injected').forEach(el => el.classList.remove('sort-play-like-button-injected'));
         } else {
-            const mainView = document.querySelector("main");
+            const mainView = document.querySelector(".Root__main-view") || document.querySelector("main") || document.body;
             if (mainView) likeButton_processTracklist(mainView);
         }
         mountLikeButton();
         mountLikeButtonNowPlayingView();
+        mountLikeButtonWatchFeed();
     });
   }
 
