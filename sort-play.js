@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.88.0";
+  const SORT_PLAY_VERSION = "5.88.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -2074,7 +2074,8 @@
             throw new Error("All Last.fm API keys are invalid or have been revoked.");
         }
         params.set('api_key', apiKey);
-        const directUrl = `${CONFIG.lastfm.baseUrl}?${params}`;
+        const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
+        const directUrl = `${CONFIG.lastfm.baseUrl}?${queryString}`;
         const gatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(directUrl)}`;
 
         if (useLfmGateway) {
@@ -35855,7 +35856,8 @@ const getDominantColor = (src) => {
       });
 
       try {
-          const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${params.toString()}`);
+          const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
+          const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${queryString}`);
           
           if (response.status === 401 || response.status === 403) {
               return { page: targetPage, hasNextPage: false, comments: [], error: "session_expired", fromCache: false };
@@ -36039,7 +36041,8 @@ const getDominantColor = (src) => {
       });
 
       try {
-          const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${params.toString()}`);
+          const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
+          const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${queryString}`);
           if (!response.ok) return null;
           const data = await response.json();
           if (data && Array.isArray(data) && data.length > 0) {
