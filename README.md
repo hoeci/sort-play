@@ -7,9 +7,9 @@
 *A Spicetify extension that adds powerful sorting, filtering, UI features, and more to the Spotify desktop client.*
 
 <p>
-  <a href="https://spicetify.app/docs/getting-started"><img src="https://img.shields.io/badge/Spicetify-Marketplace-1DB954?style=for-the-badge&logo=spotify" alt="Spicetify Marketplace"></a>
-  <a href="https://github.com/hoeci/sort-play"><img src="https://img.shields.io/github/stars/hoeci/sort-play?style=for-the-badge&logo=github&color=eac54f" alt="GitHub Stars"></a>
-  <img src="https://img.shields.io/badge/Made%20with-%E2%9D%A4-F472B6?style=for-the-badge" alt="Made with Love">
+  <a href="https://spicetify.app/docs/getting-started"><img src="https://badges.niko2nio2.workers.dev/badge/Spicetify/Extension/1DB954?logo=spotify&v=1" alt="Spicetify Extension"></a>
+  <a href="https://github.com/hoeci/sort-play"><img src="https://badges.niko2nio2.workers.dev/github/stars/hoeci/sort-play?logo=github&color=eac54f&v=1" alt="GitHub Stars"></a>
+  <img src="https://badges.niko2nio2.workers.dev/badge/Made with/❤/F472B6?v=1" alt="Made with Love">
 </p>
 
 <p>
