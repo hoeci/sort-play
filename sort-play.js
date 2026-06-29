@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "5.89.0";
+  const SORT_PLAY_VERSION = "6.0.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -58,6 +58,7 @@
   const STORAGE_KEY_NEW_RELEASES_LIMIT = "sort-play-new-releases-limit";
   const STORAGE_KEY_FOLLOWED_RELEASES_LIMIT = "sort-play-followed-releases-limit";
   const STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE = "sort-play-discovery-playlist-size";
+  const STORAGE_KEY_DISCOVERY_STRICT_ALBUM_EXCLUSION = "sort-play-discovery-strict-album-exclusion";
   const STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS = "sort-play-set-dedicated-playlist-covers";
   const STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS = "sort-play-dynamic-playlist-jobs";
   const STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES = "sort-play-dynamic-playlist-custom-schedules";
@@ -128,6 +129,7 @@
   const STORAGE_KEY_CHAT_CUSTOM_NAME = "sp-chat-custom-name";
   const STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION = "sort-play-auto-hide-discography-notification";
   const STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED = "sort-play-range-exclude-unlistened";
+  const STORAGE_KEY_GENRE_FILTER_SOURCES = "sort-play-genre-filter-sources";
   const STORAGE_KEY_TASTE_PROFILE = "sort-play-taste-profile";
 
   const SYNCABLE_SETTINGS_KEYS = [
@@ -149,7 +151,7 @@
     STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, STORAGE_KEY_DEDICATED_PLAYLIST_MAP,
     STORAGE_KEY_COLOR_SORT_MODE, STORAGE_KEY_TOP_TRACKS_LIMIT,
     STORAGE_KEY_NEW_RELEASES_LIMIT, STORAGE_KEY_FOLLOWED_RELEASES_LIMIT,
-    STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS,
+    STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, STORAGE_KEY_DISCOVERY_STRICT_ALBUM_EXCLUSION, STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS,
     STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS, STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES,
     STORAGE_KEY_DEDICATED_PLAYLIST_JOBS, STORAGE_KEY_DYNAMIC_SORT_TYPE,
     STORAGE_KEY_DYNAMIC_SCHEDULE, STORAGE_KEY_DYNAMIC_UPDATE_SOURCE,
@@ -182,7 +184,7 @@
     STORAGE_KEY_CUSTOM_FILTER_PAGE_SIZE, STORAGE_KEY_ACTIVE_RANGE_FILTER, 
     STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
     STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR,
-    STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED
+    STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, STORAGE_KEY_GENRE_FILTER_SOURCES
   ];
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
@@ -224,6 +226,7 @@
   let newReleasesDaysLimit = 'release-2';
   let followedReleasesAlbumLimit = 'all';
   let colorSortMode = 'perceptual';
+  let discoveryStrictAlbumExclusion = false;
   let useEnergyWaveShuffle = false;
   let energyWaveShuffleLimit = 6000;
   let includeSongStats = true;
@@ -282,7 +285,6 @@
   let isUpdatingAlbumTracklist = false;
   let isUpdatingArtistTracklist = false;
   let internalTokenRefreshPromise = null;
-  let userMarketPromise = null;
   let s_Access_Token = null;
   let s_Token_Exp = 0;
   let lfmKeyIndex = 0;
@@ -372,7 +374,8 @@
   const CHAT_API_URL = "https://sort-play-chat.niko2nio2.workers.dev";
   
   const DEVELOPER_HAS_SPOTIFY_PREMIUM = false;
-
+  const SPOTIFY_TRACK_GENRES_WORKING = true;
+  
   async function get_S_Client_Token() {
       if (!DEVELOPER_HAS_SPOTIFY_PREMIUM) return null;
 
@@ -420,7 +423,7 @@
       { value: '★', text: '★' }, { value: '✶', text: '✶' }, { value: '✵', text: '✵' }, { value: '✳', text: '✳' },
       { value: '♪', text: '♪' }, { value: '✕', text: '✕' }, { value: '╳', text: '╳' }, { value: ' ', text: 'ㅤ' }
   ];
-
+  
   const settingsSvg = `<svg viewBox="0 0 256 256"><path d="M244.1,105.9c-0.4-2.9-2.6-5.5-5.6-6.3c-10.7-3.3-19.9-10.7-25.8-20.7c-5.9-10.4-7.8-21.4-5.2-32.9c0.7-2.9-0.4-6.3-2.6-8.1c-11.4-9.9-24-17-37.7-21.8c-2.9-0.7-5.9,0-8.1,1.9c-8.5,7.8-19.5,12.2-31,12.2s-22.5-4.4-31-12.2c-2.2-2.2-5.2-2.6-8.1-1.9C75.3,20.6,62.8,28,51.3,38c-2.2,2.2-3.3,5.2-2.6,8.1c2.6,11.1,0.7,22.5-5.2,32.9c-5.9,10-14.8,17.4-26.2,21c-2.9,0.7-5.2,3.3-5.5,6.3c-1.1,8.1-1.9,15.1-1.9,21.8c0,7,0.4,13.7,1.9,21.8c0.4,3,2.6,5.2,5.5,6.3c11.1,3.7,20.3,11.1,26.2,21.1c5.9,10,7.8,21.8,5.2,32.5c-0.7,2.9,0.4,6.3,2.6,8.1c11.4,10,24,17,37.7,21.8c0.7,0.4,1.9,0.4,2.6,0.4c1.9,0,4-0.7,4.8-1.9c8.5-7.7,19.6-12.2,31-12.2s22.5,4.4,31,12.2c2.2,1.9,5.5,2.6,8.5,1.5c14.4-5.2,26.9-12.6,37.7-21.8c2.2-2.2,3.3-5.2,2.6-8.1c-2.6-11.1-0.7-22.5,5.2-32.9c5.9-10,14.8-17.4,26.2-21c3-0.7,5.2-3.3,5.6-6.3c1.1-8.1,1.9-15.2,1.9-21.8C246,120.7,245.6,114,244.1,105.9z M127.8,174.9c-25.4,0-46-20.6-46-46c0-25.4,20.6-46,46-46s46,20.6,46,46C173.8,154.2,153.2,174.9,127.8,174.9z"/></svg>`;
   const sortIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path d="M13 12H21M13 8H21M13 16H21M6 7V17M6 17L3 14M6 17L9 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const quickFiltersIconSvg = `<svg width="22px" height="21px" viewBox="0 0 24 24" fill="none"><path d="M21 6H19M21 12H16M21 18H16M7 20V13.5612C7 13.3532 7 13.2492 6.97958 13.1497C6.96147 13.0615 6.93151 12.9761 6.89052 12.8958C6.84431 12.8054 6.77934 12.7242 6.64939 12.5617L3.35061 8.43826C3.22066 8.27583 3.15569 8.19461 3.10948 8.10417C3.06849 8.02393 3.03853 7.93852 3.02042 7.85026C3 7.75078 3 7.64677 3 7.43875V5.6C3 5.03995 3 4.75992 3.10899 4.54601C3.20487 4.35785 3.35785 4.20487 3.54601 4.10899C3.75992 4 4.03995 4 4.6 4H13.4C13.9601 4 14.2401 4 14.454 4.10899C14.6422 4.20487 14.7951 4.35785 14.891 4.54601C15 4.75992 15 5.03995 15 5.6V7.43875C15 7.64677 15 7.75078 14.9796 7.85026C14.9615 7.93852 14.9315 8.02393 14.8905 8.10417C14.8443 8.19461 14.7793 8.27583 14.6494 8.43826L11.3506 12.5617C11.2207 12.7242 11.1557 12.8054 11.1095 12.8958C11.0685 12.9761 11.0385 13.0615 11.0204 13.1497C11 13.2492 11 13.3532 11 13.5612V17L7 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
@@ -429,10 +432,17 @@
   const genreFilterIconSvg = `<svg width="22px" height="21px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M20 20L18.2678 18.2678M18.2678 18.2678C18.7202 17.8154 19 17.1904 19 16.5C19 15.1193 17.8807 14 16.5 14C15.1193 14 14 15.1193 14 16.5C14 17.8807 15.1193 19 16.5 19C17.1904 19 17.8154 18.7202 18.2678 18.2678ZM15.6 10H18.4C18.9601 10 19.2401 10 19.454 9.89101C19.6422 9.79513 19.7951 9.64215 19.891 9.45399C20 9.24008 20 8.96005 20 8.4V5.6C20 5.03995 20 4.75992 19.891 4.54601C19.7951 4.35785 19.6422 4.20487 19.454 4.10899C19.2401 4 18.9601 4 18.4 4H15.6C15.0399 4 14.7599 4 14.546 4.10899C14.3578 4.20487 14.2049 4.35785 14.109 4.54601C14 4.75992 14 5.03995 14 5.6V8.4C14 8.96005 14 9.24008 14.109 9.45399C14.2049 9.64215 14.3578 9.79513 14.546 9.89101C14.7599 10 15.0399 10 15.6 10ZM5.6 10H8.4C8.96005 10 9.24008 10 9.45399 9.89101C9.64215 9.79513 9.79513 9.64215 9.89101 9.45399C10 9.24008 10 8.96005 10 8.4V5.6C10 5.03995 10 4.75992 9.89101 4.54601C9.79513 4.35785 9.64215 4.20487 9.45399 4.10899C9.24008 4 8.96005 4 8.4 4H5.6C5.03995 4 4.75992 4 4.54601 4.10899C4.35785 4.20487 4.20487 4.35785 4.10899 4.54601C4 4.75992 4 5.03995 4 5.6V8.4C4 8.96005 4 9.24008 4.10899 9.45399C4.20487 9.64215 4.35785 9.79513 4.54601 9.89101C4.75992 10 5.03995 10 5.6 10ZM5.6 20H8.4C8.96005 20 9.24008 20 9.45399 19.891C9.64215 19.7951 9.79513 19.6422 9.89101 19.454C10 19.2401 10 18.9601 10 18.4V15.6C10 15.0399 10 14.7599 9.89101 14.546C9.79513 14.3578 9.64215 14.2049 9.45399 14.109C9.24008 14 8.96005 14 8.4 14H5.6C5.03995 14 4.75992 14 4.54601 14.109C4.35785 14.2049 4.20487 14.3578 4.10899 14.546C4 14.7599 4 15.0399 4 15.6V18.4C4 18.9601 4 19.2401 4.10899 19.454C4.20487 19.6422 4.35785 19.7951 4.54601 19.891C4.75992 20 5.03995 20 5.6 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const customFilterIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M7 9H17M7 15H17M15 13V17M9 7V11M7.2 20H16.8C17.9201 20 18.4802 20 18.908 19.782C19.2843 19.5903 19.5903 19.2843 19.782 18.908C20 18.4802 20 17.9201 20 16.8V7.2C20 6.0799 20 5.51984 19.782 5.09202C19.5903 4.71569 19.2843 4.40973 18.908 4.21799C18.4802 4 17.9201 4 16.8 4H7.2C6.0799 4 5.51984 4 5.09202 4.21799C4.71569 4.40973 4.40973 4.71569 4.21799 5.09202C4 5.51984 4 6.07989 4 7.2V16.8C4 17.9201 4 18.4802 4.21799 18.908C4.40973 19.2843 4.71569 19.5903 5.09202 19.782C5.51984 20 6.07989 20 7.2 20Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const aiPickIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M12 3L14.0357 8.16153C14.2236 8.63799 14.3175 8.87622 14.4614 9.0771C14.5889 9.25516 14.7448 9.41106 14.9229 9.53859C15.1238 9.68245 15.362 9.77641 15.8385 9.96432L21 12L15.8385 14.0357C15.362 14.2236 15.1238 14.3175 14.9229 14.4614C14.7448 14.5889 14.5889 14.7448 14.4614 14.9229C14.3175 15.1238 14.2236 15.362 14.0357 15.8385L12 21L9.96432 15.8385C9.77641 15.362 9.68245 15.1238 9.53859 14.9229C9.41106 14.7448 9.25516 14.5889 9.0771 14.4614C8.87622 14.3175 8.63799 14.2236 8.16153 14.0357L3 12L8.16153 9.96432C8.63799 9.77641 8.87622 9.68245 9.0771 9.53859C9.25516 9.41106 9.41106 9.25516 9.53859 9.0771C9.68245 8.87622 9.77641 8.63799 9.96432 8.16153L12 3Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const analyzeIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M3 12H7L9 19L12 5L15 17L17 12H21" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const shuffleIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M18 4L21 7M21 7L18 10M21 7H17C16.0707 7 15.606 7 15.2196 7.07686C13.6329 7.39249 12.3925 8.63288 12.0769 10.2196C12 10.606 12 11.0707 12 12C12 12.9293 12 13.394 11.9231 13.7804C11.6075 15.3671 10.3671 16.6075 8.78036 16.9231C8.39397 17 7.92931 17 7 17H3M18 20L21 17M21 17L18 14M21 17H17C16.0707 17 15.606 17 15.2196 16.9231C15.1457 16.9084 15.0724 16.8917 15 16.873M3 7H7C7.92931 7 8.39397 7 8.78036 7.07686C8.85435 7.09158 8.92758 7.1083 9 7.12698" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const convertToSpotifyIconSvg = `<svg width="22px" height="22px" viewBox="0 0 24 24" fill="none"><path fill="none" d="M12 9.5V15.5M9 12.5H15M8.4 19C5.41766 19 3 16.6044 3 13.6493C3 11.2001 4.8 8.9375 7.5 8.5C8.34694 6.48637 10.3514 5 12.6893 5C15.684 5 18.1317 7.32251 18.3 10.25C19.8893 10.9449 21 12.6503 21 14.4969C21 16.9839 18.9853 19 16.5 19L8.4 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const settingsIconSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM12.9 3.06C12.7 3 12.47 3 12 3s-.7 0-.9.06c-.31.09-.57.27-.77.52-.13.16-.21.38-.39.81-.25.62-.94.94-1.57.73l-.57-.19c-.4-.14-.6-.2-.8-.22-.29-.02-.58.05-.83.2-.18.1-.33.25-.63.55-.32.32-.48.48-.58.66-.15.27-.21.58-.18.89.02.21.1.42.27.84.27.66 0 1.41-.6 1.77l-.28.17c-.42.25-.63.38-.79.55-.14.16-.24.34-.3.54-.07.22-.07.47-.07.97 0 .59 0 .89.09 1.14.09.22.22.42.4.58.2.18.47.29 1.02.51.55.22.84.83.65 1.4l-.22.65c-.15.44-.22.67-.23.89-.01.26.05.52.18.75.1.2.27.36.6.7.33.33.5.5.69.6.23.13.49.19.76.18.22-.01.44-.08.89-.23l.52-.17c.64-.21 1.33.11 1.58.73.17.43.26.65.39.81.2.25.46.43.77.52.2.06.43.06.9.06s.7 0 .9-.06c.31-.09.57-.27.77-.52.13-.16.21-.38.39-.81.25-.62.94-.94 1.57-.73l.53.17c.44.15.67.22.89.23.26.01.52-.05.75-.18.2-.1.37-.27.7-.6.33-.33.5-.5.6-.7.13-.23.19-.49.18-.76-.01-.22-.08-.44-.23-.89l-.21-.65c-.19-.57.09-1.18.65-1.4.55-.22.82-.33 1.02-.51.18-.16.31-.36.4-.58.09-.25.09-.55.09-1.14 0-.5 0-.75-.07-.97-.06-.2-.17-.38-.3-.54-.16-.17-.37-.3-.79-.55l-.28-.17c-.6-.36-.86-1.11-.59-1.77.17-.42.25-.63.27-.84.03-.31-.03-.62-.18-.89-.1-.18-.26-.34-.58-.66-.3-.3-.45-.45-.63-.55-.25-.15-.54-.22-.83-.2-.2.01-.4.08-.8.22l-.57.19c-.63.21-1.32-.11-1.57-.73-.18-.43-.26-.65-.39-.81-.2-.25-.46-.43-.77-.52-.21-.06-.44-.06-.91-.06Z"/></svg>`;
   const infoIconSvg = `<svg width="14px" height="14px" viewBox="0 0 24 24" fill="none" style="margin-left: 2px; margin-bottom: 4px; vertical-align: middle; cursor: help; color: #888; opacity: 0.8;"><path d="M12 8H12.01M12 11V16M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const barChartIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`;
+  const hexbinChartIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l4.5 2.6v5.2L12 12.4l-4.5-2.6V4.6z"/><path d="M7.5 10l-4.5 2.6v5.2L7.5 20.4l4.5-2.6V12.6"/><path d="M16.5 10l4.5 2.6v5.2L16.5 20.4l-4.5-2.6"/></svg>`;
+  const eraChartIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="4" height="8"></rect><rect x="7" y="8" width="10" height="8"></rect><rect x="17" y="8" width="4" height="8"></rect></svg>`;
+  const gridChartIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>`;
+  const listChartIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>`;
+  const donutChartIconSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>`;
   const liveChatIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none"><path d="M19.4003 18C19.7837 17.2499 20 16.4002 20 15.5C20 12.4624 17.5376 10 14.5 10C11.4624 10 9 12.4624 9 15.5C9 18.5376 11.4624 21 14.5 21L21 21C21 21 20 20 19.4143 18.0292M18.85 12C18.9484 11.5153 19 11.0137 19 10.5C19 6.35786 15.6421 3 11.5 3C7.35786 3 4 6.35786 4 10.5C4 11.3766 4.15039 12.2181 4.42676 13C5.50098 16.0117 3 18 3 18H9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const coffeeIconSVG = `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="none"><path d="M18.5 7H19C19.4647 7 19.697 7 19.8902 7.03843C20.6836 7.19624 21.3038 7.81644 21.4616 8.60982C21.5 8.80302 21.5 9.03535 21.5 9.5C21.5 9.96465 21.5 10.197 21.4616 10.3902C21.3038 11.1836 20.6836 11.8038 19.8902 11.9616C19.697 12 19.4647 12 19 12H18.5M3 20H21M12 17C10.6055 17 9.90821 17 9.33277 16.8619C7.50453 16.4229 6.07707 14.9955 5.63815 13.1672C5.5 12.5918 5.5 11.8945 5.5 10.5L5.5 7.2C5.5 6.0799 5.5 5.51984 5.71799 5.09202C5.90973 4.7157 6.21569 4.40974 6.59202 4.21799C7.01984 4 7.57989 4 8.7 4L15.3 4C16.4201 4 16.9802 4 17.408 4.21799C17.7843 4.40973 18.0903 4.71569 18.282 5.09202C18.5 5.51984 18.5 6.07989 18.5 7.2V10.5C18.5 11.8945 18.5 12.5918 18.3619 13.1672C17.9229 14.9955 16.4955 16.4229 14.6672 16.8619C14.0918 17 13.3945 17 12 17Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const copyIconSVG = `<svg width="16px" height="16px" viewBox="0 0 20 20" fill="none"><path fill="currentColor" fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v9a2 2 0 002 2h2v2a2 2 0 002 2h9a2 2 0 002-2V8a2 2 0 00-2-2h-2V4a2 2 0 00-2-2H4zm9 4V4H4v9h2V8a2 2 0 012-2h5zM8 8h9v9H8V8z"/></svg>`;
@@ -490,7 +500,33 @@
   const lastFmIconSvg = `<svg width="18" height="18" viewBox="1 0 24 24" fill="currentColor"><path d="M7,13v6a1,1,0,0,1-2,0V13a1,1,0,0,1,2,0Zm11,7a1,1,0,0,0,1-1V5a1,1,0,0,0-2,0V19A1,1,0,0,0,18,20Zm-6,0a1,1,0,0,0,1-1V9a1,1,0,0,0-2,0V19A1,1,0,0,0,12,20Z"/></svg>`;
   const selectDropdownIconSvgDataUri = "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e";
   const spSpinnerLoaderStyle = `.sp-spinner-loader { border: 2px solid rgba(255, 255, 255, 0.2); border-top: 2px solid #1db954; border-radius: 50%; width: 24px; height: 24px; animation: spSpinnerSpin 1s linear infinite; box-sizing: border-box; display: block; } @keyframes spSpinnerSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
-
+  const sunSvg = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor"><path d="M7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM12.75 3a.75.75 0 00-1.5 0v2.25a.75.75 0 001.5 0V3zM12.75 18.75a.75.75 0 00-1.5 0V21a.75.75 0 001.5 0v-2.25zM21 11.25h-2.25a.75.75 0 000 1.5H21a.75.75 0 000-1.5zM5.25 11.25H3a.75.75 0 000 1.5h2.25a.75.75 0 000-1.5zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.591a.75.75 0 001.06 1.06l1.591-1.591zM6.166 5.106a.75.75 0 00-1.06 1.06l1.591 1.591a.75.75 0 001.06-1.06l-1.591-1.591zM17.834 18.894a.75.75 0 001.06-1.06l-1.591-1.591a.75.75 0 00-1.06 1.06l1.591 1.591zM5.106 17.834a.75.75 0 001.06 1.06l1.591-1.591a.75.75 0 00-1.06-1.06l-1.591 1.591z"/></svg>`;
+  const flameSvg = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor"><path fill-rule="evenodd" d="M12.963 2.286a.75.75 0 00-1.071-.136 9.742 9.742 0 00-3.539 6.177A7.547 7.547 0 016.648 6.61a.75.75 0 00-1.152.082A9 9 0 1015.68 4.534a7.46 7.46 0 01-2.717-2.248zM15.75 14.25a3.75 3.75 0 11-7.313-1.172c.628.46 1.354.81 2.133 1a5.99 5.99 0 011.925-3.545 3.75 3.75 0 013.255 3.717z" clip-rule="evenodd" /></svg>`;
+  const moonSvg = `<svg viewBox="0 0 24 24" width="92%" height="92%" fill="currentColor"><path fill-rule="evenodd" d="M9.528 1.718a.75.75 0 01.162.819A8.97 8.97 0 009 6a9 9 0 009 9 8.97 8.97 0 003.463-.69.75.75 0 01.981.98 10.503 10.503 0 01-9.694 6.46c-5.799 0-10.5-4.701-10.5-10.5 0-4.368 2.667-8.112 6.46-9.694a.75.75 0 01.818.162z" clip-rule="evenodd" /></svg>`;
+  const dropSvg = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor"><path fill-rule="evenodd" d="M11.522 1.838a.75.75 0 01.956 0c2.478 2.015 6.272 5.86 6.272 10.662 0 3.728-3.022 6.75-6.75 6.75s-6.75-3.022-6.75-6.75c0-4.802 3.794-8.647 6.272-10.662z" clip-rule="evenodd" /></svg>`;
+  const timeIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="32" height="32"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>`;
+  const weatherIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="32" height="32"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path></svg>`;
+  const partyIconSvg = `<svg viewBox="21 0 512 512" width="95%" height="95%" fill="currentColor"><path d="M337.329,83.426c4.776-8.208,7.714-17.614,7.714-27.774C345.043,24.968,320.076,0,289.391,0s-55.652,24.968-55.652,55.652c0,10.16,2.938,19.566,7.714,27.774C144.795,105.331,72.348,191.767,72.348,294.957C72.348,414.635,169.712,512,289.391,512s217.043-97.365,217.043-217.043C506.435,191.767,433.988,105.331,337.329,83.426zM352.701,178.087h-46.614v-62.325C323.399,124.578,340.243,146.489,352.701,178.087zM126.013,211.478h55.21c-4.532,20.736-7.335,43.193-8.262,66.783h-66.376C108.75,254.378,115.557,231.858,126.013,211.478zM126.012,378.435c-10.455-20.38-17.262-42.9-19.427-66.783h66.376c0.927,23.59,3.73,46.047,8.261,66.783H126.012zM147.834,411.826h42.673c6.47,19.102,14.432,36.195,23.729,50.524C188.414,450.708,165.677,433.398,147.834,411.826zM272.696,474.151c-17.312-8.816-34.156-30.727-46.614-62.325h46.614V474.151zM272.696,278.261h-66.36c1.043-24.363,4.353-46.755,9.275-66.783h57.085V278.261zM272.696,178.087h-46.614c12.458-31.598,29.302-53.508,46.614-62.325V178.087zM289.391,77.913c-12.277,0-22.261-9.984-22.261-22.261c0-12.277,9.984-22.261,22.261-22.261s22.261,9.984,22.261,22.261C311.652,67.929,301.668,77.913,289.391,77.913zM306.087,474.151v-62.325h46.614C340.243,443.424,323.399,465.335,306.087,474.151zM363.172,378.435h-57.085v-66.783h66.36C371.404,336.016,368.094,358.407,363.172,378.435zM306.087,278.261v-66.783h57.085c4.923,20.028,8.232,42.419,9.275,66.783H306.087zM364.545,127.563c25.824,11.642,48.561,28.953,66.403,50.524h-42.674C381.804,158.985,373.842,141.892,364.545,127.563zM397.559,378.435c4.532-20.736,7.335-43.193,8.262-66.783h66.376c-2.165,23.883-8.972,46.403-19.428,66.783H397.559zM89.044,77.913H72.348V61.217c0-9.223-7.473-16.696-16.696-16.696c-9.223,0-16.696,7.473-16.696,16.696v16.696H22.261c-9.223,0-16.696,7.473-16.696,16.696s7.473,16.696,16.696,16.696h16.696V128c0,9.223,7.473,16.696,16.696,16.696c9.223,0,16.696-7.473,16.696-16.696v-16.696h16.696c9.223,0,16.696-7.473,16.696-16.696S98.266,77.913,89.044,77.913z"/></svg>`;
+  const focusIconSvg = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none"><g stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="12" width="4" height="7" rx="2" fill="currentColor"/><rect x="4" y="12" width="4" height="7" rx="2" fill="currentColor"/><path d="M20 16v-3C20 10.6131 19.1571 8.32387 17.6569 6.63604 16.1566 4.94821 14.1217 4 12 4 9.87827 4 7.84344 4.94821 6.34315 6.63604 4.84286 8.32387 4 10.6131 4 13v3"/></g></svg>`;
+  const chillIconSvg = `<svg viewBox="0 0 24 24" width="95%" height="95%" fill="currentColor"><rect x="4" y="5" width="16" height="9" rx="2"/><rect x="2" y="12" width="20" height="5" rx="1.5"/><path d="M5 17v2a1 1 0 0 0 2 0v-2zm12 0v2a1 1 0 0 0 2 0v-2z"/></svg>`;
+  const driveIconSvg = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>`;
+  const morningIconSvg = `<svg viewBox="-1.5 0 24 24" width="95%" height="95%" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M14.032 5H5.96802C5.52939 4.99999 5.15087 4.99998 4.83762 5.02135C4.50779 5.04386 4.17788 5.09336 3.85195 5.22836C3.11687 5.53285 2.53285 6.11687 2.22836 6.85195C2.09336 7.17788 2.04386 7.50779 2.02135 7.83762C1.99998 8.15087 1.99999 8.52934 2 8.96797V15.6667C2 17.7784 2.16809 19.6089 3.56583 20.7366C4.24347 21.2833 5.11558 21.5861 6.14322 21.7617C7.17262 21.9377 8.44648 22 10 22C11.5535 22 12.8274 21.9377 13.8568 21.7617C14.8844 21.5861 15.7565 21.2833 16.4342 20.7366C17.528 19.8541 17.8688 18.5412 17.9652 17H19C20.6569 17 22 15.6569 22 14V11C22 9.34315 20.6569 8 19 8H17.9877C17.9852 7.94407 17.9822 7.88994 17.9787 7.83762C17.9561 7.50779 17.9066 7.17788 17.7716 6.85195C17.4672 6.11687 16.8831 5.53285 16.1481 5.22836C15.8221 5.09336 15.4922 5.04386 15.1624 5.02135C14.8491 4.99998 14.4706 4.99999 14.032 5ZM18 10V15H19C19.5523 15 20 14.5523 20 14V11C20 10.4477 19.5523 10 19 10H18Z"/></svg>`;
+  const gamingIconSvg = `<svg viewBox="0 0 24 24" width="95%" height="95%" fill="currentColor"><path d="M21.986 9.74a3.193 3.193 0 0 0-.008-.088A5.003 5.003 0 0 0 17 5H7a4.97 4.97 0 0 0-4.987 4.737c-.01.079-.013.161-.013.253v6.51c0 .925.373 1.828 1.022 2.476A3.524 3.524 0 0 0 5.5 20c1.8 0 2.504-1 3.5-3 .146-.292.992-2 3-2 1.996 0 2.853 1.707 3 2 1.004 2 1.7 3 3.5 3 .925 0 1.828-.373 2.476-1.022A3.524 3.524 0 0 0 22 16.5V10c0-.095-.004-.18-.014-.26zM7 12.031a2 2 0 1 1-.001-3.999A2 2 0 0 1 7 12.031zm10-5a1 1 0 1 1 0 2 1 1 0 1 1 0-2zm-2 4a1 1 0 1 1 0-2 1 1 0 1 1 0 2zm2 2a1 1 0 1 1 0-2 1 1 0 1 1 0 2zm2-2a1 1 0 1 1 0-2 1 1 0 1 1 0 2z"/></svg>`;
+  const rainyIconSvg = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none"><path fill-rule="evenodd" d="M6 14H18C19.6569 14 21 12.6569 21 11 21 9.34315 19.6569 8 18 8 17.36 8 16.826 7.53873 16.5639 6.95481 15.7822 5.21307 14.0328 4 12 4 9.96722 4 8.21776 5.21308 7.43606 6.95481 7.17399 7.53873 6.64004 8 6 8 4.34315 8 3 9.34315 3 11 3 12.6569 4.34315 14 6 14Z" fill="currentColor"/><path d="M12 19V17M17 20V17M7 21V17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  const pregameIconSvg = `<svg viewBox="0 -64 640 640" width="95%" height="95%" fill="currentColor"><path d="M639.4 433.6c-8.4-20.4-31.8-30.1-52.2-21.6l-22.1 9.2-38.7-101.9c47.9-35 64.8-100.3 34.5-152.8L474.3 16c-8-13.9-25.1-19.7-40-13.6L320 49.8 205.7 2.4c-14.9-6.2-32-.3-40 13.6L79.1 166.5C48.9 219 65.7 284.3 113.6 319.2L74.9 421.1l-22.1-9.2c-20.4-8.5-43.7 1.2-52.2 21.6-1.7 4.1.2 8.8 4.3 10.5l162.3 67.4c4.1 1.7 8.7-.2 10.4-4.3 8.4-20.4-1.2-43.8-21.6-52.3l-22.1-9.2L173.3 342c4.4.5 8.8 1.3 13.1 1.3 51.7 0 99.4-33.1 113.4-85.3l20.2-75.4 20.2 75.4c14 52.2 61.7 85.3 113.4 85.3 4.3 0 8.7-.8 13.1-1.3L506 445.6l-22.1 9.2c-20.4 8.5-30.1 31.9-21.6 52.3 1.7 4.1 6.4 6 10.4 4.3L635.1 444c4-1.7 6-6.3 4.3-10.4zM275.9 162.1l-112.1-46.5 36.5-63.4 94.5 39.2-18.9 70.7zm88.2 0l-18.9-70.7 94.5-39.2 36.5 63.4-112.1 46.5z"/></svg>`;
+  
+  const VIBE_DEFS = [
+    { id: 'workout', label: 'Hype / Adrenaline', icon: flameSvg, color: '#D16666', desc: 'High energy, fast tempo, and a heavy beat to get your adrenaline pumping and keep you energized.', long_desc: 'Focuses on high energy, fast tempos, and strong rhythmic elements. Tracks with heavy beats and intense drops perfect for feeling unstoppable, powering through tasks, or intense exercise.' },
+    { id: 'party', label: 'Party / Dance', icon: partyIconSvg, color: '#D4B856', desc: 'Highly danceable, upbeat, and positive tracks perfectly picked to energize a room or boost your mood.', long_desc: 'Highly danceable and always upbeat tracks. Features high valence (happiness) and steady beats to keep the energy high and the vibes entirely positive.' },
+    { id: 'focus', label: 'Focus / Study', icon: focusIconSvg, color: '#9B5DE5', desc: 'Instrumental, calm, and steady background tracks designed to help you concentrate without distractions.', long_desc: 'Instrumental-heavy or low-speech tracks with steady, non-distracting energy. Avoids sudden loud changes to maintain a calm, focused environment.' },
+    { id: 'chill', label: 'Chill / Relax', icon: chillIconSvg, color: '#60B080', desc: 'Gentle, acoustic-leaning, and relaxed tracks creating a peaceful atmosphere to comfortably wind down to.', long_desc: 'Low energy, gentle, and relaxing tracks. Often features acoustic elements or soft synths with a positive, pleasant feel to help you comfortably wind down.' },
+    { id: 'drive', label: 'Late Night Drive', icon: driveIconSvg, color: '#6090C0', desc: 'Moderate energy with a steady, rhythmic beat perfect for long drives or night-time focus.', long_desc: 'Moderate, steady energy with a consistent beat. Perfectly balances focus and relaxation for long, late-night drives without being too intense.' },
+    { id: 'morning', label: 'Morning Coffee', icon: morningIconSvg, color: '#E28743', desc: 'Positive, mild-tempo, and warm acoustic-friendly vibes to gently lift your spirits.', long_desc: 'Mild-tempo, acoustic-friendly tracks with high valence. Creates a warm, positive, and gentle atmosphere to start your day off right or instantly lift your mood.' },
+    { id: 'gaming', label: 'Gaming / Cyber', icon: gamingIconSvg, color: '#00F0FF', desc: 'Fast-paced, electronic-heavy, and intense tracks built for highly competitive or immersive gaming sessions.', long_desc: 'Fast-paced, electronic-heavy, and immersive. Features high intensity and synthetic beats, built for competitive matches or deep cyber/sci-fi sessions.' },
+    { id: 'rainy', label: 'Rainy / Melancholy', icon: rainyIconSvg, color: '#4A6FA5', desc: 'Sad, slow-tempo, and moody tracks ideal for quiet, thoughtful moments or a grey day.', long_desc: 'Low energy combined with low valence. Moody, sad, and thoughtful tracks ideal for quiet moments or staying indoors on a rainy day.' },
+    { id: 'pregame', label: 'Festival / Anthem', icon: pregameIconSvg, color: '#F15BB5', desc: 'Very high energy and highly danceable tracks with massive drops designed to bring pure excitement.', long_desc: 'Very high energy and highly danceable. Build-up hype tracks with massive drops and driving beats designed to bring pure joy, excitement, and festival-level energy.' }
+  ];
+  
   const ICON_PATHS = {
     sortAsc: "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z",
     sortDesc: "M.998 7.19A.749.749 0 0 0 .47 8.47L7.99 16l7.522-7.53a.75.75 0 1 0-1.06-1.06L8.74 13.13V.75a.75.75 0 1 0-1.498 0v12.38L1.528 7.41a.749.749 0 0 0-.53-.22z",
@@ -583,6 +619,7 @@
           })),
           duration_ms: trackData.duration_ms,
           popularity: trackData.popularity,
+          explicit: trackData.explicit || false,
           external_ids: trackData.external_ids || {},
           id: trackData.id,
           uri: trackData.uri || `spotify:track:${trackData.id}`,
@@ -1254,7 +1291,19 @@
     }
   }
   
-  
+  const HTML_ESCAPE_MAP = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+  };
+
+  const escapeHtml = (str, fallback = "Unknown") => {
+      if (str == null || str === "") return fallback;
+      return String(str).replace(/[&<>"']/g, c => HTML_ESCAPE_MAP[c]);
+  };
+
   const getWebpackService = (id) => {
     const req = window.webpackChunkclient_web.push([[Symbol()], {}, (r) => r]);
     return Object.values(req.m).flatMap(m => {
@@ -1306,6 +1355,147 @@
           });
       }
       return results;
+  }
+
+  function parseDateProtobuf(bytes) {
+      let year = null, month = null, day = null;
+      let i = 0;
+      while (i < bytes.length) {
+          const tag = bytes[i++];
+          const field = tag >> 3;
+          const wire = tag & 7;
+          if (wire !== 0) break; 
+          let val = 0;
+          let shift = 0;
+          while (i < bytes.length) {
+              const b = bytes[i++];
+              val |= (b & 0x7f) << shift;
+              if (!(b & 0x80)) break;
+              shift += 7;
+          }
+          const decoded = (val >>> 1) ^ -(val & 1);
+          if (field === 1) year = decoded;
+          if (field === 2) month = decoded;
+          if (field === 3) day = decoded;
+      }
+      if (year) {
+          return `${year}-${String(month||1).padStart(2,'0')}-${String(day||1).padStart(2,'0')}`;
+      }
+      return null;
+  }
+
+  function extractCoreMetadataFromExtKind10(bytes) {
+      let isrc = null;
+      let releaseDate = null;
+      const currentYear = new Date().getFullYear();
+      
+      for (let i = 0; i < bytes.length - 10; i++) {
+          if (!isrc && bytes[i] === 10 && bytes[i+1] === 4 && bytes[i+2] === 105 && bytes[i+3] === 115 && bytes[i+4] === 114 && bytes[i+5] === 99 && bytes[i+6] === 18) {
+              const len = bytes[i+7];
+              if (len > 0 && len <= 20) {
+                  isrc = String.fromCharCode(...bytes.slice(i+8, i+8+len));
+              }
+          }
+          
+          if (!releaseDate && bytes[i] === 0x32 && bytes[i+1] >= 2 && bytes[i+1] <= 10 && bytes[i+2] === 0x08) {
+              const len = bytes[i+1];
+              const dateBytes = bytes.slice(i+2, i+2+len);
+              const parsedDate = parseDateProtobuf(dateBytes);
+              
+              if (parsedDate) {
+                  const parts = parsedDate.split('-');
+                  if (parts.length === 3) {
+                      const year = parseInt(parts[0], 10);
+                      const month = parseInt(parts[1], 10);
+                      const day = parseInt(parts[2], 10);
+                      
+                      if (
+                          year >= 1900 && year <= currentYear + 2 &&
+                          month >= 1 && month <= 12 &&
+                          day >= 1 && day <= 31
+                      ) {
+                          releaseDate = parsedDate;
+                      }
+                  }
+              }
+          }
+      }
+      return { isrc, releaseDate };
+  }
+
+  async function fetchCoreMetadataBatch(uris) {
+      const client = getMetadataClient();
+      if (!client) throw new Error("Metadata client not available");
+      
+      const validUris = uris.filter(uri => uri && uri.startsWith("spotify:track:"));
+      if (validUris.length === 0) return new Map();
+
+      const response = await client.fetch({
+        extensionQuery: [{ extensionKind: 10, entityUri: validUris }],
+      });
+
+      const results = new Map();
+      if (response.extension && response.extension[0] && response.extension[0].entityExtension) {
+          response.extension[0].entityExtension.forEach(item => {
+              if (item.extensionData && item.extensionData.value) {
+                  const bytes = Object.values(item.extensionData.value);
+                  const extracted = extractCoreMetadataFromExtKind10(bytes);
+                  results.set(item.entityUri, extracted);
+              }
+          });
+      }
+      return results;
+  }
+  
+  async function fetchReleaseDatesBatchNew(uris) {
+      const coreMetaMap = await fetchCoreMetadataBatch(uris);
+      const results = new Map();
+      coreMetaMap.forEach((val, uri) => {
+          if (val && val.releaseDate) {
+              results.set(uri, val.releaseDate);
+          }
+      });
+      return results;
+  }
+
+  async function getLikedIsrcsSet(likedSongs, updateProgress = () => {}) {
+      const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
+      const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+      const likedIsrcSet = new Set();
+      const missingLikedIds = [];
+      
+      likedTrackIds.forEach(id => {
+          const meta = cachedLikedMetadata.get(id);
+          if (meta && meta.external_ids && meta.external_ids.isrc) {
+              likedIsrcSet.add(meta.external_ids.isrc);
+          } else {
+              missingLikedIds.push(id);
+          }
+      });
+
+      if (missingLikedIds.length > 0) {
+          let processed = 0;
+          for (let i = 0; i < missingLikedIds.length; i += 500) {
+              const batchIds = missingLikedIds.slice(i, i + 500);
+              const batchUris = batchIds.map(id => `spotify:track:${id}`);
+              try {
+                  const res = await fetchCoreMetadataBatch(batchUris);
+                  res.forEach((val, uri) => {
+                      if (val && val.isrc) {
+                          likedIsrcSet.add(val.isrc);
+                          const id = uri.split(':')[2];
+                          const existing = cachedLikedMetadata.get(id) || { id, external_ids: {} };
+                          if (!existing.external_ids) existing.external_ids = {};
+                          existing.external_ids.isrc = val.isrc;
+                          idb.set('trackMetadata', id, existing);
+                      }
+                  });
+              } catch(e){}
+              processed += batchIds.length;
+              updateProgress(`Liked ISRCs ${Math.floor((processed / missingLikedIds.length) * 100)}%`);
+          }
+      }
+      return likedIsrcSet;
   }
   
   const extendedMetadataJsonDescriptor = {
@@ -1454,6 +1644,7 @@
                   uri: `spotify:track:${trackId}`,
                   popularity: body.popularity,
                   duration_ms: body.duration,
+                  trackNumber: body.number || body.track_number || 0,
                   explicit: body.explicit,
                   album: {
                       name: body.album?.name,
@@ -1521,7 +1712,10 @@
                           id: t.albumOfTrack.uri.split(':')[2],
                           images: t.albumOfTrack.coverArt?.sources?.map(s => ({ url: s.url })) || []
                       },
-                      duration_ms: t.duration.totalMilliseconds
+                      duration_ms: t.duration.totalMilliseconds,
+                      explicit: t.explicit || false,
+                      trackNumber: parseInt(t.trackNumber, 10) || 0,
+                      is_playable: t.playability?.playable
                   };
               })
           }
@@ -1751,67 +1945,6 @@
     } catch (error) {
       console.error('Error flagging personal scrobble cache:', error);
     }
-  }
-  
-  function cleanupLegacyCache() {
-    if (localStorage.getItem('sort-play-idb-migration-cleanup-done-v3') === 'true') {
-        return;
-    }
-
-    if (Spicetify.LocalStorage) {
-        try {
-            if (typeof Spicetify.LocalStorage.remove === 'function') {
-                Spicetify.LocalStorage.remove(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS);
-                Spicetify.LocalStorage.remove("sort-play-dedicated-playlist-meta");
-            } else {
-                Spicetify.LocalStorage.set(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS, "");
-                Spicetify.LocalStorage.set("sort-play-dedicated-playlist-meta", "");
-            }
-        } catch(e) {}
-    }
-
-    const keysToRemove = [
-        'spotify-play-count-cache2', 
-        'spotify-play-count-cache-timestamp2',
-        'spotify-release-date-cache2', 
-        'spotify-release-date-cache-timestamp2',
-        'spotify-scrobbles-cache3', 
-        'spotify-scrobbles-cache-timestamp3',
-        'sort-play-personal-scrobbles-cache', 
-        'sort-play-personal-scrobbles-cache-timestamp',
-        'spotify-palette-analysis-cache',
-        'spotify-palette-analysis-cache-timestamp'
-    ];
-
-    let removedCount = 0;
-
-    keysToRemove.forEach(key => {
-        if (localStorage.getItem(key)) {
-            localStorage.removeItem(key);
-            removedCount++;
-        }
-    });
-
-    const prefixes = [
-        'sort-play-playlist-cache-v1-',
-        'sort-play-genre-cache-v2-',
-        'sort-play-like-'
-    ];
-
-    const allKeys = Object.keys(window.localStorage);
-    for (let i = 0; i < allKeys.length; i++) {
-        const key = allKeys[i];
-        if (prefixes.some(prefix => key.startsWith(prefix))) {
-            localStorage.removeItem(key);
-            removedCount++;
-        }
-    }
-    
-    if (removedCount > 0) {
-        console.log(`[Sort-Play] Cleaned up ${removedCount} legacy localStorage items.`);
-    }
-
-    localStorage.setItem('sort-play-idb-migration-cleanup-done-v3', 'true');
   }
   
   const notificationStyles = document.createElement('style');
@@ -2142,27 +2275,6 @@
         }
     }
   }
-
-  async function fetchUserMarket() {
-    if (userMarketPromise) return userMarketPromise;
-
-    userMarketPromise = (async () => {
-        try {
-            const locale = Spicetify.Locale.getLocale();
-            if (locale && locale.includes('-')) {
-                const market = locale.split('-')[1].toUpperCase();
-                return market;
-            }
-        } catch (e) {
-            console.warn("[Sort-Play] Could not get market from Spicetify.Locale, trying fallback.");
-        }
-
-        console.error("[Sort-Play] FATAL: Could not determine user's market. Track availability checks may be inaccurate.");
-        return null; 
-    })();
-    
-    return userMarketPromise;
-  }
   
   const possibleSuffixes = [
     "\\(PlayCount\\)",
@@ -2203,14 +2315,23 @@
     "\\(Compilations\\)",
     "\\(Clean\\)",
     "\\(Cleaned\\)",
-    "\\(Filtered\\)"
+    "\\(Vibe Blend\\)",
+    "\\(Workout\\)",
+    "\\(Party\\)",
+    "\\(Focus\\)",
+    "\\(Chill\\)",
+    "\\(Late Night Drive\\)",
+    "\\(Morning Coffee\\)",
+    "\\(Gaming\\)",
+    "\\(Rainy\\)",
+    "\\(Pre-Game\\)",
   ];
 
-  const BASE_COVERS_URL = "https://cdn.jsdelivr.net/gh/hoeci/sort-play@b4c938cd63194151d6b46c403b5404f1bd5f3c52/assets/base-covers/";
-  const COVER_TOP = `${BASE_COVERS_URL}top.png`;
-  const COVER_NEW = `${BASE_COVERS_URL}newrel.png`;
-  const COVER_DISCOVERY = `${BASE_COVERS_URL}discovery.png`;
-  const COVER_LASTFM = `${BASE_COVERS_URL}lastfm.png`;
+  const BASE_COVERS_URL = "https://cdn.jsdelivr.net/gh/hoeci/sort-play@65b11e34affd7e5ad8edd68e60958cc8f1393b4a/assets/base-covers/";
+  const COVER_TOP = `${BASE_COVERS_URL}top.jpg`;
+  const COVER_NEW = `${BASE_COVERS_URL}newrel.jpg`;
+  const COVER_DISCOVERY = `${BASE_COVERS_URL}discovery.jpg`;
+  const COVER_LASTFM = `${BASE_COVERS_URL}lastfm.jpg`;
 
   const DEDICATED_PLAYLIST_COVERS = {
     'topThisMonth': COVER_TOP,
@@ -2260,9 +2381,9 @@
     {
         title: 'Discovery',
         cards: [
-            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover songs based on your recent listening.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v2', broken: true },
-            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Find music based on your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v2', broken: true },
-            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Explore music from artists completely new to you.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v2', broken: true },
+            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover tracks matching your recent vibe.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v3', broken: false },
+            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Discover tracks matching your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v3', broken: false },
+            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Discover tracks from new artists that match your musical taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v3', broken: false },
             { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer, broken: false },
         ]
     },
@@ -2389,6 +2510,7 @@
     }
     followedReleasesAlbumLimit = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT) || 'all';
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
+    discoveryStrictAlbumExclusion = localStorage.getItem(STORAGE_KEY_DISCOVERY_STRICT_ALBUM_EXCLUSION) === "true";
     placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
     const changeTitleOnCreateStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE);
@@ -2492,6 +2614,7 @@
     localStorage.setItem(STORAGE_KEY_NEW_RELEASES_LIMIT, newReleasesDaysLimit);
     localStorage.setItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT, followedReleasesAlbumLimit);
     localStorage.setItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, discoveryPlaylistSize);
+    localStorage.setItem(STORAGE_KEY_DISCOVERY_STRICT_ALBUM_EXCLUSION, discoveryStrictAlbumExclusion);
     localStorage.setItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, placePlaylistsInFolder);
     localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE, changeTitleOnCreate);
@@ -2606,6 +2729,7 @@
           [STORAGE_KEY_NEW_RELEASES_LIMIT]: "release-2",
           [STORAGE_KEY_FOLLOWED_RELEASES_LIMIT]: "all",
           [STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE]: "50",
+          [STORAGE_KEY_DISCOVERY_STRICT_ALBUM_EXCLUSION]: "false",
           [STORAGE_KEY_SET_DEDICATED_PLAYLIST_COVERS]: "true",
           [STORAGE_KEY_DYNAMIC_PLAYLIST_JOBS]: "[]",
           [STORAGE_KEY_DYNAMIC_PLAYLIST_CUSTOM_SCHEDULES]: "[]",
@@ -2670,7 +2794,8 @@
           [STORAGE_KEY_MATCH_WHOLE_WORD]: "false",
           [STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION]: "false",
           [STORAGE_KEY_GENRE_SEPARATOR]: ",",
-          [STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED]: "false"
+          [STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED]: "false",
+          [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}'
         };
     
         if (key === STORAGE_KEY_NP_CONFIG) {
@@ -2936,8 +3061,8 @@
         }
     } else {
         inputHtml = `
-            ${inputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${inputLabel}</label>` : ''}
-            <input type="${inputType}" id="sp-simple-input" value="${inputValue}" placeholder="${inputPlaceholder}"
+            ${inputLabel ? `<label style="color: #c1c1c1; font-size: 14px;">${escapeHtml(inputLabel, "")}</label>` : ''}
+            <input type="${inputType}" id="sp-simple-input" value="${escapeHtml(inputValue, "")}" placeholder="${escapeHtml(inputPlaceholder, "")}"
                    style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; font-family: inherit; outline: none;">
         `;
     }
@@ -3885,106 +4010,6 @@
     </div>
 
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
-        Dedicated Playlist Creation
-    </div>
-    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
-
-    <div class="setting-row" id="setDedicatedCoversSettingRow">
-        <label class="col description">
-            Set Custom Playlist Covers
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" id="setDedicatedCoversToggle" ${setDedicatedPlaylistCovers ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
-
-    <div class="setting-row" id="topTracksLimitSetting">
-        <label class="col description">
-            Top Tracks Playlist Max Size
-        </label>
-        <div class="col action">
-            <select id="topTracksLimitSelect" style="width: 70px;">
-                <option value="50">50</option>
-                <option value="100">100</option>
-                <option value="150">150</option>
-                <option value="200">200</option>
-                <option value="250">250</option>
-                <option value="500">500</option>
-                <option value="1000">1000</option>
-                <option value="2000">2000</option>
-                <option value="11000">Max</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="setting-row" id="discoveryPlaylistSizeSetting">
-        <label class="col description">
-            Discovery Playlist Size
-        </label>
-        <div class="col action">
-            <select id="discoveryPlaylistSizeSelect" style="width: 70px;">
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="75">75</option>
-                <option value="100">100</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="setting-row" id="newReleasesLimitSetting">
-        <label class="col description">
-            New Releases Time Window
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">Set the lookback period for New Releases playlists. 'Release Week' options are anchored to the music industry's Friday release schedule, while 'Days' are a rolling window.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <select id="newReleasesLimitSelect" style="max-width: 180px;">
-            <option value="release-1">This Release Week</option>
-            <option value="release-2">Last 2 Release Weeks</option>
-            <option value="release-3">Last 3 Release Weeks</option>
-            <option value="release-5">Last 5 Release Weeks</option>
-            <option value="release-9">Last 9 Release Weeks</option>
-            <option disabled>──────────</option>
-            <option value="1">Last 24 Hours</option>
-            <option value="2">Last 2 Days</option>
-            <option value="3">Last 3 Days</option>
-            <option value="4">Last 4 Days</option>
-            <option value="7">Last 7 Days</option>
-            <option value="10">Last 10 Days</option>
-            <option value="15">Last 15 Days</option>
-            <option value="30">Last 30 Days</option>
-            <option value="60">Last 60 Days</option>
-            <option value="90">Last 90 Days</option>
-            <option value="150">Last 150 Days</option>
-        </select>
-        </div>
-    </div>
-
-    <div class="setting-row" id="followedReleasesLimitSetting">
-        <label class="col description">
-            Followed Artist (Full) Tracks Per Album
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">Limit the number of tracks added from each album in the "Followed Artist (Full)" playlist.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <select id="followedReleasesLimitSelect" style="max-width: 120px;">
-                <option value="1">1 Track</option>
-                <option value="2">2 Tracks</option>
-                <option value="3">3 Tracks</option>
-                <option value="5">5 Tracks</option>
-                <option value="all">All Tracks</option>
-            </select>
-        </div>
-    </div>
-
-    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Last.fm
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
@@ -4099,10 +4124,7 @@
     if (versionTagBtn) {
         versionTagBtn.addEventListener("click", () => {
             hasNewUpdate = false;
-            try {
-                if (Spicetify.LocalStorage) Spicetify.LocalStorage.set("sort-play-last-version", SORT_PLAY_VERSION);
-                window.localStorage.setItem("sort-play-last-version", SORT_PLAY_VERSION);
-            } catch(e) {}
+            localStorage.setItem("sort-play-last-version", SORT_PLAY_VERSION);
             const dot = modalContainer.querySelector("#sortPlayVersionDot");
             if (dot) dot.remove();
             showUpdateHistoryModal();
@@ -4166,17 +4188,12 @@
     const openPlaylistAfterSortSwitchLabel = modalContainer.querySelector("#openPlaylistAfterSortSwitchLabel");
     const openPlaylistAfterSortSettingRow = modalContainer.querySelector("#openPlaylistAfterSortSettingRow");
     const colorSortModeSelect = modalContainer.querySelector("#colorSortModeSelect");
-    const topTracksLimitSelect = modalContainer.querySelector("#topTracksLimitSelect");
-    const newReleasesLimitSelect = modalContainer.querySelector("#newReleasesLimitSelect");
-    const followedReleasesLimitSelect = modalContainer.querySelector("#followedReleasesLimitSelect");
-    const discoveryPlaylistSizeSelect = modalContainer.querySelector("#discoveryPlaylistSizeSelect");
     const placePlaylistsInFolderToggle = modalContainer.querySelector("#placePlaylistsInFolderToggle");
     const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
     const changeTitleOnCreateToggle = modalContainer.querySelector("#changeTitleOnCreateToggle");
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
     const changeDescriptionOnModifyToggle = modalContainer.querySelector("#changeDescriptionOnModifyToggle");
     const overwriteCustomDescriptionToggle = modalContainer.querySelector("#overwriteCustomDescriptionToggle");
-    const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
     const showSecondAdditionalColumnToggle = modalContainer.querySelector("#showSecondAdditionalColumnToggle");
     const secondColumnTypeSelect = modalContainer.querySelector("#secondColumnTypeSelect");
     const secondDateFormatSettingsBtn = modalContainer.querySelector("#secondDateFormatSettingsBtn");
@@ -4403,38 +4420,8 @@
       updateSortCurrentPlaylistToggleState();
     }
 
-    setDedicatedCoversToggle.addEventListener("change", () => {
-        setDedicatedPlaylistCovers = setDedicatedCoversToggle.checked;
-        saveSettings();
-    });
-
     colorSortModeSelect.addEventListener("change", () => {
         colorSortMode = colorSortModeSelect.value;
-        saveSettings();
-    });
-
-    topTracksLimitSelect.value = topTracksLimit;
-    topTracksLimitSelect.addEventListener("change", () => {
-        topTracksLimit = parseInt(topTracksLimitSelect.value, 10);
-        saveSettings();
-    });
-
-    newReleasesLimitSelect.value = newReleasesDaysLimit;
-    newReleasesLimitSelect.addEventListener("change", () => {
-        const val = newReleasesLimitSelect.value;
-        newReleasesDaysLimit = val.startsWith('release-') ? val : parseInt(val, 10);
-        saveSettings();
-    });
-    
-    followedReleasesLimitSelect.value = followedReleasesAlbumLimit;
-    followedReleasesLimitSelect.addEventListener("change", () => {
-        followedReleasesAlbumLimit = followedReleasesLimitSelect.value;
-        saveSettings();
-    });
-    
-    discoveryPlaylistSizeSelect.value = discoveryPlaylistSize;
-    discoveryPlaylistSizeSelect.addEventListener("change", () => {
-        discoveryPlaylistSize = parseInt(discoveryPlaylistSizeSelect.value, 10);
         saveSettings();
     });
 
@@ -8274,14 +8261,251 @@
     });
   }
 
+  function showDedicatedSettingsModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-dedicated-settings-overlay";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        z-index: 2004;
+        display: flex; justify-content: center; align-items: center;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container sort-play-settings sort-play-font-scope";
+    modalContainer.style.cssText = `
+        width: 550px !important;
+        border-radius: 30px;
+        overflow: hidden;
+        border: 2px solid #282828;
+        background-color: #181818 !important;
+        display: flex; 
+        flex-direction: column;
+        max-height: 90vh;
+        z-index: 2005;
+        box-shadow: 0 10px 50px rgba(0,0,0,0.7);
+    `;
+
+    modalContainer.innerHTML = `
+    <style>
+      .main-trackCreditsModal-mainSection { overflow-y: auto !important; padding: 16px 45px 16px 45px; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #333333 #181818; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar { width: 8px; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar-track { background: #282828; border-radius: 4px; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb { background-color: #5a5a5a; border-radius: 4px; }
+      .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb:hover { background-color: #7a7a7a; }
+      .sort-play-settings .col { padding: 0; }
+      .sort-play-settings .setting-row::after { content: ""; display: table; clear: both; }
+      .sort-play-settings .setting-row { padding: 10px 0; align-items: center; display: flex; justify-content: space-between; }
+      .sort-play-settings .setting-row .col.description { flex: 1; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; margin: 0; padding-right: 15px; }
+      .sort-play-settings .setting-row .col.action { display: flex; align-items: center; justify-content: flex-end; width: 170px; flex-shrink: 0; position: relative; }
+      .sort-play-settings select { padding: 4px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 125px; height: auto; outline: none; }
+      .sort-play-settings .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+      .sort-play-settings .switch input { opacity: 0; width: 0; height: 0; }
+      .sort-play-settings .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+      .sort-play-settings .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+      .sort-play-settings input:checked + .sliderx { background-color: #1DB954; }
+      .sort-play-settings input:checked + .sliderx:before { transform: translateX(16px); }
+      .tooltip-container { position: relative; display: inline-flex; vertical-align: middle; margin-left: 4px; }
+      .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
+      .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+      .tooltip-container:hover .custom-tooltip { visibility: visible; }
+      .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
+      .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+    </style>
+    <div class="main-trackCreditsModal-header" style="padding: 29px 32px 19px 32px !important; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828;">
+        <h1 class="main-trackCreditsModal-title"><span style='font-size: 26px; font-weight: 700; color: white;'>Dedicated Settings</span></h1>
+        <button class="main-trackCreditsModal-closeBtn" id="closeDedicatedSettingsModal" aria-label="Close">
+          ${closeModalIcon20Svg}
+        </button>
+    </div>
+    <div class="main-trackCreditsModal-mainSection" style="padding-top: 24px; padding-bottom: 30px;">
+        
+      <div class="setting-row" id="setDedicatedCoversSettingRow">
+          <label class="col description">
+              Set Custom Playlist Covers
+          </label>
+          <div class="col action">
+              <label class="switch">
+                  <input type="checkbox" id="setDedicatedCoversToggle" ${setDedicatedPlaylistCovers ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+              </label>
+          </div>
+      </div>
+
+      <div class="setting-row" id="topTracksLimitSetting">
+          <label class="col description">
+              Top Tracks Playlist Max Size
+          </label>
+          <div class="col action">
+              <select id="topTracksLimitSelect" style="width: 70px;">
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="150">150</option>
+                  <option value="200">200</option>
+                  <option value="250">250</option>
+                  <option value="500">500</option>
+                  <option value="1000">1000</option>
+                  <option value="2000">2000</option>
+                  <option value="11000">Max</option>
+              </select>
+          </div>
+      </div>
+
+      <div class="setting-row" id="discoveryPlaylistSizeSetting">
+          <label class="col description">
+              Discovery Playlist Size
+          </label>
+          <div class="col action">
+              <select id="discoveryPlaylistSizeSelect" style="width: 70px;">
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="75">75</option>
+                  <option value="100">100</option>
+              </select>
+          </div>
+      </div>
+
+      <div class="setting-row" id="discoveryStrictAlbumExclusionSetting">
+          <label class="col description">
+              Strict Album Exclusion (Discovery)
+              <span class="tooltip-container">
+                  ${infoIconSvg}
+                  <span class="custom-tooltip">If enabled, Discovery playlists completely exclude an album if you have liked even a single track from it.</span>
+              </span>
+          </label>
+          <div class="col action">
+              <label class="switch">
+                  <input type="checkbox" id="discoveryStrictAlbumExclusionToggle" ${discoveryStrictAlbumExclusion ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+              </label>
+          </div>
+      </div>
+
+      <div class="setting-row" id="newReleasesLimitSetting">
+          <label class="col description">
+              New Releases Time Window
+              <span class="tooltip-container">
+                  ${infoIconSvg}
+                  <span class="custom-tooltip">Set the lookback period for New Releases playlists. 'Release Week' options are anchored to the music industry's Friday release schedule, while 'Days' are a rolling window.</span>
+              </span>
+          </label>
+          <div class="col action">
+          <select id="newReleasesLimitSelect" style="max-width: 180px;">
+              <option value="release-1">This Release Week</option>
+              <option value="release-2">Last 2 Release Weeks</option>
+              <option value="release-3">Last 3 Release Weeks</option>
+              <option value="release-5">Last 5 Release Weeks</option>
+              <option value="release-9">Last 9 Release Weeks</option>
+              <option disabled>──────────</option>
+              <option value="1">Last 24 Hours</option>
+              <option value="2">Last 2 Days</option>
+              <option value="3">Last 3 Days</option>
+              <option value="4">Last 4 Days</option>
+              <option value="7">Last 7 Days</option>
+              <option value="10">Last 10 Days</option>
+              <option value="15">Last 15 Days</option>
+              <option value="30">Last 30 Days</option>
+              <option value="60">Last 60 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="150">Last 150 Days</option>
+          </select>
+          </div>
+      </div>
+
+      <div class="setting-row" id="followedReleasesLimitSetting">
+          <label class="col description">
+              Followed Artist Tracks Per Album
+              <span class="tooltip-container">
+                  ${infoIconSvg}
+                  <span class="custom-tooltip">Limit the number of tracks added from each album in the "Followed Artist (Full)" playlist.</span>
+              </span>
+          </label>
+          <div class="col action">
+              <select id="followedReleasesLimitSelect" style="max-width: 120px;">
+                  <option value="1">1 Track</option>
+                  <option value="2">2 Tracks</option>
+                  <option value="3">3 Tracks</option>
+                  <option value="5">5 Tracks</option>
+                  <option value="all">All Tracks</option>
+              </select>
+          </div>
+      </div>
+
+    </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    requestAnimationFrame(() => {
+        overlay.style.opacity = "1";
+    });
+
+    const closeModal = () => {
+        overlay.style.opacity = "0";
+        setTimeout(() => overlay.remove(), 200);
+    };
+
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeModal();
+    });
+    modalContainer.querySelector("#closeDedicatedSettingsModal").addEventListener("click", closeModal);
+
+    const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
+    const topTracksLimitSelect = modalContainer.querySelector("#topTracksLimitSelect");
+    const discoveryPlaylistSizeSelect = modalContainer.querySelector("#discoveryPlaylistSizeSelect");
+    const discoveryStrictAlbumExclusionToggle = modalContainer.querySelector("#discoveryStrictAlbumExclusionToggle");
+    const newReleasesLimitSelect = modalContainer.querySelector("#newReleasesLimitSelect");
+    const followedReleasesLimitSelect = modalContainer.querySelector("#followedReleasesLimitSelect");
+
+    setDedicatedCoversToggle.addEventListener("change", () => {
+        setDedicatedPlaylistCovers = setDedicatedCoversToggle.checked;
+        saveSettings();
+    });
+
+    topTracksLimitSelect.value = topTracksLimit;
+    topTracksLimitSelect.addEventListener("change", () => {
+        topTracksLimit = parseInt(topTracksLimitSelect.value, 10);
+        saveSettings();
+    });
+
+    discoveryPlaylistSizeSelect.value = discoveryPlaylistSize;
+    discoveryPlaylistSizeSelect.addEventListener("change", () => {
+        discoveryPlaylistSize = parseInt(discoveryPlaylistSizeSelect.value, 10);
+        saveSettings();
+    });
+
+    discoveryStrictAlbumExclusionToggle.addEventListener("change", () => {
+        discoveryStrictAlbumExclusion = discoveryStrictAlbumExclusionToggle.checked;
+        saveSettings();
+    });
+
+    newReleasesLimitSelect.value = newReleasesDaysLimit;
+    newReleasesLimitSelect.addEventListener("change", () => {
+        const val = newReleasesLimitSelect.value;
+        newReleasesDaysLimit = val.startsWith('release-') ? val : parseInt(val, 10);
+        saveSettings();
+    });
+    
+    followedReleasesLimitSelect.value = followedReleasesAlbumLimit;
+    followedReleasesLimitSelect.addEventListener("change", () => {
+        followedReleasesAlbumLimit = followedReleasesLimitSelect.value;
+        saveSettings();
+    });
+  }
+  
   function showCreatePlaylistModal() {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-create-playlist-overlay";
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background-color: rgba(0, 0, 0, 0.85);
-        backdrop-filter: blur(15px);
-        -webkit-backdrop-filter: blur(15px);
+        background-color: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
         z-index: 2002;
         display: flex; justify-content: center; align-items: center;
         opacity: 0;
@@ -8296,21 +8520,22 @@
         max-width: 62vw;
         height: auto;
         max-height: 80vh;
-        background-color: #121212 !important;
-        border: 1px solid #333;
+        background-color: #181818 !important;
+        border: 1px solid #282828;
         display: flex;
         flex-direction: column;
         border-radius: 30px;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.8);
     `;
 
     const shadowRoot = modalContainer.attachShadow({ mode: 'open' });
     modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
     modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
 
-    const cachedCounts = JSON.parse(window.localStorage.getItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS) || '{}');
+    const cachedCounts = JSON.parse(localStorage.getItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS) || '{}');
     let dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
-    const dedicatedPlaylistMeta = JSON.parse(window.localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
+    const dedicatedPlaylistMeta = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
     const jobs = getDedicatedJobs();
     
     jobs.forEach(job => {
@@ -8318,6 +8543,27 @@
             dedicatedPlaylistBehavior[job.dedicatedType] = 'autoUpdate';
         }
     });
+
+    const lastActiveId = localStorage.getItem('sort-play-last-active-dedicated') || 'recommendRecentVibe';
+    let defaultBgImgUrl = DEDICATED_PLAYLIST_COVERS[lastActiveId] || DEDICATED_PLAYLIST_COVERS.recommendRecentVibe;
+    let defaultColor = '143, 70, 215';
+
+    for (const section of playlistCardsData) {
+        const card = section.cards.find(c => c.id === lastActiveId);
+        if (card) {
+            defaultBgImgUrl = card.thumbnailUrl;
+            if (section.title === 'Discovery') defaultColor = '143, 70, 215';
+            else if (section.title === 'New Releases') defaultColor = '55, 152, 165';
+            else if (section.title === 'My Top Tracks') defaultColor = '36, 191, 112';
+            else if (section.title === 'Last.fm') defaultColor = '209, 23, 14';
+            
+            const cachedMeta = dedicatedPlaylistMeta[card.id];
+            if (cachedMeta && cachedMeta.imageUrl && !isDefaultMosaicCover(cachedMeta.imageUrl)) {
+                defaultBgImgUrl = cachedMeta.imageUrl;
+            }
+            break;
+        }
+    }
 
     const getScheduleBadgeText = (schedule) => {
         if (!schedule) return "AUTO";
@@ -8403,11 +8649,11 @@
                     <div class="card-content-wrapper" style="padding-bottom: 14px;">
                         <div class="card-text">
                             <div class="card-title-row">
-                                <span class="card-title" title="${displayTitle}">${displayTitle}</span>
-                                ${card.version ? `<span class="card-version-tag">${card.version}</span>` : ''}
+                                <span class="card-title" title="${escapeHtml(displayTitle, "")}">${escapeHtml(displayTitle, "")}</span>
+                                ${card.version ? `<span class="card-version-tag">${escapeHtml(card.version, "")}</span>` : ''}
                                 <span class="badge-container">${badgeHtml}</span>
                             </div>
-                            <span class="card-desc">${card.description}</span>
+                            <span class="card-desc">${escapeHtml(card.description, "")}</span>
                         </div>
                     </div>
 
@@ -8505,15 +8751,20 @@
         :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; }
         *, button, input, select, textarea { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
         h1 { margin: 0; line-height: normal; }
+        .theater-wrapper { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; background-color: #121212; border-radius: 30px; }
+        .dynamic-bg-group { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0; transition: opacity 0.4s ease-out; background-color: #121212; }
+        .dynamic-bg-group.active { opacity: 1; }
+        .bg-layer { position: absolute; top: -11%; left: -5%; right: -5%; bottom: -10%; background-size: 110% auto; background-position: center top; background-repeat: no-repeat; opacity: 1; filter: brightness(0.7); }
+        .bg-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; }
+        .modal-content-container { position: relative; z-index: 2; display: flex; flex-direction: column; height: 100%; flex-grow: 1; }
         .create-playlist-modal-body { flex-grow: 1; overflow-y: auto; padding: 30px 30px; display: flex; flex-direction: column; }
         .columns-container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 25px; height: 100%; }
-        .category-column { display: flex; flex-direction: column; gap: 66px; min-width: 0; overflow-y: auto; scrollbar-width: none; }
+        .category-column { display: flex; flex-direction: column; gap: 66px; min-width: 0; overflow-y: auto; scrollbar-width: none; padding: 10px; margin: -10px; }
         .category-section { display: flex; flex-direction: column; gap: 12px; }
-        .category-header { font-size: 13px; font-weight: 700; color: #b3b3b3; text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 1px solid #333; }
-        .cards-stack { display: flex; flex-direction: column; gap: 10px; }
-        .slim-card { position: relative; height: 85px; background-color: #252525; border-radius: 12px; overflow: hidden; cursor: pointer; border: 1px solid transparent; user-select: none; -webkit-backface-visibility: hidden; backface-visibility: hidden; transform: translateZ(0); transition: border-color 0.1s; }
-        .slim-card:hover { z-index: 2; }
-        .slim-card:has(.settings-overlay-panel.active) { border-color: transparent; z-index: 2; }
+        .category-header { font-size: 13px; font-weight: 700; color: rgb(255 255 255 / 50%); text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 1px solid rgb(255 255 255 / 8%); }
+        .cards-stack { display: flex; flex-direction: column; gap: 10px; padding: 8px; margin: -8px; }
+        .slim-card { position: relative; height: 85px; background-color: #252525; border-radius: 12px; overflow: hidden; cursor: pointer; border: 1px solid rgba(var(--overlay-color), 0.15); user-select: none; -webkit-backface-visibility: hidden; backface-visibility: hidden; transform: translateZ(0); transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .slim-card:hover, .slim-card:has(.settings-overlay-panel.active) { z-index: 2; border-color: rgba(var(--overlay-color), 0.5); box-shadow: 0 0 14px rgba(var(--overlay-color), 0.35); }
         .card-bg { position: absolute; top: 0; left: -4px; width: 102%; height: 102%; background-size: 100% auto; background-position: top center; filter: grayscale(0.2) brightness(0.7); transition: transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94); will-change: transform; transform-origin: center center; }
         .slim-card:hover .card-bg, .slim-card:has(.settings-overlay-panel.active) .card-bg { transform: scale(1.03); }
         .card-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
@@ -8535,14 +8786,14 @@
         .settings-trigger { position: absolute; top: 0; right: 0; height: 100%; width: 30px; z-index: 10; background: transparent; border: none; border-left: 1px solid transparent; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s, background-color 0.2s, border-color 0.2s; cursor: pointer; }
         .slim-card:hover .settings-trigger { opacity: 1; }
         .settings-trigger:hover { background-color: rgba(255,255,255,0.1); border-left-color: rgba(255,255,255,0.1); }
-        .settings-overlay-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgb(255 255 255 / 10%); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 20; display: flex; align-items: center; justify-content: center; padding: 0 30px 0 10px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease, visibility 0.2s ease; }
+        .settings-overlay-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; background: rgb(255 255 255 / 10%); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 20; display: flex; align-items: center; justify-content: center; padding: 0 30px 0 10px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease, visibility 0.2s ease; }
         .settings-overlay-panel.active { opacity: 1; visibility: visible; pointer-events: auto; }
         .settings-options { display: flex; gap: 4px; background: #181818; padding: 3px; border-radius: 4px; }
         .mode-btn { background: transparent; border: none; color: #888; font-size: 11px; font-weight: 600; padding: 6px 12px; border-radius: 3px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
         .mode-btn:hover { color: #fff; background: #333; }
         .mode-btn.active { background: #1ED760; color: #000; }
         .mode-btn.active[data-val="autoUpdate"]:hover { background-color: #3BE377; }
-        .close-settings { position: absolute; right: 0; top: 0; height: 100%; width: 30px; background: transparent; border: none; color: #888; font-size: 18px; cursor: pointer; }
+        .close-settings { position: absolute; right: 0; top: 0; height: 100%; width: 30px; border-top-right-radius: 12px; border-bottom-right-radius: 12px; background: transparent; border: none; color: #888; font-size: 18px; cursor: pointer; }
         .close-settings:hover, .close-settings.hover { color: #fff; background: rgba(255,255,255,0.1); }
         .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
         .broken-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(12, 12, 12, 0.85); z-index: 15; display: flex; align-items: center; justify-content: center; pointer-events: none; backdrop-filter: blur(0.8px); opacity: 1; }
@@ -8552,6 +8803,12 @@
         .slim-card.broken-card .card-bg { filter: grayscale(100%) contrast(120%) brightness(40%) !important; transform: none !important; }
         .slim-card.broken-card .card-overlay::before, .slim-card.broken-card .card-overlay::after { display: none !important; }
         .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+        .top-right-controls { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; z-index: 10; }
+        .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: background 0.2s, border-color 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); padding: 0 !important; margin: 0 !important; line-height: 0 !important; font-size: 0 !important; box-sizing: border-box !important; }
+        .top-icon-btn:hover { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.3) !important; }
+        .top-icon-btn svg { display: block !important; margin: 0 !important; padding: 0 !important; transform: none !important; }
+        #closeCreatePlaylistModal svg { width: 17px !important; height: 17px !important; }
+        #dedicatedSettingsBtn svg { width: 19px !important; height: 19px !important; }
         .slim-card.has-custom-cover .card-bg { filter: grayscale(0.1) brightness(0.5) contrast(1.05); background-position: center center !important; background-size: cover !important; }
         .slim-card.has-custom-cover .card-overlay::before { background: linear-gradient(90deg, rgba(var(--overlay-color), 0.15) 0%, rgba(0,0,0,0.45) 100%); opacity: 1; }
         .slim-card.has-custom-cover .card-title { text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.8); padding: 6px 4px; margin: -6px -4px; }
@@ -8559,14 +8816,26 @@
         .slim-card.has-custom-cover .global-stats { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.9)) drop-shadow(0 0 6px rgba(0,0,0,0.8)); }
       </style>
 
-      <div class="main-trackCreditsModal-header" style="border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px;">
-          <h1 class="main-trackCreditsModal-title"><span style='font-size: 26px; font-weight: 700; color: white;'>Dedicated Playlist Creation</span></h1>
-          <button id="closeCreatePlaylistModal" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            ${closeModalIcon20Svg}
-          </button>
-      </div>
-      <div class="create-playlist-modal-body">
-        ${contentHtml}
+      <div class="theater-wrapper">
+          <div id="dynamic-bg-container" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; z-index: 0; pointer-events: none; overflow: hidden; border-radius: 30px; background-color: #121212;">
+              <div class="dynamic-bg-group active" style="z-index: 1;">
+                  <div class="bg-layer" style="background-image: url('${defaultBgImgUrl}');"></div>
+                  <div class="bg-overlay" style="background: linear-gradient(to bottom, rgba(${defaultColor}, 0.4) -20%, rgba(18, 18, 18, 0.75) 50%, rgba(18, 18, 18, 0.4) 100%);"></div>
+              </div>
+          </div>
+          
+          <div class="modal-content-container">
+              <div class="top-right-controls">
+                  <button id="dedicatedSettingsBtn" class="top-icon-btn" title="Settings & Configuration">${settingsIconSvg}</button>
+                  <button id="closeCreatePlaylistModal" class="top-icon-btn" title="Close">${closeIconSmall2Svg}</button>
+              </div>
+              <div class="main-trackCreditsModal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 29px 32px 19px 32px; flex-shrink: 0; border: none;">
+                  <h1 class="main-trackCreditsModal-title"><span style='font-size: 26px; font-weight: 700; color: white;'>Dedicated Playlist Creation</span></h1>
+              </div>
+              <div class="create-playlist-modal-body" style="padding-bottom: 30px;">
+                  ${contentHtml}
+              </div>
+          </div>
       </div>
     `;
     
@@ -8576,6 +8845,79 @@
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             overlay.style.opacity = "1";
+        });
+    });
+
+    const bgContainer = shadowRoot.getElementById('dynamic-bg-container');
+    let currentImgUrl = defaultBgImgUrl;
+    let globalZIndex = 1;
+
+    const setBackground = (imgUrl, color) => {
+        if (currentImgUrl === imgUrl) return;
+        currentImgUrl = imgUrl;
+
+        const newGroup = document.createElement('div');
+        newGroup.className = 'dynamic-bg-group';
+        newGroup.style.zIndex = ++globalZIndex;
+        
+        const newLayer = document.createElement('div');
+        newLayer.className = 'bg-layer';
+        newLayer.style.backgroundImage = `url('${imgUrl}')`;
+
+        const newOverlay = document.createElement('div');
+        newOverlay.className = 'bg-overlay';
+        newOverlay.style.background = `linear-gradient(to bottom, rgba(${color}, 0.4) -20%, rgba(18, 18, 18, 0.75) 50%, rgba(18, 18, 18, 0.4) 100%)`;
+
+        newGroup.appendChild(newLayer);
+        newGroup.appendChild(newOverlay);
+
+        const applyLayer = () => {
+            if (currentImgUrl !== imgUrl) return;
+
+            bgContainer.appendChild(newGroup);
+
+            void newGroup.offsetWidth;
+            newGroup.classList.add('active');
+
+            const cleanup = (e) => {
+                if (e && e.propertyName !== 'opacity') return;
+                newGroup.removeEventListener('transitionend', cleanup);
+                
+                setTimeout(() => {
+                    const currentZ = parseInt(newGroup.style.zIndex, 10);
+                    Array.from(bgContainer.children).forEach(child => {
+                        if (child !== newGroup) {
+                            const childZ = parseInt(child.style.zIndex, 10) || 0;
+                            if (childZ < currentZ) {
+                                child.remove();
+                            }
+                        }
+                    });
+                }, 50);
+            };
+
+            newGroup.addEventListener('transitionend', cleanup);
+            setTimeout(cleanup, 600);
+        };
+
+        const img = new Image();
+        img.onload = applyLayer;
+        img.onerror = applyLayer;
+        img.src = imgUrl;
+    };
+
+    const cards = shadowRoot.querySelectorAll('.slim-card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', () => {
+            if (card.classList.contains('broken-card')) return;
+            const bgDiv = card.querySelector('.card-bg');
+            if (!bgDiv) return;
+            
+            const rawBg = bgDiv.style.backgroundImage;
+            const imgUrl = rawBg.replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
+            const overlayColor = card.style.getPropertyValue('--overlay-color') || '0,0,0';
+            
+            setBackground(imgUrl, overlayColor);
         });
     });
 
@@ -8689,7 +9031,7 @@
 
                         if (cacheNeedsUpdate) {
                             dedicatedPlaylistMeta[cardId] = { name: newName, imageUrl: newImage };
-                            window.localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
+                            localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
                         }
                     }
                 }).catch(e => {
@@ -8702,7 +9044,7 @@
             localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
         }
         if (metaNeedsSave) {
-            window.localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
+            localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
         }
     })();
 
@@ -8728,7 +9070,7 @@
     fetch(`${STATS_URL}/counts`)
         .then(res => res.json())
         .then(data => {
-            window.localStorage.setItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS, JSON.stringify(data));
+            localStorage.setItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS, JSON.stringify(data));
             const statElements = modalContainer.querySelectorAll('.global-stats');
             statElements.forEach(statEl => {
                 const key = statEl.getAttribute('data-id');
@@ -8763,6 +9105,8 @@
             if (e.target === card) return;
 
             const cardId = card.getAttribute('data-id');
+            localStorage.setItem('sort-play-last-active-dedicated', cardId);
+            
             const behavior = dedicatedPlaylistBehavior[cardId] || 'createOnce';
             
             if (behavior === 'autoUpdate') {
@@ -8911,6 +9255,9 @@
     });
 
     modalContainer.querySelector("#closeCreatePlaylistModal").addEventListener("click", closeModal);
+    modalContainer.querySelector("#dedicatedSettingsBtn").addEventListener("click", () => {
+        showDedicatedSettingsModal();
+    });
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
 
@@ -8974,7 +9321,7 @@
               <h1 class="main-trackCreditsModal-title"><span style='font-size: 25px;'>Auto-Update Schedule</span></h1>
           </div>
           <div class="main-trackCreditsModal-originalCredits" style="padding: 20px 32px !important;">
-              <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 20px;">Set the update frequency for "${cardName}":</p>
+              <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 20px;">Set the update frequency for "${escapeHtml(cardName, "")}":</p>
               <select id="dedicated-schedule-select" class="form-select" style="width: 100%; margin-bottom: 10px;">
                   <option value="10800000" ${String(currentSchedule) === '10800000' ? 'selected' : ''}>Every 3 Hours</option>
                   <option value="21600000" ${String(currentSchedule) === '21600000' ? 'selected' : ''}>Every 6 Hours</option>
@@ -9498,14 +9845,81 @@
     console.error(`[Sort-Play] ${context}:`, error);
   }
 
-const getDominantColor = (src) => {
-      if (!src) return Promise.resolve([40, 40, 40]);
+  const getDominantColor = async (src, entityUri = null) => {
+      const processFinalColor = (r, g, b) => {
+          const { h, s, l } = rgbToHsl(r, g, b);
+          if (s > 0.75) {
+              const cappedS = 0.75;
+              const hNorm = h / 360;
+              const q = l < 0.5 ? l * (1 + cappedS) : l + cappedS - l * cappedS;
+              const p = 2 * l - q;
+              const hue2rgb = (p, q, t) => {
+                  if (t < 0) t += 1;
+                  if (t > 1) t -= 1;
+                  if (t < 1/6) return p + (q - p) * 6 * t;
+                  if (t < 1/2) return q;
+                  if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                  return p;
+              };
+              return [
+                  Math.round(hue2rgb(p, q, hNorm + 1/3) * 255),
+                  Math.round(hue2rgb(p, q, hNorm) * 255),
+                  Math.round(hue2rgb(p, q, hNorm - 1/3) * 255)
+              ];
+          }
+          return [r, g, b];
+      };
+
+      if (entityUri) {
+          try {
+              let queryName, dataPath;
+              if (entityUri.includes(':playlist:')) {
+                  queryName = 'fetchExtractedColorForPlaylistEntity';
+                  dataPath = ['playlistV2', 'images', 'items', 0, 'extractedColors', 'colorDark', 'hex'];
+              } else if (entityUri.includes(':album:')) {
+                  queryName = 'fetchExtractedColorForAlbumEntity';
+                  dataPath = ['albumUnion', 'coverArt', 'extractedColors', 'colorDark', 'hex'];
+              } else if (entityUri.includes(':artist:')) {
+                  queryName = 'fetchExtractedColorForArtistEntity';
+                  dataPath = ['artistUnion', 'visuals', 'avatarImage', 'extractedColors', 'colorDark', 'hex'];
+              }
+
+              if (queryName) {
+                  const res = await Spicetify.GraphQL.Request({
+                      name: queryName,
+                      operation: "query",
+                      sha256Hash: "b2d6d99fb6237952dfa6638385f9c6085f1b1fb9d0468753ca6ad98ff45adc6f",
+                      value: null
+                  }, { uri: entityUri });
+
+                  let current = res.data;
+                  for (const key of dataPath) {
+                      if (current === undefined || current === null) break;
+                      current = current[key];
+                  }
+
+                  if (typeof current === 'string' && current.startsWith('#')) {
+                      const hex = current.replace('#', '');
+                      const r = parseInt(hex.substring(0, 2), 16);
+                      const g = parseInt(hex.substring(2, 4), 16);
+                      const b = parseInt(hex.substring(4, 6), 16);
+                      return processFinalColor(r, g, b);
+                  }
+              }
+          } catch (e) {
+              console.warn("[Sort-Play] Native color extraction failed, falling back to ColorThief", e);
+          }
+      }
+
+      if (!src || src.startsWith('spotify:')) return [40, 40, 40];
+      
       if (dominantColorCache.has(src)) {
           const cached = dominantColorCache.get(src);
           if (Date.now() - cached.ts < CACHE_EXPIRE_MODAL_ASSETS) {
-              return Promise.resolve(cached.data);
+              return cached.data;
           }
       }
+      
       return new Promise((resolve) => {
           const img = new Image();
           img.crossOrigin = 'Anonymous';
@@ -9523,9 +9937,9 @@ const getDominantColor = (src) => {
                       count++;
                   }
                   if(count === 0) return resolve([40, 40, 40]);
-                  const result = [Math.round(r/count), Math.round(g/count), Math.round(b/count)];
-                  dominantColorCache.set(src, { ts: Date.now(), data: result });
-                  resolve(result);
+                  const finalColor = processFinalColor(Math.round(r/count), Math.round(g/count), Math.round(b/count));
+                  dominantColorCache.set(src, { ts: Date.now(), data: finalColor });
+                  resolve(finalColor);
               } catch(e) { resolve([40, 40, 40]); }
           };
           img.onerror = () => resolve([40, 40, 40]);
@@ -9618,6 +10032,7 @@ const getDominantColor = (src) => {
   function showGenreDetailsModal(genreMapOrPromise, trackName, artistName, coverUrl, trackUri = null, trackObj = null, forceUpdate = false) {
       const trackIdKey = trackUri || `${trackName}|${artistName}`;
       const existing = document.getElementById("sort-play-genre-details-window");
+      const entityUriForColor = trackObj?.albumUri || trackObj?.album?.uri || trackObj?.track?.album?.uri || trackUri;
 
       const enforceBoundaries = (element) => {
           requestAnimationFrame(() => {
@@ -9707,7 +10122,7 @@ const getDominantColor = (src) => {
                           }
                       }, 200);
 
-                      getDominantColor(coverUrl).then(([r, g, b]) => {
+                      getDominantColor(coverUrl, entityUriForColor).then(([r, g, b]) => {
                           if (existing.dataset.trackId === trackIdKey) {
                               updateGenreModalBackground(existing, coverUrl, r, g, b);
                           }
@@ -9727,7 +10142,7 @@ const getDominantColor = (src) => {
                   }
               } else {
                   updateModalContent();
-                  getDominantColor(coverUrl).then(([r, g, b]) => {
+                  getDominantColor(coverUrl, entityUriForColor).then(([r, g, b]) => {
                       if (existing.dataset.trackId === trackIdKey) {
                           updateGenreModalBackground(existing, coverUrl, r, g, b);
                       }
@@ -9883,7 +10298,7 @@ const getDominantColor = (src) => {
           transition: height 0.3s ease, background-color 0.4s ease, border-color 0.4s ease;
       `;
       
-      getDominantColor(coverUrl).then(([r, g, b]) => {
+      getDominantColor(coverUrl, entityUriForColor).then(([r, g, b]) => {
           updateGenreModalBackground(modalContainer, coverUrl, r, g, b);
       });
 
@@ -9961,8 +10376,8 @@ const getDominantColor = (src) => {
                       globalTagIndex++;
 
                       return `
-                        <div class="genre-detail-tag ${animClass}" data-genre="${g.name}" title="Source: ${tooltip}" style="background: rgba(255,255,255,0.08); color: #fff; padding: 4px 6px 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.05); user-select: none; display: flex; align-items: center; gap: 8px; ${delayStyle}">
-                            <span class="genre-text">${titleCase}</span>${scoreHtml}
+                        <div class="genre-detail-tag ${animClass}" data-genre="${escapeHtml(g.name, "")}" title="Source: ${escapeHtml(tooltip, "")}" style="background: rgba(255,255,255,0.08); color: #fff; padding: 4px 6px 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; border: 1px solid rgba(255,255,255,0.05); user-select: none; display: flex; align-items: center; gap: 8px; ${delayStyle}">
+                            <span class="genre-text">${escapeHtml(titleCase, "")}</span>${scoreHtml}
                             <button class="genre-copy-btn" title="Copy" style="background: transparent; border: none; color: rgba(255,255,255,0.6); cursor: pointer; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 3px; transition: all 0.2s;">
                                 ${smallCopyIcon}
                             </button>
@@ -10017,8 +10432,8 @@ const getDominantColor = (src) => {
               </div>
               <div class="sp-genre-info">
                   <div class="sp-genre-all-title">All Genres</div>
-                  <div class="sp-genre-track" title="${trackName}">${trackName}</div>
-                  <div class="sp-genre-artist" title="${artistName}">${artistName}</div>
+                  <div class="sp-genre-track" title="${escapeHtml(trackName)}">${escapeHtml(trackName)}</div>
+                  <div class="sp-genre-artist" title="${escapeHtml(artistName)}">${escapeHtml(artistName)}</div>
               </div>
               <div class="sp-window-controls">
                   <button class="sp-control-btn minimize-btn" title="Minimize">
@@ -10372,12 +10787,12 @@ const getDominantColor = (src) => {
   }
 
   const GENRE_ALIASES_RAW = {
-    "r&b": ["r&b", "rnb", "r and b", "r n b", "rhythm and blues", "rhythm & blues"],
+    "r&b": ["r&b", "rnb", "r and b", "r n b", "rhythm and blues", "rhythm & blues", "r&b's", "rnb's"],
     "neo soul": ["neo soul", "neosoul", "neo-soul"],
-    "hip hop": ["hip hop", "hip-hop", "hiphop"],
+    "hip hop": ["hip hop", "hip-hop", "hiphop", "hip-hop music", "hip hop's", "hip-hops"],
     "lo-fi": ["lo-fi", "lofi", "lo fi"],
     "trap": ["trap", "trap music"],
-    "pop": ["pop", "pop music"],
+    "pop": ["pop", "pop music", "pop's", "popmusic", "pops"],
     "indie pop": ["indie pop", "indiepop", "indie-pop"],
     "synth pop": ["synth pop", "synthpop", "synth-pop"],
     "electropop": ["electropop", "electro-pop", "electro pop"],
@@ -10389,7 +10804,7 @@ const getDominantColor = (src) => {
     "rock and roll": ["rock & roll", "rock n roll", "rock and roll", "rock'n'roll"],
     "alternative rock": ["alternative rock", "alt rock", "alt-rock"],
     "indie rock": ["indie rock", "indierock", "indie-rock"],
-    "hard rock": ["hard rock", "hardrock"],
+    "hard rock": ["hard rock", "hardrock", "hard rock music", "hard rock's", "hard-rock", "hardrockmusic"],
     "soft rock": ["soft rock", "softrock"],
     "psychedelic rock": ["psychedelic rock", "psych rock"],
     "pop punk": ["pop punk", "poppunk", "pop-punk"],
@@ -10397,7 +10812,7 @@ const getDominantColor = (src) => {
     "new wave": ["new wave", "newwave"],
     "post-rock": ["post-rock", "postrock", "post rock"],
     "shoegaze": ["shoegaze", "shoe gaze"],
-    "metal": ["metal", "heavy metal", "heavymetal"],
+    "metal": ["metal", "heavy metal", "heavymetal", "metal rock", "metal's", "metalhead", "metallic", "metalmusic", "metals"],
     "death metal": ["death metal", "deathmetal"],
     "black metal": ["black metal", "blackmetal"],
     "metalcore": ["metalcore", "metal core"],
@@ -10405,27 +10820,46 @@ const getDominantColor = (src) => {
     "power metal": ["power metal", "powermetal"],
     "thrash metal": ["thrash metal", "thrashmetal"],
     "doom metal": ["doom metal", "doommetal"],
-    "electronic": ["electronic", "electronica"],
-    "edm": ["edm", "electronic dance music"],
-    "house": ["house", "house music"],
+    "electronic": ["electro", "electro's", "electronic", "electronic music", "electronic's", "electronica", "electronicas", "electronico", "electronics", "electronik", "eletronic"],
+    "edm": ["edm", "electronic dance", "electronic dance music"],
+    "house": ["house", "house music", "house's", "housemusic"],
     "deep house": ["deep house", "deephouse"],
     "tech house": ["tech house", "techhouse"],
-    "drum and bass": ["drum and bass", "dnb", "d&b", "drum n bass", "drum & bass"],
+    "drum and bass": ["drum and bass", "dnb", "d&b", "drum n bass", "drum & bass", "drumandbass", "drum'n'bass"],
     "psytrance": ["psytrance", "psy trance", "psy-trance"],
-    "synthwave": ["synthwave", "synth wave", "synth-wave"],
+    "synthwave": ["synthwave", "synth wave", "synth-wave", "synthwave's"],
     "vaporwave": ["vaporwave", "vapor wave"],
     "chillwave": ["chillwave", "chill wave"],
-    "latin": ["latin", "latin music"],
+    "latin": ["latin", "latin music", "latin's", "latina", "latinas", "latinmusic", "latino", "latinos"],
     "reggaeton": ["reggaeton", "reggaetón", "regueton"],
     "bossa nova": ["bossa nova", "bossanova"],
     "salsa": ["salsa", "salsa music"],
     "singer-songwriter": ["singer-songwriter", "singer songwriter", "singer/songwriter"],
     "nu disco": ["nu disco", "nu-disco", "nudisco"],
     "soundtrack": ["soundtrack", "ost", "original soundtrack"],
-    "country": ["country", "country music"],
-    "classical": ["classical", "classical music"],
+    "country": ["country", "country music", "country's", "countrymusic"],
+    "classical": ["classic", "classical", "classical music", "classical's", "classics", "orchestra", "orchestral", "orchestral music", "orchestras"],
     "world": ["world", "world music"],
-    "christian": ["christian", "christian music", "ccm"]
+    "christian": ["christian", "christian music", "ccm"],
+    "rock": ["rock", "rock music", "rock's", "rockmusic", "rocks", "rockin", "rockin'"],
+    "indie": ["indie", "indie's", "indiemusic", "indies"],
+    "dance": ["dance", "dance music", "dance's", "dances", "dancey"],
+    "jazz": ["jazz", "jazz's", "jazzier", "jazziest", "jazzmusic", "jazzy"],
+    "folk": ["folk", "folk music", "folk's", "folkie", "folkier", "folklore", "folkmusic", "folksy"],
+    "rap": ["rap", "rap music", "raps", "rapper", "rappers"],
+    "punk": ["punk", "punk music", "punk's", "punkmusic", "punks", "punky"],
+    "soul": ["soul", "soul music", "soul's", "soulful", "soulmusic", "souly"],
+    "blues": ["blues", "blues music", "blues'", "bluesier", "bluesiest", "bluesmusic", "bluesy"],
+    "alternative": ["alt", "alternative", "alternative music", "alternative's", "alternativemusic", "alternatives"],
+    "instrumental": ["instrumental", "instrumental's", "instrumentalmusic", "instrumentals", "no vocals"],
+    "experimental": ["experiment", "experimental", "experimental's", "experimentalmusic", "experiments"],
+    "ambient": ["ambient", "ambient's", "ambients", "atmospheric"],
+    "acoustic": ["acoustic", "acoustic's", "acousticmusic", "acoustics"],
+    "reggae": ["reggae", "reggae music", "reggae's", "reggaemusic"],
+    "techno": ["tech", "techno", "techno music", "techno's", "technomusic"],
+    "trance": ["trance", "trance music", "trance's", "trancemusic", "trancing"],
+    "funk": ["funk", "funk's", "funkier", "funkiest", "funkmusic", "funky"],
+    "disco": ["disco", "disco music", "disco's", "discomusic", "discos"]
   };
 
   const GENRE_ALIAS_MAP = new Map();
@@ -10555,74 +10989,88 @@ const getDominantColor = (src) => {
           const validUris = trackUris.filter(uri => uri && uri.startsWith("spotify:track:"));
           if (validUris.length === 0) return new Map();
 
-          const response = await client.fetch({ extensionQuery: [
-              { extensionKind: 6, entityUri: validUris },
-              { extensionKind: 28, entityUri: validUris }
-          ]});
-          
-          const results = new Map();
-          validUris.forEach(uri => results.set(uri, { concepts: [], scores: [] }));
+          const finalMap = new Map();
+          const BATCH_SIZE = 500;
 
-          if (response.extension) {
-              response.extension.forEach(ext => {
-                  const kind = ext.extensionKind;
-                  if ((kind === 6 || kind === 28) && ext.entityExtension) {
-                      ext.entityExtension.forEach(item => {
-                          if (item.extensionData && item.extensionData.value) {
-                              const uri = item.entityUri;
-                              const res = results.get(uri) || { concepts: [], scores: [] };
-                              
-                              if (kind === 6) {
-                                  const text = new TextDecoder().decode(item.extensionData.value);
-                                  const rawMatches = text.match(/[A-Za-z0-9 _\-\&']{3,}/g);
-                                  if (rawMatches) {
-                                      const matches = rawMatches.filter(s => {
-                                          const l = s.toLowerCase();
-                                          return !l.startsWith('spotify') && !l.startsWith('&spotify') && l !== 'concept';
-                                      });
-                                      for (let j = 0; j < matches.length; j++) {
-                                          if (/^[a-zA-Z0-9]{22}$/.test(matches[j]) && j > 0) {
-                                              const concept = matches[j - 1].toLowerCase().trim();
-                                              if (concept !== 'track') {
-                                                  res.concepts.push(concept);
+          for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
+              const batch = validUris.slice(i, i + BATCH_SIZE);
+              
+              try {
+                  const response = await client.fetch({ extensionQuery: [
+                      { extensionKind: 6, entityUri: batch },
+                      { extensionKind: 28, entityUri: batch }
+                  ]});
+                  
+                  const batchResults = new Map();
+                  batch.forEach(uri => batchResults.set(uri, { concepts: [], scores: [] }));
+
+                  if (response.extension) {
+                      response.extension.forEach(ext => {
+                          const kind = ext.extensionKind;
+                          if ((kind === 6 || kind === 28) && ext.entityExtension) {
+                              ext.entityExtension.forEach(item => {
+                                  if (item.extensionData && item.extensionData.value) {
+                                      const uri = item.entityUri;
+                                      const res = batchResults.get(uri) || { concepts: [], scores: [] };
+                                      
+                                      if (kind === 6) {
+                                          const text = new TextDecoder().decode(item.extensionData.value);
+                                          const rawMatches = text.match(/[A-Za-z0-9 _\-\&']{3,}/g);
+                                          if (rawMatches) {
+                                              const matches = rawMatches.filter(s => {
+                                                  const l = s.toLowerCase();
+                                                  return !l.startsWith('spotify') && !l.startsWith('&spotify') && l !== 'concept';
+                                              });
+                                              for (let j = 0; j < matches.length; j++) {
+                                                  if (/^[a-zA-Z0-9]{22}$/.test(matches[j]) && j > 0) {
+                                                      const concept = matches[j - 1].toLowerCase().trim();
+                                                      if (concept !== 'track') {
+                                                          res.concepts.push(concept);
+                                                      }
+                                                  }
                                               }
                                           }
+                                      } else if (kind === 28) {
+                                          const buffer = new Uint8Array(Object.values(item.extensionData.value)).buffer;
+                                          const dataView = new DataView(buffer);
+                                          for(let k = 0; k < buffer.byteLength - 8; k++) {
+                                              try {
+                                                  let val = dataView.getFloat64(k, true);
+                                                  if (val > 0.001 && val <= 1.0) res.scores.push(val);
+                                              } catch(e){}
+                                          }
                                       }
+                                      batchResults.set(uri, res);
                                   }
-                              } else if (kind === 28) {
-                                  const buffer = new Uint8Array(Object.values(item.extensionData.value)).buffer;
-                                  const dataView = new DataView(buffer);
-                                  for(let i = 0; i < buffer.byteLength - 8; i++) {
-                                      try {
-                                          let val = dataView.getFloat64(i, true);
-                                          if (val > 0.001 && val <= 1.0) res.scores.push(val);
-                                      } catch(e){}
-                                  }
-                              }
-                              results.set(uri, res);
+                              });
                           }
                       });
                   }
-              });
+                  
+                  batchResults.forEach((data, uri) => {
+                      const uniqueConceptsMap = new Map();
+                      data.concepts.forEach((concept, index) => {
+                          const lower = concept.toLowerCase();
+                          if (!uniqueConceptsMap.has(lower)) {
+                              uniqueConceptsMap.set(lower, data.scores[index] || 0);
+                          }
+                      });
+                      
+                      const genres = Array.from(uniqueConceptsMap.entries()).map(([name, score]) => ({
+                          name,
+                          score
+                      }));
+                      
+                      finalMap.set(uri, genres);
+                  });
+              } catch (batchError) {
+                  console.warn(`[Sort-Play] Failed to fetch Native Spotify Track Genres Batch for slice ${i}-${i + BATCH_SIZE}:`, batchError);
+                  batch.forEach(uri => {
+                      if (!finalMap.has(uri)) finalMap.set(uri, []);
+                  });
+              }
           }
           
-          const finalMap = new Map();
-          results.forEach((data, uri) => {
-              const uniqueConceptsMap = new Map();
-              data.concepts.forEach((concept, index) => {
-                  const lower = concept.toLowerCase();
-                  if (!uniqueConceptsMap.has(lower)) {
-                      uniqueConceptsMap.set(lower, data.scores[index] || 0);
-                  }
-              });
-              
-              const genres = Array.from(uniqueConceptsMap.entries()).map(([name, score]) => ({
-                  name,
-                  score
-              }));
-              
-              finalMap.set(uri, genres);
-          });
           return finalMap;
       } catch (e) {
           console.warn("[Sort-Play] Failed to fetch Native Spotify Track Genres Batch:", e);
@@ -10841,8 +11289,14 @@ const getDominantColor = (src) => {
                           isrc = track.external_ids.isrc;
                       } else {
                           try {
-                              const meta = await fetchInternalTrackMetadata(trackId);
-                              isrc = meta?.external_ids?.isrc;
+                              const metaMap = await fetchCoreMetadataBatch([track.uri]);
+                              const coreMeta = metaMap.get(track.uri);
+                              if (coreMeta && coreMeta.isrc) {
+                                  isrc = coreMeta.isrc;
+                              } else {
+                                  const meta = await fetchInternalTrackMetadata(trackId);
+                                  isrc = meta?.external_ids?.isrc;
+                              }
                           } catch(e) {}
                       }
 
@@ -12589,21 +13043,21 @@ const getDominantColor = (src) => {
           }
 
           const presetsHtml = presets.map(p => `
-              <div class="preset-item" data-id="${p.id}">
+              <div class="preset-item" data-id="${escapeHtml(p.id, "")}">
                   <div class="preset-info">
-                      <div class="preset-title">${p.title}</div>
-                      <div class="preset-prompt">${p.prompt}</div>
+                      <div class="preset-title">${escapeHtml(p.title, "")}</div>
+                      <div class="preset-prompt">${escapeHtml(p.prompt, "")}</div>
                   </div>
                   <div class="preset-actions">
-                      <button class="preset-action-btn edit-btn" data-id="${p.id}" title="Edit">${penIconSvg}</button>
-                      <button class="preset-action-btn delete-btn" data-id="${p.id}" title="Delete">${trashIconSVG}</button>
+                      <button class="preset-action-btn edit-btn" data-id="${escapeHtml(p.id, "")}" title="Edit">${penIconSvg}</button>
+                      <button class="preset-action-btn delete-btn" data-id="${escapeHtml(p.id, "")}" title="Delete">${trashIconSVG}</button>
                   </div>
               </div>
           `).join('');
 
           const historyHtml = history.map((h, i) => `
               <div class="history-item" data-index="${i}">
-                  <div class="history-text">${h}</div>
+                  <div class="history-text">${escapeHtml(h, "")}</div>
                   <button class="preset-action-btn save-history-btn" data-index="${i}" title="Save as Preset">
                       ${plusIcon16Svg}
                   </button>
@@ -12830,9 +13284,13 @@ const getDominantColor = (src) => {
     const shuffledLyricsIndices = shuffleArray(tracksWithLyricsIndices);
 
     for (const index of shuffledLyricsIndices) {
+        const approxSize = new Blob([JSON.stringify(prunedTracks[index].lyrics)]).size;
         delete prunedTracks[index].lyrics;
         lyricsRemovedCount++;
-        currentSize = getPromptSize(prunedTracks);
+        currentSize -= approxSize;
+        if (currentSize <= maxSize || lyricsRemovedCount % 10 === 0) {
+            currentSize = getPromptSize(prunedTracks);
+        }
         if (currentSize <= maxSize) break;
     }
 
@@ -12841,9 +13299,13 @@ const getDominantColor = (src) => {
         const shuffledStatsIndices = shuffleArray(tracksWithStatsIndices);
 
         for (const index of shuffledStatsIndices) {
+            const approxSize = new Blob([JSON.stringify(prunedTracks[index].stats)]).size;
             delete prunedTracks[index].stats;
             statsRemovedCount++;
-            currentSize = getPromptSize(prunedTracks);
+            currentSize -= approxSize;
+            if (currentSize <= maxSize || statsRemovedCount % 10 === 0) {
+                currentSize = getPromptSize(prunedTracks);
+            }
             if (currentSize <= maxSize) break;
         }
     }
@@ -13099,6 +13561,9 @@ const getDominantColor = (src) => {
   }
 
   async function loadImageDirectly(imageUrl) {
+      if (imageUrl.startsWith('spotify:')) {
+          return Promise.reject(new Error("Cannot load spotify: URIs directly with crossOrigin"));
+      }
       return new Promise((resolve, reject) => {
           const img = new Image();
           img.crossOrigin = 'Anonymous';
@@ -13151,12 +13616,33 @@ const getDominantColor = (src) => {
           let albumDetails;
           try {
               const hexId = spotifyHex(albumId);
-              const token = Spicetify.Platform.Session.accessToken;
-              const res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
-                  headers: { "Authorization": `Bearer ${token}` }
-              });
+              let res = null;
+              let attempt = 0;
+              while (attempt < 3) {
+                  if (internalTokenRefreshPromise) await internalTokenRefreshPromise;
+                  const token = Spicetify.Platform.Session.accessToken;
+                  res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
+                      headers: { "Authorization": `Bearer ${token}` }
+                  });
+                  if (res.status === 401) {
+                      if (!internalTokenRefreshPromise) {
+                          internalTokenRefreshPromise = (async () => {
+                              try {
+                                  const tData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                                  Spicetify.Platform.Session.accessToken = tData.accessToken;
+                                  await new Promise(r => setTimeout(r, 500));
+                                  return tData.accessToken;
+                              } catch(e) { throw e; } finally { internalTokenRefreshPromise = null; }
+                          })();
+                      }
+                      try { await internalTokenRefreshPromise; } catch(e) { break; }
+                      attempt++;
+                      continue;
+                  }
+                  break;
+              }
               
-              if (res.ok) {
+              if (res && res.ok) {
                   const body = await res.json();
                   if (body.cover_group && body.cover_group.image) {
                       const images = body.cover_group.image.map(img => ({
@@ -13229,12 +13715,23 @@ const getDominantColor = (src) => {
 
     if (!targetIsrc || !targetDate) {
         try {
-            const meta = await fetchInternalTrackMetadata(trackId);
-            if (meta) {
-                if (!targetIsrc) targetIsrc = meta.external_ids?.isrc;
-                if (!targetDate) targetDate = meta.album?.release_date;
+            const metaMap = await fetchCoreMetadataBatch([track.uri]);
+            const coreMeta = metaMap.get(track.uri);
+            if (coreMeta) {
+                if (!targetIsrc) targetIsrc = coreMeta.isrc;
+                if (!targetDate) targetDate = coreMeta.releaseDate;
             }
         } catch(e) {}
+        
+        if (!targetIsrc || !targetDate) {
+            try {
+                const meta = await fetchInternalTrackMetadata(trackId);
+                if (meta) {
+                    if (!targetIsrc) targetIsrc = meta.external_ids?.isrc;
+                    if (!targetDate) targetDate = meta.album?.release_date;
+                }
+            } catch(e) {}
+        }
     }
 
     if (!targetPlaycount) {
@@ -13242,6 +13739,15 @@ const getDominantColor = (src) => {
             const pcRes = await fetchPlayCountsBatchNew([track.uri]);
             targetPlaycount = pcRes.get(track.uri) || 0;
         } catch(e) {}
+        
+        if (!targetPlaycount && Spicetify.GraphQL.Definitions.getTrack) {
+            try {
+                const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getTrack, { uri: track.uri });
+                if (res?.data?.trackUnion?.playcount) {
+                    targetPlaycount = parseInt(res.data.trackUnion.playcount, 10) || 0;
+                }
+            } catch (e) {}
+        }
     }
 
     const rawTrackName = track.songTitle || track.name || "";
@@ -13293,18 +13799,37 @@ const getDominantColor = (src) => {
     });
 
     let finalDate = targetDate;
-    const trackNumber = track.trackNumber || 0;
+    let bestTrackNumber = track.trackNumber || track.track?.track_number || 0;
+    let bestAlbumName = track.albumName || track.album?.name || track.track?.album?.name || "";
 
     if (allItems.length > 0) {
         const itemUris = [...new Set(allItems.map(i => i.uri))];
         const itemIds = itemUris.map(u => u.split(":")[2]);
 
-        const MAX_META_CONCURRENCY = 50;
         const metaMap = new Map();
-        for (let i = 0; i < itemIds.length; i += MAX_META_CONCURRENCY) {
-            const batch = itemIds.slice(i, i + MAX_META_CONCURRENCY);
-            const metaBatch = await Promise.all(batch.map(id => fetchInternalTrackMetadata(id).catch(() => null)));
-            metaBatch.forEach(m => { if (m) metaMap.set(m.id, m); });
+        try {
+            const fetchedCoreMeta = await fetchCoreMetadataBatch(itemUris);
+            
+            allItems.forEach(item => {
+                const coreData = fetchedCoreMeta.get(item.uri);
+                metaMap.set(item.id, {
+                    id: item.id,
+                    name: item.name,
+                    duration_ms: item.duration_ms,
+                    artists: item.artists,
+                    album: { name: item.album?.name, release_date: coreData?.releaseDate || null },
+                    external_ids: { isrc: coreData?.isrc || null },
+                    trackNumber: item.trackNumber
+                });
+            });
+        } catch (e) {
+            console.warn("[Sort-Play] Fast batch meta fetch failed in True Date, falling back", e);
+            const MAX_META_CONCURRENCY = 50;
+            for (let i = 0; i < itemIds.length; i += MAX_META_CONCURRENCY) {
+                const batch = itemIds.slice(i, i + MAX_META_CONCURRENCY);
+                const metaBatch = await Promise.all(batch.map(id => fetchInternalTrackMetadata(id).catch(() => null)));
+                metaBatch.forEach(m => { if (m) metaMap.set(m.id, m); });
+            }
         }
 
         const playsMap = await fetchPlayCountsBatchNew(itemUris).catch(() => new Map());
@@ -13368,6 +13893,8 @@ const getDominantColor = (src) => {
                 if (!isNaN(mTime) && mTime < bestTime) {
                     bestTime = mTime;
                     bestDate = meta.album.release_date;
+                    if (meta.trackNumber !== undefined) bestTrackNumber = meta.trackNumber;
+                    if (meta.album.name) bestAlbumName = meta.album.name;
                 }
             }
         });
@@ -13378,10 +13905,10 @@ const getDominantColor = (src) => {
     }
 
     if (finalDate) {
-        await idb.set('trueReleaseDates', trackId, { date: finalDate, trackNumber: trackNumber });
+        await idb.set('trueReleaseDates', trackId, { date: finalDate, trackNumber: bestTrackNumber, albumName: bestAlbumName });
     }
 
-    return { ...track, trueReleaseDate: finalDate, trackNumber: trackNumber };
+    return { ...track, trueReleaseDate: finalDate, trueTrackNumber: bestTrackNumber, trueAlbumName: bestAlbumName };
   }
   
   async function getTrackDetailsWithReleaseDateForFilter(track) {
@@ -13434,18 +13961,25 @@ const getDominantColor = (src) => {
     
     const refreshedTracks = await refreshTrackAlbumInfo(
         tracks, 
-        (progress) => { updateProgress(`${Math.floor(progress * 0.30)}%`); }
+        (progress) => { updateProgress(`${Math.floor(progress * 0.20)}%`); }
     );
 
     updateProgress("Enriching...");
     
     const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
         refreshedTracks, 
-        (progress) => { updateProgress(`${30 + Math.floor(progress * 0.60)}%`); }
+        (progress) => { updateProgress(`${20 + Math.floor(progress * 0.40)}%`); }
+    );
+
+    updateProgress("Popularity...");
+
+    const tracksWithPopularity = await fetchPopularityForMultipleTracks(
+        tracksWithPlayCounts,
+        (progress) => { updateProgress(`${60 + Math.floor(progress * 0.20)}%`); }
     );
 
     const { unique } = await deduplicateTracks(
-        tracksWithPlayCounts, 
+        tracksWithPopularity, 
         true, 
         true,
         (progress) => { updateProgress(`Dedup ${progress}%`); },
@@ -13509,8 +14043,12 @@ const getDominantColor = (src) => {
         tracks = convertedTracks;
 
         const openModal = async () => {
+            const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}');
             const { trackGenreMap, rawTrackGenres } = await fetchAllTrackGenres(
-                tracks
+                tracks,
+                null,
+                null,
+                gfSources
             );
             const modalPromise = showGenreFilterModal(tracks, trackGenreMap, rawTrackGenres, currentUri);
             setTimeout(() => resetButtons(), 100);
@@ -13525,6 +14063,734 @@ const getDominantColor = (src) => {
         );
         resetButtons();
     }
+  }
+
+  async function showVibeFilterModal(tracksWithVibes, currentUri, sourceDetailsOverride = null) {
+      let viewMode = 'grid';
+      let strictness = parseFloat(localStorage.getItem('sort-play-vibe-strictness')) || 0.4;
+      const appendNameChecked = localStorage.getItem('sort-play-vibe-append-name') !== 'false';
+      let limitEnabled = localStorage.getItem('sort-play-vibe-limit-enabled') === 'true';
+      let limitCount = parseInt(localStorage.getItem('sort-play-vibe-limit-count'), 10) || 100;
+      let activeVibesMap = {}; 
+      let sourceName = "Current View";
+      let sourceCoverUrl = null;
+
+      if (sourceDetailsOverride) {
+          if (sourceDetailsOverride.name && sourceDetailsOverride.name !== "Source") {
+              sourceName = sourceDetailsOverride.name;
+          }
+          if (sourceDetailsOverride.coverImage) {
+              sourceCoverUrl = sourceDetailsOverride.coverImage;
+          }
+          let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
+          while (suffixPattern.test(sourceName)) sourceName = sourceName.replace(suffixPattern, "");
+      } else {
+          try {
+              const { sourceName: fetchedName } = await fetchSourceNameAndArtist(currentUri);
+              if (fetchedName && fetchedName !== "Source") sourceName = fetchedName;
+              let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
+              while (suffixPattern.test(sourceName)) sourceName = sourceName.replace(suffixPattern, "");
+
+              if (URI.isPlaylistV1OrV2(currentUri)) {
+                  const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUri);
+                  if (meta.images?.[0]?.url) sourceCoverUrl = meta.images[0].url;
+              } else if (URI.isAlbum(currentUri)) {
+                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: currentUri, locale: "en", offset: 0, limit: 1 });
+                  if (res.data.albumUnion?.coverArt?.sources?.[0]?.url) sourceCoverUrl = res.data.albumUnion.coverArt.sources[0].url;
+              } else if (URI.isArtist(currentUri)) {
+                  sourceCoverUrl = await getArtistImageUrl(currentUri.split(":")[2]);
+              }
+          } catch(e) { console.warn("[Sort-Play] Failed fetching source details for vibe filter", e); }
+      }
+
+      const overlay = document.createElement("div");
+      overlay.className = "sort-play-font-scope";
+      overlay.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background-color: rgba(0, 0, 0, 0.7); z-index: 3000;
+          display: flex; justify-content: center; align-items: center;
+          backdrop-filter: blur(8px);
+      `;
+
+      const modalContainer = document.createElement("div");
+      modalContainer.className = "main-embedWidgetGenerator-container";
+      modalContainer.style.cssText = `
+          width: 850px !important; background-color: #181818 !important;
+          border: 1px solid #282828; border-radius: 30px; display: flex;
+          flex-direction: column; max-height: 85vh; overflow: hidden;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.5); position: relative;
+      `;
+
+      modalContainer.innerHTML = `
+        <style>
+            .sp-vibe-tab-container { display: flex; background: rgba(255,255,255,0.05); padding: 4px; border-radius: 8px; }
+            .sp-vibe-tab { background: transparent; border: none; color: #b3b3b3; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+            .sp-vibe-tab.active { background: #333; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+            
+            .sp-strictness-section { padding: 16px 24px; border-bottom: 1px solid #282828; flex-shrink: 0; background: rgba(0,0,0,0.1); }
+            .sp-strictness-header { color: #b3b3b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; text-align: left; }
+            .sp-strictness-container { display: flex; gap: 10px; justify-content: center; }
+            .sp-strictness-btn { flex: 1; padding: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #b3b3b3; font-weight: 700; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+            .sp-strictness-btn:hover:not(.active) { background: rgba(255,255,255,0.06); color: #fff; }
+            .sp-strictness-btn.active { background: rgba(30,215,96,0.1); border-color: #1ed760; color: #1ed760; box-shadow: 0 4px 12px rgba(30,215,96,0.1); }
+            
+            .sp-vibe-body-area { flex: 1; overflow-y: auto; padding: 16px 24px; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+            .sp-vibe-body-area::-webkit-scrollbar { width: 8px; }
+            .sp-vibe-body-area::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+            .sp-vibe-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+            .sp-vibe-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 16px 8px; display: flex; flex-direction: column; align-items: center; text-align: center; cursor: pointer; transition: background-color 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease; }
+            .sp-vibe-card:hover:not(.disabled):not(.selected) { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.18); }
+            .sp-vibe-card.selected { background: rgba(30,215,96,0.1); border-color: #1ed760; }
+            .sp-vibe-card.disabled { opacity: 0.3; filter: grayscale(1); cursor: not-allowed; }
+            .sp-vibe-card-icon { width: 32px; height: 32px; margin-bottom: 12px; display: flex; justify-content: center; align-items: center; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
+            .sp-vibe-card-icon svg { width: 100% !important; height: 100% !important; }
+            .sp-vibe-card-title { font-size: 13px; font-weight: 800; color: #fff; margin-bottom: 4px; line-height: 1.2; padding: 0 4px; }
+            .sp-vibe-card-count { font-size: 11px; font-weight: 600; color: #b3b3b3; }
+            
+            .sp-vibe-mixer-row { display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.04); transition: border-color 0.2s, background 0.2s; }
+            .sp-vibe-mixer-row:hover:not(.disabled-row) { background: rgba(255,255,255,0.04); }
+            .sp-vibe-mixer-row:focus-within { border-color: rgba(255,255,255,0.15); }
+            .sp-vibe-mixer-icon { width: 24px; height: 24px; flex-shrink: 0; display: flex; justify-content: center; align-items: center; }
+            .sp-vibe-mixer-icon svg { width: 100% !important; height: 100% !important; }
+            .sp-vibe-mixer-label { width: 130px; font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .sp-slider-wrapper { flex: 1; display: flex; align-items: center; gap: 12px; }
+            .sp-mixer-slider { -webkit-appearance: none; width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; outline: none; }
+            .sp-mixer-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #1ed760; cursor: pointer; transition: transform 0.1s; }
+            .sp-mixer-slider::-webkit-slider-thumb:hover { transform: scale(1.1); }
+            .sp-mixer-pct { width: 36px; font-size: 12px; font-weight: 700; color: #b3b3b3; text-align: right; font-variant-numeric: tabular-nums; }
+            
+            .sp-vibe-info-panel { width: 270px; background: rgba(0,0,0,0.15); border-left: 1px solid #282828; padding: 24px; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+            .sp-info-title { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; line-height: 1.2; }
+            .sp-info-desc { font-size: 13px; color: #b3b3b3; line-height: 1.5; margin-bottom: 16px; }
+            .sp-info-icon { width: 40px; height: 40px; margin-bottom: 16px; display: flex; align-items: center; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5)); }
+            .sp-info-icon svg { width: 100% !important; height: 100% !important; }
+            #sp-vibe-info-content { display: grid; grid-template-areas: "stack"; flex: 1; align-items: start; margin-top: 24px; }
+            #sp-vibe-info-default, #sp-vibe-info-dynamic { grid-area: stack; transition: opacity 0.15s ease-in-out; opacity: 1; pointer-events: auto; }
+            #sp-vibe-info-dynamic.hidden, #sp-vibe-info-default.hidden { opacity: 0; pointer-events: none; }
+
+            .sp-vibe-footer { padding: 16px 24px; border-top: 1px solid #282828; background: rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; }
+            .sp-btn { padding: 10px 24px; border-radius: 32px; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; cursor: pointer; border: none; transition: transform 0.1s, filter 0.2s, background-color 0.2s, color 0.2s, border-color 0.2s; }
+            .sp-btn-secondary { background: transparent; color: #fff; border: 1px solid #727272; }
+            .sp-btn-secondary:not(:disabled):hover { border-color: #fff; }
+            .sp-btn-primary { background: #1ed760; color: #000; }
+            .sp-btn-primary:not(:disabled):hover { background: #3be477; }
+            .sp-btn:disabled { cursor: not-allowed; transform: none !important; }
+            .sp-btn-secondary:disabled { border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
+            .sp-btn-primary:disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.3); }
+            .sp-close-icon-btn { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; width: 32px; height: 32px; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+            .sp-close-icon-btn:hover { background: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.3); }
+            .sp-vibe-settings-container { display: flex; align-items: center; background: rgba(255,255,255,0.05); border-radius: 20px; transition: max-width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); max-width: 36px; height: 36px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
+            .sp-vibe-settings-container.expanded { max-width: 450px; }
+            .sp-vibe-settings-expander { background: transparent; border: none; color: #b3b3b3; cursor: pointer; width: 34px; height: 34px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; padding: 0; transition: color 0.2s, background-color 0.2s; border-radius: 17px; }
+            .sp-vibe-settings-expander:hover, .sp-vibe-settings-container.expanded .sp-vibe-settings-expander { color: #fff; background: rgba(255,255,255,0.1); }
+            .sp-vibe-settings-controls { display: flex; align-items: center; opacity: 0; transition: opacity 0.2s; white-space: nowrap; padding-left: 10px; padding-right: 16px; gap: 16px; pointer-events: none; }
+            .sp-vibe-settings-container.expanded .sp-vibe-settings-controls { opacity: 1; pointer-events: auto; transition-delay: 0.1s; }
+            .sp-vibe-setting-item { display: flex; align-items: center; gap: 6px; }
+            .sp-vibe-setting-item input[type="checkbox"] { accent-color: #1ed760; width: 16px; height: 16px; margin: 0; cursor: pointer; }
+            .sp-vibe-setting-item label { font-size: 13px; color: #b3b3b3; font-weight: 500; cursor: pointer; user-select: none; margin-top: 1px; }
+            .sp-vibe-setting-item input[type="number"] { width: 70px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); color: #fff; border-radius: 6px; padding: 4px 4px 4px 8px; font-size: 13px; font-family: inherit; margin-left: 2px; }
+          .sp-vibe-setting-divider { width: 1px; height: 14px; background-color: rgba(255,255,255,0.15); flex-shrink: 0; }
+      </style>
+
+        <div style="position: absolute; top: 20px; right: 24px; z-index: 10;">
+            <button class="sp-close-icon-btn" id="sp-vibe-close-x" title="Close">
+                ${closeIconSmall2Svg}
+            </button>
+        </div>
+
+        <div style="display: flex; flex: 1; min-height: 0;">
+            <div style="flex: 1; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid #282828;">
+                <div style="padding: 20px 24px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column; padding-right: 16px; min-width: 0;">
+                        <h2 style="margin: 0; color: white; font-size: 22px; font-weight: 800; line-height: 1;">Vibe Filter</h2>
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #b3b3b3; margin-top: 6px;">
+                            <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 250px;" title="${escapeHtml(sourceName)}">${escapeHtml(sourceName)}</span>
+                            <span style="font-size: 9px; color: rgba(255,255,255,0.3);">●</span>
+                            <span style="white-space: nowrap; color: rgba(255,255,255,0.6); font-variant-numeric: tabular-nums;">${tracksWithVibes.length} Tracks</span>
+                        </div>
+                    </div>
+                    <div class="sp-vibe-tab-container" style="flex-shrink: 0;">
+                        <button class="sp-vibe-tab active" data-view="grid">Grid</button>
+                        <button class="sp-vibe-tab" data-view="mixer">Mixer</button>
+                    </div>
+                </div>
+
+                <div class="sp-strictness-section">
+                    <div class="sp-strictness-header">Vibe Match Strictness Level</div>
+                    <div class="sp-strictness-container">
+                        <button class="sp-strictness-btn ${strictness === 0.4 ? 'active' : ''}" data-strict="0.4">Broad Match</button>
+                        <button class="sp-strictness-btn ${strictness === 0.6 ? 'active' : ''}" data-strict="0.6">Balanced Match</button>
+                        <button class="sp-strictness-btn ${strictness === 0.8 ? 'active' : ''}" data-strict="0.8">Strict Match</button>
+                    </div>
+                </div>
+
+                <div class="sp-vibe-body-area" id="sp-vibe-body-area"></div>
+            </div>
+
+            <div class="sp-vibe-info-panel" id="sp-vibe-info-panel">
+                <div id="sp-vibe-info-content">
+                    <div id="sp-vibe-info-default">
+                        <div class="sp-info-title">Vibe Guide</div>
+                        <div class="sp-info-desc" style="font-size: 12px; line-height: 1.4;">Select vibes to filter tracks based on their audio features.<br><br><b style="color: #fff;">Grid Mode:</b> Acts as a standard filter. Select multiple vibes to include all tracks that match <i>any</i> of them.<br><br><b style="color: #fff;">Mixer Mode:</b> Acts as a volume knob. Set percentages to pull the top scoring tracks from that vibe's available pool (e.g., 50% pulls the top half of matching tracks).</div>
+                    </div>
+                    <div id="sp-vibe-info-dynamic" class="hidden">
+                        <div class="sp-info-icon" id="sp-info-dynamic-icon"></div>
+                        <div class="sp-info-title" id="sp-info-dynamic-title"></div>
+                        <div class="sp-info-desc" id="sp-info-dynamic-desc"></div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: auto; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: center; text-align: center;">
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Total Selected</div>
+                    <div id="vibe-total-count" style="font-size: 48px; font-weight: 800; color: #f15e6c; line-height: 1; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">0</div>
+                    <div id="vibe-total-label" style="font-size: 14px; font-weight: 700; color: #b3b3b3; margin-top: 6px;">Tracks</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sp-vibe-footer">
+            <div id="sp-vibe-settings-container" class="sp-vibe-settings-container">
+                <button id="sp-vibe-settings-expander" class="sp-vibe-settings-expander" title="Settings">
+                    ${settingsIconSvg.replace('width="22"', 'width="18"').replace('height="22"', 'height="18"')}
+                </button>
+                <div id="sp-vibe-settings-controls" class="sp-vibe-settings-controls">
+                    <div class="sp-vibe-setting-item">
+                        <input type="checkbox" id="sp-vibe-limit-checkbox" ${limitEnabled ? 'checked' : ''}>
+                        <label for="sp-vibe-limit-checkbox">Limit Tracks:</label>
+                        <input type="number" id="sp-vibe-limit-input" value="${limitCount}" min="1">
+                    </div>
+                    <div class="sp-vibe-setting-divider"></div>
+                    <div class="sp-vibe-setting-item">
+                        <input type="checkbox" id="sp-vibe-append-name" ${appendNameChecked ? 'checked' : ''}>
+                        <label for="sp-vibe-append-name">Append vibe name to title</label>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <button id="sp-vibe-play-btn" class="sp-btn sp-btn-secondary" disabled>Play Now</button>
+                <button id="sp-vibe-create-btn" class="sp-btn sp-btn-primary" disabled>Create Playlist</button>
+            </div>
+      </div>
+      `;
+
+      document.body.appendChild(overlay);
+      overlay.appendChild(modalContainer);
+
+      const bodyArea = modalContainer.querySelector('#sp-vibe-body-area');
+      const countHeader = modalContainer.querySelector('#vibe-total-count');
+      const countLabel = modalContainer.querySelector('#vibe-total-label');
+      const playBtn = modalContainer.querySelector('#sp-vibe-play-btn');
+      const createBtn = modalContainer.querySelector('#sp-vibe-create-btn');
+      const appendNameCheckbox = modalContainer.querySelector('#sp-vibe-append-name');
+      const settingsContainer = modalContainer.querySelector('#sp-vibe-settings-container');
+      const settingsExpander = modalContainer.querySelector('#sp-vibe-settings-expander');
+      const limitCheckbox = modalContainer.querySelector('#sp-vibe-limit-checkbox');
+      const limitInput = modalContainer.querySelector('#sp-vibe-limit-input');
+
+      settingsExpander.addEventListener('click', () => {
+          settingsContainer.classList.toggle('expanded');
+      });
+
+      appendNameCheckbox.addEventListener('change', (e) => {
+          localStorage.setItem('sort-play-vibe-append-name', e.target.checked);
+      });
+
+      limitCheckbox.addEventListener('change', (e) => {
+          limitEnabled = e.target.checked;
+          localStorage.setItem('sort-play-vibe-limit-enabled', limitEnabled);
+      });
+
+      limitInput.addEventListener('input', (e) => {
+          const val = parseInt(e.target.value, 10);
+          if (!isNaN(val) && val > 0) {
+              limitCount = val;
+              localStorage.setItem('sort-play-vibe-limit-count', limitCount);
+          }
+      });
+
+      const infoDefault = modalContainer.querySelector('#sp-vibe-info-default');
+      const infoDynamic = modalContainer.querySelector('#sp-vibe-info-dynamic');
+      const infoDynIcon = modalContainer.querySelector('#sp-info-dynamic-icon');
+      const infoDynTitle = modalContainer.querySelector('#sp-info-dynamic-title');
+      const infoDynDesc = modalContainer.querySelector('#sp-info-dynamic-desc');
+
+      let infoResetTimeout = null;
+
+      const setInfo = (title, desc, iconHtml, color) => {
+          if (infoResetTimeout) {
+              clearTimeout(infoResetTimeout);
+              infoResetTimeout = null;
+          }
+          
+          infoDynTitle.textContent = title;
+          infoDynTitle.style.color = color || '#fff';
+          infoDynDesc.textContent = desc;
+          infoDynIcon.innerHTML = iconHtml || '';
+          infoDynIcon.style.color = color || '#fff';
+          if (!iconHtml) infoDynIcon.style.display = 'none';
+          else infoDynIcon.style.display = 'flex';
+          
+          infoDefault.classList.add('hidden');
+          infoDynamic.classList.remove('hidden');
+      };
+
+      const resetInfo = () => {
+          if (infoResetTimeout) clearTimeout(infoResetTimeout);
+          infoResetTimeout = setTimeout(() => {
+              infoDynamic.classList.add('hidden');
+              infoDefault.classList.remove('hidden');
+              infoResetTimeout = null;
+          }, 300);
+      };
+
+      const getIndividualVibeCount = (vibeId) => {
+          return tracksWithVibes.filter(t => (t.vibeScores[vibeId] || 0) >= strictness).length;
+      };
+
+      const getFilteredTracks = () => {
+          if (viewMode === 'grid') {
+              return tracksWithVibes.filter(t => evaluateTrackVibeMatch(t, activeVibesMap, strictness));
+          } else {
+              const activeKeys = Object.keys(activeVibesMap).filter(k => activeVibesMap[k] > 0);
+              if (activeKeys.length === 0) return [];
+
+              const combinedTracksMap = new Map();
+
+              activeKeys.forEach(vibe => {
+                  const passingTracks = tracksWithVibes.filter(t => (t.vibeScores[vibe] || 0) >= strictness);
+                  
+                  passingTracks.sort((a, b) => (b.vibeScores[vibe] || 0) - (a.vibeScores[vibe] || 0));
+                  
+                  const sliderWeight = activeVibesMap[vibe];
+                  const targetCount = Math.round(passingTracks.length * sliderWeight);
+                  
+                  const selectedTracks = passingTracks.slice(0, targetCount);
+                  
+                  selectedTracks.forEach(t => {
+                      if (!combinedTracksMap.has(t.uri)) {
+                          combinedTracksMap.set(t.uri, t);
+                      }
+                  });
+              });
+
+              return Array.from(combinedTracksMap.values());
+          }
+      };
+
+      const updateGlobalState = () => {
+          const filtered = getFilteredTracks();
+          const count = filtered.length;
+          countHeader.innerText = count;
+          countHeader.style.color = count > 0 ? '#1ed760' : '#f15e6c';
+          countLabel.innerText = count === 1 ? 'Track' : 'Tracks';
+          playBtn.disabled = count === 0;
+          createBtn.disabled = count === 0;
+      };
+
+      const renderGrid = () => {
+          const cards = VIBE_DEFS.map(def => ({
+              ...def,
+              count: getIndividualVibeCount(def.id)
+          }));
+          
+          cards.sort((a, b) => {
+              if (a.count === 0 && b.count > 0) return 1;
+              if (a.count > 0 && b.count === 0) return -1;
+              return 0;
+          });
+
+          let html = `<div class="sp-vibe-grid">`;
+          cards.forEach(c => {
+              const isSelected = !!activeVibesMap[c.id];
+              const disabledClass = c.count === 0 ? 'disabled' : '';
+              const selectedClass = isSelected ? 'selected' : '';
+              
+              html += `
+                  <div class="sp-vibe-card ${disabledClass} ${selectedClass}" data-id="${c.id}">
+                      <div class="sp-vibe-card-icon" style="color: ${c.color};">${c.icon}</div>
+                      <div class="sp-vibe-card-title">${c.label}</div>
+                      <div class="sp-vibe-card-count">${c.count} tracks</div>
+                  </div>
+              `;
+          });
+          html += `</div>`;
+          bodyArea.innerHTML = html;
+
+          bodyArea.querySelectorAll('.sp-vibe-card').forEach(card => {
+              card.addEventListener('mouseenter', () => {
+                  const def = VIBE_DEFS.find(d => d.id === card.dataset.id);
+                  if (def) setInfo(def.label, def.long_desc || def.desc, def.icon, def.color);
+              });
+              card.addEventListener('mouseleave', resetInfo);
+
+              if (!card.classList.contains('disabled')) {
+                  card.addEventListener('click', () => {
+                      const vId = card.dataset.id;
+                      if (activeVibesMap[vId]) {
+                          delete activeVibesMap[vId];
+                          card.classList.remove('selected');
+                      } else {
+                          activeVibesMap[vId] = 1.0;
+                          card.classList.add('selected');
+                      }
+                      updateGlobalState();
+                  });
+              }
+          });
+      };
+
+      const renderMixer = () => {
+          let html = ``;
+          VIBE_DEFS.forEach(c => {
+              const count = getIndividualVibeCount(c.id);
+              const weight = count === 0 ? 0 : (activeVibesMap[c.id] || 0);
+              
+              if (count === 0 && activeVibesMap[c.id]) {
+                  delete activeVibesMap[c.id];
+              }
+              
+              const pct = Math.round(weight * 100);
+              const isDisabled = count === 0;
+              const disabledClass = isDisabled ? 'disabled-row' : '';
+              const disabledInline = isDisabled ? 'opacity: 0.35; cursor: not-allowed;' : '';
+              
+              html += `
+                  <div class="sp-vibe-mixer-row ${disabledClass}" style="${disabledInline}" data-id="${c.id}">
+                      <div class="sp-vibe-mixer-icon" style="color: ${c.color}; filter: drop-shadow(0 0 4px ${c.color}80);">${c.icon}</div>
+                      <div class="sp-vibe-mixer-label">${c.label}</div>
+                      <div class="sp-slider-wrapper">
+                          <input type="range" class="sp-mixer-slider" data-id="${c.id}" min="0" max="100" value="${pct}" style="background: linear-gradient(to right, #1ed760 ${pct}%, rgba(255,255,255,0.1) ${pct}%);" ${isDisabled ? 'disabled' : ''}>
+                          <span class="sp-mixer-pct" id="pct-${c.id}">${pct}%</span>
+                      </div>
+                  </div>
+              `;
+          });
+          bodyArea.innerHTML = html;
+
+          bodyArea.querySelectorAll('.sp-vibe-mixer-row').forEach(row => {
+              row.addEventListener('mouseenter', () => {
+                  const def = VIBE_DEFS.find(d => d.id === row.dataset.id);
+                  if (def) setInfo(def.label, def.long_desc || def.desc, def.icon, def.color);
+              });
+              row.addEventListener('mouseleave', resetInfo);
+          });
+
+          bodyArea.querySelectorAll('.sp-mixer-slider:not([disabled])').forEach(slider => {
+              slider.addEventListener('input', (e) => {
+                  const val = parseInt(e.target.value, 10);
+                  const vId = e.target.dataset.id;
+                  e.target.style.background = `linear-gradient(to right, #1ed760 ${val}%, rgba(255,255,255,0.1) ${val}%)`;
+                  bodyArea.querySelector(`#pct-${vId}`).innerText = `${val}%`;
+                  
+                  if (val === 0) {
+                      delete activeVibesMap[vId];
+                  } else {
+                      activeVibesMap[vId] = val / 100;
+                  }
+                  updateGlobalState();
+              });
+          });
+      };
+
+      const refreshView = () => {
+          if (viewMode === 'grid') renderGrid();
+          else renderMixer();
+          updateGlobalState();
+      };
+
+      modalContainer.querySelectorAll('.sp-vibe-tab').forEach(btn => {
+          btn.addEventListener('click', () => {
+              if (btn.classList.contains('active')) return;
+              modalContainer.querySelectorAll('.sp-vibe-tab').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              viewMode = btn.dataset.view;
+              
+              if (viewMode === 'grid') {
+                  Object.keys(activeVibesMap).forEach(k => activeVibesMap[k] = 1.0);
+              }
+              refreshView();
+          });
+      });
+
+      modalContainer.querySelectorAll('.sp-strictness-btn').forEach(btn => {
+          btn.addEventListener('mouseenter', () => {
+              const level = btn.dataset.strict;
+              let title = "Broad Match";
+              let desc = "A relaxed filter that catches tracks loosely fitting the selected vibe. Yields a larger playlist with more variety.";
+              if (level === "0.6") {
+                  title = "Balanced Match";
+                  desc = "A balanced filter that requires tracks to confidently match the vibe while allowing some stylistic flexibility.";
+              } else if (level === "0.8") {
+                  title = "Strict Match";
+                  desc = "A highly rigorous filter. Only tracks that perfectly embody the selected vibe are included. Yields a smaller, focused playlist.";
+              }
+              setInfo(title, desc, null, '#1ed760');
+          });
+          btn.addEventListener('mouseleave', resetInfo);
+
+          btn.addEventListener('click', () => {
+              if (btn.classList.contains('active')) return;
+              modalContainer.querySelectorAll('.sp-strictness-btn').forEach(b => b.classList.remove('active'));
+              btn.classList.add('active');
+              strictness = parseFloat(btn.dataset.strict);
+              localStorage.setItem('sort-play-vibe-strictness', strictness);
+              refreshView();
+          });
+      });
+
+      refreshView();
+
+      const getVibeLabels = () => {
+          const activeKeys = Object.keys(activeVibesMap);
+          if (activeKeys.length === 0) return { shortName: "Vibe Blend", longDesc: "Vibe Blend" };
+          
+          const vibeDetails = activeKeys.map(k => {
+              const def = VIBE_DEFS.find(d => d.id === k);
+              const name = def ? def.label.split('/')[0].trim() : k;
+              const weight = activeVibesMap[k];
+              return { name, weight };
+          });
+
+          let shortName = "Vibe Blend";
+          if (activeKeys.length === 1) {
+              shortName = vibeDetails[0].name;
+          } else if (activeKeys.length === 2) {
+              shortName = `${vibeDetails[0].name} & ${vibeDetails[1].name}`;
+          }
+
+          let longDescParts = vibeDetails.map(v => {
+              if (viewMode === 'mixer') {
+                  return `${v.name} (${Math.round(v.weight * 100)}%)`;
+              }
+              return v.name;
+          });
+
+          let longDesc = "";
+          if (longDescParts.length === 1) {
+              longDesc = longDescParts[0];
+          } else if (longDescParts.length === 2) {
+              longDesc = `${longDescParts[0]} and ${longDescParts[1]}`;
+          } else {
+              const last = longDescParts.pop();
+              longDesc = `${longDescParts.join(', ')}, and ${last}`;
+          }
+
+          return { shortName, longDesc };
+      };
+
+      const close = () => overlay.remove();
+
+      modalContainer.querySelector('#sp-vibe-close-x').addEventListener('click', close);
+      overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) {
+              e.preventDefault();
+              e.stopPropagation();
+          }
+      });
+
+      playBtn.addEventListener('click', async () => {
+          const finalTracks = getFilteredTracks();
+          if (finalTracks.length === 0) return;
+          
+          close();
+          
+          try {
+              let tracksToPlay = finalTracks;
+              const containsLocalFiles = finalTracks.some(track => Spicetify.URI.isLocal(track.uri));
+
+              if (useEnergyWaveShuffle && !containsLocalFiles && finalTracks.length <= energyWaveShuffleLimit) {
+                  const activeKeys = Object.keys(activeVibesMap);
+                  const isSingleVibe = activeKeys.length === 1;
+                  
+                  showNotification(isSingleVibe ? `Applying Vibe Flow...` : "Performing Randomized Energy Wave Shuffle...");
+                  
+                  const tracksWithData = finalTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+                  const tracksWithoutData = finalTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+
+                  if (tracksWithData.length < 3) {
+                      tracksToPlay = shuffleArray(finalTracks);
+                  } else {
+                      let waveSorted;
+                      if (isSingleVibe) {
+                          waveSorted = await energyWaveSort(tracksWithData, activeKeys[0]);
+                      } else {
+                          waveSorted = await randomizedEnergyWaveSort(tracksWithData);
+                      }
+                      tracksToPlay = [...waveSorted, ...shuffleArray(tracksWithoutData)];
+                  }
+              } else {
+                  tracksToPlay = shuffleArray(finalTracks);
+              }
+
+              if (limitEnabled && limitCount > 0 && tracksToPlay.length > limitCount) {
+                  tracksToPlay = tracksToPlay.slice(0, limitCount);
+              }
+
+              let contextUri = currentUri;
+              if (isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)) {
+                  contextUri = null;
+              }
+
+              await setQueueFromTracks(tracksToPlay, contextUri, 'shuffle');
+          } catch(err) {
+              console.error("[Sort-Play] Error setting queue for Vibe Filter:", err);
+              showNotification("Failed to set queue.", true);
+          }
+      });
+
+      createBtn.addEventListener('click', async () => {
+          const finalTracks = getFilteredTracks();
+          if (finalTracks.length === 0) return;
+          
+          close();
+          startProcessing("Creating...");
+          
+          try {
+              const vibeLabels = getVibeLabels();
+              const playlistName = appendNameCheckbox.checked ? `${sourceName} (${vibeLabels.shortName})` : sourceName;
+              
+              let strictnessLabel = "Broad";
+              if (strictness === 0.6) strictnessLabel = "Balanced";
+              if (strictness === 0.8) strictnessLabel = "Strict";
+              
+              const playlistDesc = `Filtered for ${vibeLabels.longDesc} (${strictnessLabel} Match). Created by Sort-Play.`;
+              
+              let tracksToSave = finalTracks;
+              const activeKeys = Object.keys(activeVibesMap);
+              
+              const tracksWithData = finalTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+              const tracksWithoutData = finalTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+              
+              if (tracksWithData.length >= 3) {
+                  mainButton.innerText = "Sorting...";
+                  if (activeKeys.length === 1) {
+                      const sorted = await energyWaveSort(tracksWithData, activeKeys[0]);
+                      tracksToSave = [...sorted, ...tracksWithoutData];
+                  } else {
+                      const sorted = await randomizedEnergyWaveSort(tracksWithData);
+                      tracksToSave = [...sorted, ...shuffleArray(tracksWithoutData)];
+                  }
+                  mainButton.innerText = "Creating...";
+              }
+              
+              if (limitEnabled && limitCount > 0 && tracksToSave.length > limitCount) {
+                  tracksToSave = tracksToSave.slice(0, limitCount);
+              }
+
+              const trackUris = tracksToSave.map(t => t.uri);
+
+              const newPlaylist = await createPlaylist(playlistName, playlistDesc);
+              
+              const PLAYLIST_LIMIT = 11000;
+              const totalParts = Math.ceil(trackUris.length / PLAYLIST_LIMIT);
+              
+              for (let i = 0; i < totalParts; i++) {
+                  const start = i * PLAYLIST_LIMIT;
+                  const end = start + PLAYLIST_LIMIT;
+                  const batchUris = trackUris.slice(start, end);
+                  await addTracksToPlaylist(newPlaylist.id, batchUris);
+              }
+              
+              await addPlaylistToLibrary(newPlaylist.uri);
+
+              if (sourceCoverUrl && !isDefaultMosaicCover(sourceCoverUrl)) {
+                  try {
+                      let b64Image;
+                      if (URI.isArtist(currentUri)) {
+                          b64Image = await toBase64(sourceCoverUrl);
+                      } else {
+                          b64Image = await imageUrlToBase64(sourceCoverUrl);
+                      }
+                      await setPlaylistImage(newPlaylist.id, b64Image);
+                  } catch (e) {
+                      console.warn("[Sort-Play] Failed to copy cover art for vibe filter", e);
+                  }
+              }
+
+              await navigateToPlaylist(newPlaylist);
+              showNotification(`Playlist "${playlistName}" created successfully!`);
+          } catch(err) {
+              console.error("[Sort-Play] Error creating playlist for Vibe Filter:", err);
+              showNotification("Failed to create playlist.", true);
+          } finally {
+              resetButtons();
+          }
+      });
+  }
+
+  async function handleVibeFilter() {
+      startProcessing();
+
+      try {
+          const currentUri = getCurrentUri();
+          if (!currentUri) {
+              resetButtons();
+              showNotification("Please select a playlist or artist first");
+              return;
+          }
+
+          let tracks;
+          let isArtistPage = false;
+
+          if (URI.isPlaylistV1OrV2(currentUri)) {
+              tracks = await getPlaylistTracks(currentUri.split(":")[2]);
+          } else if (URI.isArtist(currentUri)) {
+              tracks = await getArtistTracks(currentUri);
+              isArtistPage = true;
+          } else if (isLikedSongsPage(currentUri)) {
+              tracks = await getLikedSongs();
+          } else if (URI.isAlbum(currentUri)) {
+              const albumId = currentUri.split(":")[2];
+              tracks = await getAlbumTracks(albumId);
+          } else {
+              throw new Error('Invalid playlist or artist page');
+          }
+
+          if (!tracks || tracks.length === 0) {
+              throw new Error('No tracks found');
+          }
+
+          if (isArtistPage) {
+              tracks = await processArtistPageTracks(tracks);
+          }
+
+          const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
+              tracks, 
+              (progress) => { mainButton.innerText = progress; }
+          );
+      
+          if (unconvertedCount > 0) {
+              const plural = unconvertedCount === 1 ? "track" : "tracks";
+              showNotification(`${unconvertedCount} local ${plural} not found on Spotify and were skipped.`, 'warning');
+          }
+          
+          if (convertedTracks.length === 0) {
+              throw new Error('No tracks found');
+          }
+          tracks = convertedTracks;
+
+          mainButton.innerText = "Analyzing...";
+          const trackIds = tracks.map(t => t.uri.split(":")[2]).filter(Boolean);
+          const allStats = await getBatchTrackStats(trackIds);
+
+          const tracksWithVibes = tracks.map(track => {
+              const trackId = track.uri.split(":")[2];
+              const features = allStats[trackId] || {};
+              const vibeScores = calculateTrackVibeScores(features);
+              return { ...track, features, vibeScores };
+          });
+          
+          await showVibeFilterModal(tracksWithVibes, currentUri);
+
+      } catch (error) {
+          console.error("Error in vibe filter:", error);
+          showNotification(
+              "An error occurred while preparing the vibe filter.",
+              true
+          );
+      } finally {
+          resetButtons();
+      }
   }
 
   async function handleCustomFilter() {
@@ -13670,7 +14936,8 @@ const getDominantColor = (src) => {
 
                 const getFirstWord = (title) => {
                     if (!title) return "";
-                    return title.toLowerCase().replace(/^[^a-z0-9]+/, '').split(/\s+/)[0];
+                    const match = title.toLowerCase().match(/[a-z0-9]+/);
+                    return match ? match[0] : "";
                 };
                 const localFirstWord = getFirstWord(track.name);
                 const localArtistWords = (track.artistName || "").toLowerCase().split(/\s+/).filter(w => w.length > 1);
@@ -13719,6 +14986,9 @@ const getDominantColor = (src) => {
                 const spotifyTrack = res.result.tracks.items[0];
                 foundSpotifyTracks.push({
                     uri: spotifyTrack.uri, uid: res.originalTrack.uid, name: spotifyTrack.name,
+                    is_playable: spotifyTrack.is_playable,
+                    explicit: spotifyTrack.explicit || false,
+                    artists: spotifyTrack.artists,
                     albumUri: spotifyTrack.album.uri, albumName: spotifyTrack.album.name,
                     artistUris: spotifyTrack.artists.map(a => a.uri),
                     allArtists: spotifyTrack.artists.map(a => a.name).join(", "),
@@ -13729,6 +14999,8 @@ const getDominantColor = (src) => {
                     track: {
                         album: { id: spotifyTrack.album.id, name: spotifyTrack.album.name },
                         name: spotifyTrack.name, duration_ms: spotifyTrack.duration_ms, id: spotifyTrack.id,
+                        explicit: spotifyTrack.explicit || false,
+                        artists: spotifyTrack.artists
                     }
                 });
             } else {
@@ -14215,14 +15487,14 @@ const getDominantColor = (src) => {
                               data-track-uri="${track.uri}"
                           />
                       </div>
-                      <span class="song-title text-overflow" title="${track.songTitle || track.name}">${track.songTitle || track.name}</span>
+                      <span class="song-title text-overflow" title="${escapeHtml(track.songTitle || track.name)}">${escapeHtml(track.songTitle || track.name)}</span>
                   </div>
               </td>
               <td class="sticky-col artist-col">
-                  <span class="text-overflow" title="${track.allArtists}">${track.allArtists}</span> 
+                  <span class="text-overflow" title="${escapeHtml(track.allArtists)}">${escapeHtml(track.allArtists)}</span> 
               </td>
               <td>
-                  <span class="text-overflow" title="${track.albumName}">${track.albumName}</span>
+                  <span class="text-overflow" title="${escapeHtml(track.albumName)}">${escapeHtml(track.albumName)}</span>
               </td>
               <td>${track.releaseDate ? new Date(track.releaseDate).toLocaleDateString() : "N/A"}</td>
               <td>${formatDuration(track.durationMs)}</td> 
@@ -16084,23 +17356,26 @@ const getDominantColor = (src) => {
         const likedSongUris = new Set(likedSongs.map(s => s.uri));
         
         if (!isHeadless) mainButton.innerText = "ISRCs...";
-        const tracksWithMetadata = await refreshTrackAlbumInfo(filteredTracks, (p) => {
-             if (!isHeadless) mainButton.innerText = `ISRCs ${Math.floor(p)}%`;
-        });
-
-        const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
-        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
         
-        const likedIsrcSet = new Set();
-        cachedLikedMetadata.forEach(meta => {
-            if (meta && meta.external_ids && meta.external_ids.isrc) {
-                likedIsrcSet.add(meta.external_ids.isrc);
-            }
-        });
+        const trackUris = filteredTracks.map(t => t.uri);
+        const fetchedMetaMap = new Map();
+        for (let i = 0; i < trackUris.length; i += 500) {
+            const batch = trackUris.slice(i, i + 500);
+            try {
+                const res = await fetchCoreMetadataBatch(batch);
+                res.forEach((val, key) => fetchedMetaMap.set(key, val));
+            } catch(e){}
+            if (!isHeadless) mainButton.innerText = `ISRCs ${Math.floor((i / trackUris.length) * 100)}%`;
+        }
 
-        filteredTracks = tracksWithMetadata.filter(track => {
-            const isLiked = likedSongUris.has(track.uri) || (track.track?.external_ids?.isrc && likedIsrcSet.has(track.track.external_ids.isrc));
-            
+        const likedIsrcSet = await getLikedIsrcsSet(likedSongs);
+
+        filteredTracks = filteredTracks.filter(track => {
+            let isLiked = likedSongUris.has(track.uri);
+            if (!isLiked) {
+                const isrc = fetchedMetaMap.get(track.uri)?.isrc || track.track?.external_ids?.isrc;
+                if (isrc && likedIsrcSet.has(isrc)) isLiked = true;
+            }
             if (likedFilterMode === 'exclude') return !isLiked;
             if (likedFilterMode === 'require') return isLiked;
             return true;
@@ -17404,8 +18679,8 @@ const getDominantColor = (src) => {
             itemDiv.innerHTML = `
                 <img src="${data.coverUrl || ''}" class="library-item-cover" onerror="this.style.display='none'">
                 <div class="library-item-text">
-                    <span class="library-item-title">${data.name}</span>
-                    <span class="library-item-info">${data.info || 'Added via link'}${trackCountStr}</span>
+                    <span class="library-item-title">${escapeHtml(data.name)}</span>
+                    <span class="library-item-info">${escapeHtml(data.info || 'Added via link')}${trackCountStr}</span>
                 </div>
                 <button class="remove-manual-btn" title="Remove">
                     ${removeManualIconSvg}
@@ -17619,8 +18894,8 @@ const getDominantColor = (src) => {
                     itemDiv.innerHTML = `
                         <img src="${item.coverUrl || 'https://i.imgur.com/33q4t4k.png'}" class="library-item-cover" onerror="this.src='https://i.imgur.com/33q4t4k.png'">
                         <div class="library-item-text">
-                            <span class="library-item-title">${item.name}</span>
-                            <span class="library-item-info">${item.info}${trackCountStr}</span>
+                            <span class="library-item-title">${escapeHtml(item.name)}</span>
+                            <span class="library-item-info">${escapeHtml(item.info)}${trackCountStr}</span>
                         </div>
                     `;
 
@@ -17996,6 +19271,8 @@ const getDominantColor = (src) => {
         let rawDetectedGenres = currentFilters.detectedGenres ? [...currentFilters.detectedGenres] : [];
         let detectedGenres = [...rawDetectedGenres];
 
+        let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}');
+
         const normalizeList = (list) => {
             if (!list || list.length === 0) return [];
             const rawObjs = list.map(g => ({ name: g, source: 'spotify' }));
@@ -18058,8 +19335,8 @@ const getDominantColor = (src) => {
                 const hasCountClass = isDetected ? 'has-count' : '';
                 
                 return `
-                    <button class="genre-button ${statusClass} ${isDetected ? 'detected' : ''} ${hasCountClass}" data-genre="${genre}">
-                        <span>${genre}</span>
+                    <button class="genre-button ${statusClass} ${isDetected ? 'detected' : ''} ${hasCountClass}" data-genre="${escapeHtml(genre, "")}">
+                        <span>${escapeHtml(genre, "")}</span>
                         ${isDetected ? `<span class="genre-count-badge">${countDisplay}</span>` : ''}
                     </button>
                 `;
@@ -18124,14 +19401,14 @@ const getDominantColor = (src) => {
             
             const capturedRawSet = new Set();
             rawGenresMap.forEach(data => {
-                const genres = [
-                    ...(data.spotify_track_genres || []),
-                    ...(data.spotify_artist_genres || []),
-                    ...(data.lastfm_track_genres || []),
-                    ...(data.lastfm_artist_genres || []),
-                    ...(data.deezer_genres || []),
-                    ...(data.apple_music_genres || [])
-                ];
+                const genres = [];
+                if (gfSources.spotify_track) genres.push(...(data.spotify_track_genres || []));
+                if (gfSources.lastfm_track) genres.push(...(data.lastfm_track_genres || []));
+                if (gfSources.lastfm_artist) genres.push(...(data.lastfm_artist_genres || []));
+                if (gfSources.deezer) {
+                    genres.push(...(data.deezer_genres || []));
+                    genres.push(...(data.apple_music_genres || []));
+                }
                 genres.forEach(g => capturedRawSet.add(g));
             });
             rawDetectedGenres = Array.from(capturedRawSet).sort();
@@ -18160,14 +19437,14 @@ const getDominantColor = (src) => {
                 let finalGenresForTrack = [];
 
                 if (rawData) {
-                    let combined = [
-                        ...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })),
-                        ...(rawData.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
-                        ...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
-                        ...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                        ...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
-                        ...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
-                    ];
+                    let combined = [];
+                    if (gfSources.spotify_track) combined.push(...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
+                    if (gfSources.lastfm_track) combined.push(...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
+                    if (gfSources.lastfm_artist) combined.push(...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
+                    if (gfSources.deezer) {
+                        combined.push(...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
+                        combined.push(...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
+                    }
 
                     let uniqueSet = new Set();
                     if (groupGenres) {
@@ -18277,7 +19554,7 @@ const getDominantColor = (src) => {
               .scan-btn { background-color: #1ED760; color: black; border: none; padding: 6px 16px; border-radius: 20px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background-color 0.1s; }
               .scan-btn:hover { background-color: #3BE377; }
               .scan-btn:disabled { background-color: #555; color: #888; cursor: default; }
-              .modal-content { padding: 20px 32px; flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+              .modal-content { padding: 20px 32px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
               .search-container { position: relative; margin-bottom: 16px; }
               .search-bar { width: 100%; padding: 10px 16px; background-color: #333; border: 1px solid #333; border-radius: 8px; color: white; font-size: 14px; box-sizing: border-box; }
               .search-bar:focus { border-color: #555; outline: none; }
@@ -18315,12 +19592,20 @@ const getDominantColor = (src) => {
               .custom-tooltip { visibility: hidden; position: absolute; z-index: 10000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; pointer-events: none; }
               .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
               .tooltip-container:hover .custom-tooltip { visibility: visible; }
+              .top-right-controls { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; z-index: 10; }
+              .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: background 0.2s, border-color 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); padding: 0 !important; margin: 0 !important; line-height: 0 !important; font-size: 0 !important; box-sizing: border-box !important; }
+              .top-icon-btn:hover { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.3) !important; }
+              .top-icon-btn svg { display: block !important; margin: 0 !important; padding: 0 !important; transform: none !important; }
+              #close-modal-btn svg { width: 17px !important; height: 17px !important; }
+              #gfSettingsBtnDynamic svg { width: 19px !important; height: 19px !important; }
             </style>
-            <div class="modal-header">
+            <div style="position: relative; display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%;">
+            <div class="top-right-controls">
+                <button id="gfSettingsBtnDynamic" class="top-icon-btn" title="Filter Settings">${settingsIconSvg}</button>
+                <button id="close-modal-btn" class="top-icon-btn" title="Close">${closeIconSmall2Svg}</button>
+            </div>
+            <div class="modal-header" style="border: none !important; padding-top: 32px !important;">
                 <span class="modal-title">Genre Filter</span>
-                <button class="main-trackCreditsModal-closeBtn" id="close-modal-btn">
-                    ${closeModalIcon18Svg}
-                </button>
             </div>
             <div class="scan-banner" style="${isScanned ? 'display: none;' : ''}">
             <span class="scan-text" id="scan-status-text">${detectedGenres.length > 0 ? "Showing saved genres. Scan sources to update counts." : "Showing common genres. Click 'Scan Sources' to see actual genres from your sources."}</span>
@@ -18358,6 +19643,7 @@ const getDominantColor = (src) => {
                     <button class="btn-primary" id="save-btn">Save Filter</button>
                 </div>
             </div>
+            </div>
         `;
 
         document.body.appendChild(overlay);
@@ -18369,8 +19655,8 @@ const getDominantColor = (src) => {
         const statusText = modalContainer.querySelector('#scan-status-text');
         const scanBanner = modalContainer.querySelector('.scan-banner');
         
-        const runScan = async (preFetchedTracks = null) => {
-            if (isScanned && !preFetchedTracks) return;
+        const runScan = async (preFetchedTracks = null, forceRescan = false) => {
+            if (isScanned && !preFetchedTracks && !forceRescan) return;
             scanBtn.disabled = true;
             statusText.textContent = "Fetching tracks from sources...";
             
@@ -18419,7 +19705,8 @@ const getDominantColor = (src) => {
                         
                         processRawGenres(lastScanResult);
                         scanBanner.style.display = 'none';
-                    }
+                    },
+                    gfSources
                 );
 
             } catch (error) {
@@ -18508,6 +19795,15 @@ const getDominantColor = (src) => {
 
         modalContainer.querySelector('#cancel-btn').addEventListener('click', () => closeModal(null));
         modalContainer.querySelector('#close-modal-btn').addEventListener('click', () => closeModal(null));
+        modalContainer.querySelector('#gfSettingsBtnDynamic').addEventListener('click', () => {
+            showGenreFilterSettingsModal(gfSources, (newSources) => {
+                gfSources = newSources;
+                localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(gfSources));
+                if (lastScanResult) {
+                    processRawGenres(lastScanResult);
+                }
+            });
+        });
         overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(null); });
     });
   }
@@ -19615,13 +20911,13 @@ const getDominantColor = (src) => {
             <div class="job-cover-art-container">
                 <img 
                     src="${job.coverUrl || ''}" 
-                    alt="${job.targetPlaylistName || job.sourceName}" 
+                    alt="${escapeHtml(job.targetPlaylistName || job.sourceName)}" 
                     style="visibility: hidden;" 
                     onerror="this.remove()"
                 >
             </div>
                 <div class="job-details">
-                    <span class="job-source-name" title="${job.targetPlaylistName || job.sourceName}">${job.targetPlaylistName || job.sourceName}</span>
+                    <span class="job-source-name" title="${escapeHtml(job.targetPlaylistName || job.sourceName)}">${escapeHtml(job.targetPlaylistName || job.sourceName)}</span>
                     <span class="job-info">${sortTypeMap[job.sortType] || 'Unknown Sort'}${isReversedText} &bull; ${scheduleMap[job.schedule] || 'Custom'}</span>
                     <div class="job-status-line">
                         <span class="job-last-run">Last run: ${formatTimeAgo(job.lastRun)}</span>
@@ -20302,8 +21598,8 @@ const getDominantColor = (src) => {
                 <div class="source-item" data-uri="${source.uri}">
                     <img src="${source.coverUrl || 'https://i.imgur.com/33q4t4k.png'}" class="source-cover-art-small">
                     <div class="source-text-info">
-                        <div class="source-name" title="${source.name}">${source.name}</div>
-                        <div class="source-info">${source.info}${trackCountDisplay}</div>
+                        <div class="source-name" title="${escapeHtml(source.name, "")}">${escapeHtml(source.name, "")}</div>
+                        <div class="source-info">${escapeHtml(source.info, "")}${trackCountDisplay}</div>
                         <div class="source-limit-wrapper" style="display: none; margin-top: 6px; align-items: center;">
                             <button class="source-limit-toggle-btn ${limitBtnClass}" data-index="${index}" title="Toggle limit for this source">Limit</button>
                             <div class="limit-controls-container" style="display: flex; align-items: center; transition: opacity 0.2s; ${limitControlsStyle}">
@@ -21128,8 +22424,67 @@ const getDominantColor = (src) => {
 
   const mainGenres = Object.keys(GENRE_MAPPINGS);
 
+  function showGenreFilterSettingsModal(currentSources, onSave) {
+      const descriptionHtml = `
+          <div style="background-color: rgba(241, 94, 108, 0.1); border: 1px solid rgba(241, 94, 108, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 5px;">
+              <p style="margin: 0; color: #ffbaba; font-size: 13px; line-height: 1.4;">
+                  <strong>Note:</strong> Spotify Track genres are very fast. Enabling other sources (Last.fm, Deezer) may significantly increase processing time.<br><br>
+                  <em>Enabling a new source will take effect the next time you open the filter or run a scan. Disabling a source applies immediately.</em>
+              </p>
+          </div>
+      `;
+
+      showSimpleInputModal({
+          title: "Genre Sources",
+          descriptionHtml: descriptionHtml,
+          saveButtonText: "Done",
+          toggleOptions: [
+              { id: "spotify_track", label: "Spotify (Track Genres)", checked: currentSources.spotify_track },
+              { id: "lastfm_track", label: "Last.fm (Track Tags)", checked: currentSources.lastfm_track },
+              { id: "lastfm_artist", label: "Last.fm (Artist Tags)", checked: currentSources.lastfm_artist },
+              { id: "deezer", label: "Deezer (Album Genres)", checked: currentSources.deezer }
+          ],
+          onSave: (results, saveBtn, closeModal) => {
+              onSave(results);
+              closeModal();
+          }
+      });
+  }
+
   async function showGenreFilterModal(tracks, initialTrackGenreMap, rawGenreData, sourceUri) {
     const abortController = new AbortController();
+    let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}');
+    let activeTitleSources = { ...gfSources };
+
+    const getDynamicGenreTitle = (sources) => {
+        const active = [];
+        if (sources.spotify_track || sources.spotify_artist) active.push("Spotify");
+        if (sources.lastfm_track || sources.lastfm_artist) active.push("Last.fm");
+        if (sources.deezer) active.push("Deezer");
+
+        if (active.length === 0) return "No Genre Sources Selected";
+
+        if (active.length === 1) {
+            if (active[0] === "Spotify") {
+                if (sources.spotify_track && !sources.spotify_artist) return "Genres from Spotify Tracks";
+                if (!sources.spotify_track && sources.spotify_artist) return "Genres from Spotify Artists";
+                return "Genres from Spotify";
+            }
+            if (active[0] === "Last.fm") {
+                if (sources.lastfm_track && !sources.lastfm_artist) return "Genres from Last.fm Tracks";
+                if (!sources.lastfm_track && sources.lastfm_artist) return "Genres from Last.fm Artists";
+                return "Genres from Last.fm";
+            }
+            return "Genres from Deezer";
+        }
+
+        if (active.length === 2) {
+            return `Genres from ${active[0]} and ${active[1]}`;
+        }
+
+        return `Genres from ${active.slice(0, -1).join(', ')}, and ${active[active.length - 1]}`;
+    };
+
     if (!genrePlaylistsCache) {
         genrePlaylistsCache = await getGenreMapping();
     }
@@ -21156,13 +22511,14 @@ const getDominantColor = (src) => {
         tracks.forEach(track => {
             const rawData = rawGenreData.get(track.uri);
             if (rawData) {
-                let combined = [
-                    ...(rawData.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
-                    ...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
-                    ...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                    ...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
-                    ...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
-                ];
+                let combined = [];
+                if (gfSources.spotify_track) combined.push(...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
+                if (gfSources.lastfm_track) combined.push(...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
+                if (gfSources.lastfm_artist) combined.push(...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
+                if (gfSources.deezer) {
+                    combined.push(...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
+                    combined.push(...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
+                }
 
                 let finalUniqueGenres;
                 if (groupGenres) {
@@ -21304,19 +22660,26 @@ const getDominantColor = (src) => {
       .genre-filter-modal .genre-stats { display: flex; justify-content: center; align-items: center; color: #c1c1c1; font-size: 14px; background-color: #252525; padding: 10px 0; border: 1px solid #343434; border-top: none; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-bottom: 5px; position: relative; z-index: 1; flex-shrink: 0; }
       .genre-filter-modal .genre-stats span { margin: 0 25px; }
       .genre-modal-title { font-size: 15px; font-weight: 400; color: white; flex-shrink: 0; }
+      .top-right-controls { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; z-index: 10; }
+      .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: background 0.2s, border-color 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); padding: 0 !important; margin: 0 !important; line-height: 0 !important; font-size: 0 !important; box-sizing: border-box !important; }
+      .top-icon-btn:hover { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.3) !important; }
+      .top-icon-btn svg { display: block !important; margin: 0 !important; padding: 0 !important; transform: none !important; }
+      #closeGenreModalBtn svg { width: 17px !important; height: 17px !important; }
+      #gfSettingsBtn svg { width: 19px !important; height: 19px !important; }
     </style>
-    <div class="genre-filter-modal" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
-    <div class="main-trackCreditsModal-header">
+    <div class="genre-filter-modal" style="position: relative; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+    <div class="top-right-controls">
+        <button id="gfSettingsBtn" class="top-icon-btn" title="Filter Settings">${settingsIconSvg}</button>
+        <button id="closeGenreModalBtn" class="top-icon-btn" title="Close">${closeIconSmall2Svg}</button>
+    </div>
+    <div class="main-trackCreditsModal-header" style="border: none !important; padding-top: 32px !important;">
         <h1 style="font-size: 26px; font-weight: 700; color: white; margin:0;">Genre Filter</h1>
-        <button id="closeGenreModalBtn" aria-label="Close" class="main-trackCreditsModal-closeBtn">
-            ${closeModalIcon18Svg}
-        </button>
     </div>
 
-    <div class="main-trackCreditsModal-mainSection">
+    <div class="main-trackCreditsModal-mainSection" style="padding-top: 0px !important;">
         <div style="display: flex; flex-direction: column; gap: 15px; flex: 1; min-height: 0;">
         <h2 class="genre-modal-title">
-        Genres from Spotify, Last.fm, and Deezer
+        <span id="gf-dynamic-title-text">${getDynamicGenreTitle(activeTitleSources)}</span>
         <span style="font-size: 0.85em; font-weight: normal; opacity: 0.5; margin-left: 8px;">
         💡 Left-click to include • Right-click to exclude
         </span>
@@ -21396,6 +22759,25 @@ const getDominantColor = (src) => {
     overlay.appendChild(modalContainer);
 
     modalContainer.querySelector('#closeGenreModalBtn').addEventListener('click', closeModal);
+    modalContainer.querySelector('#gfSettingsBtn').addEventListener('click', () => {
+        showGenreFilterSettingsModal(gfSources, (newSources) => {
+            gfSources = newSources;
+            localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(gfSources));
+
+            for (const key in activeTitleSources) {
+                if (activeTitleSources[key] === true && newSources[key] === false) {
+                    activeTitleSources[key] = false;
+                }
+            }
+            
+            const titleTextSpan = modalContainer.querySelector('#gf-dynamic-title-text');
+            if (titleTextSpan) titleTextSpan.textContent = getDynamicGenreTitle(activeTitleSources);
+
+            rebuildGenreMap();
+            updateGenreButtons();
+            updateFilteredTracksCount();
+        });
+    });
     preventDragCloseModal(abortController.signal);
 
     const matchAllGenresToggle = modalContainer.querySelector("#matchAllGenresToggle");
@@ -21466,13 +22848,15 @@ const getDominantColor = (src) => {
             tracks.forEach(track => {
                 const rawData = rawGenreData.get(track.uri);
                 if (!rawData) return;
-                const rawGenres = [
-                    ...(rawData.spotify_track_genres || []),
-                    ...(rawData.spotify_artist_genres || []),
-                    ...(rawData.lastfm_track_genres || []),
-                    ...(rawData.lastfm_artist_genres || []),
-                    ...(rawData.deezer_genres || [])
-                ];
+                const rawGenres = [];
+                if (gfSources.spotify_track) rawGenres.push(...(rawData.spotify_track_genres || []));
+                if (gfSources.lastfm_track) rawGenres.push(...(rawData.lastfm_track_genres || []));
+                if (gfSources.lastfm_artist) rawGenres.push(...(rawData.lastfm_artist_genres || []));
+                if (gfSources.deezer) {
+                    rawGenres.push(...(rawData.deezer_genres || []));
+                    rawGenres.push(...(rawData.apple_music_genres || []));
+                }
+                
                 rawGenres.forEach(r => {
                     if (oldSelectedSet.has(r)) uniqueSelectedRawGenres.add(r);
                     if (oldExcludedSet.has(r)) uniqueExcludedRawGenres.add(r);
@@ -21514,13 +22898,14 @@ const getDominantColor = (src) => {
                 const rawData = rawGenreData.get(track.uri);
                 if (!rawData) return;
 
-                const rawGenres = [
-                    ...(rawData.spotify_track_genres || []),
-                    ...(rawData.spotify_artist_genres || []),
-                    ...(rawData.lastfm_track_genres || []),
-                    ...(rawData.lastfm_artist_genres || []),
-                    ...(rawData.deezer_genres || [])
-                ];
+                const rawGenres = [];
+                if (gfSources.spotify_track) rawGenres.push(...(rawData.spotify_track_genres || []));
+                if (gfSources.lastfm_track) rawGenres.push(...(rawData.lastfm_track_genres || []));
+                if (gfSources.lastfm_artist) rawGenres.push(...(rawData.lastfm_artist_genres || []));
+                if (gfSources.deezer) {
+                    rawGenres.push(...(rawData.deezer_genres || []));
+                    rawGenres.push(...(rawData.apple_music_genres || []));
+                }
 
                 rawGenres.forEach(rawGenre => {
                     const mappedGroupObjects = mapAndNormalizeGenres([{ name: rawGenre, source: 'spotify' }]);
@@ -22028,7 +23413,7 @@ const getDominantColor = (src) => {
     }
   };
 
-  async function getLastfmGenres(artist, track) {
+  async function getLastfmGenres(artist, track, skipArtist = false) {
     const cacheKey = `${artist}-${track}`;
     if (lastfmCache.has(cacheKey)) {
         return lastfmCache.get(cacheKey);
@@ -22054,24 +23439,26 @@ const getDominantColor = (src) => {
         })());
 
         let cachedArtistTags = null;
-        if (lastfmArtistTagsCache.has(artist)) {
-            cachedArtistTags = lastfmArtistTagsCache.get(artist);
-        } else {
-            const dbCached = await idb.get('lastfmArtistTags', artist, CACHE_EXPIRE_GENRES);
-            if (dbCached) {
-                cachedArtistTags = dbCached;
-                lastfmArtistTagsCache.set(artist, dbCached);
+        if (!skipArtist) {
+            if (lastfmArtistTagsCache.has(artist)) {
+                cachedArtistTags = lastfmArtistTagsCache.get(artist);
             } else {
-                promises.push((async () => {
-                    const params = new URLSearchParams({ method: 'artist.getInfo', artist, format: 'json' });
-                    return fetchLfmWithGateway(params);
-                })());
+                const dbCached = await idb.get('lastfmArtistTags', artist, CACHE_EXPIRE_GENRES);
+                if (dbCached) {
+                    cachedArtistTags = dbCached;
+                    lastfmArtistTagsCache.set(artist, dbCached);
+                } else {
+                    promises.push((async () => {
+                        const params = new URLSearchParams({ method: 'artist.getInfo', artist, format: 'json' });
+                        return fetchLfmWithGateway(params);
+                    })());
+                }
             }
         }
 
         const responses = await Promise.all(promises);
         const trackResponse = responses[0];
-        const artistResponse = !cachedArtistTags && responses.length > 1 ? responses[1] : null;
+        const artistResponse = (!skipArtist && !cachedArtistTags && responses.length > 1) ? responses[1] : null;
   
         if (!trackResponse.ok && trackResponse.status !== 404) {
              throw new Error(`Last.fm track network error: ${trackResponse.status}`);
@@ -22090,27 +23477,29 @@ const getDominantColor = (src) => {
             }
         }
   
-        if (cachedArtistTags) {
-            result.artist_genres = cachedArtistTags;
-        } else if (artistResponse) {
-            if (!artistResponse.ok && artistResponse.status !== 404) {
-                 throw new Error(`Last.fm artist network error: ${artistResponse.status}`);
-            }
+        if (!skipArtist) {
+            if (cachedArtistTags) {
+                result.artist_genres = cachedArtistTags;
+            } else if (artistResponse) {
+                if (!artistResponse.ok && artistResponse.status !== 404) {
+                     throw new Error(`Last.fm artist network error: ${artistResponse.status}`);
+                }
 
-            if (artistResponse.ok) {
-                const artistData = await safeJson(artistResponse);
-                if (artistData && artistData.error) {
-                    if (artistData.error !== 6) {
-                        throw new Error(`Last.fm API error: ${artistData.message}`);
+                if (artistResponse.ok) {
+                    const artistData = await safeJson(artistResponse);
+                    if (artistData && artistData.error) {
+                        if (artistData.error !== 6) {
+                            throw new Error(`Last.fm API error: ${artistData.message}`);
+                        }
+                    } else if (artistData?.artist?.tags?.tag) {
+                        const tags = artistData.artist.tags.tag
+                            .map(tag => tag.name.toLowerCase())
+                            .filter(g => !/^\d+$/.test(g));
+                        
+                        lastfmArtistTagsCache.set(artist, tags);
+                        idb.set('lastfmArtistTags', artist, tags);
+                        result.artist_genres = tags;
                     }
-                } else if (artistData?.artist?.tags?.tag) {
-                    const tags = artistData.artist.tags.tag
-                        .map(tag => tag.name.toLowerCase())
-                        .filter(g => !/^\d+$/.test(g));
-                    
-                    lastfmArtistTagsCache.set(artist, tags);
-                    idb.set('lastfmArtistTags', artist, tags);
-                    result.artist_genres = tags;
                 }
             }
         }
@@ -22246,7 +23635,7 @@ const getDominantColor = (src) => {
         popularity: (data.popularity !== undefined && data.popularity !== null) ? data.popularity : null,
         popularity_updated_at: Math.floor(Date.now() / 86400000),
 
-        audio_features: data.audio_features || {} 
+        audio_features: {}
       }));
 
       let success = false;
@@ -22288,7 +23677,18 @@ const getDominantColor = (src) => {
     }
   }
 
-  async function fetchAllTrackGenres(tracks, updateProgressCallback = null, onGenresReadyCallback = null) {
+  async function fetchAllTrackGenres(tracks, updateProgressCallback = null, onGenresReadyCallback = null, requestedSources = null) {
+    const reqSources = requestedSources ? { ...requestedSources } : {
+        spotify_track: true,
+        spotify_artist: !SPOTIFY_TRACK_GENRES_WORKING,
+        lastfm_track: !SPOTIFY_TRACK_GENRES_WORKING,
+        lastfm_artist: !SPOTIFY_TRACK_GENRES_WORKING,
+        deezer: !SPOTIFY_TRACK_GENRES_WORKING,
+        apple_music: !SPOTIFY_TRACK_GENRES_WORKING
+    };
+    reqSources.apple_music = reqSources.deezer;
+    const needsExternal = reqSources.lastfm_track || reqSources.lastfm_artist || reqSources.deezer || reqSources.apple_music || reqSources.spotify_artist;
+
     const updateProgress = (msg) => {
         if (updateProgressCallback) updateProgressCallback(msg);
         else mainButton.innerText = msg;
@@ -22333,11 +23733,16 @@ const getDominantColor = (src) => {
                         spotify_artist_genres: [], 
                         lastfm_track_genres: [], 
                         lastfm_artist_genres: [], 
-                        deezer_genres: [], 
+                        deezer_genres: [],
+                        apple_music_genres: [],
                         release_date: null,
                         duration_ms: -1,
                         release_date_text: "N/A",
-                        audio_features: null 
+                        audio_features: null,
+                        _lfm_track_checked: reqSources.lastfm_track,
+                        _lfm_artist_checked: reqSources.lastfm_artist,
+                        _deezer_checked: reqSources.deezer,
+                        _sp_artist_checked: reqSources.spotify_artist
                     } 
                 };
             }
@@ -22362,7 +23767,7 @@ const getDominantColor = (src) => {
                 }
             }
     
-            if (DEVELOPER_HAS_SPOTIFY_PREMIUM && artistIdsToFetch.length > 0) {
+            if (reqSources.spotify_artist && DEVELOPER_HAS_SPOTIFY_PREMIUM && artistIdsToFetch.length > 0) {
                 const artistBatches = [];
                 for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                     artistBatches.push(artistIdsToFetch.slice(i, i + 50));
@@ -22397,28 +23802,33 @@ const getDominantColor = (src) => {
                 }));
             }
     
-            const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name);
             let lfmTrackGenres = [];
             let lfmArtistGenres = [];
             
-            if (lastfmGenresData === null) {
-                isCompleteSuccess = false; 
-            } else {
-                const artistNames = trackDetails.artists.map(artist => artist.name.toLowerCase());
-                const filterGenres = (genres) => genres.filter(genre => !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName)));
-                lfmTrackGenres = filterGenres(lastfmGenresData.track_genres);
-                lfmArtistGenres = filterGenres(lastfmGenresData.artist_genres);
+            if (reqSources.lastfm_track || reqSources.lastfm_artist) {
+                const skipLfmArtist = !reqSources.lastfm_artist;
+                const lastfmGenresData = await getLastfmGenres(trackDetails.artists[0].name, trackDetails.name, skipLfmArtist);
+                if (lastfmGenresData === null) {
+                    isCompleteSuccess = false; 
+                } else {
+                    const artistNames = trackDetails.artists.map(artist => artist.name.toLowerCase());
+                    const filterGenres = (genres) => genres.filter(genre => !containsYear(genre) && !artistNames.some(artistName => genre.includes(artistName)));
+                    if (reqSources.lastfm_track) lfmTrackGenres = filterGenres(lastfmGenresData.track_genres);
+                    if (reqSources.lastfm_artist) lfmArtistGenres = filterGenres(lastfmGenresData.artist_genres);
+                }
             }
     
             let deezer_genres = [];
-            if (isrc && deezerGatewayUrl) {
-                try {
-                    deezer_genres = await getDeezerGenres(isrc, deezerGatewayUrl);
-                } catch (e) {
-                    throw e;
+            if (reqSources.deezer) {
+                if (isrc && deezerGatewayUrl) {
+                    try {
+                        deezer_genres = await getDeezerGenres(isrc, deezerGatewayUrl);
+                    } catch (e) {
+                        throw e;
+                    }
+                } else if (isrc && !deezerGatewayUrl) {
+                    isCompleteSuccess = false;
                 }
-            } else if (isrc && !deezerGatewayUrl) {
-                isCompleteSuccess = false;
             }
     
             const releaseDateStr = trackDetails.album?.release_date;
@@ -22443,6 +23853,7 @@ const getDominantColor = (src) => {
                     lastfm_track_genres: lfmTrackGenres,
                     lastfm_artist_genres: lfmArtistGenres,
                     deezer_genres: deezer_genres,
+                    apple_music_genres: [],
                     release_date: releaseDateInDays,
                     duration_ms: safeVal(trackDetails.duration_ms),
                     release_date_text: releaseDateStr || "N/A",
@@ -22450,7 +23861,11 @@ const getDominantColor = (src) => {
                     artist_name: artistNamesList,
                     explicit: trackDetails.explicit,
                     track_name: trackDetails.name,
-                    popularity: trackDetails.popularity
+                    popularity: trackDetails.popularity,
+                    _lfm_track_checked: reqSources.lastfm_track,
+                    _lfm_artist_checked: reqSources.lastfm_artist,
+                    _deezer_checked: reqSources.deezer,
+                    _sp_artist_checked: reqSources.spotify_artist
                 }
             };
     
@@ -22474,55 +23889,65 @@ const getDominantColor = (src) => {
     });
 
     let cachedGenresByUri = new Map();
-    if (urisNotInSession.length > 0) {
+    if (urisNotInSession.length > 0 && needsExternal) {
         cachedGenresByUri = await getGenresFromTurso(urisNotInSession, 'ids');
+        cachedGenresByUri.forEach(val => {
+            val._lfm_track_checked = true;
+            val._lfm_artist_checked = true;
+            val._deezer_checked = true;
+            val._sp_artist_checked = true;
+        });
     }
     
     const missingUris = [];
-    
     const todayInDays = Math.floor(Date.now() / 86400000);
 
     const isDataStale = (cached) => {
         if (!cached) return true;
 
+        if (reqSources.lastfm_track && !cached.lastfm_track_genres?.length && !cached._lfm_track_checked) return true;
+        if (reqSources.lastfm_artist && !cached.lastfm_artist_genres?.length && !cached._lfm_artist_checked) return true;
+        if (reqSources.deezer && !cached.deezer_genres?.length && !cached._deezer_checked) return true;
+        if (reqSources.spotify_artist && !cached.spotify_artist_genres?.length && !cached._sp_artist_checked) return true;
+
         const daysSinceLastUpdate = cached.updated_at ? (todayInDays - cached.updated_at) : 9999;
-
-        const allGenresEmpty = (!cached.spotify_artist_genres?.length) &&
-                               (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
-                               (!cached.deezer_genres?.length) &&
-                               (!cached.apple_music_genres?.length);
-
-        if (allGenresEmpty && daysSinceLastUpdate > 180) return true;
-
         if (!cached.release_date) return false;
 
         const daysSinceRelease = todayInDays - cached.release_date;
-        
         let refetchCooldown = 5;
-        if (daysSinceRelease <= 5) {
-            refetchCooldown = 2;
-        }
+        if (daysSinceRelease <= 5) refetchCooldown = 2;
 
         if (daysSinceLastUpdate < refetchCooldown) return false;
-        
-        if (allGenresEmpty && daysSinceRelease < 70) return true;
-
-        let sourceCount = 0;
-        if (cached.spotify_artist_genres?.length > 0) sourceCount++;
-        if ((cached.lastfm_track_genres?.length > 0) || (cached.lastfm_artist_genres?.length > 0)) sourceCount++;
-        if (cached.deezer_genres?.length > 0) sourceCount++;
-        if (cached.apple_music_genres?.length > 0) sourceCount++;
-
-        if (sourceCount === 1 && daysSinceRelease < 40) return true;
-
         if (daysSinceRelease < 30) return true;
 
-        return false;
+        if (!needsExternal) {
+            return false;
+        } else {
+            const allGenresEmpty = (!cached.spotify_artist_genres?.length) &&
+                                   (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
+                                   (!cached.deezer_genres?.length) &&
+                                   (!cached.apple_music_genres?.length);
+
+            if (allGenresEmpty && daysSinceLastUpdate > 180) return true;
+            if (allGenresEmpty && daysSinceRelease < 70) return true;
+
+            let sourceCount = 0;
+            if (cached.spotify_artist_genres?.length > 0) sourceCount++;
+            if (cached.lastfm_track_genres?.length > 0 || cached.lastfm_artist_genres?.length > 0) sourceCount++;
+            if (cached.deezer_genres?.length > 0) sourceCount++;
+            if (cached.apple_music_genres?.length > 0) sourceCount++;
+
+            if (sourceCount === 1 && daysSinceRelease < 40) return true;
+
+            return false;
+        }
     };
 
     urisNotInSession.forEach(uri => {
         let cached = cachedGenresByUri.get(uri);
-        if (cached) cached = flattenAudioFeatures(cached);
+        if (cached) {
+            cached = flattenAudioFeatures(cached);
+        }
 
         if (!cached || isDataStale(cached)) {
             missingUris.push(uri);
@@ -22536,40 +23961,38 @@ const getDominantColor = (src) => {
     const tracksWithIsrcs = []; 
     
     if (tracksToFetch.length > 0) {
-        updateProgress("Details...");
-        const CHUNK_SIZE = 50;
-        let processedCount = 0;
-  
-        for (let i = 0; i < tracksToFetch.length; i += CHUNK_SIZE) {
-          const chunk = tracksToFetch.slice(i, i + CHUNK_SIZE);
-          const chunkTrackIds = chunk.map(t => t.uri.split(':')[2]);
-  
-          try {
-              let responseTracks = [];
-  
-              const fetchBatchInternal = async () => {
-                  const promises = chunkTrackIds.map(id => fetchInternalTrackMetadata(id));
-                  return await Promise.all(promises);
-              };
-  
-              responseTracks = await fetchBatchInternal();
-  
-              responseTracks.forEach((td, idx) => {
-                  if (td) {
-                      tracksWithIsrcs.push({
-                          uri: chunk[idx].uri,
-                          isrc: td.external_ids?.isrc,
-                          details: td
-                      });
-                  }
-              });
-          } catch (error) {
-              console.error(`[Sort-Play] Failed to fetch track details for ISRC lookup:`, error);
-          }
-          processedCount += chunk.length;
-          updateProgress(`Details ${Math.round((processedCount / tracksToFetch.length) * 100)}%`);
+        if (needsExternal) {
+            updateProgress("ISRCs...");
+            const CHUNK_SIZE = 500;
+            let processedCount = 0;
+            
+            for (let i = 0; i < tracksToFetch.length; i += CHUNK_SIZE) {
+                const chunk = tracksToFetch.slice(i, i + CHUNK_SIZE);
+                const chunkUris = chunk.map(t => t.uri);
+                
+                try {
+                    const fetchedMetaMap = await fetchCoreMetadataBatch(chunkUris);
+                    
+                    chunk.forEach(t => {
+                        const meta = fetchedMetaMap.get(t.uri);
+                        tracksWithIsrcs.push({
+                            uri: t.uri,
+                            isrc: meta?.isrc || null,
+                            details: null
+                        });
+                    });
+                } catch (error) {
+                    console.error(`[Sort-Play] Failed to fetch fast ISRCs for genre lookup:`, error);
+                    chunk.forEach(t => tracksWithIsrcs.push({ uri: t.uri, isrc: null, details: null }));
+                }
+                
+                processedCount += chunk.length;
+                updateProgress(`ISRCs ${Math.round((processedCount / tracksToFetch.length) * 100)}%`);
+            }
+        } else {
+            tracksToFetch.forEach(t => tracksWithIsrcs.push({ uri: t.uri, isrc: null, details: null }));
         }
-      }
+    }
 
     const isrcsToCheck = [...new Set(tracksWithIsrcs.map(t => t.isrc).filter(Boolean))];
     let cachedGenresByIsrc = new Map();
@@ -22583,11 +24006,15 @@ const getDominantColor = (src) => {
         }
     });
 
-    if (isrcsNotInSession.length > 0) {
+    if (isrcsNotInSession.length > 0 && needsExternal) {
         updateProgress("Linking...");
         const tursoResults = await getGenresFromTurso(isrcsNotInSession, 'isrcs');
         tursoResults.forEach((val, key) => {
             const flattenedVal = flattenAudioFeatures(val);
+            flattenedVal._lfm_track_checked = true;
+            flattenedVal._lfm_artist_checked = true;
+            flattenedVal._deezer_checked = true;
+            flattenedVal._sp_artist_checked = true;
             cachedGenresByIsrc.set(key, flattenedVal);
             sessionGenreCache.set(key, flattenedVal);
         });
@@ -22610,8 +24037,9 @@ const getDominantColor = (src) => {
     });
 
     if (tracksNeedingExternalFetch.length > 0) {
-        const uniqueArtistIds = new Set();
-        tracksNeedingExternalFetch.forEach(item => {
+        if (needsExternal) {
+            const uniqueArtistIds = new Set();
+            tracksNeedingExternalFetch.forEach(item => {
             if (item.details && item.details.artists) {
                 item.details.artists.forEach(artist => {
                     if (artist.uri) {
@@ -22625,7 +24053,7 @@ const getDominantColor = (src) => {
         });
 
         const artistIdsToFetch = Array.from(uniqueArtistIds);
-        if (DEVELOPER_HAS_SPOTIFY_PREMIUM && artistIdsToFetch.length > 0) {
+        if (reqSources.spotify_artist && DEVELOPER_HAS_SPOTIFY_PREMIUM && artistIdsToFetch.length > 0) {
             updateProgress("Artists...");
             for (let i = 0; i < artistIdsToFetch.length; i += 50) {
                 const batch = artistIdsToFetch.slice(i, i + 50);
@@ -22761,17 +24189,43 @@ const getDominantColor = (src) => {
         await Promise.all(allPools);
 
         if (sharedQueue.length > 0) {
-            for (const item of sharedQueue) {
-                try {
-                    const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null);
-                    if (!result.data.isrc) result.data.isrc = item.isrc;
-                    finalGenresMap.set(item.uri, result.data);
-                    itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...result.data });
-                } catch (e) {} finally {
-                    fetchedCount++;
-                    updateProgress(`Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`);
+                for (const item of sharedQueue) {
+                    try {
+                        const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null);
+                        if (!result.data.isrc) result.data.isrc = item.isrc;
+                        finalGenresMap.set(item.uri, result.data);
+                        itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...result.data });
+                    } catch (e) {} finally {
+                        fetchedCount++;
+                        updateProgress(`Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`);
+                    }
                 }
             }
+        } else {
+            tracksNeedingExternalFetch.forEach(item => {
+                const dummyData = {
+                    isrc: item.isrc,
+                    spotify_artist_genres: [],
+                    lastfm_track_genres: [],
+                    lastfm_artist_genres: [],
+                    deezer_genres: [],
+                    apple_music_genres: [],
+                    release_date: null,
+                    duration_ms: -1,
+                    release_date_text: null,
+                    audio_features: null,
+                    artist_name: null,
+                    explicit: null,
+                    track_name: null,
+                    popularity: null,
+                    _lfm_track_checked: reqSources.lastfm_track,
+                    _lfm_artist_checked: reqSources.lastfm_artist,
+                    _deezer_checked: reqSources.deezer,
+                    _sp_artist_checked: reqSources.spotify_artist
+                };
+                finalGenresMap.set(item.uri, dummyData);
+                itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...dummyData });
+            });
         }
     }
 
@@ -22803,14 +24257,14 @@ const getDominantColor = (src) => {
         tracks.forEach(track => {
             let genres = finalGenresMap.get(track.uri);
             if (genres) {
-                let combined = [
-                    ...(genres.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })),
-                    ...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
-                    ...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
-                    ...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                    ...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
-                    ...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
-                ];
+                let combined = [];
+                if (reqSources.spotify_track) combined.push(...(genres.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
+                if (reqSources.lastfm_track) combined.push(...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
+                if (reqSources.spotify_artist) combined.push(...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })));
+                if (reqSources.lastfm_artist) combined.push(...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
+                if (reqSources.deezer) combined.push(...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
+                if (reqSources.apple_music) combined.push(...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
+                
                 const mappedAndNormalized = mapAndNormalizeGenres(combined);
                 const finalUniqueGenres = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
                 trackGenreMap.set(track.uri, finalUniqueGenres);
@@ -22898,172 +24352,47 @@ const getDominantColor = (src) => {
         }
     }
 
-    const trackIdsForFeatures = new Set();
-    finalGenresMap.forEach((data, uri) => {
-        if (!data.tempo && data.tempo !== 0 && data.tempo !== -1 && !trackIdsForFeatures.has(uri.split(':')[2])) {
-            trackIdsForFeatures.add(uri.split(':')[2]);
-        }
-    });
+    if (reqSources.spotify_track) {
+        updateProgress("Genres...");
+        const urisToFetchNative = [];
+        finalGenresMap.forEach((data, uri) => {
+            if (!data.spotify_track_genres) urisToFetchNative.push(uri);
+        });
 
-    if (trackIdsForFeatures.size > 0) {
-        updateProgress("Audio...");
-        const ids = Array.from(trackIdsForFeatures);
-        const BATCH_SIZE = 150;
-
-        for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-            const batch = ids.slice(i, i + BATCH_SIZE);
-            
-            const batchPromises = batch.map(async (id) => {
-                try {
-                    const features = await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/audio-attributes/v1/audio-features/${id}`);
-                    if (features && features.id) {
-                        return { id, features, success: true };
-                    }
-                } catch (e) {}
-                return { id, features: null, success: false };
-            });
-
-            const batchResults = await Promise.all(batchPromises);
-            const idsNeedingInternal = [];
-
-            batchResults.forEach(res => {
-                const uri = `spotify:track:${res.id}`;
-                const genreData = finalGenresMap.get(uri);
+        if (urisToFetchNative.length > 0) {
+            const genreMap = await getGenreMapping();
+            const BATCH_SIZE = 500;
+            let processedNative = 0;
+            for (let i = 0; i < urisToFetchNative.length; i += BATCH_SIZE) {
+                const batch = urisToFetchNative.slice(i, i + BATCH_SIZE);
+                const nativeGenresMap = await fetchNativeSpotifyTrackGenresBatch(batch);
                 
-                if (res.success && res.features) {
-                    const af = res.features;
-                    const features = {
-                        danceability: safeVal(af.danceability),
-                        energy: safeVal(af.energy),
-                        valence: safeVal(af.valence),
-                        acousticness: safeVal(af.acousticness),
-                        instrumentalness: safeVal(af.instrumentalness),
-                        speechiness: safeVal(af.speechiness),
-                        liveness: safeVal(af.liveness),
-                        tempo: safeVal(af.tempo),
-                        key: safeVal(af.key),
-                        mode: safeVal(af.mode),
-                        time_signature: safeVal(af.time_signature),
-                        loudness: safeVal(af.loudness),
-                        duration_ms: safeVal(af.duration_ms)
-                    };
-
-                    if (genreData) {
-                        Object.assign(genreData, features);
-
-                        if (genreData.isrc) {
-                            const existing = itemsToSaveMap.get(uri);
-                            const updatedEntry = {
-                                ...(existing || {}),
-                                track_uri: uri,
-                                isrc: genreData.isrc,
-                                ...genreData,
-                                audio_features: features
-                            };
-                            itemsToSaveMap.set(uri, updatedEntry);
-                        }
-                    }
-                    
-                    if (features.key === -1 || !features.tempo) {
-                        idsNeedingInternal.push(res.id);
-                    }
-                } else {
-                    idsNeedingInternal.push(res.id);
-                }
-            });
-
-            if (idsNeedingInternal.length > 0) {
-                try {
-                    const internalData = await fetchInternalAudioFeaturesBatch(idsNeedingInternal);
-                    idsNeedingInternal.forEach(id => {
-                        const uri = `spotify:track:${id}`;
-                        const genreData = finalGenresMap.get(uri);
-                        const int = internalData[id];
-                        
-                        if (genreData && int) {
-                            if (int.key_raw !== -1) {
-                                genreData.key = int.key_raw;
-                                genreData.mode = int.mode;
-                                genreData.camelot = int.camelot;
-                            }
-                            if (int.tempo) genreData.tempo = int.tempo;
-                            
-                            if (genreData.isrc) {
-                                const existing = itemsToSaveMap.get(uri) || {};
-                                existing.audio_features = existing.audio_features || {};
-                                existing.audio_features.key = genreData.key;
-                                existing.audio_features.mode = genreData.mode;
-                                existing.audio_features.tempo = genreData.tempo;
-                                itemsToSaveMap.set(uri, existing);
-                            }
-                        } else if (genreData && !int) {
-                             const emptyFeatures = {
-                                danceability: -1, energy: -1, valence: -1, acousticness: -1,
-                                instrumentalness: -1, speechiness: -1, liveness: -1, tempo: -1,
-                                key: -1, mode: -1, time_signature: -1, loudness: -1
-                            };
-                            Object.assign(genreData, emptyFeatures);
-                            if (genreData.isrc) {
-                                const existing = itemsToSaveMap.get(uri);
-                                itemsToSaveMap.set(uri, {
-                                    ...(existing || {}),
-                                    track_uri: uri,
-                                    isrc: genreData.isrc,
-                                    ...genreData,
-                                    audio_features: emptyFeatures
-                                });
-                            }
-                        }
+                batch.forEach(uri => {
+                    const nativeGenres = nativeGenresMap.get(uri) || [];
+                    const validNative = nativeGenres.filter(g => {
+                        const name = g.name.toLowerCase();
+                        return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
                     });
-                } catch (e) {
-                    console.warn("Secondary internal fetch failed for audio features", e);
-                }
-            }
 
-            updateProgress(`Audio ${Math.round(((i + BATCH_SIZE) / ids.length) * 100)}%`);
-            await new Promise(r => setTimeout(r, 100));
-        }
-    }
+                    let finalNative = [];
+                    if (validNative.length > 0) {
+                        validNative.forEach(g => {
+                            const pct = g.score * 100;
+                            if (pct > 5) {
+                                finalNative.push(g.name); 
+                            }
+                        });
+                    }
 
-    updateProgress("Genres...");
-    const urisToFetchNative = [];
-    finalGenresMap.forEach((data, uri) => {
-        if (!data.spotify_track_genres) urisToFetchNative.push(uri);
-    });
-
-    if (urisToFetchNative.length > 0) {
-        const genreMap = await getGenreMapping();
-        const BATCH_SIZE = 500;
-        let processedNative = 0;
-        for (let i = 0; i < urisToFetchNative.length; i += BATCH_SIZE) {
-            const batch = urisToFetchNative.slice(i, i + BATCH_SIZE);
-            const nativeGenresMap = await fetchNativeSpotifyTrackGenresBatch(batch);
-            
-            batch.forEach(uri => {
-                const nativeGenres = nativeGenresMap.get(uri) || [];
-                const validNative = nativeGenres.filter(g => {
-                    const name = g.name.toLowerCase();
-                    return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
+                    const data = finalGenresMap.get(uri);
+                    if (data) {
+                        data.spotify_track_genres = finalNative;
+                    }
                 });
-
-                let finalNative = [];
-                if (validNative.length > 0) {
-                    validNative.forEach(g => {
-                        const pct = g.score * 100;
-                        if (pct > 5) {
-                            finalNative.push(g.name); 
-                        }
-                    });
-                }
-
-                const data = finalGenresMap.get(uri);
-                if (data) {
-                    data.spotify_track_genres = finalNative;
-                }
-            });
-            processedNative += batch.length;
-            updateProgress(`Genres ${Math.round((processedNative / urisToFetchNative.length) * 100)}%`);
-            await new Promise(resolve => setTimeout(resolve, 0));
+                processedNative += batch.length;
+                updateProgress(`Genres ${Math.round((processedNative / urisToFetchNative.length) * 100)}%`);
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
         }
     }
 
@@ -23074,7 +24403,7 @@ const getDominantColor = (src) => {
 
     const dataToSave = Array.from(itemsToSaveMap.values());
 
-    if (dataToSave.length > 0) {
+    if (dataToSave.length > 0 && needsExternal) {
         saveGenresToTurso(dataToSave).then(() => {
             console.log(`[Sort-Play] Background cloud genre/audio caching complete for ${dataToSave.length} items.`);
         }).catch(err => {
@@ -23089,14 +24418,14 @@ const getDominantColor = (src) => {
     tracks.forEach(track => {
         let genres = finalGenresMap.get(track.uri);
         if (genres) {
-            let combined = [
-                ...(genres.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })),
-                ...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })),
-                ...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })),
-                ...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })),
-                ...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })),
-                ...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' }))
-            ];
+            let combined = [];
+            if (reqSources.spotify_track) combined.push(...(genres.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
+            if (reqSources.lastfm_track) combined.push(...(genres.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
+            if (reqSources.spotify_artist) combined.push(...(genres.spotify_artist_genres || []).map(g => ({ name: g, source: 'spotify' })));
+            if (reqSources.lastfm_artist) combined.push(...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
+            if (reqSources.deezer) combined.push(...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
+            if (reqSources.apple_music) combined.push(...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
+            
             const mappedAndNormalized = mapAndNormalizeGenres(combined);
             const finalUniqueGenres = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
 
@@ -23162,6 +24491,11 @@ const getDominantColor = (src) => {
         const lowerName = rawGenreName.toLowerCase().trim();
 
         if (GENRE_CLEANUP_KEYWORDS.some(keyword => lowerName.includes(keyword))) {
+            return;
+        }
+
+        if (source === 'spotify_track') {
+            mappedGenres.add(JSON.stringify({ name: normalizeGenre(rawGenreName), source: source }));
             return;
         }
 
@@ -23462,13 +24796,15 @@ const getDominantColor = (src) => {
         popularity: null,
         releaseDate: null,
         addedAt: item.addedAt || null,
+        explicit: item.isExplicit || item.explicit || false,
         track: {
             album: {
                 id: item.album.uri.split(":")[2]
             },
             name: item.name,
             duration_ms: item.duration.milliseconds,
-            id: item.uri.split(":")[2]
+            id: item.uri.split(":")[2],
+            explicit: item.isExplicit || item.explicit || false
           }
       }));
 
@@ -23503,6 +24839,7 @@ const getDominantColor = (src) => {
             popularity: null,
             releaseDate: null,
             addedAt: item.addedAt || null,
+            explicit: item.isExplicit || item.explicit || false,
             track: {
                 album: {
                     id: item.album.uri.split(":")[2],
@@ -23510,7 +24847,8 @@ const getDominantColor = (src) => {
                 },
                 name: item.name,
                 duration_ms: item.duration.milliseconds,
-                id: item.uri.split(":")[2]
+                id: item.uri.split(":")[2],
+                explicit: item.isExplicit || item.explicit || false
             }
         }));
     } catch (error) {
@@ -23538,13 +24876,15 @@ const getDominantColor = (src) => {
     releaseDate: 0,
     addedAt: track.addedAt,
     trackNumber: track.album?.trackNumber || track.trackNumber || 0,
+    explicit: track.isExplicit || track.explicit || false,
     track: {
       album: {
         id: track.album.uri.split(":")[2]
       },
       name: track.name,
       duration_ms: track.duration.milliseconds,
-      id: track.uri.split(":")[2]
+      id: track.uri.split(":")[2],
+      explicit: track.isExplicit || track.explicit || false
     }
   });
 
@@ -23698,7 +25038,7 @@ const getDominantColor = (src) => {
                   <div class="${baseClass} ${selClass}" data-uri="${p.uri}">
                       <img src="${cover}" class="playlist-cover">
                       <div class="playlist-info">
-                          <div class="playlist-name" title="${p.name}">${p.name}</div>
+                          <div class="playlist-name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
                           <div class="playlist-meta">Playlist • ${p.tracks?.total || 0} tracks</div>
                       </div>
                   </div>
@@ -23904,6 +25244,7 @@ const getDominantColor = (src) => {
                 id: a.uri ? a.uri.split(':')[2] : null
             }));
             const rawPlaycount = t.playcount ? parseInt(t.playcount, 10) : 0;
+            const isExplicit = t.isExplicit || t.explicit || false;
 
             return {
                 uri: t.uri,
@@ -23923,6 +25264,7 @@ const getDominantColor = (src) => {
                 releaseDate: releaseDate,
                 addedAt: null,
                 trackNumber: parseInt(t.trackNumber, 10) || 0,
+                explicit: isExplicit,
                 track: {
                     album: { 
                         id: albumId, 
@@ -23935,7 +25277,8 @@ const getDominantColor = (src) => {
                     id: t.uri.split(':')[2],
                     artists: artists,
                     external_ids: {},
-                    trackNumber: parseInt(t.trackNumber, 10) || 0
+                    trackNumber: parseInt(t.trackNumber, 10) || 0,
+                    explicit: isExplicit
                 }
             };
         });
@@ -24158,7 +25501,7 @@ const getDominantColor = (src) => {
       const uniqueCompilationTracksMap = new Map();
       for (const track of compilationTracks) {
         const title = (track.name || "").toLowerCase().trim();
-        const duration = track.durationMilis;
+        const duration = Math.round(track.durationMilis / 1000);
         const artistKey = (track.artistUris || []).sort().join(',');
         const compositeKey = `${title}|${duration}|${artistKey}`;
 
@@ -24355,7 +25698,7 @@ const getDominantColor = (src) => {
 
       for (const track of allTracks) {
         const title = (track.name || "").toLowerCase().trim();
-        const duration = track.durationMilis;
+        const duration = Math.round(track.durationMilis / 1000);
         const artistKey = (track.artistUris || []).sort().join(',');
         const compositeKey = `${title}|${duration}|${artistKey}`;
 
@@ -24411,21 +25754,44 @@ const getDominantColor = (src) => {
             };
 
             const file = await getFileFromBase64(base64Image);
-            const sessionToken = Spicetify.Platform.Session.accessToken;
             const uploadToken = await Spicetify.Platform.PlaylistAPI.uploadImage(file);
             
             if (!uploadToken) throw new Error("Upload failed: No token returned");
 
-            const regRes = await fetch(`https://spclient.wg.spotify.com/playlist/v2/playlist/${playlistId}/register-image`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${sessionToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ uploadToken })
-            });
+            let regRes = null;
+            let attempt = 0;
+            while (attempt < 3) {
+                if (internalTokenRefreshPromise) await internalTokenRefreshPromise;
+                const sessionToken = Spicetify.Platform.Session.accessToken;
+                
+                regRes = await fetch(`https://spclient.wg.spotify.com/playlist/v2/playlist/${playlistId}/register-image`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${sessionToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ uploadToken })
+                });
 
-            if (!regRes.ok) throw new Error(`Registration failed: ${regRes.status}`);
+                if (regRes.status === 401) {
+                    if (!internalTokenRefreshPromise) {
+                        internalTokenRefreshPromise = (async () => {
+                            try {
+                                const tData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                                Spicetify.Platform.Session.accessToken = tData.accessToken;
+                                await new Promise(r => setTimeout(r, 500));
+                                return tData.accessToken;
+                            } catch(e) { throw e; } finally { internalTokenRefreshPromise = null; }
+                        })();
+                    }
+                    try { await internalTokenRefreshPromise; } catch(e) { break; }
+                    attempt++;
+                    continue;
+                }
+                break;
+            }
+
+            if (!regRes || !regRes.ok) throw new Error(`Registration failed: ${regRes?.status}`);
 
             const buffer = await regRes.arrayBuffer();
             const fullHex = bufferToHex(buffer);
@@ -24480,6 +25846,9 @@ const getDominantColor = (src) => {
   }
   
   async function toBase64(imageUrl) {
+    if (imageUrl.startsWith('spotify:')) {
+        return Promise.reject(new Error("Cannot convert spotify: URIs to base64 using canvas"));
+    }
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "Anonymous";
@@ -24649,6 +26018,21 @@ const getDominantColor = (src) => {
           }
       }
 
+      if ((playCount === "N/A" || playCount === undefined) && Spicetify.GraphQL.Definitions.getTrack) {
+          try {
+              const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getTrack, { uri: `spotify:track:${trackId}` });
+              if (res?.data?.trackUnion?.playcount) {
+                  const pc = parseInt(res.data.trackUnion.playcount, 10);
+                  if (!isNaN(pc)) {
+                      playCount = pc;
+                      await idb.set('playCounts', trackId, playCount);
+                  }
+              }
+          } catch (e) {
+              console.warn("[Sort-Play] GraphQL single playcount fallback failed", e);
+          }
+      }
+
       return {
         ...track,
         trackNumber: trackNumber,
@@ -24784,6 +26168,32 @@ const getDominantColor = (src) => {
                 await Promise.all(workers);
             }
         }
+
+        const finalMissingTracks = stillMissingTracks.filter(track => !playCountMap.has(track._tempId));
+        if (finalMissingTracks.length > 0 && Spicetify.GraphQL.Definitions.getTrack) {
+            const GQL_CONCURRENCY = 10;
+            const gqlQueue = [...finalMissingTracks];
+            
+            async function gqlWorker() {
+                while (gqlQueue.length > 0) {
+                    const track = gqlQueue.shift();
+                    const uri = `spotify:track:${track._tempId}`;
+                    try {
+                        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getTrack, { uri });
+                        if (res?.data?.trackUnion?.playcount) {
+                            const pc = parseInt(res.data.trackUnion.playcount, 10);
+                            if (!isNaN(pc)) {
+                                playCountMap.set(track._tempId, pc);
+                                idb.set('playCounts', track._tempId, pc);
+                            }
+                        }
+                    } catch (e) {}
+                }
+            }
+            
+            const gqlWorkers = Array(Math.min(GQL_CONCURRENCY, finalMissingTracks.length)).fill(null).map(() => gqlWorker());
+            await Promise.all(gqlWorkers);
+        }
     } else {
         if (updateProgress) updateProgress(100);
     }
@@ -24844,7 +26254,8 @@ const getDominantColor = (src) => {
     const missingIds = [];
 
     trackIds.forEach(id => {
-        if (!cachedMetadata.has(id)) {
+        const meta = cachedMetadata.get(id);
+        if (!meta || !meta.album || !meta.artists) {
             missingIds.push(id);
         }
     });
@@ -24857,11 +26268,33 @@ const getDominantColor = (src) => {
         let type = 'album';
         try {
             const hexId = spotifyHex(albumId);
-            const token = Spicetify.Platform.Session.accessToken;
-            const url = `https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`;
-            const res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            let res = null;
+            let attempt = 0;
+            while(attempt < 3) {
+                if (internalTokenRefreshPromise) await internalTokenRefreshPromise;
+                const token = Spicetify.Platform.Session.accessToken;
+                const url = `https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`;
+                res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+                
+                if (res.status === 401) {
+                    if (!internalTokenRefreshPromise) {
+                        internalTokenRefreshPromise = (async () => {
+                            try {
+                                const tData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                                Spicetify.Platform.Session.accessToken = tData.accessToken;
+                                await new Promise(r => setTimeout(r, 500));
+                                return tData.accessToken;
+                            } catch(e) { throw e; } finally { internalTokenRefreshPromise = null; }
+                        })();
+                    }
+                    try { await internalTokenRefreshPromise; } catch(e) { break; }
+                    attempt++;
+                    continue;
+                }
+                break;
+            }
             
-            if (res.ok) {
+            if (res && res.ok) {
                 const body = await res.json();
                 if (body.album_type) type = body.album_type;
                 else if (body.type) type = body.type;
@@ -24930,10 +26363,12 @@ const getDominantColor = (src) => {
 
     trackIds.forEach(id => {
         const meta = cachedMetadata.get(id);
-        if (meta) {
+        if (meta && meta.album && meta.artists) {
             idb.set('trackMetadata', id, meta);
+            const originalTrack = uniqueTracks.get(id) || {};
 
             const newTrack = {
+                ...originalTrack,
                 uri: meta.uri,
                 name: meta.name,
                 albumName: meta.album.name,
@@ -24946,11 +26381,15 @@ const getDominantColor = (src) => {
                 album_type: meta.albumType || 'album',
                 trackId: meta.id,
                 albumId: meta.album.id,
+                explicit: meta.explicit || false,
+                artists: meta.artists,
+                artistUris: meta.artists.map(a => a.uri || (a.id ? `spotify:artist:${a.id}` : null)).filter(Boolean),
                 track: {
                     id: meta.id,
                     name: meta.name,
                     uri: meta.uri,
                     duration_ms: meta.duration_ms,
+                    explicit: meta.explicit || false,
                     album: {
                         ...meta.album,
                         album_type: meta.albumType || 'album'
@@ -24972,32 +26411,56 @@ const getDominantColor = (src) => {
     const trackIds = tracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean);
     const cachedMap = await idb.getMany('releaseDates', trackIds, CACHE_EXPIRE_RELEASE_DATE);
     
-    let processedCount = 0;
-    const CONCURRENCY_LIMIT = 10;
-    const queue = tracks.map((track, index) => ({ track, index }));
+    const missingUris = [];
     const results = new Array(tracks.length);
     
-    const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
-        while (queue.length > 0) {
-            const { track, index } = queue.shift();
-            const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
-            
-            let cached = trackId ? cachedMap.get(trackId) : null;
-            
-            if (cached && typeof cached === 'object' && cached.trackNumber !== undefined && !Spicetify.URI.isLocal(track.uri)) {
-                results[index] = { ...track, releaseDate: cached.date, trackNumber: cached.trackNumber };
-            } else {
-                results[index] = await fetchFunction(track);
-            }
-            
-            processedCount++;
-            if (processedCount % 20 === 0 || processedCount === tracks.length) {
-                updateProgress(Math.floor((processedCount / tracks.length) * 100));
-            }
+    tracks.forEach((track, index) => {
+        const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+        let cached = trackId ? cachedMap.get(trackId) : null;
+        
+        if (cached && typeof cached === 'object' && cached.trackNumber !== undefined && !Spicetify.URI.isLocal(track.uri)) {
+            results[index] = { ...track, releaseDate: cached.date, trackNumber: cached.trackNumber };
+        } else {
+            missingUris.push({ track, index, trackId });
         }
     });
+
+    if (missingUris.length > 0) {
+        const BATCH_SIZE = 500;
+        let processedCount = 0;
+        
+        for (let i = 0; i < missingUris.length; i += BATCH_SIZE) {
+            const batch = missingUris.slice(i, i + BATCH_SIZE);
+            const urisToFetch = batch.map(b => b.track.uri);
+            
+            try {
+                const fetchedMetaMap = await fetchCoreMetadataBatch(urisToFetch);
+                
+                for (const item of batch) {
+                    const { track, index, trackId } = item;
+                    const meta = fetchedMetaMap.get(track.uri);
+                    
+                    if (meta && meta.releaseDate) {
+                        results[index] = { ...track, releaseDate: meta.releaseDate, trackNumber: track.trackNumber || 0 };
+                        if (trackId) idb.set('releaseDates', trackId, { date: meta.releaseDate, trackNumber: track.trackNumber || 0 });
+                    } else {
+                        results[index] = await fetchFunction(track);
+                    }
+                }
+            } catch (e) {
+                console.warn("[Sort-Play] Batch core metadata fetch failed, falling back", e);
+                for (const item of batch) {
+                    results[item.index] = await fetchFunction(item.track);
+                }
+            }
+            
+            processedCount += batch.length;
+            updateProgress(Math.floor((processedCount / missingUris.length) * 100));
+        }
+    } else {
+        updateProgress(100);
+    }
     
-    await Promise.all(workers);
     return results;
   }
 
@@ -25010,15 +26473,23 @@ const getDominantColor = (src) => {
     const uniqueTrackIds = [...new Set(trackIds)];
     
     const cachedMetadata = await idb.getMany('trackMetadata', uniqueTrackIds, CACHE_EXPIRE_METADATA);
-    const missingIds = uniqueTrackIds.filter(id => !cachedMetadata.has(id));
+    
+    const missingIds = uniqueTrackIds.filter(id => {
+        const meta = cachedMetadata.get(id);
+        return !meta || meta.popularity === undefined || meta.popularity === null;
+    });
 
-    const batchSize = 50;
+    const batchSize = 250;
     let tracksProcessed = 0;
 
     const processInternalItem = async (id) => {
         const data = await fetchInternalTrackMetadata(id);
         if (data) {
             const cacheData = formatTrackCacheData(data);
+            const existing = cachedMetadata.get(id);
+            if (existing && existing.external_ids) {
+                cacheData.external_ids = { ...existing.external_ids, ...cacheData.external_ids };
+            }
             cachedMetadata.set(data.id, cacheData);
             idb.set('trackMetadata', data.id, cacheData);
         }
@@ -25033,7 +26504,11 @@ const getDominantColor = (src) => {
       const intermediateProgress = Math.round(
           ((tracksProcessed / missingIds.length) * 100) / totalProgressSteps
       );
-      updateProgress(intermediateProgress);
+      if (updateProgress) updateProgress(intermediateProgress);
+      
+      if (i + batchSize < missingIds.length) {
+          await new Promise(r => setTimeout(r, 50));
+      }
     }
 
     return tracks.map(track => {
@@ -25042,17 +26517,27 @@ const getDominantColor = (src) => {
         
         let releaseDate = track.releaseDate;
         let albumName = track.albumName;
+        let explicit = track.explicit || track.track?.explicit || false;
 
-        if (meta && meta.album) {
-            if (meta.album.release_date) releaseDate = meta.album.release_date;
-            if (meta.album.name) albumName = meta.album.name;
+        if (meta) {
+            if (meta.album && meta.album.release_date) releaseDate = meta.album.release_date;
+            if (meta.album && meta.album.name) albumName = meta.album.name;
+            if (meta.explicit !== undefined) explicit = meta.explicit;
+        }
+        
+        let finalPop = track.popularity;
+        if (meta && meta.popularity !== undefined && meta.popularity !== null) {
+            finalPop = meta.popularity;
+        } else if (finalPop === undefined) {
+            finalPop = null;
         }
 
         return {
             ...track,
-            popularity: meta ? meta.popularity : (track.popularity || null),
+            popularity: finalPop,
             releaseDate: releaseDate,
-            albumName: albumName
+            albumName: albumName,
+            explicit: explicit
         };
     });
   }
@@ -25060,10 +26545,25 @@ const getDominantColor = (src) => {
   async function getTrackDetailsWithReleaseDate(track) {
     const trackId = track.uri.split(":")[2];
     
+    if (Spicetify.URI.isLocal(track.uri)) {
+        return { ...track, releaseDate: null, trackNumber: track.trackNumber || 0 };
+    }
+
     const cached = await idb.get('releaseDates', trackId, CACHE_EXPIRE_RELEASE_DATE);
     
     if (cached && typeof cached === 'object' && cached.trackNumber !== undefined) {
         return { ...track, releaseDate: cached.date, trackNumber: cached.trackNumber };
+    }
+
+    try {
+        const fetchedMetaMap = await fetchCoreMetadataBatch([track.uri]);
+        const meta = fetchedMetaMap.get(track.uri);
+        if (meta && meta.releaseDate) {
+            await setCachedReleaseDate(trackId, meta.releaseDate, track.trackNumber || 0);
+            return { ...track, releaseDate: meta.releaseDate, trackNumber: track.trackNumber || 0 };
+        }
+    } catch (e) {
+        console.warn("[Sort-Play] Fast single release date fetch failed, falling back", e);
     }
 
     let albumId;
@@ -25108,7 +26608,7 @@ const getDominantColor = (src) => {
       return { ...track, releaseDate: cached?.date || cached || null, trackNumber: cached?.trackNumber || 0 };
     }
   }
-
+  
   async function _fetchLastFmTrackInfoCore(artistName, trackName, username = null, useFallback = false) {
     const maxRetries = 5;
     let delay = 1000;
@@ -25697,6 +27197,16 @@ const getDominantColor = (src) => {
         text: "Advanced Filters",
         sortType: "advancedFiltersParent",
         children: [
+              {
+                backgroundColor: "transparent",
+                color: "white",
+                text: "Vibe Filter",
+                sortType: "vibeFilter",
+                onClick: async function(event) {
+                    event.stopPropagation();
+                    await handleVibeFilter();
+                }
+            },
             {
                 backgroundColor: "transparent",
                 color: "white",
@@ -25810,6 +27320,98 @@ const getDominantColor = (src) => {
           closeAllMenus();
           showDynamicPlaylistsWindow();
         },
+      },
+      {
+        type: "divider",
+      },
+      {
+        backgroundColor: "transparent",
+        color: "white",
+        text: "Analyze Playlist",
+        sortType: "analyzeCurrentView",
+        onClick: async function(event) {
+            event.stopPropagation();
+            closeAllMenus();
+            const uri = getCurrentUri();
+            const isPlaylist = uri && (URI.isPlaylistV1OrV2(uri) || isLikedSongsPage(uri) || isLocalFilesPage(uri));
+            const isArtist = uri && URI.isArtist(uri);
+            const isAlbum = uri && URI.isAlbum(uri);
+
+            if (isPlaylist || isArtist || isAlbum) {
+                startProcessing("Loading...");
+                try {
+                    let tracks = [];
+                    let sourceDetails = { name: "Current View", ownerName: "", coverImage: null, id: null };
+                    let contextType = "playlist";
+
+                    if (isPlaylist) {
+                        contextType = "playlist";
+                        if (URI.isPlaylistV1OrV2(uri)) {
+                            tracks = await getPlaylistTracks(uri.split(":")[2]);
+                            try { 
+                                const meta = await Spicetify.Platform.PlaylistAPI.getMetadata(uri); 
+                                sourceDetails.name = meta.name;
+                                sourceDetails.ownerName = meta.owner?.name || meta.owner?.display_name || "";
+                                sourceDetails.coverImage = meta.images?.[0]?.url || null;
+                            } catch(err) {}
+                        } else if (isLikedSongsPage(uri)) {
+                            tracks = await getLikedSongs();
+                            sourceDetails.name = "Liked Songs";
+                            sourceDetails.coverImage = "https://misc.scdn.co/liked-songs/liked-songs-64.png";
+                        } else if (isLocalFilesPage(uri)) {
+                            tracks = await getLocalFilesTracks();
+                            sourceDetails.name = "Local Files";
+                        }
+                    } else if (isArtist) {
+                        contextType = "artist";
+                        const artistId = uri.split(":")[2];
+                        sourceDetails.id = artistId;
+                        let rawTracks = await getArtistTracks(uri, true);
+                        tracks = await processArtistPageTracks(rawTracks, false, 'analyzeCurrentView', (msg) => { mainButton.innerText = msg; });
+                        try {
+                            const { sourceName } = await fetchSourceNameAndArtist(uri);
+                            sourceDetails.name = sourceName;
+                            if ((sourceDetails.name === "Source" || sourceDetails.name.startsWith("Unknown ")) && tracks.length > 0) {
+                                let foundName = null;
+                                for (const t of tracks) {
+                                    const artistsArr = t.artists || t.track?.artists || [];
+                                    const match = artistsArr.find(a => (a.id || (a.uri && a.uri.split(":")[2])) === artistId);
+                                    if (match && match.name) {
+                                        foundName = match.name;
+                                        break;
+                                    }
+                                }
+                                sourceDetails.name = foundName || tracks[0].artistName || tracks[0].artists?.[0]?.name || "Unknown Artist";
+                            }
+                            sourceDetails.coverImage = await getArtistImageUrl(artistId);
+                        } catch(err) {}
+                    } else if (isAlbum) {
+                        contextType = "album";
+                        const albumId = uri.split(":")[2];
+                        tracks = await getAlbumTracks(albumId);
+                        try {
+                            const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: uri, locale: "en", offset: 0, limit: 1 });
+                            const u = res.data.albumUnion;
+                            sourceDetails.name = u.name;
+                            sourceDetails.ownerName = u.artists?.items?.[0]?.profile?.name || "";
+                            sourceDetails.coverImage = u.coverArt?.sources?.[0]?.url || null;
+                        } catch(err) {
+                            if (tracks.length > 0) {
+                                sourceDetails.name = tracks[0].trueAlbumName || tracks[0].albumName || tracks[0].album?.name || "Unknown Album";
+                            }
+                        }
+                    }
+
+                    await showPlaylistAnalysisModal(tracks, sourceDetails, contextType, (msg) => { mainButton.innerText = msg; });
+                } catch(err) {
+                    showNotification(err.message || "Failed to analyze current view.", true);
+                } finally {
+                    resetButtons();
+                }
+            } else {
+                showNotification("Analysis is currently only available for Playlists, Artists, and Albums.", true);
+            }
+        }
       },
       {
         type: "divider",
@@ -26162,6 +27764,8 @@ const getDominantColor = (src) => {
         iconSvgString = shuffleIconSvg;
       } else if (style.text === "Convert to Spotify") {
         iconSvgString = convertToSpotifyIconSvg;
+      } else if (style.sortType === "analyzeCurrentView") {
+        iconSvgString = analyzeIconSvg;
       } else if (style.isSetting) {
         iconSvgString = settingsIconSvg;
       } else {
@@ -26217,6 +27821,7 @@ const getDominantColor = (src) => {
       menuContainer.style.backgroundColor = getNativeMenuBackgroundColor();
 
       const isLocalPage = isLocalFilesPage(getCurrentUri());
+      const currentUriForAnalysis = getCurrentUri();
 
       menuButtons.forEach((button, index) => {
           const style = buttonStyles.menuItems[index];
@@ -26229,6 +27834,32 @@ const getDominantColor = (src) => {
           }
 
           button.style.display = shouldShow ? (style.type === 'divider' ? 'block' : 'flex') : 'none';
+
+          if (style.sortType === 'analyzeCurrentView') {
+              const span = button.querySelector('span');
+              const isPlaylist = currentUriForAnalysis && (URI.isPlaylistV1OrV2(currentUriForAnalysis) || isLikedSongsPage(currentUriForAnalysis) || isLocalFilesPage(currentUriForAnalysis));
+              const isArtist = currentUriForAnalysis && URI.isArtist(currentUriForAnalysis);
+              const isAlbum = currentUriForAnalysis && URI.isAlbum(currentUriForAnalysis);
+
+              let targetText = "Analyze Current View";
+              if (isPlaylist) targetText = "Analyze Playlist";
+              else if (isArtist) targetText = "Analyze Artist";
+              else if (isAlbum) targetText = "Analyze Album";
+
+              if (span) {
+                  span.innerText = targetText;
+              } else {
+                  button.innerText = targetText;
+              }
+
+              if (isPlaylist || isArtist || isAlbum) {
+                  button.style.opacity = "1";
+                  button.style.pointerEvents = "auto";
+              } else {
+                  button.style.opacity = "0.4";
+                  button.style.pointerEvents = "none";
+              }
+          }
 
           if (style.type === 'parent' && button._submenu) {
               const subMenuItems = Array.from(button._submenu.children);
@@ -26517,9 +28148,10 @@ const getDominantColor = (src) => {
         closeAllMenus();
       });
   
+      button.dataset.action = item.sortType;
       subMenu.appendChild(button);
     });
-
+  
     return subMenu;
   }
 
@@ -26736,30 +28368,68 @@ const getDominantColor = (src) => {
     const trackIds = tracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean);
     const cachedMap = await idb.getMany('trueReleaseDates', trackIds, CACHE_EXPIRE_RELEASE_DATE);
 
-    let processedCount = 0;
-    const CONCURRENCY_LIMIT = 10;
-    const queue = tracks.map((track, index) => ({ track, index }));
+    const missingTracks = [];
     const results = new Array(tracks.length);
-    const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
-        while (queue.length > 0) {
-            const { track, index } = queue.shift();
-            const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
 
-            let cached = trackId ? cachedMap.get(trackId) : null;
-            if (cached && typeof cached === 'object' && cached.date !== undefined && !Spicetify.URI.isLocal(track.uri)) {
-                results[index] = { ...track, trueReleaseDate: cached.date, trackNumber: cached.trackNumber };
-            } else {
-                results[index] = await getTrackDetailsWithTrueReleaseDate(track);
-                await new Promise(r => setTimeout(r, 100));
-            }
-
-            processedCount++;
-            if (processedCount % 10 === 0 || processedCount === tracks.length) {
-                updateProgress(Math.floor((processedCount / tracks.length) * 100));
-            }
+    tracks.forEach((track, index) => {
+        const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+        let cached = trackId ? cachedMap.get(trackId) : null;
+        if (cached && typeof cached === 'object' && cached.date !== undefined && !Spicetify.URI.isLocal(track.uri)) {
+            results[index] = { 
+                ...track, 
+                trueReleaseDate: cached.date, 
+                trueTrackNumber: cached.trackNumber !== undefined ? cached.trackNumber : (track.trackNumber || 0),
+                trueAlbumName: cached.albumName !== undefined ? cached.albumName : (track.albumName || "")
+            };
+        } else {
+            missingTracks.push({ track, index });
         }
     });
-    await Promise.all(workers);
+
+    if (missingTracks.length > 0) {
+        const BATCH_SIZE = 500;
+        let processedCount = 0;
+
+        for (let i = 0; i < missingTracks.length; i += BATCH_SIZE) {
+            const batch = missingTracks.slice(i, i + BATCH_SIZE);
+            const urisToFetch = batch.map(b => b.track.uri);
+            
+            let fetchedMetaMap = new Map();
+            try {
+                fetchedMetaMap = await fetchCoreMetadataBatch(urisToFetch);
+            } catch (e) {
+                console.warn("[Sort-Play] Batch core meta fetch failed in true dates", e);
+            }
+
+            const CONCURRENCY_LIMIT = 10;
+            const queue = [...batch];
+            
+            const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
+                while (queue.length > 0) {
+                    const { track, index } = queue.shift();
+                    
+                    const meta = fetchedMetaMap.get(track.uri);
+                    if (meta) {
+                        if (!track.track) track.track = {};
+                        if (!track.track.external_ids) track.track.external_ids = {};
+                        if (meta.isrc && !track.track.external_ids.isrc) track.track.external_ids.isrc = meta.isrc;
+                        if (meta.releaseDate && !track.releaseDate) track.releaseDate = meta.releaseDate;
+                    }
+
+                    results[index] = await getTrackDetailsWithTrueReleaseDate(track);
+                    
+                    processedCount++;
+                    if (processedCount % 10 === 0 || processedCount === missingTracks.length) {
+                        updateProgress(Math.floor((processedCount / missingTracks.length) * 100));
+                    }
+                }
+            });
+            await Promise.all(workers);
+        }
+    } else {
+        updateProgress(100);
+    }
+
     return results;
   }
 
@@ -26879,6 +28549,9 @@ const getDominantColor = (src) => {
     canvas.height = size;
 
     try {
+        if (baseImageUrl.startsWith('spotify:')) {
+            throw new Error("Cannot load spotify: URIs directly with crossOrigin");
+        }
         const baseImage = new Image();
         baseImage.crossOrigin = 'Anonymous';
         baseImage.src = baseImageUrl;
@@ -27168,15 +28841,19 @@ const getDominantColor = (src) => {
                 const uniqueArtists = [...new Set(artistQuery.split(/[;,]/).map(a => a.trim()).filter(Boolean))];
                 const artistSearchTerm = uniqueArtists.join(' ');
                 
+                const safeTrackName = (track.name || "").replace(/"/g, '\\"');
+                const safeArtistTerm = artistSearchTerm.replace(/"/g, '\\"');
+                
                 const lenientQuery = `${track.name} ${artistSearchTerm}`;
-                const strictQuery = `track:"${track.name}" artist:"${artistSearchTerm}"`;
+                const strictQuery = `track:"${safeTrackName}" artist:"${safeArtistTerm}"`;
 
                 try {
                     let result = { tracks: { items: [] } };
 
                     const getFirstWord = (title) => {
                         if (!title) return "";
-                        return title.toLowerCase().replace(/^[^a-z0-9]+/, '').split(/\s+/)[0];
+                        const match = title.toLowerCase().match(/[a-z0-9]+/);
+                        return match ? match[0] : "";
                     };
                     const localFirstWord = getFirstWord(track.name);
                     const localArtistWords = (track.artistName || "").toLowerCase().split(/\s+/).filter(w => w.length > 1);
@@ -27342,10 +29019,10 @@ const getDominantColor = (src) => {
                 const spotifyArtist = item.spotifyTrack.artists.map(a => a.name).join(', ') || 'N/A';
                 spotifySideHTML = `
                     <div class="track-text-wrapper">
-                        <span class="track-item-title" title="${spotifyTitle}">${spotifyTitle}</span>
-                        <span class="track-item-artist" title="${spotifyArtist}">${spotifyArtist}</span>
+                        <span class="track-item-title" title="${escapeHtml(spotifyTitle)}">${escapeHtml(spotifyTitle)}</span>
+                        <span class="track-item-artist" title="${escapeHtml(spotifyArtist)}">${escapeHtml(spotifyArtist)}</span>
                     </div>
-                    <button class="copy-track-button" data-title="${spotifyTitle}" data-artist="${spotifyArtist}" title="Copy 'Track - Artist'">
+                    <button class="copy-track-button" data-title="${escapeHtml(spotifyTitle)}" data-artist="${escapeHtml(spotifyArtist)}" title="Copy 'Track - Artist'">
                         ${copyIconSVG}
                     </button>
                 `;
@@ -27362,10 +29039,10 @@ const getDominantColor = (src) => {
             <div class="conversion-row">
                 <div class="track-item local-track">
                     <div class="track-text-wrapper">
-                        <span class="track-item-title" title="${localTitle}">${localTitle}</span>
-                        <span class="track-item-artist" title="${localArtist}">${localArtist}</span>
+                        <span class="track-item-title" title="${escapeHtml(localTitle)}">${escapeHtml(localTitle)}</span>
+                        <span class="track-item-artist" title="${escapeHtml(localArtist)}">${escapeHtml(localArtist)}</span>
                     </div>
-                    <button class="copy-track-button" data-title="${localTitle}" data-artist="${localArtist}" title="Copy 'Track - Artist'">
+                    <button class="copy-track-button" data-title="${escapeHtml(localTitle)}" data-artist="${escapeHtml(localArtist)}" title="Copy 'Track - Artist'">
                         ${copyIconSVG}
                     </button>
                 </div>
@@ -27592,6 +29269,2462 @@ const getDominantColor = (src) => {
     });
   }
 
+  async function showPlaylistAnalysisModal(tracks, sourceDetails, contextType = 'playlist', updateProgressCallback = null) {
+    const existing = document.getElementById("sort-play-analysis-overlay");
+    if (existing) existing.remove();
+
+    const updateProgress = (msg) => { if(updateProgressCallback) updateProgressCallback(msg); };
+
+    let coverUrlStr = sourceDetails?.coverImage || COVER_TOP;
+    if (coverUrlStr.startsWith('spotify:image:')) {
+      coverUrlStr = 'https://i.scdn.co/image/' + coverUrlStr.split(':')[2];
+    }
+    const coverImage = coverUrlStr;
+    const currentEntityUri = getCurrentUri();
+    const [r, g, b] = await getDominantColor(coverImage, currentEntityUri);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    
+    let cR = r, cG = g, cB = b;
+    let bgR = Math.round(r * 0.1);
+    let bgG = Math.round(g * 0.1);
+    let bgB = Math.round(b * 0.1);
+    
+    if (brightness < 80) {
+      cR = Math.min(255, r + 60); cG = Math.min(255, g + 60); cB = Math.min(255, b + 60);
+      bgR = Math.round(cR * 0.15); bgG = Math.round(cG * 0.15); bgB = Math.round(cB * 0.15);
+    }
+    if (bgR < 18 && bgG < 18 && bgB < 18) { bgR = 18; bgG = 18; bgB = 18; }
+    const dominantColorHex = `rgb(${cR}, ${cG}, ${cB})`;
+    const lighterR = Math.round(cR + (255 - cR) * 0.45);
+    const lighterG = Math.round(cG + (255 - cG) * 0.45);
+    const lighterB = Math.round(cB + (255 - cB) * 0.45);
+    const lighterDominantColorHex = `rgb(${lighterR}, ${lighterG}, ${lighterB})`;
+
+    try {
+      if (!tracks || tracks.length === 0) {
+        throw new Error("No tracks available to analyze. Please add tracks to the playlist.");
+      }
+
+      updateProgress("Fetching...");
+      const trackIds = tracks.map(t => {
+          if (t.uri && Spicetify.URI.isLocal(t.uri)) return null;
+          return t.trackId || (t.uri ? t.uri.split(':')[2] : null);
+      }).filter(Boolean);
+      const spotifyTrackUris = tracks.map(t => t.uri).filter(uri => uri && uri.startsWith('spotify:track:'));
+
+      const genreMap = await getGenreMapping();
+
+      const [withDates, statsMap, nativeGenresMap, tracksWithPlays] = await Promise.all([
+          fetchPopularityForMultipleTracks(tracks, () => {})
+              .then(res => processReleaseDatesConcurrently(res, () => {}, getTrackDetailsWithReleaseDate)),
+          getBatchTrackStats(trackIds, () => {}),
+          fetchNativeSpotifyTrackGenresBatch(spotifyTrackUris),
+          enrichTracksWithPlayCounts(tracks, () => {})
+      ]);
+
+      updateProgress("Math...");
+
+      const playCountMap = new Map();
+      tracksWithPlays.forEach(t => {
+          const id = t.trackId || t.id || t.track?.id || (t.uri ? t.uri.split(':')[2] : null);
+          if (id && t.playCount !== undefined && t.playCount !== "N/A") {
+              const pc = parseInt(t.playCount, 10);
+              if (!isNaN(pc) && pc > 0) {
+                  playCountMap.set(id, pc);
+              }
+          }
+      });
+
+      let totalDuration = 0;
+      let totalPopularity = 0;
+      let popCount = 0;
+      let explicitCount = 0;
+      let totalYear = 0;
+      let yearCount = 0;
+      let totalPlayCount = 0;
+      const validPlaysList = [];
+
+      const vibePoints = [];
+      const tempoList = [];
+      const timelinePoints = [];
+      const decadeStats = {};
+      const camelotCounts = {};
+      const genreCounts = {};
+      const artistStatsMap = new Map();
+      const albumStatsMap = new Map();
+
+      const featureKeys = ['energy', 'danceability', 'valence', 'acousticness', 'speechiness', 'instrumentalness', 'tempo', 'liveness'];
+      const featureSums = Object.fromEntries(featureKeys.map(k => [k, 0]));
+      let featureCount = 0;
+      let tracksWithGenres = 0;
+
+      let contextCounts = { workout: 0, party: 0, focus: 0, chill: 0, drive: 0, morning: 0, gaming: 0, rainy: 0, pregame: 0 };
+      let contextTracks = { workout: [], party: [], focus: [], chill: [], drive: [], morning: [], gaming: [], rainy: [], pregame: [] };
+      let totalContextTracks = 0;
+
+      nativeGenresMap.forEach((genres, uri) => {
+        if (genres && genres.length > 0) {
+          const validNative = genres.filter(g => {
+              const name = g.name.toLowerCase();
+              return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
+          });
+
+          if (validNative.length > 0) {
+            tracksWithGenres++;
+            
+            const normalizedNames = validNative.map(g => normalizeGenre(g.name));
+            
+            const uniqueGenreNames = new Set(normalizedNames);
+
+            uniqueGenreNames.forEach(name => {
+              const titleCased = name.replace(/\b\w/g, l => l.toUpperCase());
+              genreCounts[titleCased] = (genreCounts[titleCased] || 0) + 1;
+            });
+          }
+        }
+      });
+
+      withDates.forEach(track => {
+        const tid = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+        const stats = statsMap[tid];
+        const trackName = track.songTitle || track.name;
+        const artistName = track.artistName || (track.artists && track.artists[0]?.name) || "Unknown Artist";
+        
+        let trackArtists = [];
+        if (track.artists && track.artists.length > 0) {
+            trackArtists = track.artists;
+        } else if (track.track?.artists && track.track.artists.length > 0) {
+            trackArtists = track.track.artists;
+        } else if (track.artistUris && track.artistUris.length > 0) {
+            const names = track.allArtists ? track.allArtists.split(', ') : [artistName];
+            trackArtists = track.artistUris.map((uri, idx) => ({
+                id: uri.split(':')[2],
+                uri: uri,
+                name: names[idx] || artistName
+            }));
+        } else {
+            trackArtists = [{name: artistName, id: artistName}];
+        }
+
+        trackArtists.forEach(a => {
+            const aId = a.id || a.uri?.split(':')[2] || a.name;
+            if (!artistStatsMap.has(aId)) artistStatsMap.set(aId, { name: a.name, count: 0, popSum: 0, popCount: 0, id: aId });
+            const stat = artistStatsMap.get(aId);
+            stat.count++;
+            if (track.popularity != null && !isNaN(track.popularity)) {
+                stat.popSum += Number(track.popularity);
+                stat.popCount++;
+            }
+        });
+
+        const albId = track.albumId || track.album?.id || track.track?.album?.id || track.albumName || "Unknown Album";
+        const albName = track.albumName || track.album?.name || track.track?.album?.name || "Unknown Album";
+        if (!albumStatsMap.has(albId)) {
+            let cover = null;
+            if (track.track?.album?.images?.length) {
+                cover = track.track.album.images[track.track.album.images.length > 1 ? 1 : 0].url;
+            } else if (track.album?.images?.length) {
+                cover = track.album.images[track.album.images.length > 1 ? 1 : 0].url;
+            } else if (track.metadata?.image_url) {
+                cover = track.metadata.image_url;
+            }
+            if (cover && cover.startsWith('spotify:image:')) {
+                cover = 'https://i.scdn.co/image/' + cover.split(':')[2];
+            }
+            albumStatsMap.set(albId, { name: albName, count: 0, id: albId, cover: cover, artist: artistName });
+        }
+        albumStatsMap.get(albId).count++;
+
+        const pc = playCountMap.get(tid);
+        if (pc !== undefined) {
+            totalPlayCount += pc;
+            validPlaysList.push(pc);
+        }
+
+        totalDuration += (track.durationMs || track.durationMilis || track.track?.duration_ms || 0);
+        if (track.explicit || track.track?.explicit) explicitCount++;
+        
+        if (track.popularity != null && !isNaN(track.popularity)) {
+          totalPopularity += Number(track.popularity);
+          popCount++;
+        }
+
+        if (stats && stats.energy != null && !isNaN(stats.energy) && stats.valence != null && !isNaN(stats.valence)) {
+          vibePoints.push({
+            x: Number(stats.valence),
+            y: Number(stats.energy),
+            title: trackName,
+            artist: artistName,
+            pop: track.popularity != null && !isNaN(track.popularity) ? Number(track.popularity) : 0
+          });
+          
+          featureKeys.forEach(k => featureSums[k] += Number(stats[k] || 0));
+          featureCount++;
+
+          const tRaw = Number(stats.tempo || 120);
+          if (tRaw > 0) tempoList.push(tRaw);
+
+          let validContexts = Object.entries(calculateTrackVibeScores(stats));
+          
+          const totalScore = validContexts.reduce((sum, [_, v]) => sum + v, 0);
+
+          if (totalScore > 0) {
+              totalContextTracks++;
+              validContexts.forEach(([ctx, score]) => {
+                  contextCounts[ctx] += (score / totalScore);
+                  contextTracks[ctx].push({
+                      title: trackName,
+                      artist: artistName,
+                      pop: track.popularity != null && !isNaN(track.popularity) ? Number(track.popularity) : 0,
+                      score: score
+                  });
+              });
+          }
+        }
+
+        if (track.releaseDate) {
+          const d = new Date(track.releaseDate);
+          if (!isNaN(d.getTime())) {
+            const year = d.getFullYear();
+            if (year > 1900) {
+              timelinePoints.push({ ts: d.getTime(), year: year, title: trackName, artist: artistName });
+              totalYear += year;
+              yearCount++;
+
+              const decade = Math.floor(year / 10) * 10;
+              if (!decadeStats[decade]) {
+                  decadeStats[decade] = { count: 0, artists: {}, genres: {} };
+              }
+              decadeStats[decade].count++;
+              
+              decadeStats[decade].artists[artistName] = (decadeStats[decade].artists[artistName] || 0) + 1;
+              
+              const ng = nativeGenresMap.get(track.uri) || [];
+              const validNative = ng.filter(g => {
+                  const name = g.name.toLowerCase();
+                  return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
+              });
+              validNative.forEach(g => {
+                  const name = normalizeGenre(g.name).replace(/\b\w/g, l => l.toUpperCase());
+                  decadeStats[decade].genres[name] = (decadeStats[decade].genres[name] || 0) + 1;
+              });
+            }
+          }
+        }
+
+        if (stats && stats.key_raw !== -1 && stats.mode !== -1) {
+          let camKey = stats.camelot;
+          if (!camKey) {
+             const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
+             const keyName = pitchClasses[stats.key_raw];
+             const modeSuffix = stats.mode === 0 ? 'm' : '';
+             camKey = KEY_TO_CAMELOT_MAP[keyName + modeSuffix] || KEY_TO_CAMELOT_MAP[keyName];
+          }
+          if (camKey) {
+             camelotCounts[camKey] = (camelotCounts[camKey] || 0) + 1;
+          }
+        }
+      });
+
+      const totalHours = Math.floor(totalDuration / 3600000);
+      const totalMins = Math.floor((totalDuration % 3600000) / 60000);
+      const avgPop = popCount > 0 ? Math.round(totalPopularity / popCount) : 0;
+      const explicitPct = tracks.length > 0 ? Math.round((explicitCount / tracks.length) * 100) : 0;
+      const avgYear = yearCount > 0 ? Math.round(totalYear / yearCount) : "N/A";
+
+      const avgTempoQuickStat = featureCount > 0 ? Math.round(featureSums.tempo / featureCount) : "N/A";
+
+      validPlaysList.sort((a, b) => a - b);
+      const medianPlays = validPlaysList.length > 0
+          ? (validPlaysList.length % 2 === 1
+              ? validPlaysList[Math.floor(validPlaysList.length / 2)]
+              : Math.round((validPlaysList[validPlaysList.length / 2 - 1] + validPlaysList[validPlaysList.length / 2]) / 2))
+          : 0;
+
+      const formattedTotalPlays = formatPlayCount(totalPlayCount, 'abbreviated');
+      const formattedMedianPlays = formatPlayCount(medianPlays, 'abbreviated');
+
+      updateProgress("Artists...");
+      
+      let artistArray = Array.from(artistStatsMap.values());
+      if (contextType === 'artist' && sourceDetails?.id) {
+          artistArray = artistArray.filter(a => a.id !== sourceDetails.id && a.name !== sourceDetails.name);
+      } else if (contextType === 'artist' && sourceDetails?.name) {
+          const targetNameLower = sourceDetails.name.toLowerCase();
+          artistArray = artistArray.filter(a => a.name.toLowerCase() !== targetNameLower);
+      }
+
+      const allSortedArtists = artistArray.sort((a, b) => {
+          if (b.count !== a.count) return b.count - a.count;
+          const avgPopA = a.popCount > 0 ? a.popSum / a.popCount : 0;
+          const avgPopB = b.popCount > 0 ? b.popSum / b.popCount : 0;
+          return avgPopB - avgPopA;
+      });
+      const sortedArtists = allSortedArtists.slice(0, 30);
+      
+      const isRealId = (id) => id && typeof id === 'string' && /^[a-zA-Z0-9]{22}$/.test(id.split(':').pop());
+      const topArtistsForImages = sortedArtists.filter(a => isRealId(a.id)).slice(0, 30);
+      
+      await Promise.all(topArtistsForImages.map(async (a) => {
+          try {
+              const cleanId = a.id.split(':').pop();
+              const cacheKey = `artist_img_${cleanId}`;
+              
+              let url = null;
+              if (spotifyImageCache.has(cacheKey)) {
+                  url = spotifyImageCache.get(cacheKey).data;
+              } else {
+                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.queryArtistOverview, { uri: `spotify:artist:${cleanId}`, locale: "en", includePrerelease: false });
+                  const sources = res.data?.artistUnion?.visuals?.avatarImage?.sources;
+                  if (sources && sources.length > 0) {
+                      sources.sort((x, y) => x.width - y.width);
+                      url = sources.length > 1 ? sources[1].url : sources[0].url;
+                      spotifyImageCache.set(cacheKey, { ts: Date.now(), data: url });
+                  }
+              }
+
+              if (url) {
+                  a.avatar = url;
+                  await new Promise((resolve) => {
+                      const img = new Image();
+                      img.onload = resolve;
+                      img.onerror = resolve;
+                      img.src = url;
+                  });
+              }
+          } catch(e) {}
+      }));
+
+      function generateTreemap(items, x, y, w, h) {
+          if (items.length === 0) return [];
+          
+          let total = items.reduce((sum, item) => sum + item.count, 0);
+          if (total === 0) return [];
+          
+          let nodes = [];
+          let itemsWithArea = items.map(item => ({ ...item, area: (item.count / total) * (w * h) }));
+          
+          let rect = { x, y, w, h };
+          
+          function worst(row, w_length) {
+              if (row.length === 0) return Infinity;
+              let s = row.reduce((sum, item) => sum + item.area, 0);
+              if (s === 0) return Infinity;
+              let minArea = Math.min(...row.map(i => i.area));
+              let maxArea = Math.max(...row.map(i => i.area));
+              let val1 = (w_length ** 2 * maxArea) / (s ** 2);
+              let val2 = (s ** 2) / (w_length ** 2 * minArea);
+              return Math.max(val1, val2);
+          }
+          
+          let currentRow = [];
+          let currentItems = [...itemsWithArea];
+          
+          while (currentItems.length > 0) {
+              let w_length = Math.max(0.0001, Math.min(rect.w, rect.h));
+              let item = currentItems[0];
+              
+              if (worst(currentRow, w_length) >= worst([...currentRow, item], w_length)) {
+                  currentRow.push(item);
+                  currentItems.shift();
+              } else {
+                  layoutRow(currentRow, rect);
+                  currentRow = [];
+              }
+          }
+          if (currentRow.length > 0) {
+              layoutRow(currentRow, rect);
+          }
+          
+          function layoutRow(row, rect) {
+              let rowArea = row.reduce((sum, item) => sum + item.area, 0);
+              if (rowArea === 0) return;
+              
+              let isWide = rect.w >= rect.h;
+              
+              if (isWide) {
+                  let rowWidth = rowArea / Math.max(0.0001, rect.h);
+                  let currentY = rect.y;
+                  for (let item of row) {
+                      let itemH = item.area / Math.max(0.0001, rowWidth);
+                      nodes.push({ ...item, x: rect.x, y: currentY, w: rowWidth, h: itemH });
+                      currentY += itemH;
+                  }
+                  rect.x += rowWidth;
+                  rect.w -= rowWidth;
+              } else {
+                  let rowHeight = rowArea / Math.max(0.0001, rect.w);
+                  let currentX = rect.x;
+                  for (let item of row) {
+                      let itemW = item.area / Math.max(0.0001, rowHeight);
+                      nodes.push({ ...item, x: currentX, y: rect.y, w: itemW, h: rowHeight });
+                      currentX += itemW;
+                  }
+                  rect.y += rowHeight;
+                  rect.h -= rowHeight;
+              }
+          }
+          
+          return nodes;
+      }
+
+      const treemapNodes = generateTreemap(sortedArtists, 0, 0, 100, 100);
+
+
+
+      let treemapHtml = treemapNodes.map((node) => {
+          const a = node;
+          const safeName = escapeHtml(a.name);
+          const avgArtistPop = a.popCount > 0 ? Math.round(a.popSum / a.popCount) : 0;
+          const tooltipData = `${a.count} ${a.count === 1 ? 'track' : 'tracks'} | Avg Pop: ${avgArtistPop}`;
+
+          let bgStyle = `background-color: ${dominantColorHex};`;
+          if (a.avatar) {
+              bgStyle = `background-image: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.95)), url('${a.avatar}');`;
+          } else {
+              bgStyle = `background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.85)); background-color: ${dominantColorHex};`;
+          }
+
+          const showName = node.w >= 11 && node.h >= 11;
+          const showCount = node.w >= 6 && node.h >= 6;
+
+          let nameFontSize = node.w > 30 && node.h > 30 ? '18px' : (node.w > 18 && node.h > 18 ? '13px' : '10px');
+          let countFontSize = node.w > 30 && node.h > 30 ? '13px' : (node.w > 18 && node.h > 18 ? '11px' : '9px');
+          
+          let textContent = '';
+          if (showName) {
+              const displayArtistName = a.name.length > 30 ? a.name.substring(0, 30).trim() + '..' : a.name;
+              textContent += `<div style="font-weight: 800; color: #fff; font-size: ${nameFontSize}; text-align: center; text-shadow: 0 2px 5px rgba(0,0,0,0.9); line-height: 1.1; padding: 0 4px; width: 100%; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;">${escapeHtml(displayArtistName)}</div>`;
+          }
+          if (showCount) {
+              textContent += `<div style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: ${countFontSize}; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,0.9); margin-top: ${showName ? '4px' : '0'};">${a.count}</div>`;
+          }
+
+          return `
+              <div class="sp-chart-dot sp-treemap-node" 
+                   style="position: absolute; left: ${node.x}%; top: ${node.y}%; width: ${node.w}%; height: ${node.h}%; padding: 2px; box-sizing: border-box;"
+                   data-title="${safeName}" data-val="${tooltipData}">
+                  <div class="sp-treemap-inner" style="width: 100%; height: 100%; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; position: relative; pointer-events: none; background-color: rgba(0,0,0,0.45);">
+                      <div class="sp-treemap-bg" style="position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; ${bgStyle} transform: scale(1.05); background-size: cover; background-position: center; z-index: 1; opacity: 0.75;"></div>
+                      <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                          ${textContent}
+                      </div>
+                  </div>
+              </div>
+          `;
+      }).join('');
+
+      const artistMapSvg = `
+          <div style="position: relative; width: 100%; height: 100%; border-radius: 8px; overflow: hidden;">
+              ${treemapHtml}
+          </div>
+      `;
+
+      let statsData = [
+          { val: artistStatsMap.size, label: "Unique Artists" },
+          { val: albumStatsMap.size, label: "Unique Albums" },
+          { val: avgYear, label: contextType === 'album' ? "Release Year" : "Avg Release Year" },
+          { val: `${explicitPct}%`, label: "Explicit Tracks" },
+          { val: avgTempoQuickStat, label: "Avg Tempo" }
+      ];
+
+      if (contextType === 'album') {
+          statsData = statsData.filter(s => s.label !== "Unique Albums");
+          if (artistStatsMap.size === 1) {
+              statsData = statsData.filter(s => s.label !== "Unique Artists");
+          }
+      } else if (contextType === 'artist') {
+          if (artistStatsMap.size === 1) {
+              statsData = statsData.filter(s => s.label !== "Unique Artists");
+          }
+      }
+
+      const quickStatsHtml = `
+          <style>
+              .scrollable-content:has(> .quick-stats-container){overflow:hidden !important;}
+              .qs-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;min-height:0;}
+              .qs-val{font-size:clamp(16px, 11cqh, 28px);font-weight:800;color:#fff;line-height:1.1;}
+              .qs-lbl{font-size:clamp(9px, 4.5cqh, 11px);color:rgba(255,255,255,0.5);font-weight:700;text-transform:uppercase;letter-spacing:1px;line-height:1.2;text-align:center;padding:0 4px;margin-top:2px;}
+          </style>
+          <div class="quick-stats-container" style="display: flex; flex-direction: column; height: 100%; gap: clamp(4px, 2cqh, 12px); box-sizing: border-box; container-type: size; padding-bottom: 2px;">
+              ${statsData.map(s => `
+                  <div class="qs-card">
+                      <span class="qs-val">${s.val}</span>
+                      <span class="qs-lbl">${s.label}</span>
+                  </div>
+              `).join('')}
+          </div>
+      `;
+
+      let audioFeaturesHtml = '<div style="color:#888; text-align:center; padding-top:20px;">No audio features data</div>';
+      if (featureCount > 0) {
+        const featuresList = [
+          { label: 'Energy', fullName: 'Energy', val: Math.round(featureSums.energy / featureCount), desc: "Measure of intensity and activity. High energy tracks feel fast, loud, and noisy." },
+          { label: 'Dance', fullName: 'Danceability', val: Math.round(featureSums.danceability / featureCount), desc: "How suitable the tracks are for dancing based on tempo, rhythm stability, and beat strength." },
+          { label: 'Valence', fullName: 'Valence', val: Math.round(featureSums.valence / featureCount), desc: "Musical positiveness. High valence sounds more happy, cheerful, or euphoric." },
+          { label: 'Acoustic', fullName: 'Acousticness', val: Math.round(featureSums.acousticness / featureCount), desc: "Confidence measure of whether the tracks are acoustic vs electronic." },
+          { label: 'Speech', fullName: 'Speechiness', val: Math.round(featureSums.speechiness / featureCount), desc: "Presence of spoken words. Higher values indicate more talk-like tracks (e.g., rap, podcasts)." },
+          { label: 'Instrum.', fullName: 'Instrumentalness', val: Math.round(featureSums.instrumentalness / featureCount), desc: "Predicts whether tracks contain no vocals. Higher values mean less vocal content." }
+        ];
+
+        let radarPoints = [];
+        let radarLabels = [];
+        let radarWeb = '';
+        let radarAxes = '';
+
+        const cx = 50, cy = 50, r = 32; 
+        const numPoints = 6;
+
+        for(let level=1; level<=5; level++) {
+            let webPoints = [];
+            for(let i=0; i<numPoints; i++) {
+                const angle = (Math.PI * 2 * i / numPoints) - (Math.PI / 2);
+                const levelR = r * (level / 5);
+                webPoints.push(`${cx + levelR * Math.cos(angle)},${cy + levelR * Math.sin(angle)}`);
+            }
+            radarWeb += `<polygon points="${webPoints.join(' ')}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="0.4"/>`;
+        }
+
+        featuresList.forEach((f, i) => {
+            const angle = (Math.PI * 2 * i / numPoints) - (Math.PI / 2);
+            
+            const endX = cx + r * Math.cos(angle);
+            const endY = cy + r * Math.sin(angle);
+            radarAxes += `<line x1="${cx}" y1="${cy}" x2="${endX}" y2="${endY}" stroke="rgba(255,255,255,0.15)" stroke-width="0.6"/>`;
+
+            const valR = r * (f.val / 100);
+            const pX = cx + valR * Math.cos(angle);
+            const pY = cy + valR * Math.sin(angle);
+            radarPoints.push(`${pX},${pY}`);
+
+            const labelR = r + 12;
+            const lX = cx + labelR * Math.cos(angle);
+            const lY = cy + labelR * Math.sin(angle);
+
+            radarLabels.push(`
+                <g class="sp-radar-label" style="cursor: help;" data-feature-name="${f.fullName}" data-feature-val="${f.val}%" data-feature-desc="${escapeHtml(f.desc)}">
+                    <circle cx="${lX}" cy="${lY}" r="8" fill="transparent" />
+                    <text x="${lX}" y="${lY - 2.5}" fill="rgba(255,255,255,0.6)" font-size="2.8" font-weight="600" text-anchor="middle" dominant-baseline="middle" font-family="'SpotifyMixUI', sans-serif" style="text-transform: uppercase; letter-spacing: 0.5px; pointer-events: none;">${f.label}</text>
+                    <text x="${lX}" y="${lY + 2.5}" fill="#fff" font-size="3.8" font-weight="800" text-anchor="middle" dominant-baseline="middle" font-family="'SpotifyMixUI', sans-serif" style="pointer-events: none;">${f.val}%</text>
+                </g>
+            `);
+        });
+
+        const dataPolygon = `<polygon points="${radarPoints.join(' ')}" fill="${dominantColorHex}" fill-opacity="0.4" stroke="${dominantColorHex}" stroke-width="1" stroke-linejoin="round"/>`;
+        const dataCircles = radarPoints.map(p => `<circle cx="${p.split(',')[0]}" cy="${p.split(',')[1]}" r="1.5" fill="#fff"/>`).join('');
+
+        const avgTempo = Math.round(featureSums.tempo / featureCount);
+        const avgLivenessRaw = featureSums.liveness / featureCount;
+        const avgLiveness = Math.round(avgLivenessRaw <= 1 && avgLivenessRaw > 0 ? avgLivenessRaw * 100 : avgLivenessRaw);
+
+        const tempoDesc = escapeHtml("The overall estimated tempo of a track in beats per minute (BPM). Indicates the speed or pace of the music.");
+        const livenessDesc = escapeHtml("Detects the presence of an audience in the recording. Higher values represent a higher probability that the tracks were performed live.");
+
+        audioFeaturesHtml = `
+          <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 5px; padding-bottom: 25px; box-sizing: border-box;">
+            <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
+                ${radarWeb}
+                ${radarAxes}
+                ${dataPolygon}
+                ${dataCircles}
+                ${radarLabels.join('')}
+            </svg>
+            <div style="position: absolute; bottom: 10px; left: 2px; right: 2px; display: flex; justify-content: space-between; pointer-events: none;">
+              <div class="sp-radar-label" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; pointer-events: auto; cursor: help;" data-feature-name="Tempo" data-feature-val="${avgTempo} BPM" data-feature-desc="${tempoDesc}">
+                <span style="font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; pointer-events: none;">Tempo</span>
+                <span style="font-size: 15px; font-weight: 800; color: #fff; font-family: 'SpotifyMixUI', sans-serif; pointer-events: none;">${avgTempo} BPM</span>
+              </div>
+              <div class="sp-radar-label" style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px; pointer-events: auto; cursor: help;" data-feature-name="Liveness" data-feature-val="${avgLiveness}%" data-feature-desc="${livenessDesc}">
+                <span style="font-size: 10px; color: rgba(255,255,255,0.5); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; pointer-events: none;">Liveness</span>
+                <span style="font-size: 15px; font-weight: 800; color: #fff; font-family: 'SpotifyMixUI', sans-serif; pointer-events: none;">${avgLiveness}%</span>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      const W_span = 78;
+      const H_span = 78;
+      const cols = 13;
+      const rows = 12;
+      
+      const R_x = 3.9;
+      const H_hex = 6.5;
+      
+      const cells = [];
+      for (let c = 0; c < cols; c++) {
+          const isOdd = c % 2 === 1;
+          const rowsInCol = isOdd ? rows - 1 : rows;
+          for (let r = 0; r < rowsInCol; r++) {
+              const cx = 11 + R_x + c * 1.5 * R_x;
+              const cy = 11 + (H_hex / 2) + (isOdd ? H_hex / 2 : 0) + r * H_hex;
+              cells.push({ c, r, cx, cy, tracks: [] });
+          }
+      }
+
+      vibePoints.forEach(p => {
+          const screenX = 11 + (p.x / 100) * W_span;
+          const screenY = 89 - (p.y / 100) * H_span;
+          
+          let minDist = Infinity;
+          let bestCell = null;
+          
+          cells.forEach(cell => {
+              const dx = cell.cx - screenX;
+              const dy = cell.cy - screenY;
+              const distSq = dx*dx + dy*dy;
+              if (distSq < minDist) {
+                  minDist = distSq;
+                  bestCell = cell;
+              }
+          });
+          
+          if (bestCell) bestCell.tracks.push(p);
+      });
+
+      let maxHexCount = 0;
+      cells.forEach(cell => {
+          if (cell.tracks.length > maxHexCount) maxHexCount = cell.tracks.length;
+      });
+
+      const hexPath = (cx, cy) => {
+          const sRx = R_x * 0.9;
+          const sHx = H_hex * 0.9;
+          return `M ${cx - sRx},${cy} 
+                  L ${cx - sRx/2},${cy - sHx/2} 
+                  L ${cx + sRx/2},${cy - sHx/2} 
+                  L ${cx + sRx},${cy} 
+                  L ${cx + sRx/2},${cy + sHx/2} 
+                  L ${cx - sRx/2},${cy + sHx/2} Z`;
+      };
+
+      let emptyHexesHtml = '';
+      let filledHexesHtml = '';
+      
+      cells.forEach(cell => {
+          const pathD = hexPath(cell.cx, cell.cy);
+          const count = cell.tracks.length;
+          
+          if (count === 0) {
+              emptyHexesHtml += `<path d="${pathD}" fill="rgba(255,255,255,0.03)" stroke="none" pointer-events="none" class="sp-chart-axis-anim" />`;
+          } else {
+              const fillOpacity = maxHexCount > 1 ? 0.2 + 0.8 * (count / maxHexCount) : 0.8;
+              
+              cell.tracks.sort((a, b) => b.pop - a.pop);
+              const top5 = cell.tracks.slice(0, 5);
+              
+              const topTracksStr = top5.map(t => `${escapeHtml(t.title)};;${escapeHtml(t.artist)};;${Math.round(t.x)};;${Math.round(t.y)}`).join('||');
+              const avgVal = Math.round(cell.tracks.reduce((sum, t) => sum + t.x, 0) / count);
+              const avgEng = Math.round(cell.tracks.reduce((sum, t) => sum + t.y, 0) / count);
+              
+              filledHexesHtml += `<path d="${pathD}" fill="${dominantColorHex}" fill-opacity="${fillOpacity}" stroke="none" class="sp-hex-bin" style="cursor:crosshair; transform-origin: ${cell.cx}px ${cell.cy}px;" data-hex-count="${count}" data-hex-tracks="${topTracksStr}" data-hex-val="H: ${avgVal}% | E: ${avgEng}%" />`;
+          }
+      });
+
+      const vibeSvg = `
+        <style>
+          .sp-hex-bin { transition: stroke-width 0.2s, stroke 0.2s, filter 0.2s, transform 0.2s; }
+          .sp-hex-bin:hover { stroke: #fff; stroke-width: 0.8px; filter: brightness(1.3); transform: scale(1.05); }
+        </style>
+        <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
+          <rect x="10" y="10" width="80" height="80" fill="rgba(255,255,255,0.01)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" class="sp-chart-axis-anim"/>
+          ${emptyHexesHtml}
+          ${filledHexesHtml}
+          <text x="50" y="3" fill="rgba(255,255,255,0.5)" font-size="4.2" font-weight="600" text-anchor="middle" class="sp-chart-axis-anim">High Energy</text>
+          <text x="50" y="97" fill="rgba(255,255,255,0.5)" font-size="4.2" font-weight="600" text-anchor="middle" dominant-baseline="hanging" class="sp-chart-axis-anim">Low Energy</text>
+          <text x="1.5" y="50" fill="rgba(255,255,255,0.5)" font-size="4.2" font-weight="600" text-anchor="middle" transform="rotate(-90 1.5,50)" class="sp-chart-axis-anim">Moody / Somber</text>
+          <text x="98.5" y="50" fill="rgba(255,255,255,0.5)" font-size="4.2" font-weight="600" text-anchor="middle" transform="rotate(90 98.5,50)" class="sp-chart-axis-anim">Upbeat / Joyful</text>
+        </svg>
+      `;
+      
+      let moodCounts = { intense: 0, upbeat: 0, melancholic: 0, chill: 0 };
+      let moodTracks = { intense: [], upbeat: [], melancholic: [], chill: [] };
+      let totalMoods = 0;
+
+      vibePoints.forEach(p => {
+          const x = p.x / 100;
+          const y = p.y / 100;
+          
+          const scores = {
+              upbeat: x * y,
+              intense: (1 - x) * y,
+              chill: x * (1 - y),
+              melancholic: (1 - x) * (1 - y)
+          };
+
+          totalMoods++;
+
+          Object.entries(scores).forEach(([mood, score]) => {
+              moodCounts[mood] += score;
+              if (score >= 0.40) {
+                  moodTracks[mood].push({
+                      ...p,
+                      match: Math.round(score * 100)
+                  });
+              }
+          });
+      });
+
+      const getPct = (val) => totalMoods > 0 ? Math.round((val / totalMoods) * 100) : 0;
+
+      const moods = [
+          { id: 'upbeat', label: 'Upbeat / Joyful', emoji: sunSvg, color: '#D4B856', pct: getPct(moodCounts.upbeat), tracks: moodTracks.upbeat, desc: 'High energy and positive. Happy, cheerful, and euphoric music that naturally lifts your spirits.' },
+          { id: 'intense', label: 'Intense / Edgy', emoji: flameSvg, color: '#D16666', pct: getPct(moodCounts.intense), tracks: moodTracks.intense, desc: 'High energy and intense. Aggressive, driving, or highly active beats to fuel your adrenaline.' },
+          { id: 'chill', label: 'Chill / Peaceful', emoji: moonSvg, color: '#60B080', pct: getPct(moodCounts.chill), tracks: moodTracks.chill, desc: 'Low energy and positive. Relaxing, soothing, and pleasant tunes perfect for unwinding completely.' },
+          { id: 'melancholic', label: 'Sad / Moody', emoji: dropSvg, color: '#6090C0', pct: getPct(moodCounts.melancholic), tracks: moodTracks.melancholic, desc: 'Low energy and sad. Somber, emotional, or reflective songs for deep, quiet moments.' }
+      ];
+
+      const dominantMood = [...moods].sort((a, b) => b.pct - a.pct)[0];
+
+      let moodRingHtml = `<div style="display:flex; height:100%; align-items:center; justify-content:center; color:#888;">Not enough vibe data</div>`;
+
+      if (totalMoods > 0) {
+          const radius = 38;
+          const circ = 2 * Math.PI * radius; 
+          const strokeWidth = 8;
+          
+          const activeMoods = moods.filter(m => m.pct > 0);
+          const numSegments = activeMoods.length;
+          
+          const gapSize = numSegments > 1 ? 4 : 0; 
+          const totalGapSpace = numSegments * gapSize;
+          const totalDrawSpace = Math.max(0, circ - totalGapSpace);
+          
+          let currentOffset = 0;
+          let svgPaths = '';
+          
+          activeMoods.forEach((mood, index) => {
+              const drawLength = (mood.pct / 100) * totalDrawSpace;
+              
+              svgPaths += `
+                  <circle cx="50" cy="50" r="${radius}" 
+                      fill="none" stroke="${mood.color}" stroke-width="${strokeWidth}" 
+                      stroke-linecap="butt"
+                      stroke-dasharray="${drawLength} ${circ}" 
+                      stroke-dashoffset="${-currentOffset}" 
+                      style="transform-origin: center; transform: rotate(-90deg); filter: drop-shadow(0px 0px 4px ${mood.color}80);"
+                  />
+              `;
+              currentOffset += drawLength + gapSize;
+          });
+
+          const legendHtml = moods.map(mood => {
+              const parts = mood.label.split('/');
+              const mainMood = parts[0].trim();
+              const subMood = parts[1] ? parts[1].trim() : '';
+
+              const topTracksStr = mood.tracks
+                  .sort((a, b) => b.match - a.match)
+                  .slice(0, 5)
+                  .map(t => `${escapeHtml(t.title)};;${escapeHtml(t.artist)};;${t.match}`)
+                  .join('||');
+
+              return `
+              <div class="sp-vibe-breakdown-item sp-mood-item" data-vibe-name="${escapeHtml(mainMood)}" data-vibe-pct="${mood.pct}%" data-vibe-desc="${escapeHtml(mood.desc)}" data-vibe-tracks="${topTracksStr}" style="flex: 1 1 160px; display: flex; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px 16px; border-radius: 12px; opacity: ${mood.pct > 0 ? 1 : 0.4}; transition: opacity 0.2s; box-sizing: border-box; cursor: help;">
+                  <div style="color: ${mood.color}; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 0 6px ${mood.color}60); flex-shrink: 0; margin-right: 14px; width: 24px; height: 24px;">
+                      ${mood.emoji}
+                  </div>
+                  <div style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+                      <span style="color: #fff; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${mainMood}</span>
+                      <span style="color: rgba(255,255,255,0.5); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${subMood}</span>
+                  </div>
+                  <div style="color: ${mood.color}; font-size: 18px; font-weight: 800; line-height: 1; flex-shrink: 0; margin-left: 10px; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                      ${mood.pct}%
+                  </div>
+              </div>
+              `;
+          }).join('');
+
+          moodRingHtml = `
+              <div style="display: flex; flex-direction: column; width: 100%; height: 100%; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box; overflow: hidden;">
+                  <div style="position: relative; width: min(100%, 230px); aspect-ratio: 1; flex-shrink: 0; margin-bottom: 24px; margin-top: 4px;">
+                      <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
+                          <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="8" />
+                          ${svgPaths}
+                      </svg>
+                      <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                          <div style="color: ${dominantMood.color}; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5)); margin-bottom: 2px; transform: translateY(-2px); display: flex; justify-content: center; align-items: center; width: 48px; height: 48px;">
+                              ${dominantMood.emoji}
+                          </div>
+                          <div style="font-size: 32px; font-weight: 800; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.5); line-height: 1.1;">${dominantMood.pct}%</div>
+                          <div style="font-size: 11px; font-weight: 800; color: ${dominantMood.color}; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-top: 2px;">${dominantMood.label.split('/')[0].trim()}</div>
+                      </div>
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; width: 100%; max-width: 440px;">
+                      ${legendHtml}
+                  </div>
+              </div>
+          `;
+      }
+      
+      let erasHtml = '<div style="display:flex; height:100%; align-items:center; justify-content:center; color:#888;">Not enough era data</div>';
+      let timelineBarSvg = erasHtml;
+      
+      if (timelinePoints.length > 0) {
+        timelinePoints.sort((a, b) => a.ts - b.ts);
+        const minTs = Math.min(...timelinePoints.map(p => p.ts));
+        const maxTs = Math.max(...timelinePoints.map(p => p.ts));
+        const minYear = new Date(minTs).getFullYear();
+        const maxYear = new Date(maxTs).getFullYear();
+        
+        const yearCounts = {};
+        timelinePoints.forEach(p => {
+            yearCounts[p.year] = (yearCounts[p.year] || 0) + 1;
+        });
+        
+        const maxCount = Math.max(...Object.values(yearCounts), 1);
+        const rangeY = maxYear - minYear;
+        
+        const startX = 14; 
+        const chartW = 160; 
+        const endX = startX + chartW;
+        
+        const numBars = rangeY + 1;
+        const step = chartW / numBars;
+        const barWidth = rangeY === 0 ? 20 : Math.max(0.1, step * 0.85);
+        
+        let barsHtml = '';
+        let hoverPillarsHtml = '';
+        
+        for(let y = minYear; y <= maxYear; y++) {
+            const count = yearCounts[y] || 0;
+            const xCenter = startX + ((y - minYear) * step) + (step / 2);
+            const pct = Math.round((count / timelinePoints.length) * 100);
+            
+            hoverPillarsHtml += `<rect x="${xCenter - step/2}" y="10" width="${step}" height="80" fill="transparent" class="sp-chart-segment" style="cursor: crosshair;" data-title="${y}" data-artist="${count} ${count === 1 ? 'track' : 'tracks'} (${pct}%)" data-val=""/>`;
+            
+            if (count > 0) {
+                const h = (count / maxCount) * 80;
+                const yPos = 90 - h;
+                barsHtml += `<rect x="${xCenter - barWidth/2}" y="${yPos}" width="${barWidth}" height="${h}" fill="${dominantColorHex}" rx="0.5" pointer-events="none"/>`;
+            }
+        }
+        
+        const halfCount = Math.ceil(maxCount / 2);
+        let gridLinesBar = '';
+        for (let i = 1; i <= 3; i++) {
+            const lineVal = 10 + (i * 20);
+            gridLinesBar += `<line x1="${startX}" y1="${lineVal}" x2="${endX}" y2="${lineVal}" stroke="rgba(255,255,255,0.05)" stroke-width="0.3" class="sp-chart-axis-anim"/>`;
+        }
+
+        let xAxisHtml = '';
+        if (rangeY <= 10) {
+            const minYearX = startX + (0 * step) + (step / 2);
+            xAxisHtml += `<text x="${minYearX}" y="95" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="middle" dominant-baseline="hanging" class="sp-chart-axis-anim">${minYear}</text>`;
+            if (rangeY > 0) {
+                const maxYearX = startX + (rangeY * step) + (step / 2);
+                xAxisHtml += `<text x="${maxYearX}" y="95" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="middle" dominant-baseline="hanging" class="sp-chart-axis-anim">${maxYear}</text>`;
+            }
+        } else {
+            const firstDecade = Math.ceil(minYear / 10) * 10;
+            
+            if ((firstDecade - minYear) * step >= 8.5) {
+                const minYearX = startX + (step / 2);
+                xAxisHtml += `
+                  <line x1="${minYearX}" y1="90" x2="${minYearX}" y2="92" stroke="rgba(255,255,255,0.2)" stroke-width="0.3"/>
+                  <text x="${minYearX}" y="94" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="middle" dominant-baseline="hanging">${minYear}</text>
+                `;
+            }
+
+            let lastDecadePlotted = null;
+            for (let d = firstDecade; d <= maxYear; d += 10) {
+                lastDecadePlotted = d;
+                const dCenter = startX + ((d - minYear) * step) + (step / 2);
+                xAxisHtml += `
+                  <line x1="${dCenter}" y1="90" x2="${dCenter}" y2="92" stroke="rgba(255,255,255,0.2)" stroke-width="0.3"/>
+                  <text x="${dCenter}" y="94" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="middle" dominant-baseline="hanging">${d}</text>
+                `;
+            }
+            
+            if (lastDecadePlotted !== null && (maxYear - lastDecadePlotted) * step >= 8.5) {
+                const maxYearX = startX + (rangeY * step) + (step / 2);
+                xAxisHtml += `
+                  <line x1="${maxYearX}" y1="90" x2="${maxYearX}" y2="92" stroke="rgba(255,255,255,0.2)" stroke-width="0.3"/>
+                  <text x="${maxYearX}" y="94" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="middle" dominant-baseline="hanging">${maxYear}</text>
+                `;
+            }
+        }
+        
+        timelineBarSvg = `
+          <svg viewBox="0 0 180 100" width="100%" height="100%" style="overflow: visible; preserveAspectRatio: none;">
+            <rect x="${startX}" y="10" width="${chartW}" height="80" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" class="sp-chart-axis-anim"/>
+            ${gridLinesBar}
+            ${xAxisHtml}
+            <text x="${startX - 2}" y="10" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="end" dominant-baseline="middle" class="sp-chart-axis-anim">${maxCount}</text>
+            <text x="${startX - 2}" y="50" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="end" dominant-baseline="middle" class="sp-chart-axis-anim">${halfCount}</text>
+            <text x="${startX - 2}" y="90" fill="rgba(255,255,255,0.4)" font-size="3" text-anchor="end" dominant-baseline="middle" class="sp-chart-axis-anim">0</text>
+            ${barsHtml}
+            ${hoverPillarsHtml}
+          </svg>
+        `;
+
+        const decades = Object.keys(decadeStats).map(Number).sort((a, b) => a - b);
+        if (decades.length > 0) {
+            const totalEraTracks = decades.reduce((sum, d) => sum + decadeStats[d].count, 0);
+            const maxEraTracks = Math.max(...decades.map(d => decadeStats[d].count));
+
+            let segmentsHtml = '';
+            let cardsHtml = '';
+
+            decades.forEach((d, i) => {
+                const stat = decadeStats[d];
+                const rawPct = (stat.count / totalEraTracks) * 100;
+                const pct = Math.round(rawPct);
+                const displayPct = (pct === 0 && stat.count > 0) ? '<1%' : `${pct}%`;
+                const trackWord = stat.count === 1 ? 'track' : 'tracks';
+                
+                const sortedArtists = Object.entries(stat.artists).sort((a, b) => b[1] - a[1]);
+                const topArtistsList = sortedArtists.slice(0, 3).map(a => a[0]).join(', ') || 'Unknown';
+                const topGenres = Object.entries(stat.genres).sort((a, b) => b[1] - a[1]).slice(0, 3).map(g => g[0]).join(', ') || 'Mixed';
+
+                const baseOpacity = Math.max(0.25, stat.count / maxEraTracks).toFixed(2);
+
+                segmentsHtml += `
+                    <div class="sp-era-element" 
+                        style="width: ${Math.max(rawPct, 0.5)}%; height: 100%; background-color: ${dominantColorHex}; opacity: ${baseOpacity}; transition: filter 0.2s, opacity 0.2s; cursor: crosshair; border-radius: 4px;"
+                        data-era-decade="${d}"
+                        data-era-pct="${escapeHtml(displayPct)}"
+                        data-base-opacity="${baseOpacity}"
+                        data-era-artists="${escapeHtml(topArtistsList)}"
+                        data-era-genres="${escapeHtml(topGenres)}"
+                        data-era-tracks="${stat.count}">
+                    </div>
+                `;
+
+                cardsHtml += `
+                    <div class="sp-era-element" 
+                        style="background: rgba(255,255,255,0.04); border-top: 4px solid ${dominantColorHex}; border-radius: 8px; padding: clamp(4px, 1.5vh, 18px) clamp(4px, 1vw, 14px); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: crosshair; transition: background 0.2s, opacity 0.2s, filter 0.2s, box-shadow 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.2); position: relative; container-type: size; overflow: hidden;"
+                        data-era-decade="${d}"
+                        data-era-pct="${escapeHtml(displayPct)}"
+                        data-base-opacity="1"
+                        data-era-artists="${escapeHtml(topArtistsList)}"
+                        data-era-genres="${escapeHtml(topGenres)}"
+                        data-era-tracks="${stat.count}">
+                        <div style="position: absolute; top: clamp(4px, 8cqh, 10px); right: clamp(6px, 5cqw, 12px); font-weight: 800; color: ${lighterDominantColorHex}; font-size: clamp(9px, 18cqmin, 13px); opacity: 0.9; line-height: 1;">${escapeHtml(displayPct)}</div>
+                        <div style="font-weight: 800; color: #fff; font-size: clamp(14px, 35cqmin, 22px); text-shadow: 0 2px 4px rgba(0,0,0,0.5); margin-bottom: 2px; line-height: 1.1;">${d}s</div>
+                        <div style="font-weight: 600; color: rgba(255,255,255,0.5); font-size: clamp(9px, 18cqmin, 13px); margin-top: clamp(2px, 3cqh, 4px); text-align: center; line-height: 1.1;">${stat.count} ${trackWord}</div>
+                    </div>
+                `;
+            });
+
+            let highlightsHtml = '';
+            if (timelinePoints.length > 0) {
+                const sortedByTime = [...timelinePoints].sort((a, b) => a.ts - b.ts);
+                const oldestTrack = sortedByTime[0];
+                const newestTrack = sortedByTime[sortedByTime.length - 1];
+                const yearSpan = newestTrack.year - oldestTrack.year;
+                
+                let spanText = yearSpan > 0 ? `Spans ${yearSpan} Years` : `Released ${oldestTrack.year}`;
+
+                highlightsHtml = `
+                    <div class="sp-chart-axis-anim" style="padding-top: clamp(10px, 1.5vh, 16px); border-top: 1px solid rgba(255,255,255,0.06); display: flex; gap: 12px; flex-shrink: 0; align-items: center;">
+                        <div style="flex: 1; background: rgba(255,255,255,0.02); border-radius: 8px; padding: clamp(6px, 1.5vh, 10px) 14px; display: flex; align-items: center; gap: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
+                            <div style="width: 3px; height: 32px; background: ${dominantColorHex}; border-radius: 2px; opacity: 0.4;"></div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Earliest (${oldestTrack.year})</div>
+                                <div style="font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(oldestTrack.title)}">${escapeHtml(oldestTrack.title)}</div>
+                                <div style="font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(oldestTrack.artist)}">${escapeHtml(oldestTrack.artist)}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 80px;">
+                            <div style="font-size: 10px; font-weight: 800; color: ${lighterDominantColorHex}; text-transform: uppercase; letter-spacing: 0.5px; text-align: center; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 12px;">${spanText}</div>
+                        </div>
+
+                        <div style="flex: 1; background: rgba(255,255,255,0.02); border-radius: 8px; padding: clamp(6px, 1.5vh, 10px) 14px; display: flex; align-items: center; gap: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);">
+                            <div style="flex: 1; min-width: 0; text-align: right;">
+                                <div style="font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Latest (${newestTrack.year})</div>
+                                <div style="font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(newestTrack.title)}">${escapeHtml(newestTrack.title)}</div>
+                                <div style="font-size: 11px; color: rgba(255,255,255,0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(newestTrack.artist)}">${escapeHtml(newestTrack.artist)}</div>
+                            </div>
+                            <div style="width: 3px; height: 32px; background: ${dominantColorHex}; border-radius: 2px; opacity: 1;"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            erasHtml = `
+                <div style="display: flex; flex-direction: column; width: 100%; height: 100%; box-sizing: border-box; padding: 10px; gap: clamp(10px, 1.5vh, 20px);">
+                    <div class="sp-chart-axis-anim" style="display: flex; gap: 4px; height: 28px; width: 100%; flex-shrink: 0;">
+                        ${segmentsHtml}
+                    </div>
+                    <div class="sp-chart-axis-anim" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 110px), 1fr)); grid-auto-rows: minmax(0, 1fr); gap: clamp(8px, 1.5vh, 16px); flex: 1; min-height: 0;">
+                        ${cardsHtml}
+                    </div>
+                    ${highlightsHtml}
+                </div>
+            `;
+        }
+      }
+
+      const allSortedAlbums = Array.from(albumStatsMap.values()).sort((a, b) => b.count - a.count);
+      const sortedAlbums = allSortedAlbums.slice(0, 30);
+      
+      const topAlbumsForImages = sortedAlbums.filter(a => !a.cover && isRealId(a.id)).slice(0, 30);
+      
+      await Promise.all(topAlbumsForImages.map(async (a) => {
+          try {
+              const cleanId = a.id.split(':').pop();
+              const cacheKey = `album_img_${cleanId}`;
+              
+              let url = null;
+              if (spotifyImageCache.has(cacheKey)) {
+                  url = spotifyImageCache.get(cacheKey).data;
+              } else {
+                  const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getAlbum, { uri: `spotify:album:${cleanId}`, locale: "en", offset: 0, limit: 1 });
+                  const sources = res.data?.albumUnion?.coverArt?.sources;
+                  if (sources && sources.length > 0) {
+                      sources.sort((x, y) => x.width - y.width);
+                      url = sources.length > 1 ? sources[1].url : sources[0].url;
+                      spotifyImageCache.set(cacheKey, { ts: Date.now(), data: url });
+                  }
+              }
+
+              if (url) {
+                  a.cover = url;
+                  await new Promise((resolve) => {
+                      const img = new Image();
+                      img.onload = resolve;
+                      img.onerror = resolve;
+                      img.src = url;
+                  });
+              }
+          } catch(e) {}
+      }));
+
+      const albumTreemapNodes = generateTreemap(sortedAlbums, 0, 0, 100, 100);
+
+
+
+      let albumTreemapHtml = albumTreemapNodes.map((node) => {
+          const a = node;
+          const safeName = escapeHtml(a.name);
+          const safeArtist = escapeHtml(a.artist);
+          const tooltipData = `${a.count} ${a.count === 1 ? 'track' : 'tracks'}`;
+
+          let bgStyle = `background-color: ${dominantColorHex};`;
+          if (a.cover) {
+              bgStyle = `background-image: linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.95)), url('${a.cover}');`;
+          } else {
+              bgStyle = `background-image: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.85)); background-color: ${dominantColorHex};`;
+          }
+
+          const showName = node.w >= 11 && node.h >= 11;
+          const showCount = node.w >= 6 && node.h >= 6;
+
+          let nameFontSize = node.w > 30 && node.h > 30 ? '16px' : (node.w > 18 && node.h > 18 ? '12px' : '9px');
+          let countFontSize = node.w > 30 && node.h > 30 ? '12px' : (node.w > 18 && node.h > 18 ? '10px' : '8px');
+          
+          let textContent = '';
+          if (showName) {
+              const displayAlbumName = a.name.length > 30 ? a.name.substring(0, 30).trim() + '..' : a.name;
+              textContent += `<div style="font-weight: 800; color: #fff; font-size: ${nameFontSize}; text-align: center; text-shadow: 0 2px 5px rgba(0,0,0,0.9); line-height: 1.1; padding: 0 4px; width: 100%; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;">${escapeHtml(displayAlbumName)}</div>`;
+          }
+          if (showCount) {
+              textContent += `<div style="font-weight: 600; color: rgba(255,255,255,0.9); font-size: ${countFontSize}; text-align: center; text-shadow: 0 1px 4px rgba(0,0,0,0.9); margin-top: ${showName ? '4px' : '0'};">${a.count}</div>`;
+          }
+
+          return `
+              <div class="sp-chart-dot sp-treemap-node" 
+                   style="position: absolute; left: ${node.x}%; top: ${node.y}%; width: ${node.w}%; height: ${node.h}%; padding: 2px; box-sizing: border-box;"
+                   data-title="${safeName}" data-val="${tooltipData}" data-artist="${safeArtist}">
+                  <div class="sp-treemap-inner" style="width: 100%; height: 100%; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; position: relative; pointer-events: none; background-color: rgba(0,0,0,0.45);">
+                      <div class="sp-treemap-bg" style="position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; ${bgStyle} transform: scale(1.05); background-size: cover; background-position: center; z-index: 1; opacity: 0.75;"></div>
+                      <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                          ${textContent}
+                      </div>
+                  </div>
+              </div>
+          `;
+      }).join('');
+
+      const albumMapSvg = `
+          <div style="position: relative; width: 100%; height: 100%; border-radius: 8px; overflow: hidden;">
+              ${albumTreemapHtml}
+          </div>
+      `;
+      
+      const sortedGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 300);
+      let genresHtml = '<div style="color:#888; text-align:center; padding-top:20px;">No genre data</div>';
+      if (sortedGenres.length > 0) {
+        genresHtml = `<div style="display:flex; flex-direction:column; gap:16px; padding: 10px 4px;">` + 
+          sortedGenres.map(([name, count]) => {
+            const trackRatio = Math.max(1, tracksWithGenres);
+            const pct = Math.round((count / trackRatio) * 100);
+            
+            let displayString = `${pct}%`;
+            let barWidth = pct;
+            let textColor = '#fff';
+
+            if (pct === 0 && count > 0) {
+                displayString = '<1%';
+                barWidth = 1; 
+                textColor = 'rgba(255,255,255,0.5)';
+            } else if (pct > 100) {
+                displayString = '100%';
+                barWidth = 100;
+            }
+
+            return `
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width: 120px; font-size: 13px; color: #e0e0e0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${name}">${name}</div>
+                <div style="flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+                  <div class="sp-bar-fill" style="width: ${barWidth}%; height: 100%; background: ${dominantColorHex}; border-radius: 3px;"></div>
+                </div>
+                <div style="width: 40px; font-size: 14px; color: ${textColor}; font-weight: 700; text-align: right;">${displayString}</div>
+              </div>
+            `;
+          }).join('') + `</div>`;
+      }
+
+      const CAMELOT_TO_KEY = {
+          "1B": "B", "2B": "F♯/G♭", "3B": "C♯/D♭", "4B": "G♯/A♭",
+          "5B": "D♯/E♭", "6B": "A♯/B♭", "7B": "F", "8B": "C",
+          "9B": "G", "10B": "D", "11B": "A", "12B": "E",
+          "1A": "G♯/A♭m", "2A": "D♯/E♭m", "3A": "A♯/B♭m", "4A": "Fm",
+          "5A": "Cm", "6A": "Gm", "7A": "Dm", "8A": "Am",
+          "9A": "Em", "10A": "Bm", "11A": "F♯/G♭m", "12A": "C♯/D♭m"
+      };
+
+      const maxKeyCount = Math.max(...Object.values(camelotCounts), 0);
+      let keysHtml = '<div style="color:#888; text-align:center; padding-top:20px;">No key data</div>';
+      if (maxKeyCount > 0) {
+          let wheelHtml = '';
+          const cx = 50, cy = 50, rOut = 45, rMid = 28, rIn = 11;
+          
+          for (let i = 1; i <= 12; i++) {
+              const startAngle = (i * 30 - 105) * Math.PI / 180;
+              const endAngle = (i * 30 - 75) * Math.PI / 180;
+              const textAngle = (i * 30 - 90) * Math.PI / 180;
+
+              const makeArc = (r1, r2) => {
+                  const x1 = cx + r1 * Math.cos(startAngle);
+                  const y1 = cy + r1 * Math.sin(startAngle);
+                  const x2 = cx + r1 * Math.cos(endAngle);
+                  const y2 = cy + r1 * Math.sin(endAngle);
+                  const x3 = cx + r2 * Math.cos(endAngle);
+                  const y3 = cy + r2 * Math.sin(endAngle);
+                  const x4 = cx + r2 * Math.cos(startAngle);
+                  const y4 = cy + r2 * Math.sin(startAngle);
+                  return `M ${x1} ${y1} A ${r1} ${r1} 0 0 1 ${x2} ${y2} L ${x3} ${y3} A ${r2} ${r2} 0 0 0 ${x4} ${y4} Z`;
+              };
+
+              const countB = camelotCounts[`${i}B`] || 0;
+              const countA = camelotCounts[`${i}A`] || 0;
+
+              const opB = countB === 0 ? 0.03 : 0.2 + 0.8 * (countB / maxKeyCount);
+              const opA = countA === 0 ? 0.03 : 0.2 + 0.8 * (countA / maxKeyCount);
+
+              const pctB = featureCount > 0 ? Math.round((countB / featureCount) * 100) : 0;
+              const pctA = featureCount > 0 ? Math.round((countA / featureCount) * 100) : 0;
+
+              const standardB = CAMELOT_TO_KEY[`${i}B`];
+              const standardA = CAMELOT_TO_KEY[`${i}A`];
+
+              wheelHtml += `<path d="${makeArc(rOut, rMid)}" fill="${dominantColorHex}" fill-opacity="${opB}" stroke="rgba(255,255,255,0.1)" stroke-width="0.5" class="sp-chart-segment" data-title="${i}B - ${standardB}" data-artist="Major Scale" data-val="${countB} tracks (${pctB}%)"></path>`;
+              wheelHtml += `<path d="${makeArc(rMid, rIn)}" fill="${dominantColorHex}" fill-opacity="${opA}" stroke="rgba(255,255,255,0.1)" stroke-width="0.5" class="sp-chart-segment" data-title="${i}A - ${standardA}" data-artist="Minor Scale" data-val="${countA} tracks (${pctA}%)"></path>`;
+
+              const txB = cx + ((rOut + rMid)/2) * Math.cos(textAngle);
+              const tyB = cy + ((rOut + rMid)/2) * Math.sin(textAngle);
+              const txA = cx + ((rMid + rIn)/2) * Math.cos(textAngle);
+              const tyA = cy + ((rMid + rIn)/2) * Math.sin(textAngle);
+
+              const weightB = countB > 0 ? "800" : "500";
+              const colB = countB > 0 ? "#fff" : "rgba(255,255,255,0.3)";
+              const weightA = countA > 0 ? "800" : "500";
+              const colA = countA > 0 ? "#fff" : "rgba(255,255,255,0.3)";
+
+              wheelHtml += `<text x="${txB}" y="${tyB}" fill="${colB}" font-size="4" font-weight="${weightB}" text-anchor="middle" dominant-baseline="central" font-family="'SpotifyMixUI', sans-serif" pointer-events="none">${i}B</text>`;
+              wheelHtml += `<text x="${txA}" y="${tyA}" fill="${colA}" font-size="3.5" font-weight="${weightA}" text-anchor="middle" dominant-baseline="central" font-family="'SpotifyMixUI', sans-serif" pointer-events="none">${i}A</text>`;
+          }
+
+          keysHtml = `
+            <style>
+              .sp-chart-segment { transition: fill-opacity 0.2s, stroke-width 0.2s; cursor: crosshair; stroke: transparent; stroke-width: 0; }
+              .sp-chart-segment:hover { stroke-width: 0.4; stroke: #fff; }
+            </style>
+            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px;">
+              <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
+                  ${wheelHtml}
+              </svg>
+            </div>
+          `;
+      }
+
+      let tempoHtml = '<div style="color:#888; text-align:center; padding-top:20px;">No tempo data</div>';
+      if (tempoList.length > 0) {
+          const buckets = [
+              { label: '<80', min: 0, max: 80, count: 0 },
+              { label: '80-100', min: 80, max: 100, count: 0 },
+              { label: '100-120', min: 100, max: 120, count: 0 },
+              { label: '120-140', min: 120, max: 140, count: 0 },
+              { label: '140-160', min: 140, max: 160, count: 0 },
+              { label: '160+', min: 160, max: 999, count: 0 }
+          ];
+          
+          tempoList.forEach(t => {
+              for (let b of buckets) {
+                  if (t >= b.min && t < b.max) {
+                      b.count++;
+                      break;
+                  }
+              }
+          });
+          
+          const maxTempoCount = Math.max(...buckets.map(b => b.count), 1);
+          const totalTempo = tempoList.length;
+          
+          const numBars = buckets.length;
+          const chartW = 100;
+          const chartH = 70;
+          const startY = 85;
+          const step = chartW / numBars;
+          const barWidth = step * 0.65;
+          
+          let barsHtml = '';
+          let labelsHtml = '';
+          
+          buckets.forEach((b, i) => {
+              const h = (b.count / maxTempoCount) * chartH;
+              const x = i * step + (step - barWidth) / 2;
+              const y = startY - h;
+              const pct = Math.round((b.count / totalTempo) * 100);
+              
+              const op = b.count === 0 ? 0.05 : 0.3 + 0.7 * (b.count / maxTempoCount);
+              
+              barsHtml += `
+                  <rect x="${i * step}" y="5" width="${step}" height="90" fill="transparent" class="sp-chart-segment" style="cursor: crosshair;" data-title="${b.label} BPM" data-artist="${b.count} tracks (${pct}%)" data-val=""/>
+              `;
+              
+              if (b.count > 0) {
+                  barsHtml += `
+                      <rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="${dominantColorHex}" fill-opacity="${op}" rx="1.5" pointer-events="none" class="sp-tempo-bar" style="transition: filter 0.2s;"/>
+                      <text x="${x + barWidth/2}" y="${y - 2}" fill="#fff" font-size="3.5" font-weight="800" text-anchor="middle" pointer-events="none">${b.count}</text>
+                  `;
+              }
+              
+              labelsHtml += `
+                  <text x="${x + barWidth/2}" y="${startY + 6}" fill="rgba(255,255,255,0.5)" font-size="3.5" font-weight="700" text-anchor="middle" pointer-events="none">${b.label}</text>
+              `;
+          });
+          
+          tempoHtml = `
+            <style>
+              .sp-chart-segment:hover ~ .sp-tempo-bar { filter: brightness(1.3); }
+            </style>
+            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px;">
+              <svg viewBox="0 0 100 100" width="100%" height="100%" style="overflow: visible;">
+                  <line x1="0" y1="${startY}" x2="100" y2="${startY}" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+                  ${barsHtml}
+                  ${labelsHtml}
+              </svg>
+            </div>
+          `;
+      }
+      
+      let settingsHtml = '<div style="display:flex; height:100%; align-items:center; justify-content:center; color:#888;">No setting data</div>';
+
+      let predictedTimeOfDay = "Anytime";
+      let predictedWeather = "Any Weather";
+
+      if (featureCount > 0) {
+          const avgE = (featureSums.energy / featureCount) / 100;
+          const avgV = (featureSums.valence / featureCount) / 100;
+          const avgA = (featureSums.acousticness / featureCount) / 100;
+          const avgI = (featureSums.instrumentalness / featureCount) / 100;
+          const avgD = (featureSums.danceability / featureCount) / 100;
+
+          if (avgA > 0.4 && avgV > 0.4 && avgE < 0.6) predictedTimeOfDay = "Early Morning";
+          else if (avgE > 0.6 && avgD > 0.5) predictedTimeOfDay = "Friday Night";
+          else if (avgV > 0.5 && avgA > 0.3) predictedTimeOfDay = "Golden Hour";
+          else if (avgV < 0.4 && (avgA > 0.5 || avgI > 0.4)) predictedTimeOfDay = "Late Night";
+          else predictedTimeOfDay = "Afternoon";
+
+          if (avgV > 0.6 && avgE > 0.5) predictedWeather = "Sunny & Clear";
+          else if (avgV < 0.4 && avgA > 0.5 && avgE < 0.4) predictedWeather = "Heavy Rain";
+          else if (avgV < 0.5 && avgE < 0.5 && avgI > 0.4) predictedWeather = "Snow / Freezing";
+          else if (avgA > 0.4 && avgE < 0.6) predictedWeather = "Overcast / Foggy";
+          else predictedWeather = "Breezy / Mild";
+      }
+
+      if (totalContextTracks > 0) {
+          const contexts = VIBE_DEFS.map(def => ({
+              ...def,
+              count: contextCounts[def.id]
+          }));
+
+          contexts.forEach(c => c.pct = Math.round((c.count / totalContextTracks) * 100));
+          contexts.sort((a, b) => b.pct - a.pct);
+
+          const dominant = contexts[0];
+
+          const breakdownHtml = contexts.filter(c => c.pct > 0).map(c => {
+              const topTracksStr = (contextTracks[c.id] || [])
+                  .sort((a, b) => b.score - a.score)
+                  .slice(0, 5)
+                  .map(t => {
+                      const matchPct = Math.round(Math.min(1, t.score) * 100);
+                      return `${escapeHtml(t.title)};;${escapeHtml(t.artist)};;${matchPct}`;
+                  })
+                  .join('||');
+                  
+              return `
+              <div class="sp-vibe-breakdown-item sp-setting-item" style="display: flex; align-items: center; gap: 12px; cursor: help;" data-vibe-name="${escapeHtml(c.label)}" data-vibe-pct="${c.pct}%" data-vibe-desc="${escapeHtml(c.desc)}" data-vibe-tracks="${topTracksStr}">
+                  <div style="width: 24px; height: 24px; color: ${c.color}; flex-shrink: 0; filter: drop-shadow(0 0 4px ${c.color}40); display: flex; justify-content: center; align-items: center;">
+                      ${c.icon}
+                  </div>
+                  <div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                      <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                          <span style="color: #fff; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${c.label}</span>
+                          <span style="color: ${c.color}; font-size: 12px; font-weight: 800;">${c.pct}%</span>
+                      </div>
+                      <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden;">
+                          <div style="width: ${c.pct}%; height: 100%; background: ${c.color}; border-radius: 3px;"></div>
+                      </div>
+                  </div>
+              </div>
+          `;
+          }).join('');
+
+          settingsHtml = `
+              <style>.sp-dominant-vibe-icon svg { width: 100% !important; height: 100% !important; }</style>
+              <div style="display: flex; flex-wrap: wrap; width: 100%; height: 100%; box-sizing: border-box; gap: 16px; align-items: stretch; align-content: flex-start;">
+                  <div style="flex: 1 1 140px; max-width: 220px; display: flex; flex-direction: column; gap: 12px;">
+                      <div style="flex: 1; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px solid rgba(255,255,255,0.04); padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; min-height: 140px;">
+                          <div style="width: min(100%, 110px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at center, ${dominant.color}40 0%, transparent 70%); display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 12px;">
+                              <div class="sp-dominant-vibe-icon" style="width: 48px; height: 48px; color: ${dominant.color}; filter: drop-shadow(0 4px 12px ${dominant.color}80); display: flex; justify-content: center; align-items: center;">
+                                  ${dominant.icon}
+                              </div>
+                              <svg style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; transform: rotate(-90deg); overflow: visible;" viewBox="0 0 100 100">
+                                  <circle cx="50" cy="50" r="46" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="4" />
+                                  <circle cx="50" cy="50" r="46" fill="none" stroke="${dominant.color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${(dominant.pct/100) * 289} 289" style="filter: drop-shadow(0 0 6px ${dominant.color});" />
+                              </svg>
+                          </div>
+                          <div style="font-size: 26px; font-weight: 800; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.5); line-height: 1;">${dominant.pct}%</div>
+                          <div style="font-size: 11px; font-weight: 800; color: ${dominant.color}; text-transform: uppercase; letter-spacing: 1px; text-align: center; margin-top: 6px;">${dominant.label.split('/')[0].trim()}</div>
+                          <div style="font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.5px; text-align: center; margin-top: 4px;">Dominant Vibe</div>
+                      </div>
+
+                      <div style="display: flex; flex-direction: column; gap: 8px;">
+                          <div style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.02); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.04);">
+                              <div style="color: ${dominant.color}; width: 22px; height: 22px; display: flex; justify-content: center; align-items: center;">${timeIconSvg}</div>
+                              <div style="display: flex; flex-direction: column; min-width: 0;">
+                                  <span style="color: rgba(255,255,255,0.5); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Time</span>
+                                  <span style="color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${predictedTimeOfDay}</span>
+                              </div>
+                          </div>
+                          <div style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.02); padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.04);">
+                              <div style="color: ${dominant.color}; width: 22px; height: 22px; display: flex; justify-content: center; align-items: center;">${weatherIconSvg}</div>
+                              <div style="display: flex; flex-direction: column; min-width: 0;">
+                                  <span style="color: rgba(255,255,255,0.5); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">Weather</span>
+                                  <span style="color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${predictedWeather}</span>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div style="flex: 2 1 200px; display: flex; flex-direction: column; background: rgba(255,255,255,0.02); border-radius: 16px; border: 1px solid rgba(255,255,255,0.04); height: 100%; min-height: 200px; overflow: hidden; box-sizing: border-box;">
+                      <div style="padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); flex-shrink: 0; background: rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center;">
+                          <span style="font-size: 10px; font-weight: 800; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px;">Vibe Breakdown</span>
+                          <button id="sp-analysis-open-vibe-filter" title="Open in Vibe Filter" class="sp-analysis-vibe-btn" style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: rgba(255,255,255,0.7); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px 6px;">
+                              <div style="width: 16px; height: 16px; pointer-events: none;">${genreFilterIconSvg.replace('width="22px"', 'width="100%"').replace('height="21px"', 'height="100%"')}</div>
+                          </button>
+                      </div>
+                      <div class="scrollable-content" style="flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; justify-content: flex-start; gap: 0;">
+                          ${breakdownHtml}
+                      </div>
+                  </div>
+              </div>
+          `;
+      }
+      
+      const plName = sourceDetails?.name || "Current View";
+      const ownerName = sourceDetails?.ownerName || "";
+      
+      let subtitleText = "Playlist Analysis";
+      if (contextType === 'artist') subtitleText = "Artist Analysis";
+      else if (contextType === 'album') subtitleText = "Album Analysis";
+      if (ownerName) subtitleText += ` • by ${ownerName}`;
+      
+      const topArtistsSectionTitle = contextType === 'artist' ? 'Top Collaborators' : 'Top Artists';
+
+      const titleLength = plName.length;
+      let idealFontSize = 34;
+      if (titleLength > 15) {
+        idealFontSize = Math.max(20, 34 - (titleLength - 15) * 0.9);
+      }
+
+      const overlay = document.createElement("div");
+      overlay.id = "sort-play-analysis-overlay";
+      overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7) !important; z-index: 2005;
+        display: flex; justify-content: center; align-items: center;
+        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      `;
+
+      const closeModal = () => overlay.remove();
+
+      const modalContainer = document.createElement("div");
+      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+
+      modalContainer.style.cssText = `
+        z-index: 2003;
+        width: 95vw !important;
+        max-width: 1400px !important;
+        background-color: rgb(${bgR}, ${bgG}, ${bgB}) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 30px !important;
+        box-shadow: 0 10px 60px rgba(0,0,0,0.8) !important;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        overflow: hidden;
+        height: 85vh;
+        min-height: 650px;
+        animation: none !important;
+        transform: none !important;
+        opacity: 1 !important;
+      `;
+
+      const boxArtists = `
+        <div class="sp-bento-box">
+          <div class="sp-bento-box-title">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                ${topArtistsSectionTitle}
+                <span id="artist-title-suffix" style="font-size: 12px; opacity: 0.7; font-weight: 600; text-transform: none; letter-spacing: normal;"></span>
+            </div>
+            <div class="sp-chart-toggle" id="artist-toggle-container">
+                <button data-view="map" title="Map View (Treemap)">
+                    ${gridChartIconSvg}
+                </button>
+                <button data-view="list" title="List View (Ranking)">
+                    ${listChartIconSvg}
+                </button>
+            </div>
+          </div>
+          <div style="flex: 1; min-height: 0; position: relative; margin: -5px;">
+            <div id="artist-chart-map" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; padding: 5px; transition: opacity 0.3s;">
+                ${artistMapSvg}
+            </div>
+            <div id="artist-chart-list" class="scrollable-content" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; padding: 5px; opacity: 0; pointer-events: none; transition: opacity 0.3s; padding-right: 14px;">
+                <div id="artist-list-content" style="position: relative; width: 100%; height: ${allSortedArtists.length * 44}px;"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const boxGenres = `
+        <div class="sp-bento-box">
+          <div class="sp-bento-box-title"><span>Top Genres</span></div>
+          <div class="scrollable-content">
+            ${genresHtml}
+          </div>
+        </div>
+      `;
+
+      const boxStats = `
+        <div class="sp-bento-box">
+          <div class="sp-bento-box-title"><span>Quick Stats</span></div>
+          <div class="scrollable-content" style="padding-right: 0;">
+            ${quickStatsHtml}
+          </div>
+        </div>
+      `;
+
+      const boxAlbums = `
+        <div class="sp-bento-box">
+          <div class="sp-bento-box-title">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                Top Albums
+                <span id="album-title-suffix" style="font-size: 12px; opacity: 0.7; font-weight: 600; text-transform: none; letter-spacing: normal;"></span>
+            </div>
+            <div class="sp-chart-toggle" id="album-toggle-container">
+                <button data-view="map" title="Map View (Treemap)">
+                    ${gridChartIconSvg}
+                </button>
+                <button data-view="list" title="List View (Ranking)">
+                    ${listChartIconSvg}
+                </button>
+            </div>
+          </div>
+          <div style="flex: 1; min-height: 0; position: relative; margin: -5px;">
+            <div id="album-chart-map" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; padding: 5px; transition: opacity 0.3s;">
+                ${albumMapSvg}
+            </div>
+            <div id="album-chart-list" class="scrollable-content" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; padding: 5px; opacity: 0; pointer-events: none; transition: opacity 0.3s; padding-right: 14px;">
+                <div id="album-list-content" style="position: relative; width: 100%; height: ${allSortedAlbums.length * 50}px;"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const boxTimeline = `
+        <div class="sp-bento-box">
+          <div class="sp-bento-box-title">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                Timeline
+                <span id="timeline-title-suffix" style="font-size: 12px; opacity: 0.7; font-weight: 600; text-transform: none; letter-spacing: normal;"></span>
+            </div>
+            <div class="sp-chart-toggle" id="timeline-toggle-container">
+                <button data-view="bar" title="Bar Chart (Distribution)">
+                    ${barChartIconSvg}
+                </button>
+                <button data-view="eras" title="Eras (Decades Analysis)">
+                    ${eraChartIconSvg}
+                </button>
+            </div>
+          </div>
+          <div style="flex: 1; padding: 5px; min-height: 0; position: relative;">
+            <div id="timeline-chart-bar" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; transition: opacity 0.3s;">
+                ${timelineBarSvg}
+            </div>
+            <div id="timeline-chart-eras" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; transition: opacity 0.3s;">
+                ${erasHtml}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const boxVibe = `
+        <div class="sp-bento-box">
+          <div style="display: flex; flex-direction: column; margin-bottom: 16px; flex-shrink: 0; align-items: center;">
+            <div class="sp-bento-box-title" style="margin-bottom: 4px; width: 100%;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                  Vibe Map
+                  <span id="vibe-title-suffix" style="font-size: 12px; opacity: 0.7; font-weight: 600; text-transform: none; letter-spacing: normal;"></span>
+              </div>
+              <div class="sp-chart-toggle" id="vibe-toggle-container">
+                  <button data-view="ring" title="Mood Ring (Categories)">
+                      ${donutChartIconSvg}
+                  </button>
+                  <button data-view="heatmap" title="Vibe Heatmap (Happiness vs Energy)">
+                      ${hexbinChartIconSvg}
+                  </button>
+              </div>
+            </div>
+            <div style="font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1px; text-align: center;">Analyzes raw emotional tone (Positivity vs. Energy)</div>
+          </div>
+          <div style="flex: 1; padding: 5px; min-height: 0; position: relative;">
+            <div id="vibe-chart-ring" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; transition: opacity 0.3s;">
+                ${moodRingHtml}
+            </div>
+            <div id="vibe-chart-heatmap" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; transition: opacity 0.3s; padding: 10px;">
+                ${vibeSvg}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const boxSetting = `
+        <div class="sp-bento-box">
+          <div style="display: flex; flex-direction: column; margin-bottom: 16px; flex-shrink: 0; align-items: center;">
+            <div class="sp-bento-box-title" style="margin-bottom: 4px; width: 100%;"><span>Setting Predictor</span></div>
+            <div style="font-size: 9px; font-weight: 700; color: rgba(255,255,255,0.35); text-transform: uppercase; letter-spacing: 1px; text-align: center;">Matches context using all audio features (Tempo, Acousticness, etc.)</div>
+          </div>
+          <div class="scrollable-content" style="padding-right: 0;">
+            ${settingsHtml}
+          </div>
+        </div>
+      `;
+
+      const boxKeys = `
+        <div class="sp-bento-box" style="flex: 1;">
+          <div class="sp-bento-box-title"><span>Top Musical Keys</span></div>
+          <div class="scrollable-content" style="padding-top: 10px;">
+            ${keysHtml}
+          </div>
+        </div>
+      `;
+
+      const boxTempo = `
+        <div class="sp-bento-box" style="flex: 1;">
+          <div class="sp-bento-box-title"><span>Tempo Distribution</span></div>
+          <div class="scrollable-content" style="padding-top: 10px;">
+            ${tempoHtml}
+          </div>
+        </div>
+      `;
+
+      const boxAudio = `
+        <div class="sp-bento-box">
+          <div class="sp-bento-box-title"><span>Audio Profile</span></div>
+          <div class="scrollable-content">
+            ${audioFeaturesHtml}
+          </div>
+        </div>
+      `;
+
+      let carouselPagesHtml = '';
+      let paginationHtml = '';
+
+      if (contextType === 'album') {
+          carouselPagesHtml = `
+              <div class="carousel-page album-page-1">
+                  ${boxVibe}
+                  ${boxGenres}
+                  ${boxStats}
+              </div>
+              <div class="carousel-page album-page-2">
+                  ${boxSetting}
+                  ${boxAudio}
+              </div>
+          `;
+          paginationHtml = `
+              <button class="sp-page-dot active" title="Page 1"></button>
+              <button class="sp-page-dot" title="Page 2"></button>
+          `;
+      } else {
+          carouselPagesHtml = `
+              <div class="carousel-page page-1">
+                  ${boxArtists}
+                  ${boxGenres}
+                  ${boxStats}
+              </div>
+              <div class="carousel-page page-2">
+                  ${boxAlbums}
+                  ${boxTimeline}
+              </div>
+              <div class="carousel-page page-3">
+                  ${boxVibe}
+                  ${boxSetting}
+              </div>
+              <div class="carousel-page page-4">
+                  ${boxKeys}
+                  ${boxTempo}
+                  ${boxAudio}
+              </div>
+          `;
+          paginationHtml = `
+              <button class="sp-page-dot active" title="Page 1"></button>
+              <button class="sp-page-dot" title="Page 2"></button>
+              <button class="sp-page-dot" title="Page 3"></button>
+              <button class="sp-page-dot" title="Page 4"></button>
+          `;
+      }
+
+      modalContainer.innerHTML = `
+        <style>
+          @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+          
+          .sp-bento-panel { animation: modalFadeIn 0.2s ease forwards; flex: 1; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+          .sp-artist-list-item { width: 100%; height: 36px; background: rgba(255,255,255,0.02); border-radius: 8px; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); cursor: default; }
+          .sp-album-list-item { height: 42px; }
+          .sp-artist-list-bar { position: absolute; top: 0; left: 0; bottom: 0; border-radius: 8px; }
+
+          .sp-treemap-node { transition: filter 0.2s ease, z-index 0s; will-change: transform, opacity; }
+          .sp-treemap-inner { border: 1px solid rgba(${cR}, ${cG}, ${cB}, 0.4); border-radius: 6px; box-sizing: border-box; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+          .sp-treemap-node:hover { filter: brightness(1.25); z-index: 10; }
+          .sp-treemap-node:hover .sp-treemap-inner { border-color: rgb(${cR}, ${cG}, ${cB}); box-shadow: 0 0 0 1px rgb(${cR}, ${cG}, ${cB}); }
+
+          .sp-analysis-vibe-btn { transition: color 0.2s, background-color 0.2s, border-color 0.2s; }
+          .sp-analysis-vibe-btn:hover { color: #fff !important; background-color: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.3) !important; }
+
+          .sp-bento-panel::before, .sp-bento-panel::after {
+            content: ''; position: absolute; top: -24px; left: -24px; right: -24px; bottom: -24px;
+            background-image: linear-gradient(to bottom, rgba(${cR}, ${cG}, ${cB}, 0.65) -35%, rgba(${bgR}, ${bgG}, ${bgB}, 0.8) 45%, rgba(${bgR}, ${bgG}, ${bgB}, 0.9) 100%), url('${coverImage}');
+            background-size: cover; background-position: center; background-repeat: no-repeat; pointer-events: none;
+          }
+          .sp-bento-panel::before { z-index: -2; }
+          .sp-bento-panel::after { filter: blur(12px); z-index: -1; transform: scale(1.01); }
+          
+          .sp-bento-header { padding: 30px 40px; display: flex; align-items: center; z-index: 1; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+          .sp-bento-cover { width: 80px; height: 80px; border-radius: 8px; margin-right: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); object-fit: cover; flex-shrink: 0; }
+          .sp-bento-title-wrapper { display: flex; flex-direction: column; justify-content: center; overflow: visible; flex: 1; min-width: 120px; margin-right: 32px; }
+          .sp-bento-title { font-weight: 800; color: white; margin: -10px -12px -8px -10px; padding: 10px 12px 10px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 10px rgba(0,0,0,0.4); }
+          .sp-bento-subtitle { font-size: 14px; color: rgba(255,255,255,0.7); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 12px 6px 10px; margin: -4px -12px -6px -10px; text-shadow: 0 1px 5px rgba(0,0,0,0.3); }
+          
+          .sp-bento-header-divider { width: 1px; height: 60px; background-color: rgba(255,255,255,0.1); margin-right: 32px; flex-shrink: 0; }
+          
+          .sp-bento-header-stats { display: flex; justify-content: space-between; gap: 15px; align-items: center; flex: 0 0 55%; max-width: 55%; width: 55%; overflow-x: auto; scrollbar-width: none; padding-right: 50px; padding-top: 10px; margin-top: -10px; padding-bottom: 10px; margin-bottom: -10px; }
+          .sp-header-stat { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+          .sp-stat-val { font-size: 24px; font-weight: 800; color: white; letter-spacing: -0.5px; white-space: nowrap; text-shadow: 0 2px 10px rgba(0,0,0,0.4); }
+          .sp-stat-lbl { font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 1px 5px rgba(0,0,0,0.3); }
+          
+          .top-right-controls { position: absolute; top: 20px; right: 24px; display: flex; gap: 8px; z-index: 10; }
+          .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex; align-items: center; justify-content: center; transition: background 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+          .top-icon-btn:hover { background: rgba(${cR}, ${cG}, ${cB}, 0.6) !important; border-color: rgba(255,255,255,0.3) !important; }
+          
+          .carousel-viewport { flex: 1; overflow-y: auto; overflow-x: hidden; position: relative; z-index: 1; scroll-snap-type: y mandatory; overscroll-behavior-y: contain; scrollbar-width: none; container-type: size; }
+          .carousel-viewport::-webkit-scrollbar { display: none; }
+          .carousel-track { display: flex; flex-direction: column; gap: 40px; padding: 40px; }
+          
+          .carousel-page { flex: 0 0 auto; height: max(400px, 85cqh); scroll-snap-align: center; scroll-snap-stop: always; box-sizing: border-box; display: grid; gap: 20px; }
+          .page-1 { grid-template-columns: 2.05fr 2.05fr 0.9fr; }
+          .page-2 { grid-template-columns: 2.05fr 2.05fr 0.9fr; }
+          .page-2 > :nth-child(2) { grid-column: span 2; }
+          .page-3 { grid-template-columns: 1fr 1fr; }
+          .page-4 { grid-template-columns: 1fr 1fr 1fr; }
+          .album-page-1 { grid-template-columns: 2.05fr 2.05fr 0.9fr; }
+          .album-page-2 { grid-template-columns: 1fr 1fr; }
+          @media (max-width: 1100px) { 
+              .page-1, .page-2, .page-3, .page-4, .album-page-1, .album-page-2 { grid-template-columns: 1fr; } 
+              .page-2 > :nth-child(2) { grid-column: auto; } 
+          }
+          @media (max-width: 768px) { .carousel-page { height: auto; scroll-snap-align: none; } }
+          
+          .sp-bento-box { background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; position: relative; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 8px 32px rgba(0,0,0,0.2); overflow: hidden; }
+          .sp-bento-box-title { font-size: 12px; text-transform: uppercase; font-weight: 800; letter-spacing: 1.5px; color: rgba(255,255,255,0.5); margin-bottom: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; }
+          .sp-bento-box-title::before, .sp-bento-box-title::after { content: ''; display: block; width: 6px; height: 6px; border-radius: 50%; background-color: ${dominantColorHex}; box-shadow: 0 0 8px ${dominantColorHex}; }
+          
+          .sp-chart-toggle { position: absolute; right: 0; display: flex; background: rgba(0,0,0,0.15); border: 1px solid rgba(${cR}, ${cG}, ${cB}, 0.2); border-radius: 14px; padding: 2px; gap: 2px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
+          .sp-chart-toggle button { background: transparent; border: 1px solid transparent; color: rgba(255,255,255,0.4); cursor: pointer; border-radius: 11px; width: 30px; height: 24px; padding: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; margin: 0; box-sizing: border-box; }
+          .sp-chart-toggle button.active { background: rgba(${cR}, ${cG}, ${cB}, 0.75); color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.1); }
+          .sp-chart-toggle button:hover:not(.active) { color: rgba(255,255,255,0.8); background: rgba(${cR}, ${cG}, ${cB}, 0.2); }
+          .sp-chart-toggle svg { width: 14px; height: 14px; }
+
+          .scrollable-content { flex: 1; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: rgba(${cR}, ${cG}, ${cB}, 0.4) transparent; }
+          .scrollable-content::-webkit-scrollbar { width: 6px; }
+          .scrollable-content::-webkit-scrollbar-thumb { background-color: rgba(${cR}, ${cG}, ${cB}, 0.4); border-radius: 3px; transition: background-color 0.2s ease; }
+          .scrollable-content::-webkit-scrollbar-thumb:hover { background-color: rgba(${cR}, ${cG}, ${cB}, 0.8); }
+          
+          .sp-chart-dot { transition: r 0.2s, fill 0.2s; cursor: crosshair; }
+          .sp-chart-dot:hover { r: 3.5; fill: #fff; }
+
+          .sp-setting-item { padding: 4px 12px; margin: 0 -12px; border: 1px solid transparent; border-radius: 8px; transition: all 0.2s ease; flex: 1; min-height: 38px; }
+          .sp-setting-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.15); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+          
+          .sp-mood-item { transition: all 0.2s ease !important; }
+          .sp-mood-item:hover { background: rgba(255,255,255,0.06) !important; border-color: rgba(255,255,255,0.3) !important; box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important; }
+          
+          #sp-analysis-tooltip { position: fixed; top: 0; left: 0; background: rgba(20,20,20,0.95); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.5); pointer-events: none; z-index: 10000; display: none; flex-direction: column; gap: 4px; white-space: nowrap; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; transform: translateZ(0); }
+          g.sp-radar-label text { transition: filter 0.2s ease, fill 0.2s ease; }
+          g.sp-radar-label:hover text { filter: drop-shadow(0 0 4px rgba(255,255,255,0.8)); }
+          g.sp-radar-label:hover text:nth-of-type(1) { fill: rgba(255,255,255,0.95) !important; }
+          g.sp-radar-label circle { stroke: none !important; fill: transparent !important; }
+          div.sp-radar-label { transition: background 0.2s, box-shadow 0.2s; border-radius: 8px; padding: 8px 12px; margin: 0; }
+          div.sp-radar-label:hover { background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15); }
+
+          .sp-pagination { position: absolute; right: 16px; top: 55%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 100; pointer-events: auto; }
+          .sp-page-dot { width: 6px; height: 16px; border-radius: 4px; background: rgba(255,255,255,0.15); border: none; cursor: pointer; transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); padding: 0; margin: 0; box-sizing: border-box; display: block; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+          .sp-page-dot:hover:not(.active) { background: rgba(255,255,255,0.4); height: 24px; }
+          .sp-page-dot.active { height: 40px; background: ${lighterDominantColorHex}; box-shadow: 0 0 10px ${dominantColorHex}; }
+          @media (max-width: 768px) { .sp-pagination { display: none; } }
+        </style>
+        
+        <div class="sp-bento-panel">
+          <div class="top-right-controls">
+            <button class="top-icon-btn" id="closeAnalysisX" title="Close">
+              ${closeIconSmall2Svg}
+            </button>
+          </div>
+          
+          <div class="sp-bento-header">
+            <img src="${coverImage}" class="sp-bento-cover">
+            <div class="sp-bento-title-wrapper">
+              <h2 class="sp-bento-title" title="${plName}" style="font-size: clamp(20px, 3vw, ${idealFontSize}px);">${plName}</h2>
+              <div class="sp-bento-subtitle">${escapeHtml(subtitleText)}</div>
+            </div>
+            
+            <div class="sp-bento-header-divider"></div>
+            
+            <div class="sp-bento-header-stats">
+              ${[
+                { val: tracks.length.toLocaleString(), lbl: "Total Tracks" },
+                { val: `${totalHours}h ${totalMins}m`, lbl: "Duration" },
+                { val: `${avgPop}%`, lbl: "Avg Popularity" },
+                { val: formattedTotalPlays, lbl: "Total Streams", title: totalPlayCount > 0 ? totalPlayCount.toLocaleString() + ' streams' : 'N/A' },
+                { val: formattedMedianPlays, lbl: "Median Streams", title: medianPlays > 0 ? medianPlays.toLocaleString() + ' streams' : 'N/A' }
+              ].map(s => `
+                <div class="sp-header-stat">
+                  <div class="sp-stat-val" title="${s.title || s.val}">${s.val}</div>
+                  <div class="sp-stat-lbl">${s.lbl}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="carousel-viewport" id="carousel-viewport">
+            <div class="carousel-track" id="carousel-track">
+                ${carouselPagesHtml}
+            </div>
+          </div>
+        </div>
+        <div class="sp-pagination">
+            ${paginationHtml}
+        </div>
+        <div id="sp-analysis-tooltip"></div>
+      `;
+
+      overlay.appendChild(modalContainer);
+      document.body.appendChild(overlay);
+
+      const setupToggle = (toggleId, storageKey, viewA, viewB, updateCb) => {
+          const container = modalContainer.querySelector(toggleId);
+          if (!container) return;
+          const btnA = container.querySelector(`[data-view="${viewA}"]`);
+          const btnB = container.querySelector(`[data-view="${viewB}"]`);
+          if (!btnA || !btnB) return;
+          
+          let currentMode = localStorage.getItem(storageKey) || viewA;
+          
+          const applyView = () => {
+              btnA.classList.toggle('active', currentMode === viewA);
+              btnB.classList.toggle('active', currentMode === viewB);
+              updateCb(currentMode);
+          };
+          
+          applyView();
+          
+          btnA.addEventListener('click', (e) => { e.stopPropagation(); currentMode = viewA; localStorage.setItem(storageKey, currentMode); applyView(); });
+          btnB.addEventListener('click', (e) => { e.stopPropagation(); currentMode = viewB; localStorage.setItem(storageKey, currentMode); applyView(); });
+      };
+
+      const chartBar = modalContainer.querySelector('#timeline-chart-bar');
+      const chartEras = modalContainer.querySelector('#timeline-chart-eras');
+      const titleSuffix = modalContainer.querySelector('#timeline-title-suffix');
+      
+      if (timelinePoints.length > 0 && chartBar && chartEras) {
+          setupToggle('#timeline-toggle-container', 'sort-play-timeline-chart-type', 'bar', 'eras', (mode) => {
+              const isBar = mode === 'bar';
+              chartBar.style.opacity = isBar ? '1' : '0';
+              chartBar.style.pointerEvents = isBar ? 'auto' : 'none';
+              chartBar.style.zIndex = isBar ? '2' : '1';
+              chartEras.style.opacity = isBar ? '0' : '1';
+              chartEras.style.pointerEvents = isBar ? 'none' : 'auto';
+              chartEras.style.zIndex = isBar ? '1' : '2';
+              titleSuffix.innerText = isBar ? '(Release Year Distribution)' : '(Decades & Eras)';
+          });
+      } else {
+          const tc = modalContainer.querySelector('#timeline-toggle-container');
+          if (tc) tc.style.display = 'none';
+          if (chartEras) chartEras.style.display = 'none';
+      }
+
+      const artistChartMap = modalContainer.querySelector('#artist-chart-map');
+      const artistChartList = modalContainer.querySelector('#artist-chart-list');
+      const artistListContent = modalContainer.querySelector('#artist-list-content');
+      const artistTitleSuffix = modalContainer.querySelector('#artist-title-suffix');
+
+      if (artistChartMap && artistChartList) {
+          const maxArtistCount = allSortedArtists[0]?.count || 1;
+          const renderedArtistIndices = new Set();
+
+          const renderVisibleArtists = () => {
+              const scrollTop = artistChartList.scrollTop;
+              const clientHeight = artistChartList.clientHeight || 800;
+              const buffer = 15;
+              const itemHeight = 44; 
+              const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - buffer);
+              const endIndex = Math.min(allSortedArtists.length - 1, Math.ceil((scrollTop + clientHeight) / itemHeight) + buffer);
+
+              const newIndices = new Set();
+              for (let i = startIndex; i <= endIndex; i++) newIndices.add(i);
+
+              for (let idx of renderedArtistIndices) {
+                  if (!newIndices.has(idx)) {
+                      const el = artistListContent.querySelector(`[data-idx="${idx}"]`);
+                      if (el) el.remove();
+                      renderedArtistIndices.delete(idx);
+                  }
+              }
+
+              let htmlToAppend = "";
+              for (let i = startIndex; i <= endIndex; i++) {
+                  if (!renderedArtistIndices.has(i)) {
+                      const a = allSortedArtists[i];
+                      const globalRank = i + 1;
+                      const widthPct = Math.max((a.count / maxArtistCount) * 100, 1);
+                      
+                      htmlToAppend += `
+                          <div class="sp-artist-list-item" data-idx="${i}" style="position: absolute; top: ${i * itemHeight}px; left: 0; width: 100%;">
+                              <div class="sp-artist-list-bar" style="width: ${widthPct}%; background: linear-gradient(90deg, rgba(${cR}, ${cG}, ${cB}, 0.45) 0%, rgba(${cR}, ${cG}, ${cB}, 0.15) 100%); border-left: 3px solid rgb(${cR}, ${cG}, ${cB});"></div>
+                              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 8px; z-index: 2; pointer-events: none;">
+                                  <div style="display: flex; align-items: center; gap: ${globalRank > 99 ? '12px' : '14px'}; min-width: 0;">
+                                      <span style="font-weight: 800; color: rgba(255,255,255,0.3); font-size: 11px; width: ${globalRank > 99 ? '30px' : '28px'}; text-align: right; letter-spacing: 0.5px; flex-shrink: 0;">#${globalRank}</span>
+                                      <span style="font-weight: 700; color: rgba(255,255,255,0.95); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 4px rgba(0,0,0,0.3);" title="${escapeHtml(a.name)}">${escapeHtml(a.name)}</span>
+                                  </div>
+                                  <div style="font-weight: 500; color: rgba(255,255,255,0.5); font-size: 12px; white-space: nowrap; flex-shrink: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                                      <span style="color: #fff; font-weight: 700;">${a.count}</span><span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; margin-left: 4px;">${a.count === 1 ? 'track' : 'tracks'}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      `;
+                      renderedArtistIndices.add(i);
+                  }
+              }
+
+              if (htmlToAppend) {
+                  artistListContent.insertAdjacentHTML('beforeend', htmlToAppend);
+              }
+          };
+
+          setupToggle('#artist-toggle-container', 'sort-play-artist-chart-type', 'map', 'list', (mode) => {
+              const isMap = mode === 'map';
+              artistChartMap.style.opacity = isMap ? '1' : '0';
+              artistChartMap.style.pointerEvents = isMap ? 'auto' : 'none';
+              artistChartMap.style.zIndex = isMap ? '2' : '1';
+              artistChartList.style.opacity = isMap ? '0' : '1';
+              artistChartList.style.pointerEvents = isMap ? 'none' : 'auto';
+              artistChartList.style.zIndex = isMap ? '1' : '2';
+              artistTitleSuffix.innerText = isMap ? '(Treemap)' : '(Full Ranking)';
+              if (!isMap && renderedArtistIndices.size === 0) renderVisibleArtists();
+          });
+
+          let artistScrollTicking = false;
+          artistChartList.addEventListener('scroll', () => {
+              if (!artistScrollTicking) {
+                  window.requestAnimationFrame(() => {
+                      renderVisibleArtists();
+                      artistScrollTicking = false;
+                  });
+                  artistScrollTicking = true;
+              }
+          });
+      }
+
+      const albumChartMap = modalContainer.querySelector('#album-chart-map');
+      const albumChartList = modalContainer.querySelector('#album-chart-list');
+      const albumListContent = modalContainer.querySelector('#album-list-content');
+      const albumTitleSuffix = modalContainer.querySelector('#album-title-suffix');
+
+      if (albumChartMap && albumChartList) {
+          const maxAlbumCount = allSortedAlbums[0]?.count || 1;
+          const renderedAlbumIndices = new Set();
+
+          const renderVisibleAlbums = () => {
+              const scrollTop = albumChartList.scrollTop;
+              const clientHeight = albumChartList.clientHeight || 800;
+              const buffer = 15;
+              const itemHeight = 50; 
+              const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - buffer);
+              const endIndex = Math.min(allSortedAlbums.length - 1, Math.ceil((scrollTop + clientHeight) / itemHeight) + buffer);
+
+              const newIndices = new Set();
+              for (let i = startIndex; i <= endIndex; i++) newIndices.add(i);
+
+              for (let idx of renderedAlbumIndices) {
+                  if (!newIndices.has(idx)) {
+                      const el = albumListContent.querySelector(`[data-idx="${idx}"]`);
+                      if (el) el.remove();
+                      renderedAlbumIndices.delete(idx);
+                  }
+              }
+
+              let htmlToAppend = "";
+              for (let i = startIndex; i <= endIndex; i++) {
+                  if (!renderedAlbumIndices.has(i)) {
+                      const a = allSortedAlbums[i];
+                      const globalRank = i + 1;
+                      const widthPct = Math.max((a.count / maxAlbumCount) * 100, 1);
+                      
+                      htmlToAppend += `
+                          <div class="sp-artist-list-item sp-album-list-item" data-idx="${i}" style="position: absolute; top: ${i * itemHeight}px; left: 0; width: 100%;">
+                              <div class="sp-artist-list-bar" style="width: ${widthPct}%; background: linear-gradient(90deg, rgba(${cR}, ${cG}, ${cB}, 0.45) 0%, rgba(${cR}, ${cG}, ${cB}, 0.15) 100%); border-left: 3px solid rgb(${cR}, ${cG}, ${cB});"></div>
+                              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 14px 0 8px; z-index: 2; pointer-events: none;">
+                                  <div style="display: flex; align-items: center; gap: ${globalRank > 99 ? '12px' : '14px'}; min-width: 0; flex: 1;">
+                                      <span style="font-weight: 800; color: rgba(255,255,255,0.3); font-size: 11px; width: ${globalRank > 99 ? '30px' : '28px'}; text-align: right; letter-spacing: 0.5px; flex-shrink: 0;">#${globalRank}</span>
+                                      <div style="display: flex; flex-direction: column; overflow: hidden; min-width: 0;">
+                                          <span style="font-weight: 700; color: rgba(255,255,255,0.95); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 4px rgba(0,0,0,0.3); line-height: 1.2;" title="${escapeHtml(a.name)}">${escapeHtml(a.name)}</span>
+                                          <span style="font-weight: 500; color: rgba(255,255,255,0.5); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;" title="${escapeHtml(a.artist)}">${escapeHtml(a.artist)}</span>
+                                      </div>
+                                  </div>
+                                  <div style="font-weight: 500; color: rgba(255,255,255,0.5); font-size: 12px; white-space: nowrap; flex-shrink: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-left: 10px;">
+                                      <span style="color: #fff; font-weight: 700;">${a.count}</span><span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; margin-left: 4px;">${a.count === 1 ? 'track' : 'tracks'}</span>
+                                  </div>
+                              </div>
+                          </div>
+                      `;
+                      renderedAlbumIndices.add(i);
+                  }
+              }
+
+              if (htmlToAppend) {
+                  albumListContent.insertAdjacentHTML('beforeend', htmlToAppend);
+              }
+          };
+
+          setupToggle('#album-toggle-container', 'sort-play-album-chart-type', 'map', 'list', (mode) => {
+              const isMap = mode === 'map';
+              albumChartMap.style.opacity = isMap ? '1' : '0';
+              albumChartMap.style.pointerEvents = isMap ? 'auto' : 'none';
+              albumChartMap.style.zIndex = isMap ? '2' : '1';
+              albumChartList.style.opacity = isMap ? '0' : '1';
+              albumChartList.style.pointerEvents = isMap ? 'none' : 'auto';
+              albumChartList.style.zIndex = isMap ? '1' : '2';
+              albumTitleSuffix.innerText = isMap ? '(Treemap)' : '(Full Ranking)';
+              if (!isMap && renderedAlbumIndices.size === 0) renderVisibleAlbums();
+          });
+
+          let albumScrollTicking = false;
+          albumChartList.addEventListener('scroll', () => {
+              if (!albumScrollTicking) {
+                  window.requestAnimationFrame(() => {
+                      renderVisibleAlbums();
+                      albumScrollTicking = false;
+                  });
+                  albumScrollTicking = true;
+              }
+          });
+      }
+
+      const vibeChartRing = modalContainer.querySelector('#vibe-chart-ring');
+      const vibeChartHeatmap = modalContainer.querySelector('#vibe-chart-heatmap');
+      const vibeTitleSuffix = modalContainer.querySelector('#vibe-title-suffix');
+      
+      if (vibePoints.length > 0 && vibeChartRing && vibeChartHeatmap) {
+          setupToggle('#vibe-toggle-container', 'sort-play-vibe-chart-type', 'ring', 'heatmap', (mode) => {
+              const isRing = mode === 'ring';
+              vibeChartRing.style.opacity = isRing ? '1' : '0';
+              vibeChartRing.style.pointerEvents = isRing ? 'auto' : 'none';
+              vibeChartRing.style.zIndex = isRing ? '2' : '1';
+              vibeChartHeatmap.style.opacity = isRing ? '0' : '1';
+              vibeChartHeatmap.style.pointerEvents = isRing ? 'none' : 'auto';
+              vibeChartHeatmap.style.zIndex = isRing ? '1' : '2';
+              vibeTitleSuffix.innerText = isRing ? '(The Mood Ring)' : '(Vibe Heatmap)';
+          });
+      } else {
+          const tc = modalContainer.querySelector('#vibe-toggle-container');
+          if (tc) tc.style.display = 'none';
+          if (vibeChartHeatmap) vibeChartHeatmap.style.display = 'none';
+      }
+
+      modalContainer.querySelector('#closeAnalysisX').onclick = closeModal;
+
+      const openVibeFilterBtn = modalContainer.querySelector('#sp-analysis-open-vibe-filter');
+      if (openVibeFilterBtn) {
+          openVibeFilterBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const tracksWithVibesForFilter = tracks.map(track => {
+                  const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+                  const features = statsMap[trackId] || {};
+                  const vibeScores = calculateTrackVibeScores(features);
+                  return { ...track, features, vibeScores };
+              });
+              showVibeFilterModal(tracksWithVibesForFilter, currentEntityUri, sourceDetails);
+          });
+      }
+
+      const tooltip = modalContainer.querySelector('#sp-analysis-tooltip');
+      
+      let lastHoveredTarget = null;
+      let isTooltipVisible = false;
+      let cachedEraElements = null;
+      let cachedTooltipDims = { w: 0, h: 0 };
+      let cachedTargetRect = { top: 0, left: 0, width: 0, height: 0 };
+      let tooltipHideTimeout = null;
+
+      const resetEraStyles = () => {
+          if (!cachedEraElements) cachedEraElements = modalContainer.querySelectorAll('.sp-era-element');
+          cachedEraElements.forEach(el => {
+              const isCard = !!el.style.borderTop;
+              if (!isCard) {
+                  const baseOpacity = el.getAttribute('data-base-opacity') || '1';
+                  el.style.opacity = baseOpacity;
+                  el.style.filter = 'none';
+              } else {
+                  el.style.background = 'rgba(255,255,255,0.04)'; 
+                  el.style.boxShadow = '0 4px 10px rgba(0,0,0,0.2)';
+              }
+          });
+      };
+
+      const forceHideTooltip = () => {
+          if (tooltipHideTimeout) {
+              clearTimeout(tooltipHideTimeout);
+              tooltipHideTimeout = null;
+          }
+          if (isTooltipVisible) {
+              tooltip.style.display = 'none';
+              isTooltipVisible = false;
+              if (lastHoveredTarget && lastHoveredTarget.classList.contains('sp-era-element')) {
+                  resetEraStyles();
+              }
+              lastHoveredTarget = null;
+          }
+      };
+
+      modalContainer.addEventListener('mousemove', (e) => {
+        let targetEl = e.target;
+        if (!targetEl || targetEl.nodeType !== 1) return;
+        
+        let isDot = targetEl.classList.contains('sp-chart-dot');
+        let isSeg = targetEl.classList.contains('sp-chart-segment');
+        let isEra = targetEl.classList.contains('sp-era-element');
+        let isHex = targetEl.classList.contains('sp-hex-bin');
+        let isVibeItem = targetEl.classList.contains('sp-vibe-breakdown-item');
+        let isRadarLabel = targetEl.classList.contains('sp-radar-label');
+
+        if (!isEra && !isDot && !isSeg && !isHex && !isVibeItem && !isRadarLabel && targetEl.closest) {
+            const eraEl = targetEl.closest('.sp-era-element');
+            if (eraEl) { targetEl = eraEl; isEra = true; }
+            const vibeEl = targetEl.closest('.sp-vibe-breakdown-item');
+            if (vibeEl) { targetEl = vibeEl; isVibeItem = true; }
+            const radarEl = targetEl.closest('.sp-radar-label');
+            if (radarEl) { targetEl = radarEl; isRadarLabel = true; }
+        }
+        
+        if (!isDot && !isSeg && !isEra && !isHex && !isVibeItem && !isRadarLabel) {
+          if (isTooltipVisible && !tooltipHideTimeout) {
+              tooltipHideTimeout = setTimeout(forceHideTooltip, 150);
+          }
+          return;
+        }
+
+        if (tooltipHideTimeout) {
+            clearTimeout(tooltipHideTimeout);
+            tooltipHideTimeout = null;
+        }
+        
+        if (targetEl !== lastHoveredTarget) {
+            if (lastHoveredTarget && lastHoveredTarget.classList.contains('sp-era-element') && (!isEra || targetEl.getAttribute('data-era-decade') !== lastHoveredTarget.getAttribute('data-era-decade'))) {
+                resetEraStyles();
+            }
+
+            lastHoveredTarget = targetEl;
+
+            if (isEra) {
+                const decade = targetEl.getAttribute('data-era-decade');
+                const pct = targetEl.getAttribute('data-era-pct');
+                const artists = targetEl.getAttribute('data-era-artists');
+                const genres = targetEl.getAttribute('data-era-genres');
+                const trackCount = targetEl.getAttribute('data-era-tracks');
+
+                if (!cachedEraElements) cachedEraElements = modalContainer.querySelectorAll('.sp-era-element');
+                cachedEraElements.forEach(el => {
+                    const isCard = !!el.style.borderTop;
+                    if (el.getAttribute('data-era-decade') !== decade) {
+                        if (!isCard) {
+                            el.style.opacity = '0.3';
+                            el.style.filter = 'grayscale(0.6)';
+                        } else {
+                            el.style.background = 'rgba(255,255,255,0.04)';
+                            el.style.boxShadow = '0 4px 10px rgba(0,0,0,0.2)';
+                        }
+                    } else {
+                        if (!isCard) {
+                            el.style.opacity = '1';
+                            el.style.filter = 'none';
+                        } else {
+                            el.style.background = 'rgba(255,255,255,0.04)'; 
+                            el.style.boxShadow = `0 4px 10px rgba(0,0,0,0.2), inset 0 0 0 1px ${dominantColorHex}`;
+                        }
+                    }
+                });
+
+                tooltip.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 12px; min-width: 240px; max-width: 320px; padding: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                            <span style="font-weight: 800; font-size: 20px; color: #fff; letter-spacing: 0.5px;">${decade}s</span>
+                            <span style="font-size: 12px; font-weight: 800; color: ${lighterDominantColorHex}; background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 12px;">${escapeHtml(pct)}</span>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <span style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px;">Top Artists</span>
+                            <span style="font-size: 14px; font-weight: 600; color: #fff; white-space: normal; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${artists}</span>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <span style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px;">Top Genres</span>
+                            <span style="font-size: 14px; font-weight: 600; color: #fff; white-space: normal; line-height: 1.5; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">${genres}</span>
+                        </div>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.05);">
+                            <span style="font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px;">Total Tracks</span>
+                            <span style="font-size: 15px; font-weight: 800; color: #fff;">${trackCount}</span>
+                        </div>
+                    </div>
+                `;
+            } else if (isHex) {
+                const count = targetEl.getAttribute('data-hex-count');
+                const tracksStr = targetEl.getAttribute('data-hex-tracks');
+                const valEnergy = targetEl.getAttribute('data-hex-val');
+                
+                const trackHtml = tracksStr.split('||').map((t, idx) => {
+                    const [title, artist, val, eng] = t.split(';;');
+                    return `<div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 4px; background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 6px; gap: 16px;">
+                              <div style="display:flex; flex-direction:column; min-width: 0;">
+                                <span style="font-size:12px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 170px;">${idx + 1}. ${title}</span>
+                                <span style="font-size:10px; color:rgba(255,255,255,0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 170px;">${artist}</span>
+                              </div>
+                              <span style="font-size:9px; font-weight:800; color:${lighterDominantColorHex}; background:rgba(255,255,255,0.1); padding: 3px 6px; border-radius: 4px; flex-shrink: 0; text-align: center; line-height: 1.2;">H: ${val}%<br>E: ${eng}%</span>
+                            </div>`;
+                }).join('');
+                
+                tooltip.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 10px; min-width: 220px; padding: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">
+                            <span style="font-weight: 800; font-size: 14px; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">${count} Track${count === '1' ? '' : 's'} Here</span>
+                            <span style="font-size: 11px; font-weight: 800; color: ${lighterDominantColorHex}; background: rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 8px; white-space: nowrap;">Avg ${valEnergy}</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-size: 10px; font-weight: 800; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Top Tracks in Area</span>
+                            ${trackHtml}
+                        </div>
+                    </div>
+                `;
+            } else if (isVibeItem) {
+                const vibeName = targetEl.getAttribute('data-vibe-name');
+                const vibePct = targetEl.getAttribute('data-vibe-pct');
+                const vibeDesc = targetEl.getAttribute('data-vibe-desc');
+                const tracksStr = targetEl.getAttribute('data-vibe-tracks');
+                
+                let trackHtml = '<div style="color:rgba(255,255,255,0.5); font-size:11px; margin-top: 4px;">No strongly defining tracks for this vibe</div>';
+                if (tracksStr) {
+                    trackHtml = tracksStr.split('||').map((t, idx) => {
+                        const [title, artist, match] = t.split(';;');
+                        return `<div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 4px; background: rgba(255,255,255,0.05); padding: 6px 8px; border-radius: 6px; gap: 16px;">
+                                  <div style="display:flex; flex-direction:column; min-width: 0;">
+                                    <span style="font-size:12px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 180px;">${idx + 1}. ${title}</span>
+                                    <span style="font-size:10px; color:rgba(255,255,255,0.5); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 180px;">${artist}</span>
+                                  </div>
+                                  <span style="font-size:10px; font-weight:800; color:${lighterDominantColorHex}; background:rgba(255,255,255,0.1); padding: 3px 6px; border-radius: 4px; flex-shrink: 0;">${match}% Match</span>
+                                </div>`;
+                    }).join('');
+                }
+                
+                tooltip.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 10px; width: 300px; box-sizing: border-box; padding: 6px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 800; font-size: 14px; color: #fff; text-transform: uppercase; letter-spacing: 0.5px;">${vibeName}</span>
+                            <span style="font-size: 11px; font-weight: 800; color: ${lighterDominantColorHex}; background: rgba(255,255,255,0.1); padding: 3px 8px; border-radius: 8px;">${vibePct} of Playlist</span>
+                        </div>
+                        <div style="border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
+                            <div style="font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.7); line-height: 16px; height: 32px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                ${vibeDesc}
+                            </div>
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <span style="font-size: 10px; font-weight: 800; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Strongest Matches</span>
+                            ${trackHtml}
+                        </div>
+                    </div>
+                `;
+            } else if (isRadarLabel) {
+                const fName = targetEl.getAttribute('data-feature-name');
+                const fVal = targetEl.getAttribute('data-feature-val');
+                const fDesc = targetEl.getAttribute('data-feature-desc');
+                tooltip.innerHTML = `
+                    <div style="display: flex; flex-direction: column; gap: 8px; min-width: 180px; max-width: 240px; padding: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px;">
+                            <span style="font-weight: 800; font-size: 13px; color: #fff;">${fName}</span>
+                            <span style="font-size: 12px; font-weight: 800; color: ${lighterDominantColorHex};">${fVal}</span>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); white-space: normal; line-height: 1.4;">
+                            ${fDesc}
+                        </div>
+                    </div>
+                `;
+            } else {
+                const valText = targetEl.getAttribute('data-val');
+                const artistText = targetEl.getAttribute('data-artist');
+                tooltip.innerHTML = `
+                  <span style="color: #fff; font-weight: 700; font-size: 14px;">${targetEl.getAttribute('data-title')}</span>
+                  ${artistText && artistText !== 'null' ? `<span style="color: rgba(255,255,255,0.7); font-size: 12px;">${artistText}</span>` : ''}
+                  ${valText ? `<span style="color: ${lighterDominantColorHex}; margin-top: 4px; font-weight: 600;">${valText}</span>` : ''}
+                `;
+            }
+            
+            tooltip.style.display = 'flex';
+            isTooltipVisible = true;
+            
+            cachedTooltipDims.w = tooltip.offsetWidth;
+            cachedTooltipDims.h = tooltip.offsetHeight;
+            
+            const rect = targetEl.getBoundingClientRect();
+            cachedTargetRect = { top: rect.top, left: rect.left, bottom: rect.bottom, width: rect.width, height: rect.height };
+        }
+        
+        let tX, tY;
+        const isTimelineSeg = isSeg && targetEl.closest('#timeline-chart-bar');
+
+        if (isEra) {
+            const isCard = !!targetEl.style.borderTop;
+            tX = cachedTargetRect.left + (cachedTargetRect.width / 2) - (cachedTooltipDims.w / 2);
+
+            if (isCard) {
+                tY = cachedTargetRect.bottom + 10;
+                if (tY + cachedTooltipDims.h > window.innerHeight - 10) {
+                    tY = cachedTargetRect.top - cachedTooltipDims.h - 10;
+                }
+            } else {
+                const parentAxis = targetEl.closest('.sp-chart-axis-anim');
+                const topRef = parentAxis ? parentAxis.getBoundingClientRect().top : cachedTargetRect.top;
+                tY = topRef - cachedTooltipDims.h - 10;
+                
+                if (tY < 10) {
+                    tY = cachedTargetRect.bottom + 10;
+                }
+            }
+            
+            if (tX < 10) tX = 10;
+            if (tX + cachedTooltipDims.w > window.innerWidth - 10) tX = window.innerWidth - cachedTooltipDims.w - 10;
+            
+        } else if (isTimelineSeg) {
+            const svgContainer = targetEl.closest('svg');
+            const svgRect = svgContainer ? svgContainer.getBoundingClientRect() : cachedTargetRect;
+            
+            tX = cachedTargetRect.left + (cachedTargetRect.width / 2) - (cachedTooltipDims.w / 2);
+            tY = svgRect.top - cachedTooltipDims.h - 10;
+            
+            if (tY < 10) {
+                tY = svgRect.bottom + 10;
+            }
+            if (tX < 10) tX = 10;
+            if (tX + cachedTooltipDims.w > window.innerWidth - 10) tX = window.innerWidth - cachedTooltipDims.w - 10;
+            
+        } else if (isRadarLabel) {
+            tX = cachedTargetRect.left + (cachedTargetRect.width / 2) - (cachedTooltipDims.w / 2);
+            tY = cachedTargetRect.top - cachedTooltipDims.h - 15;
+            
+            if (tY < 10) {
+                tY = cachedTargetRect.bottom + 15;
+            }
+            if (tX < 10) tX = 10;
+            if (tX + cachedTooltipDims.w > window.innerWidth - 10) tX = window.innerWidth - cachedTooltipDims.w - 10;
+            
+        } else if (isSeg) {
+            tX = e.clientX - (cachedTooltipDims.w / 2);
+            tY = e.clientY - cachedTooltipDims.h - 15;
+        } else if (isVibeItem) {
+            tX = e.clientX + 15;
+            tY = e.clientY - (cachedTooltipDims.h / 2);
+            
+            if (tX + cachedTooltipDims.w > window.innerWidth - 10) {
+                tX = e.clientX - cachedTooltipDims.w - 15;
+            }
+            if (tY + cachedTooltipDims.h > window.innerHeight - 10) {
+                tY = window.innerHeight - cachedTooltipDims.h - 10;
+            }
+            if (tY < 10) tY = 10;
+        } else {
+            tX = cachedTargetRect.left + (cachedTargetRect.width / 2) - (cachedTooltipDims.w / 2);
+            tY = cachedTargetRect.top - cachedTooltipDims.h - 15;
+        }
+        
+        if (!isEra && !isTimelineSeg && !isRadarLabel) {
+            if (tX < 10) tX = 10;
+            if (tX + cachedTooltipDims.w > window.innerWidth - 10) tX = window.innerWidth - cachedTooltipDims.w - 10;
+            if (tY < 10) {
+                tY = isSeg ? e.clientY + 20 : cachedTargetRect.bottom + 15;
+            }
+        }
+        
+        tooltip.style.transform = `translate3d(${Math.round(tX)}px, ${Math.round(tY)}px, 0)`;
+      });
+
+      modalContainer.addEventListener('mouseleave', forceHideTooltip);
+      modalContainer.addEventListener('scroll', forceHideTooltip, true);
+
+      const carouselViewport = modalContainer.querySelector('#carousel-viewport');
+      const carouselPages = modalContainer.querySelectorAll('.carousel-page');
+      const pageDots = modalContainer.querySelectorAll('.sp-page-dot');
+
+      if (carouselViewport && carouselPages.length === pageDots.length) {
+          let isNavigating = false;
+          let navTimeout = null;
+          
+          let wheelLock = false;
+          let lastDelta = 0;
+          let lastNavTime = 0;
+          let wheelResetTimeout = null;
+
+          carouselViewport.addEventListener('wheel', (e) => {
+              const innerScroll = e.target.closest('.scrollable-content');
+              if (innerScroll) {
+                  const canScrollUp = innerScroll.scrollTop > 0;
+                  const canScrollDown = Math.ceil(innerScroll.scrollTop + innerScroll.clientHeight) < innerScroll.scrollHeight;
+                  if ((e.deltaY < 0 && canScrollUp) || (e.deltaY > 0 && canScrollDown)) {
+                      return; 
+                  }
+              }
+
+              e.preventDefault();
+
+              const delta = Math.abs(e.deltaY);
+              const now = Date.now();
+
+              const isAcceleration = delta > lastDelta * 1.8 && delta > 25;
+              const isTimeElapsed = now - lastNavTime > 500;
+
+              if (wheelLock && (isAcceleration || isTimeElapsed)) {
+                  wheelLock = false;
+              }
+
+              lastDelta = delta;
+
+              clearTimeout(wheelResetTimeout);
+              wheelResetTimeout = setTimeout(() => { 
+                  wheelLock = false; 
+                  lastDelta = 0; 
+              }, 250);
+
+              if (wheelLock || delta < 15) return;
+
+              let currentIndex = Array.from(pageDots).findIndex(d => d.classList.contains('active'));
+              if (currentIndex === -1) currentIndex = 0;
+
+              let nextIndex = e.deltaY > 0 
+                  ? Math.min(currentIndex + 1, carouselPages.length - 1)
+                  : Math.max(currentIndex - 1, 0);
+              
+              if (nextIndex !== currentIndex) {
+                  wheelLock = true;
+                  lastNavTime = now;
+                  isNavigating = true;
+                  
+                  pageDots.forEach((d, i) => d.classList.toggle('active', i === nextIndex));
+                  
+                  const targetPage = carouselPages[nextIndex];
+                  const targetY = targetPage.offsetTop - (carouselViewport.clientHeight / 2) + (targetPage.clientHeight / 2);
+                  carouselViewport.scrollTo({ top: targetY, behavior: 'smooth' });
+
+                  clearTimeout(navTimeout);
+                  navTimeout = setTimeout(() => { isNavigating = false; }, 600);
+              }
+          }, { passive: false });
+
+          pageDots.forEach((dot, index) => {
+              dot.addEventListener('click', (e) => {
+                  e.stopPropagation();
+                  
+                  wheelLock = true;
+                  lastNavTime = Date.now();
+                  isNavigating = true;
+                  
+                  pageDots.forEach((d, i) => d.classList.toggle('active', i === index));
+                  
+                  const targetPage = carouselPages[index];
+                  const targetY = targetPage.offsetTop - (carouselViewport.clientHeight / 2) + (targetPage.clientHeight / 2);
+                  carouselViewport.scrollTo({ top: targetY, behavior: 'smooth' });
+                  
+                  clearTimeout(navTimeout);
+                  navTimeout = setTimeout(() => { isNavigating = false; }, 600);
+              });
+          });
+
+          const pageObserver = new IntersectionObserver((entries) => {
+              if (isNavigating) return;
+
+              let maxVisible = null;
+              let maxRatio = 0;
+              entries.forEach(entry => {
+                  if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
+                      maxRatio = entry.intersectionRatio;
+                      maxVisible = entry.target;
+                  }
+              });
+              
+              if (maxVisible && maxRatio > 0.2) {
+                  const idx = Array.from(carouselPages).indexOf(maxVisible);
+                  if (idx !== -1) {
+                      pageDots.forEach((d, i) => d.classList.toggle('active', i === idx));
+                  }
+              }
+          }, {
+              root: carouselViewport,
+              threshold: [0.2, 0.4, 0.6, 0.8, 1.0]
+          });
+
+          carouselPages.forEach(page => pageObserver.observe(page));
+      }
+
+    } catch (err) {
+      console.error("Error in playlist analysis:", err);
+      throw err;
+    }
+  }
+
   async function getOrCreateDedicatedPlaylist(sortType, name, description, maxRetries = 5, initialDelay = 1000) {
     const actualSortType = sortType.startsWith('tastemakerProfile_') ? 'tastemakerProfile' : sortType;
     const dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
@@ -27727,10 +31860,10 @@ const getDominantColor = (src) => {
                 delete dedicatedPlaylistMap[sortType];
                 localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
                 
-                let currentMetaMap = JSON.parse(window.localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
+                let currentMetaMap = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
                 if (currentMetaMap[sortType]) {
                     delete currentMetaMap[sortType];
-                    window.localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(currentMetaMap));
+                    localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(currentMetaMap));
                 }
             }
         }
@@ -27956,6 +32089,7 @@ const getDominantColor = (src) => {
                                 id: d.uri.split(':')[2],
                                 uri: d.uri,
                                 name: d.name,
+                                explicit: d.explicit || false,
                                 artists: d.artists?.items?.map(a => ({
                                     name: a.profile?.name,
                                     uri: a.uri,
@@ -28084,15 +32218,138 @@ const getDominantColor = (src) => {
   const softGte = (val, t, m = 0.15) => spMath.clamp((val - (t - m)) / (2 * m), 0, 1);
   const softLte = (val, t, m = 0.15) => spMath.clamp(((t + m) - val) / (2 * m), 0, 1);
 
+  const MUSIC_MODEL_MAP = {
+    "chill": { M: 1.0 }, "nostalgia": { M: 1.0 }, "easy listening": { M: 1.0 }, "relaxing": { M: 1.0 },
+    "slow": { M: 1.0 }, "mellow": { M: 1.0 }, "love": { M: 1.0 }, "soft": { M: 1.0 },
+    "melancholy": { M: 1.0 }, "moody": { M: 1.0 }, "calm": { M: 1.0 }, "sad": { M: 1.0 },
+    "romantic": { M: 1.0 }, "tranquil": { M: 1.0 }, "smooth": { M: 1.0 }, "quiet": { M: 1.0 },
+    "dark": { M: 1.0 }, "acoustic": { M: 0.8, U: 0.2 }, "lounge": { M: 1.0 }, "chill beats": { M: 0.8, C: 0.2 },
+    "emotional": { M: 1.0 }, "new age": { M: 0.8, S: 0.2 }, "downtempo": { M: 0.7, C: 0.3 }, "soothing": { M: 1.0 },
+    "peaceful": { M: 1.0 }, "gentle": { M: 1.0 }, "atmospheric": { M: 0.8, S: 0.2 }, "cozy": { M: 1.0 },
+    "sensual": { M: 1.0 }, "ambient": { M: 0.9, S: 0.1 }, "children's music": { M: 0.8, U: 0.2 }, "ethereal": { M: 0.8, S: 0.2 },
+    "nature": { M: 1.0 }, "rain": { M: 1.0 }, "lullaby": { M: 1.0 }, "chanson": { M: 0.7, S: 0.3 }, "spiritual": { M: 0.6, U: 0.4 },
+    "country": { U: 1.0 }, "singer-songwriter": { U: 0.7, M: 0.3 }, "folk": { U: 0.9, M: 0.1 }, "americana": { U: 1.0 },
+    "gospel": { U: 0.8, S: 0.2 }, "bluegrass": { S: 0.6, U: 0.4 }, "worship": { U: 0.8, M: 0.2 }, "sertanejo": { U: 1.0 },
+    "tejano": { U: 1.0 }, "norte": { U: 1.0 }, "sierre": { U: 1.0 }, "banda": { U: 1.0 },
+    "classical": { S: 1.0 }, "jazz": { S: 1.0 }, "blues": { S: 0.8, U: 0.2 }, "classy": { S: 1.0 },
+    "soundtrack": { S: 0.8, M: 0.2 }, "soul funk": { S: 0.6, C: 0.4 }, "latin": { S: 0.5, C: 0.5 },
+    "orchestral": { S: 1.0 }, "symphony": { S: 1.0 }, "acid jazz": { S: 0.7, C: 0.3 }, "epic": { S: 0.6, I: 0.4 },
+    "swing music": { S: 0.8, C: 0.2 }, "classical piano": { S: 0.9, M: 0.1 }, "gregorian chant": { S: 0.8, M: 0.2 },
+    "tango": { S: 0.9, I: 0.1 }, "bolero": { S: 0.8, M: 0.2 }, "cumbia": { S: 0.6, C: 0.4 }, "mariachi": { S: 0.8, U: 0.2 },
+    "bossa nova": { S: 0.7, M: 0.3 }, "flamenco": { S: 0.8, I: 0.2 }, "samba": { S: 0.7, C: 0.3 }, "big band": { S: 1.0 },
+    "cabaret": { S: 1.0 }, "minimalism": { S: 0.8, M: 0.2 }, "opera": { S: 1.0 },
+    "rock": { I: 1.0 }, "rock and roll": { U: 0.6, I: 0.4 }, "metal": { I: 1.0 }, "hard rock": { I: 1.0 },
+    "aggressive": { I: 1.0 }, "punk": { I: 1.0 }, "angst": { I: 1.0 }, "emo": { I: 0.7, M: 0.3 },
+    "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "rock en espa": { I: 0.9, C: 0.1 },
+    "grunge": { I: 1.0 }, "death metal": { I: 1.0 }, "metalcore": { I: 1.0 }, "screamo": { I: 1.0 },
+    "rockabilly": { I: 0.8, U: 0.2 }, "industrial": { I: 0.8, C: 0.2 }, "hardcore punk": { I: 1.0 },
+    "black metal": { I: 1.0 }, "doom metal": { I: 1.0 },
+    "pop": { U: 0.4, C: 0.4, M: 0.2 }, "electronic": { M: 0.6, C: 0.4 }, "electronica": { M: 0.6, C: 0.4 }, "dance pop": { C: 0.6, U: 0.4 },
+    "dance": { C: 0.6, M: 0.4 }, "electropop": { C: 0.8, M: 0.2 }, "upbeat": { C: 1.0 }, "electro": { C: 0.8, M: 0.2 },
+    "edm": { C: 1.0 }, "fast": { C: 1.0 }, "happy": { C: 0.7, M: 0.3 }, "pump up": { C: 0.8, I: 0.2 },
+    "beats": { C: 0.8, M: 0.2 }, "hip hop": { C: 1.0 }, "club": { C: 1.0 }, "rap": { C: 1.0 },
+    "disco": { C: 1.0 }, "house": { C: 1.0 }, "garage": { C: 1.0 }, "gaming": { C: 0.7, I: 0.3 },
+    "bubblegum pop": { C: 1.0 }, "ibiza": { C: 1.0 }, "funk": { C: 0.8, S: 0.2 }, "techno": { C: 1.0 },
+    "motivation": { C: 0.8, I: 0.2 }, "trap": { C: 1.0 }, "trance": { C: 1.0 }, "funny": { C: 0.8, U: 0.2 },
+    "motown": { C: 0.6, S: 0.4 }, "reggaeton": { C: 1.0 }, "reggae": { S: 0.5, C: 0.5 }, "k-pop": { C: 1.0 },
+    "dub": { C: 0.8, M: 0.2 }, "ska": { C: 0.7, I: 0.3 }, "drum and bass": { C: 0.8, I: 0.2 }, "j-pop": { C: 1.0 },
+    "dubstep": { C: 0.8, I: 0.2 }, "trap latino": { C: 1.0 }, "gangster rap": { C: 1.0 }, "crunk": { C: 1.0 },
+    "hardstyle": { C: 0.8, I: 0.2 }, "hardcore techno": { C: 0.8, I: 0.2 }, "afrobeats": { C: 1.0 }, "dancehall": { C: 1.0 },
+    "funk carioca": { C: 1.0 }, "merengue": { C: 1.0 }, "bachata": { C: 1.0 }, "roots reggae": { S: 0.5, C: 0.3, U: 0.2 },
+    "pop rock": { C: 0.6, I: 0.4 },
+    "alternative rock": { I: 0.7, C: 0.3 },
+    "modern rock": { I: 0.7, C: 0.3 },
+    "indie": { C: 0.5, M: 0.3, U: 0.2 },
+    "classic rock": { I: 0.8, S: 0.2 },
+    "soft rock": { M: 0.7, I: 0.3 },
+    "indie rock": { I: 0.6, C: 0.3, M: 0.1 },
+    "pop rap": { C: 1.0 },
+    "indie pop": { C: 0.6, M: 0.4 },
+    "synthpop": { C: 0.8, M: 0.2 },
+    "alternative pop": { C: 0.7, M: 0.3 },
+    "garage rock": { I: 0.8, U: 0.2 },
+    "r&b": { M: 0.6, C: 0.4 },
+    "electro house": { C: 0.8, I: 0.2 },
+    "roots rock": { I: 0.6, U: 0.4 },
+    "folk rock": { U: 0.6, I: 0.4 },
+    "psychedelic rock": { I: 0.6, S: 0.4 },
+    "pop punk": { I: 0.6, C: 0.4 },
+    "new wave": { C: 0.6, I: 0.4 },
+    "jazz blues": { S: 0.8, U: 0.2 },
+    "britpop": { C: 0.6, I: 0.4 },
+    "folk pop": { U: 0.5, C: 0.3, M: 0.2 },
+    "soul": { M: 0.6, S: 0.4 },
+    "jazz funk": { S: 0.7, C: 0.3 },
+    "trip hop": { C: 0.5, M: 0.3, S: 0.2 },
+    "deep house": { C: 0.8, M: 0.2 },
+    "aor": { I: 0.5, M: 0.3, S: 0.2 },
+    "spooky": { M: 0.5, I: 0.5 },
+    "indie folk": { U: 0.6, M: 0.4 },
+    "chillstep": { C: 0.6, M: 0.4 },
+    "blues rock": { I: 0.7, S: 0.3 },
+    "dream pop": { M: 0.7, C: 0.3 },
+    "funk rock": { I: 0.6, C: 0.4 },
+    "synthwave": { C: 0.6, M: 0.4 },
+    "smooth jazz": { S: 0.7, M: 0.3 },
+    "alternative hip hop": { C: 0.7, S: 0.3 },
+    "country rock": { U: 0.6, I: 0.4 },
+    "post-punk": { I: 0.7, S: 0.3 },
+    "southern hip hop": { C: 1.0 },
+    "vaporwave": { M: 0.6, C: 0.4 },
+    "post-rock": { S: 0.5, I: 0.5 },
+    "shoegaze": { I: 0.6, M: 0.4 }
+  };
+
+  function getTrackMusicProfile(genres, features) {
+      let m = 0, u = 0, s = 0, i = 0, c = 0;
+      let weightSum = 0;
+
+      if (genres && genres.length > 0) {
+          genres.forEach(g => {
+              const model = MUSIC_MODEL_MAP[g.name];
+              if (model) {
+                  const w = g.score || 1;
+                  if (model.M) m += model.M * w;
+                  if (model.U) u += model.U * w;
+                  if (model.S) s += model.S * w;
+                  if (model.I) i += model.I * w;
+                  if (model.C) c += model.C * w;
+                  weightSum += w;
+              }
+          });
+      }
+
+      if (weightSum > 0) {
+          return spMath.normalize([m, u, s, i, c]);
+      }
+
+      if (features && features.energy != null) {
+          const nE = Number(features.energy) / 100;
+          const nA = Number(features.acousticness || 0) / 100;
+          const nI = Number(features.instrumentalness || 0) / 100;
+          const nD = Number(features.danceability || 0) / 100;
+          
+          m = (1 - nE) * nA;
+          u = nA * 0.5 + 0.2; 
+          s = nI * nA + 0.1;
+          i = nE * (1 - nA);
+          c = nD * nE;
+          
+          return spMath.normalize([m, u, s, i, c]);
+      }
+
+      return [0.2, 0.2, 0.2, 0.2, 0.2];
+  }
+  
   const TASTE_ARCHETYPES = [
-    { id: 'dark_intensity', affinity: (f) => softGte(f.energy, 0.6) * softLte(f.valence, 0.4) },
-    { id: 'euphoric', affinity: (f) => softGte(f.energy, 0.6) * softGte(f.valence, 0.6) },
-    { id: 'melancholic', affinity: (f) => softLte(f.energy, 0.4) * softLte(f.valence, 0.4) },
-    { id: 'warm_acoustic', affinity: (f) => softLte(f.energy, 0.5) * softGte(f.acousticness, 0.6) },
-    { id: 'club_banger', affinity: (f) => softGte(f.energy, 0.6) * softGte(f.danceability, 0.7) },
-    { id: 'chill_groove', affinity: (f) => softLte(f.energy, 0.5) * softGte(f.danceability, 0.6) },
-    { id: 'lyrical_heavy', affinity: (f) => softGte(f.speechiness, 0.4) * softLte(f.instrumentalness, 0.2) },
-    { id: 'pure_instrumental', affinity: (f) => softGte(f.instrumentalness, 0.8) }
+    { id: 'dark_intensity', affinity: (f) => softGte(f.energy, 0.7) * softLte(f.valence, 0.35) * softLte(f.acousticness, 0.2) },
+    { id: 'euphoric', affinity: (f) => softGte(f.energy, 0.65) * softGte(f.valence, 0.65) },
+    { id: 'melancholic', affinity: (f) => softLte(f.energy, 0.45) * softLte(f.valence, 0.35) },
+    { id: 'warm_acoustic', affinity: (f) => softLte(f.energy, 0.5) * softGte(f.acousticness, 0.65) },
+    { id: 'club_banger', affinity: (f) => softGte(f.energy, 0.65) * Math.exp(-Math.pow(f.tempo - 120, 2) / 450) * (0.4 + 0.6 * f.danceability) },
+    { id: 'chill_groove', affinity: (f) => softLte(f.energy, 0.55) * Math.exp(-Math.pow(f.tempo - 100, 2) / 600) * (0.5 + 0.5 * f.danceability) },
+    { id: 'lyrical_heavy', affinity: (f) => softGte(f.speechiness, 0.4) * softLte(f.instrumentalness, 0.1) },
+    { id: 'pure_instrumental', affinity: (f) => softGte(f.instrumentalness, 0.8) * softLte(f.speechiness, 0.05) }
   ];
 
   async function buildWeightedTasteCorpus(updateProgress, cachedEnrichedData = new Map(), needFullRebuild = false) {
@@ -28251,6 +32508,7 @@ const getDominantColor = (src) => {
       const getValDist = (obj) => Object.values(obj);
       const entropies = {
           genre: spMath.getNormalizedEntropy(getValDist(profile.genreProfile)),
+          musicModel: spMath.getNormalizedEntropy(profile.musicProfile),
           vibe: spMath.getNormalizedEntropy(profile.vibe1D.energy),
           archetype: spMath.getNormalizedEntropy(getValDist(profile.archetypes)),
           streamCount: spMath.getNormalizedEntropy(profile.globalPlaysHist),
@@ -28262,12 +32520,13 @@ const getDominantColor = (src) => {
       for(const k in entropies) disc[k] = Math.max(0, 1 - entropies[k]);
 
       let weights = {
-          genre: 35,
+          genre: 25,
+          musicModel: 15,
           vibe: 25,
-          archetype: 12,
-          streamCount: 13,
-          tempo: 10,
-          key: 5
+          archetype: 8,
+          streamCount: 11,
+          tempo: 12,
+          key: 4
       };
 
       for(const k in weights) {
@@ -28290,9 +32549,13 @@ const getDominantColor = (src) => {
           let archId = 'none';
           let maxAff = 0;
           const normF = { 
-              energy: f.energy/100, valence: f.valence/100, 
-              danceability: (f.danceability||50)/100, acousticness: (f.acousticness||50)/100,
-              speechiness: (f.speechiness||10)/100, instrumentalness: (f.instrumentalness||0)/100 
+              energy: f.energy !== null ? f.energy/100 : 0.5, 
+              valence: f.valence !== null ? f.valence/100 : 0.5, 
+              danceability: (f.danceability||50)/100, 
+              acousticness: (f.acousticness||50)/100,
+              speechiness: (f.speechiness||10)/100, 
+              instrumentalness: (f.instrumentalness||0)/100,
+              tempo: f.tempo || 120
           };
           for (const arch of TASTE_ARCHETYPES) {
               const aff = arch.affinity(normF);
@@ -28507,6 +32770,13 @@ const getDominantColor = (src) => {
       
       for(let k in featureVars) featureVars[k] = Math.max(0.01, featureVars[k]);
 
+      let musicProfileSum = [0, 0, 0, 0, 0];
+      trackWeights.forEach(tw => {
+          const mVec = tw.item.musicVector || getTrackMusicProfile(tw.item.genres, tw.item.features);
+          for(let j=0; j<5; j++) musicProfileSum[j] += mVec[j] * tw.weight;
+      });
+      const musicProfile = spMath.normalize(musicProfileSum);
+
       let topLabelTokens = topGenres.slice(0, 3).map(g => g[0].replace(/\b\w/g, l => l.toUpperCase())).join(' / ');
       if (!topLabelTokens) topLabelTokens = "Mixed Vibe";
       let topArchetype = Object.entries(archetypes).sort((a,b) => b[1] - a[1])[0];
@@ -28526,7 +32796,8 @@ const getDominantColor = (src) => {
           relativePlaysHist,
           genreMedians,
           featureMeans,
-          featureVars
+          featureVars,
+          musicProfile
       };
 
       profile.adaptiveWeights = calculateAdaptiveWeights(profile, trackWeights);
@@ -28654,7 +32925,7 @@ const getDominantColor = (src) => {
 
           const profile = buildSingleClusterProfile(trackWeights, pmiMatrixObj);
           profile.mass = clusterWeight;
-          profile.trackCount = trackWeights.length;
+          profile.trackCount = Math.round(clusterWeight * corpus.length);
           clusters.push(profile);
       }
 
@@ -28769,10 +33040,12 @@ const getDominantColor = (src) => {
         }
 
         let totalWeight = 0;
-        const featureSums = { e: 0, v: 0, d: 0, a: 0, s: 0, i: 0 };
+        const featureSums = { e: 0, v: 0, d: 0, a: 0, s: 0, i: 0, t: 0 };
         const genreCounts = new Map();
+        let musicProfileSum = [0, 0, 0, 0, 0];
         
-        const fData = { e: [], v: [], d: [], a: [], s: [], i: [] };
+        const fData = { e: [], v: [], d: [], a: [], s: [], i: [], t: [] };
+        const popValues = [];
 
         tracks.forEach(t => {
             const f = t.features;
@@ -28781,6 +33054,10 @@ const getDominantColor = (src) => {
             
             const weight = (hasAnyLiked && isLiked) ? 1.7 : 1.0;
 
+            if (t.popularity !== null && t.popularity !== undefined && !isNaN(t.popularity)) {
+                popValues.push(Number(t.popularity));
+            }
+
             if (f && f.energy !== null) {
                 const e = f.energy / 100;
                 const v = f.valence !== null ? f.valence / 100 : 0.5;
@@ -28788,6 +33065,7 @@ const getDominantColor = (src) => {
                 const a = f.acousticness !== null ? f.acousticness / 100 : 0.5;
                 const s = f.speechiness !== null ? f.speechiness / 100 : 0.1;
                 const i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+                const t = (f.tempo || 120) / 220;
 
                 featureSums.e += e * weight;
                 featureSums.v += v * weight;
@@ -28795,6 +33073,7 @@ const getDominantColor = (src) => {
                 featureSums.a += a * weight;
                 featureSums.s += s * weight;
                 featureSums.i += i * weight;
+                featureSums.t += t * weight;
                 
                 fData.e.push({val: e, weight});
                 fData.v.push({val: v, weight});
@@ -28802,6 +33081,7 @@ const getDominantColor = (src) => {
                 fData.a.push({val: a, weight});
                 fData.s.push({val: s, weight});
                 fData.i.push({val: i, weight});
+                fData.t.push({val: t, weight});
 
                 totalWeight += weight;
             }
@@ -28811,6 +33091,9 @@ const getDominantColor = (src) => {
                     genreCounts.set(g.name, (genreCounts.get(g.name) || 0) + ((g.score || 1) * weight));
                 });
             }
+
+            const mVec = t.musicVector || getTrackMusicProfile(t.genres, t.features);
+            for(let j=0; j<5; j++) musicProfileSum[j] += mVec[j] * weight;
         });
 
         if (totalWeight === 0) return { isValid: false };
@@ -28822,6 +33105,7 @@ const getDominantColor = (src) => {
             a: featureSums.a / totalWeight,
             s: featureSums.s / totalWeight,
             i: featureSums.i / totalWeight,
+            t: featureSums.t / totalWeight,
         };
 
         let totalVar = 0;
@@ -28847,13 +33131,28 @@ const getDominantColor = (src) => {
             genreProfile[name] = count / maxGenreVal;
         });
 
-        return { isValid: true, featureMeans, genreProfile, coherence };
+        const popProfile = new Array(10).fill(0);
+        if (popValues.length > 0) {
+            popValues.forEach(pop => {
+                const bucketIdx = Math.min(9, Math.floor(pop / 10));
+                popProfile[bucketIdx]++;
+            });
+            const maxBucketVal = Math.max(...popProfile, 1);
+            for (let i = 0; i < 10; i++) {
+                popProfile[i] = popProfile[i] / maxBucketVal;
+            }
+        }
+
+        const musicProfile = spMath.normalize(musicProfileSum);
+
+        return { isValid: true, featureMeans, genreProfile, coherence, popProfile, musicProfile };
     }
 
     function scoreTrackAgainstContext(track, context) {
         if (!context.isValid) return 50;
 
         let vibeScore = 50;
+        let hardGateMultiplier = 1.0;
         const f = track.features;
         if (f && f.energy !== null) {
             const e = f.energy / 100;
@@ -28863,16 +33162,25 @@ const getDominantColor = (src) => {
             const s = f.speechiness !== null ? f.speechiness / 100 : 0.1;
             const i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
 
+            if (context.featureMeans.i > 0.80) {
+                if (s > 0.15) hardGateMultiplier *= Math.exp(-(s - 0.15) * 8);
+            } else if (context.featureMeans.s > 0.40) {
+                if (i > 0.50) hardGateMultiplier *= Math.exp(-(i - 0.50) * 6);
+            }
+
+            const t = (f.tempo || 120) / 220;
+
             const calcDist = (val, mean, weight = 1.0) => weight * Math.pow(val - mean, 2);
             
-            let dist = calcDist(e, context.featureMeans.e, 1.5) +
-                       calcDist(v, context.featureMeans.v, 1.5) +
-                       calcDist(d, context.featureMeans.d, 1.0) +
-                       calcDist(a, context.featureMeans.a, 1.0) +
+            let dist = calcDist(e, context.featureMeans.e, 1.6) +
+                       calcDist(v, context.featureMeans.v, 1.6) +
+                       calcDist(t, context.featureMeans.t, 1.3) +
+                       calcDist(a, context.featureMeans.a, 1.1) +
+                       calcDist(d, context.featureMeans.d, 0.4) +
                        calcDist(s, context.featureMeans.s, 0.5) +
                        calcDist(i, context.featureMeans.i, 0.5);
             
-            vibeScore = Math.max(0, 100 * Math.exp(-dist * 1.5));
+            vibeScore = Math.max(0, 100 * Math.exp(-dist * 1.35));
         }
 
         let genreScore = 50;
@@ -28894,7 +33202,21 @@ const getDominantColor = (src) => {
             genreScore = vibeScore;
         }
 
-        return (vibeScore * 0.6) + (genreScore * 0.4);
+        const coh = (context.coherence !== undefined && context.coherence !== null) ? context.coherence : 0.6;
+        const vibeWeight = 0.30 + (0.40 * coh);
+        const musicModelWeight = 0.20;
+        const genreWeight = 1.0 - vibeWeight - musicModelWeight;
+
+        const mVec = track.musicVector || getTrackMusicProfile(track.genres, track.features);
+        const musicModelScore = spMath.cosineSimilarity(mVec, context.musicProfile) * 100;
+
+        let baseScore = ((vibeScore * vibeWeight) + (genreScore * genreWeight) + (musicModelScore * musicModelWeight)) * hardGateMultiplier;
+
+        if (genreScore < 25 && musicModelScore > 80) {
+            baseScore += (musicModelScore - genreScore) * 0.25; 
+        }
+
+        return Math.min(100, baseScore);
     }
 
     function scoreTrackAgainstCluster(track, cluster, pmiMatrix) {
@@ -28938,11 +33260,18 @@ const getDominantColor = (src) => {
         }
 
         let vibeScore = 50, vibeConf = 0.3;
+        let hardGateMultiplier = 1.0;
         const f = track.features;
         if (f && f.energy !== null && f.valence !== null && f.danceability !== null && f.acousticness !== null) {
             const e = f.energy / 100, v = f.valence / 100, d = f.danceability / 100, 
                   a = f.acousticness / 100, s = f.speechiness !== null ? f.speechiness / 100 : 0.1, 
                   i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+
+            if (cluster.featureMeans.i > 0.80) {
+                if (s > 0.15) hardGateMultiplier *= Math.exp(-(s - 0.15) * 8);
+            } else if (cluster.featureMeans.s > 0.40) {
+                if (i > 0.50) hardGateMultiplier *= Math.exp(-(i - 0.50) * 6);
+            }
 
             const getGaussianDistance = (val, mean, variance) => Math.exp(-Math.pow(val - mean, 2) / (2 * variance)) * 100;
             
@@ -28971,7 +33300,7 @@ const getDominantColor = (src) => {
             const jES = getDensityScore2D(cluster.vibe2D.es, e, s, 0, 1);
             
             const avgDistJoint = (distE*distV + distE*distD + distE*distA + distV*distD + distV*distA + distD*distA + distE*distI + distE*distS) / (8 * 100); 
-            let jointScore = (jEV + jED + jEA + jVD + jVA + jDA + jEI + jES) / 8;
+            let jointScore = ((jEV * 1.5) + (jEA * 1.2) + (jVA * 1.2) + (jEI * 1.0) + (jES * 1.0) + (jED * 0.4) + (jVD * 0.4) + (jDA * 0.3)) / 7.0;
             jointScore = Math.max(jointScore, avgDistJoint);
 
             if (cluster.trackCount < 200) {
@@ -28993,9 +33322,13 @@ const getDominantColor = (src) => {
         let archScore = 50, archConf = 0.3;
         if (vibeConf >= 0.6) {
             const normF = { 
-                energy: f.energy/100, valence: f.valence/100, 
-                danceability: (f.danceability||50)/100, acousticness: (f.acousticness||50)/100,
-                speechiness: (f.speechiness||10)/100, instrumentalness: (f.instrumentalness||0)/100 
+                energy: f.energy !== null ? f.energy/100 : 0.5, 
+                valence: f.valence !== null ? f.valence/100 : 0.5, 
+                danceability: (f.danceability||50)/100, 
+                acousticness: (f.acousticness||50)/100,
+                speechiness: (f.speechiness||10)/100, 
+                instrumentalness: (f.instrumentalness||0)/100,
+                tempo: f.tempo || 120
             };
             
             const trackArchVec = TASTE_ARCHETYPES.map(arch => arch.affinity(normF));
@@ -29050,7 +33383,7 @@ const getDominantColor = (src) => {
             const te3 = t*2 <= 220 ? getDensityScore2D(cluster.vibe2D.te, normTd, e, 0, 1) : 0;
             const kde2D = Math.max(te1, te2, te3);
             
-            tempoScore = 0.4 * kde1D + 0.6 * kde2D;
+            tempoScore = 0.3 * kde1D + 0.7 * kde2D;
             tempoConf = 1.0; 
         }
 
@@ -29071,15 +33404,24 @@ const getDominantColor = (src) => {
             keyConf = 1.0;
         }
 
+        const mVec = track.musicVector || getTrackMusicProfile(track.genres, track.features);
+        const musicModelScore = spMath.cosineSimilarity(mVec, cluster.musicProfile) * 100;
+        const musicModelConf = 1.0;
+
+        if (genreScore < 25 && musicModelScore > 80) {
+            noveltyContrib += (musicModelScore - genreScore) * 0.05; 
+        }
+
         const scores = { 
             genre: spMath.clamp(genreScore, 0, 100), 
+            musicModel: spMath.clamp(musicModelScore, 0, 100),
             vibe: spMath.clamp(vibeScore, 0, 100), 
             archetype: spMath.clamp(archScore, 0, 100), 
             streamCount: spMath.clamp(streamScore, 0, 100), 
             tempo: spMath.clamp(tempoScore, 0, 100), 
             key: spMath.clamp(keyScore, 0, 100) 
         };
-        const confs = { genre: genreConf, vibe: vibeConf, archetype: archConf, streamCount: streamConf, tempo: tempoConf, key: keyConf };
+        const confs = { genre: genreConf, musicModel: musicModelConf, vibe: vibeConf, archetype: archConf, streamCount: streamConf, tempo: tempoConf, key: keyConf };
         
         let rawSum = 0, weightSum = 0;
         for (const dim in cluster.adaptiveWeights) {
@@ -29104,6 +33446,8 @@ const getDominantColor = (src) => {
         if (maxDeviation > 25) {
             penalty = Math.max(0.70, 1.0 - 0.30 * ((maxDeviation - 25) / 75));
         }
+        
+        penalty *= hardGateMultiplier;
 
         return { rawScore: meanScore, penalty, noveltyContrib };
     }
@@ -29201,6 +33545,62 @@ const getDominantColor = (src) => {
         return scoredTracks;
     }
 
+    function calculateTrackVibeScores(trackOrFeatures) {
+      const f = trackOrFeatures.features || trackOrFeatures;
+      if (!f || f.energy === null || f.valence === null) return {};
+  
+      const getMatch = (val, ideal, weight) => Math.max(0, 1 - Math.abs(val - ideal)) * weight;
+  
+      const nE = f.energy / 100;
+      const nD = (f.danceability || 0) / 100;
+      const nA = (f.acousticness || 0) / 100;
+      const nI = (f.instrumentalness || 0) / 100;
+      const nV = (f.valence || 0) / 100;
+      const nS = (f.speechiness || 0) / 100;
+      const tRaw = f.tempo || 120;
+      const nT = Math.max(0, Math.min(1, (tRaw - 60) / 120));
+  
+      const scores = {
+          workout: (getMatch(nE, 0.9, 0.45) + getMatch(nT, 0.8, 0.25) + getMatch(nD, 0.7, 0.2) + getMatch(nA, 0.0, 0.1)) * (nE > 0.65 && nD > 0.4 && nA < 0.25 ? 1 : 0.1),
+          party: (getMatch(nV, 0.8, 0.3) + getMatch(nE, 0.8, 0.3) + getMatch(nD, 0.8, 0.3) + getMatch(nA, 0.0, 0.1)) * (nE > 0.55 && nD > 0.60 && nA < 0.30 ? 1 : 0.1),
+          focus: (getMatch(nI, 0.8, 0.5) + getMatch(nA, 0.7, 0.3) + getMatch(nE, 0.2, 0.2)) * (nE < 0.55 && nS < 0.15 && (nI > 0.3 || (nA > 0.8 && nE < 0.25)) ? 1 : 0.1),
+          chill: (getMatch(nA, 0.7, 0.4) + getMatch(nE, 0.3, 0.3) + getMatch(nV, 0.5, 0.2) + getMatch(nD, 0.4, 0.1)) * (nE < 0.65 && nD < 0.85 && tRaw < 160 ? 1 : 0.1),
+          drive: (getMatch(nE, 0.55, 0.3) + getMatch(nD, 0.6, 0.3) + getMatch(nV, 0.4, 0.2) + getMatch(nA, 0.1, 0.2)) * (nE >= 0.3 && nE < 0.8 && nD <= 0.75 && nV <= 0.55 ? 1 : 0.1),
+          morning: (getMatch(nA, 0.6, 0.3) + getMatch(nV, 0.7, 0.3) + getMatch(nE, 0.4, 0.3) + getMatch(nD, 0.5, 0.1)) * (nE < 0.65 && nV > 0.45 && nS < 0.15 ? 1 : 0.1),
+          gaming: (getMatch(nE, 0.85, 0.35) + getMatch(nI, 0.5, 0.25) + getMatch(nT, 0.7, 0.2) + getMatch(nV, 0.3, 0.2)) * (nE > 0.65 && nA < 0.25 && nV < 0.75 ? 1 : 0.1),
+          rainy: (getMatch(nV, 0.2, 0.4) + getMatch(nA, 0.8, 0.3) + getMatch(nE, 0.2, 0.3)) * (nE < 0.55 && nV < 0.55 && nD < 0.65 ? 1 : 0.1),
+          pregame: (getMatch(nE, 0.85, 0.35) + getMatch(nV, 0.65, 0.25) + getMatch(nD, 0.7, 0.2) + getMatch(nT, 0.7, 0.15) + getMatch(nA, 0.0, 0.05)) * (nE > 0.65 && nD > 0.45 && nA < 0.25 ? 1 : 0.1)
+      };
+  
+      const validScores = {};
+      for (const [vibe, score] of Object.entries(scores)) {
+          if (score >= 0.4) {
+              validScores[vibe] = score;
+          }
+      }
+      return validScores;
+  }
+  function evaluateTrackVibeMatch(track, activeVibesMap, strictness) {
+      const keys = Object.keys(activeVibesMap);
+      if (keys.length === 0) return false;
+
+      let maxWeightedScore = 0;
+      
+      for (const [vibe, weight] of Object.entries(activeVibesMap)) {
+          if (weight <= 0) continue;
+          
+          const score = track.vibeScores[vibe] || 0;
+          
+          const weightedScore = score * weight;
+          
+          if (weightedScore > maxWeightedScore) {
+              maxWeightedScore = weightedScore;
+          }
+      }
+      
+      return maxWeightedScore >= strictness;
+  }
+  
   function calculateAudioStatistics(tracksWithFeatures) {
     const features = ['energy', 'valence', 'danceability', 'acousticness', 'tempo'];
     const stats = {
@@ -29242,7 +33642,14 @@ const getDominantColor = (src) => {
         const allLikedSongs = await getLikedSongs();
         const completeLikedSongUrisSet = new Set(allLikedSongs.map(song => song.uri));
         
+        if (!isHeadless) mainButton.innerText = "ISRCs...";
+        const likedIsrcs = await getLikedIsrcsSet(allLikedSongs);
+        const likedTrackIds = allLikedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
+        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
+        
+        const albumFingerprintMap = new Map();
         const likedSongsFingerprintMap = new Map();
+        
         allLikedSongs.forEach(song => {
             const title = song.name.toLowerCase().trim();
             if (!likedSongsFingerprintMap.has(title)) {
@@ -29250,16 +33657,125 @@ const getDominantColor = (src) => {
             }
             const artistUrisForTitle = likedSongsFingerprintMap.get(title);
             song.artistUris.forEach(uri => artistUrisForTitle.add(uri));
+            
+            const id = song.uri.split(':')[2];
+            const meta = cachedLikedMetadata.get(id);
+            if (meta?.external_ids?.isrc) {
+                song.isrc = meta.external_ids.isrc;
+            }
+            
+            if (song.albumName) {
+                const cleanAlbum = getCleanTitle(song.albumName);
+                const primaryArtistUri = song.artistUris?.[0] || song.artistName || "Unknown";
+                const fingerprint = `${cleanAlbum}|${primaryArtistUri}`;
+                
+                if (!albumFingerprintMap.has(fingerprint)) {
+                    albumFingerprintMap.set(fingerprint, new Map());
+                }
+                const trackIdentifier = song.isrc || song.uri;
+                albumFingerprintMap.get(fingerprint).set(trackIdentifier, song.uri);
+            }
         });
+
+        const fetchRadioTracks = async (seedUris) => {
+            if (!seedUris || seedUris.length === 0) return [];
+            const results = [];
+            const CONCURRENCY_LIMIT = 10;
+            const queue = [...seedUris];
+            
+            const worker = async () => {
+                while (queue.length > 0) {
+                    const uri = queue.shift();
+                    try {
+                        let token = Spicetify.Platform.Session.accessToken;
+                        const url = `https://spclient.wg.spotify.com/inspiredby-mix/v2/seed_to_playlist/${uri}?response-format=json`;
+                        let res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+                        
+                        if (res.status === 401) {
+                            if (!internalTokenRefreshPromise) {
+                                internalTokenRefreshPromise = (async () => {
+                                    try {
+                                        const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                                        Spicetify.Platform.Session.accessToken = tokenData.accessToken;
+                                        await new Promise(r => setTimeout(r, 500));
+                                        return tokenData.accessToken;
+                                    } catch(e) { throw e; } finally { internalTokenRefreshPromise = null; }
+                                })();
+                            }
+                            await internalTokenRefreshPromise;
+                            token = Spicetify.Platform.Session.accessToken;
+                            res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+                        }
+                        
+                        if (!res.ok) continue;
+                        const data = await res.json();
+                        const radioUri = data?.mediaItems?.[0]?.uri;
+                        if (!radioUri) continue;
+                        
+                        const playlistContents = await Spicetify.Platform.PlaylistAPI.getContents(radioUri);
+                        if (playlistContents && playlistContents.items) {
+                            playlistContents.items.forEach(t => {
+                                if (t.uri.startsWith('spotify:track:')) {
+                                    results.push({
+                                        uri: t.uri,
+                                        id: t.uri.split(":")[2],
+                                        trackId: t.uri.split(":")[2],
+                                        name: t.name,
+                                        album: t.album ? { name: t.album.name, uri: t.album.uri } : null,
+                                        artists: t.artists.map(a => ({ id: a.uri.split(":")[2], uri: a.uri, name: a.name })),
+                                        duration_ms: t.duration.milliseconds,
+                                        explicit: t.isExplicit || t.explicit || false,
+                                        is_playable: t.isPlayable !== false
+                                    });
+                                }
+                            });
+                        }
+                    } catch (e) {}
+                    await new Promise(r => setTimeout(r, 10));
+                }
+            };
+
+            const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(() => worker());
+            await Promise.all(workers);
+            return results;
+        };
+
+        const fetchRelatedBatch = async (artists, sampleSize) => {
+            const shuffled = shuffleArray(artists).slice(0, sampleSize);
+            const results = new Map();
+            const promises = shuffled.map(async (artist) => {
+                try {
+                    const res = await Spicetify.GraphQL.Request({
+                        name: "queryArtistRelated",
+                        operation: "query",
+                        sha256Hash: "3d031d6cb22a2aa7c8d203d49b49df731f58b1e2799cc38d9876d58771aa66f3",
+                        value: null
+                    }, { uri: `spotify:artist:${artist.id}` });
+                    const items = res?.data?.artistUnion?.relatedContent?.relatedArtists?.items;
+                    if (items) {
+                        items.forEach(item => {
+                            if (item.uri) {
+                                results.set(item.uri.split(':')[2], {
+                                    id: item.uri.split(':')[2],
+                                    uri: item.uri,
+                                    name: item.profile?.name || item.name || "Unknown"
+                                });
+                            }
+                        });
+                    }
+                } catch (e) {}
+            });
+            await Promise.all(promises);
+            return Array.from(results.values());
+        };
 
         if (vibeType === 'pureDiscovery') {
             playlistName = "Pure Discovery";
-            playlistDescription = "Discover new music from artists completely new to you. Created by Sort-Play.";
+            playlistDescription = "Discover tracks from new artists that match your musical taste. Created by Sort-Play.";
 
             mainButton.innerText = "Filtering...";
             
             const knownArtistIds = await getComprehensiveKnownArtistsSet();
-            const userMarket = await fetchUserMarket() || 'US';
             
             allLikedSongs.forEach(song => {
                 if (song.artistUris) {
@@ -29271,9 +33787,47 @@ const getDominantColor = (src) => {
 
             if (!isHeadless) mainButton.innerText = "Profiling...";
             
-            const shortTermArtists = await getTopItems('artists', 'short_term', 50);
+            const [shortTermArtists, shortTermTracks] = await Promise.all([
+                getTopItems('artists', 'short_term', 50),
+                getTopItems('tracks', 'short_term', 50)
+            ]);
             
-            const recentLikedArtists = allLikedSongs.slice(0, 50).map(song => {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const recentLikes = allLikedSongs.filter(t => t.addedAt && new Date(t.addedAt) >= thirtyDaysAgo);
+            const recentLikesCount = recentLikes.length;
+            
+            let recentSample = [];
+            let randomSample = [];
+            
+            if (recentLikesCount >= 30) {
+                recentSample = shuffleArray(recentLikes).slice(0, 25);
+                const recentSampleSet = new Set(recentSample);
+                const remaining = allLikedSongs.filter(t => !recentSampleSet.has(t));
+                randomSample = shuffleArray(remaining).slice(0, 15);
+            } else if (recentLikesCount >= 10) {
+                const takeCount = Math.max(10, Math.floor(recentLikesCount * 0.8));
+                recentSample = shuffleArray(recentLikes).slice(0, takeCount);
+                const recentSampleSet = new Set(recentSample);
+                const remaining = allLikedSongs.filter(t => !recentSampleSet.has(t));
+                randomSample = shuffleArray(remaining).slice(0, 10);
+            } else {
+                recentSample = recentLikes;
+                const recentSampleSet = new Set(recentSample);
+                const remaining = allLikedSongs.filter(t => !recentSampleSet.has(t));
+                
+                if (shortTermArtists.length < 10) {
+                    randomSample = shuffleArray(remaining).slice(0, 30);
+                } else {
+                    randomSample = shuffleArray(remaining).slice(0, 5);
+                }
+            }
+            
+            const combinedLikedSample = [...recentSample, ...randomSample];
+            const tracksToProfile = [...shortTermTracks, ...combinedLikedSample];
+
+            const recentLikedArtists = combinedLikedSample.map(song => {
                 if (song.artistUris && song.artistUris.length > 0) {
                     return { id: song.artistUris[0].split(':')[2] };
                 }
@@ -29288,20 +33842,6 @@ const getDominantColor = (src) => {
                 throw new Error("Need more listening history or liked songs to build a discovery profile.");
             }
             
-            const fetchRelatedBatch = async (artists, sampleSize) => {
-                const shuffled = shuffleArray(artists).slice(0, sampleSize);
-                const results = new Map();
-                const promises = shuffled.map(async (artist) => {
-                    try {
-                        const relatedData = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artist.id}/related-artists`);
-                        if (relatedData && relatedData.artists) {
-                            relatedData.artists.forEach(rel => results.set(rel.id, rel));
-                        }
-                    } catch (e) {}
-                });
-                await Promise.all(promises);
-                return Array.from(results.values());
-            };
 
             if (!isHeadless) mainButton.innerText = "Related...";
             const level1Raw = await fetchRelatedBatch(topArtistsForSeeding, 20);
@@ -29340,92 +33880,160 @@ const getDominantColor = (src) => {
                 });
             }
 
-            const directPickCount = Math.floor(discoveryPlaylistSize / 2);
-            const directPool = [...level3, ...level2];
-            const uniqueDirectPool = Array.from(new Map(directPool.map(a => [a.id, a])).values());
-            
-            if (uniqueDirectPool.length < directPickCount) uniqueDirectPool.push(...level1);
+            if (!isHeadless) mainButton.innerText = "Deep Cuts...";
+            const level4Raw = await fetchRelatedBatch(level3, 15);
+            const level4 = level4Raw.filter(a => !knownArtistIds.has(a.id));
+
+            if (level4.length < 5 && level3.length > 0) {
+                const additionalLevel4 = await fetchRelatedBatch(level3, 30);
+                const additionalUnknowns = additionalLevel4.filter(a => !knownArtistIds.has(a.id));
+                const existingIds = new Set(level4.map(a => a.id));
+                additionalUnknowns.forEach(a => {
+                    if (!existingIds.has(a.id)) { level4.push(a); existingIds.add(a.id); }
+                });
+            }
 
             if (!isHeadless) mainButton.innerText = "Picking...";
-            const chosenDirectArtists = shuffleArray(uniqueDirectPool).slice(0, directPickCount + 15); 
+            const directPickCount = Math.floor(discoveryPlaylistSize / 2);
+            
+            let l4Pct = (Math.random() * (0.10 - 0.05)) + 0.05;
+            let l3Pct = (Math.random() * (0.50 - 0.35)) + 0.35;
+            let l2Pct = (Math.random() * (0.30 - 0.20)) + 0.20;
+            let l1Pct = 1.0 - l4Pct - l3Pct - l2Pct;
+
+            if (l1Pct > 0.15) {
+                const excess = l1Pct - 0.15;
+                l1Pct = 0.15;
+                l3Pct += excess * 0.6;
+                l2Pct += excess * 0.4;
+            } else if (l1Pct < 0.05) {
+                const deficit = 0.05 - l1Pct;
+                l1Pct = 0.05;
+                l3Pct -= deficit * 0.6;
+                l2Pct -= deficit * 0.4;
+            }
+
+            const targetL4 = Math.round(directPickCount * l4Pct);
+            const targetL3 = Math.round(directPickCount * l3Pct);
+            const targetL2 = Math.round(directPickCount * l2Pct);
+            const targetL1 = Math.max(0, directPickCount - targetL4 - targetL3 - targetL2);
+
             const directTracks = [];
             const processedArtistIds = new Set(); 
 
-            const directBatches = [];
-            while(chosenDirectArtists.length) directBatches.push(chosenDirectArtists.splice(0, 5));
+            async function fillQuotaFromPool(pool, quota) {
+                if (quota <= 0 || pool.length === 0) return 0;
+                const queue = shuffleArray([...pool]);
+                let filled = 0;
+                
+                const CONCURRENCY_LIMIT = 15;
+                const worker = async () => {
+                    while (queue.length > 0) {
+                        if (filled >= quota) break;
+                        
+                        const artist = queue.shift();
+                        if (knownArtistIds.has(artist.id) || processedArtistIds.has(artist.id)) continue;
+                        processedArtistIds.add(artist.id);
 
-            for (const batch of directBatches) {
-                if (directTracks.length >= directPickCount) break;
+                        try {
+                            const res = await Spicetify.GraphQL.Request(
+                                Spicetify.GraphQL.Definitions.queryArtistOverview, 
+                                { uri: `spotify:artist:${artist.id}`, locale: "en", includePrerelease: false }
+                            );
+                            
+                            const topTracks = res?.data?.artistUnion?.discography?.topTracks?.items;
+                            
+                            if (topTracks && topTracks.length > 0) {
+                                const mappedCandidates = topTracks.map(item => {
+                                    const t = item.track;
+                                    return {
+                                        uri: t.uri,
+                                        id: t.uri.split(':')[2],
+                                        name: t.name,
+                                        album: t.albumOfTrack ? { name: t.albumOfTrack.name, uri: t.albumOfTrack.uri } : null,
+                                        artists: t.artists?.items?.map(a => ({
+                                            id: a.uri.split(':')[2],
+                                            uri: a.uri,
+                                            name: a.profile?.name || "Unknown"
+                                        })) || [],
+                                        duration_ms: t.duration?.totalMilliseconds || 0,
+                                        playcount: parseInt(t.playcount, 10) || 0,
+                                        is_playable: t.playability?.playable !== false
+                                    };
+                                });
 
-                await Promise.all(batch.map(async (artist) => {
-                    if (knownArtistIds.has(artist.id) || processedArtistIds.has(artist.id)) return;
+                                const availabilityChecks = await Promise.all(mappedCandidates.map(t => isTrackAvailable(t)));
+                                const validTracks = [];
 
-                    try {
-                        const topTracksRes = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/artists/${artist.id}/top-tracks?market=${userMarket}`);
-                        if (topTracksRes && topTracksRes.tracks && topTracksRes.tracks.length > 0) {
-                            const validTracks = [];
-                            for (const t of topTracksRes.tracks) {
-                                if (!completeLikedSongUrisSet.has(t.uri) && t.popularity > 0 && await isTrackAvailable(t)) {
-                                    validTracks.push(t);
-                                }
-                            }
-
-                            if (validTracks.length > 0) {
-                                let trackToPick;
-                                
-                                let poolSize = 1;
-                                const maxPool = Math.min(5, validTracks.length);
-                                
-                                for (let i = 0; i < maxPool - 1; i++) {
-                                    if ((validTracks[i].popularity - validTracks[i+1].popularity) > 4) {
-                                        break;
+                                for (let i = 0; i < mappedCandidates.length; i++) {
+                                    const t = mappedCandidates[i];
+                                    if (!completeLikedSongUrisSet.has(t.uri) && availabilityChecks[i]) {
+                                        validTracks.push(t);
                                     }
-                                    poolSize++;
                                 }
-                                
-                                const pickIndex = Math.floor(Math.random() * poolSize);
-                                trackToPick = validTracks[pickIndex];
-                                
-                                directTracks.push(trackToPick);
-                                processedArtistIds.add(artist.id);
-                                trackToPick.artists.forEach(a => knownArtistIds.add(a.id));
+
+                                if (validTracks.length > 0 && filled < quota) {
+                                    let poolSize = 1;
+                                    const maxPool = Math.min(5, validTracks.length);
+                                    
+                                    for (let i = 0; i < maxPool - 1; i++) {
+                                        if (validTracks[i+1].playcount < (validTracks[i].playcount * 0.4)) {
+                                            break;
+                                        }
+                                        poolSize++;
+                                    }
+                                    
+                                    const pickIndex = Math.floor(Math.random() * poolSize);
+                                    const trackToPick = validTracks[pickIndex];
+                                    
+                                    directTracks.push(trackToPick);
+                                    trackToPick.artists.forEach(a => knownArtistIds.add(a.id));
+                                    filled++;
+                                }
                             }
-                        }
-                    } catch (e) {}
-                }));
-                await new Promise(r => setTimeout(r, 100));
+                        } catch (e) {}
+                    }
+                };
+
+                const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(() => worker());
+                await Promise.all(workers);
+                return filled;
             }
 
-            if (!isHeadless) mainButton.innerText = "Get recs...";
+            let filledL4 = await fillQuotaFromPool(level4, targetL4);
+            let deficitL4 = targetL4 - filledL4;
+
+            let filledL3 = await fillQuotaFromPool(level3, targetL3 + deficitL4);
+            let deficitL3 = (targetL3 + deficitL4) - filledL3;
+
+            let filledL2 = await fillQuotaFromPool(level2, targetL2 + deficitL3);
+            let deficitL2 = (targetL2 + deficitL3) - filledL2;
+
+            await fillQuotaFromPool(level1, targetL1 + deficitL2);
+
+            if (!isHeadless) mainButton.innerText = "Expanding...";
             
             const makeRecRequest = async (seeds) => {
-                const finalSeeds = (seeds && seeds.length > 0) ? seeds : shuffleArray(topArtistsForSeeding).slice(0, 3);
-                const seedIds = finalSeeds.map(a => a.id);
-                
-                const params = new URLSearchParams({ 
-                    limit: 35,
-                    min_popularity: '5',
-                    market: userMarket,
-                    seed_artists: seedIds.join(',')
-                });
-                
-                try {
-                    const res = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
-                    return res?.tracks || [];
-                } catch (e) { return []; }
+                const fallbackCount = discoveryPlaylistSize > 50 ? 6 : 3;
+                const finalSeeds = (seeds && seeds.length > 0) ? seeds : shuffleArray(topArtistsForSeeding).slice(0, fallbackCount);
+                const seedUris = finalSeeds.map(a => `spotify:artist:${a.id}`);
+                return await fetchRadioTracks(seedUris);
             };
 
-            const seedsL1 = shuffleArray(level1).slice(0, 3);
-            const seedsL2 = shuffleArray(level2).slice(0, 3);
-            const seedsL3 = shuffleArray(level3).slice(0, 3);
+            const seedCount = discoveryPlaylistSize > 50 ? 6 : 3;
+            const seedsL1 = shuffleArray(level1).slice(0, seedCount);
+            const seedsL2 = shuffleArray(level2).slice(0, seedCount);
+            const seedsL3 = shuffleArray(level3).slice(0, seedCount);
+            const seedsL4 = shuffleArray(level4).slice(0, seedCount > 3 ? 2 : 1);
 
-            const [recsL1, recsL2, recsL3] = await Promise.all([
+            const [recsL1, recsL2, recsL3, recsL4] = await Promise.all([
                 makeRecRequest(seedsL1),
                 makeRecRequest(seedsL2),
-                makeRecRequest(seedsL3)
+                makeRecRequest(seedsL3),
+                makeRecRequest(seedsL4)
             ]);
 
-            const rawApiTracks = [...recsL1, ...recsL2, ...recsL3];
+            const rawApiTracks = [...recsL1, ...recsL2, ...recsL3, ...recsL4];
             
             let apiRecommendedTracks = [];
             if (rawApiTracks.length > 0) {
@@ -29449,31 +34057,105 @@ const getDominantColor = (src) => {
 
             if (!isHeadless) mainButton.innerText = "Combining...";
             
-            const finalDirect = directTracks.slice(0, directPickCount);
-            const neededApi = discoveryPlaylistSize - finalDirect.length;
-            const finalApi = apiRecommendedTracks.slice(0, neededApi);
-            
-            let allCandidates = [...finalDirect, ...finalApi];
-            
+            let allCandidates = [];
             const uniqueUriSet = new Set();
-            allCandidates = allCandidates.filter(t => {
-                if(uniqueUriSet.has(t.uri)) return false;
-                uniqueUriSet.add(t.uri);
-                return true;
-            });
+            
+            for (const t of directTracks) {
+                if (!uniqueUriSet.has(t.uri)) {
+                    uniqueUriSet.add(t.uri);
+                    allCandidates.push(t);
+                }
+            }
+            
+            for (const t of apiRecommendedTracks) {
+                if (!uniqueUriSet.has(t.uri)) {
+                    uniqueUriSet.add(t.uri);
+                    allCandidates.push(t);
+                }
+            }
 
             if (allCandidates.length === 0) throw new Error("Could not find enough tracks matching discovery criteria.");
             
-            if (!isHeadless) mainButton.innerText = "Sorting...";
-            const trackIds = allCandidates.map(t => t.id);
-            const stats = await getBatchTrackStats(trackIds);
-            const tracksWithFeatures = allCandidates.map(t => ({ ...t, features: stats[t.id] }));
+            if (!isHeadless) mainButton.innerText = "Evaluating...";
             
-            const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-            const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+            const profileTrackIds = [...new Set(tracksToProfile.map(t => t.id || t.uri.split(':')[2]))].filter(Boolean);
+            const candidateTrackIds = allCandidates.map(t => t.id || t.uri.split(':')[2]).filter(Boolean);
+            
+            const allAudioStats = await getBatchTrackStats([...profileTrackIds, ...candidateTrackIds]);
+            
+            tracksToProfile.forEach(t => t.features = allAudioStats[t.id || t.uri.split(':')[2]]);
+            const tracksToProfileWithPop = await fetchPopularityForMultipleTracks(tracksToProfile, null);
+            const contextProfile = buildContextProfile(tracksToProfileWithPop, completeLikedSongUrisSet, likedIsrcs);
+            
+            const candidatesWithFeatures = allCandidates.map(t => ({ ...t, features: allAudioStats[t.id || t.uri.split(':')[2]] }));
+            const candidatesWithPop = await fetchPopularityForMultipleTracks(candidatesWithFeatures, null);
+            
+            candidatesWithPop.forEach(t => {
+                let score = scoreTrackAgainstContext(t, contextProfile);
+                
+                if (t.popularity !== null && contextProfile.popProfile) {
+                    const bucketIdx = Math.min(9, Math.floor(t.popularity / 10));
+                    const popWeight = contextProfile.popProfile[bucketIdx] || 0;
+                    score += (15 * popWeight);
+                }
+                t.finalScore = score;
+            });
+            
+            candidatesWithPop.forEach(t => {
+                const fuzz = 0.85 + (Math.random() * 0.30);
+                t.lotteryWeight = Math.pow(Math.max(0.1, t.finalScore * fuzz), 2);
+            });
+            
+            if (!isHeadless) mainButton.innerText = "Selecting...";
+            const finalSelected = [];
+            const seenArtists = new Set();
+            const seenAlbums = new Set();
+            let candidatePool = [...candidatesWithPop];
+            const targetPlaylistCount = discoveryPlaylistSize;
+            
+            while (finalSelected.length < targetPlaylistCount && candidatePool.length > 0) {
+                let totalWeight = candidatePool.reduce((sum, t) => sum + t.lotteryWeight, 0);
+                if (totalWeight <= 0) break;
+                
+                let r = Math.random() * totalWeight;
+                let selectedIdx = candidatePool.length - 1;
+                for (let i = 0; i < candidatePool.length; i++) {
+                    r -= candidatePool[i].lotteryWeight;
+                    if (r <= 0) {
+                        selectedIdx = i;
+                        break;
+                    }
+                }
+                
+                const track = candidatePool[selectedIdx];
+                candidatePool.splice(selectedIdx, 1);
+                
+                let albumIdentifier = track.album?.id || track.album?.uri || track.album?.name?.toLowerCase().trim() || track.albumName?.toLowerCase().trim();
+                let artistIdentifier = track.artists?.[0]?.id || track.artists?.[0]?.uri || track.artists?.[0]?.name?.toLowerCase().trim() || track.artistName?.toLowerCase().trim();
+                
+                const relaxLimits = candidatePool.length < (targetPlaylistCount - finalSelected.length) + 10;
+                
+                if (!relaxLimits) {
+                    if (seenAlbums.has(albumIdentifier) || seenArtists.has(artistIdentifier)) {
+                        continue;
+                    }
+                } else if (seenAlbums.has(albumIdentifier)) {
+                    continue;
+                }
+                
+                if (albumIdentifier) seenAlbums.add(albumIdentifier);
+                if (artistIdentifier) seenArtists.add(artistIdentifier);
+                finalSelected.push(track);
+            }
+            
+            const tracksToSort = finalSelected.slice(0, targetPlaylistCount);
+            
+            if (!isHeadless) mainButton.innerText = "Sorting...";
+            const validForWave = tracksToSort.filter(t => t.features && t.features.energy != null);
+            const others = tracksToSort.filter(t => !t.features || t.features.energy == null);
             
             const sortedTracks = await energyWaveSort(validForWave, 'discovery');
-            const finalTracks = [...sortedTracks, ...others];
+            const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
             
             const trackUris = finalTracks.map(track => track.uri);
             
@@ -29497,14 +34179,15 @@ const getDominantColor = (src) => {
 
         if (vibeType === 'recommendRecentVibe') {
             playlistName = "Discovery: Recent Taste";
-            playlistDescription = "A diverse mix based on your recent taste. Created by Sort-Play.";
+            playlistDescription = "Discover tracks matching your recent vibe. Created by Sort-Play.";
             time_range = 'short_term';
             contrast_time_range = 'long_term';
         } else if (vibeType === 'recommendAllTime') {
             playlistName = "Discovery: All-Time Taste";
-            playlistDescription = "A diverse mix based on your all-time taste. Created by Sort-Play.";
+            playlistDescription = "Discover tracks matching your long-term taste. Created by Sort-Play.";
             time_range = 'long_term';
             contrast_time_range = 'short_term';
+            top_pool_size = 250;
         }
 
         if (!isHeadless) mainButton.innerText = "Get top...";
@@ -29527,15 +34210,23 @@ const getDominantColor = (src) => {
 
         if (!isHeadless) mainButton.innerText = "Profiling...";
 
+        const knownArtistIds = await getComprehensiveKnownArtistsSet({ isHeadless });
+        allLikedSongs.forEach(song => {
+            if (song.artistUris) song.artistUris.forEach(uri => { if (uri) knownArtistIds.add(uri.split(':')[2]); });
+        });
+
         let primarySeedTracks = [];
         let primarySeedArtistIds = new Set();
         let likedSample = [];
+        let unknownRadioSeeds = [];
 
         if (vibeType === 'recommendAllTime') {
-            const shuffledLiked = shuffleArray(allLikedSongs).slice(0, 200);
-            likedSample = shuffledLiked;
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const historicalLikes = allLikedSongs.filter(t => !t.addedAt || new Date(t.addedAt) < thirtyDaysAgo);
+            const likedPool = historicalLikes.length >= 20 ? historicalLikes : allLikedSongs;
             
-            const mappedLiked = shuffledLiked.map(t => ({
+            const mappedLiked = shuffleArray(likedPool).slice(0, 200).map(t => ({
                 id: t.uri.split(':')[2],
                 uri: t.uri,
                 name: t.name,
@@ -29544,57 +34235,77 @@ const getDominantColor = (src) => {
                 _isLikedSong: true
             }));
             
-            const likedPortion = Math.ceil(top_pool_size * 0.7);
-            const topPortion = Math.floor(top_pool_size * 0.3);
+            likedSample = mappedLiked;
+            let likedPortion = Math.ceil(top_pool_size * 0.70);
+            let topPortion = Math.floor(top_pool_size * 0.30);
             
             primarySeedTracks = [
                 ...shuffleArray(mappedLiked).slice(0, likedPortion),
                 ...shuffleArray(topTracks).slice(0, topPortion)
             ];
+            mappedLiked.slice(0, likedPortion).forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
+
+            const walkSeeds = shuffleArray(likedPool).slice(0, 15).flatMap(t => (t.artistUris || []).map(u => ({ id: u.split(':')[2] })));
+            const l1 = await fetchRelatedBatch(walkSeeds, 15);
+            const l2 = await fetchRelatedBatch(l1, 15);
+            const l3 = await fetchRelatedBatch(l2, 20);
             
-            mappedLiked.forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
+            const unknownL3 = l3.filter(a => !knownArtistIds.has(a.id));
+            unknownRadioSeeds = shuffleArray(unknownL3).slice(0, 5).map(a => `spotify:artist:${a.id}`);
             
         } else if (vibeType === 'recommendRecentVibe') {
             const cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - 28);
+            cutoffDate.setDate(cutoffDate.getDate() - 30);
             
-            const recentLikes = allLikedSongs.filter(t => new Date(t.addedAt) >= cutoffDate);
+            const recentLikes = allLikedSongs.filter(t => t.addedAt && new Date(t.addedAt) >= cutoffDate);
+            const recentLikesCount = recentLikes.length;
             
-            if (recentLikes.length < 10) {
-                likedSample = [...allLikedSongs]
-                    .sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))
-                    .slice(0, 30);
+            let likedPortion = 0;
+            let topPortion = 0;
+            let poolToSample = [];
+            
+            if (recentLikesCount >= 10) {
+                likedPortion = Math.ceil(top_pool_size * 0.65);
+                topPortion = Math.floor(top_pool_size * 0.35);
+                poolToSample = recentLikes;
             } else {
-                const now = Date.now();
-                const weightedTracks = recentLikes.map(t => {
-                    const daysAgo = (now - new Date(t.addedAt).getTime()) / (1000 * 60 * 60 * 24);
-                    const weight = Math.exp(-0.05 * Math.max(0, daysAgo)); 
-                    return { track: t, weight };
-                });
-
-                const selected = [];
-                const pool = [...weightedTracks];
+                likedPortion = Math.ceil(top_pool_size * 0.65);
+                topPortion = Math.floor(top_pool_size * 0.35);
                 
-                for (let i = pool.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [pool[i], pool[j]] = [pool[j], pool[i]];
-                }
-
-                const sampleSize = Math.min(pool.length, 80);
-                
-                for (let i = 0; i < sampleSize && pool.length > 0; i++) {
-                    let totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
-                    let r = Math.random() * totalWeight;
-                    let idx = 0;
-                    for (let j = 0; j < pool.length; j++) {
-                        r -= pool[j].weight;
-                        if (r <= 0) { idx = j; break; }
-                    }
-                    selected.push(pool[idx].track);
-                    pool.splice(idx, 1);
-                }
-                likedSample = selected;
+                poolToSample = [...allLikedSongs]
+                    .sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0))
+                    .slice(0, 50);
             }
+            
+            const now = Date.now();
+            const weightedTracks = poolToSample.map(t => {
+                const daysAgo = (now - new Date(t.addedAt || now).getTime()) / (1000 * 60 * 60 * 24);
+                const weight = Math.exp(-0.05 * Math.max(0, daysAgo)); 
+                return { track: t, weight };
+            });
+
+            const selected = [];
+            const pool = [...weightedTracks];
+            
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            const sampleSize = Math.min(pool.length, 80);
+            
+            for (let i = 0; i < sampleSize && pool.length > 0; i++) {
+                let totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
+                let r = Math.random() * totalWeight;
+                let idx = 0;
+                for (let j = 0; j < pool.length; j++) {
+                    r -= pool[j].weight;
+                    if (r <= 0) { idx = j; break; }
+                }
+                selected.push(pool[idx].track);
+                pool.splice(idx, 1);
+            }
+            likedSample = selected;
             
             const mappedRecent = likedSample.map(t => ({
                 id: t.uri.split(':')[2],
@@ -29605,15 +34316,19 @@ const getDominantColor = (src) => {
                 _isLikedSong: true
             }));
             
-            const likedPortion = Math.ceil(top_pool_size * 0.8);
-            const topPortion = Math.floor(top_pool_size * 0.2);
-            
             primarySeedTracks = [
                 ...mappedRecent.slice(0, likedPortion),
                 ...shuffleArray(topTracks).slice(0, topPortion)
             ];
             
-            mappedRecent.forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
+            mappedRecent.slice(0, likedPortion).forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
+
+            const walkSeeds = shuffleArray(poolToSample).slice(0, 15).flatMap(t => (t.artistUris || []).map(u => ({ id: u.split(':')[2] })));
+            const l1 = await fetchRelatedBatch(walkSeeds, 15);
+            const l2 = await fetchRelatedBatch(l1, 15);
+            
+            const unknownL1L2 = [...l1, ...l2].filter(a => !knownArtistIds.has(a.id));
+            unknownRadioSeeds = shuffleArray(unknownL1L2).slice(0, 5).map(a => `spotify:artist:${a.id}`);
             
         } else {
             likedSample = shuffleArray(allLikedSongs).slice(0, 50);
@@ -29648,19 +34363,19 @@ const getDominantColor = (src) => {
         const profileTrackIds = [...new Set(tracksToProfile.map(t => t.id))];
         const allAudioStats = await getBatchTrackStats(profileTrackIds);
 
+        tracksToProfile.forEach(t => t.features = allAudioStats[t.id]);
         originalTopTracks.forEach(t => t.features = allAudioStats[t.id]);
         topTracks.forEach(t => {
             if (!t.features) t.features = allAudioStats[t.id];
         });
 
         const profilingSource = primarySeedTracks.length > 0 ? primarySeedTracks : originalTopTracks;
-        const tracksWithFeatures = profilingSource.filter(t => t.features);
-        const userAudioProfile = calculateAudioStatistics(tracksWithFeatures);
+        const tracksWithFeatureProfiles = profilingSource.filter(t => t.features);
+        const userAudioProfile = calculateAudioStatistics(tracksWithFeatureProfiles);
 
         const allGenres = new Set(topArtists.flatMap(a => a.genres));
         const shuffledGenres = shuffleArray(Array.from(allGenres));
         let genreBridgeSeeds = [];
-        let genreBridgeTargets = {};
 
         if (shuffledGenres.length >= 2) {
             const genre1 = shuffledGenres[0];
@@ -29669,44 +34384,11 @@ const getDominantColor = (src) => {
             const artistsForGenre1 = shuffleArray(topArtists.filter(a => a.genres.includes(genre1))).slice(0, 3);
             const artistsForGenre2 = shuffleArray(topArtists.filter(a => a.genres.includes(genre2))).slice(0, 2);
             genreBridgeSeeds = [...artistsForGenre1, ...artistsForGenre2].map(a => a.id);
-
-            const getGenreTracks = (g) => topTracks.filter(t => t.features && t.artists.some(a => {
-                const artistObj = topArtists.find(ta => ta.id === a.id);
-                return artistObj && artistObj.genres.includes(g);
-            }));
-
-            const tracksG1 = getGenreTracks(genre1);
-            const tracksG2 = getGenreTracks(genre2);
-            
-            if (tracksG1.length > 0 && tracksG2.length > 0) {
-                const stat1 = calculateAudioStatistics(tracksG1).averages;
-                const stat2 = calculateAudioStatistics(tracksG2).averages;
-                
-                genreBridgeTargets = {
-                    target_energy: (stat1.energy + stat2.energy) / 2,
-                    target_valence: (stat1.valence + stat2.valence) / 2,
-                    target_danceability: (stat1.danceability + stat2.danceability) / 2,
-                };
-            }
         }
 
         const sortedByPopAsc = [...topTracks].sort((a, b) => a.popularity - b.popularity);
         const deepCutPool = sortedByPopAsc.slice(0, 50);
         const deepCutSeeds = shuffleArray(deepCutPool).slice(0, 5).map(t => t.id);
-        
-        let deepCutTargets = {};
-        const deepCutTracksWithFeatures = deepCutPool.filter(t => t.features);
-        if (deepCutTracksWithFeatures.length > 0) {
-            const dcStats = calculateAudioStatistics(deepCutTracksWithFeatures).averages;
-            deepCutTargets = {
-                target_energy: dcStats.energy,
-                target_valence: dcStats.valence,
-                target_acousticness: dcStats.acousticness,
-                max_popularity: 40
-            };
-        } else {
-            deepCutTargets = { max_popularity: 40 };
-        }
 
         let likedSongSeedUris = [];
         if (vibeType === 'recommendRecentVibe') {
@@ -29774,153 +34456,220 @@ const getDominantColor = (src) => {
         }
         const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
 
-        let edgeExplorerTargets = {};
         let edgeExplorerSeeds = shuffleArray(topTracks).slice(0, 5).map(t => t.id);
+
+        if (!isHeadless) mainButton.innerText = "Expanding...";
         
-        if (userAudioProfile) {
-            const featuresToPush = ['energy', 'valence', 'acousticness'];
-            const featureToPush = featuresToPush[Math.floor(Math.random() * featuresToPush.length)];
-            const range = userAudioProfile.ranges[featureToPush];
-            const isHighPush = Math.random() > 0.5;
-
-            const safeParams = {};
-            featuresToPush.forEach(f => {
-                if (f !== featureToPush) {
-                    safeParams[`min_${f}`] = Math.max(0, userAudioProfile.ranges[f].min / 100);
-                    safeParams[`max_${f}`] = Math.min(1, userAudioProfile.ranges[f].max / 100);
-                }
-            });
-
-            if (isHighPush) {
-                edgeExplorerTargets = {
-                    ...safeParams,
-                    [`min_${featureToPush}`]: Math.min(0.95, userAudioProfile.ranges[featureToPush].max / 100),
-                    [`max_${featureToPush}`]: 1.0
-                };
-            } else {
-                edgeExplorerTargets = {
-                    ...safeParams,
-                    [`min_${featureToPush}`]: 0.0,
-                    [`max_${featureToPush}`]: Math.max(0.05, userAudioProfile.ranges[featureToPush].min / 100)
-                };
-            }
+        let allSeedUris = [];
+        const addUris = (arr, prefix) => arr.forEach(id => allSeedUris.push(`${prefix}:${id}`));
+        
+        addUris(shuffleArray(topArtists).slice(0, 5).map(a => a.id), 'spotify:artist');
+        addUris(shuffleArray(topTracks).slice(0, 5).map(t => t.id), 'spotify:track');
+        addUris(genreBridgeSeeds, 'spotify:artist');
+        addUris(deepCutSeeds, 'spotify:track');
+        addUris(likedSongSeedUris, 'spotify:track');
+        addUris(smartSeedUris, 'spotify:track');
+        addUris(edgeExplorerSeeds, 'spotify:track');
+        
+        if (typeof unknownRadioSeeds !== 'undefined' && unknownRadioSeeds.length > 0) {
+            unknownRadioSeeds.forEach(uri => allSeedUris.push(uri));
         }
-
-        if (!isHeadless) mainButton.innerText = "Get recs...";
         
-        const trackArtistMap = new Map();
-        const addToLookup = (t) => {
-            const tid = t.id || (t.uri ? t.uri.split(':')[2] : null);
-            if (tid && !trackArtistMap.has(tid)) {
-                const aIds = new Set();
-                if (t.artists) t.artists.forEach(a => aIds.add(a.id || (a.uri ? a.uri.split(':')[2] : null)));
-                if (t.artistUris) t.artistUris.forEach(u => aIds.add(u.split(':')[2]));
-                trackArtistMap.set(tid, aIds);
-            }
-        };
-        topTracks.forEach(addToLookup);
-        allLikedSongs.forEach(addToLookup);
+        allSeedUris = [...new Set(allSeedUris)];
 
-        const recommendationBatches = [];
-        const NUM_CALLS = 7;
-        
-        for (let i = 0; i < NUM_CALLS; i++) {
-            let params = new URLSearchParams({ limit: 100 });
-            let seed_artists = [], seed_tracks = [];
-            const forbiddenArtistIds = new Set();
+        const rawApiTracks = await fetchRadioTracks(allSeedUris);
 
-            if (i < 2) {
-                seed_artists = shuffleArray(topArtists).slice(0, 3).map(a => a.id);
-                seed_tracks = shuffleArray(topTracks).slice(0, 2).map(t => t.id);
-            } 
-            else if (i === 2) {
-                seed_artists = genreBridgeSeeds;
-                Object.keys(genreBridgeTargets).forEach(key => params.append(key, (genreBridgeTargets[key] / 100).toFixed(2)));
-            } 
-            else if (i === 3) {
-                seed_tracks = deepCutSeeds;
-                Object.keys(deepCutTargets).forEach(key => {
-                    if (key === 'max_popularity') params.append(key, deepCutTargets[key]);
-                    else params.append(key, (deepCutTargets[key] / 100).toFixed(2));
-                });
-            } 
-            else if (i === 4) {
-                seed_tracks = likedSongSeedUris;
-            } 
-            else if (i === 5) {
-                seed_tracks = smartSeedUris;
-            } 
-            else if (i === 6) {
-                seed_tracks = edgeExplorerSeeds;
-                Object.keys(edgeExplorerTargets).forEach(key => params.append(key, edgeExplorerTargets[key].toFixed(2)));
-            }
-
-            if (seed_artists.length > 0) {
-                seed_artists.forEach(id => forbiddenArtistIds.add(id));
-            }
-
-            if (seed_tracks.length > 0) {
-                seed_tracks.forEach(tid => {
-                    const aIds = trackArtistMap.get(tid);
-                    if (aIds) aIds.forEach(id => forbiddenArtistIds.add(id));
-                });
-            }
-
-            if (seed_artists.length > 0) params.append('seed_artists', [...new Set(seed_artists)].join(','));
-            if (seed_tracks.length > 0) params.append('seed_tracks', [...new Set(seed_tracks)].join(','));
-
-            try {
-                if (seed_artists.length > 0 || seed_tracks.length > 0) {
-                    const recsResponse = await Spicetify.CosmosAsync.get(`https://api.spotify.com/v1/recommendations?${params.toString()}`);
-                    if (recsResponse?.tracks?.length > 0) {
-                        const filteredRecs = recsResponse.tracks.filter(t => {
-                            if (!t.artists) return true;
-                            return !t.artists.some(a => forbiddenArtistIds.has(a.id));
-                        });
-
-                        if (filteredRecs.length > 0) {
-                            recommendationBatches.push(filteredRecs);
-                        }
-                    }
-                }
-            } catch (e) { console.warn(`Recommendation call ${i+1} failed.`, e); }
-            await new Promise(resolve => setTimeout(resolve, 250));
-        }
-
-        if (recommendationBatches.length === 0) {
-            throw new Error("Spotify didn't return any recommendations. Try again!");
+        if (rawApiTracks.length === 0) {
+            throw new Error("Spotify Radio API didn't return any recommendations. Try again!");
         }
 
         if (!isHeadless) mainButton.innerText = "Mixing...";
-        let interleavedTracks = [];
-        const maxBatchLength = Math.max(...recommendationBatches.map(batch => batch.length));
-        for (let i = 0; i < maxBatchLength; i++) {
-            for (let j = 0; j < recommendationBatches.length; j++) {
-                if (recommendationBatches[j][i]) {
-                    interleavedTracks.push(recommendationBatches[j][i]);
-                }
-            }
-        }
         
         const seenUris = new Set();
-        const uniqueMixedTracks = interleavedTracks.filter(track => {
+        const uniqueMixedTracks = rawApiTracks.filter(track => {
             if (seenUris.has(track.uri)) return false;
             seenUris.add(track.uri);
             return true;
         });
 
         if (!isHeadless) mainButton.innerText = "Excluding...";
+        const recommendedUris = uniqueMixedTracks.map(t => t.uri);
+        const fetchedRecommendedMetaMap = await fetchCoreMetadataBatch(recommendedUris);
+        uniqueMixedTracks.forEach(t => {
+            const meta = fetchedRecommendedMetaMap.get(t.uri);
+            if (meta?.isrc) t.isrc = meta.isrc;
+        });
+
         const availabilityChecks = await Promise.all(uniqueMixedTracks.map(track => isTrackAvailable(track)));
-        let newRecommendedTracks = uniqueMixedTracks.filter((track, index) => {
+        
+        const singleLikedUrisToFetch = new Set();
+        
+        if (!discoveryStrictAlbumExclusion) {
+            uniqueMixedTracks.forEach(track => {
+                if (!track.album?.name) return;
+                const cleanAlbum = getCleanTitle(track.album.name);
+                const primaryArtistUri = track.artists?.[0]?.uri || track.artists?.[0]?.name || "Unknown";
+                const fingerprint = `${cleanAlbum}|${primaryArtistUri}`;
+                
+                const likedOnAlbum = albumFingerprintMap.get(fingerprint);
+                if (likedOnAlbum && likedOnAlbum.size === 1) {
+                    const likedUri = Array.from(likedOnAlbum.values())[0];
+                    singleLikedUrisToFetch.add(likedUri);
+                }
+            });
+        }
+
+        let preFilteredTracks = uniqueMixedTracks.filter((track, index) => {
             if (!availabilityChecks[index]) return false;
             if (completeLikedSongUrisSet.has(track.uri)) return false;
+            if (track.isrc && likedIsrcs.has(track.isrc)) return false;
             
             const title = track.name.toLowerCase().trim();
             const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
-            if (!likedArtistUrisForTitle) return true;
+            if (likedArtistUrisForTitle) {
+                const recommendedArtistUris = track.artists.map(a => a.uri);
+                if (recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri))) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        const albumsToCheck = new Set();
+        preFilteredTracks.forEach(t => {
+            if (t.album && t.album.id) albumsToCheck.add(t.album.id);
+            else if (t.album && t.album.uri) albumsToCheck.add(t.album.uri.split(':')[2]);
+        });
+
+        const excludedAlbumIds = new Set();
+        const albumIdsArray = Array.from(albumsToCheck);
+        
+        const CONCURRENCY = 30; 
+        const albumTrackUrisMap = new Map();
+        
+        for (let i = 0; i < albumIdsArray.length; i += CONCURRENCY) {
+            const batch = albumIdsArray.slice(i, i + CONCURRENCY);
+            await Promise.all(batch.map(async (albumId) => {
+                let uris = [];
+                try {
+                    const hexId = spotifyHex(albumId);
+                    let token = Spicetify.Platform.Session.accessToken;
+                    let res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
+                        headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
+                    });
+                    if (res.status === 401) {
+                         if (!internalTokenRefreshPromise) {
+                              internalTokenRefreshPromise = (async () => {
+                                  const tData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                                  Spicetify.Platform.Session.accessToken = tData.accessToken;
+                                  await new Promise(r => setTimeout(r, 500));
+                                  return tData.accessToken;
+                              })();
+                          }
+                          await internalTokenRefreshPromise;
+                          token = Spicetify.Platform.Session.accessToken;
+                          res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
+                              headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
+                          });
+                    }
+                    if (res.ok) {
+                        const body = await res.json();
+                        if (body.disc) {
+                            for (const disc of body.disc) {
+                                if (disc.track) {
+                                    for (const track of disc.track) {
+                                        if (track.gid) uris.push(`spotify:track:${hexToBase62(track.gid)}`);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (err) {}
+                
+                if (uris.length === 0) {
+                    try {
+                        const fallbackTracks = await getAlbumTracks(albumId);
+                        if (fallbackTracks) uris = fallbackTracks.map(t => t.uri);
+                    } catch(e) {}
+                }
+                
+                if (uris.length > 0) albumTrackUrisMap.set(albumId, uris);
+            }));
+        }
+
+        const allUrisToFetchIsrc = [];
+        albumTrackUrisMap.forEach(uris => {
+            uris.forEach(uri => {
+                if (!completeLikedSongUrisSet.has(uri)) {
+                    allUrisToFetchIsrc.push(uri);
+                }
+            });
+        });
+
+        const uniqueUrisToFetch = [...new Set(allUrisToFetchIsrc)];
+        let fetchedMetaMap = new Map();
+        
+        for (let i = 0; i < uniqueUrisToFetch.length; i += 500) {
+            const batch = uniqueUrisToFetch.slice(i, i + 500);
+            try {
+                const res = await fetchCoreMetadataBatch(batch);
+                res.forEach((val, key) => fetchedMetaMap.set(key, val));
+            } catch (err) {
+                console.warn("[Sort-Play] Batch ISRC fetch failed during optimization", err);
+            }
+        }
+
+        for (const [albumId, uris] of albumTrackUrisMap.entries()) {
+            let likedCount = 0;
+            let lowestPopLikedUri = null;
+
+            for (const uri of uris) {
+                let isLiked = false;
+                if (completeLikedSongUrisSet.has(uri)) {
+                    isLiked = true;
+                } else {
+                    const meta = fetchedMetaMap.get(uri);
+                    if (meta && meta.isrc && likedIsrcs.has(meta.isrc)) {
+                        isLiked = true;
+                    }
+                }
+                
+                if (isLiked) {
+                    likedCount++;
+                    lowestPopLikedUri = uri;
+                    
+                    if (discoveryStrictAlbumExclusion) {
+                        excludedAlbumIds.add(albumId);
+                        break; 
+                    }
+                }
+            }
             
-            const recommendedArtistUris = track.artists.map(a => a.uri);
-            return !recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri));
+            if (!discoveryStrictAlbumExclusion && likedCount > 0) {
+                if (likedCount >= 2) {
+                    excludedAlbumIds.add(albumId);
+                } else if (likedCount === 1 && lowestPopLikedUri) {
+                    try {
+                        const tId = lowestPopLikedUri.split(':')[2];
+                        const meta = await fetchInternalTrackMetadata(tId);
+                        const pop = meta?.popularity || 0;
+                        if (pop < 75) {
+                            excludedAlbumIds.add(albumId);
+                        }
+                    } catch(e) {}
+                }
+            }
+        }
+
+        let newRecommendedTracks = preFilteredTracks.filter(track => {
+            let albumId = null;
+            if (track.album && track.album.id) albumId = track.album.id;
+            else if (track.album && track.album.uri) albumId = track.album.uri.split(':')[2];
+            
+            if (albumId && excludedAlbumIds.has(albumId)) {
+                return false;
+            }
+            return true;
         });
 
         const uniqueMainArtists = new Set();
@@ -29933,17 +34682,93 @@ const getDominantColor = (src) => {
             return true;
         });
 
-        if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you. Great taste!");
+        if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you or filtered out.");
+        
+        if (!isHeadless) mainButton.innerText = "Profiling...";
+        const trackIdsToScore = newRecommendedTracks.map(t => t.id);
+        const statsToScore = await getBatchTrackStats(trackIdsToScore);
+        const tracksWithFeatures = newRecommendedTracks.map(t => ({ ...t, features: statsToScore[t.id] }));
+        const tracksWithPop = await fetchPopularityForMultipleTracks(tracksWithFeatures, null);
+        
+        const tracksToProfileWithPop = await fetchPopularityForMultipleTracks(tracksToProfile, null);
+        const contextProfile = buildContextProfile(tracksToProfileWithPop, completeLikedSongUrisSet, new Set()); 
+        
+        tracksWithPop.forEach(t => {
+            let score = scoreTrackAgainstContext(t, contextProfile);
+            
+            if (t.popularity !== null && contextProfile.popProfile) {
+                const bucketIdx = Math.min(9, Math.floor(t.popularity / 10));
+                const popWeight = contextProfile.popProfile[bucketIdx] || 0;
+                score += (15 * popWeight);
+            }
+            
+            if (userAudioProfile && t.features) {
+                ['energy', 'valence', 'acousticness'].forEach(f => {
+                    const val = t.features[f];
+                    if (val !== undefined && val !== null) {
+                        const range = userAudioProfile.ranges[f];
+                        if (range) {
+                            if (val > range.max || val < range.min) {
+                                score += 10;
+                            }
+                        }
+                    }
+                });
+            }
+            t.finalScore = score;
+        });
+        
+        tracksWithPop.forEach(t => {
+            const fuzz = 0.85 + (Math.random() * 0.30);
+            t.lotteryWeight = Math.pow(Math.max(0.1, t.finalScore * fuzz), 2);
+        });
+        
+        const finalSelected = [];
+        const seenArtists = new Set();
+        const seenAlbums = new Set();
+        let candidatePool = [...tracksWithPop];
+        const targetPlaylistCount = discoveryPlaylistSize;
+        
+        while (finalSelected.length < targetPlaylistCount && candidatePool.length > 0) {
+            let totalWeight = candidatePool.reduce((sum, t) => sum + t.lotteryWeight, 0);
+            if (totalWeight <= 0) break;
+            
+            let r = Math.random() * totalWeight;
+            let selectedIdx = candidatePool.length - 1;
+            for (let i = 0; i < candidatePool.length; i++) {
+                r -= candidatePool[i].lotteryWeight;
+                if (r <= 0) {
+                    selectedIdx = i;
+                    break;
+                }
+            }
+            
+            const track = candidatePool[selectedIdx];
+            candidatePool.splice(selectedIdx, 1);
+            
+            let albumIdentifier = track.album?.id || track.album?.uri || track.album?.name?.toLowerCase().trim() || track.albumName?.toLowerCase().trim();
+            let artistIdentifier = track.artists?.[0]?.id || track.artists?.[0]?.uri || track.artists?.[0]?.name?.toLowerCase().trim() || track.artistName?.toLowerCase().trim();
+            
+            const relaxLimits = candidatePool.length < (targetPlaylistCount - finalSelected.length) + 10;
+            
+            if (!relaxLimits) {
+                if (seenAlbums.has(albumIdentifier) || seenArtists.has(artistIdentifier)) {
+                    continue;
+                }
+            } else if (seenAlbums.has(albumIdentifier)) {
+                continue;
+            }
+            
+            if (albumIdentifier) seenAlbums.add(albumIdentifier);
+            if (artistIdentifier) seenArtists.add(artistIdentifier);
+            finalSelected.push(track);
+        }
+
+        const tracksToSort = finalSelected.slice(0, targetPlaylistCount);
         
         if (!isHeadless) mainButton.innerText = "Sorting...";
-        const tracksToSort = newRecommendedTracks.slice(0, discoveryPlaylistSize * 2);
-        
-        const trackIds = tracksToSort.map(t => t.id);
-        const stats = await getBatchTrackStats(trackIds);
-        const tracksWithFeaturesFinal = tracksToSort.map(t => ({ ...t, features: stats[t.id] }));
-        
-        const validForWave = tracksWithFeaturesFinal.filter(t => t.features && t.features.energy != null);
-        const others = tracksWithFeaturesFinal.filter(t => !t.features || t.features.energy == null);
+        const validForWave = tracksToSort.filter(t => t.features && t.features.energy != null);
+        const others = tracksToSort.filter(t => !t.features || t.features.energy == null);
         
         const sortedTracks = await energyWaveSort(validForWave);
         const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
@@ -30120,12 +34945,12 @@ const getDominantColor = (src) => {
 
         const getFirstWord = (title) => {
             if (!title) return "";
-            const clean = title.replace(/^[^a-zA-Z0-9]+/, '').split(/\s+/)[0].replace(/[^a-zA-Z0-9]+$/, '').toLowerCase();
-            return clean;
+            const match = title.toLowerCase().match(/[a-z0-9]+/);
+            return match ? match[0] : "";
         };
 
         for (const track of verifiedNewTracks) {
-            const duration = track.duration_ms;
+            const duration = Math.round(track.duration_ms / 1000);
             const artistIds = track.artists ? track.artists.map(a => a.id).sort().join(',') : "";
             const firstWord = getFirstWord(track.name);
 
@@ -30244,19 +35069,26 @@ const getDominantColor = (src) => {
   async function isTrackAvailable(track) {
     if (!track) return false;
 
-    if (track.is_playable === false) {
+    if (track.is_playable === false || track.isPlayable === false || track.playability?.playable === false) {
         return false;
     }
 
-    if (Array.isArray(track.available_markets)) {
-        if (track.available_markets.length === 0) {
-            return false;
-        }
+    if (track.is_playable === true || track.isPlayable === true || track.playability?.playable === true) {
+        return true;
+    }
 
-        const userMarket = await userMarketPromise;
-        if (userMarket) {
-            return track.available_markets.includes(userMarket);
+    const trackId = track.id || (track.uri ? track.uri.split(':')[2] : null);
+    if (!trackId) return false;
+
+    try {
+        const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.getTrack, {
+            uri: `spotify:track:${trackId}`
+        });
+        if (res?.data?.trackUnion?.playability) {
+            return res.data.trackUnion.playability.playable === true;
         }
+    } catch (e) {
+        console.warn(`[Sort-Play] Failed to check availability for ${trackId}`, e);
     }
 
     return true;
@@ -30306,8 +35138,10 @@ const getDominantColor = (src) => {
             responseTracks = await fetchBatchInternal();
 
             if (responseTracks) {
-                for (const fullTrack of responseTracks) {
-                    if (fullTrack && await isTrackAvailable(fullTrack)) {
+                const availabilityChecks = await Promise.all(responseTracks.map(t => isTrackAvailable(t)));
+                for (let i = 0; i < responseTracks.length; i++) {
+                    const fullTrack = responseTracks[i];
+                    if (fullTrack && availabilityChecks[i]) {
                         directTracks.push(fullTrack);
                         if (directTracks.length >= numTracksNeeded) {
                             break;
@@ -30386,7 +35220,8 @@ const getDominantColor = (src) => {
                             images: t.albumOfTrack.coverArt?.sources?.map(s => ({ url: s.url })) || []
                         },
                         duration_ms: t.duration.totalMilliseconds,
-                        is_playable: t.playable
+                        explicit: t.explicit || false,
+                        is_playable: t.playability?.playable
                     };
                 });
 
@@ -30559,24 +35394,22 @@ const getDominantColor = (src) => {
 
         updateProgress("Verifying...");
         const availableTracks = [];
-        for (const t of resolvedSpotifyTracks) {
-            if (await isTrackAvailable(t)) availableTracks.push(t);
+        const availabilityChecks = await Promise.all(resolvedSpotifyTracks.map(t => isTrackAvailable(t)));
+        for (let i = 0; i < resolvedSpotifyTracks.length; i++) {
+            if (availabilityChecks[i]) availableTracks.push(resolvedSpotifyTracks[i]);
         }
 
         updateProgress("Filtering...");
         const likedUris = new Set(allLiked.map(s => s.uri));
-        const likedTrackIds = allLiked.map(s => s.uri.split(':')[2]).filter(Boolean);
-        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
-        const likedIsrcs = new Set();
-        cachedLikedMetadata.forEach(meta => {
-            if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
-        });
+        const likedIsrcs = await getLikedIsrcsSet(allLiked);
 
         const candidatesForMeta = availableTracks.map(t => ({
             uri: t.uri,
             id: t.id || t.uri.split(':')[2],
             track: t.track || t, 
             name: t.name,
+            is_playable: t.is_playable,
+            explicit: t.explicit,
             artistName: t.artistName || (t.artists && t.artists[0]?.name) || "",
             allArtists: t.allArtists || (t.artists && t.artists.map(a => a.name).join(", ")),
             artists: t.artists
@@ -30687,8 +35520,13 @@ const getDominantColor = (src) => {
           const gatewayUrlBase = LFM_GATEWAY_URL;
           const baseUrl = `https://www.last.fm/user/${username}/obsessions`;
           
-          const response = await fetch(`${gatewayUrlBase}${encodeURIComponent(baseUrl)}`);
-          if (!response.ok) return [];
+          let response = null;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+              response = await fetch(`${gatewayUrlBase}${encodeURIComponent(baseUrl)}`);
+              if (response.ok) break;
+              if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
+          }
+          if (!response || !response.ok) return [];
           
           const html = await response.text();
           const parser = new DOMParser();
@@ -30882,18 +35720,14 @@ const getDominantColor = (src) => {
           updateProgress("Filtering...");
           const likedSongs = await getLikedSongs();
           const likedUris = new Set(likedSongs.map(s => s.uri));
-          const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
-          const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
-          const likedIsrcs = new Set();
-          cachedLikedMetadata.forEach(meta => {
-              if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
-          });
+          const likedIsrcs = await getLikedIsrcsSet(likedSongs);
 
           const candidatesForMeta = convertedTracks.map(t => ({
               uri: t.uri,
               id: t.id || t.uri.split(':')[2],
               track: t.track || t, 
               name: t.name,
+              is_playable: t.is_playable,
               artistName: t.artistName || (t.artists && t.artists[0]?.name) || "",
               allArtists: t.allArtists || (t.artists && t.artists.map(a => a.name).join(", ")),
               artists: t.artists
@@ -30906,14 +35740,17 @@ const getDominantColor = (src) => {
           const seenUris = new Set();
           const spotifyArtistCounts = new Map();
           
-          for (const c of candidatesWithMeta) {
+          const availabilityChecks = await Promise.all(candidatesWithMeta.map(c => isTrackAvailable(c)));
+          
+          for (let i = 0; i < candidatesWithMeta.length; i++) {
+              const c = candidatesWithMeta[i];
               if (seenUris.has(c.uri)) continue;
               
               if (likedUris.has(c.uri)) continue;
               const isrc = c.track?.external_ids?.isrc;
               if (isrc && likedIsrcs.has(isrc)) continue;
 
-              if (!(await isTrackAvailable(c))) continue;
+              if (!availabilityChecks[i]) continue;
 
               const trackArtists = c.artists || c.track?.artists || [];
               if (trackArtists.length === 0 && !c.artistName) continue;
@@ -31034,20 +35871,31 @@ const getDominantColor = (src) => {
         const gatewayUrl = `${LFM_GATEWAY_URL}${encodeURIComponent(targetUrl)}`;
         
         let candidates = [];
-        try {
-            const response = await fetch(gatewayUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
-            const htmlText = await response.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(htmlText, "text/html");
-            const neighborNodes = doc.querySelectorAll('.user-list-item .user-list-name a');
-            
-            candidates = Array.from(neighborNodes).map(node => ({
-                name: node.textContent.trim()
-            }));
-        } catch (scrapeError) {
-            throw new Error(`Failed to scrape neighbors: ${scrapeError.message}`);
+        let scrapeErrorMsg = "";
+        
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                const response = await fetch(gatewayUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const htmlText = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const neighborNodes = doc.querySelectorAll('.user-list-item .user-list-name a');
+                
+                candidates = Array.from(neighborNodes).map(node => ({
+                    name: node.textContent.trim()
+                }));
+                scrapeErrorMsg = "";
+                break;
+            } catch (scrapeError) {
+                scrapeErrorMsg = scrapeError.message;
+                if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+            }
+        }
+
+        if (scrapeErrorMsg) {
+            throw new Error(`Failed to scrape neighbors: ${scrapeErrorMsg}`);
         }
 
         if (candidates.length === 0) {
@@ -31165,18 +36013,15 @@ const getDominantColor = (src) => {
         const likedSongs = await getLikedSongs();
         const likedUris = new Set(likedSongs.map(s => s.uri));
         
-        const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
-        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
-        const likedIsrcs = new Set();
-        cachedLikedMetadata.forEach(meta => {
-            if (meta?.external_ids?.isrc) likedIsrcs.add(meta.external_ids.isrc);
-        });
+        const likedIsrcs = await getLikedIsrcsSet(likedSongs);
 
         const candidatesForMeta = availableTracks.map(t => ({
             uri: t.uri,
             id: t.id || t.uri.split(':')[2],
             track: t.track || t, 
             name: t.name,
+            is_playable: t.is_playable,
+            explicit: t.explicit,
             artistName: t.artistName || (t.artists && t.artists[0]?.name) || "",
             allArtists: t.allArtists || (t.artists && t.artists.map(a => a.name).join(", ")),
             artists: t.artists
@@ -32147,19 +36992,18 @@ const getDominantColor = (src) => {
             
             updateProgressText("ISRCs...");
             
-            const tracksWithMetadata = await refreshTrackAlbumInfo(uniqueTracks, (progress) => {
-                updateProgressText(`ISRCs ${Math.floor(progress)}%`);
-            });
+            const trackUris = uniqueTracks.map(t => t.uri);
+            const fetchedMetaMap = new Map();
+            for (let i = 0; i < trackUris.length; i += 500) {
+                const batch = trackUris.slice(i, i + 500);
+                try {
+                    const res = await fetchCoreMetadataBatch(batch);
+                    res.forEach((val, key) => fetchedMetaMap.set(key, val));
+                } catch(e){}
+                updateProgressText(`ISRCs ${Math.floor((i / trackUris.length) * 100)}%`);
+            }
 
-            const likedTrackIds = likedSongs.map(s => s.uri.split(':')[2]).filter(Boolean);
-            const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTrackIds, CACHE_EXPIRE_METADATA);
-            
-            const likedIsrcSet = new Set();
-            cachedLikedMetadata.forEach(meta => {
-                if (meta && meta.external_ids && meta.external_ids.isrc) {
-                    likedIsrcSet.add(meta.external_ids.isrc);
-                }
-            });
+            const likedIsrcSet = await getLikedIsrcsSet(likedSongs, (msg) => { updateProgressText(msg); });
 
             const originalOrderMap = new Map();
             tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
@@ -32170,14 +37014,12 @@ const getDominantColor = (src) => {
                     let isLikedB = likedSongUris.has(b.uri);
 
                     if (!isLikedA) {
-                        const metaA = tracksWithMetadata.find(t => t.uri === a.uri);
-                        const isrcA = metaA?.track?.external_ids?.isrc;
+                        const isrcA = fetchedMetaMap.get(a.uri)?.isrc || a.track?.external_ids?.isrc;
                         if (isrcA && likedIsrcSet.has(isrcA)) isLikedA = true;
                     }
                     
                     if (!isLikedB) {
-                        const metaB = tracksWithMetadata.find(t => t.uri === b.uri);
-                        const isrcB = metaB?.track?.external_ids?.isrc;
+                        const isrcB = fetchedMetaMap.get(b.uri)?.isrc || b.track?.external_ids?.isrc;
                         if (isrcB && likedIsrcSet.has(isrcB)) isLikedB = true;
                     }
 
@@ -32195,8 +37037,7 @@ const getDominantColor = (src) => {
                         let isLiked = likedSongUris.has(track.uri);
                         
                         if (!isLiked) {
-                            const meta = tracksWithMetadata.find(t => t.uri === track.uri);
-                            const isrc = meta?.track?.external_ids?.isrc;
+                            const isrc = fetchedMetaMap.get(track.uri)?.isrc || track.track?.external_ids?.isrc;
                             if (isrc && likedIsrcSet.has(isrc)) isLiked = true;
                         }
                         
@@ -32695,6 +37536,30 @@ const getDominantColor = (src) => {
             const { sourceName } = await fetchSourceNameAndArtist(sourceUriForNaming);
             finalSourceName = sourceName;
         }
+
+        if ((!finalSourceName || finalSourceName.trim() === "Source" || finalSourceName.trim().toLowerCase().startsWith("unknown")) && sortedTracks && sortedTracks.length > 0) {
+            if (isArtistPage) {
+                const targetArtistId = sourceUriForNaming.split(":")[2];
+                let foundName = null;
+                for (const t of sortedTracks) {
+                    const artistsArr = t.artists || t.track?.artists || [];
+                    const match = artistsArr.find(a => (a.id || (a.uri && a.uri.split(":")[2])) === targetArtistId);
+                    if (match && match.name) {
+                        foundName = match.name;
+                        break;
+                    }
+                }
+                if (foundName) {
+                    finalSourceName = foundName;
+                } else {
+                    finalSourceName = sortedTracks[0].artistName || sortedTracks[0].artists?.[0]?.name || "Unknown Artist";
+                }
+            } else if (isAlbumPage) {
+                finalSourceName = sortedTracks[0].trueAlbumName || sortedTracks[0].albumName || sortedTracks[0].album?.name || "Unknown Album";
+            } else {
+                finalSourceName = sortedTracks[0].albumName || sortedTracks[0].album?.name || "Unknown Playlist";
+            }
+        }
         
         let suffixPattern = new RegExp(`\\s*(${possibleSuffixes.join("|")})\\s*`);
         while (suffixPattern.test(finalSourceName)) {
@@ -33065,6 +37930,17 @@ const getDominantColor = (src) => {
       return clean;
   }
 
+  function getNormalizedTitle(rawTitle) {
+      if (!rawTitle) return "";
+      return rawTitle
+          .trim()
+          .toLowerCase()
+          .replace(/['’ʼ]/g, "'")
+          .replace(/[()\[\],.:-]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+  }
+
   function getCamelotKey(features) {
       if (!features) return null;
       let camelotKey = features.camelot;
@@ -33216,6 +38092,76 @@ const getDominantColor = (src) => {
             ],
             openingOverride: 'Medium-Energy/Positive-Valence',
             closingOverride: 'Medium-Energy/Positive-Valence'
+        },
+        drive: {
+            core: [
+                'Medium-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Neutral-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Neutral-Valence',
+            closingOverride: 'Low-Energy/Neutral-Valence'
+        },
+        morning: {
+            core: [
+                'Low-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'Low-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Positive-Valence',
+            ],
+            openingOverride: 'Low-Energy/Positive-Valence',
+            closingOverride: 'Medium-Energy/Positive-Valence'
+        },
+        gaming: {
+            core: [
+                'High-Energy/Neutral-Valence',
+                'High-Energy/Negative-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'High-Energy/Neutral-Valence',
+                'High-Energy/Negative-Valence',
+                'High-Energy/Neutral-Valence',
+                'Medium-Energy/Negative-Valence',
+                'High-Energy/Neutral-Valence',
+            ],
+            openingOverride: 'High-Energy/Neutral-Valence',
+            closingOverride: 'High-Energy/Neutral-Valence'
+        },
+        rainy: {
+            core: [
+                'Low-Energy/Neutral-Valence',
+                'Low-Energy/Negative-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Medium-Energy/Negative-Valence',
+                'Low-Energy/Negative-Valence',
+                'Low-Energy/Neutral-Valence',
+                'Low-Energy/Negative-Valence',
+                'Medium-Energy/Neutral-Valence',
+            ],
+            openingOverride: 'Low-Energy/Neutral-Valence',
+            closingOverride: 'Low-Energy/Negative-Valence'
+        },
+        pregame: {
+            core: [
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+                'High-Energy/Positive-Valence',
+                'Medium-Energy/Positive-Valence',
+                'High-Energy/Neutral-Valence',
+                'High-Energy/Positive-Valence',
+            ],
+            openingOverride: 'Medium-Energy/Positive-Valence',
+            closingOverride: 'High-Energy/Positive-Valence'
         }
     };
 
@@ -33804,9 +38750,17 @@ const getDominantColor = (src) => {
             const valB = valBStr ? new Date(valBStr).getTime() : 0;
             const dateComparison = isAsc ? valA - valB : valB - valA;
             if (dateComparison !== 0) return dateComparison;
-            const albumCompare = (a.albumName || "").toLowerCase().localeCompare((b.albumName || "").toLowerCase());
+            
+            const albumA = sortType === "trueReleaseDate" ? (a.trueAlbumName || a.albumName || "") : (a.albumName || "");
+            const albumB = sortType === "trueReleaseDate" ? (b.trueAlbumName || b.albumName || "") : (b.albumName || "");
+            
+            const albumCompare = albumA.toLowerCase().localeCompare(albumB.toLowerCase());
             if (albumCompare !== 0) return albumCompare;
-            return (a.trackNumber || 0) - (b.trackNumber || 0);
+            
+            const trackNumA = sortType === "trueReleaseDate" ? (a.trueTrackNumber || a.trackNumber || 0) : (a.trackNumber || 0);
+            const trackNumB = sortType === "trueReleaseDate" ? (b.trueTrackNumber || b.trackNumber || 0) : (b.trackNumber || 0);
+            
+            return trackNumA - trackNumB;
         });
     } else if (sortType === "shuffle") {
         return shuffleArray(uniqueTracks);
@@ -33981,10 +38935,10 @@ const getDominantColor = (src) => {
                     ${indexText ? `<span style="color: #b3b3b3; font-variant-numeric: tabular-nums; width: 24px; text-align: right; font-size: 13px; flex-shrink: 0;">${indexText}</span>` : ''}
                     <img src="${coverUrl}" data-track-uri="${uri}" class="track-item-cover" style="opacity: ${needsCoverLoad ? '0' : '1'}; flex-shrink: 0;">
                     <div style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; min-width: 0;">
-                        <span class="track-item-title" title="${title}">${title}</span>
-                        <div class="track-item-artist-wrapper" title="${artist} • ${album}">
-                            <span class="track-item-artist-names">${artist}</span>
-                            <span class="track-item-album-name"><span style="margin: 0 4px;">•</span>${album}</span>
+                        <span class="track-item-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+                        <div class="track-item-artist-wrapper" title="${escapeHtml(artist)} • ${escapeHtml(album)}">
+                            <span class="track-item-artist-names">${escapeHtml(artist)}</span>
+                            <span class="track-item-album-name"><span style="margin: 0 4px;">•</span>${escapeHtml(album)}</span>
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; width: 115px; margin-left: 12px;">
@@ -33998,7 +38952,7 @@ const getDominantColor = (src) => {
                         <button class="copy-track-button copy-uri" data-link="${trackLink}" title="Copy Spotify Link">
                             ${linkIconSVG}
                         </button>
-                        <button class="copy-track-button copy-text" data-title="${title}" data-artist="${artist}" title="Copy 'Track - Artist'">
+                        <button class="copy-track-button copy-text" data-title="${escapeHtml(title)}" data-artist="${escapeHtml(artist)}" title="Copy 'Track - Artist'">
                             ${copyIconSVG}
                         </button>
                     </div>
@@ -34348,20 +39302,42 @@ const getDominantColor = (src) => {
     });
 
     if (missingIds.length > 0) {
-        const BATCH_SIZE = 50;
-        
-        const processDedupeInternal = async (id) => {
-            const data = await fetchInternalTrackMetadata(id);
-            if (data) {
-                const cacheData = formatTrackCacheData(data);
-                cachedMetadata.set(data.id, cacheData);
-                idb.set('trackMetadata', data.id, cacheData);
-            }
-        };
-
+        const BATCH_SIZE = 500;
         for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
-            const batch = missingIds.slice(i, i + BATCH_SIZE);
-            await Promise.all(batch.map(id => processDedupeInternal(id)));
+            const batchIds = missingIds.slice(i, i + BATCH_SIZE);
+            const urisToFetch = batchIds.map(id => `spotify:track:${id}`);
+            
+            try {
+                const fetchedMetaMap = await fetchCoreMetadataBatch(urisToFetch);
+                for (const id of batchIds) {
+                    const uri = `spotify:track:${id}`;
+                    const meta = fetchedMetaMap.get(uri);
+                    if (meta && meta.isrc) {
+                        let existing = cachedMetadata.get(id) || { id, external_ids: {} };
+                        if (!existing.external_ids) existing.external_ids = {};
+                        existing.external_ids.isrc = meta.isrc;
+                        cachedMetadata.set(id, existing);
+                        
+                        const idbCached = await idb.get('trackMetadata', id);
+                        if (idbCached) {
+                            if (!idbCached.external_ids) idbCached.external_ids = {};
+                            idbCached.external_ids.isrc = meta.isrc;
+                            idb.set('trackMetadata', id, idbCached);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("[Sort-Play] Fast ISRC fetch failed during deduplication", e);
+                const fallbackBatch = batchIds.slice(0, 50);
+                await Promise.all(fallbackBatch.map(async id => {
+                    const data = await fetchInternalTrackMetadata(id);
+                    if (data) {
+                        const cacheData = formatTrackCacheData(data);
+                        cachedMetadata.set(data.id, cacheData);
+                        idb.set('trackMetadata', data.id, cacheData);
+                    }
+                }));
+            }
         }
     }
 
@@ -34445,16 +39421,6 @@ const getDominantColor = (src) => {
         }
         return clean;
     };
-    
-    const getNormalizedTitle = (rawTitle) => {
-        return rawTitle
-            .trim()
-            .toLowerCase()
-            .replace(/['’ʼ]/g, "'")
-            .replace(/[()\[\],.:-]/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    };
 
     const normalizeAndSplitArtists = (artistStr) => {
         const clean = (name) => name.toLowerCase().replace(/[.&]/g, '').replace(/\s+/g, ' ').trim();
@@ -34485,7 +39451,7 @@ const getDominantColor = (src) => {
             if (isCompA && !isCompB) return 1;
             if (!isCompA && isCompB) return -1;
 
-            if (sortType === 'releaseDate' || sortType === 'trueReleaseDate') {
+            if (sortType === 'releaseDate' || sortType === 'trueReleaseDate' || sortType === 'analyzeCurrentView') {
                 const isAlbumA = typeA === 'album';
                 const isAlbumB = typeB === 'album';
 
@@ -34803,7 +39769,20 @@ const getDominantColor = (src) => {
         }
     }
 
-    return { unique: finalUniqueTracks, removed: finalRemovedTracks };
+    const seenUris = new Set();
+    const cleanedUniqueTracks = [];
+    for (const track of finalUniqueTracks) {
+        if (!seenUris.has(track.uri)) {
+            seenUris.add(track.uri);
+            cleanedUniqueTracks.push(track);
+        } else {
+            if (!finalRemovedTracks.includes(track)) {
+                finalRemovedTracks.push(track);
+            }
+        }
+    }
+
+    return { unique: cleanedUniqueTracks, removed: finalRemovedTracks };
   }
 
   async function handleScrobblesSorting(tracks, sortType, updateProgress) {
@@ -35201,8 +40180,7 @@ const getDominantColor = (src) => {
     try {
         const protobuf = await loadProtobuf();
         
-        const { AuthorizationAPI, ProductStateAPI, PlatformData } = Spicetify.Platform;
-        const token = AuthorizationAPI.getState().token.accessToken;
+        const { ProductStateAPI, PlatformData } = Spicetify.Platform;
         const productState = await ProductStateAPI.getValues();
         const country = productState.country || "US";
         const catalogue = productState.catalogue || "premium";
@@ -35244,22 +40222,64 @@ const getDominantColor = (src) => {
             };
 
             const buffer = rootRequest.encode(payload).finish();
+            
+            let attempt = 0;
+            let success = false;
+            let decoded = null;
 
-            const res = await fetch("https://spclient.wg.spotify.com/extended-metadata/v0/extended-metadata", {
-                method: "POST",
-                body: buffer,
-                headers: {
-                    "Content-Type": "application/protobuf",
-                    "Authorization": `Bearer ${token}`,
-                    "Spotify-App-Version": Spicetify.Platform.version,
-                    "App-Platform": PlatformData.app_platform
+            while (attempt < 3 && !success) {
+                if (internalTokenRefreshPromise) {
+                    await internalTokenRefreshPromise;
                 }
-            });
+                const token = Spicetify.Platform.Session.accessToken;
 
-            if (!res.ok) continue;
+                const res = await fetch("https://spclient.wg.spotify.com/extended-metadata/v0/extended-metadata", {
+                    method: "POST",
+                    body: buffer,
+                    headers: {
+                        "Content-Type": "application/protobuf",
+                        "Authorization": `Bearer ${token}`,
+                        "Spotify-App-Version": Spicetify.Platform.version,
+                        "App-Platform": PlatformData.app_platform
+                    }
+                });
 
-            const resBuffer = new Uint8Array(await res.arrayBuffer());
-            const decoded = rootResponse.decode(resBuffer);
+                if (res.status === 401) {
+                    if (!internalTokenRefreshPromise) {
+                        console.warn(`[Sort-Play] Token 401 in AudioFeaturesBatch. Starting Refresh...`);
+                        internalTokenRefreshPromise = (async () => {
+                            try {
+                                const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                                const newToken = tokenData.accessToken;
+                                Spicetify.Platform.Session.accessToken = newToken;
+                                await new Promise(r => setTimeout(r, 500));
+                                return newToken;
+                            } catch (e) {
+                                console.error("[Sort-Play] Token refresh failed", e);
+                                throw e;
+                            } finally {
+                                internalTokenRefreshPromise = null;
+                            }
+                        })();
+                    }
+                    try {
+                        await internalTokenRefreshPromise;
+                    } catch (e) {
+                        break;
+                    }
+                    attempt++;
+                    continue;
+                }
+
+                if (!res.ok) break;
+
+                const resBuffer = new Uint8Array(await res.arrayBuffer());
+                decoded = rootResponse.decode(resBuffer);
+                success = true;
+            }
+
+            if (!success || !decoded) continue;
+
             const data = rootResponse.toObject(decoded, {
                 longs: String,
                 enums: String,
@@ -35350,22 +40370,69 @@ const getDominantColor = (src) => {
         }
     });
 
-    if (missingIds.length === 0) return results;
+    if (missingIds.length === 0) {
+        if (updateProgress) updateProgress(100);
+        return results;
+    }
 
     const pitchClasses = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"];
-    const BATCH_SIZE = 150;
+    const BATCH_SIZE = 250;
     let tracksProcessed = 0;
 
     for (let i = 0; i < missingIds.length; i += BATCH_SIZE) {
         const batchIds = missingIds.slice(i, i + BATCH_SIZE);
         
         const batchPromises = batchIds.map(async (id) => {
-            try {
-                const features = await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/audio-attributes/v1/audio-features/${id}`);
-                if (features && features.id) {
-                    return { id, features, success: true };
-                }
-            } catch (e) {}
+            let attempt = 0;
+            while (attempt < 3) {
+                try {
+                    if (internalTokenRefreshPromise) {
+                        await internalTokenRefreshPromise;
+                    }
+                    const token = Spicetify.Platform.Session.accessToken;
+                    const url = `https://spclient.wg.spotify.com/audio-attributes/v1/audio-features/${id}`;
+                    const res = await fetch(url, {
+                        headers: {
+                            "Authorization": `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (res.status === 401) {
+                        if (!internalTokenRefreshPromise) {
+                            console.warn(`[Sort-Play] Token 401 in BatchTrackStats. Starting Refresh...`);
+                            internalTokenRefreshPromise = (async () => {
+                                try {
+                                    const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
+                                    const newToken = tokenData.accessToken;
+                                    Spicetify.Platform.Session.accessToken = newToken;
+                                    await new Promise(r => setTimeout(r, 500));
+                                    return newToken;
+                                } catch (e) {
+                                    console.error("[Sort-Play] Token refresh failed", e);
+                                    throw e;
+                                } finally {
+                                    internalTokenRefreshPromise = null;
+                                }
+                            })();
+                        }
+                        try {
+                            await internalTokenRefreshPromise;
+                        } catch (e) {
+                            return { id, features: null, success: false };
+                        }
+                        attempt++;
+                        continue;
+                    }
+
+                    if (!res.ok) throw new Error("Fetch failed");
+                    const features = await res.json();
+                    
+                    if (features && features.id) {
+                        return { id, features, success: true };
+                    }
+                } catch (e) {}
+                break;
+            }
             return { id, features: null, success: false };
         });
 
@@ -35429,7 +40496,10 @@ const getDominantColor = (src) => {
 
         tracksProcessed += batchIds.length;
         if (updateProgress) updateProgress(Math.min(100, Math.floor((tracksProcessed / missingIds.length) * 100)));
-        await new Promise(r => setTimeout(r, 100)); 
+        
+        if (i + BATCH_SIZE < missingIds.length) {
+            await new Promise(r => setTimeout(r, 50)); 
+        }
     }
 
     return results;
@@ -36306,6 +41376,7 @@ const getDominantColor = (src) => {
       const trackName = isArtistContext ? "" : (trackInfo.name || trackInfo.songTitle || "");
       const trackUri = trackInfo.uri || "";
       const trackId = trackUri.split(":")[2] || null;
+      const entityUriForColor = isArtistContext ? trackUri : (trackInfo.albumUri || trackInfo.album?.uri || trackInfo.track?.album?.uri || trackUri);
 
       let lfmArtist = artistName;
       let lfmTrack = trackName;
@@ -36426,7 +41497,7 @@ const getDominantColor = (src) => {
               }
           }
 
-          const [r, g, b] = await getDominantColor(albumImage);
+          const [r, g, b] = await getDominantColor(albumImage, entityUriForColor);
           const brightness = (r * 299 + g * 587 + b * 114) / 1000;
           const fabTextColor = brightness > 140 ? '#000000' : '#ffffff';
           
@@ -36731,11 +41802,11 @@ const getDominantColor = (src) => {
                     <div class="lfm-header">
                         <img src="${albumImage}" class="lfm-cover" style="${coverStyle}">
                         <div class="lfm-info">
-                            <div class="lfm-title" title="${titleStr}">
-                                <span class="lfm-title-text">${titleStr}</span>
+                            <div class="lfm-title" title="${escapeHtml(titleStr, "")}">
+                                <span class="lfm-title-text">${escapeHtml(titleStr, "")}</span>
                                 ${(trackId && !isArtistContext) ? `<button id="lfm-fix-match-btn-header" title="Fix Match (Override Link)" style="background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.6); padding:0; margin-left:8px; flex-shrink:0; display:flex; align-items:center; transition: color 0.2s;">${penIconSvg}</button>` : ''}
                             </div>
-                            <div class="lfm-artist">${artistStr}</div>
+                            <div class="lfm-artist">${escapeHtml(artistStr, "")}</div>
                         </div>
                     </div>
 
@@ -36866,11 +41937,11 @@ const getDominantColor = (src) => {
                               </div>
                               <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; padding-bottom: 2px;">
                                   <div style="display: flex; align-items: baseline; gap: 8px;">
-                                      <a href="${userUrl}" target="_blank" style="color: white; font-weight: 600; font-size: 13px; word-break: break-all; text-decoration: none;">${c.username}</a>
-                                      <span style="color: rgba(255,255,255,0.5); font-size: 11px; white-space: nowrap;">${dateStr}</span>
+                                      <a href="${userUrl}" target="_blank" style="color: white; font-weight: 600; font-size: 13px; word-break: break-all; text-decoration: none;">${escapeHtml(c.username, "User")}</a>
+                                      <span style="color: rgba(255,255,255,0.5); font-size: 11px; white-space: nowrap;">${escapeHtml(dateStr, "")}</span>
                                   </div>
                                   <div style="color: rgba(255,255,255,0.85); font-size: 13px; line-height: 1.4; margin-top: 2px; word-break: break-word;">
-                                      ${c.body}
+                                      ${escapeHtml(c.body, "")}
                                   </div>
                                   <div style="display: flex; align-items: center; gap: 9px; margin-top: 6px;">
                                       ${replyHtml}
@@ -37520,6 +42591,33 @@ const getDominantColor = (src) => {
                 }
             } catch(e) {
                 console.warn("[Sort-Play] Global playcount prefetch failed", e);
+            }
+        }
+    }
+
+    if (columnConfigs.some(c => c.type === 'releaseDate')) {
+        const allSpotifyIds = spotifyTracksToProcess.map(item => item.id);
+        const cachedGlobalRD = await idb.getMany('releaseDates', allSpotifyIds, CACHE_EXPIRE_RELEASE_DATE);
+        const missingRDIds = allSpotifyIds.filter(id => {
+            const rd = cachedGlobalRD.get(id);
+            return rd === undefined || rd === null;
+        });
+
+        if (missingRDIds.length > 0) {
+            try {
+                const RD_BATCH_SIZE = 500;
+                for (let i = 0; i < missingRDIds.length; i += RD_BATCH_SIZE) {
+                    const batch = missingRDIds.slice(i, i + RD_BATCH_SIZE);
+                    const uris = batch.map(id => `spotify:track:${id}`);
+                    const rdResults = await fetchReleaseDatesBatchNew(uris);
+                    
+                    for (const [uri, date] of rdResults.entries()) {
+                        const tId = uri.split(":")[2];
+                        await idb.set('releaseDates', tId, { date: date, trackNumber: 0 });
+                    }
+                }
+            } catch(e) {
+                console.warn("[Sort-Play] Global release date prefetch failed", e);
             }
         }
     }
@@ -39058,24 +44156,37 @@ const getDominantColor = (src) => {
             }
         });
 
-        const processLikeInternal = async (id) => {
-            const track = await fetchInternalTrackMetadata(id);
-            if (track) {
-                idb.set('trackMetadata', track.id, formatTrackCacheData(track));
-
-                if (track.external_ids && track.external_ids.isrc) {
-                    newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+        if (likedTracksIdsWithUnknownISRCs.length > 0) {
+            for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 500) {
+                let batchIds = likedTracksIdsWithUnknownISRCs.slice(i, i + 500);
+                let batchUris = batchIds.map(id => `spotify:track:${id}`);
+                
+                try {
+                    const fetchedMetaMap = await fetchCoreMetadataBatch(batchUris);
+                    for (const id of batchIds) {
+                        const meta = fetchedMetaMap.get(`spotify:track:${id}`);
+                        if (meta && meta.isrc) {
+                            newLikedTracksIdsISRCs.set(id, meta.isrc);
+                            const existing = cachedLikedMetadata.get(id) || { id, external_ids: {} };
+                            if (!existing.external_ids) existing.external_ids = {};
+                            existing.external_ids.isrc = meta.isrc;
+                            idb.set('trackMetadata', id, existing);
+                        }
+                    }
+                } catch(e) {
+                    await Promise.all(batchIds.slice(0, 50).map(async id => {
+                        try {
+                            const track = await fetchInternalTrackMetadata(id);
+                            if (track && track.external_ids?.isrc) {
+                                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
+                            }
+                        } catch (err) {}
+                    }));
                 }
-            }
-        };
-
-        for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 50) {
-            let batch = likedTracksIdsWithUnknownISRCs.slice(i, i + 50);
-            
-            await Promise.all(batch.map(id => processLikeInternal(id)));
-            
-            if (i + 50 < likedTracksIdsWithUnknownISRCs.length) {
-                await new Promise(resolve => setTimeout(resolve, 150));
+                
+                if (i + 500 < likedTracksIdsWithUnknownISRCs.length) {
+                    await new Promise(resolve => setTimeout(resolve, 150));
+                }
             }
         }
 
@@ -39100,7 +44211,7 @@ const getDominantColor = (src) => {
         setTimeout(likeButton_initiateLikedSongs, 30000);
     }
 
-    const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16, dynamicSizeSelector = null, buttonStyle = { marginRight: "12px" } }) {
+    const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16.3, dynamicSizeSelector = null, buttonStyle = { marginRight: "12px" } }) {
         const trackId = uri.replace("spotify:track:", "");
         const [currentSize, setCurrentSize] = Spicetify.React.useState(size);
         const [isrc, setISRC] = Spicetify.React.useState(null);
@@ -39165,24 +44276,27 @@ const getDominantColor = (src) => {
         Spicetify.React.useEffect(() => {
             if (!dynamicSizeSelector) return;
 
-            const referenceElement = document.querySelector(dynamicSizeSelector);
+            const buttonSelector = dynamicSizeSelector.split(',').map(s => s.replace(' svg', '')).join(',');
+            const referenceElement = document.querySelector(buttonSelector) || document.querySelector(dynamicSizeSelector);
             if (!referenceElement) return;
 
-            const resizeObserver = new ResizeObserver(entries => {
-                for (let entry of entries) {
-                    const newSize = entry.contentRect.height || entry.contentRect.width;
+            const updateSize = () => {
+                const targetSvg = document.querySelector(dynamicSizeSelector);
+                if (targetSvg) {
+                    const rect = targetSvg.getBoundingClientRect();
+                    const newSize = rect.height || rect.width;
                     if (newSize > 0) {
                         setCurrentSize(newSize);
                     }
                 }
+            };
+
+            const resizeObserver = new ResizeObserver(() => {
+                updateSize();
             });
 
             resizeObserver.observe(referenceElement);
-
-            const initialSize = referenceElement.getBoundingClientRect().height;
-            if (initialSize > 0) {
-                setCurrentSize(initialSize);
-            }
+            updateSize();
 
             return () => resizeObserver.disconnect();
         }, [dynamicSizeSelector]);
@@ -39978,8 +45092,6 @@ const getDominantColor = (src) => {
   }
   
   loadSettings();
-  fetchUserMarket();
-  cleanupLegacyCache();
   fetchLastFmKeys();
   fetchGeminiKeys();
 
