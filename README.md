@@ -133,13 +133,12 @@ Generate a variety of curated playlists with a single click.
 *   **Available Playlist Types:**
     *   **My Top Tracks:** Create playlists of your most-played tracks from the "Last Month," "Last 6 Months," or "All Time."
     *   **New Releases from Followed Artists:** A full playlist in order of release of all new singles and album tracks from every artist you follow.
-    *   **Genre Exploration:**
-        *   **Genre Tree Explorer:** Generate a tailored playlist by selecting from a comprehensive list of main genres.
-        *   **Random Genre Explorer:** Get a mix from a random selection of 20 genres from across Spotify.
     *   **Discovery Mixes:**
         *   **Recent Taste:** Recommendations based on your recent listening habits.
         *   **All-Time Taste:** Recommendations based on your long-term listening history.
         *   **Pure Discovery:** Recommendations exclusively from artists completely new to your listening history.
+    *   **Genre Exploration:**
+        *   **Random Genre Explorer:** Get a mix from a random selection of 20 genres from across Spotify.
     *   **Last.fm Generators:**
         *   **Infinite Vibe:** A continuous mood generated from your current track, recent obsessions, and library deep cuts.
         *   **Tastemaker Profile:** Enter a Last.fm username to clone their top tracks, loved tracks, and obsessions into a fresh discovery playlist.
@@ -168,6 +167,29 @@ Build powerful, self-updating playlists that manage themselves.
 </details>
 
 <details>
+<summary><b>➕ Playlist Analyzer</b> - Get visual insights and charts for your current view.</summary>
+<br>
+
+Generate a dashboard of the current tracklist (Playlist/Artist/Album) with visual insights and charts.
+*   **Top Artists, Albums & Genres:** Explore interactive Treemaps showcasing the most prominent artists and albums, alongside genre distributions.
+*   **Quick Stats:** View metrics like total duration, average popularity, and total/median streams.
+*   **Timeline & Eras:** See when the tracks were released using a Release Year Bar Chart, or use the Decades Analysis to see the defining eras (e.g., 80s, 90s, 00s) of the list.
+*   **Vibe Map (Mood Analysis):** View the emotional tone of the tracks via a categorized Mood Ring, or explore the interactive Heatmap that maps track density based on Positivity (Valence) vs. Intensity (Energy).
+*   **Audio Profile & Musicality:** View the Tempo (BPM) distribution, Top Musical Keys displayed on an interactive Camelot Wheel, and a Radar Chart breaking down acousticness, danceability, energy, and more.
+*   **Setting Predictor:** Predicts the ideal time of day and weather (e.g., "Late Night", "Sunny & Clear") for the current tracklist based on its audio features.
+</details>
+
+<details>
+<summary><b>➕ Vibe Filter</b> - Filter tracks by mood using an interactive grid or mixer.</summary>
+<br>
+
+Analyze and filter tracks based on their raw emotional tone and audio features.
+*   **Grid Mode:** Select multiple vibes (e.g., Upbeat, Chill, Focus) to easily filter and include tracks that match any of the selected moods.
+*   **Mixer Mode:** Act like a DJ by dialing in exact percentages for each vibe to craft the perfect blended playlist.
+*   **Match Strictness:** Choose between Broad, Balanced, or Strict match levels to control how closely tracks must fit your chosen vibes.
+</details>
+
+<details>
 <summary><b>➕ Advanced Custom Filter</b> - Filter by keywords, range sliders, and preview results in an interactive table.</summary>
 <br>
 
@@ -184,7 +206,7 @@ A powerful modal to meticulously filter any playlist or discography.
 <br>
 
 Filter any playlist or discography by genre with a powerful, interactive modal.
-*   **Multi-Source Data:** Combines genre information from Spotify, Last.fm, and Deezer for the most detailed and accurate profile possible for each track.
+*   **Multi-Source Data:** Uses lightning-fast Spotify Track genres by default, with optional toggles to use genre data from Last.fm and Deezer.
 *   **Cloud Caching:** Uses a smart, community-driven database. Once a track is processed by any user, its genres load instantly for everyone else.
 *   **Intelligent Mapping:** Automatically groups hundreds of specific sub-genres into broader, easy-to-understand main genres.
 *   **Include & Exclude Modes:** Offers dual-action filtering to include genres (left-click) or exclude them (right-click).
@@ -245,18 +267,28 @@ Choose what happens after sorting and how your library is managed.
   </tr>
   <tr>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/464630a5-d2f5-4fb1-aa1c-63c06b5b8f1e" width="500px">
-      <br><b>Genre Filtering</b>
+      <img src="https://github.com/user-attachments/assets/e269a370-8d54-436a-b459-3d652186626b" width="500px">
+      <br><b>Playlist Analyzer</b>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/fd39bb6c-aab0-480a-8225-64c3ea8ba0ed" width="500px">
-      <br><b>AI Pick</b>
+      <img src="https://github.com/user-attachments/assets/8eeab9e9-4eb3-4e2d-a545-60953d72be26" width="500px">
+      <br><b>Vibe Filter</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/fb0fc640-4b4d-411f-aab0-d07e7949b158" width="500px">
+      <img src="https://github.com/user-attachments/assets/80065c83-13a6-4460-8050-93fd92232aaf" width="500px">
       <br><b>Dynamic Playlists</b>
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/f29ae93f-9f2f-42ef-9aa3-7ee744c3ff4b" width="500px">
+      <br><b>Dedicated Playlists</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/464630a5-d2f5-4fb1-aa1c-63c06b5b8f1e" width="500px">
+      <br><b>Genre Filtering</b>
     </td>
     <td align="center">
       <img src="https://github.com/user-attachments/assets/6ceabead-4def-4e97-b31d-322b0374f3da" width="500px">
@@ -265,11 +297,21 @@ Choose what happens after sorting and how your library is managed.
   </tr>
   <tr>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/67ebab88-8a98-4a15-9533-a27e7449a479" width="500px">
-      <br><b>Dedicated Playlists</b>
+      <img src="https://github.com/user-attachments/assets/d656ecb3-4bbd-4d93-af19-985ae0c76116" width="500px">
+      <br><b>Now Playing Genre & Data</b>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/868a2bd6-252e-41f3-a3ee-854c26a20c10" width="500px">
+      <img src="https://github.com/user-attachments/assets/fd39bb6c-aab0-480a-8225-64c3ea8ba0ed" width="500px">
+      <br><b>AI Pick</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/54959812-3b7c-43c8-8be7-9d1ad88bd411" width="500px">
+      <br><b>Last.fm Details</b>
+    </td>
+    <td align="center">
+      <img src="https://github.com/user-attachments/assets/fd59711a-86dd-4baa-9df7-fecaf91a882f" width="500px">
       <br><b>Settings</b>
     </td>
   </tr>
