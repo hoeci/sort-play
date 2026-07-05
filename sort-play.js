@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.1.0";
+  const SORT_PLAY_VERSION = "6.1.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -1305,7 +1305,10 @@
   };
 
   const getWebpackService = (id) => {
-    const req = window.webpackChunkclient_web.push([[Symbol()], {}, (r) => r]);
+    const chunk = window.webpackChunkclient_web ?? window.rspackChunkclient_web;
+    if (!chunk) return null;
+    
+    const req = chunk.push([[Symbol()], {}, (r) => r]);
     return Object.values(req.m).flatMap(m => {
       try { return Object.values(req(Object.keys(req.m).find(k => req.m[k] === m))); } catch { return []; }
     }).find(c => c?.SERVICE_ID === id);
@@ -1327,6 +1330,8 @@
       if (metadataServiceClient) return metadataServiceClient;
       try {
           const MetadataService = getWebpackService("spotify.mdata_esperanto.proto.MetadataService");
+          if (!MetadataService) return null;
+          
           const transport = Spicetify.Platform.ProductStateAPI.productStateApi.transport;
           metadataServiceClient = new MetadataService(transport);
       } catch (e) {
