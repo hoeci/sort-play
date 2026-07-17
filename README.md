@@ -30,7 +30,7 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 *   **Global Play Count:** The track's total play count on Spotify.
 *   **Popularity:** Spotify's internal 0-100 popularity index.
 *   **Release Date:** The track's official album release date.
-*   **True Release Date:** The track's actual historical debut. Automatically bypasses later re-issues, compilations, and remasters to find the original release date, while preserving accurate dates for live tracks and remixes.
+*   **True Release Date:** The track's actual historical debut. Automatically bypasses later re-issues, compilations, and remasters to find the original release date, while preserving accurate dates for live tracks and remixes (Note: accuracy is limited to the oldest available track on Spotify and may not be 100% accurate).
 *   **Last.fm Scrobbles:** The track's total global scrobbles on Last.fm.
 *   **My Scrobbles:** Your personal scrobble count for each track (requires Last.fm username).
 *   **Scrobble Range:** Your personal scrobbles within a specific custom date range (requires Last.fm username).
@@ -75,6 +75,7 @@ Enhance your music views with more information.
 *   **Data Types:** Display Play Count, Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence and DJ Info (Key + BPM + Energy).
 *   **Custom Formatting:** Configure the format for release dates and how your personal scrobbles are displayed (number vs. checkmark).
 *   **Quick Column Switching:** Click the header of any extra column to instantly switch its data type.
+*   **Interactive Cells:** Click on a True Release Date cell to instantly navigate to that exact album. Click on Scrobble data cells to instantly view detailed Last.fm stats.
 </details>
 
 <details>
@@ -193,12 +194,14 @@ Analyze and filter tracks based on their raw emotional tone and audio features.
 <summary><b>➕ Advanced Custom Filter</b> - Filter by keywords, range sliders, and preview results in an interactive table.</summary>
 <br>
 
-A powerful modal to meticulously filter any playlist or discography.
-*   **Keyword Filtering:** Use keywords to filter by track title, album, and artist, with options to keep or exclude matches and match whole words.
+A completely redesigned, powerful modal to meticulously filter any playlist or discography.
 *   **Range Sliders:** Apply precise range sliders for attributes like Release Date, Duration, Play Count, Popularity, and Audio Features.
-*   **Interactive Table:** View, sort, and manually remove tracks from your filtered selection in a detailed table before creating the playlist.
+*   **Track Versions & Status:** Filter precisely by Live, Remix, Acoustic, and Instrumental versions, as well as Explicit, Liked, Followed, and Scrobble History status.
+*   **Release Types & Quick Actions:** Instantly isolate Albums, EPs, Singles, or Compilations, and apply quick deduplication directly in the modal.
+*   **Keyword Filtering:** Use keywords to filter by track title, album, and artist, with options to keep or exclude matches and match whole words.
+*   **Interactive Tracklist:** View, sort, and manually remove tracks from your filtered selection in a detailed Tracklist before creating the playlist.
 *   **Save & Load Keywords:** Save your favorite keyword sets into named groups and load them instantly for future use.
-*   **Integrated Mini-Player:** Preview and listen to tracks directly within the filter modal to help make your selections.
+*   **Integrated Mini-Player:** Preview and listen to tracks directly within the Tracklist to help make your selections.
 </details>
 
 <details>
@@ -232,7 +235,7 @@ Use AI to select specific songs from your current list based on your prompt.
 <summary><b>➕ Local File Integration</b> - Convert local files to Spotify tracks for sorting and streaming.</summary>
 <br>
 
-*   **Automatic Sorting Integration:** Converts local tracks in playlists to their Spotify versions on-the-fly when sorting or filtering.
+*   **Universal Support:** Fully supported across sorting, custom/genre filtering, dynamic playlists, and analysis tools. Automatically converts local tracks in playlists to their Spotify versions on-the-fly.
 *   **Dedicated Conversion Tool:** Convert your entire 'Local Files' library into a new, streamable Spotify playlist.
 *   **Detailed Report:** After converting your Local Files, view a report of which tracks were found and which couldn't be matched.
 *   **Export Report:** Download the detailed conversion report as a JSON file for your records.
@@ -281,7 +284,7 @@ Choose what happens after sorting and how your library is managed.
       <br><b>Dynamic Playlists</b>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/f29ae93f-9f2f-42ef-9aa3-7ee744c3ff4b" width="500px">
+      <img src="https://github.com/user-attachments/assets/e732e945-0cd1-4fb2-b8a6-cc172b0ba48a" width="500px">
       <br><b>Dedicated Playlists</b>
     </td>
   </tr>
@@ -291,7 +294,7 @@ Choose what happens after sorting and how your library is managed.
       <br><b>Genre Filtering</b>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/6ceabead-4def-4e97-b31d-322b0374f3da" width="500px">
+      <img src="https://github.com/user-attachments/assets/f688d571-c3c1-402e-9f40-dfdbcdee5c72" width="500px">
       <br><b>Custom Filters</b>
     </td>
   </tr>
