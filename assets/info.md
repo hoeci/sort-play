@@ -50,7 +50,7 @@ Get visual insights and charts for any playlist, album, or artist. Includes Top 
 Filter tracks by mood using an interactive grid or mixer. Dial in exact percentages of specific vibes (Upbeat, Chill, Focus, etc.) and adjust match strictness (Broad, Balanced, Strict) to craft the perfect playlist.
 
 ### ➕ Advanced Custom Filter
-Filter by keywords (track, album, artist) and range sliders (Release Date, Duration, Play Count, Popularity, Tempo, Energy, etc.). View results in an interactive table with integrated mini-player. Save and load keyword sets.
+Filter by range sliders (Release Date, Duration, Play Count, Popularity, Audio Features), track versions & status (Live, Remix, Acoustic, Instrumental, Explicit, Liked, Followed, Scrobble History), release types, and keywords. Apply quick deduplication and view results in an interactive tracklist with an integrated mini-player.
 
 ### ➕ Genre Filtering
 Filter by genre using Spotify Track data (with optional toggles for Last.fm and Deezer). Browse with track counts, search, and "match all" option.
@@ -59,7 +59,7 @@ Filter by genre using Spotify Track data (with optional toggles for Last.fm and 
 Use AI to select specific songs from your current list based on natural language prompts. Powered by Google Gemini with customizable instructions, model selection, and data toggles.
 
 ### ➕ Local File Integration
-Automatic conversion when sorting/filtering. Dedicated tool converts Local Files library to Spotify playlist with detailed export reports.
+Fully supported across sorting, custom/genre filtering, dynamic playlists, and analysis tools. Automatic conversion to Spotify tracks when processing. Dedicated tool converts Local Files library to a Spotify playlist with detailed export reports.
 
 ### ➕ Flexible Output Options
 Save as new playlist, modify current playlist, add to queue. Configure playlist privacy and automatic titling. Automatic playlist organization into "Sort-Play Library" folder.
@@ -92,7 +92,7 @@ Save as new playlist, modify current playlist, add to queue. Configure playlist 
       <br><b>Dynamic Playlists</b>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/f29ae93f-9f2f-42ef-9aa3-7ee744c3ff4b" width="500px">
+      <img src="https://github.com/user-attachments/assets/e732e945-0cd1-4fb2-b8a6-cc172b0ba48a" width="500px">
       <br><b>Dedicated Playlists</b>
     </td>
   </tr>
@@ -102,7 +102,7 @@ Save as new playlist, modify current playlist, add to queue. Configure playlist 
       <br><b>Genre Filtering</b>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/6ceabead-4def-4e97-b31d-322b0374f3da" width="500px">
+      <img src="https://github.com/user-attachments/assets/f688d571-c3c1-402e-9f40-dfdbcdee5c72" width="500px">
       <br><b>Custom Filters</b>
     </td>
   </tr>
