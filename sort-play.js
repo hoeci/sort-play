@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.2.0";
+  const SORT_PLAY_VERSION = "6.3.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -2670,6 +2670,7 @@
     valence: false,
     acousticness: false,
     instrumentalness: false,
+    key: false,
     filterLiked: false,
     sortByLiked: false,
     filterSingles: false,
@@ -2729,6 +2730,10 @@
     }
     followedReleasesAlbumLimit = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_LIMIT) || 'all';
     discoveryPlaylistSize = parseInt(localStorage.getItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE), 10) || 50;
+    if (discoveryPlaylistSize === 25) {
+        discoveryPlaylistSize = 30;
+        localStorage.setItem(STORAGE_KEY_DISCOVERY_PLAYLIST_SIZE, "30");
+    }
     discoveryStrictAlbumExclusion = localStorage.getItem(STORAGE_KEY_DISCOVERY_STRICT_ALBUM_EXCLUSION) === "true";
     placePlaylistsInFolder = localStorage.getItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER) === "true";
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
@@ -8625,7 +8630,7 @@
           </label>
           <div class="col action">
               <select id="discoveryPlaylistSizeSelect" style="width: 70px;">
-                  <option value="25">25</option>
+                  <option value="30">30</option>
                   <option value="50">50</option>
                   <option value="75">75</option>
                   <option value="100">100</option>
@@ -12860,6 +12865,7 @@
           "valence",
           "acousticness",
           "instrumentalness",
+          "key",
           "filterFollowedMain",
           "filterFollowedAny",
           "removeFollowed",
@@ -12906,6 +12912,7 @@
           valence: { fullName: "valence", shortName: "Valence" },
           acousticness: { fullName: "acousticness", shortName: "Acousticness" },
           instrumentalness: { fullName: "instrumentalness", shortName: "Instrumentalness" },
+          key: { fullName: "key (Camelot)", shortName: "Key" },
           tasteMatch: { fullName: "taste profile match", shortName: "Taste Match" },
           aiPick: { fullName: "AI recommendation", shortName: "AI Pick" },
           default: { fullName: "default order", shortName: "Default" },
@@ -16486,6 +16493,9 @@
     let cfAcousticMode = 'all';
     let cfInstrumentalMode = 'all';
     let cfReleaseTypes = new Set(['album', 'ep', 'single', 'compilation']);
+    let cfSelectedKeys = new Set();
+    let cfPrimaryKeys = new Set();
+    let cfHarmonicMode = false;
     let cfRemoveDuplicates = false;
     let cfOnePerArtist = false;
     let cfRemoveTrashed = false;
@@ -17073,6 +17083,18 @@
             });
         }
 
+        if (cfSelectedKeys.size > 0) {
+            badges.push({
+                text: `Key: ${Array.from(cfSelectedKeys).join(', ')}`,
+                clear: () => {
+                    cfSelectedKeys.clear();
+                    cfPrimaryKeys.clear();
+                    modalContainer.querySelectorAll('.key-pill-btn').forEach(b => b.classList.remove('active', 'harmonic-active'));
+                    debouncedUpdateTrackFilters();
+                }
+            });
+        }
+
         if (cfRemoveDuplicates) badges.push({ text: 'Remove Duplicates', clear: () => { cfRemoveDuplicates = false; modalContainer.querySelector('#cf-remove-duplicates').checked = false; debouncedUpdateTrackFilters(); } });
         if (cfOnePerArtist) badges.push({ text: 'One per Artist', clear: () => { cfOnePerArtist = false; modalContainer.querySelector('#cf-one-per-artist').checked = false; debouncedUpdateTrackFilters(); } });
         if (cfRemoveTrashed) badges.push({ text: 'Remove Trashed', clear: () => { cfRemoveTrashed = false; modalContainer.querySelector('#cf-remove-trashed').checked = false; debouncedUpdateTrackFilters(); } });
@@ -17401,6 +17423,13 @@
                     else if (type === 'single') resolvedType = 'single';
                     
                     if (!cfReleaseTypes.has(resolvedType)) {
+                        track.isRemovedByStatus = true;
+                    }
+                }
+
+                if (!track.isRemovedByStatus && cfSelectedKeys.size > 0) {
+                    const camelot = getCamelotKey(track.features);
+                    if (!camelot || !cfSelectedKeys.has(camelot)) {
                         track.isRemovedByStatus = true;
                     }
                 }
@@ -17967,6 +17996,44 @@
         { group: 'Audio Features', id: 'features.speechiness', label: 'Speechiness', type: 'number' }
     ];
 
+    const availableCamelotKeys = new Set();
+    tracks.forEach(t => {
+        const camelot = getCamelotKey(t.features);
+        if (camelot) availableCamelotKeys.add(camelot);
+    });
+
+    const camelotFilterEntries = [];
+    for (let k = 0; k < 12; k++) {
+        for (let m = 0; m <= 1; m++) {
+            const camelot = formatKey(k, m, 'camelot');
+            const standard = formatKey(k, m, 'standard');
+            const order = parseInt(camelot, 10) * 2 + (camelot.slice(-1) === 'B' ? 1 : 0);
+            camelotFilterEntries.push({ camelot, standard, order });
+        }
+    }
+    camelotFilterEntries.sort((a, b) => {
+        const aAvailable = availableCamelotKeys.has(a.camelot);
+        const bAvailable = availableCamelotKeys.has(b.camelot);
+        
+        if (aAvailable !== bAvailable) {
+            return aAvailable ? -1 : 1;
+        }
+
+        const numA = parseInt(a.camelot, 10);
+        const numB = parseInt(b.camelot, 10);
+        const isMajorA = a.camelot.slice(-1) === 'B';
+        const isMajorB = b.camelot.slice(-1) === 'B';
+        const groupA = numA <= 6 ? 1 : 2;
+        const groupB = numB <= 6 ? 1 : 2;
+        if (groupA !== groupB) return groupA - groupB;
+        if (isMajorA !== isMajorB) return (isMajorA ? 1 : 0) - (isMajorB ? 1 : 0);
+        return numA - numB;
+    });
+    const keyFilterHtml = camelotFilterEntries.map(e => {
+        const isAvailable = availableCamelotKeys.has(e.camelot);
+        return `<button class="key-pill-btn ${isAvailable ? '' : 'unavailable'}" data-camelot="${e.camelot}"><span class="key-pill-camelot">${e.camelot}</span><span class="key-pill-standard">${e.standard}</span></button>`;
+    }).join('');
+
     let currentFilterGroup = '';
     const rangeFiltersHtml = rangeFiltersConfig.map(cfg => {
         let isDeferred = false;
@@ -18107,6 +18174,10 @@
       .custom-tooltip-bottom { top: 100% !important; bottom: auto !important; margin-top: 8px !important; margin-bottom: 0 !important; }
       .custom-tooltip-bottom::after { top: auto !important; bottom: 100% !important; border-color: transparent transparent #373737 transparent !important; }
       .custom-tooltip-bottom::before { content: ""; position: absolute; bottom: 100%; left: 0; width: 100%; height: 8px; background: transparent; }
+      .custom-tooltip-right { left: -10px !important; right: auto !important; transform: none !important; }
+      .custom-tooltip-right::after { left: 14px !important; right: auto !important; transform: none !important; }
+      .custom-tooltip-left { right: -10px !important; left: auto !important; transform: none !important; }
+      .custom-tooltip-left::after { right: 14px !important; left: auto !important; transform: none !important; }
       .actions-col { right: 0; padding: 0 !important; }
       .actions-col::after { content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 1px; background: #282828; pointer-events: none; }
       .tracklist-table td:nth-child(n+6):not(:last-child) { text-align: center; }
@@ -18176,7 +18247,7 @@
       .view-control-btn { background: transparent; border: 1px solid #434343; color: #b3b3b3; border-radius: 4px; height: 26px; padding: 0 10px; display: flex; align-items: center; gap: 6px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; transition: color 0.2s, border-color 0.2s, background-color 0.2s; }
       .view-control-btn:hover { color: #fff; border-color: #666; background: rgba(255,255,255,0.05); }
       .view-control-btn.icon-only { padding: 0; width: 28px; justify-content: center; }
-      .view-control-btn.icon-only.active { color: #1ed760; border-color: #1ed760; background: rgba(30, 215, 96, 0.1); }
+      .view-control-btn.active, .view-control-btn.icon-only.active { color: #1ed760; border-color: #1ed760; background: rgba(30, 215, 96, 0.1); }
       .view-controls-divider { width: 1px; height: 16px; background-color: #434343; margin: 0 2px; }
       .max-rows-label { color: #b3b3b3; font-size: 12px; font-weight: 600; }
       .max-rows-select { padding: 0px 4px; border-radius: 4px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; height: 26px; font-size: 12px; font-family: inherit; outline: none; }
@@ -18320,6 +18391,27 @@
       .reset-filter-btn { background: transparent; border: none; color: #b3b3b3; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 50%; transition: color 0.2s, background-color 0.2s; }
       .reset-filter-btn:hover { color: #fff; background-color: rgba(255, 255, 255, 0.1); }
       .reset-filter-btn svg { width: 16px; height: 16px; }
+      .key-filter-block { border-top: 1px solid #282828; padding-top: 14px; margin-top: 4px; padding-bottom: 6px; flex-shrink: 0; padding-right: 20px; }
+      .key-filter-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; }
+      .key-filter-content-wrapper { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.25s ease, margin-top 0.25s ease; margin-top: 0; }
+      .key-filter-block.expanded .key-filter-content-wrapper { grid-template-rows: 1fr; margin-top: 14px; }
+      .key-filter-content { overflow: hidden; }
+      .key-pill-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; width: 100%; }
+      .key-pill-btn { background: #282828; border: 1px solid #434343; color: #b3b3b3; padding: 4px 0; border-radius: 8px; cursor: pointer; transition: all 0.2s; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.15; box-sizing: border-box; min-width: 0; }
+      .key-pill-btn.unavailable { opacity: 0.25; pointer-events: none; cursor: default; }
+      .key-pill-camelot { font-size: 12px; font-weight: 700; }
+      .key-pill-standard { font-size: 10px; font-weight: 500; opacity: 0.65; margin-top: 1px; }
+      .key-pill-btn.active { background: #1db954; color: black; border-color: #1db954; opacity: 1; }
+      .key-pill-btn.active .key-pill-standard { opacity: 0.85; }
+      .key-pill-btn.harmonic-active { background: rgba(30, 215, 96, 0.15); color: #1ed760; border-color: rgba(30, 215, 96, 0.4); opacity: 1; }
+      .key-pill-btn.harmonic-active .key-pill-standard { opacity: 0.85; }
+      .key-pill-btn:hover:not(.active):not(.harmonic-active) { color: #fff; border-color: #fff; }
+      .harmonic-toggle-btn { background: #282828; border: 1px solid #434343; color: #b3b3b3; border-radius: 12px; height: 24px; padding: 0 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+      .harmonic-toggle-btn:hover { color: #fff; border-color: #666; background: #333; }
+      .harmonic-toggle-btn.active { background: rgba(30, 215, 96, 0.15); color: #1ed760; border-color: #1ed760; }
+      .key-filter-header .caret-btn { background: none; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+      .key-filter-header .caret-icon { transition: transform 0.2s ease; }
+      .key-filter-header .caret-icon.rotated { transform: rotate(90deg); }
     </style>
     
     <div class="top-right-controls">
@@ -18578,6 +18670,37 @@
                     <div class="range-filters-items">
                         ${rangeFiltersHtml}
                     </div>
+                    <div class="key-filter-block" id="keyFilterBlock">
+                        <div class="key-filter-header" id="keyFilterHeaderBtn" style="cursor: pointer;">
+                            <div class="settings-title" style="display: flex; align-items: center; margin: 0; pointer-events: none;">
+                                <button class="caret-btn" style="pointer-events: none; margin-left: -5px; margin-right: 5px;">${caretIconSvg}</button>
+                                Key (Camelot)
+                                <span class="tooltip-container" style="display: inline-flex; align-items: center; margin-left: 6px; pointer-events: auto;">
+                                    ${infoIconSvg.replace('margin-bottom: 4px;', 'margin-bottom: 0px;')}
+                                    <span class="custom-tooltip custom-tooltip-right" style="font-weight: normal; max-width: 240px;">Filter by musical key. Select one or more Camelot codes to keep only tracks in those keys. Tracks with no key data are hidden while this filter is active.</span>
+                                </span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <button id="cfHarmonicToggleBtn" class="harmonic-toggle-btn">
+                                    <span>Harmonic</span>
+                                    <span class="tooltip-container" style="display: inline-flex; align-items: center;">
+                                        ${infoIconSvg.replace('margin-bottom: 4px;', 'margin-bottom: 0px;')}
+                                        <span class="custom-tooltip custom-tooltip-left" style="font-weight: normal; max-width: 240px; text-transform: none; white-space: normal;">When on, clicking a key selects it plus its harmonically compatible neighbors (±1 on the wheel and the relative major/minor), e.g. 8A also selects 7A, 9A and 8B.</span>
+                                    </span>
+                                </button>
+                                <button id="resetKeyFilterBtn" class="reset-filter-btn" title="Reset Key Filter">
+                                    ${resetIconSvg}
+                                </button>
+                            </div>
+                        </div>
+                        <div class="key-filter-content-wrapper">
+                            <div class="key-filter-content">
+                                <div class="key-pill-grid">
+                                    ${keyFilterHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -18745,6 +18868,91 @@
             }
         });
     });
+
+    const harmonicGroup = (camelot) => {
+        const num = parseInt(camelot, 10);
+        const letter = camelot.slice(-1);
+        if (isNaN(num) || (letter !== 'A' && letter !== 'B')) return [camelot];
+        const wrap = (n) => ((n - 1 + 12) % 12) + 1;
+        const relative = letter === 'A' ? 'B' : 'A';
+        return [`${num}${letter}`, `${wrap(num + 1)}${letter}`, `${wrap(num - 1)}${letter}`, `${num}${relative}`];
+    };
+
+    const updateKeyPillUI = () => {
+        modalContainer.querySelectorAll('.key-pill-btn').forEach(b => {
+            const cam = b.dataset.camelot;
+            b.classList.remove('active', 'harmonic-active');
+            if (cfPrimaryKeys.has(cam)) {
+                b.classList.add('active');
+            } else if (cfSelectedKeys.has(cam) && !b.classList.contains('unavailable')) {
+                b.classList.add('harmonic-active');
+            }
+        });
+    };
+
+    const refreshKeySelection = () => {
+        cfSelectedKeys.clear();
+        cfPrimaryKeys.forEach(primary => {
+            cfSelectedKeys.add(primary);
+            if (cfHarmonicMode) {
+                harmonicGroup(primary).forEach(g => cfSelectedKeys.add(g));
+            }
+        });
+        updateKeyPillUI();
+    };
+
+    modalContainer.querySelectorAll('.key-pill-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const cam = btn.dataset.camelot;
+            if (cfPrimaryKeys.has(cam)) {
+                cfPrimaryKeys.delete(cam);
+            } else {
+                cfPrimaryKeys.add(cam);
+            }
+            refreshKeySelection();
+            debouncedUpdateTrackFilters();
+        });
+    });
+
+    const keyFilterHeaderBtn = modalContainer.querySelector('#keyFilterHeaderBtn');
+    const keyFilterBlock = modalContainer.querySelector('#keyFilterBlock');
+    if (keyFilterHeaderBtn && keyFilterBlock) {
+        keyFilterHeaderBtn.addEventListener('click', (e) => {
+            if (e.target.closest('button:not(.caret-btn)') || e.target.closest('.tooltip-container')) return;
+            keyFilterBlock.classList.toggle('expanded');
+            const isExpanded = keyFilterBlock.classList.contains('expanded');
+            const caret = keyFilterHeaderBtn.querySelector('.caret-icon');
+            if (caret) caret.classList.toggle('rotated', isExpanded);
+            
+            keyFilterBlock.querySelectorAll('.custom-tooltip').forEach(t => {
+                t.classList.toggle('custom-tooltip-bottom', isExpanded);
+            });
+        });
+    }
+
+    const cfHarmonicToggleBtn = modalContainer.querySelector('#cfHarmonicToggleBtn');
+    if (cfHarmonicToggleBtn) {
+        cfHarmonicToggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            cfHarmonicMode = !cfHarmonicMode;
+            cfHarmonicToggleBtn.classList.toggle('active', cfHarmonicMode);
+            refreshKeySelection();
+            debouncedUpdateTrackFilters();
+        });
+    }
+
+    const resetKeyFilterBtn = modalContainer.querySelector('#resetKeyFilterBtn');
+    if (resetKeyFilterBtn) {
+        resetKeyFilterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            cfSelectedKeys.clear();
+            cfPrimaryKeys.clear();
+            updateKeyPillUI();
+            debouncedUpdateTrackFilters();
+        });
+    }
 
     const setSegmented = (id, callback) => {
         const control = modalContainer.querySelector(`#${id}`);
@@ -19258,6 +19466,10 @@
         cfReleaseTypes = new Set(['album', 'ep', 'single', 'compilation']);
         modalContainer.querySelectorAll('#cf-release-types .pill-btn').forEach(b => b.classList.add('active'));
 
+        cfSelectedKeys.clear();
+        cfPrimaryKeys.clear();
+        modalContainer.querySelectorAll('.key-pill-btn').forEach(b => b.classList.remove('active', 'harmonic-active'));
+
         cfRemoveDuplicates = false;
         const dupToggle = modalContainer.querySelector('#cf-remove-duplicates');
         if (dupToggle) dupToggle.checked = false;
@@ -19303,6 +19515,10 @@
 
         cfReleaseTypes = new Set(['album', 'ep', 'single', 'compilation']);
         modalContainer.querySelectorAll('#cf-release-types .pill-btn').forEach(b => b.classList.add('active'));
+
+        cfSelectedKeys.clear();
+        cfPrimaryKeys.clear();
+        modalContainer.querySelectorAll('.key-pill-btn').forEach(b => b.classList.remove('active', 'harmonic-active'));
 
         cfRemoveDuplicates = false;
         const dupToggle = modalContainer.querySelector('#cf-remove-duplicates');
@@ -20363,7 +20579,7 @@
         tracksForProcessing = await processTrueReleaseDatesConcurrently(tracksWithPopularity, () => {});
     }
 
-    const audioFeatureSortTypes = ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness'];
+    const audioFeatureSortTypes = ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'key'];
     if (audioFeatureSortTypes.includes(sortType)) {
         const trackIds = tracksWithPopularity.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || t.uri.split(":")[2])).filter(Boolean);
         const allStats = await getBatchTrackStats(trackIds);
@@ -20454,6 +20670,20 @@
                  showNotification(`${invalidFeatureTracks.length} tracks missing ${sortType} data.`, 'warning');
             }
             break;
+        case 'key': {
+            const withKeyValues = uniqueTracks.map(track => ({ track, keyValue: getCamelotSortValue(track) }));
+            const validKeyTracks = withKeyValues.filter(item => item.keyValue !== null);
+            const invalidKeyTracks = withKeyValues.filter(item => item.keyValue === null).map(item => item.track);
+
+            validKeyTracks.sort((a, b) => isAscending ? a.keyValue - b.keyValue : b.keyValue - a.keyValue);
+
+            sortedTracks = [...validKeyTracks.map(item => item.track), ...invalidKeyTracks];
+
+            if (invalidKeyTracks.length > 0 && !isHeadless) {
+                 showNotification(`${invalidKeyTracks.length} tracks missing key data.`, 'warning');
+            }
+            break;
+        }
         case "shuffle":
             sortedTracks = shuffleArray(uniqueTracks);
             break;
@@ -30238,6 +30468,7 @@
               { backgroundColor: "transparent", color: "white", text: "Valence", sortType: "valence", hasInnerButton: true },
               { backgroundColor: "transparent", color: "white", text: "Acousticness", sortType: "acousticness", hasInnerButton: true },
               { backgroundColor: "transparent", color: "white", text: "Instrumentalness", sortType: "instrumentalness", hasInnerButton: true },
+              { backgroundColor: "transparent", color: "white", text: "Key (Camelot)", sortType: "key", hasInnerButton: true },
             ],
           },
         ],
@@ -36993,21 +37224,69 @@
             return Array.from(results.values());
         };
 
+        if (!isHeadless) mainButton.innerText = "Filtering...";
+        const knownArtistIds = await getComprehensiveKnownArtistsSet({ isHeadless });
+        allLikedSongs.forEach(song => {
+            if (song.artistUris) {
+                song.artistUris.forEach(uri => {
+                    if (uri) knownArtistIds.add(uri.split(':')[2]);
+                });
+            }
+        });
+
+        let trashSongs = {};
+        let trashArtists = {};
+        try {
+            const sList = Spicetify.LocalStorage.get("TrashSongList");
+            const aList = Spicetify.LocalStorage.get("TrashArtistList");
+            if (sList) trashSongs = JSON.parse(sList);
+            if (aList) trashArtists = JSON.parse(aList);
+        } catch(e) {
+            try {
+                trashSongs = JSON.parse(localStorage.getItem("TrashSongList") || "{}");
+                trashArtists = JSON.parse(localStorage.getItem("TrashArtistList") || "{}");
+            } catch(ex) {}
+        }
+        
+        const bannedArtistIds = new Set();
+        const trashedUris = Object.keys(trashSongs);
+        
+        Object.keys(trashArtists).forEach(uri => {
+            const id = uri.split(":")[2];
+            if (id) bannedArtistIds.add(id);
+        });
+
+        if (trashedUris.length > 0) {
+            if (!isHeadless) mainButton.innerText = "Purging...";
+            const trashedIds = trashedUris.map(uri => uri.split(":")[2]).filter(Boolean);
+            
+            const mockTracks = trashedIds.map(id => ({ uri: `spotify:track:${id}` }));
+            await fetchPopularityForMultipleTracks(mockTracks, null);
+            
+            const cachedMetaMap = await idb.getMany('trackMetadata', trashedIds);
+            trashedIds.forEach(id => {
+                const meta = cachedMetaMap.get(id);
+                if (meta && meta.artists && meta.artists.length > 0) {
+                    meta.artists.forEach(a => { if (a.id) bannedArtistIds.add(a.id); });
+                }
+            });
+        }
+        
+        knownArtistIds.forEach(id => bannedArtistIds.delete(id));
+
+        const isTrashFiltered = (track) => {
+            if (trashSongs[track.uri]) return true;
+            const artists = track.artists || track.track?.artists || [];
+            for (const a of artists) {
+                const id = a.id || (a.uri ? a.uri.split(':')[2] : null);
+                if (id && bannedArtistIds.has(id)) return true;
+            }
+            return false;
+        };
+
         if (vibeType === 'pureDiscovery') {
             playlistName = "Pure Discovery";
             playlistDescription = "Discover tracks from new artists that match your musical taste. Created by Sort-Play.";
-
-            mainButton.innerText = "Filtering...";
-            
-            const knownArtistIds = await getComprehensiveKnownArtistsSet();
-            
-            allLikedSongs.forEach(song => {
-                if (song.artistUris) {
-                    song.artistUris.forEach(uri => {
-                        if (uri) knownArtistIds.add(uri.split(':')[2]);
-                    });
-                }
-            });
 
             if (!isHeadless) mainButton.innerText = "Profiling...";
             
@@ -37191,7 +37470,7 @@
 
                                 for (let i = 0; i < mappedCandidates.length; i++) {
                                     const t = mappedCandidates[i];
-                                    if (!completeLikedSongUrisSet.has(t.uri) && availabilityChecks[i]) {
+                                    if (!completeLikedSongUrisSet.has(t.uri) && availabilityChecks[i] && !isTrashFiltered(t)) {
                                         validTracks.push(t);
                                     }
                                 }
@@ -37270,6 +37549,7 @@
                     seenApiUris.add(track.uri);
                     
                     if (completeLikedSongUrisSet.has(track.uri)) return false;
+                    if (isTrashFiltered(track)) return false;
                     
                     const hasKnownArtist = track.artists.some(a => knownArtistIds.has(a.id));
                     if (hasKnownArtist) return false;
@@ -37433,11 +37713,6 @@
         }
 
         if (!isHeadless) mainButton.innerText = "Profiling...";
-
-        const knownArtistIds = await getComprehensiveKnownArtistsSet({ isHeadless });
-        allLikedSongs.forEach(song => {
-            if (song.artistUris) song.artistUris.forEach(uri => { if (uri) knownArtistIds.add(uri.split(':')[2]); });
-        });
 
         let primarySeedTracks = [];
         let primarySeedArtistIds = new Set();
@@ -37743,6 +38018,7 @@
             if (!availabilityChecks[index]) return false;
             if (completeLikedSongUrisSet.has(track.uri)) return false;
             if (track.isrc && likedIsrcs.has(track.isrc)) return false;
+            if (isTrashFiltered(track)) return false;
             
             const title = track.name.toLowerCase().trim();
             const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
@@ -40695,6 +40971,36 @@
 
             sortedTracks = [...sortedTracksWithData, ...tracksWithoutData];
 
+        } else if (sortType === "key") {
+            const trackIds = tracksWithPopularity.map(t => Spicetify.URI.isLocal(t.uri) ? null : t.trackId).filter(Boolean);
+            const allStats = await getBatchTrackStats(trackIds, (progress) => {
+                const overallProgress = 60 + Math.floor(progress * 0.40);
+                updateProgressText(`${overallProgress}%`);
+            });
+
+            const tracksWithAudioFeatures = tracksWithPopularity.map(track => {
+                const stats = allStats[track.trackId] || {};
+                return { ...track, ...stats };
+            });
+
+            const deduplicationResult = await deduplicateTracks(
+                tracksWithAudioFeatures,
+                false,
+                isArtistPage,
+                (progress) => { updateProgressText(`Dedup ${progress}%`); }
+            );
+            uniqueTracks = deduplicationResult.unique;
+            removedTracks = deduplicationResult.removed;
+
+            const withKeyValues = uniqueTracks.map(track => ({ track, keyValue: getCamelotSortValue(track) }));
+            const tracksWithData = withKeyValues.filter(item => item.keyValue !== null);
+            const tracksWithoutData = withKeyValues.filter(item => item.keyValue === null).map(item => item.track);
+            missingDataCount = tracksWithoutData.length;
+
+            tracksWithData.sort((a, b) => isAscending ? a.keyValue - b.keyValue : b.keyValue - a.keyValue);
+
+            sortedTracks = [...tracksWithData.map(item => item.track), ...tracksWithoutData];
+
         } else if (sortType === "scrobbles" || sortType === "personalScrobbles" || sortType === "personalScrobblesRange") {
             try {
                 let tracksWithScrobbles;
@@ -41111,7 +41417,7 @@
         }
       }
 
-      if (missingDataCount > 0 && ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'energyWave'].includes(sortType)) {
+      if (missingDataCount > 0 && ['tempo', 'energy', 'danceability', 'valence', 'acousticness', 'instrumentalness', 'key', 'energyWave'].includes(sortType)) {
         const sortTypeInfo = {
             tempo: { fullName: "tempo (BPM)" },
             energy: { fullName: "energy" },
@@ -41119,6 +41425,7 @@
             valence: { fullName: "valence" },
             acousticness: { fullName: "acousticness" },
             instrumentalness: { fullName: "instrumentalness" },
+            key: { fullName: "key (Camelot)" },
             energyWave: { fullName: "audio features" }
         }[sortType];
 
@@ -41237,6 +41544,15 @@
           camelotKey = KEY_TO_CAMELOT_MAP[keyName + modeSuffix] || KEY_TO_CAMELOT_MAP[keyName] || null;
       }
       return camelotKey;
+  }
+
+  function getCamelotSortValue(features) {
+      const camelot = getCamelotKey(features);
+      if (!camelot) return null;
+      const num = parseInt(camelot, 10);
+      if (isNaN(num)) return null;
+      const isB = camelot.slice(-1).toUpperCase() === 'B';
+      return num * 2 + (isB ? 1 : 0);
   }
 
   function startProcessing(buttonText = null) {
