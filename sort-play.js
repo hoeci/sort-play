@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.3.0";
+  const SORT_PLAY_VERSION = "6.3.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -8123,7 +8123,7 @@
               .setting-label { font-size: 11px; color: #b3b3b3; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .np-select, .np-input { background: #181818; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; font-family: inherit; font-size: 13px; width: 100%; }
               .np-select:focus, .np-input:focus { border-color: #888; outline: none; }
-              .separator-container { position: relative; display: flex; gap: 6px; }
+              .sp-separator-container { position: relative; display: flex; gap: 6px; margin: 0; }
               .toggle-sep-menu-btn { background: #333; border: 1px solid #444; color: #ccc; border-radius: 4px; width: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
               .toggle-sep-menu-btn:hover { background: #444; color: white; }
               .separator-dropdown { display: none; position: absolute; background-color: #282828; border: 1px solid #444; border-radius: 4px; padding: 8px; width: 250px; z-index: 100; top: 100%; right: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.5); grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 4px; }
@@ -8232,7 +8232,7 @@
                 </div>
                 <div class="setting-group">
                     <span class="setting-label">Separator</span>
-                    <div class="separator-container">
+                    <div class="sp-separator-container">
                         <input type="text" class="np-input item-separator-input" value="${item.separator || ''}" placeholder="None" data-section="${section}" data-index="${index}">
                         <button class="toggle-sep-menu-btn" title="Presets">▼</button>
                         <div class="separator-dropdown">
@@ -8331,7 +8331,29 @@
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const dropdown = btn.nextElementSibling;
-                dropdown.classList.toggle('visible');
+                
+                if (!dropdown.classList.contains('visible')) {
+                    const btnRect = btn.getBoundingClientRect();
+                    const bodyContainer = btn.closest('.np-modal-body');
+                    const bodyRect = bodyContainer.getBoundingClientRect();
+                    
+                    const spaceBelow = bodyRect.bottom - btnRect.bottom;
+                    
+                    if (spaceBelow < 150) {
+                        dropdown.style.top = 'auto';
+                        dropdown.style.bottom = '100%';
+                        dropdown.style.marginTop = '0';
+                        dropdown.style.marginBottom = '4px';
+                    } else {
+                        dropdown.style.top = '100%';
+                        dropdown.style.bottom = 'auto';
+                        dropdown.style.marginTop = '4px';
+                        dropdown.style.marginBottom = '0';
+                    }
+                    dropdown.classList.add('visible');
+                } else {
+                    dropdown.classList.remove('visible');
+                }
                 
                 const closeDropdown = (evt) => {
                     if (!dropdown.contains(evt.target) && evt.target !== btn) {
@@ -18675,10 +18697,6 @@
                             <div class="settings-title" style="display: flex; align-items: center; margin: 0; pointer-events: none;">
                                 <button class="caret-btn" style="pointer-events: none; margin-left: -5px; margin-right: 5px;">${caretIconSvg}</button>
                                 Key (Camelot)
-                                <span class="tooltip-container" style="display: inline-flex; align-items: center; margin-left: 6px; pointer-events: auto;">
-                                    ${infoIconSvg.replace('margin-bottom: 4px;', 'margin-bottom: 0px;')}
-                                    <span class="custom-tooltip custom-tooltip-right" style="font-weight: normal; max-width: 240px;">Filter by musical key. Select one or more Camelot codes to keep only tracks in those keys. Tracks with no key data are hidden while this filter is active.</span>
-                                </span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <button id="cfHarmonicToggleBtn" class="harmonic-toggle-btn">
@@ -20626,15 +20644,19 @@
                 const valBStr = sortType === "trueReleaseDate" ? b.trueReleaseDate : b.releaseDate;
                 const valA = valAStr ? new Date(valAStr).getTime() : 0;
                 const valB = valBStr ? new Date(valBStr).getTime() : 0;
-                const dateComparison = sortOrderState[sortType] ? valA - valB : valB - valA;
+                const dateComparison = isAscending ? valA - valB : valB - valA;
                 if (dateComparison !== 0) return dateComparison;
 
-                const albumA = (a.albumName || "").toLowerCase();
-                const albumB = (b.albumName || "").toLowerCase();
-                const albumCompare = albumA.localeCompare(albumB);
+                const albumA = sortType === "trueReleaseDate" ? (a.trueAlbumName || a.albumName || "") : (a.albumName || "");
+                const albumB = sortType === "trueReleaseDate" ? (b.trueAlbumName || b.albumName || "") : (b.albumName || "");
+                
+                const albumCompare = albumA.toLowerCase().localeCompare(albumB.toLowerCase());
                 if (albumCompare !== 0) return albumCompare;
 
-                return (a.trackNumber || 0) - (b.trackNumber || 0);
+                const trackNumA = sortType === "trueReleaseDate" ? (a.trueTrackNumber || a.trackNumber || 0) : (a.trackNumber || 0);
+                const trackNumB = sortType === "trueReleaseDate" ? (b.trueTrackNumber || b.trackNumber || 0) : (b.trackNumber || 0);
+                
+                return trackNumA - trackNumB;
             });
             break;
         case "scrobbles":
@@ -20642,10 +20664,10 @@
             const tracksWithScrobbles = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
             if (sortType === 'personalScrobbles') {
                 sortedTracks = tracksWithScrobbles
-                    .sort((a, b) => (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
+                    .sort((a, b) => isAscending ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
             } else {
                 sortedTracks = tracksWithScrobbles
-                    .sort((a, b) => (b.scrobbles ?? 0) - (a.scrobbles ?? 0));
+                    .sort((a, b) => isAscending ? (a.scrobbles ?? 0) - (b.scrobbles ?? 0) : (b.scrobbles ?? 0) - (a.scrobbles ?? 0));
             }
             break;
         }
@@ -29648,7 +29670,8 @@
         let cached = trackId ? cachedMap.get(trackId) : null;
         
         if (cached && typeof cached === 'object' && cached.trackNumber !== undefined) {
-            results[index] = { ...track, releaseDate: cached.date, trackNumber: cached.trackNumber };
+            const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : cached.trackNumber;
+            results[index] = { ...track, releaseDate: cached.date, trackNumber: finalTrackNum };
         } else {
             missingUris.push({ track, index, trackId });
         }
@@ -29671,9 +29694,10 @@
                     const meta = fetchedMetaMap.get(track.uri);
                     
                     if (meta && meta.releaseDate) {
-                        results[index] = { ...track, releaseDate: meta.releaseDate, trackNumber: track.trackNumber || 0 };
+                        const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : 0;
+                        results[index] = { ...track, releaseDate: meta.releaseDate, trackNumber: finalTrackNum };
                         if (trackId) {
-                            entriesToSave.push({ key: trackId, val: { date: meta.releaseDate, trackNumber: track.trackNumber || 0 } });
+                            entriesToSave.push({ key: trackId, val: { date: meta.releaseDate, trackNumber: finalTrackNum } });
                         }
                     } else {
                         results[index] = await fetchFunction(track);
@@ -29841,15 +29865,17 @@
     const cached = await idb.get('releaseDates', trackId, CACHE_EXPIRE_RELEASE_DATE);
     
     if (cached && typeof cached === 'object' && cached.trackNumber !== undefined) {
-        return { ...track, releaseDate: cached.date, trackNumber: cached.trackNumber };
+        const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : cached.trackNumber;
+        return { ...track, releaseDate: cached.date, trackNumber: finalTrackNum };
     }
 
     try {
         const fetchedMetaMap = await fetchCoreMetadataBatch([track.uri]);
         const meta = fetchedMetaMap.get(track.uri);
         if (meta && meta.releaseDate) {
-            await setCachedReleaseDate(trackId, meta.releaseDate, track.trackNumber || 0);
-            return { ...track, releaseDate: meta.releaseDate, trackNumber: track.trackNumber || 0 };
+            const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : 0;
+            await setCachedReleaseDate(trackId, meta.releaseDate, finalTrackNum);
+            return { ...track, releaseDate: meta.releaseDate, trackNumber: finalTrackNum };
         }
     } catch (e) {
         console.warn("[Sort-Play] Fast single release date fetch failed, falling back", e);
@@ -29862,22 +29888,24 @@
       albumId = track.albumUri.split(":")[2];
     } else {
       console.warn(`Could not determine album ID for track ${track.name}`);
-      return { ...track, releaseDate: cached?.date || cached || null, trackNumber: cached?.trackNumber || 0 };
+      const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : (cached?.trackNumber || 0);
+      return { ...track, releaseDate: cached?.date || cached || null, trackNumber: finalTrackNum };
     }
 
     try {
       if (albumTracksDataCache[albumId]) {
         const trackData = albumTracksDataCache[albumId].find(t => t.uri === track.uri);
         if (trackData && trackData.releaseDate) {
-          setCachedReleaseDate(trackId, trackData.releaseDate, trackData.trackNumber).catch(() => {});
-          return { ...track, releaseDate: trackData.releaseDate, trackNumber: trackData.trackNumber };
+          const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : trackData.trackNumber;
+          setCachedReleaseDate(trackId, trackData.releaseDate, finalTrackNum).catch(() => {});
+          return { ...track, releaseDate: trackData.releaseDate, trackNumber: finalTrackNum };
         }
       }
 
       const releaseDate = await getReleaseDatesForAlbum(albumId);
       
-      let trackNumber = 0;
-      if (albumTracksDataCache[albumId]) {
+      let trackNumber = track.trackNumber > 0 ? track.trackNumber : 0;
+      if (trackNumber === 0 && albumTracksDataCache[albumId]) {
           const trackData = albumTracksDataCache[albumId].find(t => t.uri === track.uri);
           if (trackData) {
               trackNumber = trackData.trackNumber;
@@ -29889,12 +29917,14 @@
       try {
           const meta = await fetchInternalTrackMetadata(trackId);
           if (meta && meta.album && meta.album.release_date) {
-              await setCachedReleaseDate(trackId, meta.album.release_date);
-              return { ...track, releaseDate: meta.album.release_date, trackNumber: track.trackNumber || 0 };
+              const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : 0;
+              await setCachedReleaseDate(trackId, meta.album.release_date, finalTrackNum);
+              return { ...track, releaseDate: meta.album.release_date, trackNumber: finalTrackNum };
           }
       } catch (e) {}
       console.error(`Error getting release date for track ${track.name} (album ${albumId}):`, error);
-      return { ...track, releaseDate: cached?.date || cached || null, trackNumber: cached?.trackNumber || 0 };
+      const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : (cached?.trackNumber || 0);
+      return { ...track, releaseDate: cached?.date || cached || null, trackNumber: finalTrackNum };
     }
   }
   
@@ -31753,10 +31783,11 @@
         const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
         let cached = trackId ? cachedMap.get(trackId) : null;
         if (cached && typeof cached === 'object' && cached.date !== undefined) {
+            const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : (cached.trackNumber !== undefined ? cached.trackNumber : 0);
             results[index] = { 
                 ...track, 
                 trueReleaseDate: cached.date, 
-                trueTrackNumber: cached.trackNumber !== undefined ? cached.trackNumber : (track.trackNumber || 0),
+                trueTrackNumber: finalTrackNum,
                 trueAlbumName: cached.albumName !== undefined ? cached.albumName : (track.albumName || ""),
                 trueAlbumId: cached.albumId !== undefined ? cached.albumId : (track.albumId || track.album?.id || track.track?.album?.id || "")
             };
@@ -44299,7 +44330,14 @@
                   }
                   removeLfmOverride(trackId);
                   
-                  document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
+                  document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
+                      delete el.dataset.spProcessed;
+                      el.onclick = null;
+                      el.onmouseover = null;
+                      el.onmouseout = null;
+                      el.style.cursor = "default";
+                      el.style.textDecoration = "none";
+                  });
                   if (typeof updateTracklist === 'function') updateTracklist();
                   showNotification("Last.fm override cleared.");
                   closeModal();
@@ -45927,6 +45965,11 @@
                         document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
                             el.textContent = "";
                             delete el.dataset.spProcessed;
+                            el.onclick = null;
+                            el.onmouseover = null;
+                            el.onmouseout = null;
+                            el.style.cursor = "default";
+                            el.style.textDecoration = "none";
                         });
                         saveSettings();
                         onPageChange();
@@ -46084,6 +46127,11 @@
             trackElement.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(cell => {
                 cell.textContent = "";
                 delete cell.dataset.spProcessed;
+                cell.onclick = null;
+                cell.onmouseover = null;
+                cell.onmouseout = null;
+                cell.style.cursor = "default";
+                cell.style.textDecoration = "none";
             });
             trackElement.classList.remove('sort-play-processing');
             trackElement.removeAttribute('data-sp-fetch-failed');
@@ -46262,7 +46310,7 @@
         if (columnConfigs.some(c => c.type === 'trueReleaseDate')) {
             fetchPromises1.push(idb.getMany('trueReleaseDates', batchIds, CACHE_EXPIRE_RELEASE_DATE).then(res => dataMap.trueReleaseDates = res));
         }
-        if (columnConfigs.some(c => c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled' || c.type === 'popularity')) {
+        if (columnConfigs.some(c => c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled' || c.type === 'popularity' || c.type === 'trueReleaseDate')) {
             fetchPromises1.push(idb.getMany('trackMetadata', batchIds, CACHE_EXPIRE_METADATA).then(res => dataMap.metadata = res));
         }
 
@@ -46969,7 +47017,15 @@
             existingHeaderColumn = headerColumn;
         } else if (columnTypeChanged) {
             if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
-            tracklist_.querySelectorAll('.sort-play-data').forEach(cell => { cell.textContent = ""; delete cell.dataset.spProcessed; });
+            tracklist_.querySelectorAll('.sort-play-data').forEach(cell => { 
+                cell.textContent = ""; 
+                delete cell.dataset.spProcessed; 
+                cell.onclick = null;
+                cell.onmouseover = null;
+                cell.onmouseout = null;
+                cell.style.cursor = "default";
+                cell.style.textDecoration = "none";
+            });
         }
     } else if (existingHeaderColumn) {
         existingHeaderColumn.remove();
@@ -46986,7 +47042,15 @@
             existingSecondHeaderColumn = headerColumn;
         } else if (secondColumnTypeChanged) {
             if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
-            tracklist_.querySelectorAll('.sort-play-second-data').forEach(cell => { cell.textContent = ""; delete cell.dataset.spProcessed; });
+            tracklist_.querySelectorAll('.sort-play-second-data').forEach(cell => { 
+                cell.textContent = ""; 
+                delete cell.dataset.spProcessed; 
+                cell.onclick = null;
+                cell.onmouseover = null;
+                cell.onmouseout = null;
+                cell.style.cursor = "default";
+                cell.style.textDecoration = "none";
+            });
         }
     } else if (existingSecondHeaderColumn) {
         existingSecondHeaderColumn.remove();
@@ -47118,7 +47182,15 @@
                 existingSecondDataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
             } else if (secondColumnTypeChanged) {
                 const dataSpan = existingSecondDataColumn.querySelector('.sort-play-second-data');
-                if (dataSpan) dataSpan.textContent = "";
+                if (dataSpan) {
+                    dataSpan.textContent = "";
+                    delete dataSpan.dataset.spProcessed;
+                    dataSpan.onclick = null;
+                    dataSpan.onmouseover = null;
+                    dataSpan.onmouseout = null;
+                    dataSpan.style.cursor = "default";
+                    dataSpan.style.textDecoration = "none";
+                }
             }
             const targetNode = track.children[sp2HeaderIndex];
             if (targetNode && existingSecondDataColumn !== targetNode) {
@@ -47135,7 +47207,15 @@
                 existingDataColumn = createDataColumn('sort-play-data-column sort-play-column', 'sort-play-data');
             } else if (columnTypeChanged) {
                 const dataSpan = existingDataColumn.querySelector('.sort-play-data');
-                if (dataSpan) dataSpan.textContent = "";
+                if (dataSpan) {
+                    dataSpan.textContent = "";
+                    delete dataSpan.dataset.spProcessed;
+                    dataSpan.onclick = null;
+                    dataSpan.onmouseover = null;
+                    dataSpan.onmouseout = null;
+                    dataSpan.style.cursor = "default";
+                    dataSpan.style.textDecoration = "none";
+                }
             }
             const targetNode = track.children[sp1HeaderIndex];
             if (targetNode && existingDataColumn !== targetNode) {
@@ -47375,6 +47455,11 @@
                 allCells.forEach(cell => {
                     cell.textContent = "";
                     delete cell.dataset.spProcessed;
+                    cell.onclick = null;
+                    cell.onmouseover = null;
+                    cell.onmouseout = null;
+                    cell.style.cursor = "default";
+                    cell.style.textDecoration = "none";
                 });
             }
         }
@@ -47555,6 +47640,11 @@
                 allCells.forEach(cell => {
                     cell.textContent = "";
                     delete cell.dataset.spProcessed;
+                    cell.onclick = null;
+                    cell.onmouseover = null;
+                    cell.onmouseout = null;
+                    cell.style.cursor = "default";
+                    cell.style.textDecoration = "none";
                 });
             }
         }
