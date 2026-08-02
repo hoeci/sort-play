@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.3.1";
+  const SORT_PLAY_VERSION = "6.3.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -132,6 +132,7 @@
   const STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION = "sort-play-auto-hide-discography-notification";
   const STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED = "sort-play-range-exclude-unlistened";
   const STORAGE_KEY_GENRE_FILTER_SOURCES = "sort-play-genre-filter-sources";
+  const STORAGE_KEY_LOCAL_FILES_HANDLING = "sort-play-local-files-handling";
   const STORAGE_KEY_TASTE_PROFILE = "sort-play-taste-profile";
   const STORAGE_KEY_CF_FETCH_POPULARITY = "sort-play-cf-fetch-popularity";
   const STORAGE_KEY_CF_FETCH_LASTFM = "sort-play-cf-fetch-lastfm";
@@ -194,6 +195,7 @@
     STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
     STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR,
     STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, STORAGE_KEY_GENRE_FILTER_SOURCES,
+    STORAGE_KEY_LOCAL_FILES_HANDLING,
     STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM,
     STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE
   ];
@@ -291,6 +293,7 @@
   let cfMyScrobblesDisplayMode = 'number';
   let cfKeyDisplayMode = 'standard';
   let rangeExcludeUnlistened = false;
+  let localFilesHandling = 'convert_keep';
   let isProcessing = false;
   let isDiscoProcessing = false;
   let isMultiDiscoMode = false;
@@ -671,6 +674,8 @@
           })),
           duration_ms: trackData.duration_ms,
           popularity: trackData.popularity,
+          trackNumber: trackData.trackNumber || trackData.track_number || 0,
+          discNumber: trackData.discNumber || trackData.disc_number || 1,
           explicit: trackData.explicit || false,
           external_ids: trackData.external_ids || {},
           id: trackData.id,
@@ -1825,6 +1830,7 @@
                   popularity: body.popularity,
                   duration_ms: body.duration,
                   trackNumber: body.number || body.track_number || 0,
+                  discNumber: body.disc_number || 1,
                   explicit: body.explicit,
                   album: {
                       name: body.album?.name,
@@ -1895,6 +1901,7 @@
                       duration_ms: t.duration.totalMilliseconds,
                       explicit: t.explicit || false,
                       trackNumber: parseInt(t.trackNumber, 10) || 0,
+                      discNumber: parseInt(t.discNumber, 10) || 1,
                       is_playable: t.playability?.playable
                   };
               })
@@ -2131,8 +2138,8 @@
     await idb.set('scrobbles', key, scrobbleCount);
   }
   
-  async function setCachedReleaseDate(trackId, rawReleaseDate, trackNumber = 0) { 
-    await idb.set('releaseDates', trackId, { date: rawReleaseDate, trackNumber: trackNumber });
+  async function setCachedReleaseDate(trackId, rawReleaseDate, trackNumber = 0, discNumber = 1) { 
+    await idb.set('releaseDates', trackId, { date: rawReleaseDate, trackNumber: trackNumber, discNumber: discNumber });
   }
 
   async function setCachedPlayCount(trackId, playCount) {
@@ -2802,6 +2809,7 @@
     autoHideDiscographyNotification = localStorage.getItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION) === "true";
     genreSeparator = localStorage.getItem(STORAGE_KEY_GENRE_SEPARATOR) || ',';
     rangeExcludeUnlistened = localStorage.getItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED) === "true";
+    localFilesHandling = localStorage.getItem(STORAGE_KEY_LOCAL_FILES_HANDLING) || 'convert_keep';
     cfFetchPopularity = localStorage.getItem(STORAGE_KEY_CF_FETCH_POPULARITY) === "true";
     cfFetchLastFm = localStorage.getItem(STORAGE_KEY_CF_FETCH_LASTFM) === "true";
     cfReleaseDateFormat = localStorage.getItem(STORAGE_KEY_CF_RELEASE_DATE_FORMAT) || 'YYYY-MM-DD';
@@ -2900,6 +2908,7 @@
     localStorage.setItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, autoHideDiscographyNotification);
     localStorage.setItem(STORAGE_KEY_GENRE_SEPARATOR, genreSeparator);
     localStorage.setItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, rangeExcludeUnlistened);
+    localStorage.setItem(STORAGE_KEY_LOCAL_FILES_HANDLING, localFilesHandling);
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
     localStorage.setItem(STORAGE_KEY_CF_FETCH_POPULARITY, cfFetchPopularity);
     localStorage.setItem(STORAGE_KEY_CF_FETCH_LASTFM, cfFetchLastFm);
@@ -3035,6 +3044,7 @@
           [STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION]: "false",
           [STORAGE_KEY_GENRE_SEPARATOR]: ",",
           [STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED]: "false",
+          [STORAGE_KEY_LOCAL_FILES_HANDLING]: "convert_keep",
           [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}',
           [STORAGE_KEY_CF_FETCH_POPULARITY]: "false",
           [STORAGE_KEY_CF_FETCH_LASTFM]: "false",
@@ -3796,6 +3806,28 @@
                 <input type="checkbox" id="useEnergyWaveShuffleToggle" ${useEnergyWaveShuffle ? 'checked' : ''}>
                 <span class="sliderx"></span>
             </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="localFilesHandlingSetting">
+        <label class="col description">
+            Local Files Handling
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">
+                    Controls how local files are processed during sorting.<br><br>
+                    <strong>Convert & Keep:</strong> Matches to Spotify for data, keeps unmatched local files.<br><br>
+                    <strong>Ghost Match:</strong> Matches to Spotify for accurate sorting, but uses the original local file in the playlist.<br><br>
+                    <strong>Strict Remove:</strong> Removes any local file that isn't found on Spotify.
+                </span>
+            </span>
+        </label>
+        <div class="col action">
+            <select id="localFilesHandlingSelect">
+                <option value="convert_keep" ${localFilesHandling === 'convert_keep' ? 'selected' : ''}>Convert & Keep</option>
+                <option value="preserve_local" ${localFilesHandling === 'preserve_local' ? 'selected' : ''}>Ghost Match</option>
+                <option value="strict_remove" ${localFilesHandling === 'strict_remove' ? 'selected' : ''}>Strict Remove</option>
+            </select>
         </div>
     </div>
 
@@ -4672,6 +4704,14 @@
         colorSortMode = colorSortModeSelect.value;
         saveSettings();
     });
+
+    const localFilesHandlingSelect = modalContainer.querySelector("#localFilesHandlingSelect");
+    if (localFilesHandlingSelect) {
+        localFilesHandlingSelect.addEventListener("change", () => {
+            localFilesHandling = localFilesHandlingSelect.value;
+            saveSettings();
+        });
+    }
 
     setGeminiApiKeyButton.addEventListener("click", () => {
         showGeminiApiKeyModal();
@@ -13316,7 +13356,8 @@
       try {
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks, 
-            (progress) => { mainButton.innerText = progress; }
+            (progress) => { mainButton.innerText = progress; },
+            'strict_remove'
         );
     
         if (unconvertedCount > 0) {
@@ -14193,7 +14234,8 @@
             return { 
                 ...track, 
                 trueReleaseDate: cached.date, 
-                trackNumber: cached.trackNumber,
+                trueTrackNumber: cached.trackNumber !== undefined ? cached.trackNumber : track.trackNumber,
+                trueDiscNumber: cached.discNumber !== undefined ? cached.discNumber : (track.discNumber || 1),
                 trueAlbumId: cached.albumId || track.albumId || track.album?.id || track.track?.album?.id || "",
                 trueAlbumName: cached.albumName || track.albumName || "",
                 _exactAlbumIdFound: !!cached.albumId
@@ -14314,6 +14356,7 @@
     let bestDate = isTargetTrustable ? targetDate : null;
     let bestTime = (isTargetTrustable && targetDate) ? new Date(targetDate).getTime() : Infinity;
     let bestTrackNumber = trackNumber;
+    let bestDiscNumber = track.discNumber || 1;
     let bestAlbumName = albumName;
     let bestAlbumId = albumId;
 
@@ -14334,7 +14377,8 @@
                     artists: item.artists,
                     album: { name: item.album?.name, release_date: coreData?.releaseDate || null, uri: item.album?.uri, id: item.album?.id, albumType: coreData?.albumType || 'album' },
                     external_ids: { isrc: coreData?.isrc || null },
-                    trackNumber: item.trackNumber
+                    trackNumber: item.trackNumber,
+                    discNumber: item.discNumber || 1
                 });
             });
         } catch (e) {
@@ -14422,6 +14466,7 @@
                     bestTime = mTime;
                     bestDate = meta.album.release_date;
                     if (meta.trackNumber !== undefined) bestTrackNumber = meta.trackNumber;
+                    if (meta.discNumber !== undefined) bestDiscNumber = meta.discNumber;
                     if (meta.album.name) bestAlbumName = meta.album.name;
                     if (meta.album.id) bestAlbumId = meta.album.id;
                     else if (meta.album.uri) bestAlbumId = meta.album.uri.split(':')[2];
@@ -14438,9 +14483,9 @@
         bestAlbumId = albumId;
     }
 
-    await idb.set('trueReleaseDates', trackId, { date: bestDate, trackNumber: bestTrackNumber, albumName: bestAlbumName, albumId: bestAlbumId });
+    await idb.set('trueReleaseDates', trackId, { date: bestDate, trackNumber: bestTrackNumber, discNumber: bestDiscNumber, albumName: bestAlbumName, albumId: bestAlbumId });
 
-    return { ...track, trueReleaseDate: bestDate, trueTrackNumber: bestTrackNumber, trueAlbumName: bestAlbumName, trueAlbumId: bestAlbumId, _exactAlbumIdFound: true };
+    return { ...track, trueReleaseDate: bestDate, trueTrackNumber: bestTrackNumber, trueDiscNumber: bestDiscNumber, trueAlbumName: bestAlbumName, trueAlbumId: bestAlbumId, _exactAlbumIdFound: true };
   }
   
   async function getTrackDetailsWithReleaseDateForFilter(track) {
@@ -14602,7 +14647,8 @@
 
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks, 
-            (progress) => { mainButton.innerText = progress; }
+            (progress) => { mainButton.innerText = progress; },
+            'strict_remove'
         );
 
         if (unconvertedCount > 0) {
@@ -15331,7 +15377,8 @@
 
           const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
               tracks, 
-              (progress) => { mainButton.innerText = progress; }
+              (progress) => { mainButton.innerText = progress; },
+              'strict_remove'
           );
       
           if (unconvertedCount > 0) {
@@ -15409,7 +15456,8 @@
 
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks, 
-            (progress) => { mainButton.innerText = progress; }
+            (progress) => { mainButton.innerText = progress; },
+            'strict_remove'
         );
     
         if (unconvertedCount > 0) {
@@ -15577,6 +15625,7 @@
             finalTrack.explicit = popTrack.explicit ?? playsTrack.explicit ?? refreshed.explicit ?? originalTrack.explicit ?? false;
             finalTrack.releaseDate = datesTrack.releaseDate ?? popTrack.releaseDate ?? refreshed.releaseDate ?? originalTrack.releaseDate ?? null;
             finalTrack.trackNumber = datesTrack.trackNumber ?? playsTrack.trackNumber ?? refreshed.trackNumber ?? originalTrack.trackNumber ?? 0;
+            finalTrack.discNumber = datesTrack.discNumber ?? playsTrack.discNumber ?? refreshed.discNumber ?? originalTrack.discNumber ?? 1;
             
             finalTrack.popularity = popTrack.popularity ?? null;
             finalTrack.features = trackId ? (allStats[trackId] || {}) : {};
@@ -15602,7 +15651,7 @@
     }
   }
 
-  async function convertLocalTracksToSpotify(tracks, updateProgress = () => {}, keepUnconverted = false) {
+  async function convertLocalTracksToSpotify(tracks, updateProgress = () => {}, mode = 'convert_keep') {
     const localTracks = tracks.filter(track => Spicetify.URI.isLocal(track.uri));
     const spotifyTracks = tracks.filter(track => !Spicetify.URI.isLocal(track.uri));
     
@@ -15697,7 +15746,7 @@
         searchResults.forEach(res => {
             if (res.success && res.result.tracks && res.result.tracks.items.length > 0) {
                 const spotifyTrack = res.result.tracks.items[0];
-                foundSpotifyTracks.push({
+                const convertedTrack = {
                     uri: spotifyTrack.uri, uid: res.originalTrack.uid, name: spotifyTrack.name,
                     is_playable: spotifyTrack.is_playable,
                     explicit: spotifyTrack.explicit || false,
@@ -15709,17 +15758,30 @@
                     durationMilis: spotifyTrack.duration_ms,
                     durationMs: spotifyTrack.duration_ms,
                     playCount: "N/A", popularity: null, releaseDate: null,
+                    trackNumber: spotifyTrack.trackNumber || 0,
+                    discNumber: spotifyTrack.discNumber || 1,
                     track: {
                         album: { id: spotifyTrack.album.id, name: spotifyTrack.album.name },
                         name: spotifyTrack.name, duration_ms: spotifyTrack.duration_ms, id: spotifyTrack.id,
                         explicit: spotifyTrack.explicit || false,
-                        artists: spotifyTrack.artists
+                        artists: spotifyTrack.artists,
+                        trackNumber: spotifyTrack.trackNumber || 0,
+                        discNumber: spotifyTrack.discNumber || 1
                     }
-                });
+                };
+
+                if (mode === 'preserve_local') {
+                    convertedTrack._originalLocalUri = res.originalTrack.uri;
+                }
+
+                foundSpotifyTracks.push(convertedTrack);
             } else {
                 unconvertedLocalCount++;
-                if (keepUnconverted) {
-                    foundSpotifyTracks.push(res.originalTrack);
+                if (mode === 'convert_keep' || mode === 'preserve_local') {
+                    foundSpotifyTracks.push({
+                        ...res.originalTrack,
+                        _isUnmatchedLocal: true
+                    });
                 }
             }
         });
@@ -16824,6 +16886,10 @@
                 const albumCompare = albumA.localeCompare(albumB);
                 if (albumCompare !== 0) return direction === 'ascending' ? albumCompare : -albumCompare;
 
+                const discNumA = sortKey === 'trueReleaseDate' ? (a.trueDiscNumber || a.discNumber || 1) : (a.discNumber || 1);
+                const discNumB = sortKey === 'trueReleaseDate' ? (b.trueDiscNumber || b.discNumber || 1) : (b.discNumber || 1);
+                if (discNumA !== discNumB) return direction === 'ascending' ? discNumA - discNumB : discNumB - discNumA;
+
                 const trackNumA = sortKey === 'trueReleaseDate' ? (a.trueTrackNumber !== undefined ? a.trueTrackNumber : (a.trackNumber || 0)) : (a.trackNumber || 0);
                 const trackNumB = sortKey === 'trueReleaseDate' ? (b.trueTrackNumber !== undefined ? b.trueTrackNumber : (b.trackNumber || 0)) : (b.trackNumber || 0);
                 return direction === 'ascending' ? trackNumA - trackNumB : trackNumB - trackNumA;
@@ -17520,11 +17586,11 @@
             }
         }
 
-        if (cfRemoveDuplicates && survivingTracks.length > 0) {
+        if ((cfRemoveDuplicates || cfOnePerArtist) && survivingTracks.length > 0) {
             if (!fetchPop) {
                 needsDeferredPop = true;
             } else {
-                const { unique } = await deduplicateTracks(survivingTracks, true, false, () => {}, 'deduplicateOnly');
+                const { unique } = await deduplicateTracks(survivingTracks, true, false, () => {}, cfOnePerArtist ? 'filterOnePerArtist' : 'deduplicateOnly');
                 const uniqueSet = new Set(unique);
                 tracks.forEach(t => {
                     if (!t.isRemovedByStatus && !t.isRemovedByRange && !t.isRemovedByKeyword && !uniqueSet.has(t)) {
@@ -19893,8 +19959,8 @@
                 if (cfScrobbleMode === 'require') filteredTracks = filteredTracks.filter(t => (t.personalScrobbles || 0) > 0);
                 if (cfScrobbleMode === 'exclude') filteredTracks = filteredTracks.filter(t => (t.personalScrobbles || 0) === 0);
                 
-                if (cfRemoveDuplicates) {
-                    const { unique } = await deduplicateTracks(filteredTracks, true, false, () => {}, 'deduplicateOnly');
+                if (cfRemoveDuplicates || cfOnePerArtist) {
+                    const { unique } = await deduplicateTracks(filteredTracks, true, false, () => {}, cfOnePerArtist ? 'filterOnePerArtist' : 'deduplicateOnly');
                     filteredTracks = unique;
                 }
                 
@@ -20184,7 +20250,7 @@
                 if (sourceTracks && sourceTracks.length > 0) {
                     const hasLocal = sourceTracks.some(t => Spicetify.URI.isLocal(t.uri));
                     if (hasLocal) {
-                        const { convertedTracks } = await convertLocalTracksToSpotify(sourceTracks);
+                        const { convertedTracks } = await convertLocalTracksToSpotify(sourceTracks, () => {}, localFilesHandling);
                         sourceTracks = convertedTracks;
                     }
                 }
@@ -20653,6 +20719,10 @@
                 const albumCompare = albumA.toLowerCase().localeCompare(albumB.toLowerCase());
                 if (albumCompare !== 0) return albumCompare;
 
+                const discNumA = sortType === "trueReleaseDate" ? (a.trueDiscNumber || a.discNumber || 1) : (a.discNumber || 1);
+                const discNumB = sortType === "trueReleaseDate" ? (b.trueDiscNumber || b.discNumber || 1) : (b.discNumber || 1);
+                if (discNumA !== discNumB) return discNumA - discNumB;
+
                 const trackNumA = sortType === "trueReleaseDate" ? (a.trueTrackNumber || a.trackNumber || 0) : (a.trackNumber || 0);
                 const trackNumB = sortType === "trueReleaseDate" ? (b.trueTrackNumber || b.trackNumber || 0) : (b.trackNumber || 0);
                 
@@ -20739,6 +20809,22 @@
         default:
             sortedTracks = uniqueTracks;
             break;
+    }
+
+    if (sortedTracks) {
+        const metricSorts = ["playCount", "popularity", "releaseDate", "trueReleaseDate", "scrobbles", "personalScrobbles", "personalScrobblesRange", "lastScrobbled", "averageColor", "energyWave", "tempo", "energy", "danceability", "valence", "acousticness", "instrumentalness", "key", "tasteMatch"];
+        if (metricSorts.includes(sortType)) {
+            const matched = sortedTracks.filter(t => !t._isUnmatchedLocal);
+            const unmatched = sortedTracks.filter(t => t._isUnmatchedLocal);
+            if (unmatched.length > 0) {
+                sortedTracks = [...matched, ...unmatched];
+            }
+        }
+        sortedTracks.forEach(t => {
+            if (t._originalLocalUri) {
+                t.uri = t._originalLocalUri;
+            }
+        });
     }
 
     return {
@@ -22664,7 +22750,7 @@
                         if (sourceTracks && sourceTracks.length > 0) {
                             const hasLocal = sourceTracks.some(t => Spicetify.URI.isLocal(t.uri));
                             if (hasLocal) {
-                                const { convertedTracks } = await convertLocalTracksToSpotify(sourceTracks);
+                                const { convertedTracks } = await convertLocalTracksToSpotify(sourceTracks, () => {}, 'strict_remove');
                                 return convertedTracks;
                             }
                             return sourceTracks;
@@ -22733,7 +22819,7 @@
                         if (sourceTracks && sourceTracks.length > 0) {
                             const hasLocal = sourceTracks.some(t => Spicetify.URI.isLocal(t.uri));
                             if (hasLocal) {
-                                const { convertedTracks } = await convertLocalTracksToSpotify(sourceTracks);
+                                const { convertedTracks } = await convertLocalTracksToSpotify(sourceTracks, () => {}, 'strict_remove');
                                 return convertedTracks;
                             }
                             return sourceTracks;
@@ -27882,6 +27968,8 @@
         releaseDate: null,
         addedAt: item.addedAt || null,
         explicit: item.isExplicit || item.explicit || false,
+        trackNumber: item.trackNumber || item.album?.trackNumber || 0,
+        discNumber: item.discNumber || item.album?.discNumber || 1,
         track: {
             album: {
                 id: item.album.uri ? item.album.uri.split(":")[2] : null
@@ -27889,7 +27977,9 @@
             name: item.name,
             duration_ms: item.duration.milliseconds,
             id: Spicetify.URI.isLocal(item.uri) ? item.uri : item.uri.split(":")[2],
-            explicit: item.isExplicit || item.explicit || false
+            explicit: item.isExplicit || item.explicit || false,
+            trackNumber: item.trackNumber || item.album?.trackNumber || 0,
+            discNumber: item.discNumber || item.album?.discNumber || 1
           }
       }));
 
@@ -27925,6 +28015,8 @@
             releaseDate: null,
             addedAt: item.addedAt || null,
             explicit: item.isExplicit || item.explicit || false,
+            trackNumber: item.trackNumber || item.album?.trackNumber || 0,
+            discNumber: item.discNumber || item.album?.discNumber || 1,
             track: {
                 album: {
                     id: item.album.uri ? item.album.uri.split(":")[2] : null,
@@ -27933,7 +28025,9 @@
                 name: item.name,
                 duration_ms: item.duration.milliseconds,
                 id: item.uri,
-                explicit: item.isExplicit || item.explicit || false
+                explicit: item.isExplicit || item.explicit || false,
+                trackNumber: item.trackNumber || item.album?.trackNumber || 0,
+                discNumber: item.discNumber || item.album?.discNumber || 1
             }
         }));
     } catch (error) {
@@ -27961,6 +28055,7 @@
     releaseDate: 0,
     addedAt: track.addedAt,
     trackNumber: track.album?.trackNumber || track.trackNumber || 0,
+    discNumber: track.discNumber || track.album?.discNumber || 1,
     explicit: track.isExplicit || track.explicit || false,
     track: {
       album: {
@@ -27969,7 +28064,9 @@
       name: track.name,
       duration_ms: track.duration.milliseconds,
       id: Spicetify.URI.isLocal(track.uri) ? track.uri : track.uri.split(":")[2],
-      explicit: track.isExplicit || track.explicit || false
+      explicit: track.isExplicit || track.explicit || false,
+      trackNumber: track.album?.trackNumber || track.trackNumber || 0,
+      discNumber: track.discNumber || track.album?.discNumber || 1
     }
   });
 
@@ -28354,6 +28451,7 @@
                 releaseDate: releaseDate,
                 addedAt: null,
                 trackNumber: item.trackNumber || parseInt(item.album?.trackNumber, 10) || 0,
+                discNumber: item.discNumber || parseInt(item.album?.discNumber, 10) || 1,
                 explicit: isExplicit,
                 track: {
                     album: { 
@@ -28368,6 +28466,7 @@
                     artists: artists,
                     external_ids: {},
                     trackNumber: item.trackNumber || parseInt(item.album?.trackNumber, 10) || 0,
+                    discNumber: item.discNumber || parseInt(item.album?.discNumber, 10) || 1,
                     explicit: isExplicit
                 }
             };
@@ -28420,6 +28519,7 @@
                 releaseDate: releaseDate,
                 addedAt: null,
                 trackNumber: parseInt(t.trackNumber, 10) || 0,
+                discNumber: parseInt(t.discNumber, 10) || 1,
                 explicit: isExplicit,
                 track: {
                     album: { 
@@ -28434,6 +28534,7 @@
                     artists: artists,
                     external_ids: {},
                     trackNumber: parseInt(t.trackNumber, 10) || 0,
+                    discNumber: parseInt(t.discNumber, 10) || 1,
                     explicit: isExplicit
                 }
             };
@@ -29246,15 +29347,17 @@
               const track = item.track;
               if (!track) return;
               const tNum = parseInt(track.trackNumber || track.track_number, 10) || 0;
+              const dNum = parseInt(track.discNumber || track.disc_number, 10) || 1;
               const pCount = parseInt(track.playcount, 10) || 0;
               const tId = track.uri.split(":")[2];
               
-              entriesToSave.push({ key: tId, val: { date: releaseDate, trackNumber: tNum } });
+              entriesToSave.push({ key: tId, val: { date: releaseDate, trackNumber: tNum, discNumber: dNum } });
 
               albumTracks.push({
                 uri: track.uri,
                 name: track.name,
                 trackNumber: tNum,
+                discNumber: dNum,
                 playcount: pCount,
                 releaseDate: releaseDate
               });
@@ -29348,6 +29451,7 @@
           if (foundTrack) {
             playCount = foundTrack.playcount;
             trackNumber = foundTrack.trackNumber;
+            track.discNumber = foundTrack.discNumber || track.discNumber || 1;
             if (playCount !== "N/A") {
                 await idb.set('playCounts', trackId, playCount);
             }
@@ -29372,6 +29476,7 @@
       return {
         ...track,
         trackNumber: trackNumber,
+        discNumber: track.discNumber || 1,
         songTitle: track.songTitle || track.name, 
         albumName: track.albumName || track.album?.name || track.track?.album?.name || "Unknown Album",
         trackId: trackId,
@@ -29555,7 +29660,8 @@
             return { 
                 ...track, 
                 playCount: "N/A", 
-                trackNumber: 0,
+                trackNumber: track.trackNumber || track.track_number || 0,
+                discNumber: track.discNumber || track.disc_number || 1,
                 songTitle: track.name || track.songTitle || "Unknown Title",
                 trackId: trackId,
                 albumId: albumId,
@@ -29568,6 +29674,7 @@
 
         const enrichedData = {
             trackNumber: track.trackNumber || track.track_number || 0,
+            discNumber: track.discNumber || track.disc_number || 1,
             songTitle: track.songTitle || track.name,
             albumName: track.albumName || track.album?.name || track.track?.album?.name || "Unknown Album",
             trackId: trackId,
@@ -29663,7 +29770,7 @@
     
     tracks.forEach((track, index) => {
         if (Spicetify.URI.isLocal(track.uri)) {
-            results[index] = { ...track, releaseDate: null, trackNumber: track.trackNumber || 0 };
+            results[index] = { ...track, releaseDate: null, trackNumber: track.trackNumber || 0, discNumber: track.discNumber || 1 };
             return;
         }
         const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
@@ -29671,7 +29778,8 @@
         
         if (cached && typeof cached === 'object' && cached.trackNumber !== undefined) {
             const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : cached.trackNumber;
-            results[index] = { ...track, releaseDate: cached.date, trackNumber: finalTrackNum };
+            const finalDiscNum = track.discNumber || cached.discNumber || 1;
+            results[index] = { ...track, releaseDate: cached.date, trackNumber: finalTrackNum, discNumber: finalDiscNum };
         } else {
             missingUris.push({ track, index, trackId });
         }
@@ -29695,9 +29803,10 @@
                     
                     if (meta && meta.releaseDate) {
                         const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : 0;
-                        results[index] = { ...track, releaseDate: meta.releaseDate, trackNumber: finalTrackNum };
+                        const finalDiscNum = track.discNumber || 1;
+                        results[index] = { ...track, releaseDate: meta.releaseDate, trackNumber: finalTrackNum, discNumber: finalDiscNum };
                         if (trackId) {
-                            entriesToSave.push({ key: trackId, val: { date: meta.releaseDate, trackNumber: finalTrackNum } });
+                            entriesToSave.push({ key: trackId, val: { date: meta.releaseDate, trackNumber: finalTrackNum, discNumber: finalDiscNum } });
                         }
                     } else {
                         results[index] = await fetchFunction(track);
@@ -29866,7 +29975,8 @@
     
     if (cached && typeof cached === 'object' && cached.trackNumber !== undefined) {
         const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : cached.trackNumber;
-        return { ...track, releaseDate: cached.date, trackNumber: finalTrackNum };
+        const finalDiscNum = track.discNumber || cached.discNumber || 1;
+        return { ...track, releaseDate: cached.date, trackNumber: finalTrackNum, discNumber: finalDiscNum };
     }
 
     try {
@@ -29897,29 +30007,33 @@
         const trackData = albumTracksDataCache[albumId].find(t => t.uri === track.uri);
         if (trackData && trackData.releaseDate) {
           const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : trackData.trackNumber;
-          setCachedReleaseDate(trackId, trackData.releaseDate, finalTrackNum).catch(() => {});
-          return { ...track, releaseDate: trackData.releaseDate, trackNumber: finalTrackNum };
+          const finalDiscNum = trackData.discNumber || track.discNumber || 1;
+          setCachedReleaseDate(trackId, trackData.releaseDate, finalTrackNum, finalDiscNum).catch(() => {});
+          return { ...track, releaseDate: trackData.releaseDate, trackNumber: finalTrackNum, discNumber: finalDiscNum };
         }
       }
 
       const releaseDate = await getReleaseDatesForAlbum(albumId);
       
       let trackNumber = track.trackNumber > 0 ? track.trackNumber : 0;
-      if (trackNumber === 0 && albumTracksDataCache[albumId]) {
+      let discNumber = track.discNumber || 1;
+      if (albumTracksDataCache[albumId]) {
           const trackData = albumTracksDataCache[albumId].find(t => t.uri === track.uri);
           if (trackData) {
-              trackNumber = trackData.trackNumber;
+              if (trackNumber === 0) trackNumber = trackData.trackNumber;
+              discNumber = trackData.discNumber || discNumber;
           }
       }
 
-      return { ...track, releaseDate: releaseDate, trackNumber: trackNumber };
+      return { ...track, releaseDate: releaseDate, trackNumber: trackNumber, discNumber: discNumber };
     } catch (error) {
       try {
           const meta = await fetchInternalTrackMetadata(trackId);
           if (meta && meta.album && meta.album.release_date) {
               const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : 0;
-              await setCachedReleaseDate(trackId, meta.album.release_date, finalTrackNum);
-              return { ...track, releaseDate: meta.album.release_date, trackNumber: finalTrackNum };
+              const finalDiscNum = meta.discNumber || track.discNumber || 1;
+              await setCachedReleaseDate(trackId, meta.album.release_date, finalTrackNum, finalDiscNum);
+              return { ...track, releaseDate: meta.album.release_date, trackNumber: finalTrackNum, discNumber: finalDiscNum };
           }
       } catch (e) {}
       console.error(`Error getting release date for track ${track.name} (album ${albumId}):`, error);
@@ -30770,7 +30884,8 @@
                     if (tracks && tracks.length > 0) {
                         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
                             tracks, 
-                            (progress) => { mainButton.innerText = progress; }
+                            (progress) => { mainButton.innerText = progress; },
+                            'strict_remove'
                         );
                         if (unconvertedCount > 0) {
                             const plural = unconvertedCount === 1 ? "track" : "tracks";
@@ -31784,10 +31899,12 @@
         let cached = trackId ? cachedMap.get(trackId) : null;
         if (cached && typeof cached === 'object' && cached.date !== undefined) {
             const finalTrackNum = (track.trackNumber > 0) ? track.trackNumber : (cached.trackNumber !== undefined ? cached.trackNumber : 0);
+            const finalDiscNum = cached.discNumber !== undefined ? cached.discNumber : (track.discNumber || 1);
             results[index] = { 
                 ...track, 
                 trueReleaseDate: cached.date, 
                 trueTrackNumber: finalTrackNum,
+                trueDiscNumber: finalDiscNum,
                 trueAlbumName: cached.albumName !== undefined ? cached.albumName : (track.albumName || ""),
                 trueAlbumId: cached.albumId !== undefined ? cached.albumId : (track.albumId || track.album?.id || track.track?.album?.id || "")
             };
@@ -35586,7 +35703,9 @@
                                     uri: d.albumOfTrack?.uri,
                                     images: d.albumOfTrack?.coverArt?.sources || []
                                 },
-                                duration_ms: d.duration?.totalMilliseconds
+                                duration_ms: d.duration?.totalMilliseconds,
+                                trackNumber: parseInt(d.trackNumber || d.track_number, 10) || 0,
+                                discNumber: parseInt(d.discNumber || d.disc_number, 10) || 1
                             };
                         });
                     }
@@ -38482,6 +38601,7 @@
                     name: t.name,
                     duration_ms: t.durationMilis,
                     track_number: t.trackNumber || (t.track?.track_number) || 0,
+                    disc_number: t.discNumber || (t.track?.disc_number) || 1,
                     artists: t.track?.artists || (t.artistUris || []).map((u, idx) => ({ id: u.split(':')[2], name: (t.allArtists || "").split(', ')[idx] || 'Unknown' })),
                     album: {
                         name: t.albumName,
@@ -38947,6 +39067,8 @@
 
         const { convertedTracks: resolvedSpotifyTracks } = await convertLocalTracksToSpotify(
             mockLocalTracks,
+            () => {},
+            'strict_remove'
         );
 
         updateProgress("Verifying...");
@@ -39272,7 +39394,7 @@
               artistName: c.artist
           }));
 
-          const { convertedTracks } = await convertLocalTracksToSpotify(mockLocalTracks, updateProgress);
+          const { convertedTracks } = await convertLocalTracksToSpotify(mockLocalTracks, updateProgress, 'strict_remove');
 
           updateProgress("Filtering...");
           const likedSongs = await getLikedSongs();
@@ -39558,6 +39680,8 @@
 
         const { convertedTracks: resolvedSpotifyTracks } = await convertLocalTracksToSpotify(
             mockLocalTracks,
+            () => {},
+            'strict_remove'
         );
 
         updateProgress("Verifying...");
@@ -40224,7 +40348,7 @@
         const { convertedTracks, unconvertedCount } = await convertLocalTracksToSpotify(
             tracks,
             (progress) => { updateProgressText(progress); },
-            false
+            localFilesHandling
         );
         tracks = convertedTracks;
         unconvertedLocalCount = unconvertedCount;
@@ -40366,7 +40490,7 @@
 
           const deduplicationResult = await deduplicateTracks(
               tracksForDeduplication, 
-              sortType === "deduplicateOnly", 
+              sortType === "deduplicateOnly" || sortType === "filterOnePerArtist", 
               isArtistPage,
               (progress) => { updateProgressText(`Dedup ${progress}%`); },
               sortType
@@ -40492,7 +40616,7 @@
             }
             const originalOrderMap = new Map();
             tracksForDeduplication.forEach((track, index) => {
-                if (track.uri) {
+                if (track.uri && !originalOrderMap.has(track.uri)) {
                     originalOrderMap.set(track.uri, index);
                 }
             });
@@ -40526,27 +40650,29 @@
             });
             
             const originalOrderMap = new Map();
-            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+            tracksForDeduplication.forEach((track, index) => {
+                if (!originalOrderMap.has(track.uri)) originalOrderMap.set(track.uri, index);
+            });
 
-            const bestTracksSet = new Set(Array.from(artistBestTrack.values()).map(t => t.uri));
+            const bestTracksArray = Array.from(artistBestTrack.values());
             
-            sortedTracks = uniqueTracks
-                .filter(t => bestTracksSet.has(t.uri))
-                .sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
+            sortedTracks = bestTracksArray.sort((a, b) => (originalOrderMap.get(a.uri) || 0) - (originalOrderMap.get(b.uri) || 0));
                 
-            removedTracks = [];
+            const artistRemoved = [];
             artistAllTracks.forEach((tracksList, artistKey) => {
                 const keptTrack = artistBestTrack.get(artistKey);
                 tracksList.forEach(t => {
                     if (t.uri !== keptTrack.uri) {
                         t._keptTrack = keptTrack;
-                        removedTracks.push(t);
+                        artistRemoved.push(t);
                     }
                 });
             });
 
+            removedTracks = [...removedTracks, ...artistRemoved];
+
             if (removedTracks.length === 0) {
-                showNotification("No multiple tracks by the same artist found.");
+                showNotification("No multiple tracks by the same artist or duplicates found.");
                 if (!isHeadless && !progressCallback) resetButtons();
                 return;
             }
@@ -40571,7 +40697,9 @@
             const likedIsrcSet = await getLikedIsrcsSet(likedSongs, (msg) => { updateProgressText(msg); });
 
             const originalOrderMap = new Map();
-            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+            tracksForDeduplication.forEach((track, index) => {
+                if (!originalOrderMap.has(track.uri)) originalOrderMap.set(track.uri, index);
+            });
             
             if (sortType === "sortByLiked") {
                 sortedTracks = uniqueTracks.sort((a, b) => {
@@ -40647,101 +40775,20 @@
                       const albumB = (b.albumName || "").toLowerCase();
                       const albumCompare = albumA.localeCompare(albumB);
                       if (albumCompare !== 0) return albumCompare;
+                      
+                      const discA = a.discNumber || 1;
+                      const discB = b.discNumber || 1;
+                      if (discA !== discB) return discA - discB;
+
                       return (a.trackNumber || 0) - (b.trackNumber || 0);
                   });
               } else {
                   const originalOrderMap = new Map();
-                  tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+                  tracksForDeduplication.forEach((track, index) => {
+                      if (!originalOrderMap.has(track.uri)) originalOrderMap.set(track.uri, index);
+                  });
                   sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
               }
-          } else if (sortType === "filterAlbumsEPsCompilations") {
-            const filteredTracks = uniqueTracks.filter(track => {
-                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
-                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
-                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
-                
-                const isEP = type === 'ep' || ((type === 'single' || type === 'album') && /\bep\b/i.test(albumName));
-                const isCompilation = type === 'compilation' || artist.includes('various artists');
-                
-                return type === 'album' || isEP || isCompilation;
-            });
-
-            if (isAscending) {
-                sortedTracks = filteredTracks.sort((a, b) => {
-                    const albumA = (a.albumName || "").toLowerCase();
-                    const albumB = (b.albumName || "").toLowerCase();
-                    const albumCompare = albumA.localeCompare(albumB);
-                    if (albumCompare !== 0) return albumCompare;
-                    
-                    const trackA = a.trackNumber || 0;
-                    const trackB = b.trackNumber || 0;
-                    return trackA - trackB;
-                });
-            } else {
-                const originalOrderMap = new Map();
-                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
-                
-                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
-            }
-
-          } else if (sortType === "filterAlbumsEPsSingles") {
-            const filteredTracks = uniqueTracks.filter(track => {
-                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
-                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
-                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
-                
-                const isEP = type === 'ep' || ((type === 'single' || type === 'album') && /\bep\b/i.test(albumName));
-                const isCompilation = type === 'compilation' || artist.includes('various artists');
-                
-                return (type === 'album' || type === 'single' || isEP) && !isCompilation;
-            });
-
-            if (isAscending) {
-                sortedTracks = filteredTracks.sort((a, b) => {
-                    const albumA = (a.albumName || "").toLowerCase();
-                    const albumB = (b.albumName || "").toLowerCase();
-                    const albumCompare = albumA.localeCompare(albumB);
-                    if (albumCompare !== 0) return albumCompare;
-                    
-                    const trackA = a.trackNumber || 0;
-                    const trackB = b.trackNumber || 0;
-                    return trackA - trackB;
-                });
-            } else {
-                const originalOrderMap = new Map();
-                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
-                
-                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
-            }
-
-          } else if (sortType === "filterAlbumsEPs") {
-            const filteredTracks = uniqueTracks.filter(track => {
-                const type = (track.albumType || track.track?.album?.album_type || '').toLowerCase();
-                const albumName = (track.albumName || track.track?.album?.name || '').toLowerCase();
-                const artist = (track.artistName || track.artists?.[0]?.name || '').toLowerCase();
-                const isEP = type === 'ep' || ((type === 'single' || type === 'album') && /\bep\b/i.test(albumName));
-                const isCompilation = type === 'compilation' || artist.includes('various artists');
-
-                return (type === 'album' || isEP) && !isCompilation;
-            });
-
-            if (isAscending) {
-                sortedTracks = filteredTracks.sort((a, b) => {
-                    const albumA = (a.albumName || "").toLowerCase();
-                    const albumB = (b.albumName || "").toLowerCase();
-                    const albumCompare = albumA.localeCompare(albumB);
-                    if (albumCompare !== 0) return albumCompare;
-                    
-                    const trackA = a.trackNumber || 0;
-                    const trackB = b.trackNumber || 0;
-                    return trackA - trackB;
-                });
-            } else {
-                const originalOrderMap = new Map();
-                tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
-                
-                sortedTracks = filteredTracks.sort((a, b) => originalOrderMap.get(a.uri) - originalOrderMap.get(b.uri));
-            }
           } else if (sortType === "removeTrashed") {
             let trashSongs = {};
             let trashArtists = {};
@@ -40869,7 +40916,9 @@
             );
 
             const originalOrderMap = new Map();
-            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+            tracksForDeduplication.forEach((track, index) => {
+                if (!originalOrderMap.has(track.uri)) originalOrderMap.set(track.uri, index);
+            });
 
             sortedTracks = dedupeResult.unique
                 .filter(t => !t._isExclusion)
@@ -40899,7 +40948,9 @@
             updateProgressText("Filtering...");
 
             const originalOrderMap = new Map();
-            tracksForDeduplication.forEach((track, index) => originalOrderMap.set(track.uri, index));
+            tracksForDeduplication.forEach((track, index) => {
+                if (!originalOrderMap.has(track.uri)) originalOrderMap.set(track.uri, index);
+            });
 
             sortedTracks = uniqueTracks.filter(track => {
                 let trackArtistIds = [];
@@ -41117,6 +41168,22 @@
                 return;
             }
         }
+      }
+
+      if (sortedTracks) {
+          const metricSorts = ["playCount", "popularity", "releaseDate", "trueReleaseDate", "scrobbles", "personalScrobbles", "personalScrobblesRange", "lastScrobbled", "averageColor", "energyWave", "tempo", "energy", "danceability", "valence", "acousticness", "instrumentalness", "key", "tasteMatch"];
+          if (metricSorts.includes(sortType)) {
+              const matched = sortedTracks.filter(t => !t._isUnmatchedLocal);
+              const unmatched = sortedTracks.filter(t => t._isUnmatchedLocal);
+              if (unmatched.length > 0) {
+                  sortedTracks = [...matched, ...unmatched];
+              }
+          }
+          sortedTracks.forEach(t => {
+              if (t._originalLocalUri) {
+                  t.uri = t._originalLocalUri;
+              }
+          });
       }
 
       if (isArtistPage && sortedTracks && sortedTracks.length > 0) {
@@ -42390,6 +42457,10 @@
             const albumCompare = albumA.toLowerCase().localeCompare(albumB.toLowerCase());
             if (albumCompare !== 0) return albumCompare;
             
+            const discNumA = sortType === "trueReleaseDate" ? (a.trueDiscNumber || a.discNumber || 1) : (a.discNumber || 1);
+            const discNumB = sortType === "trueReleaseDate" ? (b.trueDiscNumber || b.discNumber || 1) : (b.discNumber || 1);
+            if (discNumA !== discNumB) return discNumA - discNumB;
+
             const trackNumA = sortType === "trueReleaseDate" ? (a.trueTrackNumber || a.trackNumber || 0) : (a.trackNumber || 0);
             const trackNumB = sortType === "trueReleaseDate" ? (b.trueTrackNumber || b.trackNumber || 0) : (b.trackNumber || 0);
             
