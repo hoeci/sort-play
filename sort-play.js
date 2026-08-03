@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.3.2";
+  const SORT_PLAY_VERSION = "6.3.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -3628,7 +3628,7 @@
       .sort-play-settings .setting-row { padding: 5px 0; align-items: center; }
       .sort-play-settings .setting-row .col.description { float: left; padding-right: 10px; width: auto; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; }
       .sort-play-settings .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
-      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 125px; height: auto;}
+      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 130px; height: auto;}
       .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 5px; width: 125px; }
       .sort-play-settings select:disabled { opacity: 0.5; cursor: not-allowed; }
       .column-settings-button { background: none; border: none; margin: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; opacity: 0.7; transition: opacity 0.2s; }
@@ -48608,16 +48608,14 @@
     
     async function mountLikeButtonWatchFeed() {
         const MAX_RETRIES = 15;
-        let retryDelay = 250;
+        let retryDelay = 200;
     
         const watchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
-        let container = watchFeedView ? watchFeedView.querySelector(".likeControl-wrapper-wf") : null;
-
         if (likeButtonConfig.watchFeed === false || !watchFeedView) {
-            if (container) {
-                Spicetify.ReactDOM.unmountComponentAtNode(container);
-                container.remove();
-            }
+            document.querySelectorAll(".likeControl-wrapper-wf").forEach(el => {
+                Spicetify.ReactDOM.unmountComponentAtNode(el);
+                el.remove();
+            });
             return;
         }
     
@@ -48625,80 +48623,120 @@
             const currentWatchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
             if (!currentWatchFeedView) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 2, 3000);
+                retryDelay = Math.min(retryDelay * 1.5, 1000);
                 continue;
             }
-    
-            const titleNode = currentWatchFeedView.querySelector('[data-flip-id^="wf-title-spotify:track:"]');
-            if (!titleNode) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 2, 3000);
-                continue;
-            }
-            
-            const uri = titleNode.getAttribute('data-flip-id').replace('wf-title-', '');
 
-            let templateButton = currentWatchFeedView.querySelector('button[aria-label="Add to playlist"]') || 
-                                 currentWatchFeedView.querySelector('button[aria-checked="true"]') ||
-                                 currentWatchFeedView.querySelector('button[data-testid="add-button"]');
+            let uri = null;
+            const trackLink = currentWatchFeedView.querySelector('a[href^="/track/"]');
+            const titleNode = currentWatchFeedView.querySelector('[data-flip-id^="wf-title-spotify:track:"]');
             
-            if (!templateButton || !templateButton.parentElement) {
-                console.warn(`[Sort-Play Like Button WF] Retry ${i + 1}: Template button not found`);
+            if (trackLink) {
+                const href = trackLink.getAttribute('href');
+                const trackId = href.split('?')[0].split('/track/')[1];
+                if (trackId) uri = `spotify:track:${trackId}`;
+            } else if (titleNode) {
+                uri = titleNode.getAttribute('data-flip-id').replace('wf-title-', '');
+            }
+
+            const queueBtn = currentWatchFeedView.querySelector('button[data-testid="add-button"]');
+            const shareBtn = currentWatchFeedView.querySelector('.main-watchFeed-shareButton');
+            const actionContainer = queueBtn ? queueBtn.parentElement : (shareBtn ? shareBtn.parentElement : null);
+
+            if (!uri && actionContainer) {
+                let curr = actionContainer;
+                const findUri = (obj, maxDepth = 15, visited = new Set()) => {
+                    if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
+                    visited.add(obj);
+                    if (obj.uri && typeof obj.uri === 'string' && obj.uri.startsWith('spotify:track:')) return obj.uri;
+                    if (obj.trackUri && typeof obj.trackUri === 'string' && obj.trackUri.startsWith('spotify:track:')) return obj.trackUri;
+                    for (const k in obj) {
+                        if (['children', 'props', 'value', 'item', 'track', 'onAction', 'onClick'].includes(k) || !isNaN(k)) {
+                            const res = findUri(obj[k], maxDepth - 1, visited);
+                            if (res) return res;
+                        }
+                    }
+                    return null;
+                };
+
+                while (curr && !uri && curr !== document.body) {
+                    const reactPropsKey = Object.keys(curr).find(key => key.startsWith("__reactProps$"));
+                    if (reactPropsKey) {
+                        uri = findUri(curr[reactPropsKey]);
+                    }
+                    curr = curr.parentElement;
+                }
+            }
+
+            if (!uri || !actionContainer) {
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 2, 3000);
+                retryDelay = Math.min(retryDelay * 1.5, 1000);
                 continue;
             }
+
+            const playlistBtn = actionContainer.querySelector('button[aria-label="Add to playlist"]') || 
+                                actionContainer.querySelector('button[aria-label="Add to Liked Songs"]') ||
+                                actionContainer.querySelector('button[aria-checked="true"]') ||
+                                actionContainer.querySelector('button[aria-checked="false"]');
             
-            let container = currentWatchFeedView.querySelector(".likeControl-wrapper-wf");
-            if (!container) {
-                container = document.createElement("div");
-                container.className = "likeControl-wrapper-wf";
-                container.style.display = "contents";
+            const templateButton = playlistBtn || queueBtn || shareBtn || actionContainer.querySelector('button');
+
+            if (!templateButton) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                retryDelay = Math.min(retryDelay * 1.5, 1000);
+                continue;
+            }
+
+            let wrapper = actionContainer.querySelector(".likeControl-wrapper-wf");
+            if (!wrapper) {
+                wrapper = document.createElement("div");
+                wrapper.className = "likeControl-wrapper-wf";
+                wrapper.style.display = "contents";
                 try {
-                    templateButton.parentElement.appendChild(container);
+                    if (playlistBtn) {
+                        playlistBtn.insertAdjacentElement('beforebegin', wrapper);
+                    } else if (queueBtn) {
+                        queueBtn.insertAdjacentElement('afterend', wrapper);
+                    } else {
+                        actionContainer.appendChild(wrapper);
+                    }
                 } catch (error) {
-                    console.error(`[Sort-Play Like Button WF] Retry ${i + 1}: Failed to insert like button wrapper`, error);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    retryDelay = Math.min(retryDelay * 2, 3000);
+                    retryDelay = Math.min(retryDelay * 1.5, 1000);
                     continue;
                 }
             }
     
-            if (container.dataset.renderedUri === uri && container.firstChild) {
+            if (wrapper.dataset.renderedUri === uri && wrapper.firstChild) {
                 return;
             }
     
             try {
+                let cleanClassList = templateButton.className
+                    .replace(/encore-internal-color-text-bright-accent/g, '')
+                    .replace(/encore-internal-color-text-subdued/g, '')
+                    .replace(/boFkCF4QGEeMQzn5/g, '')
+                    .trim();
+
                 Spicetify.ReactDOM.render(
                     Spicetify.React.createElement(LikeButton, {
                         uri: uri,
                         key: uri,
-                        classList: templateButton.className,
-                        size: 29,
+                        classList: cleanClassList,
+                        size: 30,
                         dynamicSizeSelector: null,
-                        buttonStyle: { marginRight: "0px", marginTop: "1px",display: "flex",alignItems: "center", justifyContent: "center"}
+                        buttonStyle: { marginRight: "0px", marginTop: "1px", display: "flex", alignItems: "center", justifyContent: "center" }
                     }),
-                    container
+                    wrapper
                 );
                 
-                await new Promise(resolve => setTimeout(resolve, 50));
-                
-                if (!container.firstChild) {
-                    console.error(`[Sort-Play Like Button WF] Retry ${i + 1}: React render completed but no child element found`);
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    retryDelay = Math.min(retryDelay * 2, 3000);
-                    continue;
-                }
-                
-                container.dataset.renderedUri = uri;
-                
+                wrapper.dataset.renderedUri = uri;
                 return;
                 
             } catch (error) {
-                console.error(`[Sort-Play Like Button WF] Retry ${i + 1}: React render error`, error);
+                console.error(`[Sort-Play Like Button WF] React render error`, error);
                 await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 2, 3000);
-                continue;
+                retryDelay = Math.min(retryDelay * 1.5, 1000);
             }
         }
     }
