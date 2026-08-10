@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.3.4";
+  const SORT_PLAY_VERSION = "6.3.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -4262,7 +4262,7 @@
             Intelligent Deduplication
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Controls how duplicate songs are handled when creating an Artist Discography.<br><br>• <strong>Default</strong>: Keeps the most popular version (prefers Album versions if sorting by Release Date).<br>• <strong>Keep Single & Album</strong>: Retains both the single/EP version AND album version.<br>• <strong>One Per Release</strong>: Retains one track per uniquely named release<br>• <strong>Don't Remove</strong>: Keeps all duplicates for a 100% complete collection.<br><br><em>Note: Compilations are always removed if an original version exists.</em></span>
+                <span class="custom-tooltip">Controls how duplicate songs are handled when creating an Artist Discography.<br><br>• <strong>Default</strong>: Balances popularity and album context to keep the best version (favoring studio albums over singles). Strictly prefers original Album versions if sorting by Release Date.<br>• <strong>Keep Single & Album</strong>: Retains both the single/EP version AND album version.<br>• <strong>One Per Release</strong>: Retains one track per uniquely named release<br>• <strong>Don't Remove</strong>: Keeps all duplicates for a 100% complete collection.<br><br><em>Note: Compilations are always removed if an original version exists.</em></span>
             </span>
         </label>
         <div class="col action">
@@ -43209,37 +43209,53 @@
             .filter(w => w.length > 0);
     };
 
+    const isChronologicalOrPop = sortType === 'releaseDate' || sortType === 'trueReleaseDate' || sortType === 'analyzeCurrentView' || sortType === 'popularity';
+    const useEffectivePop = isArtistPageContext && !isChronologicalOrPop;
+
+    const trackEffectivePop = new Map();
+
+    if (useEffectivePop) {
+        const pops = tracks.map(t => t.popularity).filter(p => p !== null && p > 0).sort((a, b) => a - b);
+        let medianPop = 0;
+        if (pops.length > 0) {
+            const mid = Math.floor(pops.length / 2);
+            medianPop = pops.length % 2 !== 0 ? pops[mid] : (pops[mid - 1] + pops[mid]) / 2;
+        }
+        const relevanceThreshold = Math.max(10, medianPop * 0.75);
+
+        const albumCounts = new Map();
+        tracks.forEach(t => {
+            const type = (t.album_type || t.albumType || 'album').toLowerCase();
+            const isComp = type === 'compilation' || type === 'appears_on' || t._isAppearsOn || (t.allArtists || '').toLowerCase().includes('various artists');
+            if (isComp) return; 
+
+            const albumId = t.albumId || t.track?.album?.id || t.albumName || "";
+            if (!albumId) return;
+            
+            if (t.popularity && t.popularity >= relevanceThreshold) {
+                albumCounts.set(albumId, (albumCounts.get(albumId) || 0) + 1);
+            }
+        });
+
+        tracks.forEach(t => {
+            const rawPop = t.popularity || 0;
+            const albumId = t.albumId || t.track?.album?.id || t.albumName || "";
+            
+            const strength = Math.min(15, albumCounts.get(albumId) || 0);
+            
+            const type = (t.album_type || t.albumType || 'album').toLowerCase();
+            const isComp = type === 'compilation' || type === 'appears_on' || t._isAppearsOn || (t.allArtists || '').toLowerCase().includes('various artists');
+            
+            const compPenalty = isComp ? -15 : 0;
+            const albumBonus = (!isComp && type === 'album') ? strength : (!isComp ? Math.min(strength, 3) : 0);
+            
+            trackEffectivePop.set(t.uri, rawPop + albumBonus + compPenalty);
+        });
+    }
+
     const sortedInputTracks = [...tracks].sort((a, b) => {
         const popA = a.popularity || 0;
         const popB = b.popularity || 0;
-
-        if (isArtistPageContext) {
-            const typeA = (a.album_type || a.albumType || 'album').toLowerCase();
-            const typeB = (b.album_type || b.albumType || 'album').toLowerCase();
-
-            const isCompA = typeA === 'compilation' || typeA === 'appears_on' || a._isAppearsOn || (a.allArtists || '').toLowerCase().includes('various artists');
-            const isCompB = typeB === 'compilation' || typeB === 'appears_on' || b._isAppearsOn || (b.allArtists || '').toLowerCase().includes('various artists');
-
-            const popDiff = popA - popB;
-            const isChronological = sortType === 'releaseDate' || sortType === 'trueReleaseDate' || sortType === 'analyzeCurrentView';
-
-            if (isCompA && !isCompB) {
-                if (!isChronological && popDiff >= 15) return -1; 
-                return 1;
-            }
-            if (!isCompA && isCompB) {
-                if (!isChronological && popDiff <= -15) return 1; 
-                return -1;
-            }
-
-            if (isChronological) {
-                const isAlbumA = typeA === 'album';
-                const isAlbumB = typeB === 'album';
-
-                if (isAlbumA && !isAlbumB) return -1;
-                if (!isAlbumA && isAlbumB) return 1;
-            }
-        }
 
         const dateA = a.trueReleaseDate || a.releaseDate;
         const dateB = b.trueReleaseDate || b.releaseDate;
@@ -43247,50 +43263,105 @@
         const msB = dateB ? new Date(dateB).getTime() : Infinity;
         const albumA = a._originalAlbumName || a.trueAlbumName || a.albumName || a.track?.album?.name || "";
         const albumB = b._originalAlbumName || b.trueAlbumName || b.albumName || b.track?.album?.name || "";
-        
-        if (isArtistPageContext && (sortType === 'releaseDate' || sortType === 'trueReleaseDate' || sortType === 'analyzeCurrentView')) {
-            const cleanA = albumA.trim()
-                .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
-                .replace(/\s*(?:[\(\[\-:\u2010-\u2015\u2212]\s*.*?(deluxe|expanded|anniversary|special|bonus|tour|definitive|complete|remaster|international|gold|platinum|diamond|scary hours|edition|version|commentary)\b.*|(?:\s+(deluxe|deluxe edition|scary hours edition|bonus tracks|extended version)\b.*))$/i, '')
-                .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
-                .replace(/\s*\+$/, '');
-            const cleanB = albumB.trim()
-                .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
-                .replace(/\s*(?:[\(\[\-:\u2010-\u2015\u2212]\s*.*?(deluxe|expanded|anniversary|special|bonus|tour|definitive|complete|remaster|international|gold|platinum|diamond|scary hours|edition|version|commentary)\b.*|(?:\s+(deluxe|deluxe edition|scary hours edition|bonus tracks|extended version)\b.*))$/i, '')
-                .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
-                .replace(/\s*\+$/, '');
-            const baseA = getNormalizedTitle(cleanA);
-            const baseB = getNormalizedTitle(cleanB);
-            
-            if (baseA && baseB && baseA === baseB) {
-                if (msA !== msB) return msA - msB;
 
-                const origDateA = a._originalReleaseDate || a.releaseDate;
-                const origDateB = b._originalReleaseDate || b.releaseDate;
-                const origMsA = origDateA ? new Date(origDateA).getTime() : Infinity;
-                const origMsB = origDateB ? new Date(origDateB).getTime() : Infinity;
-                if (origMsA !== origMsB) return origMsA - origMsB;
+        if (isArtistPageContext) {
+            const isChronological = sortType === 'releaseDate' || sortType === 'trueReleaseDate' || sortType === 'analyzeCurrentView';
+            const isPopularity = sortType === 'popularity';
 
-                const isExpA = a.explicit || (a.track && a.track.explicit) ? 1 : 0;
-                const isExpB = b.explicit || (b.track && b.track.explicit) ? 1 : 0;
-                if (isExpB !== isExpA) return isExpB - isExpA;
+            if (isChronological || isPopularity) {
+                const typeA = (a.album_type || a.albumType || 'album').toLowerCase();
+                const typeB = (b.album_type || b.albumType || 'album').toLowerCase();
 
-                const origAlbumA = a._originalAlbumName || a.albumName || "";
-                const origAlbumB = b._originalAlbumName || b.albumName || "";
-                
-                const badRegex = /(commentary|instrumental|a cappella|acapella|karaoke)/i;
-                const isBadA = badRegex.test(origAlbumA) ? 1 : 0;
-                const isBadB = badRegex.test(origAlbumB) ? 1 : 0;
-                if (isBadA !== isBadB) return isBadA - isBadB;
+                const isCompA = typeA === 'compilation' || typeA === 'appears_on' || a._isAppearsOn || (a.allArtists || '').toLowerCase().includes('various artists');
+                const isCompB = typeB === 'compilation' || typeB === 'appears_on' || b._isAppearsOn || (b.allArtists || '').toLowerCase().includes('various artists');
 
-                if (origAlbumA.length !== origAlbumB.length) return origAlbumB.length - origAlbumA.length;
-                
-                if (albumA.length !== albumB.length) return albumB.length - albumA.length;
-                            
-                if (popB !== popA) return popB - popA;
+                const popDiff = popA - popB;
+
+                if (isCompA && !isCompB) {
+                    if (!isChronological && popDiff >= 15) return -1; 
+                    return 1;
+                }
+                if (!isCompA && isCompB) {
+                    if (!isChronological && popDiff <= -15) return 1; 
+                    return -1;
+                }
+
+                if (isChronological) {
+                    const isAlbumA = typeA === 'album';
+                    const isAlbumB = typeB === 'album';
+
+                    if (isAlbumA && !isAlbumB) return -1;
+                    if (!isAlbumA && isAlbumB) return 1;
+                }
+
+                if (isChronological) {
+                    const cleanA = albumA.trim()
+                        .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
+                        .replace(/\s*(?:[\(\[\-:\u2010-\u2015\u2212]\s*.*?(deluxe|expanded|anniversary|special|bonus|tour|definitive|complete|remaster|international|gold|platinum|diamond|scary hours|edition|version|commentary)\b.*|(?:\s+(deluxe|deluxe edition|scary hours edition|bonus tracks|extended version)\b.*))$/i, '')
+                        .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
+                        .replace(/\s*\+$/, '');
+                    const cleanB = albumB.trim()
+                        .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
+                        .replace(/\s*(?:[\(\[\-:\u2010-\u2015\u2212]\s*.*?(deluxe|expanded|anniversary|special|bonus|tour|definitive|complete|remaster|international|gold|platinum|diamond|scary hours|edition|version|commentary)\b.*|(?:\s+(deluxe|deluxe edition|scary hours edition|bonus tracks|extended version)\b.*))$/i, '')
+                        .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '').replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
+                        .replace(/\s*\+$/, '');
+                    const baseA = getNormalizedTitle(cleanA);
+                    const baseB = getNormalizedTitle(cleanB);
+                    
+                    if (baseA && baseB && baseA === baseB) {
+                        if (msA !== msB) return msA - msB;
+
+                        const origDateA = a._originalReleaseDate || a.releaseDate;
+                        const origDateB = b._originalReleaseDate || b.releaseDate;
+                        const origMsA = origDateA ? new Date(origDateA).getTime() : Infinity;
+                        const origMsB = origDateB ? new Date(origDateB).getTime() : Infinity;
+                        if (origMsA !== origMsB) return origMsA - origMsB;
+
+                        const isExpA = a.explicit || (a.track && a.track.explicit) ? 1 : 0;
+                        const isExpB = b.explicit || (b.track && b.track.explicit) ? 1 : 0;
+                        if (isExpB !== isExpA) return isExpB - isExpA;
+
+                        const origAlbumA = a._originalAlbumName || a.albumName || "";
+                        const origAlbumB = b._originalAlbumName || b.albumName || "";
+                        
+                        const badRegex = /(commentary|instrumental|a cappella|acapella|karaoke)/i;
+                        const isBadA = badRegex.test(origAlbumA) ? 1 : 0;
+                        const isBadB = badRegex.test(origAlbumB) ? 1 : 0;
+                        if (isBadA !== isBadB) return isBadA - isBadB;
+
+                        if (origAlbumA.length !== origAlbumB.length) return origAlbumB.length - origAlbumA.length;
+                        
+                        if (albumA.length !== albumB.length) return albumB.length - albumA.length;
+                                    
+                        if (popB !== popA) return popB - popA;
+                    }
+                    
+                    if (msA !== msB) return msA - msB;
+                }
+            } else {
+                const effPopA = trackEffectivePop.get(a.uri) || 0;
+                const effPopB = trackEffectivePop.get(b.uri) || 0;
+
+                if (effPopA !== effPopB) {
+                    return effPopB - effPopA;
+                }
+
+                const isExplicitA = a.explicit || (a.track && a.track.explicit) ? 1 : 0;
+                const isExplicitB = b.explicit || (b.track && b.track.explicit) ? 1 : 0;
+                if (isExplicitB !== isExplicitA) {
+                    return isExplicitB - isExplicitA;
+                }
+
+                if (msA !== msB) {
+                    return msA - msB; 
+                }
+
+                if (albumA.length !== albumB.length) {
+                    return albumA.length - albumB.length;
+                }
+
+                return (a.uri || "").localeCompare(b.uri || "");
             }
-            
-            if (msA !== msB) return msA - msB;
         }
 
         if (popB !== popA) {
