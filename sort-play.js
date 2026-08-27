@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.3.5";
+  const SORT_PLAY_VERSION = "6.4.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -50,6 +50,7 @@
   const STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER = "sort-play-place-playlists-in-folder";
   const STORAGE_KEY_SORT_PLAY_FOLDER_NAME = "sort-play-folder-name";
   const STORAGE_KEY_CHANGE_TITLE_ON_CREATE = "sort-play-change-title-on-create";
+  const STORAGE_KEY_CHANGE_DESCRIPTION_ON_CREATE = "sort-play-change-description-on-create";
   const STORAGE_KEY_CHANGE_TITLE_ON_MODIFY = "sort-play-change-title-on-modify";
   const STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY = "sort-play-change-description-on-modify";
   const STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION = "sort-play-overwrite-custom-description";
@@ -133,6 +134,7 @@
   const STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED = "sort-play-range-exclude-unlistened";
   const STORAGE_KEY_GENRE_FILTER_SOURCES = "sort-play-genre-filter-sources";
   const STORAGE_KEY_LOCAL_FILES_HANDLING = "sort-play-local-files-handling";
+  const STORAGE_KEY_FOLLOWED_RELEASES_CONFIG = "sort-play-followed-releases-config";
   const STORAGE_KEY_TASTE_PROFILE = "sort-play-taste-profile";
   const STORAGE_KEY_CF_FETCH_POPULARITY = "sort-play-cf-fetch-popularity";
   const STORAGE_KEY_CF_FETCH_LASTFM = "sort-play-cf-fetch-lastfm";
@@ -140,6 +142,8 @@
   const STORAGE_KEY_CF_RELEASE_DATE_FORMAT = "sort-play-cf-release-date-format";
   const STORAGE_KEY_CF_MY_SCROBBLES_MODE = "sort-play-cf-my-scrobbles-mode";
   const STORAGE_KEY_CF_KEY_MODE = "sort-play-cf-key-mode";
+  const STORAGE_KEY_PRESERVE_DATE_ADDED = "sort-play-preserve-date-added";
+  const STORAGE_KEY_DEDICATED_OVERRIDES = "sort-play-dedicated-overrides";
 
   const SYNCABLE_SETTINGS_KEYS = [
     STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
@@ -156,7 +160,7 @@
     STORAGE_KEY_CREATE_PLAYLIST, STORAGE_KEY_SORT_CURRENT_PLAYLIST,
     STORAGE_KEY_CREATE_PLAYLIST_PRIVATE, STORAGE_KEY_OPEN_PLAYLIST_AFTER_SORT,
     STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, STORAGE_KEY_SORT_PLAY_FOLDER_NAME,
-    STORAGE_KEY_CHANGE_TITLE_ON_CREATE, STORAGE_KEY_CHANGE_TITLE_ON_MODIFY,
+    STORAGE_KEY_CHANGE_TITLE_ON_CREATE, STORAGE_KEY_CHANGE_DESCRIPTION_ON_CREATE, STORAGE_KEY_CHANGE_TITLE_ON_MODIFY,
     STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY, STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION,
     STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR, STORAGE_KEY_DEDICATED_PLAYLIST_MAP,
     STORAGE_KEY_COLOR_SORT_MODE, STORAGE_KEY_TOP_TRACKS_LIMIT,
@@ -195,9 +199,10 @@
     STORAGE_KEY_FILTER_TITLE, STORAGE_KEY_FILTER_ALBUM, STORAGE_KEY_FILTER_ARTIST,
     STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, STORAGE_KEY_GENRE_SEPARATOR,
     STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, STORAGE_KEY_GENRE_FILTER_SOURCES,
-    STORAGE_KEY_LOCAL_FILES_HANDLING,
+    STORAGE_KEY_LOCAL_FILES_HANDLING, STORAGE_KEY_FOLLOWED_RELEASES_CONFIG,
     STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM,
-    STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE
+    STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
+    STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_DEDICATED_OVERRIDES
   ];
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
@@ -207,6 +212,12 @@
     { id: "gemini-flash-lite-latest", label: "Gemini Flash-Lite Latest", requiresCustomKey: false }
   ];
   const DEFAULT_AI_MODEL = AI_MODELS[1].id;
+  const DEFAULT_FR_CONFIG = { keywords: [], filterMode: 'exclude', matchWholeWord: false, filterTitle: true, filterAlbum: true, versions: { live: 'all', remix: 'all', acoustic: 'all', instrumental: 'all' }, artistFilterMode: 'exclude', selectedArtists: [] };
+  const STRICT_VERSION_REGEX_STR = "(?:\\(|\\[|-).*?\\b";
+  const STRICT_LIVE_REGEX = new RegExp(STRICT_VERSION_REGEX_STR + "live\\b.*?(?:\\)|\\]|$)", "i");
+  const STRICT_REMIX_REGEX = new RegExp(STRICT_VERSION_REGEX_STR + "remix\\b.*?(?:\\)|\\]|$)", "i");
+  const STRICT_ACOUSTIC_REGEX = new RegExp(STRICT_VERSION_REGEX_STR + "acoustic\\b.*?(?:\\)|\\]|$)", "i");
+  const STRICT_INSTRUMENTAL_REGEX = new RegExp(STRICT_VERSION_REGEX_STR + "instrumental\\b.*?(?:\\)|\\]|$)", "i");
   let showAdditionalColumn = false;
   let showSecondAdditionalColumn = false;
   let selectedColumnType = 'playCount';
@@ -230,6 +241,7 @@
   let placePlaylistsInFolder = false;
   let sortPlayFolderName = "Sort-Play Library";
   let changeTitleOnCreate = false;
+  let changeDescriptionOnCreate = true;
   let changeTitleOnModify = false;
   let changeDescriptionOnModify = true;
   let overwriteCustomDescription = true;
@@ -290,9 +302,11 @@
   let cfFetchPopularity = false;
   let cfFetchLastFm = false;
   let genreSeparator = ',';
+  let followedReleasesConfig = { ...DEFAULT_FR_CONFIG };
   let cfReleaseDateFormat = 'YYYY-MM-DD';
   let cfMyScrobblesDisplayMode = 'number';
   let cfKeyDisplayMode = 'standard';
+  let preserveDateBehavior = 'ask';
   let rangeExcludeUnlistened = false;
   let localFilesHandling = 'convert_keep';
   let isProcessing = false;
@@ -532,6 +546,7 @@
   const minimizeIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 15L12 9L18 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const restoreWindowIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none" style="margin: -2px -2px -3px;"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const closeIcon16Svg = `<svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"/></svg>`;
+  const toastCloseIconSvg = `<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"/></svg>`;
   const globalCreationsIconSvg = `<svg width="10" height="10" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>`;
   const addLinkIconSvg = `<svg viewBox="0 0 24 24"><path d="M11.75 3a.75.75 0 0 1 .75.75V11h7.25a.75.75 0 0 1 0 1.5h-7.25v7.25a.75.75 0 0 1-1.5 0V12.5H3.75a.75.75 0 0 1 0-1.5h7.25V3.75a.75.75 0 0 1 .75-.75z"></path></svg>`;
   const removeManualIconSvg = `<svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1.47 1.47a.75.75 0 0 1 1.06 0L8 6.94l5.47-5.47a.75.75 0 1 1 1.06 1.06L9.06 8l5.47 5.47a.75.75 0 1 1-1.06 1.06L8 9.06l-5.47 5.47a.75.75 0 0 1-1.06-1.06L6.94 8 1.47 2.53a.75.75 0 0 1 0-1.06z"></path></svg>`;
@@ -570,7 +585,11 @@
   const pregameIconSvg = `<svg viewBox="0 -64 640 640" width="95%" height="95%" fill="currentColor"><path d="M639.4 433.6c-8.4-20.4-31.8-30.1-52.2-21.6l-22.1 9.2-38.7-101.9c47.9-35 64.8-100.3 34.5-152.8L474.3 16c-8-13.9-25.1-19.7-40-13.6L320 49.8 205.7 2.4c-14.9-6.2-32-.3-40 13.6L79.1 166.5C48.9 219 65.7 284.3 113.6 319.2L74.9 421.1l-22.1-9.2c-20.4-8.5-43.7 1.2-52.2 21.6-1.7 4.1.2 8.8 4.3 10.5l162.3 67.4c4.1 1.7 8.7-.2 10.4-4.3 8.4-20.4-1.2-43.8-21.6-52.3l-22.1-9.2L173.3 342c4.4.5 8.8 1.3 13.1 1.3 51.7 0 99.4-33.1 113.4-85.3l20.2-75.4 20.2 75.4c14 52.2 61.7 85.3 113.4 85.3 4.3 0 8.7-.8 13.1-1.3L506 445.6l-22.1 9.2c-20.4 8.5-30.1 31.9-21.6 52.3 1.7 4.1 6.4 6 10.4 4.3L635.1 444c4-1.7 6-6.3 4.3-10.4zM275.9 162.1l-112.1-46.5 36.5-63.4 94.5 39.2-18.9 70.7zm88.2 0l-18.9-70.7 94.5-39.2 36.5 63.4-112.1 46.5z"/></svg>`;
   const compactIconSvg = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M4 9.6h16M4 14.3h16M4 19h16" /></svg>`;
   const normalIconSvg = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>`;
-  
+  const warningIcon = `<svg width="20" height="20" viewBox="0 0 24 24" style="vertical-align: -2px; margin-right: 8px; filter: drop-shadow(0 0 5px rgba(255, 193, 7, 0.8));"><circle cx="12" cy="12" r="9" fill="#FFC107"/></svg>`;
+  const plusSvgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
+  const removeSvgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+  const checkSvgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
   const VIBE_DEFS = [
     { id: 'workout', label: 'Hype / Adrenaline', icon: flameSvg, color: '#D16666', desc: 'High energy, fast tempo, and a heavy beat to get your adrenaline pumping and keep you energized.', long_desc: 'Focuses on high energy, fast tempos, and strong rhythmic elements. Tracks with heavy beats and intense drops perfect for feeling unstoppable, powering through tasks, or intense exercise.' },
     { id: 'party', label: 'Party / Dance', icon: partyIconSvg, color: '#D4B856', desc: 'Highly danceable, upbeat, and positive tracks perfectly picked to energize a room or boost your mood.', long_desc: 'Highly danceable and always upbeat tracks. Features high valence (happiness) and steady beats to keep the energy high and the vibes entirely positive.' },
@@ -781,10 +800,16 @@
         return "―";
     }
 
-    const year = dateObj.getFullYear();
-    const monthNumeric = (dateObj.getMonth() + 1).toString().padStart(2, '0');
-    const dayNumeric = dateObj.getDate().toString().padStart(2, '0');
-    const monthShort = dateObj.toLocaleString('default', { month: 'short' });
+    const year = dateObj.getUTCFullYear();
+    const monthNumeric = (dateObj.getUTCMonth() + 1).toString().padStart(2, '0');
+    const dayNumeric = dateObj.getUTCDate().toString().padStart(2, '0');
+    let monthShort;
+    try {
+        monthShort = dateObj.toLocaleString('default', { month: 'short', timeZone: 'UTC' });
+    } catch(e) {
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        monthShort = monthNames[dateObj.getUTCMonth()];
+    }
 
     if (yearOnly) {
         switch (format) {
@@ -824,11 +849,11 @@
         case 'MM-YYYY':
             return `${monthNumeric}-${year}`;
         case 'MMM D, YYYY':
-            return `${monthShort} ${dateObj.getDate()}, ${year}`;
+            return `${monthShort} ${dayNumeric}, ${year}`;
         case 'D MMM, YYYY':
-            return `${dateObj.getDate()} ${monthShort}, ${year}`;
+            return `${dayNumeric} ${monthShort}, ${year}`;
         case 'YYYY, MMM D':
-            return `${year}, ${monthShort} ${dateObj.getDate()}`;
+            return `${year}, ${monthShort} ${dayNumeric}`;
         default:
             return `${year}-${monthNumeric}-${dayNumeric}`;
     }
@@ -2179,8 +2204,11 @@
       #sort-play-notifications-wrapper { position: fixed; bottom: 108px; left: 0; z-index: 2147483647; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 0; pointer-events: none; height: 75vh; overflow: hidden; -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%); mask-image: linear-gradient(to bottom, transparent 0%, black 15%); }
       .sp-notification-section { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; width: 100%; transition: margin-top 0.2s ease; flex-shrink: 0; }
       .sp-notification-divider { height: 1px; background: rgba(255, 255, 255, 0.15); width: 100%; margin: 0; opacity: 0; visibility: hidden; max-width: 450px; transition: opacity 0.1s ease, margin 0.1s ease, visibility 0.1s ease; pointer-events: none; flex-shrink: 0; }
-      .sort-play-notification-toast { background-color: #fff; color: #000; padding: 14px 24px 14px 20px; border-radius: 0 8px 8px 0; box-shadow: 4px 4px 12px rgba(0,0,0,0.3); font-family: 'SpotifyMixUI', sans-serif; font-size: 16px; font-weight: 500; opacity: 0; transform: translateX(-100%); transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1), margin-bottom 0.25s ease, max-height 0.25s ease; pointer-events: auto; cursor: pointer; max-width: 450px; text-align: left; border-left: 10px solid #1db954; word-wrap: break-word; }
+      .sort-play-notification-toast { position: relative; background-color: #fff; color: #000; padding: 14px 24px 14px 20px; border-radius: 0 8px 8px 0; box-shadow: 4px 4px 12px rgba(0,0,0,0.3); font-family: 'SpotifyMixUI', sans-serif; font-size: 16px; font-weight: 500; opacity: 0; transform: translateX(-100%); transition: opacity 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.35s cubic-bezier(0.1, 0.9, 0.2, 1), margin-bottom 0.25s ease, max-height 0.25s ease; pointer-events: auto; cursor: pointer; max-width: 450px; text-align: left; border-left: 10px solid #1db954; word-wrap: break-word; }
       .sort-play-notification-toast:hover { filter: brightness(0.95); }
+      .sp-toast-close { position: absolute; top: 4px; right: 4px; width: 14px; height: 14px; opacity: 0; cursor: pointer; transition: opacity 0.2s ease; display: flex; align-items: center; justify-content: center; }
+      .sort-play-notification-toast:hover .sp-toast-close { opacity: 0.5; }
+      .sp-toast-close:hover { opacity: 1 !important; }
       .sort-play-notification-toast.visible { opacity: 1; transform: translateX(0); }
       .sort-play-notification-toast.sp-error { background-color: #e91429; color: white; border-left: 10px solid #8a0c18; }
       .sort-play-notification-toast.sp-warning { background-color: #FFC107; color: #000; border-left: 10px solid #ff7600; }
@@ -2258,11 +2286,22 @@
       else if (type === 'warning') toast.classList.add('sp-warning');
       else if (type === 'sticky') toast.classList.add('sp-sticky');
 
-      toast.innerText = text;
+      const textSpan = document.createElement('span');
+      textSpan.innerText = text;
+      toast.appendChild(textSpan);
 
       if (isSticky) {
           toast.ondblclick = () => removeToast(toast);
-          toast.title = "Double-click to dismiss";
+          toast.title = "Double-click or click the 'x' to dismiss";
+          
+          const closeBtn = document.createElement('div');
+          closeBtn.className = 'sp-toast-close';
+          closeBtn.innerHTML = toastCloseIconSvg;
+          closeBtn.onclick = (e) => {
+              e.stopPropagation();
+              removeToast(toast);
+          };
+          toast.appendChild(closeBtn);
       } else {
           toast.onclick = () => removeToast(toast);
           if (duration === 0) {
@@ -2324,7 +2363,7 @@
       }
 
       return {
-          update: (newText) => { toast.innerText = newText; },
+          update: (newText) => { textSpan.innerText = newText; },
           remove: () => removeToast(toast),
           element: toast
       };
@@ -2747,6 +2786,8 @@
     sortPlayFolderName = localStorage.getItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME) || "Sort-Play Library";
     const changeTitleOnCreateStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE);
     changeTitleOnCreate = changeTitleOnCreateStored === null ? false : changeTitleOnCreateStored === "true";
+    const changeDescOnCreateStored = localStorage.getItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_CREATE);
+    changeDescriptionOnCreate = changeDescOnCreateStored === null ? true : changeDescOnCreateStored === "true";
     const changeTitleStored = localStorage.getItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY);
     changeTitleOnModify = changeTitleStored === null ? false : changeTitleStored === "true";
     const changeDescStored = localStorage.getItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY);
@@ -2809,6 +2850,17 @@
     autoUpdateGenreModal = localStorage.getItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL) === "true";
     autoHideDiscographyNotification = localStorage.getItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION) !== "false";
     genreSeparator = localStorage.getItem(STORAGE_KEY_GENRE_SEPARATOR) || ',';
+    const storedFrConfig = localStorage.getItem(STORAGE_KEY_FOLLOWED_RELEASES_CONFIG);
+    if (storedFrConfig) {
+        try { 
+            const parsed = JSON.parse(storedFrConfig);
+            followedReleasesConfig = { ...DEFAULT_FR_CONFIG, ...parsed };
+            followedReleasesConfig.versions = { ...DEFAULT_FR_CONFIG.versions, ...(parsed.versions || {}) };
+            if (!Array.isArray(followedReleasesConfig.selectedArtists)) {
+                followedReleasesConfig.selectedArtists = [];
+            }
+        } catch(e) {}
+    }
     rangeExcludeUnlistened = localStorage.getItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED) === "true";
     localFilesHandling = localStorage.getItem(STORAGE_KEY_LOCAL_FILES_HANDLING) || 'convert_keep';
     cfFetchPopularity = localStorage.getItem(STORAGE_KEY_CF_FETCH_POPULARITY) === "true";
@@ -2816,6 +2868,7 @@
     cfReleaseDateFormat = localStorage.getItem(STORAGE_KEY_CF_RELEASE_DATE_FORMAT) || 'YYYY-MM-DD';
     cfMyScrobblesDisplayMode = localStorage.getItem(STORAGE_KEY_CF_MY_SCROBBLES_MODE) || 'number';
     cfKeyDisplayMode = localStorage.getItem(STORAGE_KEY_CF_KEY_MODE) || 'standard';
+    preserveDateBehavior = localStorage.getItem(STORAGE_KEY_PRESERVE_DATE_ADDED) || 'ask';
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -2858,6 +2911,7 @@
     localStorage.setItem(STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER, placePlaylistsInFolder);
     localStorage.setItem(STORAGE_KEY_SORT_PLAY_FOLDER_NAME, sortPlayFolderName);
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_CREATE, changeTitleOnCreate);
+    localStorage.setItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_CREATE, changeDescriptionOnCreate);
     localStorage.setItem(STORAGE_KEY_CHANGE_TITLE_ON_MODIFY, changeTitleOnModify);
     localStorage.setItem(STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY, changeDescriptionOnModify);
     localStorage.setItem(STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION, overwriteCustomDescription);
@@ -2908,6 +2962,7 @@
     localStorage.setItem(STORAGE_KEY_AUTO_UPDATE_GENRE_MODAL, autoUpdateGenreModal);
     localStorage.setItem(STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION, autoHideDiscographyNotification);
     localStorage.setItem(STORAGE_KEY_GENRE_SEPARATOR, genreSeparator);
+    localStorage.setItem(STORAGE_KEY_FOLLOWED_RELEASES_CONFIG, JSON.stringify(followedReleasesConfig));
     localStorage.setItem(STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED, rangeExcludeUnlistened);
     localStorage.setItem(STORAGE_KEY_LOCAL_FILES_HANDLING, localFilesHandling);
     localStorage.setItem(STORAGE_KEY_NP_CONFIG, JSON.stringify(nowPlayingConfig));
@@ -2916,6 +2971,7 @@
     localStorage.setItem(STORAGE_KEY_CF_RELEASE_DATE_FORMAT, cfReleaseDateFormat);
     localStorage.setItem(STORAGE_KEY_CF_MY_SCROBBLES_MODE, cfMyScrobblesDisplayMode);
     localStorage.setItem(STORAGE_KEY_CF_KEY_MODE, cfKeyDisplayMode);
+    localStorage.setItem(STORAGE_KEY_PRESERVE_DATE_ADDED, preserveDateBehavior);
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -2969,6 +3025,7 @@
           [STORAGE_KEY_PLACE_PLAYLISTS_IN_FOLDER]: "false",
           [STORAGE_KEY_SORT_PLAY_FOLDER_NAME]: "Sort-Play Library",
           [STORAGE_KEY_CHANGE_TITLE_ON_CREATE]: "false",
+          [STORAGE_KEY_CHANGE_DESCRIPTION_ON_CREATE]: "true",
           [STORAGE_KEY_CHANGE_TITLE_ON_MODIFY]: "false",
           [STORAGE_KEY_CHANGE_DESCRIPTION_ON_MODIFY]: "true",
           [STORAGE_KEY_OVERWRITE_CUSTOM_DESCRIPTION]: "true",
@@ -3045,13 +3102,16 @@
           [STORAGE_KEY_AUTO_HIDE_DISCOGRAPHY_NOTIFICATION]: "true",
           [STORAGE_KEY_GENRE_SEPARATOR]: ",",
           [STORAGE_KEY_RANGE_EXCLUDE_UNLISTENED]: "false",
+          [STORAGE_KEY_FOLLOWED_RELEASES_CONFIG]: JSON.stringify(DEFAULT_FR_CONFIG),
           [STORAGE_KEY_LOCAL_FILES_HANDLING]: "convert_keep",
-          [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}',
+          [STORAGE_KEY_GENRE_FILTER_SOURCES]: '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}',
           [STORAGE_KEY_CF_FETCH_POPULARITY]: "false",
           [STORAGE_KEY_CF_FETCH_LASTFM]: "false",
           [STORAGE_KEY_CF_RELEASE_DATE_FORMAT]: "YYYY-MM-DD",
           [STORAGE_KEY_CF_MY_SCROBBLES_MODE]: "number",
-          [STORAGE_KEY_CF_KEY_MODE]: "standard"
+          [STORAGE_KEY_CF_KEY_MODE]: "standard",
+          [STORAGE_KEY_PRESERVE_DATE_ADDED]: "ask",
+          [STORAGE_KEY_DEDICATED_OVERRIDES]: "{}"
         };
     
         if (key === STORAGE_KEY_NP_CONFIG) {
@@ -3570,7 +3630,7 @@
     const headerHtml = `
       <div class="main-trackCreditsModal-header" style="padding: 29px 32px 19px 32px !important; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;">
           <h1 class="main-trackCreditsModal-title" style="display: flex; align-items: center;">
-              <span style='font-size: 30px; color: white;'>Sort-Play Settings</span>
+              <span style='font-size: 29px; color: white;'>Sort-Play Settings</span>
               <span class='version-tag' id="sortPlayVersionTag" title="View Update History & Changelog">
                   v${SORT_PLAY_VERSION}
                   ${hasNewUpdate ? `<div class="version-dot" id="sortPlayVersionDot"></div>` : ''}
@@ -3631,7 +3691,8 @@
       .sort-play-settings .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
       .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 130px; height: auto;}
       .sort-play-settings select.column-type-select { flex-grow: 1; margin-right: 5px; width: 125px; }
-      .sort-play-settings select:disabled { opacity: 0.5; cursor: not-allowed; }
+      .sort-play-settings select:disabled, .sort-play-settings select:disabled:hover { opacity: 0.5; cursor: not-allowed; background-color: #282828 !important; border-color: #434343 !important; color: white !important; }
+      .sort-play-settings .setting-row.dependent-disabled { opacity: 0.5; pointer-events: none; }
       .column-settings-button { background: none; border: none; margin: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; opacity: 0.7; transition: opacity 0.2s; }
       .column-settings-button:hover { opacity: 1; }
       .column-settings-button svg { width: 16px; height: 16px; fill: #b3b3b3; }
@@ -3657,6 +3718,10 @@
       .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
       .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
       .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+      .custom-tooltip.wide { max-width: 380px; }
+      .custom-tooltip strong { color: #1ED760; font-weight: 700; }
+      .custom-tooltip.flip-bottom { bottom: auto; top: 100%; margin-bottom: 0; margin-top: 5px; }
+      .custom-tooltip.flip-bottom::after { top: auto; bottom: 100%; border-color: transparent transparent #373737 transparent; }
       .tooltip-container:hover .custom-tooltip { visibility: visible; }
       .version-tag { font-size: 13px; color: #b3b3b3; margin-left: 12px; vertical-align: middle; background: rgba(255,255,255,0.05); padding: 3px 10px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; position: relative; border: 1px solid transparent; user-select: none; }
       .version-tag:hover { background: rgba(255,255,255,0.1); color: white; border-color: rgba(255,255,255,0.2); }
@@ -3755,6 +3820,23 @@
             </label>
         </div>
     </div>
+
+    <div class="setting-row" id="preserveDateBehaviorSetting">
+        <label class="col description">
+            Preserve "Date Added" on Modify
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip wide">Controls how 'Date Added' is handled.<br><br>• <strong>Smart (Ask)</strong>: Auto-detects curation. Silently preserves small playlists, fast-sorts bulk dumps, and asks only for large curated lists.<br>• <strong>Fast</strong>: Instant, but resets 'Date Added'.<br>• <strong>Preserve</strong>: Always keeps the original dates, but is slower.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <select id="preserveDateBehaviorSelect" style="max-width: 140px;">
+                <option value="ask" ${preserveDateBehavior === 'ask' ? 'selected' : ''}>Smart (Ask)</option>
+                <option value="fast" ${preserveDateBehavior === 'fast' ? 'selected' : ''}>Fast (Reset)</option>
+                <option value="preserve" ${preserveDateBehavior === 'preserve' ? 'selected' : ''}>Preserve</option>
+            </select>
+        </div>
+    </div>
     
     <div class="setting-row" id="openPlaylistAfterSortSettingRow">
         <label class="col description">
@@ -3815,7 +3897,7 @@
             Local Files Handling
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">
+                <span class="custom-tooltip wide">
                     Controls how local files are processed during sorting.<br><br>
                     <strong>Convert & Keep:</strong> Matches to Spotify for data, keeps unmatched local files.<br><br>
                     <strong>Ghost Match:</strong> Matches to Spotify for accurate sorting, but uses the original local file in the playlist.<br><br>
@@ -4203,6 +4285,22 @@
         </div>
     </div>
 
+    <div class="setting-row" id="changeDescriptionOnCreateSettingRow">
+        <label class="col description">
+            Add Description When Creating
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Automatically adds a description detailing how the playlist was sorted/filtered when creating a new playlist.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch" id="changeDescriptionOnCreateSwitchLabel">
+                <input type="checkbox" id="changeDescriptionOnCreateToggle" ${changeDescriptionOnCreate ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
     <div class="setting-row" id="changeTitleOnModifySettingRow">
         <label class="col description">
             Update Title When Modifying
@@ -4262,7 +4360,7 @@
             Intelligent Deduplication
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip">Controls how duplicate songs are handled when creating an Artist Discography.<br><br>• <strong>Default</strong>: Balances popularity and album context to keep the best version (favoring studio albums over singles). Strictly prefers original Album versions if sorting by Release Date.<br>• <strong>Keep Single & Album</strong>: Retains both the single/EP version AND album version.<br>• <strong>One Per Release</strong>: Retains one track per uniquely named release<br>• <strong>Don't Remove</strong>: Keeps all duplicates for a 100% complete collection.<br><br><em>Note: Compilations are always removed if an original version exists.</em></span>
+                <span class="custom-tooltip wide">Controls how duplicate songs are handled when creating an Artist Discography.<br><br>• <strong>Default</strong>: Balances popularity and album context to keep the best version (favoring studio albums over singles). Strictly prefers original Album versions if sorting by Release Date.<br>• <strong>Keep Single & Album</strong>: Retains both the single/EP version AND album version.<br>• <strong>One Per Release</strong>: Retains one track per uniquely named release<br>• <strong>Don't Remove</strong>: Keeps all duplicates for a 100% complete collection.<br><br><em>Note: Compilations are always removed if an original version exists.</em></span>
             </span>
         </label>
         <div class="col action">
@@ -4301,7 +4399,7 @@
             Manage Track Overrides
             <span class="tooltip-container" style="display: inline-flex; align-items: center; margin-left: 4px;">
                 ${infoIconSvg.replace('margin-bottom: 4px;', 'margin-bottom: -2px;')}
-                <span class="custom-tooltip">Manually link Spotify tracks to the correct Last.fm pages so Sort-Play can fetch the right stats when track names don't match.<br><br><span style="opacity: 0.85; font-style: italic;">Note: This does NOT edit your actual outgoing scrobbles.</span></span>
+                <span class="custom-tooltip wide">Manually link Spotify tracks to the correct Last.fm pages so Sort-Play can fetch the right stats when track names don't match.<br><br><span style="opacity: 0.85; font-style: italic;">Note: This does NOT edit your actual outgoing scrobbles.</span></span>
             </span>
         </label>
         <div class="col action" style="float: none; margin-left: auto; display: flex; align-items: center;">
@@ -4364,6 +4462,23 @@
 
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
+
+    const scrollContainerForTooltips = modalContainer.querySelector('.main-trackCreditsModal-mainSection');
+    modalContainer.querySelectorAll('.tooltip-container').forEach(container => {
+        container.addEventListener('mouseenter', () => {
+            const tooltip = container.querySelector('.custom-tooltip');
+            if (!tooltip || !scrollContainerForTooltips) return;
+            
+            tooltip.classList.remove('flip-bottom');
+            
+            const tooltipRect = tooltip.getBoundingClientRect();
+            const containerRect = scrollContainerForTooltips.getBoundingClientRect();
+            
+            if (tooltipRect.top < containerRect.top + 5) {
+                tooltip.classList.add('flip-bottom');
+            }
+        });
+    });
 
     const liveChatBtn = modalContainer.querySelector("#liveChatBtn");
     const supportMeBtn = modalContainer.querySelector("#supportMeBtn");
@@ -4473,6 +4588,7 @@
     const placePlaylistsInFolderToggle = modalContainer.querySelector("#placePlaylistsInFolderToggle");
     const folderNameSettingsBtn = modalContainer.querySelector("#folderNameSettingsBtn");
     const changeTitleOnCreateToggle = modalContainer.querySelector("#changeTitleOnCreateToggle");
+    const changeDescriptionOnCreateToggle = modalContainer.querySelector("#changeDescriptionOnCreateToggle");
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
     const changeDescriptionOnModifyToggle = modalContainer.querySelector("#changeDescriptionOnModifyToggle");
     const overwriteCustomDescriptionToggle = modalContainer.querySelector("#overwriteCustomDescriptionToggle");
@@ -4653,7 +4769,7 @@
 
         const overwriteToggle = document.getElementById('overwriteCustomDescriptionToggle');
         if (overwriteToggle) {
-            const isDescOn = changeDescriptionOnModify;
+            const isDescOn = changeDescriptionOnModify || changeDescriptionOnCreate;
             overwriteToggle.disabled = !isDescOn;
             document.getElementById('overwriteCustomDescriptionSwitchLabel').classList.toggle("disabled", !isDescOn);
             document.getElementById('overwriteCustomDescriptionSettingRow').classList.toggle("dependent-disabled", !isDescOn);
@@ -4680,6 +4796,14 @@
         }
         updateOpenPlaylistAfterSortToggleState();
         updateChangeTitleToggleState();
+
+        const isModifyCurrentOn = sortCurrentPlaylistToggle.checked && !sortCurrentPlaylistToggle.disabled;
+        const largeBehaviorSelect = document.getElementById('preserveDateBehaviorSelect');
+        if (largeBehaviorSelect) {
+            largeBehaviorSelect.disabled = !isModifyCurrentOn;
+            const settingRow = document.getElementById('preserveDateBehaviorSetting');
+            if (settingRow) settingRow.classList.toggle("dependent-disabled", !isModifyCurrentOn);
+        }
     }
 
     function updateCreatePlaylistToggleState() {
@@ -4857,6 +4981,14 @@
             sortCurrentPlaylistEnabled = sortCurrentPlaylistToggle.checked;
             updateOpenPlaylistAfterSortToggleState();
             updateChangeTitleToggleState();
+            
+            const largeBehaviorSelect = document.getElementById('preserveDateBehaviorSelect');
+            if (largeBehaviorSelect) {
+                largeBehaviorSelect.disabled = !sortCurrentPlaylistEnabled;
+                const settingRow = document.getElementById('preserveDateBehaviorSetting');
+                if (settingRow) settingRow.classList.toggle("dependent-disabled", !sortCurrentPlaylistEnabled);
+            }
+            
             saveSettings();
         }
     });
@@ -4864,6 +4996,14 @@
     changeTitleOnCreateToggle.addEventListener("change", () => {
         if (!changeTitleOnCreateToggle.disabled) {
             changeTitleOnCreate = changeTitleOnCreateToggle.checked;
+            saveSettings();
+        }
+    });
+
+    changeDescriptionOnCreateToggle.addEventListener("change", () => {
+        if (!changeDescriptionOnCreateToggle.disabled) {
+            changeDescriptionOnCreate = changeDescriptionOnCreateToggle.checked;
+            updateChangeTitleToggleState();
             saveSettings();
         }
     });
@@ -4888,6 +5028,15 @@
             overwriteCustomDescription = overwriteCustomDescriptionToggle.checked;
             saveSettings();
         }
+    });
+
+    const preserveDateBehaviorSelect = modalContainer.querySelector("#preserveDateBehaviorSelect");
+    preserveDateBehaviorSelect.addEventListener("change", () => {
+        preserveDateBehavior = preserveDateBehaviorSelect.value;
+        if (preserveDateBehavior === 'ask') {
+            localStorage.removeItem('sort-play-ignore-extreme-warning');
+        }
+        saveSettings();
     });
 
     openPlaylistAfterSortToggle.addEventListener("change", () => {
@@ -5395,11 +5544,15 @@
 
           let html = '<div class="timeline-container">';
           
+          const formatText = (text) => {
+              return escapeHtml(text, "").replace(/(^|[\s(\[])#(\d+)\b/g, '$1<a href="https://github.com/hoeci/sort-play/issues/$2" target="_blank" style="color: #1ed760; text-decoration: none;" onmouseover="this.style.textDecoration=\'underline\'" onmouseout="this.style.textDecoration=\'none\'">#$2</a>');
+          };
+
           commits.forEach(c => {
               const lines = c.commit.message.split('\n').map(l => l.trim()).filter(l => l);
-              const title = lines[0] || "Update";
+              const title = formatText(lines[0] || "Update");
               const bodyLines = lines.slice(1).map(l => {
-                  return l.replace(/^[-*]\s*/, '').trim();
+                  return formatText(l.replace(/^[-*]\s*/, '').trim());
               }).filter(l => l);
               
               const timeAgo = getTimeAgo(c.commit.author.date);
@@ -7776,7 +7929,7 @@
                           </label>
                       </div>
                       <div class="setting-row">
-                          <label class="setting-label" for="npEveryNoiseToggle">Every Noise at Once (Artist Tags)</label>
+                          <label class="setting-label" for="npEveryNoiseToggle">Every Noise (Artist Tags)</label>
                           <label class="switch">
                               <input type="checkbox" id="npEveryNoiseToggle" ${genreSourcesNpEveryNoise ? 'checked' : ''}>
                               <span class="sliderx"></span>
@@ -7804,7 +7957,7 @@
                           </label>
                       </div>
                       <div class="setting-row">
-                          <label class="setting-label" for="apEveryNoiseToggle">Every Noise at Once (Artist Tags)</label>
+                          <label class="setting-label" for="apEveryNoiseToggle">Every Noise (Artist Tags)</label>
                           <label class="switch">
                               <input type="checkbox" id="apEveryNoiseToggle" ${genreSourcesApEveryNoise ? 'checked' : ''}>
                               <span class="sliderx"></span>
@@ -8594,6 +8747,803 @@
     });
   }
 
+  function showAppearanceModal(cardId, defaultCardData, parentOverlay, currentCoverUrl) {
+        const overlay = document.createElement("div");
+        overlay.className = "sort-play-font-scope";
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7); z-index: 3000;
+            display: flex; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+        `;
+
+        const modalContainer = document.createElement("div");
+        modalContainer.className = "main-embedWidgetGenerator-container";
+        modalContainer.style.cssText = `
+            width: 420px !important;
+            border-radius: 24px;
+            overflow: hidden; 
+            background-color: #181818 !important;
+            border: 1px solid #282828;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        `;
+
+        const overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}');
+        const custom = overrides[cardId] || {};
+        
+        let tempName = custom.name || defaultCardData.name;
+        let tempImageData = null;
+
+        modalContainer.innerHTML = `
+            <style>
+                .sp-app-input { width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid #333; background: #242424; color: white; font-family: inherit; outline: none; font-size: 13px; transition: border-color 0.2s; box-sizing: border-box; }
+                .sp-app-input:focus { border-color: #1DB954; }
+                .sp-app-label { color: #b3b3b3; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; display: block; }
+            </style>
+            <div class="main-trackCreditsModal-header" style="padding: 24px 24px 10px; border-bottom: 1px solid #282828;">
+                <h1 class="main-trackCreditsModal-title" style="margin: 0; font-size: 20px; font-weight: 700;">Edit Appearance</h1>
+            </div>
+            <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 20px;">
+                <div>
+                    <label class="sp-app-label">Playlist Name</label>
+                    <input type="text" id="app-name-input" class="sp-app-input" value="${escapeHtml(tempName)}">
+                </div>
+                
+                <div>
+                    <label class="sp-app-label">Cover Image</label>
+                    <div style="display: flex; gap: 16px; align-items: center;">
+                        <div style="width: 120px; height: 120px; border-radius: 8px; background-color: #242424; overflow: hidden; border: 1px solid #333; flex-shrink: 0; position: relative;">
+                            <img id="app-img-element" src="${currentCoverUrl}" style="width: 100%; height: 100%; object-fit: cover;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 10px; align-items: flex-start;">
+                            <button id="app-upload-btn" class="main-buttons-button main-button-secondary" style="padding: 6px 16px; border-radius: 20px; border: 1px solid #666; cursor: pointer; color: white; background: transparent; font-size: 12px; font-weight: bold;">Upload New Image</button>
+                            <span style="color: #888; font-size: 11px; line-height: 1.4;">Recommended: Square image (JPEG/PNG).<br>Max size: 256KB.</span>
+                        </div>
+                    </div>
+                    <input type="file" id="app-file-input" accept="image/jpeg, image/png, image/webp" style="display: none;">
+                </div>
+            </div>
+            <div style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+                <button id="app-reset-btn" style="background: transparent; border: none; color: #ff5c5c; cursor: pointer; font-size: 12px; font-weight: bold; padding: 4px;">Reset Default</button>
+                <div style="display: flex; gap: 10px;">
+                    <button id="app-cancel-btn" class="main-buttons-button" style="padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; background-color: #333; color: white;">Cancel</button>
+                    <button id="app-save-btn" class="main-buttons-button" style="padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; background-color: #1ED760; color: black;">Save</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+        overlay.appendChild(modalContainer);
+
+        modalContainer.querySelector('#app-upload-btn').addEventListener('click', () => {
+            modalContainer.querySelector('#app-file-input').click();
+        });
+
+        modalContainer.querySelector('#app-file-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (!file.type.match('image.*')) {
+                showNotification("Please select a valid image file (JPEG, PNG).", true);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 640;
+                    canvas.height = 640;
+                    const ctx = canvas.getContext('2d');
+                    
+                    const size = Math.min(img.width, img.height);
+                    const x = (img.width - size) / 2;
+                    const y = (img.height - size) / 2;
+                    
+                    ctx.drawImage(img, x, y, size, size, 0, 0, 640, 640);
+                    tempImageData = canvas.toDataURL('image/jpeg', 0.9);
+                    
+                    modalContainer.querySelector('#app-img-element').src = tempImageData;
+                };
+                img.onerror = () => showNotification("Failed to read image data.", true);
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        const closeAppModal = () => overlay.remove();
+
+        modalContainer.querySelector('#app-cancel-btn').addEventListener('click', closeAppModal);
+        
+        modalContainer.querySelector('#app-reset-btn').addEventListener('click', async () => {
+            const conf = await showConfirmationModal({
+                title: "Reset Appearance?",
+                description: "This will remove your custom name and image for this playlist, reverting to the official defaults.",
+                confirmText: "Reset",
+                cancelText: "Cancel"
+            });
+            if (conf === 'confirm') {
+                delete overrides[cardId];
+                localStorage.setItem(STORAGE_KEY_DEDICATED_OVERRIDES, JSON.stringify(overrides));
+                await idb.del('generatedCovers', `custom_image_${cardId}`);
+                
+                try {
+                    const dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
+                    const playlistUri = dedicatedPlaylistMap[cardId];
+                    if (playlistUri) {
+                         const activeSet = await getActiveUserPlaylistUris();
+                         if (activeSet.has(playlistUri)) {
+                             const playlistId = playlistUri.split(':')[2];
+                             
+                             await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, { name: defaultCardData.name });
+                             
+                             const user = await Spicetify.Platform.UserAPI.getUser();
+                             
+                             let usernameColor = '#24bf70';
+                             const discoveryCards = playlistCardsData.find(s => s.title === 'Discovery')?.cards || [];
+                             const newRelCards = playlistCardsData.find(s => s.title === 'New Releases')?.cards || [];
+                             const lastFmCards = playlistCardsData.find(s => s.title === 'Last.fm')?.cards || [];
+                             
+                             if (discoveryCards.some(c => c.id === cardId)) usernameColor = '#8f46d7';
+                             else if (newRelCards.some(c => c.id === cardId)) usernameColor = '#3798a5';
+                             else if (lastFmCards.some(c => c.id === cardId)) usernameColor = '#D1170E';
+                             
+                             const textMapping = {
+                                 'topThisMonth': { title: "Top Tracks", sub: "This Month" },
+                                 'topLast6Months': { title: "Top Tracks", sub: "Last 6 Months" },
+                                 'topAllTime': { title: "Top Tracks", sub: "All-Time" },
+                                 'followedReleasesChronological': { title: "New Releases", sub: "Followed" },
+                                 'recommendRecentVibe': { title: "Discovery", sub: "Recent Vibe" },
+                                 'recommendAllTime': { title: "Discovery", sub: "All-Time" },
+                                 'pureDiscovery': { title: "Discovery", sub: "Pure" },
+                                 'randomGenreExplorer': { title: "Genre Explorer", sub: "Random" },
+                                 'infiniteVibe': { title: "Infinite Vibe", sub: "Last.fm" },
+                                 'neighborsMix': { title: "Neighbors Mix", sub: "Last.fm" }
+                             };
+                             const defText = textMapping[cardId] || { title: defaultCardData.name, sub: "" };
+                             
+                             const baseImageUrl = DEDICATED_PLAYLIST_COVERS[cardId] || DEDICATED_PLAYLIST_COVERS['default'];
+                             const coverBase64 = await generatePlaylistCover(defText.title, defText.sub, user.displayName, baseImageUrl, usernameColor);
+                             setPlaylistImage(playlistId, coverBase64);
+                         }
+                    }
+                } catch(e) {
+                    console.warn("Live sync reset failed", e);
+                }
+                
+                showNotification("Appearance reset to defaults.");
+                closeAppModal();
+                if (parentOverlay) {
+                    parentOverlay.remove();
+                    setTimeout(() => showCreatePlaylistModal(), 100);
+                }
+            }
+        });
+
+        modalContainer.querySelector('#app-save-btn').addEventListener('click', async () => {
+            const saveBtn = modalContainer.querySelector('#app-save-btn');
+            saveBtn.disabled = true;
+            saveBtn.innerText = "Saving...";
+            
+            const newName = modalContainer.querySelector('#app-name-input').value.trim();
+            
+            overrides[cardId] = {
+                name: newName,
+                hasCustomImage: tempImageData ? true : (custom.hasCustomImage || false)
+            };
+            
+            localStorage.setItem(STORAGE_KEY_DEDICATED_OVERRIDES, JSON.stringify(overrides));
+            
+            if (tempImageData) {
+                await idb.set('generatedCovers', `custom_image_${cardId}`, tempImageData);
+            }
+
+            try {
+                const dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
+                const playlistUri = dedicatedPlaylistMap[cardId];
+                if (playlistUri) {
+                     const activeSet = await getActiveUserPlaylistUris();
+                     if (activeSet.has(playlistUri)) {
+                         const playlistId = playlistUri.split(':')[2];
+                         const targetName = newName || defaultCardData.name;
+                         
+                         await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, { name: targetName });
+                         
+                         if (tempImageData) {
+                             setPlaylistImage(playlistId, tempImageData);
+                         }
+                     }
+                }
+            } catch(e) {
+                console.warn("Live sync failed", e);
+            }
+
+            closeAppModal();
+            if (parentOverlay) {
+                parentOverlay.remove();
+                setTimeout(() => showCreatePlaylistModal(), 100);
+            }
+        });
+  }
+  
+  function showFollowedReleasesFilterModal() {
+    const abortController = new AbortController();
+    let tempConfig = JSON.parse(JSON.stringify(followedReleasesConfig));
+    let tempKeywords = new Set(tempConfig.keywords);
+
+    const overlay = document.createElement("div");
+    overlay.id = "followed-releases-filter-overlay";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.7); z-index: 2010;
+        display: flex; justify-content: center; align-items: center;
+    `;
+
+    const modalContainer = document.createElement("div");
+    modalContainer.className = "main-embedWidgetGenerator-container";
+    modalContainer.style.cssText = `
+        width: 435px; max-width: 90vw; background-color: #181818;
+        border-radius: 20px; border: 2px solid #282828; display: flex; flex-direction: column;
+        max-height: 85vh; overflow: hidden;
+    `;
+
+    modalContainer.innerHTML = `
+        <style>
+            #followed-releases-filter-overlay .modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+            #followed-releases-filter-overlay .modal-body::-webkit-scrollbar { width: 8px; }
+            #followed-releases-filter-overlay .modal-body::-webkit-scrollbar-track { background: transparent; }
+            #followed-releases-filter-overlay .modal-body::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+            #followed-releases-filter-overlay .filter-mode-radio-group { display: flex; align-items: center; gap: 16px; margin: 0; }
+            #followed-releases-filter-overlay .radio-button-container { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+            #followed-releases-filter-overlay .radio-button { width: 16px; height: 16px; border: 2px solid #b3b3b3; border-radius: 50%; display: flex; padding: 2px; }
+            #followed-releases-filter-overlay .radio-button input { display: none; }
+            #followed-releases-filter-overlay .radio-button-inner { width: 8px; height: 8px; background-color: #1DB954; border-radius: 50%; display: none; }
+            #followed-releases-filter-overlay .radio-button input:checked + .radio-button-inner { display: block; }
+            #followed-releases-filter-overlay .radio-label { color: #b3b3b3; font-size: 13px; }
+            #followed-releases-filter-overlay .keyword-input-container { position: relative; display: flex; flex-direction: column; background: #282828; border-radius: 6px; min-height: 96px; max-height: 150px; width: 100%; margin-top: 10px; }
+            #followed-releases-filter-overlay .keyword-tags-container { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; overflow-y: auto; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #ffffff40 transparent; }
+            #followed-releases-filter-overlay .keyword-input-wrapper { position: relative; padding: 3px; border-top: 1px solid #444; background: #313131; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; display: flex; align-items: center; }
+            #followed-releases-filter-overlay .keyword-input { background: none; border: none; color: white; padding: 4px; width: 100%; height: 24px; margin: 0; flex: 1; min-width: 0; outline: none; }
+            #followed-releases-filter-overlay .keyword-actions-container { display: flex; margin-left: auto; flex-shrink: 0; }
+            #followed-releases-filter-overlay .keyword-action-button { background-color: transparent; border: none; color: white; padding: 2px 7px; border-radius: 12px; font-size: 12px; cursor: pointer; transition: background-color: 0.2s ease; height: 24px; }
+            #followed-releases-filter-overlay .keyword-action-button:hover { background-color: #484848; }
+            #followed-releases-filter-overlay .keyword-action-button svg { width: 14px; height: 14px; fill: #fff; display: block; margin: 0 auto; }
+            #followed-releases-filter-overlay .keyword-tag { display: inline-flex; align-items: center; background: #383838; border-radius: 12px; padding: 2px 8px; color: white; font-size: 12px; white-space: nowrap; flex-shrink: 0; height: 24px; }
+            #followed-releases-filter-overlay .keyword-tag-remove { margin-left: 4px; cursor: pointer; color: #ccc; font-size: 14px; }
+            #followed-releases-filter-overlay .switch { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+            #followed-releases-filter-overlay .switch input { opacity: 0; width: 0; height: 0; }
+            #followed-releases-filter-overlay .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+            #followed-releases-filter-overlay .sliderx:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+            #followed-releases-filter-overlay input:checked + .sliderx { background-color: #1DB954; }
+            #followed-releases-filter-overlay input:checked + .sliderx:before { transform: translateX(16px); }
+            #followed-releases-filter-overlay .sp-segmented-control { display: grid; grid-template-columns: 55px 1.2fr 1fr; border: 1px solid #454545; border-radius: 4px; padding: 0; width: 100%; box-sizing: border-box; overflow: hidden; }
+            #followed-releases-filter-overlay .sp-segment-btn { background: #282828; border: none; border-left: 1px solid #454545; color: #b3b3b3; padding: 4px 2px; font-size: 11px; font-weight: 500; cursor: pointer; border-radius: 0; transition: background-color 0.2s, color 0.2s; display: flex; align-items: center; justify-content: center; height: 24px; text-transform: uppercase; }
+            #followed-releases-filter-overlay .sp-segment-btn:first-child { border-left: none; }
+            #followed-releases-filter-overlay .sp-segment-btn:hover { color: white; background-color: #333; }
+            #followed-releases-filter-overlay .sp-segment-btn.active { background-color: #555; color: white; font-weight: 700; }
+            #followed-releases-filter-overlay .sp-segment-btn.active[data-value="require"], #followed-releases-filter-overlay .sp-segment-btn.active[data-value="exclude"] { background-color: #1ED760; color: black; }
+            #followed-releases-filter-overlay .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; }
+            #followed-releases-filter-overlay .tooltip-container { position: relative; display: inline-flex; vertical-align: middle; margin-left: 6px; cursor: help; }
+            #followed-releases-filter-overlay .custom-tooltip { visibility: hidden; position: absolute; z-index: 2008; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 13px; max-width: 260px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); line-height: 1.4; font-weight: normal; opacity: 0; transition: opacity 0.2s, visibility 0.2s; text-align: left; }
+            #followed-releases-filter-overlay .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border-width: 6px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+            #followed-releases-filter-overlay .tooltip-container:hover .custom-tooltip { visibility: visible; opacity: 1; }
+        </style>
+        <div class="main-trackCreditsModal-header" style="padding: 24px 24px 10px; border-bottom: 1px solid #282828;">
+            <h1 class="main-trackCreditsModal-title" style="margin: 0; font-size: 22px; font-weight: 700;">Release Filters</h1>
+        </div>
+        <div class="modal-body">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <div class="filter-mode-radio-group">
+                    <div style="color: #fff; font-size: 13px; font-weight: 500;">Mode:</div>
+                    <label class="radio-button-container"><span class="radio-button"><input type="radio" name="frFilterMode" value="exclude" ${tempConfig.filterMode === 'exclude' ? 'checked' : ''}><span class="radio-button-inner"></span></span><span class="radio-label">Exclude</span></label>
+                    <label class="radio-button-container"><span class="radio-button"><input type="radio" name="frFilterMode" value="keep" ${tempConfig.filterMode === 'keep' ? 'checked' : ''}><span class="radio-button-inner"></span></span><span class="radio-label">Keep</span></label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="color: #fff; font-size: 13px; font-weight: 500;">Match Whole Word:</span>
+                    <label class="switch"><input type="checkbox" id="frMatchWholeWordToggle" ${tempConfig.matchWholeWord ? 'checked' : ''}><span class="sliderx"></span></label>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #b3b3b3; font-size: 13px;">Applies to:</span>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="color: #b3b3b3; font-size: 13px;">Title</span>
+                    <label class="switch"><input type="checkbox" id="frTitleToggle" ${tempConfig.filterTitle ? 'checked' : ''}><span class="sliderx"></span></label>
+                    <span style="color: #b3b3b3; font-size: 13px; margin-left: 4px;">Album</span>
+                    <label class="switch"><input type="checkbox" id="frAlbumToggle" ${tempConfig.filterAlbum ? 'checked' : ''}><span class="sliderx"></span></label>
+                </div>
+            </div>
+
+            <div class="keyword-input-container" id="frKeywordContainer">
+                <div class="keyword-tags-container"></div>
+                <div class="keyword-input-wrapper">
+                    <input type="text" class="keyword-input" placeholder="Type keyword and press Enter...">
+                    <div class="keyword-actions-container">
+                        <button class="keyword-action-button keyword-remove-all-button" title="Clear Keywords">${clearIconSVG}</button>
+                    </div>
+                </div>
+            </div>
+
+            <div style="height: 1px; background: #282828; width: 100%; margin: 20px 0;"></div>
+
+            <div class="track-versions-wrapper">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div style="color: white; font-weight: bold; font-size: 15px; display: flex; align-items: center;">
+                        Track Versions
+                        <span class="tooltip-container">
+                            ${infoIconSvg.replace('margin-bottom: 4px;', 'margin-bottom: 0px;')}
+                            <span class="custom-tooltip">Identifies versions based on track and album titles.<br><br>Selecting multiple ONLYs keeps tracks that match ANY of them (e.g., Live OR Remix).</span>
+                        </span>
+                    </div>
+                    <button id="frResetVersionsBtn" title="Reset Versions" style="background: transparent; border: none; color: #b3b3b3; cursor: pointer; display: flex; padding: 4px; border-radius: 50%;">
+                        ${resetIconSvg}
+                    </button>
+                </div>
+
+                <div class="setting-row">
+                    <span style="color: #c1c1c1; font-size: 13px;">Live</span>
+                    <div class="sp-segmented-control" id="fr-live-control" style="width: 180px;">
+                        <button class="sp-segment-btn ${tempConfig.versions.live === 'all' ? 'active' : ''}" data-value="all">Any</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.live === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.live === 'require' ? 'active' : ''}" data-value="require">Only</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span style="color: #c1c1c1; font-size: 13px;">Remix</span>
+                    <div class="sp-segmented-control" id="fr-remix-control" style="width: 180px;">
+                        <button class="sp-segment-btn ${tempConfig.versions.remix === 'all' ? 'active' : ''}" data-value="all">Any</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.remix === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.remix === 'require' ? 'active' : ''}" data-value="require">Only</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span style="color: #c1c1c1; font-size: 13px;">Acoustic</span>
+                    <div class="sp-segmented-control" id="fr-acoustic-control" style="width: 180px;">
+                        <button class="sp-segment-btn ${tempConfig.versions.acoustic === 'all' ? 'active' : ''}" data-value="all">Any</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.acoustic === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.acoustic === 'require' ? 'active' : ''}" data-value="require">Only</button>
+                    </div>
+                </div>
+                <div class="setting-row">
+                    <span style="color: #c1c1c1; font-size: 13px;">Instrumental</span>
+                    <div class="sp-segmented-control" id="fr-instrumental-control" style="width: 180px;">
+                        <button class="sp-segment-btn ${tempConfig.versions.instrumental === 'all' ? 'active' : ''}" data-value="all">Any</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.instrumental === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude</button>
+                        <button class="sp-segment-btn ${tempConfig.versions.instrumental === 'require' ? 'active' : ''}" data-value="require">Only</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: flex-end; gap: 10px;">
+            <button id="frCancelBtn" class="main-buttons-button" style="padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; background-color: #333; color: white;">Cancel</button>
+            <button id="frSaveBtn" class="main-buttons-button" style="padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; background-color: #1ED760; color: black;">Save</button>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modalContainer);
+
+    const container = modalContainer.querySelector("#frKeywordContainer");
+    tempKeywords.forEach(keyword => createKeywordTag(keyword, container, tempKeywords));
+    setupKeywordInput(container, tempKeywords, () => {}, abortController.signal);
+
+    modalContainer.querySelectorAll('input[name="frFilterMode"]').forEach(radio => {
+        radio.addEventListener('change', (e) => { tempConfig.filterMode = e.target.value; });
+    });
+
+    modalContainer.querySelector("#frMatchWholeWordToggle").addEventListener('change', (e) => {
+        tempConfig.matchWholeWord = e.target.checked;
+    });
+    modalContainer.querySelector("#frTitleToggle").addEventListener('change', (e) => {
+        tempConfig.filterTitle = e.target.checked;
+    });
+    modalContainer.querySelector("#frAlbumToggle").addEventListener('change', (e) => {
+        tempConfig.filterAlbum = e.target.checked;
+    });
+
+    const setSegmented = (id, callback) => {
+        const control = modalContainer.querySelector(`#${id}`);
+        if (!control) return;
+        control.querySelectorAll('.sp-segment-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                control.querySelectorAll('.sp-segment-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                callback(btn.dataset.value);
+            });
+        });
+    };
+
+    setSegmented('fr-live-control', val => tempConfig.versions.live = val);
+    setSegmented('fr-remix-control', val => tempConfig.versions.remix = val);
+    setSegmented('fr-acoustic-control', val => tempConfig.versions.acoustic = val);
+    setSegmented('fr-instrumental-control', val => tempConfig.versions.instrumental = val);
+
+    const resetVersionsBtn = modalContainer.querySelector('#frResetVersionsBtn');
+    if (resetVersionsBtn) {
+        resetVersionsBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            ['live', 'remix', 'acoustic', 'instrumental'].forEach(key => {
+                tempConfig.versions[key] = 'all';
+                const control = modalContainer.querySelector(`#fr-${key}-control`);
+                if (control) {
+                    control.querySelectorAll('.sp-segment-btn').forEach(b => b.classList.remove('active'));
+                    control.querySelector('[data-value="all"]').classList.add('active');
+                }
+            });
+        });
+    }
+
+    const closeModal = () => {
+        abortController.abort();
+        overlay.remove();
+    };
+
+    modalContainer.querySelector("#frSaveBtn").addEventListener("click", () => {
+        followedReleasesConfig = { ...tempConfig, keywords: Array.from(tempKeywords) };
+        saveSettings();
+        closeModal();
+    });
+
+    modalContainer.querySelector("#frCancelBtn").addEventListener("click", closeModal);
+  }
+
+  function showArtistFilterModal() {
+      const overlay = document.createElement("div");
+      overlay.id = "artist-filter-overlay";
+      overlay.className = "sort-play-font-scope";
+      overlay.style.cssText = `
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background-color: rgba(0, 0, 0, 0.7); z-index: 2010;
+          display: flex; justify-content: center; align-items: center;
+      `;
+
+      const modalContainer = document.createElement("div");
+      modalContainer.className = "main-embedWidgetGenerator-container";
+      modalContainer.style.cssText = `
+          width: 750px; max-width: 90vw; background-color: #181818;
+          border-radius: 20px; border: 2px solid #282828; display: flex; flex-direction: column;
+          max-height: 85vh; overflow: hidden; position: relative;
+      `;
+
+      let tempMode = followedReleasesConfig.artistFilterMode || 'exclude';
+      let tempSelected = new Set(followedReleasesConfig.selectedArtists || []);
+      let rightPaneIds = new Set(tempSelected);
+      let allArtists = [];
+      let leftArtists = [];
+      let rightArtists = [];
+      let searchQuery = '';
+
+      modalContainer.innerHTML = `
+          <style>
+              #artist-filter-overlay .sp-dual-list-wrapper { display: flex; gap: 15px; height: 420px; padding: 0 24px 15px; opacity: 0; transition: opacity 0.3s ease; }
+              #artist-filter-overlay .sp-dual-list-wrapper.loaded { opacity: 1; }
+              #artist-filter-overlay .sp-dual-list-pane { flex: 1; display: flex; flex-direction: column; background: #242424; border: 1px solid #333; border-radius: 8px; overflow: hidden; width: 50%; }
+              #artist-filter-overlay .sp-pane-header { padding: 10px 15px; background: #2a2a2a; border-bottom: 1px solid #333; font-size: 12px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; }
+              #artist-filter-overlay .sp-pane-content { flex: 1; overflow-y: auto; position: relative; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+              #artist-filter-overlay .sp-pane-content::-webkit-scrollbar { width: 8px; }
+              #artist-filter-overlay .sp-pane-content::-webkit-scrollbar-track { background: transparent; }
+              #artist-filter-overlay .sp-pane-content::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+              #artist-filter-overlay .sp-artist-row { position: absolute; left: 0; right: 0; height: 50px; display: flex; align-items: center; padding: 0 15px; border-bottom: 1px solid #2f2f2f; cursor: pointer; transition: background-color 0.2s, opacity 0.2s, filter 0.2s; }
+              #artist-filter-overlay .sp-artist-row:hover { background-color: #333; }
+              #artist-filter-overlay .sp-artist-avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; margin-right: 10px; background-color: #282828; flex-shrink: 0; }
+              #artist-filter-overlay .sp-artist-name { color: #fff; font-size: 13px; font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 10px; transition: color 0.2s; }
+              #artist-filter-overlay .sp-artist-action { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #333; color: #b3b3b3; transition: all 0.2s; flex-shrink: 0; }
+              #artist-filter-overlay .sp-artist-action svg { width: 16px; height: 16px; display: block; }
+              #artist-filter-overlay .sp-artist-row.left-row:hover .sp-artist-action { background: #1DB954; color: #000; }
+              #artist-filter-overlay .sp-artist-row.left-row.selected-row .sp-artist-action { background: #1DB954; color: #000; }
+              #artist-filter-overlay .sp-artist-row.left-row.selected-row:hover .sp-artist-action { background: #e91429; color: #fff; }
+              #artist-filter-overlay .sp-artist-row.right-row.active-row:hover .sp-artist-action { background: #e91429; color: #fff; }
+              #artist-filter-overlay .sp-artist-row.right-row.grayed-row { opacity: 0.4; filter: grayscale(1); }
+              #artist-filter-overlay .sp-artist-row.right-row.grayed-row:hover { opacity: 0.8; }
+              #artist-filter-overlay .sp-artist-row.right-row.grayed-row:hover .sp-artist-action { background: #1DB954; color: #000; }
+              #artist-filter-overlay .sp-artist-row.right-row.grayed-row .sp-artist-name { text-decoration: line-through; }
+              #artist-filter-overlay .sp-pane-empty { padding: 20px; text-align: center; color: #b3b3b3; font-size: 13px; }
+              #artist-filter-overlay .sp-segmented-control { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #454545; border-radius: 4px; overflow: hidden; margin-bottom: 15px; }
+              #artist-filter-overlay .sp-segment-btn { background: #282828; color: #b3b3b3; padding: 8px; font-weight: bold; font-size: 13px; border: none; cursor: pointer; border-radius: 0; transition: background-color 0.2s, color 0.2s; }
+              #artist-filter-overlay .sp-segment-btn.active[data-value="exclude"] { background: #e91429; color: #fff; }
+              #artist-filter-overlay .sp-segment-btn.active[data-value="include"] { background: #1ED760; color: #000; }
+              #artist-filter-overlay #artist-search-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #b3b3b3; cursor: pointer; display: none; padding: 4px; line-height: 1; transition: color 0.2s; }
+              #artist-filter-overlay #artist-search-clear:hover { color: #fff; }
+              #artist-filter-overlay #sp-clear-selected:hover { color: #e91429 !important; }
+          </style>
+          <div class="main-trackCreditsModal-header" style="padding: 24px 24px 10px; border-bottom: 1px solid #282828;">
+              <h1 class="main-trackCreditsModal-title" style="margin: 0; font-size: 22px; font-weight: 700;">Exclude / Include Artists</h1>
+          </div>
+          <div style="padding: 15px 24px 0; display: flex; flex-direction: column;">
+              <div class="sp-segmented-control" id="artist-mode-control">
+                  <button class="sp-segment-btn ${tempMode === 'exclude' ? 'active' : ''}" data-value="exclude">Exclude Selected</button>
+                  <button class="sp-segment-btn ${tempMode === 'include' ? 'active' : ''}" data-value="include">Only Include Selected</button>
+              </div>
+              <div style="position: relative; margin-bottom: 15px;">
+                  <input type="text" id="artist-search-input" placeholder="Search across all artists..." style="width: 100%; padding: 10px 30px 10px 12px; border-radius: 6px; border: 1px solid #333; background: #2a2a2a; color: white; outline: none; box-sizing: border-box; font-size: 13px;">
+                  <button id="artist-search-clear" title="Clear search">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>
+                  </button>
+              </div>
+          </div>
+          
+          <div class="sp-dual-list-wrapper">
+              <div class="sp-dual-list-pane">
+                  <div class="sp-pane-header">Available <span id="left-count" style="color: #b3b3b3;">...</span></div>
+                  <div id="left-list-container" class="sp-pane-content">
+                      <div id="sp-left-scroll-height" style="height: 0; width: 1px;"></div>
+                      <div id="sp-left-content"></div>
+                  </div>
+              </div>
+              <div class="sp-dual-list-pane">
+                  <div class="sp-pane-header" style="align-items: center;">
+                      <div>Selected <span id="right-count" style="color: #b3b3b3; margin-left: 4px;">${tempSelected.size}</span></div>
+                      <button id="sp-clear-selected" title="Clear All" style="background: none; border: none; color: #b3b3b3; cursor: pointer; padding: 0; display: flex; transition: color 0.2s;">
+                          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>
+                      </button>
+                  </div>
+                  <div id="right-list-container" class="sp-pane-content">
+                      <div id="sp-right-scroll-height" style="height: 0; width: 1px;"></div>
+                      <div id="sp-right-content"></div>
+                  </div>
+              </div>
+          </div>
+          
+          <div id="sp-artist-loader" style="padding: 20px; text-align: center; color: #b3b3b3; position: absolute; width: 100%; top: 58%; transform: translateY(-50%); display: block;">Loading artists...</div>
+          
+          <div style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: flex-end; gap: 10px;">
+              <button id="artistCancelBtn" class="main-buttons-button" style="padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; background-color: #333; color: white;">Cancel</button>
+              <button id="artistSaveBtn" class="main-buttons-button" style="padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; background-color: #1ED760; color: black;" disabled>Save</button>
+          </div>
+      `;
+
+      document.body.appendChild(overlay);
+      overlay.appendChild(modalContainer);
+
+      const leftContainer = modalContainer.querySelector("#left-list-container");
+      const rightContainer = modalContainer.querySelector("#right-list-container");
+      const leftScrollHeightEl = modalContainer.querySelector("#sp-left-scroll-height");
+      const rightScrollHeightEl = modalContainer.querySelector("#sp-right-scroll-height");
+      const leftContentEl = modalContainer.querySelector("#sp-left-content");
+      const rightContentEl = modalContainer.querySelector("#sp-right-content");
+      const searchInput = modalContainer.querySelector("#artist-search-input");
+      const searchClearBtn = modalContainer.querySelector("#artist-search-clear");
+      
+      const itemHeight = 50;
+      const leftRenderedIndices = new Set();
+      const rightRenderedIndices = new Set();
+      
+      const renderPane = (filteredArr, listContainer, contentEl, scrollHeightEl, renderedIndices, isRight) => {
+          if (filteredArr.length === 0) {
+              contentEl.innerHTML = '<div class="sp-pane-empty">No artists found.</div>';
+              scrollHeightEl.style.height = '0px';
+              renderedIndices.clear();
+              return;
+          }
+          
+          if (contentEl.querySelector('.sp-pane-empty')) {
+              contentEl.innerHTML = '';
+          }
+          
+          scrollHeightEl.style.height = `${filteredArr.length * itemHeight}px`;
+          
+          const scrollTop = listContainer.scrollTop;
+          const clientHeight = listContainer.clientHeight || 400;
+          const buffer = 10;
+          const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - buffer);
+          const endIndex = Math.min(filteredArr.length - 1, Math.ceil((scrollTop + clientHeight) / itemHeight) + buffer);
+          
+          const newIndices = new Set();
+          for (let i = startIndex; i <= endIndex; i++) newIndices.add(i);
+
+          for (let idx of renderedIndices) {
+              if (!newIndices.has(idx)) {
+                  const el = contentEl.querySelector(`[data-idx="${idx}"]`);
+                  if (el) el.remove();
+                  renderedIndices.delete(idx);
+              }
+          }
+
+          for (let i = startIndex; i <= endIndex; i++) {
+              if (!renderedIndices.has(i)) {
+                  const artist = filteredArr[i];
+                  const isActive = tempSelected.has(artist.id);
+                  
+                  let rowClass = 'sp-artist-row ';
+                  let iconHtml = plusSvgIcon;
+                  
+                  if (isRight) {
+                      rowClass += 'right-row ' + (isActive ? 'active-row' : 'grayed-row');
+                      iconHtml = isActive ? removeSvgIcon : plusSvgIcon;
+                  } else {
+                      rowClass += 'left-row ' + (isActive ? 'selected-row' : '');
+                      iconHtml = isActive ? checkSvgIcon : plusSvgIcon;
+                  }
+
+                  const row = document.createElement('div');
+                  row.className = rowClass;
+                  row.dataset.idx = i;
+                  row.style.top = `${i * itemHeight}px`;
+                  row.innerHTML = `
+                      <img src="${artist.coverUrl || FALLBACK_COVER_URI}" class="sp-artist-avatar" loading="lazy">
+                      <span class="sp-artist-name">${escapeHtml(artist.name)}</span>
+                      <div class="sp-artist-action">
+                          ${iconHtml}
+                      </div>
+                  `;
+                  row.onclick = () => {
+                      if (isRight) {
+                          if (tempSelected.has(artist.id)) {
+                              tempSelected.delete(artist.id);
+                              row.classList.remove('active-row');
+                              row.classList.add('grayed-row');
+                              row.querySelector('.sp-artist-action').innerHTML = plusSvgIcon;
+                          } else {
+                              tempSelected.add(artist.id);
+                              row.classList.remove('grayed-row');
+                              row.classList.add('active-row');
+                              row.querySelector('.sp-artist-action').innerHTML = removeSvgIcon;
+                          }
+                          modalContainer.querySelector('#right-count').innerText = tempSelected.size;
+                          
+                          const leftRow = Array.from(leftContentEl.children).find(el => {
+                              return leftArtists[el.dataset.idx] && leftArtists[el.dataset.idx].id === artist.id;
+                          });
+                          if (leftRow) {
+                              if (tempSelected.has(artist.id)) {
+                                  leftRow.classList.add('selected-row');
+                                  leftRow.querySelector('.sp-artist-action').innerHTML = checkSvgIcon;
+                              } else {
+                                  leftRow.classList.remove('selected-row');
+                                  leftRow.querySelector('.sp-artist-action').innerHTML = plusSvgIcon;
+                              }
+                          }
+                      } else {
+                          if (tempSelected.has(artist.id)) {
+                              tempSelected.delete(artist.id);
+                              rightPaneIds.delete(artist.id);
+                          } else {
+                              tempSelected.add(artist.id);
+                              rightPaneIds.add(artist.id);
+                          }
+                          updateLists();
+                      }
+                  };
+                  contentEl.appendChild(row);
+                  renderedIndices.add(i);
+              }
+          }
+      };
+
+      const renderLeft = () => renderPane(leftArtists, leftContainer, leftContentEl, leftScrollHeightEl, leftRenderedIndices, false);
+      const renderRight = () => renderPane(rightArtists, rightContainer, rightContentEl, rightScrollHeightEl, rightRenderedIndices, true);
+
+      const updateLists = () => {
+          leftArtists = allArtists.filter(a => !searchQuery || a.name.toLowerCase().includes(searchQuery));
+          rightArtists = allArtists.filter(a => rightPaneIds.has(a.id) && (!searchQuery || a.name.toLowerCase().includes(searchQuery)));
+          
+          modalContainer.querySelector('#left-count').innerText = leftArtists.length;
+          modalContainer.querySelector('#right-count').innerText = tempSelected.size;
+          
+          leftRenderedIndices.clear();
+          leftContentEl.innerHTML = '';
+          rightRenderedIndices.clear();
+          rightContentEl.innerHTML = '';
+          
+          renderLeft();
+          renderRight();
+      };
+
+      let leftScrollTicking = false;
+      leftContainer.addEventListener('scroll', () => {
+          if (!leftScrollTicking) {
+              window.requestAnimationFrame(() => {
+                  renderLeft();
+                  leftScrollTicking = false;
+              });
+              leftScrollTicking = true;
+          }
+      });
+
+      let rightScrollTicking = false;
+      rightContainer.addEventListener('scroll', () => {
+          if (!rightScrollTicking) {
+              window.requestAnimationFrame(() => {
+                  renderRight();
+                  rightScrollTicking = false;
+              });
+              rightScrollTicking = true;
+          }
+      });
+
+      getAllFollowedArtists().then(artists => {
+          allArtists = artists;
+          const loader = modalContainer.querySelector("#sp-artist-loader");
+          const dualWrapper = modalContainer.querySelector(".sp-dual-list-wrapper");
+          
+          loader.style.display = 'none';
+          if (allArtists.length === 0) {
+              loader.innerText = "You aren't following any artists.";
+              loader.style.display = 'block';
+              dualWrapper.style.display = 'none';
+          } else {
+              allArtists.sort((a, b) => a.name.localeCompare(b.name));
+              updateLists();
+              requestAnimationFrame(() => {
+                  dualWrapper.classList.add('loaded');
+              });
+          }
+          modalContainer.querySelector("#artistSaveBtn").disabled = false;
+      }).catch(e => {
+          const loader = modalContainer.querySelector("#sp-artist-loader");
+          loader.innerText = "Failed to load artists. Please try again later.";
+          loader.style.color = "#e91429";
+      });
+
+      let searchTimeout;
+      searchInput.addEventListener("input", (e) => {
+          searchClearBtn.style.display = e.target.value.length > 0 ? 'block' : 'none';
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+              searchQuery = e.target.value.trim().toLowerCase();
+              leftContainer.scrollTop = 0;
+              rightContainer.scrollTop = 0;
+              rightPaneIds = new Set(tempSelected);
+              updateLists();
+          }, 200);
+      });
+
+      searchClearBtn.addEventListener("click", () => {
+          searchInput.value = '';
+          searchClearBtn.style.display = 'none';
+          searchQuery = '';
+          leftContainer.scrollTop = 0;
+          rightContainer.scrollTop = 0;
+          rightPaneIds = new Set(tempSelected);
+          updateLists();
+          searchInput.focus();
+      });
+
+      const modeBtns = modalContainer.querySelectorAll(".sp-segment-btn");
+      modeBtns.forEach(btn => {
+          btn.addEventListener("click", () => {
+              modeBtns.forEach(b => b.classList.remove("active"));
+              btn.classList.add("active");
+              tempMode = btn.dataset.value;
+          });
+      });
+
+      modalContainer.querySelector("#sp-clear-selected").addEventListener("click", async () => {
+          if (tempSelected.size === 0) return;
+          const confirmed = await showConfirmationModal({
+              title: "Clear Selected Artists?",
+              description: `Are you sure you want to remove all ${tempSelected.size} selected artists?`,
+              confirmText: "Clear All",
+              cancelText: "Cancel"
+          });
+          if (confirmed === 'confirm') {
+              tempSelected.clear();
+              rightPaneIds.clear();
+              updateLists();
+          }
+      });
+
+      const closeModal = () => {
+          overlay.remove();
+      };
+
+      modalContainer.querySelector("#artistSaveBtn").addEventListener("click", () => {
+          const activeIds = new Set(allArtists.map(a => a.id));
+          const finalSelected = Array.from(tempSelected).filter(id => activeIds.has(id));
+          
+          followedReleasesConfig.artistFilterMode = tempMode;
+          followedReleasesConfig.selectedArtists = finalSelected;
+          saveSettings();
+          closeModal();
+      });
+
+      modalContainer.querySelector("#artistCancelBtn").addEventListener("click", closeModal);
+  }
+
   function showDedicatedSettingsModal() {
     const overlay = document.createElement("div");
     overlay.id = "sort-play-dedicated-settings-overlay";
@@ -8625,29 +9575,31 @@
 
     modalContainer.innerHTML = `
     <style>
-      .main-trackCreditsModal-mainSection { overflow-y: auto !important; padding: 16px 45px 16px 45px; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #333333 #181818; }
+      .main-trackCreditsModal-mainSection { overflow-y: auto !important; padding: 16px 45px 40px 45px; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #333333 #181818; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar { width: 8px; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar-track { background: #282828; border-radius: 4px; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb { background-color: #5a5a5a; border-radius: 4px; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb:hover { background-color: #7a7a7a; }
       .sort-play-settings .col { padding: 0; }
       .sort-play-settings .setting-row::after { content: ""; display: table; clear: both; }
-      .sort-play-settings .setting-row { padding: 10px 0; align-items: center; display: flex; justify-content: space-between; }
-      .sort-play-settings .setting-row .col.description { flex: 1; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; margin: 0; padding-right: 15px; }
-      .sort-play-settings .setting-row .col.action { display: flex; align-items: center; justify-content: flex-end; width: 170px; flex-shrink: 0; position: relative; }
-      .sort-play-settings select { padding: 4px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 125px; height: auto; outline: none; }
+      .sort-play-settings .setting-row { padding: 5px 0; align-items: center; }
+      .sort-play-settings .setting-row .col.description { float: left; padding-right: 10px; width: auto; color: #c1c1c1; font-family: 'SpotifyMixUI' !important; margin: 0; }
+      .sort-play-settings .setting-row .col.action { display: flex; float: right; align-items: center; justify-content: flex-end; text-align: right; gap: 8px; position: relative; }
+      .sort-play-settings select { padding: 2px 8px; border-radius: 15px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; font-size: 13px; max-width: 130px; height: auto; outline: none; }
       .sort-play-settings .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
       .sort-play-settings .switch input { opacity: 0; width: 0; height: 0; }
       .sort-play-settings .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
       .sort-play-settings .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
       .sort-play-settings input:checked + .sliderx { background-color: #1DB954; }
       .sort-play-settings input:checked + .sliderx:before { transform: translateX(16px); }
-      .tooltip-container { position: relative; display: inline-flex; vertical-align: middle; margin-left: 4px; }
-      .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
+      .tooltip-container { position: relative; display: inline-block; vertical-align: middle; margin-left: 4px; }
+      .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
       .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
       .tooltip-container:hover .custom-tooltip { visibility: visible; }
       .main-trackCreditsModal-closeBtn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; }
       .main-trackCreditsModal-closeBtn:hover { color: #ffffff; }
+      .category-header { font-size: 13px; font-weight: 700; color: rgb(255 255 255 / 50%); text-transform: uppercase; letter-spacing: 1px; padding-bottom: 8px; border-bottom: 1px solid rgb(255 255 255 / 8%); margin-top: 10px; margin-bottom: 5px; }
+      .category-header:first-child { margin-top: 8px; }
     </style>
     <div class="main-trackCreditsModal-header" style="padding: 29px 32px 19px 32px !important; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828;">
         <h1 class="main-trackCreditsModal-title"><span style='font-size: 26px; font-weight: 700; color: white;'>Dedicated Settings</span></h1>
@@ -8655,119 +9607,142 @@
           ${closeModalIcon20Svg}
         </button>
     </div>
-    <div class="main-trackCreditsModal-mainSection" style="padding-top: 24px; padding-bottom: 30px;">
-        
-      <div class="setting-row" id="setDedicatedCoversSettingRow">
-          <label class="col description">
-              Set Custom Playlist Covers
-          </label>
-          <div class="col action">
-              <label class="switch">
-                  <input type="checkbox" id="setDedicatedCoversToggle" ${setDedicatedPlaylistCovers ? 'checked' : ''}>
-                  <span class="sliderx"></span>
-              </label>
-          </div>
-      </div>
+    <div class="main-trackCreditsModal-mainSection">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
 
-      <div class="setting-row" id="topTracksLimitSetting">
-          <label class="col description">
-              Top Tracks Playlist Max Size
-          </label>
-          <div class="col action">
-              <select id="topTracksLimitSelect" style="width: 70px;">
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                  <option value="150">150</option>
-                  <option value="200">200</option>
-                  <option value="250">250</option>
-                  <option value="500">500</option>
-                  <option value="1000">1000</option>
-                  <option value="2000">2000</option>
-                  <option value="10000">Max</option>
-              </select>
-          </div>
-      </div>
+            <div class="category-header">General</div>
+            <div class="setting-row" id="setDedicatedCoversSettingRow">
+                <label class="col description">Set Custom Playlist Covers</label>
+                <div class="col action">
+                    <label class="switch">
+                        <input type="checkbox" id="setDedicatedCoversToggle" ${setDedicatedPlaylistCovers ? 'checked' : ''}>
+                        <span class="sliderx"></span>
+                    </label>
+                </div>
+            </div>
 
-      <div class="setting-row" id="discoveryPlaylistSizeSetting">
-          <label class="col description">
-              Discovery Playlist Size
-          </label>
-          <div class="col action">
-              <select id="discoveryPlaylistSizeSelect" style="width: 70px;">
-                  <option value="30">30</option>
-                  <option value="50">50</option>
-                  <option value="75">75</option>
-                  <option value="100">100</option>
-              </select>
-          </div>
-      </div>
+            <div class="category-header">New Releases</div>
+            <div class="setting-row" id="newReleasesLimitSetting">
+                <label class="col description">
+                    New Releases Time Window
+                    <span class="tooltip-container">
+                        ${infoIconSvg}
+                        <span class="custom-tooltip">Set the lookback period for New Releases playlists. 'Release Week' options are anchored to the music industry's Friday release schedule, while 'Days' are a rolling window.</span>
+                    </span>
+                </label>
+                <div class="col action">
+                    <select id="newReleasesLimitSelect" style="max-width: 180px;">
+                        <option value="release-1">This Release Week</option>
+                        <option value="release-2">Last 2 Release Weeks</option>
+                        <option value="release-3">Last 3 Release Weeks</option>
+                        <option value="release-5">Last 5 Release Weeks</option>
+                        <option value="release-9">Last 9 Release Weeks</option>
+                        <option disabled>──────────</option>
+                        <option value="1">Last 24 Hours</option>
+                        <option value="2">Last 2 Days</option>
+                        <option value="3">Last 3 Days</option>
+                        <option value="4">Last 4 Days</option>
+                        <option value="7">Last 7 Days</option>
+                        <option value="10">Last 10 Days</option>
+                        <option value="15">Last 15 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="60">Last 60 Days</option>
+                        <option value="90">Last 90 Days</option>
+                        <option value="150">Last 150 Days</option>
+                    </select>
+                </div>
+            </div>
 
-      <div class="setting-row" id="discoveryStrictAlbumExclusionSetting">
-          <label class="col description">
-              Strict Album Exclusion (Discovery)
-              <span class="tooltip-container">
-                  ${infoIconSvg}
-                  <span class="custom-tooltip">If enabled, Discovery playlists completely exclude an album if you have liked even a single track from it.</span>
-              </span>
-          </label>
-          <div class="col action">
-              <label class="switch">
-                  <input type="checkbox" id="discoveryStrictAlbumExclusionToggle" ${discoveryStrictAlbumExclusion ? 'checked' : ''}>
-                  <span class="sliderx"></span>
-              </label>
-          </div>
-      </div>
+            <div class="setting-row" id="followedReleasesLimitSetting">
+                <label class="col description">
+                    Followed Artist Tracks Per Album
+                    <span class="tooltip-container">
+                        ${infoIconSvg}
+                        <span class="custom-tooltip">Limit the number of tracks added from each album in the "Followed Artist (Full)" playlist.</span>
+                    </span>
+                </label>
+                <div class="col action">
+                    <select id="followedReleasesLimitSelect" style="max-width: 120px;">
+                        <option value="1">1 Track</option>
+                        <option value="2">2 Tracks</option>
+                        <option value="3">3 Tracks</option>
+                        <option value="5">5 Tracks</option>
+                        <option value="all">All Tracks</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-row" id="followedReleasesFilterSetting">
+                <label class="col description">
+                    Keywords & Track Versions
+                    <span class="tooltip-container">
+                        ${infoIconSvg}
+                        <span class="custom-tooltip">Filter out specific terms, remixes, live performances, and acoustic versions from your followed releases.</span>
+                    </span>
+                </label>
+                <div class="col action">
+                    <button id="configFollowedReleasesFilterBtn" class="main-buttons-button main-button-secondary" style="padding: 4px 12px; border-radius: 20px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; background-color: transparent; transition: background-color 0.2s;">Configure</button>
+                </div>
+            </div>
+            <div class="setting-row" id="followedReleasesArtistFilterSetting">
+                <label class="col description">
+                    Exclude / Include Artists
+                    <span class="tooltip-container">
+                        ${infoIconSvg}
+                        <span class="custom-tooltip">Selectively exclude or include specific artists from the 'Followed Artist (Full)' playlist.</span>
+                    </span>
+                </label>
+                <div class="col action">
+                    <button id="configArtistFilterBtn" class="main-buttons-button main-button-secondary" style="padding: 4px 12px; border-radius: 20px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; background-color: transparent; transition: background-color 0.2s;">Configure</button>
+                </div>
+            </div>
+            <div class="category-header">Discovery</div>
+            <div class="setting-row" id="discoveryPlaylistSizeSetting">
+                <label class="col description">Discovery Playlist Size</label>
+                <div class="col action">
+                    <select id="discoveryPlaylistSizeSelect" style="width: 70px;">
+                        <option value="30">30</option>
+                        <option value="50">50</option>
+                        <option value="75">75</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+            </div>
 
-      <div class="setting-row" id="newReleasesLimitSetting">
-          <label class="col description">
-              New Releases Time Window
-              <span class="tooltip-container">
-                  ${infoIconSvg}
-                  <span class="custom-tooltip">Set the lookback period for New Releases playlists. 'Release Week' options are anchored to the music industry's Friday release schedule, while 'Days' are a rolling window.</span>
-              </span>
-          </label>
-          <div class="col action">
-          <select id="newReleasesLimitSelect" style="max-width: 180px;">
-              <option value="release-1">This Release Week</option>
-              <option value="release-2">Last 2 Release Weeks</option>
-              <option value="release-3">Last 3 Release Weeks</option>
-              <option value="release-5">Last 5 Release Weeks</option>
-              <option value="release-9">Last 9 Release Weeks</option>
-              <option disabled>──────────</option>
-              <option value="1">Last 24 Hours</option>
-              <option value="2">Last 2 Days</option>
-              <option value="3">Last 3 Days</option>
-              <option value="4">Last 4 Days</option>
-              <option value="7">Last 7 Days</option>
-              <option value="10">Last 10 Days</option>
-              <option value="15">Last 15 Days</option>
-              <option value="30">Last 30 Days</option>
-              <option value="60">Last 60 Days</option>
-              <option value="90">Last 90 Days</option>
-              <option value="150">Last 150 Days</option>
-          </select>
-          </div>
-      </div>
+            <div class="setting-row" id="discoveryStrictAlbumExclusionSetting">
+                <label class="col description">
+                    Strict Album Exclusion (Discovery)
+                    <span class="tooltip-container">
+                        ${infoIconSvg}
+                        <span class="custom-tooltip">If enabled, Discovery playlists completely exclude an album if you have liked even a single track from it.</span>
+                    </span>
+                </label>
+                <div class="col action">
+                    <label class="switch">
+                        <input type="checkbox" id="discoveryStrictAlbumExclusionToggle" ${discoveryStrictAlbumExclusion ? 'checked' : ''}>
+                        <span class="sliderx"></span>
+                    </label>
+                </div>
+            </div>
 
-      <div class="setting-row" id="followedReleasesLimitSetting">
-          <label class="col description">
-              Followed Artist Tracks Per Album
-              <span class="tooltip-container">
-                  ${infoIconSvg}
-                  <span class="custom-tooltip">Limit the number of tracks added from each album in the "Followed Artist (Full)" playlist.</span>
-              </span>
-          </label>
-          <div class="col action">
-              <select id="followedReleasesLimitSelect" style="max-width: 120px;">
-                  <option value="1">1 Track</option>
-                  <option value="2">2 Tracks</option>
-                  <option value="3">3 Tracks</option>
-                  <option value="5">5 Tracks</option>
-                  <option value="all">All Tracks</option>
-              </select>
-          </div>
-      </div>
+            <div class="category-header">My Top Tracks</div>
+            <div class="setting-row" id="topTracksLimitSetting">
+                <label class="col description">Top Tracks Playlist Max Size</label>
+                <div class="col action">
+                    <select id="topTracksLimitSelect" style="width: 70px;">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="150">150</option>
+                        <option value="200">200</option>
+                        <option value="250">250</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                        <option value="2000">2000</option>
+                        <option value="10000">Max</option>
+                    </select>
+                </div>
+            </div>
 
+        </div>
     </div>
     `;
 
@@ -8787,6 +9762,24 @@
         if (e.target === overlay) closeModal();
     });
     modalContainer.querySelector("#closeDedicatedSettingsModal").addEventListener("click", closeModal);
+
+    const configFollowedReleasesFilterBtn = modalContainer.querySelector("#configFollowedReleasesFilterBtn");
+    if (configFollowedReleasesFilterBtn) {
+        configFollowedReleasesFilterBtn.addEventListener("mouseenter", () => configFollowedReleasesFilterBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)");
+        configFollowedReleasesFilterBtn.addEventListener("mouseleave", () => configFollowedReleasesFilterBtn.style.backgroundColor = "transparent");
+        configFollowedReleasesFilterBtn.addEventListener("click", () => {
+            showFollowedReleasesFilterModal();
+        });
+    }
+
+    const configArtistFilterBtn = modalContainer.querySelector("#configArtistFilterBtn");
+    if (configArtistFilterBtn) {
+        configArtistFilterBtn.addEventListener("mouseenter", () => configArtistFilterBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)");
+        configArtistFilterBtn.addEventListener("mouseleave", () => configArtistFilterBtn.style.backgroundColor = "transparent");
+        configArtistFilterBtn.addEventListener("click", () => {
+            showArtistFilterModal();
+        });
+    }
 
     const setDedicatedCoversToggle = modalContainer.querySelector("#setDedicatedCoversToggle");
     const topTracksLimitSelect = modalContainer.querySelector("#topTracksLimitSelect");
@@ -8932,6 +9925,8 @@
         return ''; 
     };
 
+    const overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}');
+
     const generateCardsHtml = (cards, category) => {
         let rgbColor = '0, 0, 0';
         if (category === 'discovery') {
@@ -8950,19 +9945,17 @@
             const badgeHtml = getBadgeHtml(behavior, card.id);
             const allowSettings = card.id !== 'tastemakerProfile' && !isBroken;
 
-            let displayTitle = card.name;
+            const custom = overrides[card.id] || {};
+            let displayTitle = custom.name || card.name;
             let displayThumbnail = card.thumbnailUrl;
-            let isCustomCover = false;
 
             const cachedMeta = dedicatedPlaylistMeta[card.id];
             if ((behavior === 'replace' || behavior === 'autoUpdate') && cachedMeta) {
-                if (cachedMeta.name) displayTitle = cachedMeta.name;
-                if (cachedMeta.imageUrl && !isDefaultMosaicCover(cachedMeta.imageUrl)) {
-                    displayThumbnail = cachedMeta.imageUrl;
-                    isCustomCover = true;
-                }
+                if (!custom.name && cachedMeta.name) displayTitle = cachedMeta.name;
             }
-            const customCoverClass = isCustomCover ? 'has-custom-cover' : '';
+            
+            const needsIdbCover = custom.hasCustomImage === true;
+            const customCoverClass = needsIdbCover ? 'has-custom-cover' : '';
 
             const autoBtnContent = behavior === 'autoUpdate' 
                 ? `Auto ${settingsSvg.replace('<svg', '<svg width="12" height="12" fill="currentColor" style="margin-left: 4px; opacity: 0.8;"')}` 
@@ -8974,7 +9967,7 @@
             const countText = hasCached ? cachedCount.toLocaleString() : '';
 
             return `
-                <div class="slim-card ${isBroken ? 'broken-card' : ''} ${customCoverClass}" data-id="${card.id}" data-name="${card.name}" style="--overlay-color: ${rgbColor};">
+                <div class="slim-card ${isBroken ? 'broken-card' : ''} ${customCoverClass}" data-id="${card.id}" data-name="${card.name}" data-needs-idb-cover="${needsIdbCover ? 'true' : 'false'}" style="--overlay-color: ${rgbColor};">
                     <div class="card-bg" style="background-image: url('${displayThumbnail}');"></div>
                     <div class="card-overlay"></div>
                     ${isBroken ? `<div class="broken-overlay"><span>Unavailable</span></div>` : ''}
@@ -8997,9 +9990,14 @@
                     </div>
 
                     ${allowSettings ? `
-                    <button class="settings-trigger" title="Configure">
-                        ${settingsSvg.replace('<svg', '<svg fill="#fff" width="14" height="14"')}
-                    </button>
+                    <div class="card-action-triggers">
+                        <button class="settings-trigger" title="Configure Behavior">
+                            ${settingsSvg.replace('<svg', '<svg fill="#fff" width="14" height="14"')}
+                        </button>
+                        <button class="appearance-trigger" title="Edit Appearance">
+                            ${penIconSvg.replace('<svg', '<svg width="14" height="14" fill="#fff"')}
+                        </button>
+                    </div>
                     <div class="settings-overlay-panel">
                         <div class="settings-options">
                             <button class="mode-btn ${behavior === 'createOnce' ? 'active' : ''}" data-val="createOnce">Once</button>
@@ -9116,9 +10114,13 @@
         .mode-badge.replace { background-color: #3e2a0f; color: #ffaa00; border: 1px solid #5e431d; }
         .mode-badge.auto { background-color: #0f3318; color: #1ed760; border: 1px solid #184f25; }
         .card-desc { color: #ddd; font-size: 12px; opacity: 0.8; margin-top: 3px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2; }
-        .settings-trigger { position: absolute; top: 0; right: 0; height: 100%; width: 30px; z-index: 10; background: transparent; border: none; border-left: 1px solid transparent; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.2s, background-color 0.2s, border-color 0.2s; cursor: pointer; }
-        .slim-card:hover .settings-trigger { opacity: 1; }
-        .settings-trigger:hover { background-color: rgba(255,255,255,0.1); border-left-color: rgba(255,255,255,0.1); }
+        .card-action-triggers { position: absolute; top: 0; right: 0; height: 100%; width: 34px; display: flex; flex-direction: column; z-index: 10; opacity: 0; transition: opacity 0.2s; border-left: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
+        .slim-card:hover .card-action-triggers, .slim-card:has(.settings-overlay-panel.active) .card-action-triggers { opacity: 1; }
+        .appearance-trigger, .settings-trigger { background: transparent; border: none; width: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s; padding: 0; margin: 0; box-sizing: border-box; }
+        .appearance-trigger:hover, .settings-trigger:hover { background-color: rgba(255,255,255,0.1); }
+        .appearance-trigger svg, .settings-trigger svg { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6)); }
+        .settings-trigger { height: 50%; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .appearance-trigger { height: 50%; }
         .settings-overlay-panel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 12px; background: rgb(255 255 255 / 10%); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); z-index: 20; display: flex; align-items: center; justify-content: center; padding: 0 30px 0 10px; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.2s ease, visibility 0.2s ease; }
         .settings-overlay-panel.active { opacity: 1; visibility: visible; pointer-events: auto; }
         .settings-options { display: flex; gap: 4px; background: #181818; padding: 3px; border-radius: 4px; }
@@ -9174,6 +10176,20 @@
     
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
+
+    (async () => {
+        const cardsNeedingCover = shadowRoot.querySelectorAll('.slim-card[data-needs-idb-cover="true"]');
+        for (const cardEl of cardsNeedingCover) {
+            const cardId = cardEl.dataset.id;
+            const b64 = await idb.get('generatedCovers', `custom_image_${cardId}`);
+            if (b64) {
+                const bgEl = cardEl.querySelector('.card-bg');
+                if (bgEl) {
+                    bgEl.style.backgroundImage = `url('${b64}')`;
+                }
+            }
+        }
+    })();
 
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -9283,35 +10299,14 @@
                         
                         const cardEl = modalContainer.querySelector(`.slim-card[data-id="${cardId}"]`);
                         if (cardEl) {
+                            const custom = overrides[cardId] || {};
                             const defaultCard = playlistCardsData.flatMap(s => s.cards).find(c => c.id === cardId);
                             if (defaultCard) {
                                 const titleEl = cardEl.querySelector('.card-title');
                                 if (titleEl) {
-                                    titleEl.innerText = defaultCard.name;
-                                    titleEl.title = defaultCard.name;
-                                }
-                                
-                                const bgEl = cardEl.querySelector('.card-bg');
-                                if (bgEl) {
-                                    const img = new Image();
-                                    img.onload = () => {
-                                        const newBg = document.createElement('div');
-                                        newBg.className = 'card-bg';
-                                        newBg.style.backgroundImage = `url('${defaultCard.thumbnailUrl}')`;
-                                        newBg.style.opacity = '0';
-                                        newBg.style.transition = 'opacity 0.15s ease, transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                                        
-                                        cardEl.insertBefore(newBg, bgEl.nextSibling);
-                                        cardEl.classList.remove('has-custom-cover');
-                                        
-                                        void newBg.offsetWidth;
-                                        newBg.style.opacity = '1';
-                                        
-                                        setTimeout(() => {
-                                            bgEl.remove();
-                                        }, 150);
-                                    };
-                                    img.src = defaultCard.thumbnailUrl;
+                                    const targetTitle = custom.name || defaultCard.name;
+                                    titleEl.innerText = targetTitle;
+                                    titleEl.title = targetTitle;
                                 }
                             }
                         }
@@ -9324,11 +10319,11 @@
                         const cardEl = modalContainer.querySelector(`.slim-card[data-id="${cardId}"]`);
                         let cacheNeedsUpdate = false;
                         let newName = meta.name;
-                        let newImage = meta.images && meta.images.length > 0 ? meta.images[0].url : null;
                         
                         const cached = dedicatedPlaylistMeta[cardId] || {};
+                        const custom = overrides[cardId] || {};
                         
-                        if (newName && cached.name !== newName) {
+                        if (newName && cached.name !== newName && !custom.name) {
                             cacheNeedsUpdate = true;
                             if (cardEl) {
                                 const titleEl = cardEl.querySelector('.card-title');
@@ -9338,42 +10333,9 @@
                                 }
                             }
                         }
-                        
-                        if (newImage && cached.imageUrl !== newImage) {
-                            cacheNeedsUpdate = true;
-                            if (cardEl) {
-                                const bgEl = cardEl.querySelector('.card-bg');
-                                if (bgEl) {
-                                    const isCustom = !isDefaultMosaicCover(newImage);
-                                    const targetImage = isCustom ? newImage : (playlistCardsData.flatMap(s => s.cards).find(c => c.id === cardId)?.thumbnailUrl || '');
-                                    
-                                    const img = new Image();
-                                    img.onload = () => {
-                                        const newBg = document.createElement('div');
-                                        newBg.className = 'card-bg';
-                                        newBg.style.backgroundImage = `url('${targetImage}')`;
-                                        newBg.style.opacity = '0';
-                                        newBg.style.transition = 'opacity 0.15s ease, transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                                        
-                                        cardEl.insertBefore(newBg, bgEl.nextSibling);
-                                        
-                                        if (isCustom) cardEl.classList.add('has-custom-cover');
-                                        else cardEl.classList.remove('has-custom-cover');
-                                        
-                                        void newBg.offsetWidth;
-                                        newBg.style.opacity = '1';
-                                        
-                                        setTimeout(() => {
-                                            bgEl.remove();
-                                        }, 150);
-                                    };
-                                    img.src = targetImage;
-                                }
-                            }
-                        }
 
                         if (cacheNeedsUpdate) {
-                            dedicatedPlaylistMeta[cardId] = { name: newName, imageUrl: newImage };
+                            dedicatedPlaylistMeta[cardId] = { name: newName };
                             localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
                         }
                     }
@@ -9444,7 +10406,7 @@
                 e.stopPropagation();
                 return;
             }
-            if (e.target.closest('.settings-trigger') || e.target.closest('.settings-overlay-panel')) return;
+            if (e.target.closest('.settings-trigger') || e.target.closest('.appearance-trigger') || e.target.closest('.settings-overlay-panel')) return;
             if (e.target === card) return;
 
             const cardId = card.getAttribute('data-id');
@@ -9499,6 +10461,24 @@
             } else {
                 handleSortAndCreatePlaylist(cardId);
             }
+        });
+    });
+
+    modalContainer.querySelectorAll('.appearance-trigger').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const card = btn.closest('.slim-card');
+            const cardId = card.dataset.id;
+            const defaultCardData = playlistCardsData.flatMap(s => s.cards).find(c => c.id === cardId);
+            
+            const bgDiv = card.querySelector('.card-bg');
+            let currentCoverUrl = defaultCardData.thumbnailUrl;
+            if (bgDiv && bgDiv.style.backgroundImage) {
+                const match = bgDiv.style.backgroundImage.match(/url\(['"]?(.*?)['"]?\)/);
+                if (match && match[1]) currentCoverUrl = match[1];
+            }
+            
+            showAppearanceModal(cardId, defaultCardData, overlay, currentCoverUrl);
         });
     });
 
@@ -10103,7 +11083,7 @@
       });
   }
   
-  async function showConfirmationModal({ title, description, confirmText, cancelText, neutralText }) {
+  async function showConfirmationModal({ title, description, confirmText, cancelText, neutralText, checkboxLabel }) {
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.id = "sort-play-confirmation-overlay";
@@ -10115,7 +11095,7 @@
       `;
 
       const modalContainer = document.createElement("div");
-      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
+      modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope sp-confirm-modal-animated";
       modalContainer.style.cssText = `
           z-index: 2003;
           width: 420px !important;
@@ -10130,9 +11110,22 @@
         ? `<button id="neutralAction" class="sp-confirm-btn sp-confirm-btn-secondary">${neutralText}</button>`
         : '';
 
+      const checkboxHtml = checkboxLabel 
+        ? `<label style="color: #b3b3b3; font-size: 13px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; margin-top: 20px; margin-bottom: 5px;">
+             <input type="checkbox" id="confirmCheckbox" style="accent-color: #1db954; width: 16px; height: 16px; margin: 0;">
+             ${checkboxLabel}
+           </label>`
+        : '';
+
       modalContainer.innerHTML = `
         <style>
-          .sp-confirm-btn { width: auto; padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: background-color 0.2s ease; }
+          @keyframes spFadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes spFadeOut { from { opacity: 1; } to { opacity: 0; } }
+          #sort-play-confirmation-overlay { animation: spFadeIn 0.15s ease-out forwards; }
+          #sort-play-confirmation-overlay.sp-closing { animation: spFadeOut 0.15s ease-out forwards; }
+          .sp-confirm-modal-animated { animation: spFadeIn 0.2s ease-out forwards; }
+          .sp-confirm-btn { width: auto; padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: background-color 0.2s ease, transform 0.1s ease; }
+          .sp-confirm-btn:active { transform: scale(0.95); }
           .sp-confirm-btn-primary { background-color: #1ED760; color: black; }
           .sp-confirm-btn-primary:hover { background-color: #3BE377; }
           .sp-confirm-btn-secondary { background-color: #333333; color: white; padding: 8px 16px; }
@@ -10143,6 +11136,7 @@
         </div>
         <div style="padding: 16px 32px 9px 32px;">
             <p style="color: #c1c1c1; font-size: 16px; margin-bottom: 25px; line-height: 1.5;">${description}</p>
+            ${checkboxHtml}
         </div>
         <div class="main-trackCreditsModal-originalCredits" style="padding: 15px 24px !important; border-top: 1px solid #282828; flex-shrink: 0;">
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
@@ -10156,9 +11150,17 @@
       document.body.appendChild(overlay);
       overlay.appendChild(modalContainer);
 
-      const closeModal = (result) => {
-          overlay.remove();
-          resolve(result);
+      const closeModal = (action) => {
+          overlay.classList.add('sp-closing');
+          setTimeout(() => {
+              overlay.remove();
+              if (checkboxLabel) {
+                  const isChecked = modalContainer.querySelector("#confirmCheckbox")?.checked || false;
+                  resolve({ action, checked: isChecked });
+              } else {
+                  resolve(action);
+              }
+          }, 140);
       };
 
       modalContainer.querySelector("#confirmAction").addEventListener("click", () => closeModal('confirm'));
@@ -14332,7 +15334,7 @@
     let targetYear = new Date().getFullYear();
     if (targetDate) {
         const d = new Date(targetDate);
-        if (!isNaN(d.getTime())) targetYear = d.getFullYear();
+        if (!isNaN(d.getTime())) targetYear = d.getUTCFullYear();
     }
 
     const queries = [];
@@ -14668,7 +15670,7 @@
         tracks = convertedTracks;
 
         const openModal = async () => {
-            const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}');
+            const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
             const { trackGenreMap, rawTrackGenres } = await fetchAllTrackGenres(
                 tracks,
                 null,
@@ -15509,7 +16511,7 @@
         });
 
         const hasLfmUser = !!loadLastFmUsername();
-        const fetchPop = cfFetchPopularity || missingPopCount <= 2000;
+        const fetchPop = cfFetchPopularity || missingPopCount <= 1000;
         const fetchPers = hasLfmUser && (cfFetchLastFm || missingPersCount <= 2000);
         const fetchGlob = fetchPers || cfFetchLastFm || missingGlobCount <= 2000;
 
@@ -17006,14 +18008,19 @@
             for (const track of tracks) {
                 if (track[filterType]) {
                     const d = new Date(track[filterType]);
-                    const ts = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                    let ts;
+                    if (filterType === 'releaseDate') {
+                        ts = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+                    } else {
+                        ts = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+                    }
                     if (!isNaN(ts)) values.push(ts);
                 }
             }
             if (values.length === 0) {
                 const now = new Date();
-                const min = new Date(now.getFullYear() - 5, 0, 1).getTime();
-                const max = now.getTime();
+                const min = Date.UTC(now.getFullYear() - 5, 0, 1);
+                const max = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
                 return { min, max, visualMin: min, visualMax: max, isLog: false };
             }
         } else if (filterType === 'durationMs') {
@@ -17062,9 +18069,9 @@
         if (isNaN(number)) return "";
         if (filterType === 'releaseDate' || filterType === 'addedAt') {
             const date = new Date(number);
-            const month = (date.getMonth() + 1).toString().padStart(2, '0'); 
-            const day = date.getDate().toString().padStart(2, '0');
-            const year = date.getFullYear();
+            const month = (date.getUTCMonth() + 1).toString().padStart(2, '0'); 
+            const day = date.getUTCDate().toString().padStart(2, '0');
+            const year = date.getUTCFullYear();
             return `${year}-${month}-${day}`;
         } else if (filterType === 'durationMs') {
             return formatDuration(number);
@@ -17090,9 +18097,9 @@
             const year = parseInt(isoDateMatch[1]);
             const month = parseInt(isoDateMatch[2]) - 1;
             const day = parseInt(isoDateMatch[3]);
-            const date = new Date(year, month, day);
-            if (isNaN(date.getTime())) return 0; 
-            return date.getTime();
+            const ts = Date.UTC(year, month, day);
+            if (isNaN(ts)) return 0; 
+            return ts;
         }
 
         const dateMatch = formattedNumber.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -17100,9 +18107,9 @@
             const month = parseInt(dateMatch[1]) - 1;
             const day = parseInt(dateMatch[2]);
             const year = parseInt(dateMatch[3]);
-            const date = new Date(year, month, day);
-            if (isNaN(date.getTime())) return 0; 
-            return date.getTime();
+            const ts = Date.UTC(year, month, day);
+            if (isNaN(ts)) return 0; 
+            return ts;
         }
 
         const durationMatch = formattedNumber.match(/^(\d+):(\d+)$/);
@@ -17382,12 +18389,6 @@
         let needsDeferredPersScrobble = false;
         let needsDeferredGlobScrobble = false;
 
-        const versionRegexStrLocal = "(?:\\(|\\[|-).*?\\b";
-        const regexLive = new RegExp(versionRegexStrLocal + "live\\b.*?(?:\\)|\\]|$)", "i");
-        const regexRemix = new RegExp(versionRegexStrLocal + "remix\\b.*?(?:\\)|\\]|$)", "i");
-        const regexAcoustic = new RegExp(versionRegexStrLocal + "acoustic\\b.*?(?:\\)|\\]|$)", "i");
-        const regexInstrumental = new RegExp(versionRegexStrLocal + "instrumental\\b.*?(?:\\)|\\]|$)", "i");
-
         tracks.forEach((track) => {
             track.isRemovedByRange = false;
             track.isRemovedByKeyword = false;
@@ -17416,7 +18417,11 @@
                             hasValue = false;
                         } else {
                             const trackDate = new Date(track[type]);
-                            trackValue = new Date(trackDate.getFullYear(), trackDate.getMonth(), trackDate.getDate()).getTime();
+                            if (type === 'releaseDate') {
+                                trackValue = Date.UTC(trackDate.getUTCFullYear(), trackDate.getUTCMonth(), trackDate.getUTCDate());
+                            } else {
+                                trackValue = Date.UTC(trackDate.getFullYear(), trackDate.getMonth(), trackDate.getDate());
+                            }
                             if (isNaN(trackValue)) hasValue = false;
                         }
                     } else if (type === 'durationMs') {
@@ -17482,10 +18487,10 @@
 
             if (!track.isRemovedByRange && !track.isRemovedByKeyword) {
                 const rawTrackName = track.songTitle || track.name || "";
-                const isLive = regexLive.test(rawTrackName);
-                const isRemix = regexRemix.test(rawTrackName);
-                const isAcoustic = regexAcoustic.test(rawTrackName);
-                const isInstrumental = regexInstrumental.test(rawTrackName);
+                const isLive = STRICT_LIVE_REGEX.test(rawTrackName);
+                const isRemix = STRICT_REMIX_REGEX.test(rawTrackName);
+                const isAcoustic = STRICT_ACOUSTIC_REGEX.test(rawTrackName);
+                const isInstrumental = STRICT_INSTRUMENTAL_REGEX.test(rawTrackName);
 
                 if (cfLiveMode === 'exclude' && isLive) track.isRemovedByStatus = true;
                 if (cfRemixMode === 'exclude' && isRemix) track.isRemovedByStatus = true;
@@ -17661,7 +18666,11 @@
                 if (type === 'releaseDate' || type === 'addedAt') {
                     if (t[type]) {
                         const d = new Date(t[type]);
-                        trackValue = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+                        if (type === 'releaseDate') {
+                            trackValue = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+                        } else {
+                            trackValue = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+                        }
                     }
                 } else if (type === 'durationMs') {
                     trackValue = t.durationMs || 0;
@@ -17902,9 +18911,9 @@
                         v = scaleParams.max;
                     } else {
                         const d = new Date(v);
-                        let snapped = new Date(d.getFullYear(), 0, 1).getTime();
+                        let snapped = Date.UTC(d.getUTCFullYear(), 0, 1);
                         if (snapped < scaleParams.min) {
-                            snapped = new Date(d.getFullYear() + 1, 0, 1).getTime();
+                            snapped = Date.UTC(d.getUTCFullYear() + 1, 0, 1);
                         }
                         v = snapped;
                     }
@@ -17936,7 +18945,7 @@
                         v = scaleParams.max;
                     } else {
                         const d = new Date(v);
-                        v = new Date(d.getFullYear(), 0, 1).getTime();
+                        v = Date.UTC(d.getUTCFullYear(), 0, 1);
                     }
                 }
 
@@ -17958,25 +18967,44 @@
                     const parseDateStrLocal = (val, isMax) => {
                         if (!val) return NaN;
                         let cleanVal = val.toString().trim().replace(/\//g, '-');
+                        
+                        let y, m, d;
                         if (/^\d{4}$/.test(cleanVal)) {
-                            const y = parseInt(cleanVal);
+                            y = parseInt(cleanVal);
                             if (y < 1000 || y > 9999) return NaN;
-                            return isMax 
-                                ? new Date(`${cleanVal}-12-31T23:59:59.999Z`).getTime() 
-                                : new Date(`${cleanVal}-01-01T00:00:00.000Z`).getTime();
+                            m = isMax ? 11 : 0;
+                            d = isMax ? 31 : 1;
+                        } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
+                            const parts = cleanVal.split('-');
+                            y = parseInt(parts[0]);
+                            m = parseInt(parts[1]) - 1;
+                            if (y < 1000 || y > 9999 || m < 0 || m > 11) return NaN;
+                            if (isMax) { m += 1; d = 0; } else { d = 1; }
+                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+                            const parts = cleanVal.split('-');
+                            y = parseInt(parts[0]);
+                            m = parseInt(parts[1]) - 1;
+                            d = parseInt(parts[2]);
+                            if (y < 1000 || y > 9999) return NaN;
+                        } else {
+                            const parsed = new Date(val); 
+                            if (isNaN(parsed.getTime())) return NaN;
+                            const isISO = /^\d{4}-\d{2}-\d{2}/.test(val);
+                            if (isISO) {
+                                y = parsed.getUTCFullYear();
+                                m = parsed.getUTCMonth();
+                                d = parsed.getUTCDate();
+                            } else {
+                                y = parsed.getFullYear();
+                                m = parsed.getMonth();
+                                d = parsed.getDate();
+                            }
+                            if (y < 1000 || y > 9999) return NaN;
                         }
-                        if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
-                            const [y, m] = cleanVal.split('-');
-                            if (parseInt(y) < 1000 || parseInt(y) > 9999 || parseInt(m) < 1 || parseInt(m) > 12) return NaN;
-                            return isMax 
-                                ? new Date(Date.UTC(parseInt(y), parseInt(m), 0, 23, 59, 59, 999)).getTime() 
-                                : new Date(`${cleanVal}-01T00:00:00.000Z`).getTime();
-                        }
-                        const d = new Date(cleanVal);
-                        if (!isNaN(d.getTime()) && d.getFullYear() >= 1000 && d.getFullYear() <= 9999) {
-                            return isMax ? d.setUTCHours(23, 59, 59, 999) : d.setUTCHours(0, 0, 0, 0);
-                        }
-                        return NaN;
+                        
+                        return isMax 
+                            ? Date.UTC(y, m, d, 23, 59, 59, 999) 
+                            : Date.UTC(y, m, d, 0, 0, 0, 0);
                     };
 
                     v1 = parseDateStrLocal(inputMin.value, false);
@@ -20422,34 +21450,56 @@
         });
     }
 
-    const parseFilterDate = (val, isMax) => {
+    const parseFilterDate = (val, isMax, isLocal) => {
         if (!val) return null;
         let cleanVal = val.toString().trim().replace(/\//g, '-');
+        
+        let y, m, d;
         if (/^\d{4}$/.test(cleanVal)) {
+            y = parseInt(cleanVal);
+            m = isMax ? 11 : 0;
+            d = isMax ? 31 : 1;
+        } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
+            const parts = cleanVal.split('-');
+            y = parseInt(parts[0]);
+            m = parseInt(parts[1]) - 1;
+            if (isMax) { m += 1; d = 0; } else { d = 1; }
+        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+            const parts = cleanVal.split('-');
+            y = parseInt(parts[0]);
+            m = parseInt(parts[1]) - 1;
+            d = parseInt(parts[2]);
+        } else {
+            const parsed = new Date(val); 
+            if (isNaN(parsed.getTime())) return null;
+            const isISO = /^\d{4}-\d{2}-\d{2}/.test(val);
+            if (isISO) {
+                y = parsed.getUTCFullYear();
+                m = parsed.getUTCMonth();
+                d = parsed.getUTCDate();
+            } else {
+                y = parsed.getFullYear();
+                m = parsed.getMonth();
+                d = parsed.getDate();
+            }
+        }
+
+        if (isLocal) {
             return isMax 
-                ? new Date(`${cleanVal}-12-31T23:59:59.999Z`).getTime() 
-                : new Date(`${cleanVal}-01-01T00:00:00.000Z`).getTime();
-        }
-        if (/^\d{4}-\d{2}$/.test(cleanVal)) {
-            const [y, m] = cleanVal.split('-');
+                ? new Date(y, m, d, 23, 59, 59, 999).getTime()
+                : new Date(y, m, d, 0, 0, 0, 0).getTime();
+        } else {
             return isMax 
-                ? new Date(Date.UTC(parseInt(y), parseInt(m), 0, 23, 59, 59, 999)).getTime() 
-                : new Date(`${cleanVal}-01T00:00:00.000Z`).getTime();
+                ? Date.UTC(y, m, d, 23, 59, 59, 999)
+                : Date.UTC(y, m, d, 0, 0, 0, 0);
         }
-        const d = new Date(cleanVal);
-        if (!isNaN(d.getTime())) {
-            if (isMax) d.setUTCHours(23, 59, 59, 999);
-            else d.setUTCHours(0, 0, 0, 0);
-            return d.getTime();
-        }
-        return null;
     };
 
     if (filters.minAddedDate || filters.maxAddedDate || filters.addedWithinDays) {
         if (!isHeadless) mainButton.innerText = "Filtering Date Added...";
         
-        const minMs = parseFilterDate(filters.minAddedDate, false);
-        const maxMs = parseFilterDate(filters.maxAddedDate, true);
+        const minMs = parseFilterDate(filters.minAddedDate, false, true);
+        const maxMs = parseFilterDate(filters.maxAddedDate, true, true);
 
         filteredTracks = filteredTracks.filter(t => {
             if (!t.addedAt) return false; 
@@ -20497,8 +21547,8 @@
                 if (isNaN(releaseMs)) return false;
 
                 if (filters.minYear || filters.maxYear) {
-                    const minMs = parseFilterDate(filters.minYear, false);
-                    const maxMs = parseFilterDate(filters.maxYear, true);
+                    const minMs = parseFilterDate(filters.minYear, false, false);
+                    const maxMs = parseFilterDate(filters.maxYear, true, false);
 
                     if (minMs !== null && releaseMs < minMs) return false;
                     if (maxMs !== null && releaseMs > maxMs) return false;
@@ -22325,7 +23375,7 @@
         let rawDetectedGenres = currentFilters.detectedGenres ? [...currentFilters.detectedGenres] : [];
         let detectedGenres = [...rawDetectedGenres];
 
-        let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}');
+        let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
 
         const normalizeList = (list) => {
             if (!list || list.length === 0) return [];
@@ -22459,6 +23509,7 @@
                 if (gfSources.spotify_track) genres.push(...(data.spotify_track_genres || []));
                 if (gfSources.lastfm_track) genres.push(...(data.lastfm_track_genres || []));
                 if (gfSources.lastfm_artist) genres.push(...(data.lastfm_artist_genres || []));
+                if (gfSources.everynoise_artist) genres.push(...(data.everynoise_artist_genres || []));
                 if (gfSources.deezer) {
                     genres.push(...(data.deezer_genres || []));
                     genres.push(...(data.apple_music_genres || []));
@@ -22495,6 +23546,7 @@
                     if (gfSources.spotify_track) combined.push(...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
                     if (gfSources.lastfm_track) combined.push(...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
                     if (gfSources.lastfm_artist) combined.push(...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
+                    if (gfSources.everynoise_artist) combined.push(...(rawData.everynoise_artist_genres || []).map(g => ({ name: g, source: 'everynoise' })));
                     if (gfSources.deezer) {
                         combined.push(...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
                         combined.push(...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
@@ -23811,26 +24863,51 @@
                     const parseDateStr = (val, isMax) => {
                         if (!val) return NaN;
                         let cleanVal = val.trim().replace(/\//g, '-');
+                        
+                        let y, m, d;
                         if (/^\d{4}$/.test(cleanVal)) {
-                            const y = parseInt(cleanVal);
+                            y = parseInt(cleanVal);
                             if (y < 1000 || y > 9999) return NaN;
+                            m = isMax ? 11 : 0;
+                            d = isMax ? 31 : 1;
+                        } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
+                            const parts = cleanVal.split('-');
+                            y = parseInt(parts[0]);
+                            m = parseInt(parts[1]) - 1;
+                            if (y < 1000 || y > 9999 || m < 0 || m > 11) return NaN;
+                            if (isMax) { m += 1; d = 0; } else { d = 1; }
+                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+                            const parts = cleanVal.split('-');
+                            y = parseInt(parts[0]);
+                            m = parseInt(parts[1]) - 1;
+                            d = parseInt(parts[2]);
+                            if (y < 1000 || y > 9999) return NaN;
+                        } else {
+                            const parsed = new Date(val); 
+                            if (isNaN(parsed.getTime())) return NaN;
+                            const isISO = /^\d{4}-\d{2}-\d{2}/.test(val);
+                            if (isISO) {
+                                y = parsed.getUTCFullYear();
+                                m = parsed.getUTCMonth();
+                                d = parsed.getUTCDate();
+                            } else {
+                                y = parsed.getFullYear();
+                                m = parsed.getMonth();
+                                d = parsed.getDate();
+                            }
+                            if (y < 1000 || y > 9999) return NaN;
+                        }
+                        
+                        const isLocal = minId === 'filter-min-addedAt';
+                        if (isLocal) {
                             return isMax 
-                                ? new Date(`${cleanVal}-12-31T23:59:59.999Z`).getTime() 
-                                : new Date(`${cleanVal}-01-01T00:00:00.000Z`).getTime();
-                        }
-                        if (/^\d{4}-\d{2}$/.test(cleanVal)) {
-                            const [y, m] = cleanVal.split('-');
-                            if (parseInt(y) < 1000 || parseInt(y) > 9999 || parseInt(m) < 1 || parseInt(m) > 12) return NaN;
+                                ? new Date(y, m, d, 23, 59, 59, 999).getTime()
+                                : new Date(y, m, d, 0, 0, 0, 0).getTime();
+                        } else {
                             return isMax 
-                                ? new Date(Date.UTC(parseInt(y), parseInt(m), 0, 23, 59, 59, 999)).getTime() 
-                                : new Date(`${cleanVal}-01T00:00:00.000Z`).getTime();
+                                ? Date.UTC(y, m, d, 23, 59, 59, 999)
+                                : Date.UTC(y, m, d, 0, 0, 0, 0);
                         }
-                        const d = new Date(cleanVal);
-                        if (!isNaN(d.getTime())) {
-                            if (d.getFullYear() < 1000 || d.getFullYear() > 9999) return NaN;
-                            return isMax ? d.setUTCHours(23, 59, 59, 999) : d.setUTCHours(0, 0, 0, 0);
-                        }
-                        return NaN;
                     };
                     
                     const minVal = parseDateStr(minEl.value, false);
@@ -25515,7 +26592,7 @@
           <div style="background-color: rgba(241, 94, 108, 0.1); border: 1px solid rgba(241, 94, 108, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 5px;">
               <p style="margin: 0; color: #ffbaba; font-size: 13px; line-height: 1.4;">
                   <strong>Note:</strong> Enabling these will slow down how fast the Custom Filter modal opens for large playlists. Keep them disabled for faster loading.<br><br>
-                  <em>If a playlist has 2000 or fewer uncached tracks for a metric, it will automatically be fetched upfront regardless of these settings to provide a better experience.</em>
+                  <em>If a playlist has 2000 or fewer uncached tracks for a metric (1000 for popularity), it will automatically be fetched upfront regardless of these settings to provide a better experience.</em>
               </p>
           </div>
       `;
@@ -25552,6 +26629,7 @@
               { id: "spotify_track", label: "Spotify (Track Genres)", checked: currentSources.spotify_track },
               { id: "lastfm_track", label: "Last.fm (Track Tags)", checked: currentSources.lastfm_track },
               { id: "lastfm_artist", label: "Last.fm (Artist Tags)", checked: currentSources.lastfm_artist },
+              { id: "everynoise_artist", label: "Every Noise (Artist Tags)", checked: currentSources.everynoise_artist },
               { 
                   id: "deezer", 
                   label: "Deezer (Album Genres)", 
@@ -25568,36 +26646,38 @@
 
   async function showGenreFilterModal(tracks, initialTrackGenreMap, rawGenreData, sourceUri) {
     const abortController = new AbortController();
-    let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false}');
+    let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
     let activeTitleSources = { ...gfSources };
+    const originallyFetchedSources = { ...gfSources };
 
-    const getDynamicGenreTitle = (sources) => {
-        const active = [];
-        if (sources.spotify_track || sources.spotify_artist) active.push("Spotify");
-        if (sources.lastfm_track || sources.lastfm_artist) active.push("Last.fm");
-        if (sources.deezer) active.push("Deezer");
+    const getDynamicGenreSourcesHtml = (activeSources, fetchedSources) => {
+        const groups = [
+            { label: "Spotify (Track)", keys: ["spotify_track"] },
+            { label: "Spotify (Artist)", keys: ["spotify_artist"] },
+            { label: "Last.fm (Track)", keys: ["lastfm_track"] },
+            { label: "Last.fm (Artist)", keys: ["lastfm_artist"] },
+            { label: "Deezer (Album)", keys: ["deezer"] },
+            { label: "EveryNoise (Artist)", keys: ["everynoise_artist"] }
+        ];
 
-        if (active.length === 0) return "No Genre Sources Selected";
+        const activePills = [];
 
-        if (active.length === 1) {
-            if (active[0] === "Spotify") {
-                if (sources.spotify_track && !sources.spotify_artist) return "Genres from Spotify Tracks";
-                if (!sources.spotify_track && sources.spotify_artist) return "Genres from Spotify Artists";
-                return "Genres from Spotify";
+        groups.forEach(group => {
+            const activeKeys = group.keys.filter(k => activeSources[k]);
+            if (activeKeys.length > 0) {
+                const hasPending = activeKeys.some(k => !fetchedSources[k]);
+                
+                if (hasPending) {
+                    activePills.push(`<span title="Source enabled but not fetched. Re-run filter to apply." style="background: rgba(233, 20, 41, 0.15); border: 1px solid rgba(233, 20, 41, 0.4); color: #ffbaba; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; cursor: help;">${group.label}</span>`);
+                } else {
+                    activePills.push(`<span style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.05); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;">${group.label}</span>`);
+                }
             }
-            if (active[0] === "Last.fm") {
-                if (sources.lastfm_track && !sources.lastfm_artist) return "Genres from Last.fm Tracks";
-                if (!sources.lastfm_track && sources.lastfm_artist) return "Genres from Last.fm Artists";
-                return "Genres from Last.fm";
-            }
-            return "Genres from Deezer";
-        }
+        });
 
-        if (active.length === 2) {
-            return `Genres from ${active[0]} and ${active[1]}`;
-        }
+        if (activePills.length === 0) return `<span style="color: #b3b3b3; font-size: 11px;">None</span>`;
 
-        return `Genres from ${active.slice(0, -1).join(', ')}, and ${active[active.length - 1]}`;
+        return activePills.join('');
     };
 
     if (!genrePlaylistsCache) {
@@ -25630,6 +26710,7 @@
                 if (gfSources.spotify_track) combined.push(...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
                 if (gfSources.lastfm_track) combined.push(...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
                 if (gfSources.lastfm_artist) combined.push(...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
+                if (gfSources.everynoise_artist) combined.push(...(rawData.everynoise_artist_genres || []).map(g => ({ name: g, source: 'everynoise' })));
                 if (gfSources.deezer) {
                     combined.push(...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
                     combined.push(...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
@@ -25661,7 +26742,14 @@
         trackGenreMap.forEach(genres => {
             if (genres.length > 0) tracksWithGenresCount++;
         });
-        totalTracksStat.textContent = `Total tracks: ${tracksWithGenresCount} (${tracks.length})`;
+        totalTracksStat.innerHTML = `
+            <span class="tooltip-container" style="cursor: help;">
+                Total tracks: ${tracksWithGenresCount} (${tracks.length})
+                <span class="custom-tooltip" style="text-align: center; white-space: nowrap; font-weight: normal; z-index: 10000;">
+                    Tracks with genres: ${tracksWithGenresCount}<br>Total tracks: ${tracks.length}
+                </span>
+            </span>
+        `;
     };
 
     let canModifyCurrentPlaylist = false;
@@ -25785,9 +26873,9 @@
       .genre-filter-modal .setting-label svg { margin-left: 0 !important; margin-bottom: 1px !important; }
       .genre-filter-modal .sort-type-select { padding: 6px 10px !important; border-radius: 6px !important; border: 1px solid #444 !important; background: #333 !important; color: white !important; width: 100% !important; cursor: pointer !important; font-size: 14px !important; }
       .tooltip-container { position: relative; display: inline-block; }
-      .custom-tooltip { visibility: hidden; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
+      .custom-tooltip { visibility: hidden; opacity: 0; transition: opacity 0.1s ease, visibility 0s linear 0.1s; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
       .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
-      .tooltip-container:hover .custom-tooltip { visibility: visible; }
+      .tooltip-container:hover .custom-tooltip { visibility: visible; opacity: 1; transition: opacity 0.1s ease 0.1s, visibility 0s linear 0.1s; }
       .genre-filter-modal .genre-stats { display: flex; justify-content: center; align-items: center; color: #c1c1c1; font-size: 14px; background-color: #252525; padding: 10px 0; border: 1px solid #343434; border-top: none; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-bottom: 5px; position: relative; z-index: 1; flex-shrink: 0; }
       .genre-filter-modal .genre-stats span { margin: 0 25px; }
       .genre-modal-title { font-size: 15px; font-weight: 400; color: white; flex-shrink: 0; }
@@ -25797,6 +26885,11 @@
       .top-icon-btn svg { display: block !important; margin: 0 !important; padding: 0 !important; transform: none !important; }
       #closeGenreModalBtn svg { width: 17px !important; height: 17px !important; }
       #gfSettingsBtn svg { width: 19px !important; height: 19px !important; }
+      .gf-help-icon-wrapper { position: absolute; right: 16px; display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #777; color: #777; cursor: help; font-size: 10px; font-weight: bold; transition: all 0.2s; }
+      .gf-help-icon-wrapper:hover { color: #fff; border-color: #fff; }
+      .gf-help-icon-tooltip { visibility: hidden; opacity: 0; transition: opacity 0.1s ease, visibility 0s linear 0.1s; position: absolute; z-index: 100; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; width: max-content; bottom: 100%; right: -6px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; text-align: left; font-weight: normal; }
+      .gf-help-icon-tooltip::after { content: ""; position: absolute; top: 100%; right: 9px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+      .gf-help-icon-wrapper:hover .gf-help-icon-tooltip { visibility: visible; opacity: 1; transition: opacity 0.1s ease 0.1s, visibility 0s linear 0.1s; }
     </style>
     <div class="genre-filter-modal" style="position: relative; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
     <div class="top-right-controls">
@@ -25809,14 +26902,14 @@
 
     <div class="main-trackCreditsModal-mainSection" style="padding-top: 0px !important;">
         <div style="display: flex; flex-direction: column; gap: 15px; flex: 1; min-height: 0;">
-        <h2 class="genre-modal-title">
-        <span id="gf-dynamic-title-text">${getDynamicGenreTitle(activeTitleSources)}</span>
-        <span style="font-size: 0.85em; font-weight: normal; opacity: 0.5; margin-left: 8px;">
-        💡 Left-click to include • Right-click to exclude
-        </span>
-        </h2>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: -5px;">
+                <span style="color: #b3b3b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Sources:</span>
+                <div id="gf-dynamic-sources-container" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                        ${getDynamicGenreSourcesHtml(activeTitleSources, originallyFetchedSources)}
+                </div>
+            </div>
             <div class="genre-header">
-            <div class="search-bar-container">
+                <div class="search-bar-container">
                     ${searchIconSvg}
                     <input type="text" class="search-bar" placeholder="Search genres...">
                     <button class="clear-search-button">&times;</button>
@@ -25831,6 +26924,13 @@
             <div class="genre-stats">
                 <span id="total-tracks-stat">Total tracks: 0</span>
                 <span id="filtered-tracks-stat">Filtered tracks: 0</span>
+                <div class="gf-help-icon-wrapper">
+                    ?
+                    <div class="gf-help-icon-tooltip">
+                        Include: <b style="color: #7ad891;">Left-click</b><br>
+                        Exclude: <b style="color: #e57373;">Right-click</b>
+                    </div>
+                </div>
             </div>
             <div class="settings-container">
                 <div class="settings-box">
@@ -25899,18 +26999,15 @@
             gfSources = newSources;
             localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(gfSources));
 
-            for (const key in activeTitleSources) {
-                if (activeTitleSources[key] === true && newSources[key] === false) {
-                    activeTitleSources[key] = false;
-                }
-            }
+            activeTitleSources = { ...newSources };
             
-            const titleTextSpan = modalContainer.querySelector('#gf-dynamic-title-text');
-            if (titleTextSpan) titleTextSpan.textContent = getDynamicGenreTitle(activeTitleSources);
+            const sourcesContainer = modalContainer.querySelector('#gf-dynamic-sources-container');
+            if (sourcesContainer) sourcesContainer.innerHTML = getDynamicGenreSourcesHtml(activeTitleSources, originallyFetchedSources);
 
             rebuildGenreMap();
             updateGenreButtons();
             updateFilteredTracksCount();
+            showNotification("Settings saved. Close and reopen the Genre Filter to apply changes.", "warning");
         });
     });
     preventDragCloseModal(abortController.signal);
@@ -25989,6 +27086,7 @@
                 if (gfSources.spotify_track) rawGenres.push(...(rawData.spotify_track_genres || []));
                 if (gfSources.lastfm_track) rawGenres.push(...(rawData.lastfm_track_genres || []));
                 if (gfSources.lastfm_artist) rawGenres.push(...(rawData.lastfm_artist_genres || []));
+                if (gfSources.everynoise_artist) rawGenres.push(...(rawData.everynoise_artist_genres || []));
                 if (gfSources.deezer) {
                     rawGenres.push(...(rawData.deezer_genres || []));
                     rawGenres.push(...(rawData.apple_music_genres || []));
@@ -26039,6 +27137,7 @@
                 if (gfSources.spotify_track) rawGenres.push(...(rawData.spotify_track_genres || []));
                 if (gfSources.lastfm_track) rawGenres.push(...(rawData.lastfm_track_genres || []));
                 if (gfSources.lastfm_artist) rawGenres.push(...(rawData.lastfm_artist_genres || []));
+                if (gfSources.everynoise_artist) rawGenres.push(...(rawData.everynoise_artist_genres || []));
                 if (gfSources.deezer) {
                     rawGenres.push(...(rawData.deezer_genres || []));
                     rawGenres.push(...(rawData.apple_music_genres || []));
@@ -26071,7 +27170,14 @@
     trackGenreMap.forEach(genres => {
       if (genres.length > 0) tracksWithGenresCount++;
     });
-    totalTracksStat.textContent = `Total tracks: ${tracksWithGenresCount} (${tracks.length})`;
+    totalTracksStat.innerHTML = `
+        <span class="tooltip-container" style="cursor: help;">
+            Total tracks: ${tracksWithGenresCount} (${tracks.length})
+            <span class="custom-tooltip" style="text-align: center; white-space: nowrap; font-weight: normal; z-index: 10000;">
+                Tracks with genres: ${tracksWithGenresCount}<br>Total tracks: ${tracks.length}
+            </span>
+        </span>
+    `;
     filteredTracksStat.textContent = `Filtered tracks: 0`;
 
     function updateFilteredTracksCount() {
@@ -26872,16 +27978,23 @@
   }
 
   async function fetchAllTrackGenres(tracks, updateProgressCallback = null, onGenresReadyCallback = null, requestedSources = null) {
-    const reqSources = requestedSources ? { ...requestedSources } : {
-        spotify_track: true,
-        spotify_artist: !SPOTIFY_TRACK_GENRES_WORKING,
-        lastfm_track: !SPOTIFY_TRACK_GENRES_WORKING,
-        lastfm_artist: !SPOTIFY_TRACK_GENRES_WORKING,
-        deezer: !SPOTIFY_TRACK_GENRES_WORKING,
-        apple_music: !SPOTIFY_TRACK_GENRES_WORKING
-    };
+    let reqSources;
+    if (requestedSources) {
+        reqSources = { ...requestedSources };
+    } else {
+        const savedSettings = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+        reqSources = { ...savedSettings };
+        if (!SPOTIFY_TRACK_GENRES_WORKING) {
+            reqSources.spotify_artist = true;
+            reqSources.lastfm_track = true;
+            reqSources.lastfm_artist = true;
+            reqSources.deezer = true;
+            reqSources.everynoise_artist = true;
+        }
+    }
     reqSources.apple_music = reqSources.deezer;
-    const needsExternal = reqSources.lastfm_track || reqSources.lastfm_artist || reqSources.deezer || reqSources.apple_music || reqSources.spotify_artist;
+    const needsExternal = reqSources.lastfm_track || reqSources.lastfm_artist || reqSources.deezer || reqSources.apple_music || reqSources.spotify_artist || reqSources.everynoise_artist;
+    const needsTurso = reqSources.lastfm_track || reqSources.lastfm_artist || reqSources.deezer || reqSources.apple_music || reqSources.spotify_artist;
 
     const updateProgress = (msg) => {
         if (updateProgressCallback) updateProgressCallback(msg);
@@ -26901,15 +28014,11 @@
         return data;
     };
 
-    const safeVal = (val) => (val !== null && val !== undefined) ? val : -1;
-
-    const justFetchedTrackIds = new Set();
-
     async function fetchSingleTrackGenresFromApis(trackUri, preFetchedTrackDetails = null, deezerGatewayUrl = null, existingData = null) {
         if (Spicetify.URI.isLocal(trackUri)) {
             return {
                 success: true, isrc: null, canSave: false,
-                data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], apple_music_genres: [], release_date: null, _lfm_track_checked: reqSources.lastfm_track, _lfm_artist_checked: reqSources.lastfm_artist, _deezer_checked: reqSources.deezer, _sp_artist_checked: reqSources.spotify_artist }
+                data: { spotify_artist_genres: [], lastfm_track_genres: [], lastfm_artist_genres: [], deezer_genres: [], apple_music_genres: [], everynoise_artist_genres: [], release_date: null, _lfm_track_checked: reqSources.lastfm_track, _lfm_artist_checked: reqSources.lastfm_artist, _deezer_checked: reqSources.deezer, _sp_artist_checked: reqSources.spotify_artist, _everynoise_checked: reqSources.everynoise_artist }
             };
         }
         const trackId = trackUri.split(":")[2];
@@ -26935,6 +28044,7 @@
                         lastfm_artist_genres: [], 
                         deezer_genres: [],
                         apple_music_genres: [],
+                        everynoise_artist_genres: [],
                         release_date: null,
                         duration_ms: -1,
                         release_date_text: "N/A",
@@ -26942,19 +28052,64 @@
                         _lfm_track_checked: reqSources.lastfm_track || existingData?._lfm_track_checked || false,
                         _lfm_artist_checked: reqSources.lastfm_artist || existingData?._lfm_artist_checked || false,
                         _deezer_checked: reqSources.deezer || existingData?._deezer_checked || false,
-                        _sp_artist_checked: reqSources.spotify_artist || existingData?._sp_artist_checked || false
+                        _sp_artist_checked: reqSources.spotify_artist || existingData?._sp_artist_checked || false,
+                        _everynoise_checked: reqSources.everynoise_artist || existingData?._everynoise_checked || false
                     } 
                 };
             }
             
             const isrc = trackDetails.external_ids?.isrc || null;
 
-            const artistIds = [...new Set(trackDetails.artists.map(artist => artist.uri.split(":")[2]))];
+            const artistIds = [...new Set(trackDetails.artists.map(artist => {
+                if (artist.uri) return artist.uri.split(":")[2];
+                if (artist.id) return artist.id;
+                return null;
+            }).filter(Boolean))];
             const spotifyGenres = new Set(existingData?.spotify_artist_genres || []);
             const artistIdsToFetch = [];
             
+            let everyNoiseGenres = new Set(existingData?.everynoise_artist_genres || []);
+            const needsEveryNoise = reqSources.everynoise_artist && !existingData?._everynoise_checked;
+
             const needsSpotifyArtist = reqSources.spotify_artist && !existingData?._sp_artist_checked;
     
+            if (needsEveryNoise) {
+                const enIdsToFetch = [];
+                for (const id of artistIds) {
+                    if (everyNoiseCache.has(id)) {
+                        everyNoiseCache.get(id).forEach(genre => everyNoiseGenres.add(genre));
+                    } else {
+                        const dbCached = await idb.get('everyNoiseArtistTags', id, CACHE_EXPIRE_GENRES);
+                        if (dbCached) {
+                            everyNoiseCache.set(id, dbCached);
+                            dbCached.forEach(genre => everyNoiseGenres.add(genre));
+                        } else {
+                            enIdsToFetch.push(id);
+                        }
+                    }
+                }
+                if (enIdsToFetch.length > 0) {
+                    try {
+                        const idsString = enIdsToFetch.join(',');
+                        const targetUrl = `https://everynoise.com/api/${idsString}`;
+                        const res = await fetch(`${LFM_GATEWAY_URL}${encodeURIComponent(targetUrl)}`);
+                        if (res.ok) {
+                            const data = await res.json();
+                            enIdsToFetch.forEach(artistId => {
+                                let rawGenres = Array.isArray(data) ? data : (data[artistId] || []);
+                                everyNoiseCache.set(artistId, rawGenres);
+                                idb.set('everyNoiseArtistTags', artistId, rawGenres);
+                                rawGenres.forEach(genre => everyNoiseGenres.add(genre));
+                            });
+                        } else {
+                            isCompleteSuccess = false;
+                        }
+                    } catch (e) {
+                        isCompleteSuccess = false;
+                    }
+                }
+            }
+
             for (const id of artistIds) {
                 if (artistGenreCache.has(id)) {
                     artistGenreCache.get(id).forEach(genre => spotifyGenres.add(genre));
@@ -27059,11 +28214,13 @@
                 lastfm_artist_genres: lfmArtistGenres,
                 deezer_genres: deezer_genres,
                 apple_music_genres: apple_music_genres,
+                everynoise_artist_genres: Array.from(everyNoiseGenres),
                 release_date: releaseDateInDays,
                 _lfm_track_checked: reqSources.lastfm_track || existingData?._lfm_track_checked || false,
                 _lfm_artist_checked: reqSources.lastfm_artist || existingData?._lfm_artist_checked || false,
                 _deezer_checked: reqSources.deezer || existingData?._deezer_checked || false,
-                _sp_artist_checked: reqSources.spotify_artist || existingData?._sp_artist_checked || false
+                _sp_artist_checked: reqSources.spotify_artist || existingData?._sp_artist_checked || false,
+                _everynoise_checked: reqSources.everynoise_artist || existingData?._everynoise_checked || false
             };
             
             if (existingData?.spotify_track_genres) {
@@ -27086,14 +28243,7 @@
 
     const todayInDays = Math.floor(Date.now() / 86400000);
 
-    const isDataStale = (cached) => {
-        if (!cached) return true;
-
-        if (reqSources.lastfm_track && !cached.lastfm_track_genres?.length && !cached._lfm_track_checked) return true;
-        if (reqSources.lastfm_artist && !cached.lastfm_artist_genres?.length && !cached._lfm_artist_checked) return true;
-        if (reqSources.deezer && !cached.deezer_genres?.length && !cached._deezer_checked) return true;
-        if (reqSources.spotify_artist && !cached.spotify_artist_genres?.length && !cached._sp_artist_checked) return true;
-
+    const isStaleByAge = (cached) => {
         const daysSinceLastUpdate = cached.updated_at ? (todayInDays - cached.updated_at) : 9999;
         if (!cached.release_date) return false;
 
@@ -27104,26 +28254,40 @@
         if (daysSinceLastUpdate < refetchCooldown) return false;
         if (daysSinceRelease < 30) return true;
 
+        const allGenresEmpty = (!cached.spotify_artist_genres?.length) &&
+                               (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
+                               (!cached.deezer_genres?.length) &&
+                               (!cached.apple_music_genres?.length) &&
+                               (!cached.everynoise_artist_genres?.length);
+
+        if (allGenresEmpty && daysSinceLastUpdate > 180) return true;
+        if (allGenresEmpty && daysSinceRelease < 70) return true;
+
+        let sourceCount = 0;
+        if (cached.spotify_artist_genres?.length > 0) sourceCount++;
+        if (cached.lastfm_track_genres?.length > 0 || cached.lastfm_artist_genres?.length > 0) sourceCount++;
+        if (cached.deezer_genres?.length > 0) sourceCount++;
+        if (cached.apple_music_genres?.length > 0) sourceCount++;
+        if (cached.everynoise_artist_genres?.length > 0) sourceCount++;
+
+        if (sourceCount === 1 && daysSinceRelease < 40) return true;
+
+        return false;
+    };
+
+    const isDataStale = (cached) => {
+        if (!cached) return true;
+
+        if (reqSources.lastfm_track && !cached.lastfm_track_genres?.length && !cached._lfm_track_checked) return true;
+        if (reqSources.lastfm_artist && !cached.lastfm_artist_genres?.length && !cached._lfm_artist_checked) return true;
+        if (reqSources.deezer && !cached.deezer_genres?.length && !cached._deezer_checked) return true;
+        if (reqSources.spotify_artist && !cached.spotify_artist_genres?.length && !cached._sp_artist_checked) return true;
+        if (reqSources.everynoise_artist && !cached.everynoise_artist_genres?.length && !cached._everynoise_checked) return true;
+
         if (!needsExternal) {
             return false;
         } else {
-            const allGenresEmpty = (!cached.spotify_artist_genres?.length) &&
-                                   (!cached.lastfm_track_genres?.length && !cached.lastfm_artist_genres?.length) &&
-                                   (!cached.deezer_genres?.length) &&
-                                   (!cached.apple_music_genres?.length);
-
-            if (allGenresEmpty && daysSinceLastUpdate > 180) return true;
-            if (allGenresEmpty && daysSinceRelease < 70) return true;
-
-            let sourceCount = 0;
-            if (cached.spotify_artist_genres?.length > 0) sourceCount++;
-            if (cached.lastfm_track_genres?.length > 0 || cached.lastfm_artist_genres?.length > 0) sourceCount++;
-            if (cached.deezer_genres?.length > 0) sourceCount++;
-            if (cached.apple_music_genres?.length > 0) sourceCount++;
-
-            if (sourceCount === 1 && daysSinceRelease < 40) return true;
-
-            return false;
+            return isStaleByAge(cached);
         }
     };
 
@@ -27141,7 +28305,7 @@
     });
 
     let cachedGenresByUri = new Map();
-    if (urisNotInSession.length > 0 && needsExternal) {
+    if (urisNotInSession.length > 0 && needsTurso) {
         cachedGenresByUri = await getGenresFromTurso(urisNotInSession, 'ids');
         cachedGenresByUri.forEach(val => {
             val._lfm_track_checked = true;
@@ -27169,7 +28333,7 @@
     const tracksWithIsrcs = []; 
     
     if (tracksToFetch.length > 0) {
-        if (needsExternal) {
+        if (needsTurso) {
             updateProgress("ISRCs...");
             const CHUNK_SIZE = 500;
             let processedCount = 0;
@@ -27186,19 +28350,20 @@
                         tracksWithIsrcs.push({
                             uri: t.uri,
                             isrc: meta?.isrc || null,
-                            details: null
+                            details: null,
+                            originalTrack: t
                         });
                     });
                 } catch (error) {
                     console.error(`[Sort-Play] Failed to fetch fast ISRCs for genre lookup:`, error);
-                    chunk.forEach(t => tracksWithIsrcs.push({ uri: t.uri, isrc: null, details: null }));
+                    chunk.forEach(t => tracksWithIsrcs.push({ uri: t.uri, isrc: null, details: null, originalTrack: t }));
                 }
                 
                 processedCount += chunk.length;
                 updateProgress(`ISRCs ${Math.round((processedCount / tracksToFetch.length) * 100)}%`);
             }
         } else {
-            tracksToFetch.forEach(t => tracksWithIsrcs.push({ uri: t.uri, isrc: null, details: null }));
+            tracksToFetch.forEach(t => tracksWithIsrcs.push({ uri: t.uri, isrc: null, details: null, originalTrack: t }));
         }
     }
 
@@ -27214,7 +28379,7 @@
         }
     });
 
-    if (isrcsNotInSession.length > 0 && needsExternal) {
+    if (isrcsNotInSession.length > 0 && needsTurso) {
         updateProgress("Linking...");
         const tursoResults = await getGenresFromTurso(isrcsNotInSession, 'isrcs');
         tursoResults.forEach((val, key) => {
@@ -27250,33 +28415,37 @@
             const uniqueLfmArtistNames = new Set();
 
             tracksNeedingExternalFetch.forEach(item => {
-                if (item.details && item.details.artists) {
-                    item.details.artists.forEach(artist => {
-                        if (artist.uri) {
-                            const artistId = artist.uri.split(':')[2];
-                            if (artistId && !artistGenreCache.has(artistId)) {
+                const trackObj = item.originalTrack;
+                if (trackObj && trackObj.artistUris) {
+                    trackObj.artistUris.forEach(uri => {
+                        if (uri) {
+                            const artistId = uri.split(':')[2];
+                            if (artistId) {
                                 uniqueArtistIdsForCache.add(artistId);
                             }
                         }
                     });
-                    
-                    const lfmArtistName = item.details.artists[0]?.name;
-                    if (lfmArtistName && !lastfmArtistTagsCache.has(lfmArtistName)) {
-                        uniqueLfmArtistNames.add(lfmArtistName);
-                    }
+                }
+                const lfmArtistName = trackObj?.artistName || trackObj?.artists?.[0]?.name;
+                if (lfmArtistName) {
+                    uniqueLfmArtistNames.add(lfmArtistName);
                 }
             });
 
             const artistIdsForCacheArray = Array.from(uniqueArtistIdsForCache);
             if (artistIdsForCacheArray.length > 0) {
-                const cachedSpArtists = await idb.getMany('artistGenres', artistIdsForCacheArray, CACHE_EXPIRE_GENRES);
-                cachedSpArtists.forEach((val, key) => artistGenreCache.set(key, val));
+                const spIdsToGetFromIdb = artistIdsForCacheArray.filter(id => !artistGenreCache.has(id));
+                if (spIdsToGetFromIdb.length > 0) {
+                    const cachedSpArtists = await idb.getMany('artistGenres', spIdsToGetFromIdb, CACHE_EXPIRE_GENRES);
+                    cachedSpArtists.forEach((val, key) => artistGenreCache.set(key, val));
+                }
             }
 
             if (reqSources.lastfm_artist || reqSources.lastfm_track) {
                 const lfmArtistNamesArray = Array.from(uniqueLfmArtistNames);
-                if (lfmArtistNamesArray.length > 0) {
-                    const cachedLfmArtists = await idb.getMany('lastfmArtistTags', lfmArtistNamesArray, CACHE_EXPIRE_GENRES);
+                const lfmNamesToGetFromIdb = lfmArtistNamesArray.filter(name => !lastfmArtistTagsCache.has(name));
+                if (lfmNamesToGetFromIdb.length > 0) {
+                    const cachedLfmArtists = await idb.getMany('lastfmArtistTags', lfmNamesToGetFromIdb, CACHE_EXPIRE_GENRES);
                     cachedLfmArtists.forEach((val, key) => lastfmArtistTagsCache.set(key, val));
                 }
             }
@@ -27312,9 +28481,121 @@
                 }
             }
 
+            if (reqSources.everynoise_artist && artistIdsForCacheArray.length > 0) {
+                const enIdsToGetFromIdb = artistIdsForCacheArray.filter(id => !everyNoiseCache.has(id));
+                if (enIdsToGetFromIdb.length > 0) {
+                    const cachedEnArtists = await idb.getMany('everyNoiseArtistTags', enIdsToGetFromIdb, CACHE_EXPIRE_GENRES);
+                    cachedEnArtists.forEach((val, key) => everyNoiseCache.set(key, val));
+                }
+                
+                const enIdsToFetch = artistIdsForCacheArray.filter(id => !everyNoiseCache.has(id));
+                if (enIdsToFetch.length > 0) {
+                    for (let i = 0; i < enIdsToFetch.length; i += 50) {
+                        updateProgress(`ENAO ${Math.round((i / enIdsToFetch.length) * 100)}%`);
+                        const batch = enIdsToFetch.slice(i, i + 50);
+                        try {
+                            const idsString = batch.join(',');
+                            const targetUrl = `https://everynoise.com/api/${idsString}`;
+                            const res = await fetch(`${LFM_GATEWAY_URL}${encodeURIComponent(targetUrl)}`);
+                            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                            const data = await res.json();
+                            
+                            batch.forEach(artistId => {
+                                let rawGenres = Array.isArray(data) ? data : (data[artistId] || []);
+                                everyNoiseCache.set(artistId, rawGenres);
+                                idb.set('everyNoiseArtistTags', artistId, rawGenres);
+                            });
+                        } catch (error) {
+                            console.warn(`[Sort-Play] Error pre-fetching EveryNoise genres:`, error);
+                            batch.forEach(artistId => {
+                                everyNoiseCache.set(artistId, []);
+                                idb.set('everyNoiseArtistTags', artistId, []);
+                            });
+                        }
+                    }
+                }
+            }
+
             const totalToFetch = tracksNeedingExternalFetch.length;
             let fetchedCount = 0;
             const sharedQueue = [...tracksNeedingExternalFetch];
+
+            const processItemResult = async (item, gatewayUrl = null) => {
+                const existingData = sessionGenreCache.get(item.uri) || cachedGenresByIsrc.get(item.isrc) || null;
+                let wasStaleByAge = false;
+                
+                const origLfmTrack = existingData?._lfm_track_checked;
+                const origLfmArtist = existingData?._lfm_artist_checked;
+                const origDeezer = existingData?._deezer_checked;
+                const origSpArtist = existingData?._sp_artist_checked;
+
+                if (existingData && isStaleByAge(existingData)) {
+                    wasStaleByAge = true;
+                    existingData._lfm_track_checked = false;
+                    existingData._lfm_artist_checked = false;
+                    existingData._deezer_checked = false;
+                    existingData._sp_artist_checked = false;
+                    existingData._everynoise_checked = false;
+                }
+
+                let synthDetails = item.details;
+                if (!synthDetails && item.originalTrack) {
+                    const trk = item.originalTrack;
+                    let artistsArr = trk.artists || trk.track?.artists || [];
+                    
+                    if (artistsArr.length === 0 && trk.artistUris) {
+                        const artistNamesFallback = trk.allArtists ? trk.allArtists.split(', ') : [trk.artistName];
+                        artistsArr = trk.artistUris.map((uri, index) => ({
+                            uri: uri,
+                            id: uri ? uri.split(':')[2] : null,
+                            name: artistNamesFallback[index] || trk.artistName || "Unknown Artist"
+                        }));
+                    }
+                    
+                    if (artistsArr.length > 0) {
+                        synthDetails = {
+                            name: trk.songTitle || trk.name || "",
+                            artists: artistsArr,
+                            album: {
+                                release_date: trk.releaseDate || trk.track?.album?.release_date || null
+                            },
+                            external_ids: {
+                                isrc: item.isrc
+                            }
+                        };
+                    }
+                }
+
+                const result = await fetchSingleTrackGenresFromApis(item.uri, synthDetails, gatewayUrl, existingData);
+                
+                if (!result.data.isrc) result.data.isrc = item.isrc;
+
+                finalGenresMap.set(item.uri, result.data);
+                
+                let tursoNeedsUpdate = false;
+                
+                if (needsTurso) {
+                    tursoNeedsUpdate = true;
+                    if (existingData && !wasStaleByAge) {
+                        const fetchedLfmTrack = reqSources.lastfm_track && !origLfmTrack;
+                        const fetchedLfmArtist = reqSources.lastfm_artist && !origLfmArtist;
+                        const fetchedDeezer = reqSources.deezer && !origDeezer;
+                        const fetchedSpArtist = reqSources.spotify_artist && !origSpArtist;
+                        
+                        if (!fetchedLfmTrack && !fetchedLfmArtist && !fetchedDeezer && !fetchedSpArtist) {
+                            tursoNeedsUpdate = false; 
+                        }
+                    }
+                }
+                
+                if (tursoNeedsUpdate && result.canSave !== false) {
+                    itemsToSaveMap.set(item.uri, {
+                        track_uri: item.uri,
+                        isrc: item.isrc,
+                        ...result.data
+                    });
+                }
+            };
 
             const needsDeezerRateLimit = reqSources.deezer || reqSources.apple_music;
 
@@ -27351,18 +28632,7 @@
                                 if (!item) break; 
 
                                 try {
-                                    const existingData = sessionGenreCache.get(item.uri) || cachedGenresByIsrc.get(item.isrc) || null;
-                                    const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, gateway.url, existingData);
-                                    
-                                    if (!result.data.isrc) result.data.isrc = item.isrc;
-
-                                    finalGenresMap.set(item.uri, result.data);
-                                    
-                                    itemsToSaveMap.set(item.uri, {
-                                        track_uri: item.uri,
-                                        isrc: item.isrc,
-                                        ...result.data
-                                    });
+                                    await processItemResult(item, gateway.url);
                                     
                                     fetchedCount++;
                                     updateProgress(`Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`);
@@ -27404,11 +28674,7 @@
                 if (sharedQueue.length > 0) {
                     for (const item of sharedQueue) {
                         try {
-                            const existingData = sessionGenreCache.get(item.uri) || cachedGenresByIsrc.get(item.isrc) || null;
-                            const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null, existingData);
-                            if (!result.data.isrc) result.data.isrc = item.isrc;
-                            finalGenresMap.set(item.uri, result.data);
-                            itemsToSaveMap.set(item.uri, { track_uri: item.uri, isrc: item.isrc, ...result.data });
+                            await processItemResult(item, null);
                         } catch (e) {} finally {
                             fetchedCount++;
                             updateProgress(`Ext ${Math.round((fetchedCount / totalToFetch) * 100)}%`);
@@ -27430,18 +28696,7 @@
                         if (!item) continue;
 
                         try {
-                            const existingData = sessionGenreCache.get(item.uri) || cachedGenresByIsrc.get(item.isrc) || null;
-                            const result = await fetchSingleTrackGenresFromApis(item.uri, item.details, null, existingData);
-                            
-                            if (!result.data.isrc) result.data.isrc = item.isrc;
-
-                            finalGenresMap.set(item.uri, result.data);
-                            
-                            itemsToSaveMap.set(item.uri, {
-                                track_uri: item.uri,
-                                isrc: item.isrc,
-                                ...result.data
-                            });
+                            await processItemResult(item, null);
                         } catch (e) {
                             console.error(`[Sort-Play] Error fetching genres for ${item.uri}:`, e);
                         } finally {
@@ -27469,11 +28724,13 @@
                     lastfm_artist_genres: existingData?.lastfm_artist_genres || [],
                     deezer_genres: existingData?.deezer_genres || [],
                     apple_music_genres: existingData?.apple_music_genres || [],
+                    everynoise_artist_genres: existingData?.everynoise_artist_genres || [],
                     release_date: existingData?.release_date || null,
                     _lfm_track_checked: reqSources.lastfm_track || existingData?._lfm_track_checked || false,
                     _lfm_artist_checked: reqSources.lastfm_artist || existingData?._lfm_artist_checked || false,
                     _deezer_checked: reqSources.deezer || existingData?._deezer_checked || false,
-                    _sp_artist_checked: reqSources.spotify_artist || existingData?._sp_artist_checked || false
+                    _sp_artist_checked: reqSources.spotify_artist || existingData?._sp_artist_checked || false,
+                    _everynoise_checked: reqSources.everynoise_artist || existingData?._everynoise_checked || false
                 };
                 if (existingData?.spotify_track_genres) {
                     dummyData.spotify_track_genres = existingData.spotify_track_genres;
@@ -27497,6 +28754,7 @@
                 if (reqSources.lastfm_artist) combined.push(...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
                 if (reqSources.deezer) combined.push(...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
                 if (reqSources.apple_music) combined.push(...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
+                if (reqSources.everynoise_artist) combined.push(...(genres.everynoise_artist_genres || []).map(g => ({ name: g, source: 'everynoise' })));
                 
                 const mappedAndNormalized = mapAndNormalizeGenres(combined);
                 const finalUniqueGenres = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
@@ -27559,7 +28817,7 @@
 
     const dataToSave = Array.from(itemsToSaveMap.values());
 
-    if (dataToSave.length > 0 && needsExternal) {
+    if (dataToSave.length > 0 && needsTurso) {
         saveGenresToTurso(dataToSave).then(() => {
             console.log(`[Sort-Play] Background cloud genre/audio caching complete for ${dataToSave.length} items.`);
         }).catch(err => {
@@ -27581,6 +28839,7 @@
             if (reqSources.lastfm_artist) combined.push(...(genres.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
             if (reqSources.deezer) combined.push(...(genres.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
             if (reqSources.apple_music) combined.push(...(genres.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
+            if (reqSources.everynoise_artist) combined.push(...(genres.everynoise_artist_genres || []).map(g => ({ name: g, source: 'everynoise' })));
             
             const mappedAndNormalized = mapAndNormalizeGenres(combined);
             const finalUniqueGenres = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
@@ -29124,7 +30383,7 @@
   
       const uniqueTracksMap = new Map();
       const isCoreDiscography = (track) => 
-          track.album_type === 'album' || track.album_type === 'single';
+          track.album_type === 'album' || track.album_type === 'single' || track.album_type === 'ep';
 
       for (const track of allTracks) {
         const title = (track.name || "").toLowerCase().trim();
@@ -30574,6 +31833,107 @@
     return innerButton;
   }
 
+  function createInnerSettingsButton(onClickCallback) {
+    const innerButton = document.createElement("button");
+    innerButton.innerHTML = settingsSvg.replace('<svg', '<svg width="16" height="16" fill="currentColor"');
+
+    innerButton.style.cssText = `
+      background-color: transparent;
+      border: none;
+      border-radius: 2px;
+      padding: 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      margin-left: 10px;
+      margin-right: -10px;
+      flex-shrink: 0;
+      color: #b3b3b3;
+      opacity: 0.7;
+      transition: opacity 0.2s, color 0.2s;
+    `;
+
+    const updateTooltipPosition = (tooltip) => {
+        if (!innerButton || !tooltip) return;
+        const rect = innerButton.getBoundingClientRect();
+        const tooltipRect = tooltip.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const margin = 10;
+
+        let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+        
+        if (left + tooltipRect.width > viewportWidth - margin) {
+            left = viewportWidth - tooltipRect.width - margin;
+        }
+        if (left < margin) {
+            left = margin;
+        }
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${rect.top - tooltipRect.height - 8}px`;
+    };
+
+    innerButton.addEventListener("mouseenter", (e) => {
+      innerButton.style.color = "#ffffff";
+      innerButton.style.opacity = "1";
+      const svgEl = innerButton.querySelector('svg');
+      if (svgEl) svgEl.style.fill = "#ffffff";
+      
+      const tooltip = document.createElement("div");
+      tooltip.className = "sort-play-custom-tooltip";
+      tooltip.innerText = "Source Settings";
+      tooltip.style.cssText = `
+        position: fixed;
+        background-color: #282828;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+        z-index: 10000;
+        pointer-events: none;
+        white-space: nowrap;
+        opacity: 0;
+        transition: opacity 0.2s;
+      `;
+      
+      document.body.appendChild(tooltip);
+      updateTooltipPosition(tooltip);
+      
+      requestAnimationFrame(() => { 
+          tooltip.style.opacity = "1"; 
+      });
+      
+      innerButton._tooltip = tooltip;
+    });
+
+    innerButton.addEventListener("mouseleave", () => {
+      innerButton.style.color = "#b3b3b3";
+      innerButton.style.opacity = "0.7";
+      const svgEl = innerButton.querySelector('svg');
+      if (svgEl) svgEl.style.fill = "#b3b3b3";
+      
+      if (innerButton._tooltip) {
+          innerButton._tooltip.remove();
+          innerButton._tooltip = null;
+      }
+    });
+
+    innerButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (innerButton._tooltip) {
+          innerButton._tooltip.remove();
+          innerButton._tooltip = null;
+      }
+      if (onClickCallback) onClickCallback(event);
+    });
+
+    return innerButton;
+  }
+
   const buttonStyles = {
     main: {
       backgroundColor: "transparent",
@@ -30724,6 +32084,16 @@
                 color: "white",
                 text: "Genre Filter",
                 sortType: "genreFilter",
+                hasSettingsButton: true,
+                onSettingsClick: (event) => {
+                    event.stopPropagation();
+                    closeAllMenus();
+                    const currentSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+                    showGenreFilterSettingsModal(currentSources, (newSources) => {
+                        localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(newSources));
+                        showNotification("Genre Filter sources updated.");
+                    });
+                },
                 onClick: async function(event) {
                     event.stopPropagation();
                     await handleGenreFilter();
@@ -31313,6 +32683,11 @@
         button.appendChild(innerPlayButton);
       }
 
+      if (style.hasSettingsButton) {
+        const innerSettingsButton = createInnerSettingsButton(style.onSettingsClick);
+        button.appendChild(innerSettingsButton);
+      }
+
       button.addEventListener("click", async (event) => {
         event.stopPropagation();
         if (style.isSetting) {
@@ -31685,6 +33060,11 @@
         button.appendChild(innerButton);
       }
   
+      if (item.hasSettingsButton) {
+        const innerSettingsButton = createInnerSettingsButton(item.onSettingsClick);
+        button.appendChild(innerSettingsButton);
+      }
+
       button.addEventListener("click", async (event) => {
         event.stopPropagation();
         if (item.onClick) {
@@ -35399,6 +36779,11 @@
         coverSubtitle = username;
     }
 
+    const overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}');
+    const custom = overrides[actualSortType] || {};
+
+    if (custom.name) finalPlaylistName = custom.name;
+
     const releasePlaylistColor = '#3798a5';
     const discoveryPlaylistColor = '#8f46d7';
     const lastFmPlaylistColor = '#D1170E';
@@ -35458,6 +36843,10 @@
                         requestBody.description = description;
                     }
 
+                    if (custom.name && meta.name !== custom.name) {
+                        requestBody.name = custom.name;
+                    }
+
                     if (Object.keys(requestBody).length > 0) {
                         await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, requestBody);
                     }
@@ -35468,18 +36857,25 @@
                             hasCustomCover = !isDefaultMosaicCover(meta.images[0].url);
                         }
                         
-                        if (!hasCustomCover) {
-                            (async () => {
-                                try {
+                        (async () => {
+                            try {
+                                if (custom.hasCustomImage) {
+                                    if (!hasCustomCover) {
+                                        const customBase64 = await idb.get('generatedCovers', `custom_image_${actualSortType}`);
+                                        if (customBase64) {
+                                            await setPlaylistImage(playlistId, customBase64);
+                                        }
+                                    }
+                                } else if (!hasCustomCover) {
                                     const user = await Spicetify.Platform.UserAPI.getUser();
                                     const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
                                     const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
-                                    setPlaylistImage(playlistId, coverBase64);
-                                } catch (coverError) {
-                                    console.error("Failed to update custom playlist cover:", coverError);
+                                    await setPlaylistImage(playlistId, coverBase64);
                                 }
-                            })();
-                        }
+                            } catch (coverError) {
+                                console.error("Failed to update custom playlist cover:", coverError);
+                            }
+                        })();
                     }
                 } catch (updateError) {
                     console.warn("Sort-Play: Failed to check/update dedicated playlist metadata:", updateError);
@@ -35513,10 +36909,22 @@
         if (setDedicatedPlaylistCovers) {
             (async () => {
                 try {
-                    const user = await Spicetify.Platform.UserAPI.getUser();
-                    const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
-                    const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
-                    setPlaylistImage(newPlaylist.id, coverBase64);
+                    if (custom.hasCustomImage) {
+                        const customBase64 = await idb.get('generatedCovers', `custom_image_${actualSortType}`);
+                        if (customBase64) {
+                            await setPlaylistImage(newPlaylist.id, customBase64);
+                        } else {
+                            const user = await Spicetify.Platform.UserAPI.getUser();
+                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                            const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
+                            await setPlaylistImage(newPlaylist.id, coverBase64);
+                        }
+                    } else {
+                        const user = await Spicetify.Platform.UserAPI.getUser();
+                        const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                        const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
+                        await setPlaylistImage(newPlaylist.id, coverBase64);
+                    }
                 } catch (coverError) {
                     console.error("Failed to generate or set custom playlist cover:", coverError);
                 }
@@ -35546,6 +36954,8 @@
         console.error("Spicetify APIs not available.");
         throw new Error("Spicetify APIs not available.");
     }
+
+    const finalDescription = changeDescriptionOnCreate ? description : "";
 
     let newPlaylist;
     try {
@@ -35580,10 +36990,12 @@
 
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    await Promise.all([
-        setPlaylistVisibility(newPlaylist.uri, !createPlaylistPrivate),
-        updatePlaylistDescription(playlistId, description)
-    ]);
+    const promises = [setPlaylistVisibility(newPlaylist.uri, !createPlaylistPrivate)];
+    if (finalDescription) {
+        promises.push(updatePlaylistDescription(playlistId, finalDescription));
+    }
+    
+    await Promise.all(promises);
     
     return { ...newPlaylist, id: newPlaylist.uri.split(':')[2] };
   }
@@ -38518,24 +39930,25 @@
 
         updateProgress("Get artists...");
         
-        async function getFollowedArtists() {
-            try {
-                if (Spicetify.Platform?.LibraryAPI?.getContents) {
-                    const res = await Spicetify.Platform.LibraryAPI.getContents({ limit: 50000, sort: { field: "NAME", order: "ASC" } });
-                    return (res.items || [])
-                        .filter(item => item.type === 'artist' || (item.uri && item.uri.includes(':artist:')))
-                        .map(a => ({ uri: a.uri, name: a.name, id: a.uri.split(':')[2] }));
-                }
-            } catch (e) {
-                console.warn("[Sort-Play] LibraryAPI fetch failed", e);
-            }
-            return [];
-        }
-
-        const followedArtists = await getFollowedArtists();
+        const followedArtists = await getAllFollowedArtists();
         if (followedArtists.length === 0) {
             throw new Error("You are not following any artists.");
         }
+
+        const filterMode = followedReleasesConfig.artistFilterMode || 'exclude';
+        const selectedSet = new Set(followedReleasesConfig.selectedArtists || []);
+
+        const activeArtists = followedArtists.filter(artist => {
+            const isSelected = selectedSet.has(artist.id);
+            if (filterMode === 'include') return isSelected;
+            return !isSelected;
+        });
+
+        if (activeArtists.length === 0) {
+            throw new Error("No artists left after applying your Artist Filter. Please check your settings.");
+        }
+
+        const followedArtistIds = new Set(activeArtists.map(a => a.id));
 
         const dateLimit = new Date();
         dateLimit.setUTCHours(0, 0, 0, 0);
@@ -38557,8 +39970,18 @@
         const newReleasesMap = new Map();
         
         const BATCH_SIZE = 300;
-        for (let i = 0; i < followedArtists.length; i += BATCH_SIZE) {
-            const artistBatch = followedArtists.slice(i, i + BATCH_SIZE);
+        let compiledFrRegexes = [];
+        const hasFrKeywords = followedReleasesConfig.keywords.length > 0;
+        if (hasFrKeywords) {
+            compiledFrRegexes = followedReleasesConfig.keywords.map(kw => {
+                return followedReleasesConfig.matchWholeWord 
+                    ? new RegExp(`\\b${escapeRegExp(kw)}\\b`, 'i') 
+                    : new RegExp(escapeRegExp(kw), 'i');
+            });
+        }
+
+        for (let i = 0; i < activeArtists.length; i += BATCH_SIZE) {
+            const artistBatch = activeArtists.slice(i, i + BATCH_SIZE);
             updateProgress(`Scanning...`);
 
             const batchPromises = artistBatch.map(artist => {
@@ -38579,6 +40002,12 @@
                 if (releases) {
                     for (const release of releases) {
                         const album = release.releases.items[0];
+                        
+                        if (hasFrKeywords && followedReleasesConfig.filterMode === 'exclude' && followedReleasesConfig.filterAlbum && album.name) {
+                            const albumMatches = compiledFrRegexes.some(regex => regex.test(album.name));
+                            if (albumMatches) continue; 
+                        }
+
                         if (album?.date?.isoString) {
                             const releaseDate = new Date(album.date.isoString);
                             if (releaseDate >= dateLimit) {
@@ -38593,7 +40022,9 @@
 
         const allNewReleases = Array.from(newReleasesMap.values());
         if (allNewReleases.length === 0) {
-            throw new Error(`No new releases found in ${daysDesc}.`);
+            let errorMsg = `No new releases found in ${daysDesc}.`;
+            if (hasFrKeywords) errorMsg += ` (Your keyword filters might have excluded them).`;
+            throw new Error(errorMsg);
         }
 
         updateProgress(`Get tracks...`);
@@ -38608,9 +40039,52 @@
             const results = await Promise.all(batch.map(async (albumMeta) => {
                 try {
                     const albumId = albumMeta.uri.split(':')[2];
-                    let tracks = await getAlbumTracks(albumId);
+                    let tracks = await getAlbumTracks(albumId, albumMeta.date?.isoString, false, albumMeta.name);
                     
                     if (!tracks || !Array.isArray(tracks)) tracks = [];
+
+                    tracks = tracks.filter(t => {
+                        const trackArtistIds = (t.artistUris || []).map(uri => uri.split(':')[2]).filter(Boolean);
+                        return trackArtistIds.some(id => followedArtistIds.has(id));
+                    });
+
+                    tracks = tracks.filter(t => {
+                        const trackTitle = t.name || t.songTitle || "";
+                        const trackAlbum = t.albumName || albumMeta.name || "";
+                        
+                        if (hasFrKeywords) {
+                            let matchesKeyword = false;
+                            if (followedReleasesConfig.filterTitle && compiledFrRegexes.some(r => r.test(trackTitle))) matchesKeyword = true;
+                            if (followedReleasesConfig.filterAlbum && compiledFrRegexes.some(r => r.test(trackAlbum))) matchesKeyword = true;
+                            
+                            if (followedReleasesConfig.filterMode === 'keep' && !matchesKeyword) return false;
+                            if (followedReleasesConfig.filterMode === 'exclude' && matchesKeyword) return false;
+                        }
+                        
+                        const isLive = STRICT_LIVE_REGEX.test(trackTitle) || STRICT_LIVE_REGEX.test(trackAlbum);
+                        const isRemix = STRICT_REMIX_REGEX.test(trackTitle) || STRICT_REMIX_REGEX.test(trackAlbum);
+                        const isAcoustic = STRICT_ACOUSTIC_REGEX.test(trackTitle) || STRICT_ACOUSTIC_REGEX.test(trackAlbum);
+                        const isInstrumental = STRICT_INSTRUMENTAL_REGEX.test(trackTitle) || STRICT_INSTRUMENTAL_REGEX.test(trackAlbum);
+                        
+                        const { live, remix, acoustic, instrumental } = followedReleasesConfig.versions;
+                        
+                        if (live === 'exclude' && isLive) return false;
+                        if (remix === 'exclude' && isRemix) return false;
+                        if (acoustic === 'exclude' && isAcoustic) return false;
+                        if (instrumental === 'exclude' && isInstrumental) return false;
+                        
+                        const onlyReqs = [];
+                        if (live === 'require') onlyReqs.push(isLive);
+                        if (remix === 'require') onlyReqs.push(isRemix);
+                        if (acoustic === 'require') onlyReqs.push(isAcoustic);
+                        if (instrumental === 'require') onlyReqs.push(isInstrumental);
+                        
+                        if (onlyReqs.length > 0 && !onlyReqs.some(Boolean)) {
+                            return false;
+                        }
+                        
+                        return true;
+                    });
 
                     if (followedReleasesAlbumLimit !== 'all') {
                         const limit = parseInt(followedReleasesAlbumLimit, 10);
@@ -38713,7 +40187,10 @@
         console.log(`Followed Releases: Verified ${verifiedNewTracks.length} tracks, deduplicated to ${genuinelyNewTracks.length} tracks.`);
 
         if (genuinelyNewTracks.length === 0) {
-            throw new Error("No genuinely new tracks found after verification and deduplication.");
+            let errorMsg = "No genuinely new tracks found after verification and deduplication.";
+            const hasVersionFilters = Object.values(followedReleasesConfig.versions).some(val => val !== 'all');
+            if (hasFrKeywords || hasVersionFilters) errorMsg += " (Your keyword/version filters might have excluded them).";
+            throw new Error(errorMsg);
         }
         
         updateProgress("Sorting...");
@@ -38749,7 +40226,16 @@
 
         const trackUris = genuinelyNewTracks.map(track => track.uri);
         const playlistName = "New Releases: Followed";
-        const playlistDescription = `All new releases from artists you follow from ${daysDesc} (since ${dateLimit.toLocaleDateString()}), sorted by release date. Created by Sort-Play.`;
+        let playlistDescription = `All new releases from artists you follow from ${daysDesc} (since ${dateLimit.toLocaleDateString()}), sorted by release date.`;
+        const hasVersionFilters = Object.values(followedReleasesConfig.versions).some(val => val !== 'all');
+        if (hasFrKeywords && hasVersionFilters) {
+            playlistDescription += ` (Filtered by keywords & versions).`;
+        } else if (hasFrKeywords) {
+            playlistDescription += ` (Filtered by keywords).`;
+        } else if (hasVersionFilters) {
+            playlistDescription += ` (Filtered by versions).`;
+        }
+        playlistDescription += ` Created by Sort-Play.`;
         
         updateProgress("Creating...");
         const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist('followedReleasesChronological', playlistName, playlistDescription);
@@ -40100,6 +41586,33 @@
       processDiscographyQueue();
   }
 
+  function getHardwareTierLimit() {
+      let limit = localStorage.getItem('sort-play-hardware-limit');
+      if (limit) return parseInt(limit, 10);
+
+      let mockVirtualDOM = [];
+      for (let i = 0; i < 2000; i++) {
+          mockVirtualDOM.push({ uid: `uid_${i}`, props: { track: { name: `Track ${i}` }, renderState: { isSelected: false } } });
+      }
+      const start = performance.now();
+      let operations = 0;
+      while (performance.now() - start < 50) {
+          const moveFrom = Math.floor(Math.random() * mockVirtualDOM.length);
+          const item = mockVirtualDOM[moveFrom];
+          let newState = [...mockVirtualDOM];
+          newState.splice(moveFrom, 1);
+          newState.unshift({ ...item, props: { ...item.props, renderState: { isSelected: true } } });
+          mockVirtualDOM = newState;
+          operations++;
+      }
+      if (operations >= 300) limit = 800;
+      else if (operations >= 120) limit = 400;
+      else limit = 200;
+      
+      localStorage.setItem('sort-play-hardware-limit', limit.toString());
+      return limit;
+  }
+
   async function handleSortAndCreatePlaylist(sortType, options = {}) {
     const { isHeadless = false, progressCallback = null } = options;
     const isAscending = options.sortDirection ? options.sortDirection === 'reversed' : !!sortOrderState[sortType];
@@ -40359,10 +41872,17 @@
                                        currentPlaylistDetails.owner &&
                                        currentPlaylistDetails.owner.id === user.username;
 
+      let useMoveOperation = false;
+
+      const hardwareLimit = getHardwareTierLimit();
+      let massiveThreshold = 2500;
+      if (hardwareLimit <= 400) massiveThreshold = 1500;
+      if (hardwareLimit <= 200) massiveThreshold = 800;
+
       if (canModifyCurrentPlaylist && !isHeadless && !targetPlaylistUriToReplace) {
         const userChoice = await showConfirmationModal({
             title: "Sort Current Playlist?",
-            description: `This will replace all tracks in this playlist with the sorted version. Do you want to modify the current playlist, or create a new one instead?`,
+            description: `This replaces all tracks in the playlist with the sorted version, overwriting the original order.`,
             confirmText: "Modify Current",
             cancelText: "Cancel",
             neutralText: "Create New",
@@ -40374,6 +41894,118 @@
             return;
         } else if (userChoice === 'neutral') {
             canModifyCurrentPlaylist = false;
+        } else if (userChoice === 'confirm') {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            const trackCount = tracks.length;
+            let extremeIgnored = localStorage.getItem('sort-play-ignore-extreme-warning') === 'true';
+            let finalChoice = null;
+
+            if (preserveDateBehavior === 'fast') {
+                finalChoice = 'fast';
+            } else if (preserveDateBehavior === 'preserve') {
+                if (trackCount >= massiveThreshold && !extremeIgnored) {
+                    const extremeChoice = await showConfirmationModal({
+                        title: `${warningIcon}Massive Playlist`,
+                        description: `Preserving 'Date Added' for ${trackCount} tracks may lag Spotify. Fast Sort is instant but resets the dates.`,
+                        confirmText: "Fast Sort",
+                        neutralText: "Keep 'Date Added'",
+                        cancelText: "Cancel",
+                        checkboxLabel: "Don't warn me again for massive playlists"
+                    });
+                    if (extremeChoice.action === 'cancel') {
+                        showNotification("Sorting cancelled.");
+                        if (!isHeadless && !progressCallback) resetButtons();
+                        return;
+                    }
+                    finalChoice = extremeChoice.action === 'confirm' ? 'fast' : 'preserve';
+                    if (extremeChoice.checked && finalChoice === 'preserve') {
+                        localStorage.setItem('sort-play-ignore-extreme-warning', 'true');
+                    }
+                } else {
+                    finalChoice = 'preserve';
+                }
+            } else {
+                let isCurated = false;
+                const validDates = [];
+                for (let i = 0; i < trackCount; i++) {
+                    const addedAt = tracks[i].addedAt;
+                    if (addedAt) {
+                        const d = new Date(addedAt).getTime();
+                        if (!isNaN(d)) validDates.push(d);
+                    }
+                }
+                validDates.sort((a, b) => a - b);
+
+                if (validDates.length >= 2) {
+                    const diffMs = validDates[validDates.length - 1] - validDates[0];
+                    if (diffMs < 60000) {
+                        isCurated = false;
+                    } else {
+                        let isBulkDumpFound = false;
+                        const bulkDumpIndices = new Set();
+                        let left = 0;
+                        for (let right = 0; right < validDates.length; right++) {
+                            while (validDates[right] - validDates[left] > 60000) {
+                                left++;
+                            }
+                            const countInWindow = right - left + 1;
+                            if (countInWindow > 15) {
+                                isBulkDumpFound = true;
+                                for (let i = left; i <= right; i++) {
+                                    bulkDumpIndices.add(i);
+                                }
+                            }
+                        }
+                        const curatedCount = validDates.length - bulkDumpIndices.size;
+                        if (isBulkDumpFound && curatedCount < 5) {
+                            isCurated = false;
+                        } else {
+                            isCurated = true;
+                        }
+                    }
+                } else {
+                    isCurated = false;
+                }
+
+                if (trackCount <= hardwareLimit) {
+                    finalChoice = isCurated ? 'preserve' : 'fast';
+                } else {
+                    if (isCurated) {
+                        const isExtreme = trackCount >= massiveThreshold;
+                        const askChoice = await showConfirmationModal({
+                            title: isExtreme ? `${warningIcon}Massive Playlist` : `${warningIcon}Keep 'Date Added'?`,
+                            description: isExtreme 
+                                ? `Preserving 'Date Added' for ${trackCount} tracks may lag Spotify. Fast Sort is instant but resets the dates.`
+                                : `Fast Sort resets the 'Date Added' of all tracks. Preserving the original dates is slower.`,
+                            confirmText: "Fast Sort",
+                            neutralText: "Keep 'Date Added'",
+                            cancelText: "Cancel",
+                            checkboxLabel: "Remember my choice"
+                        });
+
+                        if (askChoice.action === 'cancel') {
+                            showNotification("Sorting cancelled.");
+                            if (!isHeadless && !progressCallback) resetButtons();
+                            return;
+                        }
+                        
+                        finalChoice = askChoice.action === 'confirm' ? 'fast' : 'preserve';
+                        if (askChoice.checked) {
+                            preserveDateBehavior = finalChoice;
+                            localStorage.setItem(STORAGE_KEY_PRESERVE_DATE_ADDED, finalChoice);
+                            if (isExtreme && finalChoice === 'preserve') {
+                                localStorage.setItem('sort-play-ignore-extreme-warning', 'true');
+                            }
+                        }
+                    } else {
+                        finalChoice = 'fast';
+                    }
+                }
+            }
+
+            if (finalChoice === 'preserve') {
+                useMoveOperation = true;
+            }
         }
       }
 
@@ -41374,8 +43006,188 @@
                     if (trackUris.length > 10000) {
                         showNotification("Playlist exceeded 10,000 tracks. Truncating to 10,000.", "warning");
                         trackUris.length = 10000;
+                        sortedTracks.length = 10000;
                     }
-                    await replacePlaylistTracks(playlistIdToModify, trackUris);
+                    
+                    if (useMoveOperation) {
+                        const originalUidToUri = new Map(originalTracksForRemoval.map(t => [t.uid, t.uri]));
+                        const keptUids = new Set();
+                        const convertedTracksToAdd = new Set();
+
+                        for (const t of sortedTracks) {
+                            const origUri = originalUidToUri.get(t.uid);
+                            if (origUri && Spicetify.URI.isLocal(origUri) && !Spicetify.URI.isLocal(t.uri)) {
+                                convertedTracksToAdd.add(t);
+                            } else {
+                                keptUids.add(t.uid);
+                            }
+                        }
+
+                        const toRemove = originalTracksForRemoval
+                            .filter(t => !keptUids.has(t.uid))
+                            .map(t => ({ uri: t.uri, uid: t.uid }));
+                        
+                        const playlistUri = `spotify:playlist:${playlistIdToModify}`;
+                        if (toRemove.length > 0) {
+                            updateProgressText(`Removing...`);
+                            await removeTracksFromPlaylist(playlistUri, toRemove);
+                        }
+                        
+                        const currentRemainingTracks = originalTracksForRemoval.filter(t => keptUids.has(t.uid));
+                        let expectedUidIndex = sortedTracks.length - 1;
+                        for (let i = currentRemainingTracks.length - 1; i >= 0; i--) {
+                            if (expectedUidIndex < 0) break;
+                            if (currentRemainingTracks[i].uid === sortedTracks[expectedUidIndex].uid) {
+                                expectedUidIndex--;
+                            } else {
+                                break;
+                            }
+                        }
+                        const tracksToMove = sortedTracks.slice(0, expectedUidIndex + 1);
+                        
+                        if (tracksToMove.length > 0) {
+                            const isMassive = tracksToMove.length >= massiveThreshold;
+                            let originalPathForBlindfold = null;
+                            let blindfoldNotification = null;
+                            if (isMassive && !isHeadless) {
+                                blindfoldNotification = showNotification("Massive playlist detected. Switching views temporarily to prevent UI freezes. Please do not switch back until the process is done!", "sticky");
+                                originalPathForBlindfold = Spicetify.Platform.History.location.pathname;
+                                
+                                try {
+                                    Spicetify.Platform.History.push("/collection/tracks");
+                                    await new Promise(resolve => setTimeout(resolve, 250));
+                                    
+                                    if (!Spicetify.Platform.History.location.pathname.startsWith("/collection/tracks")) {
+                                        Spicetify.Platform.History.push("/");
+                                    }
+                                } catch (e) {
+                                    Spicetify.Platform.History.push("/");
+                                }
+                                
+                                await new Promise(resolve => setTimeout(resolve, 1250));
+                            }
+                            
+                            updateProgressText(`Saving 0%`);
+                            
+                            const getWebpackService = (id) => {
+                                const chunk = window.webpackChunkclient_web ?? window.rspackChunkclient_web;
+                                if (!chunk) return null;
+                                const req = chunk.push([[Symbol()], {}, (r) => r]);
+                                return Object.values(req.m).flatMap(m => {
+                                    try { return Object.values(req(Object.keys(req.m).find(k => req.m[k] === m))); } catch { return []; }
+                                }).find(c => c?.SERVICE_ID === id);
+                            };
+                            const PlaylistServiceClass = getWebpackService("spotify.playlist_esperanto.proto.PlaylistService");
+                            
+                            if (PlaylistServiceClass) {
+                                const transport = Spicetify.Platform.ProductStateAPI?.productStateApi?.transport || Spicetify.Platform.Transport;
+                                const playlistClient = new PlaylistServiceClass(transport);
+                                const totalToMove = tracksToMove.length;
+                                let processedMoves = 0;
+                                const CONCURRENCY_LIMIT = 10;
+                                let currentIndex = totalToMove - 1;
+                                
+                                const worker = async () => {
+                                    while (currentIndex >= 0) {
+                                        const trackIndex = currentIndex--;
+                                        const track = tracksToMove[trackIndex];
+                                        
+                                        let attempt = 0;
+                                        let success = false;
+                                        
+                                        while (attempt < 3 && !success) {
+                                            try {
+                                                if (convertedTracksToAdd.has(track)) {
+                                                    await Spicetify.Platform.PlaylistAPI.add(playlistUri, [track.uri], { before: "start" });
+                                                } else {
+                                                    await playlistClient.modify({
+                                                        uri: playlistUri,
+                                                        request: {
+                                                            operation: "move", before: "start", after: "", name: "", playlist: false,
+                                                            uris: [], rows: [track.uid], contents: false, itemId: "", attributesToClear: [], createItemKind: 0
+                                                        }
+                                                    });
+                                                }
+                                                success = true;
+                                            } catch (err) {
+                                                attempt++;
+                                                if (attempt === 3) console.warn(`[Sort-Play] Track operation failed for ${track.name}:`, err);
+                                                await new Promise(r => setTimeout(r, attempt * 300));
+                                            }
+                                        }
+                                        
+                                        if (!success) {
+                                            try {
+                                                if (convertedTracksToAdd.has(track)) {
+                                                    await Spicetify.Platform.PlaylistAPI.add(playlistUri, [track.uri], { before: "start" });
+                                                } else {
+                                                    await Spicetify.Platform.PlaylistAPI.move(playlistUri, [{ uid: track.uid, uri: track.uri }], { before: "start" });
+                                                }
+                                            } catch (e) {}
+                                        }
+
+                                        processedMoves++;
+                                        if (processedMoves % 50 === 0 || processedMoves === totalToMove) {
+                                            const pct = Math.floor((processedMoves / totalToMove) * 100);
+                                            updateProgressText(`Saving ${pct}%`);
+                                        }
+                                    }
+                                };
+                                
+                                const workers = Array(Math.min(CONCURRENCY_LIMIT, totalToMove)).fill(null).map(() => worker());
+                                await Promise.all(workers);
+                            } else {
+                                const BATCH_SIZE = 10;
+                                const totalToMove = tracksToMove.length;
+                                let processedMoves = 0;
+                                for (let i = totalToMove - 1; i >= 0; i -= BATCH_SIZE) {
+                                    const endIdx = Math.max(-1, i - BATCH_SIZE);
+                                    const promises = [];
+                                    for (let j = i; j > endIdx; j--) {
+                                        const track = tracksToMove[j];
+                                        if (convertedTracksToAdd.has(track)) {
+                                            promises.push(
+                                                Spicetify.Platform.PlaylistAPI.add(playlistUri, [track.uri], { before: "start" })
+                                            );
+                                        } else {
+                                            promises.push(
+                                                Spicetify.Platform.PlaylistAPI.move(playlistUri, [{ uid: track.uid, uri: track.uri }], { before: "start" })
+                                            );
+                                        }
+                                    }
+                                    try {
+                                        await Promise.race([
+                                            Promise.all(promises),
+                                            new Promise((_, reject) => setTimeout(() => reject(new Error("Spotify took too long to move tracks. Process aborted to prevent client freezing.")), 15000))
+                                        ]);
+                                    } catch (err) {
+                                        console.error("Error moving batch:", err);
+                                        throw err;
+                                    }
+                                    processedMoves += (i - endIdx);
+                                    const pct = Math.floor((processedMoves / totalToMove) * 100);
+                                    updateProgressText(`Saving ${pct}%`);
+                                    await new Promise(r => setTimeout(r, 15));
+                                }
+                            }
+                            
+                            if (isMassive && !isHeadless && originalPathForBlindfold) {
+                                if (blindfoldNotification) blindfoldNotification.remove();
+                                Spicetify.Platform.History.push(originalPathForBlindfold);
+                                await new Promise(resolve => setTimeout(resolve, 500));
+                            }
+                        }
+                        
+                        updateProgressText(`Syncing...`);
+                        try {
+                            if (typeof Spicetify.Platform.PlaylistAPI.resync === 'function') {
+                                await Spicetify.Platform.PlaylistAPI.resync(playlistUri);
+                            }
+                        } catch (e) {}
+                        await new Promise(r => setTimeout(r, 1000));
+                    } else {
+                        await replacePlaylistTracks(playlistIdToModify, trackUris);
+                    }
                 }
                 
                 if (removedTracks.length > 0 && !isArtistPage) {
@@ -41408,7 +43220,10 @@
 
             } catch (error) {
                 console.error("Error modifying current playlist:", error);
-                showNotification(`An error occurred while modifying the current playlist.`);
+                const errorMsg = error.message === "Spotify took too long to move tracks. Process aborted to prevent client freezing." 
+                    ? error.message 
+                    : `An error occurred while modifying the current playlist.`;
+                showNotification(errorMsg, true, 8000);
                 playlistWasModifiedOrCreated = false;
                 playlistUriForQueue = currentUriAtStart; 
                 modifiedPlaylistOriginalPath = null; 
@@ -42507,9 +44322,16 @@
             if (origAlbumCompare !== 0) return origAlbumCompare;
 
             const typeRank = { "album": 1, "compilation": 2, "ep": 3, "single": 4, "appears_on": 5 };
-            const rankA = typeRank[(a.albumType || a.album_type || "album").toLowerCase()] || 6;
-            const rankB = typeRank[(b.albumType || b.album_type || "album").toLowerCase()] || 6;
-            if (rankA !== rankB) return rankA - rankB;
+            const typeAStr = (a.albumType || a.album_type || "album").toLowerCase();
+            const typeBStr = (b.albumType || b.album_type || "album").toLowerCase();
+            const rankA = typeRank[typeAStr] || 6;
+            const rankB = typeRank[typeBStr] || 6;
+            
+            const idA = (sortType === "trueReleaseDate" ? a.trueAlbumId : null) || a.albumId || a.track?.album?.id || "A";
+            const idB = (sortType === "trueReleaseDate" ? b.trueAlbumId : null) || b.albumId || b.track?.album?.id || "B";
+            const isSameAlbumId = (idA === idB);
+
+            if (!isSameAlbumId && rankA !== rankB) return rankA - rankB;
             
             let discNumA = sortType === "trueReleaseDate" ? (a.trueDiscNumber || a.discNumber || 1) : (a.discNumber || 1);
             let discNumB = sortType === "trueReleaseDate" ? (b.trueDiscNumber || b.discNumber || 1) : (b.discNumber || 1);
@@ -43664,7 +45486,15 @@
             const exactEditionKey = albumId ? albumId : getNormalizedTitle(fallbackName);
             
             if (!albumGroups.has(exactEditionKey)) {
-                albumGroups.set(exactEditionKey, { rawName: albumName || "Unknown Album", baseName: baseName, realAlbumId: albumId, dateMs: Infinity, allTracks: [], originalDate: null });
+                albumGroups.set(exactEditionKey, { 
+                    rawName: albumName || "Unknown Album", 
+                    baseName: baseName, 
+                    realAlbumId: albumId, 
+                    dateMs: Infinity, 
+                    allTracks: [], 
+                    originalDate: null,
+                    type: track.albumType || track.album_type || 'album'
+                });
             }
             
             const group = albumGroups.get(exactEditionKey);
@@ -43770,6 +45600,10 @@
                 t.trueAlbumName = masterAlbum.rawName;
                 t.albumId = masterAlbum.realAlbumId;
                 t.trueAlbumId = masterAlbum.realAlbumId;
+                
+                t.albumType = masterAlbum.type;
+                t.album_type = masterAlbum.type;
+                if (t.track && t.track.album) t.track.album.album_type = masterAlbum.type;
                 
                 if (absoluteEarliestDate) {
                     t._unifiedReleaseDate = absoluteEarliestDate;
