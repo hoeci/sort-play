@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.4.0";
+  const SORT_PLAY_VERSION = "6.4.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -2614,6 +2614,20 @@
     'default': COVER_TOP
   };
 
+  const DEDICATED_PLAYLIST_DEFAULTS = {
+    'topThisMonth': { name: "My Top Tracks: This Month", uiName: "Top Tracks: This Month", title: "Top Tracks", sub: "This Month" },
+    'topLast6Months': { name: "My Top Tracks: Last 6 Months", uiName: "Top Tracks: Last 6 Months", title: "Top Tracks", sub: "Last 6 Months" },
+    'topAllTime': { name: "My Top Tracks: All-Time", uiName: "Top Tracks: All-Time", title: "Top Tracks", sub: "All-Time" },
+    'followedReleasesChronological': { name: "New Releases: Followed", uiName: "Followed Artist (Full)", title: "New Releases", sub: "Followed" },
+    'recommendRecentVibe': { name: "Discovery: Recent Taste", uiName: "Recent Vibe Discovery", title: "Discovery", sub: "Recent Vibe" },
+    'recommendAllTime': { name: "Discovery: All-Time Taste", uiName: "All-Time Discovery", title: "Discovery", sub: "All-Time" },
+    'pureDiscovery': { name: "Pure Discovery", uiName: "Pure Discovery", title: "Discovery", sub: "Pure" },
+    'randomGenreExplorer': { name: "Random Genre Explorer", uiName: "Random Genre Explorer", title: "Genre Explorer", sub: "Random" },
+    'infiniteVibe': { name: "Infinite Vibe", uiName: "Infinite Vibe", title: "Infinite Vibe", sub: "Last.fm" },
+    'neighborsMix': { name: "Neighbors Mix", uiName: "Neighbors Mix", title: "Neighbors Mix", sub: "Last.fm" },
+    'tastemakerProfile': { name: "Tastemaker Profile", uiName: "Tastemaker Profile", title: "Taste of", sub: "Tastemaker" }
+  };
+
   const dedicatedJobRunners = {
     'topThisMonth': (isHeadless = false) => handleSortAndCreatePlaylist('topThisMonth', { isHeadless }),
     'topLast6Months': (isHeadless = false) => handleSortAndCreatePlaylist('topLast6Months', { isHeadless }),
@@ -2641,32 +2655,32 @@
     {
         title: 'New Releases',
         cards: [
-            { id: 'followedReleasesChronological', name: 'Followed Artist (Full)', description: 'Every new track from the artists you follow.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological, broken: false },
+            { id: 'followedReleasesChronological', name: DEDICATED_PLAYLIST_DEFAULTS.followedReleasesChronological.uiName, description: 'Every new track from the artists you follow.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.followedReleasesChronological, broken: false },
         ]
     },
     {
         title: 'Discovery',
         cards: [
-            { id: 'recommendRecentVibe', name: 'Recent Vibe Discovery', description: 'Discover tracks matching your recent vibe.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v3', broken: false },
-            { id: 'recommendAllTime', name: 'All-Time Discovery', description: 'Discover tracks matching your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v3', broken: false },
-            { id: 'pureDiscovery', name: 'Pure Discovery', description: 'Discover tracks from new artists that match your musical taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v3', broken: false },
-            { id: 'randomGenreExplorer', name: 'Random Genre Explorer', description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer, broken: false },
+            { id: 'recommendRecentVibe', name: DEDICATED_PLAYLIST_DEFAULTS.recommendRecentVibe.uiName, description: 'Discover tracks matching your recent vibe.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v3', broken: false },
+            { id: 'recommendAllTime', name: DEDICATED_PLAYLIST_DEFAULTS.recommendAllTime.uiName, description: 'Discover tracks matching your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v3', broken: false },
+            { id: 'pureDiscovery', name: DEDICATED_PLAYLIST_DEFAULTS.pureDiscovery.uiName, description: 'Discover tracks from new artists that match your musical taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v3', broken: false },
+            { id: 'randomGenreExplorer', name: DEDICATED_PLAYLIST_DEFAULTS.randomGenreExplorer.uiName, description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer, broken: false },
         ]
     },
     {
         title: 'Last.fm',
         cards: [
-            { id: 'infiniteVibe', name: 'Infinite Vibe', description: 'An endless mix of fresh tracks based on your recent obsessions and favorites.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: false },
-            { id: 'tastemakerProfile', name: 'Tastemaker Profile', description: 'Explore music through the top tracks of a specific Last.fm user.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.tastemakerProfile, broken: false },
-            { id: 'neighborsMix', name: 'Neighbors Mix', description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: false },
+            { id: 'infiniteVibe', name: DEDICATED_PLAYLIST_DEFAULTS.infiniteVibe.uiName, description: 'An endless mix of fresh tracks based on your recent obsessions and favorites.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: false },
+            { id: 'tastemakerProfile', name: DEDICATED_PLAYLIST_DEFAULTS.tastemakerProfile.uiName, description: 'Explore music through the top tracks of a specific Last.fm user.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.tastemakerProfile, broken: false },
+            { id: 'neighborsMix', name: DEDICATED_PLAYLIST_DEFAULTS.neighborsMix.uiName, description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: false },
         ]
     },
     {
         title: 'My Top Tracks',
         cards: [
-            { id: 'topThisMonth', name: 'Top Tracks: This Month', description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth, broken: false },
-            { id: 'topLast6Months', name: 'Top Tracks: Last 6 Months', description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months, broken: false },
-            { id: 'topAllTime', name: 'Top Tracks: All-Time', description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime, broken: false },
+            { id: 'topThisMonth', name: DEDICATED_PLAYLIST_DEFAULTS.topThisMonth.uiName, description: 'Your most played tracks from the last 4 weeks.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topThisMonth, broken: false },
+            { id: 'topLast6Months', name: DEDICATED_PLAYLIST_DEFAULTS.topLast6Months.uiName, description: 'Your most played tracks from the last 6 months.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topLast6Months, broken: false },
+            { id: 'topAllTime', name: DEDICATED_PLAYLIST_DEFAULTS.topAllTime.uiName, description: 'Your most played tracks of all time.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.topAllTime, broken: false },
         ]
     }
   ];
@@ -8770,10 +8784,13 @@
             box-shadow: 0 10px 40px rgba(0,0,0,0.5);
         `;
 
-        const overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}');
+        let overrides = {};
+        try { overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}'); } catch (e) {}
         const custom = overrides[cardId] || {};
         
-        let tempName = custom.name || defaultCardData.name;
+        const actualDefaultName = DEDICATED_PLAYLIST_DEFAULTS[cardId]?.name || defaultCardData.name;
+
+        let tempName = custom.name || actualDefaultName;
         let tempImageData = null;
 
         modalContainer.innerHTML = `
@@ -8830,6 +8847,11 @@
                 return;
             }
 
+            if (file.size > 15 * 1024 * 1024) {
+                showNotification("Image is too large. Please select a file under 15MB.", true);
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
@@ -8838,6 +8860,9 @@
                     canvas.width = 640;
                     canvas.height = 640;
                     const ctx = canvas.getContext('2d');
+                    
+                    ctx.fillStyle = '#181818';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
                     
                     const size = Math.min(img.width, img.height);
                     const x = (img.width - size) / 2;
@@ -8878,7 +8903,7 @@
                          if (activeSet.has(playlistUri)) {
                              const playlistId = playlistUri.split(':')[2];
                              
-                             await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, { name: defaultCardData.name });
+                             await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, { name: actualDefaultName });
                              
                              const user = await Spicetify.Platform.UserAPI.getUser();
                              
@@ -8891,19 +8916,7 @@
                              else if (newRelCards.some(c => c.id === cardId)) usernameColor = '#3798a5';
                              else if (lastFmCards.some(c => c.id === cardId)) usernameColor = '#D1170E';
                              
-                             const textMapping = {
-                                 'topThisMonth': { title: "Top Tracks", sub: "This Month" },
-                                 'topLast6Months': { title: "Top Tracks", sub: "Last 6 Months" },
-                                 'topAllTime': { title: "Top Tracks", sub: "All-Time" },
-                                 'followedReleasesChronological': { title: "New Releases", sub: "Followed" },
-                                 'recommendRecentVibe': { title: "Discovery", sub: "Recent Vibe" },
-                                 'recommendAllTime': { title: "Discovery", sub: "All-Time" },
-                                 'pureDiscovery': { title: "Discovery", sub: "Pure" },
-                                 'randomGenreExplorer': { title: "Genre Explorer", sub: "Random" },
-                                 'infiniteVibe': { title: "Infinite Vibe", sub: "Last.fm" },
-                                 'neighborsMix': { title: "Neighbors Mix", sub: "Last.fm" }
-                             };
-                             const defText = textMapping[cardId] || { title: defaultCardData.name, sub: "" };
+                             const defText = DEDICATED_PLAYLIST_DEFAULTS[cardId] || { title: defaultCardData.name, sub: "" };
                              
                              const baseImageUrl = DEDICATED_PLAYLIST_COVERS[cardId] || DEDICATED_PLAYLIST_COVERS['default'];
                              const coverBase64 = await generatePlaylistCover(defText.title, defText.sub, user.displayName, baseImageUrl, usernameColor);
@@ -8948,7 +8961,7 @@
                      const activeSet = await getActiveUserPlaylistUris();
                      if (activeSet.has(playlistUri)) {
                          const playlistId = playlistUri.split(':')[2];
-                         const targetName = newName || defaultCardData.name;
+                         const targetName = newName || actualDefaultName;
                          
                          await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, { name: targetName });
                          
@@ -9859,9 +9872,10 @@
     modalContainer.querySelector = (sel) => shadowRoot.querySelector(sel);
     modalContainer.querySelectorAll = (sel) => shadowRoot.querySelectorAll(sel);
 
-    const cachedCounts = JSON.parse(localStorage.getItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS) || '{}');
-    let dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}');
-    const dedicatedPlaylistMeta = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
+    let cachedCounts = {}, dedicatedPlaylistBehavior = {}, dedicatedPlaylistMeta = {};
+    try { cachedCounts = JSON.parse(localStorage.getItem(STORAGE_KEY_GLOBAL_PLAYLIST_COUNTS) || '{}'); } catch(e) {}
+    try { dedicatedPlaylistBehavior = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_BEHAVIOR) || '{}'); } catch(e) {}
+    try { dedicatedPlaylistMeta = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}'); } catch(e) {}
     const jobs = getDedicatedJobs();
     
     jobs.forEach(job => {
@@ -9882,11 +9896,6 @@
             else if (section.title === 'New Releases') defaultColor = '55, 152, 165';
             else if (section.title === 'My Top Tracks') defaultColor = '36, 191, 112';
             else if (section.title === 'Last.fm') defaultColor = '209, 23, 14';
-            
-            const cachedMeta = dedicatedPlaylistMeta[card.id];
-            if (cachedMeta && cachedMeta.imageUrl && !isDefaultMosaicCover(cachedMeta.imageUrl)) {
-                defaultBgImgUrl = cachedMeta.imageUrl;
-            }
             break;
         }
     }
@@ -9925,7 +9934,8 @@
         return ''; 
     };
 
-    const overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}');
+    let overrides = {};
+    try { overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}'); } catch(e) {}
 
     const generateCardsHtml = (cards, category) => {
         let rgbColor = '0, 0, 0';
@@ -10177,20 +10187,6 @@
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
 
-    (async () => {
-        const cardsNeedingCover = shadowRoot.querySelectorAll('.slim-card[data-needs-idb-cover="true"]');
-        for (const cardEl of cardsNeedingCover) {
-            const cardId = cardEl.dataset.id;
-            const b64 = await idb.get('generatedCovers', `custom_image_${cardId}`);
-            if (b64) {
-                const bgEl = cardEl.querySelector('.card-bg');
-                if (bgEl) {
-                    bgEl.style.backgroundImage = `url('${b64}')`;
-                }
-            }
-        }
-    })();
-
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             overlay.style.opacity = "1";
@@ -10254,6 +10250,23 @@
         img.onerror = applyLayer;
         img.src = imgUrl;
     };
+
+    (async () => {
+        const cardsNeedingCover = Array.from(shadowRoot.querySelectorAll('.slim-card[data-needs-idb-cover="true"]'));
+        await Promise.all(cardsNeedingCover.map(async (cardEl) => {
+            const cardId = cardEl.dataset.id;
+            const b64 = await idb.get('generatedCovers', `custom_image_${cardId}`);
+            if (b64) {
+                const bgEl = cardEl.querySelector('.card-bg');
+                if (bgEl) {
+                    bgEl.style.backgroundImage = `url('${b64}')`;
+                }
+                if (cardId === lastActiveId) {
+                    setBackground(b64, defaultColor);
+                }
+            }
+        }));
+    })();
 
     const cards = shadowRoot.querySelectorAll('.slim-card');
     let hoverIntentTimeout;
@@ -33573,7 +33586,11 @@
     ctx.textBaseline = 'middle';
     ctx.fillStyle = textColor || '#24bf70';
 
-    let displayName = userName.length > 30 ? userName.substring(0, 30) + '...' : userName;
+    const safeUserName = userName || "";
+    const safeTitleText = titleText || "";
+    const safeSubtitleText = subtitleText || "";
+
+    let displayName = safeUserName.length > 30 ? safeUserName.substring(0, 30) + '...' : safeUserName;
     let userNameFontSize = 48;
     ctx.font = `bold ${userNameFontSize}px 'SpotifyMixUI', sans-serif`;
     const maxUserNameWidth = size * 0.8;
@@ -33582,11 +33599,13 @@
         ctx.font = `bold ${userNameFontSize}px 'SpotifyMixUI', sans-serif`;
     }
     const userNameY = size * 0.76; 
-    ctx.fillText(displayName, size / 2, userNameY);
+    if (displayName) {
+        ctx.fillText(displayName, size / 2, userNameY);
+    }
 
     const contentCenterY = size * 0.42;
-    const titleUpper = titleText.toUpperCase();
-    const subUpper = subtitleText ? subtitleText.toUpperCase() : "";
+    const titleUpper = safeTitleText.toUpperCase();
+    const subUpper = safeSubtitleText ? safeSubtitleText.toUpperCase() : "";
     
     let titleFontSize = 90;
     ctx.font = `800 ${titleFontSize}px 'SpotifyMixUI', sans-serif`;
@@ -36751,25 +36770,12 @@
     let coverTitle = name;
     let coverSubtitle = "";
 
-    const textMapping = {
-        'topThisMonth': { title: "Top Tracks", sub: "This Month" },
-        'topLast6Months': { title: "Top Tracks", sub: "Last 6 Months" },
-        'topAllTime': { title: "Top Tracks", sub: "All-Time" },
-        'followedReleasesChronological': { title: "New Releases", sub: "Followed", playlistName: "New Releases: Followed" },
-        'recommendRecentVibe': { title: "Discovery", sub: "Recent Vibe" },
-        'recommendAllTime': { title: "Discovery", sub: "All-Time" },
-        'pureDiscovery': { title: "Discovery", sub: "Pure" },
-        'genreTreeExplorer': { title: "Genre Explorer", sub: "" },
-        'randomGenreExplorer': { title: "Genre Explorer", sub: "Random" },
-        'infiniteVibe': { title: "Infinite Vibe", sub: "Last.fm" },
-        'neighborsMix': { title: "Neighbors Mix", sub: "Last.fm" }
-    };
-
-    if (textMapping[sortType]) {
-        coverTitle = textMapping[sortType].title;
-        coverSubtitle = textMapping[sortType].sub;
-        if (textMapping[sortType].playlistName) {
-            finalPlaylistName = textMapping[sortType].playlistName;
+    const defs = DEDICATED_PLAYLIST_DEFAULTS[actualSortType];
+    if (defs) {
+        coverTitle = defs.title;
+        coverSubtitle = defs.sub;
+        if (defs.name && actualSortType === sortType) {
+            finalPlaylistName = defs.name;
         }
     }
 
@@ -36779,7 +36785,8 @@
         coverSubtitle = username;
     }
 
-    const overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}');
+    let overrides = {};
+    try { overrides = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_OVERRIDES) || '{}'); } catch(e) {}
     const custom = overrides[actualSortType] || {};
 
     if (custom.name) finalPlaylistName = custom.name;
@@ -36864,6 +36871,11 @@
                                         const customBase64 = await idb.get('generatedCovers', `custom_image_${actualSortType}`);
                                         if (customBase64) {
                                             await setPlaylistImage(playlistId, customBase64);
+                                        } else {
+                                            const user = await Spicetify.Platform.UserAPI.getUser();
+                                            const baseImageUrl = DEDICATED_PLAYLIST_COVERS[actualSortType] || DEDICATED_PLAYLIST_COVERS['default'];
+                                            const coverBase64 = await generatePlaylistCover(coverTitle, coverSubtitle, user.displayName, baseImageUrl, usernameColor);
+                                            await setPlaylistImage(playlistId, coverBase64);
                                         }
                                     }
                                 } else if (!hasCustomCover) {
