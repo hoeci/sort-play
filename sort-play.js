@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.4.1";
+  const SORT_PLAY_VERSION = "6.5.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -380,7 +380,7 @@
 
   let cachedTasteProfile = null;
   let cachedTasteProfileTimestamp = 0;
-  const TASTE_PROFILE_VERSION = "1";
+  const TASTE_PROFILE_VERSION = "4";
   const TASTE_PROFILE_UPDATE_INTERVAL = 24 * 60 * 60 * 1000;
   const TASTE_PROFILE_FULL_REBUILD_INTERVAL = 30 * 24 * 60 * 60 * 1000;
   let isBuildingTasteProfile = false;
@@ -537,8 +537,7 @@
   const innerPlayPlusIconSvg = `<svg width="17px" height="17px" viewBox="0 0 24 24" fill="none"><path d="M6 12H18M12 6V18" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const closeModalIcon20Svg = `<svg width="20" height="20" viewBox="0 0 32 32"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>`;
   const closeModalIcon18Svg = `<svg width="18" height="18" viewBox="0 0 32 32"><path d="M31.098 29.794L16.955 15.65 31.097 1.51 29.683.093 15.54 14.237 1.4.094-.016 1.508 14.126 15.65-.016 29.795l1.414 1.414L15.54 17.065l14.144 14.143" fill="currentColor" fill-rule="evenodd"></path></svg>`;
-  const chatSendIconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M11.5 12H5.419M5.246 12.797L4.242 15.799C3.691 17.442 3.416 18.264 3.614 18.77C3.785 19.21 4.153 19.543 4.608 19.67C5.131 19.816 5.922 19.46 7.502 18.749L17.637 14.189C19.18 13.494 19.951 13.147 20.19 12.665C20.397 12.246 20.397 11.754 20.19 11.335C19.951 10.853 19.18 10.506 17.637 9.811L7.485 5.243C5.909 4.534 5.121 4.179 4.598 4.325C4.144 4.451 3.776 4.783 3.604 5.222C3.406 5.727 3.678 6.547 4.222 8.188L5.248 11.279C5.342 11.561 5.389 11.702 5.407 11.846C5.423 11.974 5.423 12.103 5.407 12.231C5.388 12.375 5.341 12.516 5.246 12.797Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const chatUploadIconSvg = `<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>`;
+  const chatSendIconSvg = `<svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M11.5 12H5.419M5.246 12.797L4.242 15.799C3.691 17.442 3.416 18.264 3.614 18.77C3.785 19.21 4.153 19.543 4.608 19.67C5.131 19.816 5.922 19.46 7.502 18.749L17.637 14.189C19.18 13.494 19.951 13.147 20.19 12.665C20.397 12.246 20.397 11.754 20.19 11.335C19.951 10.853 19.18 10.506 17.637 9.811L7.485 5.243C5.909 4.534 5.121 4.179 4.598 4.325C4.144 4.451 3.776 4.783 3.604 5.222C3.406 5.727 3.678 6.547 4.222 8.188L5.248 11.279C5.342 11.561 5.389 11.702 5.407 11.846C5.423 11.974 5.423 12.103 5.407 12.231C5.388 12.375 5.341 12.516 5.246 12.797Z" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
   const chatDotsIconSvg = `<svg viewBox="0 0 24 24"><path d="M12 7a2 2 0 1 0-.001-4.001A2 2 0 0 0 12 7zm0 2a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 9zm0 6a2 2 0 1 0-.001 3.999A2 2 0 0 0 12 15z"/></svg>`;
   const closeIcon24Svg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>`;
   const historyIconSvg = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 12C4 16.4183 7.58172 20 12 20C16.4183 20 20 16.4183 20 12C20 7.58172 16.4183 4 12 4C9.61061 4 7.46589 5.04751 6 6.70835C5.91595 6.80358 5.83413 6.90082 5.75463 7M12 8V12L14.5 14.5M5.75391 4.00391V7.00391H8.75391" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -1170,7 +1169,7 @@
     },
     powerIteration: (matrix, iters = 100) => {
       const n = matrix.length;
-      let vec = spMath.normalize(new Array(n).fill(0).map(() => Math.random() - 0.5));
+      let vec = spMath.normalize(new Array(n).fill(0).map((_, i) => 1 / Math.sqrt(i + 1)));
       for (let i = 0; i < iters; i++) {
           const nextVec = new Array(n).fill(0);
           for (let r = 0; r < n; r++) {
@@ -1305,9 +1304,14 @@
       this.vars = [];
       this.weights = new Array(this.k).fill(1/this.k);
       
-      const shuffled = [...data].sort(() => 0.5 - Math.random());
+      const sortedIndices = Array.from({ length: n }, (_, i) => i).sort((a, b) => data[a][0] - data[b][0]);
       for (let i = 0; i < this.k; i++) {
-          this.means.push([...shuffled[i]]);
+          const qIdx = sortedIndices[Math.floor((i + 0.5) * n / this.k)];
+          const mean = [...data[qIdx]];
+          if (i > 0 && this.means.some(m => m.every((v, idx) => Math.abs(v - mean[idx]) < 1e-4))) {
+              mean[0] += (i * 0.01);
+          }
+          this.means.push(mean);
           this.vars.push(new Array(d).fill(0.05));
       }
       
@@ -2661,9 +2665,9 @@
     {
         title: 'Discovery',
         cards: [
-            { id: 'recommendRecentVibe', name: DEDICATED_PLAYLIST_DEFAULTS.recommendRecentVibe.uiName, description: 'Discover tracks matching your recent vibe.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v3', broken: false },
-            { id: 'recommendAllTime', name: DEDICATED_PLAYLIST_DEFAULTS.recommendAllTime.uiName, description: 'Discover tracks matching your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v3', broken: false },
-            { id: 'pureDiscovery', name: DEDICATED_PLAYLIST_DEFAULTS.pureDiscovery.uiName, description: 'Discover tracks from new artists that match your musical taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v3', broken: false },
+            { id: 'recommendRecentVibe', name: DEDICATED_PLAYLIST_DEFAULTS.recommendRecentVibe.uiName, description: 'Discover tracks matching your recent vibe.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendRecentVibe, version: 'v4', broken: false },
+            { id: 'recommendAllTime', name: DEDICATED_PLAYLIST_DEFAULTS.recommendAllTime.uiName, description: 'Discover tracks matching your long-term taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.recommendAllTime, version: 'v4', broken: false },
+            { id: 'pureDiscovery', name: DEDICATED_PLAYLIST_DEFAULTS.pureDiscovery.uiName, description: 'Discover tracks from new artists that match your musical taste.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.pureDiscovery, version: 'v4', broken: false },
             { id: 'randomGenreExplorer', name: DEDICATED_PLAYLIST_DEFAULTS.randomGenreExplorer.uiName, description: 'Explore a random mix of 20 genres from across Spotify.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.randomGenreExplorer, broken: false },
         ]
     },
@@ -3467,7 +3471,15 @@
     });
 
     cancelButton.addEventListener("click", () => { closeModal(); if (onCancel) onCancel(); });
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) { closeModal(); if (onCancel) onCancel(); } });
+    overlay.addEventListener("click", (e) => { 
+        if (e.target === overlay) { 
+            if (!toggleOptions && !dropdownOptions && inputField && inputField.value !== String(inputValue || "")) {
+                return;
+            }
+            closeModal(); 
+            if (onCancel) onCancel(); 
+        } 
+    });
   }
   
   function showLastFmUsernameModal(onSuccess = null) {
@@ -3638,7 +3650,19 @@
     };
 
     overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) closeModal();
+        if (e.target === overlay) {
+            const chatInput = document.getElementById('sp-chat-input');
+            const chatNameInput = document.getElementById('sp-chat-name-input');
+            
+            if (chatInput && chatInput.value.trim() !== '') {
+                return;
+            }
+            if (chatNameInput && document.getElementById('sp-chat-name-overlay')?.style.display === 'flex' && chatNameInput.value.trim() !== '') {
+                return;
+            }
+            
+            closeModal();
+        }
     });
 
     const headerHtml = `
@@ -3686,12 +3710,12 @@
 
     modalContainer.innerHTML = `
     <style>
-      .main-trackCreditsModal-mainSection { overflow-y: auto !important; padding: 16px 45px 16px 45px; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #333333 #181818; }
+      .main-trackCreditsModal-mainSection { overflow-y: auto !important; padding: 16px 45px 16px 45px; flex-grow: 1; scrollbar-width: thin; scrollbar-color: #333333 #181818; transform: translateZ(0); will-change: transform; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar { width: 8px; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar-track { background: #282828; border-radius: 4px; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb { background-color: #5a5a5a; border-radius: 4px; }
       .main-trackCreditsModal-mainSection::-webkit-scrollbar-thumb:hover { background-color: #7a7a7a; }
-      .sort-play-settings-footer { flex-shrink: 0; padding: 10px 25px 12px 25px; background-color: #181818; border-top: 1px solid #282828; display: flex; justify-content: center; align-items: center; position: relative; }
+      .sort-play-settings-footer { flex-shrink: 0; padding: 10px 25px; background-color: #181818; border-top: 1px solid #282828; display: flex; justify-content: center; align-items: center; position: relative; height: 61px; box-sizing: border-box; }
       .sort-play-settings-footer .live-chat-button { position: absolute; right: 25px; }
       .sort-play-settings-footer .support-me-button { position: absolute; left: 25px; }
       .sort-play-settings-footer .github-link-container a { color: #1ED760; font-size: 14px; text-decoration: none; }
@@ -3840,14 +3864,14 @@
             Preserve "Date Added" on Modify
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip wide">Controls how 'Date Added' is handled.<br><br>• <strong>Smart (Ask)</strong>: Auto-detects curation. Silently preserves small playlists, fast-sorts bulk dumps, and asks only for large curated lists.<br>• <strong>Fast</strong>: Instant, but resets 'Date Added'.<br>• <strong>Preserve</strong>: Always keeps the original dates, but is slower.</span>
+                <span class="custom-tooltip wide">Controls how 'Date Added' is handled.<br><br>• <strong>Smart (Ask)</strong>: Detects multi-day curation and prompts on bulk dumps or large lists.<br>• <strong>Preserve</strong>: Keeps original dates; prompts on large playlists.<br>• <strong>Fast (Reset)</strong>: Instant sort, but resets 'Date Added' to now.</span>
             </span>
         </label>
         <div class="col action">
             <select id="preserveDateBehaviorSelect" style="max-width: 140px;">
                 <option value="ask" ${preserveDateBehavior === 'ask' ? 'selected' : ''}>Smart (Ask)</option>
-                <option value="fast" ${preserveDateBehavior === 'fast' ? 'selected' : ''}>Fast (Reset)</option>
                 <option value="preserve" ${preserveDateBehavior === 'preserve' ? 'selected' : ''}>Preserve</option>
+                <option value="fast" ${preserveDateBehavior === 'fast' ? 'selected' : ''}>Fast (Reset)</option>
             </select>
         </div>
     </div>
@@ -4477,20 +4501,36 @@
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
 
+    const chatInputCont = document.querySelector('.sp-chat-input-container');
+    const chatTextarea = document.querySelector('#sp-chat-input');
+    const replyBannerInit = document.querySelector('#sp-chat-reply-banner');
+    const attachBannerInit = document.querySelector('#sp-chat-attach-banner');
+    const settingsFooter = modalContainer.querySelector('.sort-play-settings-footer');
+    if (chatInputCont && chatTextarea && settingsFooter) {
+        const extraHeight = Math.max(0, Math.round(chatTextarea.getBoundingClientRect().height) - 40);
+        let bannersHeight = 0;
+        if (replyBannerInit && replyBannerInit.style.display !== 'none') bannersHeight += Math.round(replyBannerInit.getBoundingClientRect().height) + 8;
+        if (attachBannerInit && attachBannerInit.style.display !== 'none') bannersHeight += Math.round(attachBannerInit.getBoundingClientRect().height) + 8;
+        const baseHeight = Math.round(chatInputCont.getBoundingClientRect().height) - extraHeight - bannersHeight;
+        if (baseHeight !== 61) settingsFooter.style.height = `${baseHeight}px`;
+    }
+
     const scrollContainerForTooltips = modalContainer.querySelector('.main-trackCreditsModal-mainSection');
     modalContainer.querySelectorAll('.tooltip-container').forEach(container => {
         container.addEventListener('mouseenter', () => {
-            const tooltip = container.querySelector('.custom-tooltip');
-            if (!tooltip || !scrollContainerForTooltips) return;
-            
-            tooltip.classList.remove('flip-bottom');
-            
-            const tooltipRect = tooltip.getBoundingClientRect();
-            const containerRect = scrollContainerForTooltips.getBoundingClientRect();
-            
-            if (tooltipRect.top < containerRect.top + 5) {
-                tooltip.classList.add('flip-bottom');
-            }
+            window.requestAnimationFrame(() => {
+                const tooltip = container.querySelector('.custom-tooltip');
+                if (!tooltip || !scrollContainerForTooltips) return;
+                
+                tooltip.classList.remove('flip-bottom');
+                
+                const tooltipRect = tooltip.getBoundingClientRect();
+                const containerRect = scrollContainerForTooltips.getBoundingClientRect();
+                
+                if (tooltipRect.top < containerRect.top + 5) {
+                    tooltip.classList.add('flip-bottom');
+                }
+            });
         });
     });
 
@@ -5047,9 +5087,9 @@
     const preserveDateBehaviorSelect = modalContainer.querySelector("#preserveDateBehaviorSelect");
     preserveDateBehaviorSelect.addEventListener("change", () => {
         preserveDateBehavior = preserveDateBehaviorSelect.value;
-        if (preserveDateBehavior === 'ask') {
-            localStorage.removeItem('sort-play-ignore-extreme-warning');
-        }
+        localStorage.removeItem('sort-play-ignore-extreme-warning');
+        localStorage.removeItem('sort-play-large-playlist-action');
+        localStorage.removeItem('sort-play-massive-playlist-action');
         saveSettings();
     });
 
@@ -5640,6 +5680,67 @@
         return chatPanel;
     }
 
+    const CHAT_REACTIONS = [
+        '\u{1F44D}',
+        '\u{2764}\u{FE0F}',
+        '\u{1F604}',
+        '\u{1F440}',
+        '\u{1F622}',
+        '\u{1F525}',
+        '\u{1F389}'
+    ];
+
+    const EXTRA_SUBSET_EMOJIS = [
+        '\u{1F4AF}', '\u{1F62D}', '\u{1F480}', '\u{1F97A}', '\u{1F923}', '\u{1F60D}',
+        '\u{1F64F}', '\u{1F60A}', '\u{1F970}', '\u{1F643}', '\u{1F62E}', '\u{1F644}',
+        '\u{1F614}', '\u{1F60E}', '\u{1F914}', '\u{1F44F}', '\u{1F64C}', '\u{270C}\u{FE0F}',
+        '\u{1F44E}', '\u{1F494}', '\u{1F44B}', '\u{1F44C}', '\u{1F602}', '\u{1F91E}',
+        '\u{1F92F}', '\u{1F600}', '\u{1F603}', '\u{1F601}', '\u{1F606}', '\u{1F605}',
+        '\u{1F972}', '\u{1F642}', '\u{1F609}', '\u{1F618}', '\u{1F978}', '\u{1F615}',
+        '\u{1F641}', '\u{2639}\u{FE0F}'
+    ];
+
+    const PRIMARY_REACTION = CHAT_REACTIONS[0];
+    const SECONDARY_REACTIONS = CHAT_REACTIONS.slice(1);
+    const ALL_SUBSET_EMOJIS = [...CHAT_REACTIONS, ...EXTRA_SUBSET_EMOJIS];
+
+    let initialFontLoadPromise = Promise.resolve();
+    const existingFontLink = document.getElementById('sp-chat-emoji-font');
+    const emojiString = ALL_SUBSET_EMOJIS.join('');
+
+    if (!existingFontLink) {
+        initialFontLoadPromise = new Promise(resolve => {
+            let resolved = false;
+            const done = () => { if (!resolved) { resolved = true; resolve(); } };
+            setTimeout(done, 2000);
+
+            const encodedEmojis = encodeURIComponent(emojiString);
+            const link = document.createElement('link');
+            link.id = 'sp-chat-emoji-font';
+            link.rel = 'stylesheet';
+            link.href = `https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&text=${encodedEmojis}&display=swap`;
+            
+            link.onload = () => {
+                if (document.fonts) {
+                    document.fonts.load('1em "Noto Color Emoji"', emojiString)
+                        .then(done)
+                        .catch(done);
+                } else {
+                    done();
+                }
+            };
+            link.onerror = done;
+            document.head.appendChild(link);
+        });
+    } else {
+        if (document.fonts) {
+            initialFontLoadPromise = Promise.race([
+                document.fonts.load('1em "Noto Color Emoji"', emojiString).catch(() => {}),
+                new Promise(resolve => setTimeout(resolve, 2000))
+            ]);
+        }
+    }
+
     chatPanel = document.createElement('div');
     const chatPanelAbortController = new AbortController();
     chatPanel.id = 'sort-play-chat-panel';
@@ -5648,21 +5749,23 @@
     chatPanel.innerHTML = `
         <style>
           #sort-play-chat-panel { display: flex; flex-direction: column; background-color: #181818; border: 2px solid #282828; border-radius: 30px; overflow: hidden; position: fixed; width: 380px; height: 75vh; max-height: 675px; z-index: 2004; box-shadow: 0 16px 24px rgba(0,0,0,.3), 0 6px 8px rgba(0,0,0,.2); opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
+          #sort-play-chat-panel, #sort-play-chat-panel * { font-family: 'Noto Color Emoji', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; }
           #sort-play-chat-panel.visible { opacity: 1; pointer-events: auto; }
-          .sp-chat-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #282828; background: #181818; }
+          .sp-chat-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 16px 15px 20px; border-bottom: 1px solid #282828; background: #181818; }
           .sp-chat-title-link { display: flex; align-items: center; gap: 6px; text-decoration: none !important; cursor: pointer; outline: none; }
           .sp-chat-title-link:focus, .sp-chat-title-link:active { outline: none; }
           .sp-chat-title-link:hover .sp-chat-title { text-decoration: underline !important; }
           .sp-chat-title { color: white; font-weight: 700; font-size: 16px; text-decoration: none !important; pointer-events: none; }
           .sp-chat-ext-icon { display: flex; align-items: center; color: #b3b3b3; width: 12px; height: 12px; }
           .sp-chat-ext-icon svg { width: 100%; height: 100%; }
-          .sp-chat-header-btn { background: transparent; border: 1px solid #282828; color: #b3b3b3; border-radius: 12px; padding: 4px 10px; font-size: 11px; cursor: pointer; transition: background-color 0.2s, color 0.2s; font-weight: 600; }
+          .sp-chat-header-btn { background: transparent; border: none; color: #b3b3b3; border-radius: 50%; width: 32px; height: 32px; margin: -5px -4px -5px 0; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
           .sp-chat-header-btn:hover { background: rgba(255,255,255,0.1); color: white; }
           #sp-chat-name-overlay { display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 2000; justify-content: center; align-items: center; }
           #sp-chat-name-box { background: #282828; border: 1px solid #3e3e3e; border-radius: 25px; padding: 20px; display: flex; flex-direction: column; gap: 12px; width: 260px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
           #sp-chat-name-input { background: #181818; border: 1px solid #555; color: white; padding: 8px 12px; border-radius: 6px; outline: none; font-size: 13px; font-family: inherit; }
           #sp-chat-name-input:focus { border-color: #1db954; }
-          .sp-chat-messages-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #333333 transparent; min-height: 0; display: block; }
+          .sp-chat-messages-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #333333 transparent; min-height: 0; display: block; overscroll-behavior-y: contain; will-change: scroll-position; }
+          .sp-chat-messages-scroll.sp-is-scrolling .sp-chat-msg { pointer-events: none !important; }
           .sp-chat-messages { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; padding: 15px 12px 2px; box-sizing: border-box; }
           .sp-chat-msg { position: relative; display: flex; flex-direction: row; width: 100%; padding-bottom: 12px; gap: 8px; align-items: flex-start; }
           .sp-chat-msg:not(.sp-chat-msg-continued)::before { content: ''; position: absolute; top: 0; left: -8px; width: 9px; height: 12px; background-color: #282828; -webkit-mask-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M 9 0 L 0 0 C 4 0 9 8 9 12 Z'/%3E%3C/svg%3E"); -webkit-mask-repeat: no-repeat; mask-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 12'%3E%3Cpath d='M 9 0 L 0 0 C 4 0 9 8 9 12 Z'/%3E%3C/svg%3E"); mask-repeat: no-repeat; }
@@ -5672,7 +5775,7 @@
           .sp-chat-msg.sp-chat-msg-group .sp-chat-bubble { border-bottom-left-radius: 6px; }
           .sp-chat-msg.sp-chat-msg-continued .sp-chat-bubble { border-top-left-radius: 6px; }
           .sp-chat-msg:not(.sp-chat-msg-continued) .sp-chat-bubble { border-top-left-radius: 0; }
-          .sp-chat-bubble { background: #282828; color: white; padding: 6px 10px; border-radius: 14px; font-size: 13px; line-height: 1.5; word-break: break-word; min-width: 60px; max-width: 85%; display: block; overflow: hidden; user-select: text; -webkit-user-select: text; }
+          .sp-chat-bubble { font-family: 'Noto Color Emoji', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #282828; color: white; padding: 6px 10px; border-radius: 14px; font-size: 13px; line-height: 1.5; word-break: break-word; min-width: 60px; max-width: 85%; display: block; overflow: visible; user-select: text; -webkit-user-select: text; }
           .sp-chat-msg.sp-chat-msg-me .sp-chat-bubble { background: #193222; }
           .sp-chat-author { font-size: 12px; color: #1db954; font-weight: 700; margin-bottom: 2px; line-height: 1.2; }
           .sp-chat-reply-ref { border-left: 3px solid; padding: 4px 8px; border-radius: 5px; margin-bottom: 4px; display: flex; flex-direction: row; gap: 8px; align-items: center; overflow: hidden; min-width: 170px; box-sizing: border-box; }
@@ -5695,14 +5798,45 @@
           .sp-chat-actions { position: relative; opacity: 0; transition: opacity 0.1s ease-in-out; flex-shrink: 0; margin-top: 2px; margin-left: -4px; z-index: 1; }
           .sp-chat-msg:hover .sp-chat-actions { opacity: 1; z-index: 10; }
           .sp-chat-actions.active { opacity: 1; z-index: 1000; }
+          .sp-chat-quick-react-wrap { position: absolute; bottom: -8px; right: -8px; opacity: 0; visibility: hidden; pointer-events: none; display: flex; flex-direction: column-reverse; align-items: center; gap: 0; z-index: 10; background: #282828; border: 1px solid #3e3e3e; border-radius: 24px; padding: 2px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); transform: scale(0.65); transform-origin: 50% calc(100% - 16px); transition: opacity 0.2s ease 0.2s, transform 0.2s ease 0.2s, visibility 0s 0.4s; }
+          .sp-chat-quick-react-wrap.open-down { bottom: auto; top: calc(100% - 24px); flex-direction: column; transform-origin: 50% 16px; }
+          .sp-chat-quick-react-wrap::before { content: ''; position: absolute; top: -15px; bottom: 0; left: -15px; right: -5px; z-index: -1; }
+          .sp-chat-quick-react-wrap.open-down::before { top: 0; bottom: -15px; }
+          @keyframes spChatQrWrapEnter { 0% { opacity: 0; } }
+          @keyframes spChatQrWrapHover { 0% { transform: scale(0.65); box-shadow: 0 2px 6px rgba(0,0,0,0.3); } }
+          @keyframes spChatQrMenuEnter { 0% { height: 0; opacity: 0; } }
+          .sp-chat-bubble-wrap:hover .sp-chat-quick-react-wrap { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.1s ease 0.5s, transform 0.1s ease, visibility 0s 0.5s; animation: spChatQrWrapEnter 0.1s ease 0.5s backwards; }
+          .sp-chat-msg:has(.sp-chat-actions.active) .sp-chat-quick-react-wrap { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; transition: opacity 0.2s ease !important, visibility 0s 0s !important; }
+          .sp-chat-quick-react-wrap:hover { z-index: 100; transform: scale(1); gap: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: opacity 0.1s ease, transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1); animation: spChatQrWrapHover 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+          .sp-chat-quick-react-menu { display: flex; flex-direction: column-reverse; gap: 2px; height: 0; opacity: 0; overflow: hidden; pointer-events: none; margin-bottom: 0; margin-top: 0; transition: height 0.2s ease-in-out, opacity 0.15s ease-in-out, margin-bottom 0.2s ease-in-out, margin-top 0.2s ease-in-out; }
+          .sp-chat-quick-react-wrap.open-down .sp-chat-quick-react-menu { flex-direction: column; }
+          .sp-chat-quick-react-wrap:hover .sp-chat-quick-react-menu { height: 178px; opacity: 1; pointer-events: auto; margin-bottom: -1px; transition: height 0.3s ease-in-out 0.15s, opacity 0.25s ease-in-out 0.15s, margin-bottom 0.25s ease-in-out 0.15s; animation: spChatQrMenuEnter 0.3s ease-in-out 0.15s backwards; }
+          .sp-chat-quick-react-wrap.open-down:hover .sp-chat-quick-react-menu { margin-bottom: 0; margin-top: -1px; transition: height 0.3s ease-in-out 0.15s, opacity 0.25s ease-in-out 0.15s, margin-top 0.25s ease-in-out 0.15s; animation: spChatQrMenuEnter 0.3s ease-in-out 0.15s backwards; }
+          .sp-chat-menu-reactions { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: row; gap: 2px; background: #282828; border: 1px solid #3e3e3e; border-radius: 24px; padding: 4px; box-shadow: 0 -2px 12px rgba(0,0,0,0.4); }
+          .sp-chat-menu.open-up .sp-chat-menu-reactions { bottom: auto; top: calc(100% + 8px); box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+          .sp-chat-menu-reaction-btn { font-family: 'Noto Color Emoji', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important; line-height: 1; margin: 0; padding: 0 0 2px 0; box-sizing: border-box; flex-shrink: 0; background: transparent; border: none; cursor: pointer; width: 28px; height: 28px; min-height: 28px; border-radius: 50%; font-size: 16px; transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; align-items: center; justify-content: center; user-select: none; will-change: transform; backface-visibility: hidden; transform: translateZ(0) scale(1); }
+          .sp-chat-menu-reaction-btn:hover { transform: translateZ(0) scale(1.25); }
+          .sp-chat-reactions { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; max-width: 100%; box-sizing: border-box; vertical-align: middle; }
+          .sp-chat-reaction-pill { font-family: 'Noto Color Emoji', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: rgba(255,255,255,0.08); border: 1px solid transparent; border-radius: 12px; padding: 2px 6px; font-size: 11px; color: #b3b3b3; display: flex; align-items: center; gap: 4px; cursor: pointer; transition: all 0.2s ease; position: relative; user-select: none; }
+          .sp-chat-reaction-pill:hover { background: rgba(255,255,255,0.15); color: white; z-index: 100; }
+          .sp-chat-reaction-pill.has-me { background: rgba(29, 185, 84, 0.15); border-color: rgba(29, 185, 84, 0.4); color: #1db954; }
+          .sp-chat-reaction-pill.has-me:hover { background: rgba(29, 185, 84, 0.25); border-color: rgba(29, 185, 84, 0.6); }
+          .sp-chat-reaction-tooltip { position: absolute; bottom: calc(100% + 8px); left: -6px; transform: translateZ(0) translateY(4px) scale(0.95); background: #282828; border: 1px solid #3e3e3e; border-radius: 8px; padding: 8px 10px; font-size: 11px; color: white; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s 0.15s; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 100; width: max-content; min-width: 100px; max-width: 250px; white-space: nowrap; text-align: left; transform-origin: bottom left; cursor: default; will-change: transform, opacity; backface-visibility: hidden; }
+          .sp-chat-reaction-tooltip::after { content: ''; position: absolute; top: 100%; left: 18px; border-width: 5px; border-style: solid; border-color: #3e3e3e transparent transparent transparent; }
+          .sp-chat-reaction-tooltip::before { content: ''; position: absolute; top: 100%; left: 19px; border-width: 4px; border-style: solid; border-color: #282828 transparent transparent transparent; z-index: 1; }
+          .sp-chat-reaction-pill:hover .sp-chat-reaction-tooltip { opacity: 1; visibility: visible; pointer-events: auto; transform: translateZ(0) translateY(0) scale(1); transition: opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s, visibility 0s 0.4s; }
+          .sp-chat-msg:hover .sp-chat-actions { opacity: 1; z-index: 10; }
+          .sp-chat-actions.active { opacity: 1; z-index: 1000; }
           .sp-chat-dots-btn { background: transparent; border: none; color: #b3b3b3; cursor: pointer; padding: 5px 2px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s, color 0.2s; }
           .sp-chat-dots-btn:hover { color: white; background: rgba(255,255,255,0.1); }
           .sp-chat-dots-btn svg { width: 16px; height: 16px; fill: currentColor; }
-          @keyframes spChatMenuFadeIn { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
-          .sp-chat-menu { display: none; position: absolute; right: 0; background: #282828; border: 1px solid #3e3e3e; border-radius: 6px; flex-direction: column; padding: 4px; gap: 2px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 100; min-width: 90px; }
-          .sp-chat-menu.show { display: flex; animation: spChatMenuFadeIn 0.1s ease forwards; pointer-events: auto; }
-          .sp-chat-menu.open-down { top: 100%; margin-top: 4px; transform-origin: top right; }
-          .sp-chat-menu.open-up { bottom: 100%; margin-bottom: 4px; transform-origin: bottom right; }
+          @keyframes spChatMenuEnter { 0% { opacity: 0; transform: scale(0.85); } 100% { opacity: 1; transform: scale(1); } }
+          @keyframes spChatMenuLeave { 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+          .sp-chat-menu { display: none; position: absolute; right: 0; background: #282828; border: 1px solid #3e3e3e; border-radius: 8px; flex-direction: column; padding: 6px; gap: 2px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 3000; min-width: 140px; will-change: transform, opacity; }
+          .sp-chat-menu.show { display: flex; animation: spChatMenuEnter 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; pointer-events: auto; }
+          .sp-chat-menu.closing { display: flex; animation: spChatMenuLeave 0.15s ease forwards; pointer-events: none; }
+          .sp-chat-menu.open-down { top: 100%; margin-top: 4px; }
+          .sp-chat-menu.open-up { bottom: 100%; margin-bottom: 4px; }
           .sp-chat-action-btn { background: transparent; border: none; color: #b3b3b3; font-size: 12px; font-weight: 500; cursor: pointer; padding: 6px 10px; border-radius: 4px; transition: color 0.2s, background-color 0.2s; text-align: left; width: 100%; white-space: nowrap; }
           .sp-chat-action-btn:hover { color: white; background-color: rgba(255,255,255,0.1); }
           .sp-chat-action-btn.del-btn:hover { color: #e53935; background-color: rgba(229,57,53,0.1); }
@@ -5712,22 +5846,26 @@
           #sp-chat-reply-banner { display: flex; justify-content: space-between; align-items: center; background: #282828; padding: 8px 14px; border-radius: 8px; font-size: 12px; color: #1db954; font-weight: 500; }
           #sp-chat-reply-cancel { background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 18px; line-height: 1; }
           #sp-chat-reply-cancel:hover { color: white; }
-          .sp-chat-input-row { display: flex; gap: 6px; align-items: flex-end; position: relative; }
-          #sp-chat-input { flex: 1; min-width: 0; background: #282828; border: 1px solid #333; border-radius: 20px; padding: 10px 16px 10px 42px; color: white; font-size: 13px; outline: none; transition: border-color 0.2s; resize: none; overflow-y: hidden; height: 40px; min-height: 40px; max-height: 120px; font-family: inherit; line-height: 18px; box-sizing: border-box; margin: 0; scrollbar-width: thin; scrollbar-color: #333333 transparent; }
-          #sp-chat-upload-btn { position: absolute; left: 5px; bottom: 4px; background: transparent; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #b3b3b3; transition: color 0.2s, background-color 0.2s; padding: 0; margin: 0; }
-          #sp-chat-upload-btn:hover { color: white; background: rgba(255, 255, 255, 0.1); }
-          #sp-chat-upload-btn svg { width: 18px; height: 18px; }
+          .sp-chat-input-row { display: flex; gap: 0; align-items: flex-end; position: relative; }
+          #sp-chat-input { flex: 1; min-width: 0; background: transparent; border: none; border-radius: 0; padding: 10px 6px 10px 40px; color: white; font-size: 13px; outline: none; resize: none; overflow-y: hidden; height: 40px; min-height: 40px; max-height: 120px; font-family: inherit; line-height: 18px; box-sizing: border-box; margin: 0; scrollbar-width: none; }
+          #sp-chat-input::-webkit-scrollbar { display: none; }
+          #sp-chat-upload-btn { position: absolute; bottom: 4px; background: transparent; border: none; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white; transition: color 0.1s ease-in-out, background-color 0.15s; padding: 0; margin: 0; }
+          #sp-chat-upload-btn::after, #sp-chat-send-btn::after { content: ''; position: absolute; top: -6px; bottom: -6px; left: -6px; right: -6px; }
+          #sp-chat-upload-btn:hover { color: #1ED760; }
+          #sp-chat-upload-btn:hover svg { stroke: #1ED760; }
+          #sp-chat-upload-btn:active, #sp-chat-send-btn:active:not(:disabled) { background: rgba(255, 255, 255, 0.15); }
+          #sp-chat-upload-btn svg { width: 18px; height: 18px; stroke: currentColor; pointer-events: none; transition: stroke 0.1s ease-in-out; }
           .sp-chat-attachment { width: calc(100% + 21px); max-width: calc(100% + 21px); height: auto; max-height: 275px; display: block; border-radius: 0; margin-top: 2px; margin-bottom: 6px; margin-left: -11px; margin-right: -10px; object-fit: contain; cursor: pointer; }
           .sp-chat-attachment, .sp-chat-attachment-bg, .sp-chat-reply-img, .sp-chat-preview-img { user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
           .sp-chat-attachment.lazy-attachment { filter: blur(16px); }
           .sp-chat-reply-img.lazy-attachment { filter: blur(4px); }
-          #sp-chat-input:focus { border-color: #555; }
-          #sp-chat-send-btn { background: transparent; border: none; border-radius: 50%; width: 40px; height: 40px; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0; transition: background-color 0.2s; margin: 0; }
-          #sp-chat-send-btn:hover { background: rgba(255, 255, 255, 0.1); }
-          #sp-chat-send-btn:active { background: rgba(255, 255, 255, 0.15); }
+          #sp-chat-send-btn { position: relative; background: transparent; border: none; border-radius: 50%; width: 32px; height: 32px; min-width: 32px; min-height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0; color: white; transition: color 0.1s ease-in-out, background-color 0.15s; margin: 0 0 4px 0; }
+          #sp-chat-send-btn:hover:not(:disabled) { color: #1ED760; }
+          #sp-chat-send-btn:hover:not(:disabled) svg path { stroke: #1ED760; }
           #sp-chat-send-btn:disabled { background: transparent; cursor: not-allowed; opacity: 0.5; }
           #sp-chat-send-btn:disabled svg path { stroke: #888; }
-          #sp-chat-send-btn svg { margin-right: -2px; }
+          #sp-chat-send-btn svg { margin-right: -2px; pointer-events: none; }
+          #sp-chat-send-btn svg path { stroke: currentColor; transition: stroke 0.1s ease-in-out; }
           #sp-chat-del-overlay { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #282828; border: 1px solid #3e3e3e; border-radius: 25px; z-index: 1000; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 20px; box-shadow: 0 5px 15px 0px rgb(0 0 0 / 40%); }
           .sp-chat-del-title { color: white; font-size: 14px; font-weight: 600; }
           .sp-chat-del-btns { display: flex; gap: 10px; }
@@ -5767,6 +5905,15 @@
           .sp-chat-msg-mentioned.sp-chat-msg-group::after { bottom: 4px; }
           @keyframes highlightFadeMentioned { 0% { background-color: rgba(255, 255, 255, 0.3); } 100% { background-color: rgba(255, 215, 0, 0.15); } }
           .sp-chat-msg-highlight.sp-chat-msg-mentioned::after { animation: highlightFadeMentioned 1.5s ease-out forwards; }
+          .sp-chat-attachment-container { transform: translateZ(0); }
+          .sp-chat-attachment-container.att-top { border-top-right-radius: 14px; }
+          .sp-chat-msg:not(.sp-chat-msg-continued) .sp-chat-attachment-container.att-top { border-top-left-radius: 0; }
+          .sp-chat-msg.sp-chat-msg-continued .sp-chat-attachment-container.att-top { border-top-left-radius: 6px; }
+          .sp-chat-attachment-container.att-bottom { border-bottom-right-radius: 14px; }
+          .sp-chat-msg:not(.sp-chat-msg-group) .sp-chat-attachment-container.att-bottom { border-bottom-left-radius: 14px; }
+          .sp-chat-msg.sp-chat-msg-group .sp-chat-attachment-container.att-bottom { border-bottom-left-radius: 6px; }
+          .sp-chat-attachment-container:not(.att-top) { border-top-left-radius: 0; border-top-right-radius: 0; }
+          .sp-chat-attachment-container:not(.att-bottom) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
           .sp-chat-msg-gallery { display: grid; gap: 4px; width: calc(100% + 21px); margin-left: -11px; margin-right: -10px; overflow: hidden; }
           .sp-chat-msg-gallery.count-2 > div, .sp-chat-msg-gallery.count-3 > div, .sp-chat-msg-gallery.count-4 > div, .sp-chat-msg-gallery.count-5 > div, .sp-chat-msg-gallery.count-6 > div { aspect-ratio: 1 / 1; width: 100%; height: 100%; }
           .sp-chat-msg-gallery.count-3 > div:first-child, .sp-chat-msg-gallery.count-5 > div:first-child { grid-column: 1 / -1; aspect-ratio: 2 / 1; }
@@ -5774,6 +5921,39 @@
           #sp-chat-attach-preview-list::-webkit-scrollbar { height: 4px; }
           #sp-chat-attach-preview-list::-webkit-scrollbar-track { background: transparent; }
           #sp-chat-attach-preview-list::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
+          .sp-chat-file-attachment { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); border: 1px solid #3e3e3e; border-radius: 8px; padding: 10px 12px; text-decoration: none; color: white; margin-top: 4px; margin-bottom: 4px; transition: background-color 0.2s; cursor: pointer; max-width: 100%; box-sizing: border-box; user-select: none; }
+          .sp-chat-file-attachment:hover { background: rgba(255,255,255,0.1); }
+          .sp-chat-file-icon { flex-shrink: 0; width: 32px; height: 32px; background: #282828; border-radius: 6px; display: flex; justify-content: center; align-items: center; color: #1db954; }
+          .sp-chat-file-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+          .sp-chat-file-info { display: flex; flex-direction: column; overflow: hidden; flex: 1; }
+          .sp-chat-file-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; margin-bottom: 2px; pointer-events: none; }
+          .sp-chat-file-size { font-size: 11px; color: #b3b3b3; line-height: 1.2; pointer-events: none; }
+          .sp-chat-link { color: #1db954; text-decoration: underline; word-break: break-all; transition: color 0.2s; }
+          .sp-chat-link:hover { color: #1ed760; }
+          .sp-chat-inline-code { background: rgba(255,255,255,0.12); color: #e6e6e6; padding: 2px 5px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace !important; font-size: 0.9em; }
+          .sp-chat-pre { background: #141414; border: 1px solid #333333; border-radius: 8px; padding: 8px 10px; margin: 8px 0; overflow-x: auto; white-space: pre; scrollbar-width: thin; max-width: 100%; box-sizing: border-box; }
+          .sp-chat-pre::-webkit-scrollbar { height: 4px; }
+          .sp-chat-pre::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+          .sp-chat-code-block { font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace !important; font-size: 12px; color: #e0e0e0; display: block; }
+          .sp-chat-blockquote { border-left: 3px solid #1db954; margin: 8px 0; padding: 4px 10px; color: #b3b3b3; background: rgba(255,255,255,0.04); border-radius: 0 4px 4px 0; display: block; }
+          .sp-chat-spoiler { background-color: #3e3e3e; color: transparent; border-radius: 4px; padding: 0 4px; cursor: pointer; user-select: none; transition: background-color 0.2s, color 0.2s; }
+          .sp-chat-spoiler.revealed { background-color: rgba(255,255,255,0.15); color: inherit; user-select: text; }
+          .sp-chat-h { font-weight: 700; color: #fff; line-height: 1.35; display: block; }
+          .sp-chat-h:first-child { margin-top: 0 !important; }
+          .sp-chat-h1 { font-size: 20px; margin: 16px 0 6px 0; }
+          .sp-chat-h2 { font-size: 17px; margin: 13px 0 5px 0; }
+          .sp-chat-h3 { font-size: 15px; margin: 11px 0 5px 0; }
+          .sp-chat-h4 { font-size: 13px; margin: 9px 0 4px 0; }
+          .sp-chat-h5 { font-size: 12px; margin: 8px 0 3px 0; }
+          .sp-chat-h6 { font-size: 11px; margin: 7px 0 3px 0; }
+          .sp-chat-ul, .sp-chat-ol { margin: 8px 0; padding-left: 18px !important; list-style-type: disc !important; box-sizing: border-box; }
+          .sp-chat-ol { list-style-type: decimal !important; }
+          .sp-chat-li { display: list-item !important; margin-bottom: 4px; line-height: 1.45; }
+          .sp-chat-li:last-child { margin-bottom: 0; }
+          .sp-chat-hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 14px 0; }
+          .sp-chat-text strong { font-weight: 700; }
+          .sp-chat-text em { font-style: italic; }
+          .sp-chat-text del { text-decoration: line-through; opacity: 0.75; }
         </style>
 
         <div class="sp-chat-header">
@@ -5781,7 +5961,11 @@
                 <span class="sp-chat-title">Sort-PLay Chat Room</span>
                 <span class="sp-chat-ext-icon">${externalLinkIconSvg}</span>
             </a>
-            <button id="sp-chat-name-btn" class="sp-chat-header-btn">Change Name</button>
+            <button id="sp-chat-name-btn" class="sp-chat-header-btn" title="Change Name">
+                <svg viewBox="0 0 16 16" width="17" height="17" fill="currentColor">
+                    <path d="M8 1.5a4 4 0 100 8 4 4 0 000-8zM2.5 5.5a5.5 5.5 0 1111 0 5.5 5.5 0 01-11 0zm12.8 9.35a.75.75 0 01-1.226.865A8.5 8.5 0 008 11.5a8.5 8.5 0 00-6.074 4.215.75.75 0 01-1.226-.865A10 10 0 018 10a10 10 0 017.3 4.85z"></path>
+                </svg>
+            </button>
         </div>
         <div style="position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0;">
             <div class="sp-chat-messages-scroll" id="sp-chat-scroll-container">
@@ -5797,9 +5981,9 @@
             </button>
             <div id="sp-chat-upload-overlay-backdrop">
                 <div id="sp-chat-upload-overlay-box">
-                    <div class="sp-chat-upload-icon-wrapper">${chatUploadIconSvg}</div>
-                    <div class="sp-chat-upload-title">Attach an Image</div>
-                    <div class="sp-chat-upload-desc">Drag and drop an image here,<br>browse from your computer, or paste.</div>
+                    <div class="sp-chat-upload-icon-wrapper"><svg viewBox="0 0 24 24" style="width: 42px; height: 42px; stroke: #b3b3b3; fill: none; stroke-width: 2; stroke-linecap: round;"><path d="M6 17V8a6 6 0 1 1 12 0v10a4 4 0 1 1-8 0V9a2 2 0 1 1 4 0v8" /></svg></div>
+                    <div class="sp-chat-upload-title">Attach a File</div>
+                    <div class="sp-chat-upload-desc">Drag and drop a file here,<br>browse from your computer, or paste.<br><span style="font-size: 11px; color: #888;">(Max file size: 3MB)</span></div>
                     <div class="sp-chat-upload-btns">
                         <button class="sp-chat-upload-btn-browse" id="sp-chat-upload-browse">Browse</button>
                         <button class="sp-chat-upload-btn-paste" id="sp-chat-upload-paste">Paste</button>
@@ -5818,8 +6002,8 @@
                 <button id="sp-chat-reply-cancel" style="flex-shrink: 0; margin-left: 8px;">&times;</button>
             </div>
             <div class="sp-chat-input-row">
-                <button id="sp-chat-upload-btn" title="Attach Image">
-                    ${chatUploadIconSvg}
+                <button id="sp-chat-upload-btn" title="Attach File">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" style="width: 23px; height: 23px;"><path d="M6 17V8a6 6 0 1 1 12 0v10a4 4 0 1 1-8 0V9a2 2 0 1 1 4 0v8" /></svg>
                 </button>
                 <textarea id="sp-chat-input" rows="1" placeholder="Messaging..." autocomplete="off" maxlength="2000"></textarea>
                 <button id="sp-chat-send-btn" title="Send">
@@ -5827,7 +6011,7 @@
                 </button>
             </div>
         </div>
-        <input type="file" id="sp-chat-file-input" accept="image/*" multiple style="display:none;">
+        <input type="file" id="sp-chat-file-input" multiple style="display:none;">
         
         <div id="sp-chat-del-overlay">
             <div class="sp-chat-del-title">Remove this message?</div>
@@ -5849,7 +6033,7 @@
         </div>
         
         <div id="sp-chat-drop-overlay" style="display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(29, 185, 84, 0.15); border: 2px dashed #1db954; border-radius: 28px; z-index: 3000; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; margin: 4px;">
-            <span style="color: white; font-weight: bold; font-size: 18px; background: #282828; padding: 10px 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">Drop image to attach</span>
+            <span style="color: white; font-weight: bold; font-size: 18px; background: #282828; padding: 10px 20px; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">Drop file to attach</span>
         </div>
     `;
 
@@ -5858,24 +6042,23 @@
     document.addEventListener('click', (e) => {
         const chatPanelRef = document.getElementById('sort-play-chat-panel');
         if (!chatPanelRef) return;
-        chatPanelRef.querySelectorAll('.sp-chat-menu.show').forEach(m => {
-            if (!e.target.closest('.sp-chat-dots-btn')) {
-                m.classList.remove('show');
-                m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
-                m.closest('.sp-chat-actions').classList.remove('active');
-            }
-        });
+        if (!e.target.closest('.sp-chat-dots-btn')) {
+            closeChatMenus();
+        }
     }, { signal: chatPanelAbortController.signal });
 
     document.addEventListener('contextmenu', (e) => {
         const chatPanelRef = document.getElementById('sort-play-chat-panel');
         if (!chatPanelRef) return;
         if (!e.target.closest('.sp-chat-bubble')) {
-            chatPanelRef.querySelectorAll('.sp-chat-menu.show').forEach(m => {
-                m.classList.remove('show');
-                m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
-                m.closest('.sp-chat-actions').classList.remove('active');
-            });
+            closeChatMenus();
+        }
+    }, { signal: chatPanelAbortController.signal });
+
+    window.addEventListener('resize', () => {
+        const chatPanelRef = document.getElementById('sort-play-chat-panel');
+        if (chatPanelRef && chatPanelRef.classList.contains('visible')) {
+            positionChatPanel(chatPanelRef);
         }
     }, { signal: chatPanelAbortController.signal });
     
@@ -5896,12 +6079,42 @@
     let currentETag = null;
     let hasMoreMessages = true;
     let isFetchingOlder = false;
+    const scrollContainer = chatPanel.querySelector('#sp-chat-scroll-container');
+    const msgList = chatPanel.querySelector('#sp-chat-msg-list');
+    const scrollBottomBtn = chatPanel.querySelector('#sp-chat-scroll-bottom-btn');
     let jumpBackId = null;
     let jumpBackTimer = null;
+    let hasOpenChatMenu = false;
+    let scrollTicking = false;
+    let scrollStopTimer = null;
+
+    const closeChatMenus = (exceptMenu = null) => {
+        if (!hasOpenChatMenu) return;
+        hasOpenChatMenu = false;
+        document.querySelectorAll('.sp-chat-menu.show').forEach(m => {
+            if (m === exceptMenu) {
+                hasOpenChatMenu = true;
+                return;
+            }
+            m.classList.remove('show');
+            m.classList.add('closing');
+            const actions = m._sourceActions || m.closest('.sp-chat-actions');
+            if (actions) actions.classList.remove('active');
+            setTimeout(() => {
+                if (!m.classList.contains('show')) {
+                    m.classList.remove('closing');
+                    m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
+                    if (m._sourceActions) {
+                        m._sourceActions.appendChild(m);
+                        m._sourceActions = null;
+                    }
+                }
+            }, 150);
+        });
+    };
 
     const updateScrollBtnState = () => {
-        const btn = chatPanel.querySelector('#sp-chat-scroll-bottom-btn');
-        if (!btn) return;
+        if (!scrollBottomBtn) return;
         const dist = scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight;
         
         if (jumpBackId) {
@@ -5921,11 +6134,9 @@
             if (jumpBackTimer) clearTimeout(jumpBackTimer);
         }
         
-        if (jumpBackId) {
-            btn.classList.add('show');
-        } else {
-            if (dist > 200) btn.classList.add('show');
-            else btn.classList.remove('show');
+        const shouldShow = !!jumpBackId || dist > 200;
+        if (scrollBottomBtn.classList.contains('show') !== shouldShow) {
+            scrollBottomBtn.classList.toggle('show', shouldShow);
         }
     };
 
@@ -5979,6 +6190,7 @@
                 const res = await fetch(url, options);
                 if (res.ok || (res.status >= 400 && res.status < 500)) return res;
             } catch (err) {
+                if (err.name === 'AbortError') throw err;
                 if (i === maxRetries - 1) throw err;
             }
             await new Promise(r => setTimeout(r, delay));
@@ -5995,9 +6207,6 @@
                d1.getDate() === d2.getDate();
     };
     
-    const scrollContainer = chatPanel.querySelector('#sp-chat-scroll-container');
-    const msgList = chatPanel.querySelector('#sp-chat-msg-list');
-
     const imageCache = new Map();
     const fetchingCache = new Set();
     const attachmentQueue = [];
@@ -6017,6 +6226,7 @@
                         imageCache.set(id, urls);
                         
                         urls.forEach((url, idx) => {
+                            if (!url) return;
                             const img = new Image();
                             img.src = url;
                             
@@ -6076,7 +6286,7 @@
     
     const msgListResizeObserver = new ResizeObserver(() => {
         if (!chatPanel.classList.contains('visible') || isFetchingOlder) return;
-        if (scrollContainer && scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 350) {
+        if (scrollContainer && scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 50) {
             scrollContainer.scrollTop = scrollContainer.scrollHeight;
         }
     });
@@ -6271,7 +6481,150 @@
         });
     }
 
+    msgList.addEventListener('mouseover', (e) => {
+        if (scrollContainer.classList.contains('sp-is-scrolling')) return;
+        const bubbleWrap = e.target.closest('.sp-chat-bubble-wrap');
+        if (bubbleWrap && !bubbleWrap.dataset.qrChecked) {
+            bubbleWrap.dataset.qrChecked = "true";
+            window.requestAnimationFrame(() => {
+                if (scrollContainer.classList.contains('sp-is-scrolling')) {
+                    delete bubbleWrap.dataset.qrChecked;
+                    return;
+                }
+                const reactWrap = bubbleWrap.querySelector('.sp-chat-quick-react-wrap');
+                if (reactWrap) {
+                    const bubbleRect = bubbleWrap.getBoundingClientRect();
+                    const containerRect = scrollContainer.getBoundingClientRect();
+                    if (bubbleRect.bottom - containerRect.top < 220) {
+                        reactWrap.classList.add('open-down');
+                    } else {
+                        reactWrap.classList.remove('open-down');
+                    }
+                }
+            });
+        }
+    });
+
+    msgList.addEventListener('mouseout', (e) => {
+        if (scrollContainer.classList.contains('sp-is-scrolling')) return;
+        const bubbleWrap = e.target.closest('.sp-chat-bubble-wrap');
+        if (bubbleWrap && !bubbleWrap.contains(e.relatedTarget)) {
+            delete bubbleWrap.dataset.qrChecked;
+        }
+    });
+
     msgList.addEventListener('click', async (e) => {
+        const cancelUploadBtn = e.target.closest('.sp-chat-cancel-upload-btn');
+        if (cancelUploadBtn) {
+            e.stopPropagation();
+            const msgId = cancelUploadBtn.dataset.id;
+            const msg = serverMessages.find(m => m.id === msgId);
+            if (msg && msg.status === 'sending') {
+                msg.status = 'cancelled';
+                if (msg.abortController) msg.abortController.abort();
+                if (msg.isNew) {
+                    serverMessages = serverMessages.filter(m => m.id !== msgId);
+                }
+                renderMessages(true);
+            }
+            return;
+        }
+
+        const fileDl = e.target.closest('.sp-chat-file-dl');
+        if (fileDl) {
+            const msgId = fileDl.dataset.id;
+            const index = parseInt(fileDl.dataset.index, 10);
+            const msg = serverMessages.find(m => m.id === msgId);
+            
+            if (fileDl.dataset.fetching || (msg && msg.status === 'sending')) return;
+
+            let cachedUrls = imageCache.get(msgId) || [];
+            let fileUrl = cachedUrls[index];
+
+            if (!fileUrl && msg && msg.attachment) {
+                try {
+                    const parsed = JSON.parse(msg.attachment);
+                    const item = Array.isArray(parsed) ? parsed[index] : parsed;
+                    if (item.url && !item.url.startsWith('data:')) {
+                        fileUrl = item.url;
+                    } else if (item.url && item.url.startsWith('data:')) {
+                        fileUrl = item.url;
+                    } else {
+                        fileDl.dataset.fetching = "true";
+                        const iconWrap = fileDl.querySelector('.sp-chat-file-icon');
+                        iconWrap.innerHTML = '<div class="sp-spinner-loader" style="width:16px;height:16px;border-width:2px;margin:0;transform:scale(0.8);"></div>';
+                        
+                        const res = await fetch(`${CHAT_API_URL}/attachments?ids=${msgId}`);
+                        if (res.ok) {
+                            const map = await res.json();
+                            if (map[msgId]) {
+                                const urls = Array.isArray(map[msgId]) ? map[msgId] : [map[msgId]];
+                                imageCache.set(msgId, urls);
+                                fileUrl = urls[index];
+                            }
+                        }
+                        
+                        fileDl.dataset.fetching = "";
+                        iconWrap.innerHTML = '<svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>';
+                    }
+                } catch(err) {
+                    fileDl.dataset.fetching = "";
+                    fileDl.querySelector('.sp-chat-file-icon').innerHTML = '<svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>';
+                }
+            }
+
+            if (fileUrl) {
+                try {
+                    const parsed = JSON.parse(msg.attachment);
+                    const item = Array.isArray(parsed) ? parsed[index] : parsed;
+                    
+                    let blob = null;
+                    if (fileUrl.startsWith('data:')) {
+                        const parts = fileUrl.split(',');
+                        const meta = parts[0].split(':')[1].split(';');
+                        const mime = meta[0] === 'base64' ? 'application/octet-stream' : meta[0];
+                        const bstr = atob(parts[1]);
+                        let n = bstr.length;
+                        const u8arr = new Uint8Array(n);
+                        while (n--) u8arr[n] = bstr.charCodeAt(n);
+                        blob = new Blob([u8arr], { type: mime });
+                    }
+                    
+                    if (window.showSaveFilePicker) {
+                        try {
+                            if (!blob) {
+                                const response = await fetch(fileUrl);
+                                blob = await response.blob();
+                            }
+                            const fileHandle = await window.showSaveFilePicker({
+                                suggestedName: item.name || `file-${msgId}`
+                            });
+                            const writable = await fileHandle.createWritable();
+                            await writable.write(blob);
+                            await writable.close();
+                            return;
+                        } catch (err) {
+                            if (err.name === 'AbortError') return;
+                        }
+                    }
+
+                    let downloadUrl = blob ? URL.createObjectURL(blob) : fileUrl;
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = item.name || `file-${msgId}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        if (blob) URL.revokeObjectURL(downloadUrl);
+                    }, 100);
+                } catch(err) {
+                    console.error("Download error:", err);
+                }
+            }
+            return;
+        }
+        
         const replyRef = e.target.closest('.sp-chat-reply-ref');
         if (replyRef) {
             if (replyRef.dataset.isDeleted === "true") return;
@@ -6342,23 +6695,30 @@
 
         if ((e.target.classList.contains('sp-chat-attachment') || e.target.classList.contains('sp-chat-attachment-bg')) && !e.target.classList.contains('lazy-attachment')) {
             const msgEl = e.target.closest('.sp-chat-msg');
-            const msgId = msgEl ? msgEl.dataset.id : null;
+            if (msgEl) {
+                const msg = serverMessages.find(m => m.id === msgEl.dataset.id);
+                if (msg && msg.status === 'sending') return;
+            }
             let images = [];
-            if (msgId && imageCache.has(msgId)) {
-                const cached = imageCache.get(msgId);
-                images = Array.isArray(cached) ? cached : [cached];
-            } else if (msgEl) {
+            let startIndex = 0;
+            if (msgEl) {
                 const imgEls = Array.from(msgEl.querySelectorAll('.sp-chat-attachment'));
                 images = imgEls.map(img => img.src);
+                let clickedTarget = e.target;
+                if (clickedTarget.classList.contains('sp-chat-attachment-bg')) {
+                    clickedTarget = clickedTarget.nextElementSibling;
+                }
+                startIndex = imgEls.indexOf(clickedTarget);
+                if (startIndex === -1) startIndex = 0;
             } else {
                 images = [e.target.src];
             }
-            const startIndex = parseInt(e.target.dataset.index || "0", 10);
             showImageViewer(images, startIndex);
         }
     });
 
     msgList.addEventListener('contextmenu', (e) => {
+        if (e.target.closest('a')) return;
         const bubble = e.target.closest('.sp-chat-bubble');
         if (!bubble) return;
         
@@ -6369,18 +6729,18 @@
         
         const msgEl = bubble.closest('.sp-chat-msg');
         if (!msgEl) return;
-        const menu = msgEl.querySelector('.sp-chat-menu');
+        let menu = msgEl.querySelector('.sp-chat-menu');
+        if (!menu) {
+            const openMenu = document.querySelector('.sp-chat-menu.show');
+            if (openMenu && openMenu._sourceActions && openMenu._sourceActions.closest('.sp-chat-msg') === msgEl) {
+                menu = openMenu;
+            }
+        }
         if (!menu) return;
 
-        const chatPanelRef = document.getElementById('sort-play-chat-panel');
-        if (chatPanelRef) {
-            chatPanelRef.querySelectorAll('.sp-chat-menu.show').forEach(m => {
-                m.classList.remove('show');
-                m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
-                const actions = m.closest('.sp-chat-actions');
-                if (actions) actions.classList.remove('active');
-            });
-        }
+        const isAlreadyOpen = menu.classList.contains('show');
+        closeChatMenus(isAlreadyOpen ? null : menu);
+        if (isAlreadyOpen) return;
 
         const imgTarget = e.target.closest('.sp-chat-attachment, .sp-chat-attachment-bg');
         const copyImgBtn = menu.querySelector('.copy-img-btn');
@@ -6389,7 +6749,7 @@
         if (copyImgBtn && dlImgBtn) {
             const gallery = msgEl.querySelector('.sp-chat-msg-gallery');
             if (imgTarget) {
-                const idx = imgTarget.dataset.index || "0";
+                const idx = imgTarget.dataset.index || copyImgBtn.dataset.index;
                 copyImgBtn.style.display = 'block';
                 copyImgBtn.dataset.index = idx;
                 dlImgBtn.style.display = 'block';
@@ -6400,9 +6760,7 @@
                     dlImgBtn.style.display = 'none';
                 } else {
                     copyImgBtn.style.display = 'block';
-                    copyImgBtn.dataset.index = "0";
                     dlImgBtn.style.display = 'block';
-                    dlImgBtn.dataset.index = "0";
                 }
             }
         }
@@ -6410,28 +6768,44 @@
         menu.style.position = 'fixed';
         menu.style.visibility = 'hidden';
         menu.classList.add('show');
+        hasOpenChatMenu = true;
+        
+        menu._sourceActions = msgEl.querySelector('.sp-chat-actions');
+        menu.classList.add('sort-play-font-scope');
+        document.body.appendChild(menu);
+        
         const menuRect = menu.getBoundingClientRect();
         menu.style.visibility = '';
         
+        const panel = document.getElementById('sort-play-chat-panel');
+        const panelRect = panel ? panel.getBoundingClientRect() : { right: window.innerWidth, bottom: window.innerHeight };
+        
         let left = e.clientX;
         let top = e.clientY;
+        let originX = 'left';
+        let originY = 'top';
         
-        if (left + menuRect.width > window.innerWidth) left = e.clientX - menuRect.width;
-        if (top + menuRect.height > window.innerHeight) {
+        if (left + menuRect.width > panelRect.right) {
+            left = e.clientX - menuRect.width;
+            originX = 'right';
+        }
+        if (top + menuRect.height > panelRect.bottom) {
             top = e.clientY - menuRect.height;
             menu.classList.add('open-up');
             menu.classList.remove('open-down');
+            originY = 'bottom';
         } else {
             menu.classList.add('open-down');
             menu.classList.remove('open-up');
         }
         
+        menu.style.transformOrigin = `${originY} ${originX}`;
         menu.style.left = left + 'px';
         menu.style.top = top + 'px';
         menu.style.right = 'auto';
         menu.style.bottom = 'auto';
         
-        msgEl.querySelector('.sp-chat-actions').classList.add('active');
+        if (menu._sourceActions) menu._sourceActions.classList.add('active');
     });
 
     const sendBtn = chatPanel.querySelector('#sp-chat-send-btn');
@@ -6538,16 +6912,20 @@
             const clipboardItems = await navigator.clipboard.read();
             let files = [];
             for (const clipboardItem of clipboardItems) {
-                const imageTypes = clipboardItem.types.filter(type => type.startsWith('image/'));
-                for (const type of imageTypes) {
-                    files.push(await clipboardItem.getType(type));
+                const validTypes = clipboardItem.types.filter(t => t !== 'text/plain' && t !== 'text/html');
+                if (validTypes.length > 0) {
+                    const type = validTypes.find(t => t.startsWith('image/')) || validTypes[0];
+                    const blob = await clipboardItem.getType(type);
+                    const ext = type.split('/')[1] || 'bin';
+                    const file = new File([blob], `Pasted_File_${Date.now()}.${ext}`, { type });
+                    files.push(file);
                 }
             }
             if (files.length > 0) {
-                await handleImageFiles(files);
+                await handleFiles(files);
                 uploadOverlayBackdrop.style.display = 'none';
             } else {
-                alert("No image found in clipboard.");
+                alert("No files found in clipboard.");
             }
         } catch (err) {
             console.error("Failed to read clipboard:", err);
@@ -6557,6 +6935,12 @@
 
     uploadCancel.addEventListener('click', () => {
         uploadOverlayBackdrop.style.display = 'none';
+    });
+
+    uploadOverlayBackdrop.addEventListener('click', (e) => {
+        if (e.target === uploadOverlayBackdrop) {
+            uploadOverlayBackdrop.style.display = 'none';
+        }
     });
 
     uploadBrowse.addEventListener('click', () => {
@@ -6573,17 +6957,24 @@
         attachPreviewList.innerHTML = '';
         pendingAttachments.forEach((att, index) => {
             const item = document.createElement('div');
-            
-            let imgRatio = (att.width && att.height) ? (att.width / att.height) : 1;
-            let sizingStyle = imgRatio > 1 
-                ? "height: 100%; width: auto; max-width: none;" 
-                : "width: 100%; height: auto; max-height: none;";
-                
             item.style.cssText = 'position: relative; width: 44px; height: 44px; border-radius: 6px; overflow: hidden; flex-shrink: 0; border: 1px solid #3e3e3e; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e;';
-            item.innerHTML = `
-                <img src="${att.url}" class="sp-chat-preview-img" style="${sizingStyle} cursor: pointer; position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset;" />
-                <button class="remove-attach-btn" data-index="${index}" style="position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background-color 0.2s; z-index: 2;">&times;</button>
-            `;
+            
+            if (att.isFile) {
+                item.innerHTML = `
+                    <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; stroke: #1db954; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                    <button class="remove-attach-btn" data-index="${index}" style="position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background-color 0.2s; z-index: 2;">&times;</button>
+                `;
+            } else {
+                let imgRatio = (att.width && att.height) ? (att.width / att.height) : 1;
+                let sizingStyle = imgRatio > 1 
+                    ? "height: 100%; width: auto; max-width: none;" 
+                    : "width: 100%; height: auto; max-height: none;";
+                    
+                item.innerHTML = `
+                    <img src="${att.url}" class="sp-chat-preview-img" style="${sizingStyle} cursor: pointer; position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset;" />
+                    <button class="remove-attach-btn" data-index="${index}" style="position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; border-radius: 50%; background: rgba(0,0,0,0.6); color: white; border: none; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background-color 0.2s; z-index: 2;">&times;</button>
+                `;
+            }
             attachPreviewList.appendChild(item);
         });
         
@@ -6606,83 +6997,111 @@
         }
     });
 
-    const handleImageFiles = async (files) => {
-        const validFiles = Array.from(files).filter(f => f && f.type.startsWith('image/'));
+    const handleFiles = async (files) => {
+        const validFiles = Array.from(files).filter(f => f);
         if (!validFiles.length) return;
         
         const remainingSlots = 6 - pendingAttachments.length;
         if (remainingSlots <= 0) {
-            showNotification("Maximum of 6 images allowed per message.", true);
+            if (typeof showNotification === 'function') showNotification("Maximum of 6 attachments allowed per message.", true);
+            else alert("Maximum of 6 attachments allowed per message.");
             return;
         }
         
         if (validFiles.length > remainingSlots) {
-            showNotification("Maximum of 6 images allowed per message.", true);
+            if (typeof showNotification === 'function') showNotification("Maximum of 6 attachments allowed per message.", true);
+            else alert("Maximum of 6 attachments allowed per message.");
         }
         
         const filesToProcess = validFiles.slice(0, remainingSlots);
-        
+                
         for (const file of filesToProcess) {
-            await new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        let { width, height } = img;
-                        const MAX_DIM = 2500;
-                        if (width > MAX_DIM || height > MAX_DIM) {
-                            const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
-                            width = Math.round(width * ratio);
-                            height = Math.round(height * ratio);
-                        }
+            if (file.type.startsWith('image/')) {
+                await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let { width, height } = img;
+                            const MAX_DIM = 2500;
+                            if (width > MAX_DIM || height > MAX_DIM) {
+                                const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+                                width = Math.round(width * ratio);
+                                height = Math.round(height * ratio);
+                            }
 
-                        const getCompressUrl = (w, h, q) => {
-                            canvas.width = w;
-                            canvas.height = h;
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, w, h);
-                            return canvas.toDataURL('image/jpeg', q);
+                            const getCompressUrl = (w, h, q) => {
+                                canvas.width = w;
+                                canvas.height = h;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, w, h);
+                                return canvas.toDataURL('image/jpeg', q);
+                            };
+
+                            let currentWidth = width, currentHeight = height, quality = 0.95;
+                            let dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
+
+                            while (dataUrl.length > 512 * 1024 && quality > 0.6) {
+                                quality -= 0.1;
+                                dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
+                            }
+
+                            while (dataUrl.length > 512 * 1024 && currentWidth > 200 && currentHeight > 200) {
+                                currentWidth = Math.round(currentWidth * 0.9);
+                                currentHeight = Math.round(currentHeight * 0.9);
+                                dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
+                            }
+
+                            if (dataUrl.length > 512 * 1024) {
+                                alert("One of the images is too large to compress under 512KB.");
+                            } else {
+                                const PREVIEW_MAX = 16;
+                                let pRatio = Math.min(PREVIEW_MAX / currentWidth, PREVIEW_MAX / currentHeight);
+                                let pWidth = Math.max(1, Math.round(currentWidth * pRatio));
+                                let pHeight = Math.max(1, Math.round(currentHeight * pRatio));
+                                let previewDataUrl = getCompressUrl(pWidth, pHeight, 0.3);
+
+                                pendingAttachments.push({ url: dataUrl, width: currentWidth, height: currentHeight, preview: previewDataUrl });
+                            }
+                            resolve();
                         };
-
-                        let currentWidth = width, currentHeight = height, quality = 0.95;
-                        let dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
-
-                        while (dataUrl.length > 512 * 1024 && quality > 0.6) {
-                            quality -= 0.1;
-                            dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
-                        }
-
-                        while (dataUrl.length > 512 * 1024 && currentWidth > 200 && currentHeight > 200) {
-                            currentWidth = Math.round(currentWidth * 0.9);
-                            currentHeight = Math.round(currentHeight * 0.9);
-                            dataUrl = getCompressUrl(currentWidth, currentHeight, quality);
-                        }
-
-                        if (dataUrl.length > 512 * 1024) {
-                            alert("One of the images is too large to compress under 512KB.");
-                        } else {
-                            const PREVIEW_MAX = 16;
-                            let pRatio = Math.min(PREVIEW_MAX / currentWidth, PREVIEW_MAX / currentHeight);
-                            let pWidth = Math.max(1, Math.round(currentWidth * pRatio));
-                            let pHeight = Math.max(1, Math.round(currentHeight * pRatio));
-                            let previewDataUrl = getCompressUrl(pWidth, pHeight, 0.3);
-
-                            pendingAttachments.push({ url: dataUrl, width: currentWidth, height: currentHeight, preview: previewDataUrl });
-                        }
+                        img.onerror = () => {
+                            if (typeof showNotification === 'function') showNotification(`Failed to load image "${file.name}".`, true);
+                            else alert(`Failed to load image "${file.name}".`);
+                            resolve();
+                        };
+                        img.src = ev.target.result;
+                    };
+                    reader.onerror = () => resolve();
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                if (file.size > 3071 * 1024) {
+                    if (typeof showNotification === 'function') {
+                        showNotification(`File "${file.name}" is larger than 3071KB.`, true);
+                    } else {
+                        alert(`File "${file.name}" is larger than 3071KB.`);
+                    }
+                    continue;
+                }
+                await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        pendingAttachments.push({ url: ev.target.result, isFile: true, name: file.name, size: file.size, mime: file.type });
                         resolve();
                     };
-                    img.src = ev.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
+                    reader.onerror = () => resolve();
+                    reader.readAsDataURL(file);
+                });
+            }
         }
         updateAttachBannerUI();
         fileInput.value = "";
         input.focus();
     };
 
-    fileInput.addEventListener('change', (e) => handleImageFiles(e.target.files));
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
     input.addEventListener('paste', (e) => {
         const clipboard = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
@@ -6690,13 +7109,13 @@
         const files = [];
         for (let index in clipboard.items) {
             const item = clipboard.items[index];
-            if (item.kind === 'file' && item.type.startsWith('image/')) {
+            if (item.kind === 'file') {
                 files.push(item.getAsFile());
             }
         }
         if (files.length > 0) {
             e.preventDefault();
-            handleImageFiles(files);
+            handleFiles(files);
         }
     });
 
@@ -6735,7 +7154,7 @@
         uploadOverlayBox.classList.remove('drag-over');
         uploadOverlayBackdrop.style.display = 'none';
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-            handleImageFiles(e.dataTransfer.files);
+            handleFiles(e.dataTransfer.files);
         }
     });
 
@@ -6766,7 +7185,182 @@
         );
     };
 
+    const formatMessageContent = (rawText) => {
+        if (!rawText) return "";
+        const stash = [];
+        let text = rawText.replace(/\x02/g, '');
+
+        text = text.replace(/```(?:([a-zA-Z0-9_-]+)?\n)?([\s\S]*?)```/g, (_, lang, code) => {
+            const idx = stash.length;
+            stash.push(`<pre class="sp-chat-pre"><code class="sp-chat-code-block">${escapeHTML(code.replace(/^\n+|\n+$/g, ''))}</code></pre>`);
+            return `\x02S${idx}\x02`;
+        });
+
+        text = text.replace(/(?<!`)(`+)(?!`)([\s\S]+?)(?<!`)\1(?!`)/g, (match, delim, code) => {
+            if (/^\s*$/.test(code)) return match;
+            let cleaned = code;
+            if (cleaned.startsWith(' ') && cleaned.endsWith(' ') && cleaned.trim().length > 0) {
+                cleaned = cleaned.slice(1, -1);
+            }
+            const idx = stash.length;
+            stash.push(`<code class="sp-chat-inline-code">${escapeHTML(cleaned)}</code>`);
+            return `\x02S${idx}\x02`;
+        });
+
+        text = escapeHTML(text);
+
+        const sanitizeUrl = (url) => {
+            const clean = url.trim().replace(/^<|>$/g, '');
+            if (/^(?:javascript|data|vbscript):/i.test(clean)) return null;
+            return /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+        };
+
+        const formatInline = (str) => {
+            return str
+                .replace(/\|\|([\s\S]+?)\|\|/g, '<span class="sp-chat-spoiler" onclick="this.classList.toggle(\'revealed\')">$1</span>')
+                .replace(/\*\*\*([^\*\n]+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+                .replace(/\*\*([^\*\n]+?)\*\*/g, '<strong>$1</strong>')
+                .replace(/__([^_\n]+?)__/g, '<strong>$1</strong>')
+                .replace(/(^|[^\*])\*([^\*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
+                .replace(/(^|[^a-zA-Z0-9_])_([^_\n]+?)_(?![a-zA-Z0-9_])/g, '$1<em>$2</em>')
+                .replace(/~~([^~\n]+?)~~/g, '<del>$1</del>');
+        };
+
+        text = text.replace(/\[([^\]\n]+)\]\(((?:https?:\/\/|(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,})[^\s)]*)\)/g, (fullMatch, label, url) => {
+            const safeUrl = sanitizeUrl(url);
+            if (!safeUrl) return fullMatch;
+            const idx = stash.length;
+            stash.push(`<a href="${escapeHTML(safeUrl)}" target="_blank" rel="noopener noreferrer" class="sp-chat-link">${formatInline(label)}</a>`);
+            return `\x02S${idx}\x02`;
+        });
+
+        const urlRegex = /(https?:\/\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::\d+)?(?:\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])*)?)/gi;
+        text = text.replace(urlRegex, (match) => {
+            let clean = match;
+            let trailing = '';
+            while (/[.,!?:;)]$/.test(clean)) {
+                if (clean.endsWith(')')) {
+                    const openCount = (clean.match(/\(/g) || []).length;
+                    const closeCount = (clean.match(/\)/g) || []).length;
+                    if (openCount >= closeCount) break;
+                }
+                trailing = clean.slice(-1) + trailing;
+                clean = clean.slice(0, -1);
+            }
+            if (!clean) return match;
+            const safeUrl = sanitizeUrl(clean);
+            if (!safeUrl) return match;
+            const idx = stash.length;
+            stash.push(`<a href="${escapeHTML(safeUrl)}" target="_blank" rel="noopener noreferrer" class="sp-chat-link">${clean}</a>`);
+            return `\x02S${idx}\x02${trailing}`;
+        });
+
+        const lines = text.split('\n');
+        const formattedBlocks = [];
+        let currentListType = null;
+        let quoteBuffer = [];
+
+        const flushQuote = () => {
+            if (quoteBuffer.length > 0) {
+                formattedBlocks.push(`<blockquote class="sp-chat-blockquote">${quoteBuffer.join('<br>')}</blockquote>`);
+                quoteBuffer = [];
+            }
+        };
+
+        const flushList = () => {
+            if (currentListType) {
+                formattedBlocks.push(`</${currentListType}>`);
+                currentListType = null;
+            }
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+
+            if (/^&gt;\s?(.*)$/.test(line)) {
+                flushList();
+                quoteBuffer.push(line.replace(/^&gt;\s?/, ''));
+                continue;
+            }
+            flushQuote();
+
+            if (/^(?:[-*_]\s*){3,}$/.test(line.trim())) {
+                flushList();
+                formattedBlocks.push('<hr class="sp-chat-hr">');
+                continue;
+            }
+
+            const headerMatch = line.match(/^(#{1,6})\s+(.+)$/);
+            if (headerMatch) {
+                flushList();
+                const level = headerMatch[1].length;
+                formattedBlocks.push(`<h${level} class="sp-chat-h sp-chat-h${level}">${headerMatch[2]}</h${level}>`);
+                continue;
+            }
+
+            const ulMatch = line.match(/^[*+-]\s+(.+)$/);
+            if (ulMatch) {
+                if (currentListType !== 'ul') {
+                    flushList();
+                    formattedBlocks.push('<ul class="sp-chat-ul">');
+                    currentListType = 'ul';
+                }
+                formattedBlocks.push(`<li class="sp-chat-li">${ulMatch[1]}</li>`);
+                continue;
+            }
+
+            const olMatch = line.match(/^\d+\.\s+(.+)$/);
+            if (olMatch) {
+                if (currentListType !== 'ol') {
+                    flushList();
+                    formattedBlocks.push('<ol class="sp-chat-ol">');
+                    currentListType = 'ol';
+                }
+                formattedBlocks.push(`<li class="sp-chat-li">${olMatch[1]}</li>`);
+                continue;
+            }
+
+            flushList();
+            formattedBlocks.push(line);
+        }
+
+        flushQuote();
+        flushList();
+
+        let output = "";
+        const isBlockTag = (str) => {
+            const trimmed = str.trim();
+            if (/^<\/?(?:ul|ol|li|h[1-6]|blockquote|pre|hr)/i.test(trimmed)) return true;
+            const phMatch = trimmed.match(/^\x02S(\d+)\x02$/);
+            return phMatch && stash[parseInt(phMatch[1], 10)]?.startsWith('<pre');
+        };
+
+        for (let i = 0; i < formattedBlocks.length; i++) {
+            const curr = formattedBlocks[i];
+            if (i === 0) {
+                output += curr;
+                continue;
+            }
+            const prev = formattedBlocks[i - 1];
+
+            if (isBlockTag(prev) || isBlockTag(curr)) {
+                if (curr === '') continue;
+                output += curr;
+            } else {
+                output += '<br>' + curr;
+            }
+        }
+
+        output = formatInline(output);
+        while (/\x02S\d+\x02/.test(output)) {
+            output = output.replace(/\x02S(\d+)\x02/g, (_, id) => stash[parseInt(id, 10)] || '');
+        }
+
+        return output;
+    };
+
     const renderMessages = (preserveScroll = false) => {
+        closeChatMenus();
         const isAtBottom = scrollContainer.scrollHeight - scrollContainer.scrollTop <= scrollContainer.clientHeight + 80;
         const prevScrollTop = scrollContainer.scrollTop;
         
@@ -6792,7 +7386,7 @@
 
         const messagesHTML = serverMessages.map((m, index) => {
             const isMe = m.deviceId === deviceId || (m.authorId && m.authorId === getCurrentAuthorId()) || (isAdmin && m.isAdmin);
-            const canEdit = m.deviceId === deviceId || isAdmin;
+            const canEdit = m.deviceId === deviceId || (m.authorId && m.authorId === getCurrentAuthorId()) || isAdmin;
             const formatTooltipDate = (d) => {
                 return `${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })}`;
             };
@@ -6842,7 +7436,7 @@
                 }
             }
             
-            const safeText = escapeHTML(m.text).replace(/\n/g, '<br>');
+            const safeText = formatMessageContent(m.text);
             
             let parsedAttachments = [];
             if (m.attachment) {
@@ -6852,8 +7446,65 @@
                 } catch(e) {}
             }
             
-            const count = parsedAttachments.length;
-            const isImageOnly = count > 0 && !safeText;
+            const imageAttachments = parsedAttachments.filter(p => !p.isFile && !p.hasFile);
+            const fileAttachments = parsedAttachments.filter(p => p.isFile || p.hasFile);
+            
+            const count = imageAttachments.length;
+            const isImageOnly = count > 0 && !safeText && fileAttachments.length === 0;
+            
+            let reactionsData = {};
+            if (m.reactions) {
+                try { reactionsData = typeof m.reactions === 'string' ? JSON.parse(m.reactions) : m.reactions; } catch(e) {}
+            }
+            const groupedReactions = {};
+            for (const [devId, rData] of Object.entries(reactionsData)) {
+                if (!rData || !rData.emoji) continue;
+                if (!groupedReactions[rData.emoji]) groupedReactions[rData.emoji] = [];
+                groupedReactions[rData.emoji].push({ devId, name: devId === deviceId ? "You" : rData.name });
+            }
+            const emojiKeys = Object.keys(groupedReactions);
+            const hasReactions = emojiKeys.length > 0;
+            
+            let reactionsHTML = '';
+            if (hasReactions) {
+                reactionsHTML = `<div style="display:block;clear:both;height:0;"></div><div class="sp-chat-reactions">`;
+                emojiKeys.forEach(emoji => {
+                    const users = groupedReactions[emoji];
+                    const hasMe = users.some(u => u.devId === deviceId);
+                    const count = users.length;
+                    
+                    if (hasMe) {
+                        const myIdx = users.findIndex(u => u.devId === deviceId);
+                        if (myIdx > 0) users.unshift(users.splice(myIdx, 1)[0]);
+                    }
+                    
+                    const displayUsers = users.slice(0, 6);
+                    const extraCount = count - 6;
+                    const tooltipUsers = displayUsers.map(u => {
+                        const isMe = u.devId === deviceId;
+                        return `<div style="color: ${isMe ? '#fff' : '#b3b3b3'}; font-weight: ${isMe ? '600' : '400'}; padding: 3px 0; font-size: 11px; display: flex; align-items: center; gap: 8px;">
+                                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px;">${escapeHTML(u.name)}</span>
+                                </div>`;
+                    }).join('');
+                    
+                    const tooltipHTML = `
+                        <div class="sp-chat-reaction-tooltip">
+                            <div style="display: flex; flex-direction: column;">
+                                ${tooltipUsers}
+                                ${extraCount > 0 ? `<div style="color: #888; font-style: italic; padding: 3px 0; font-size: 10px;">and ${extraCount} more...</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                    let display = `<span style="font-size: 13px; line-height: 1;">${emoji}</span> <span style="font-weight: 500;">${count}</span>`;
+                    reactionsHTML += `<div class="sp-chat-reaction-pill ${hasMe ? 'has-me' : ''}" data-id="${m.id}" data-emoji="${emoji}">
+                        ${display}
+                        ${tooltipHTML}
+                    </div>`;
+                });
+                reactionsHTML += `</div>`;
+            }
+
             let safeReply = null;
             if (m.replyTo) {
                 try {
@@ -6869,8 +7520,45 @@
                         preview: parsed.preview,
                         width: parsed.width,
                         height: parsed.height,
-                        isDeleted: parsed.isDeleted
+                        isFile: !!parsed.isFile,
+                        fileName: escapeHTML(parsed.fileName || "File"),
+                        attachmentCount: parsed.attachmentCount || 1,
+                        isDeleted: parsed.isDeleted,
+                        url: parsed.url,
+                        hasImage: parsed.hasImage
                     };
+
+                    if (safeReply.messageId && !safeReply.isDeleted) {
+                        const liveMsg = serverMessages.find(sm => sm.id === safeReply.messageId);
+                        if (liveMsg) {
+                            safeReply.text = escapeHTML(liveMsg.text);
+                            let liveParsedAttachments = [];
+                            if (liveMsg.attachment) {
+                                try {
+                                    const lp = JSON.parse(liveMsg.attachment);
+                                    liveParsedAttachments = Array.isArray(lp) ? lp : [lp];
+                                } catch(e){}
+                            }
+                            safeReply.hasAttachment = liveParsedAttachments.length > 0;
+                            if (safeReply.hasAttachment) {
+                                safeReply.attachmentCount = liveParsedAttachments.length;
+                                const firstAtt = liveParsedAttachments[0];
+                                safeReply.isFile = !!(firstAtt.isFile || firstAtt.hasFile);
+                                safeReply.fileName = escapeHTML(firstAtt.name || "File");
+                                safeReply.preview = firstAtt.preview;
+                                safeReply.width = firstAtt.width;
+                                safeReply.height = firstAtt.height;
+                                safeReply.url = firstAtt.url;
+                                safeReply.hasImage = !!firstAtt.hasImage;
+                            } else {
+                                safeReply.attachmentCount = 0;
+                                safeReply.isFile = false;
+                                safeReply.hasImage = false;
+                                safeReply.attachmentId = null;
+                                safeReply.preview = null;
+                            }
+                        }
+                    }
                 } catch(e) {
                     safeReply = { user: escapeHTML(m.replyTo), text: "..." };
                 }
@@ -6902,34 +7590,43 @@
             if (count > 0) {
                 const hasHeader = showAuthor || safeReply;
                 const attMarginTop = hasHeader ? '4px' : '-6px';
-                const attMarginBottom = safeText ? '4px' : '-6px';
+                const attMarginBottom = (safeText || hasReactions) ? '4px' : '-6px';
+                const touchesTop = !hasHeader;
+                const touchesBottom = !(safeText || hasReactions);
+                const attClasses = `sp-chat-attachment-container ${touchesTop ? 'att-top' : ''} ${touchesBottom ? 'att-bottom' : ''}`;
                 const isSendingAttachment = isMe && m.status === 'sending';
 
                 const cachedUrls = imageCache.get(m.id) || [];
                 
                 if (count === 1) {
-                    const parsed = parsedAttachments[0];
+                    const parsed = imageAttachments[0];
+                    const absoluteIdx = parsedAttachments.indexOf(parsed);
                     let wrapperWidthStyle = 'calc(100% + 21px)';
-                    let inlineStyle = '';
+                    let inlineStyle = 'width: auto; max-width: 100%; height: auto; max-height: 275px;';
+                    
                     if (parsed.width && parsed.height) {
                         let rw = parsed.width;
                         let rh = parsed.height;
-                        if (rh > 275) rw = rw * (275 / rh);
-                        wrapperWidthStyle = rw + 'px';
-                        inlineStyle = `aspect-ratio: ${parsed.width} / ${parsed.height};`;
+                        if (rh > 275) {
+                            rw = rw * (275 / rh);
+                            rh = 275;
+                        }
+                        wrapperWidthStyle = 'calc(100% + 21px)';
+                        inlineStyle = `width: ${rw}px; max-width: 100%; height: ${rh}px;`;
                     }
                     
-                    let imgSrc = parsed.hasImage ? (cachedUrls[0] || parsed.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${parsed.width||800} ${parsed.height||600}' width='${parsed.width||800}' height='${parsed.height||600}' style='background:%231e1e1e;'%3E%3C/svg%3E`) : parsed.url;
-                    let isLazy = parsed.hasImage && !cachedUrls[0];
+                    let imgSrc = parsed.hasImage ? (cachedUrls[absoluteIdx] || parsed.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${parsed.width||800} ${parsed.height||600}' width='${parsed.width||800}' height='${parsed.height||600}' style='background:%231e1e1e;'%3E%3C/svg%3E`) : parsed.url;
+                    let isLazy = parsed.hasImage && !cachedUrls[absoluteIdx];
                     
                     attachmentHTML = `
-                        <div style="position: relative; width: ${wrapperWidthStyle}; max-width: calc(100% + 21px); margin-top: ${attMarginTop}; margin-bottom: ${attMarginBottom}; margin-left: -11px; margin-right: -10px; display: flex; justify-content: center; align-items: center; overflow: hidden; background-color: #1e1e1e;">
-                            <img src="${imgSrc}" class="sp-chat-attachment-bg ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="0"` : `data-index="0"`} style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(0.6); transform: scale(1.1); cursor: pointer; z-index: 0;" aria-hidden="true" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
-                            <img src="${imgSrc}" class="sp-chat-attachment ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="0"` : `data-index="0"`} alt="Attached Image" style="${inlineStyle} position: relative; z-index: 1; margin: 0; width: 100%; max-width: 100%; max-height: 275px; object-fit: contain; ${isSendingAttachment ? 'filter: blur(4px);' : ''}" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                        <div class="${attClasses}" style="position: relative; width: ${wrapperWidthStyle}; max-width: calc(100% + 21px); margin-top: ${attMarginTop}; margin-bottom: ${attMarginBottom}; margin-left: -11px; margin-right: -10px; display: flex; justify-content: center; align-items: center; overflow: hidden; background-color: #1e1e1e;">
+                            <img src="${imgSrc}" class="sp-chat-attachment-bg ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${absoluteIdx}"` : `data-index="${absoluteIdx}"`} style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(0.6); transform: scale(1.1); cursor: pointer; z-index: 0;" aria-hidden="true" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                            <img src="${imgSrc}" class="sp-chat-attachment ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${absoluteIdx}"` : `data-index="${absoluteIdx}"`} alt="Attached Image" style="${inlineStyle} position: relative; z-index: 1; margin: 0; object-fit: contain; ${isSendingAttachment ? 'filter: blur(4px);' : ''}" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
                             ${isSendingAttachment ? `
-                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 2; pointer-events: none;">
-                                <div style="background: rgba(0,0,0,0.6); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
-                                    <div class="sp-spinner-loader" style="transform: scale(0.9); margin: 0;"></div>
+                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 2;">
+                                <div class="sp-chat-cancel-upload-btn" data-id="${m.id}" title="Cancel upload" style="background: rgba(0,0,0,0.6); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); cursor: pointer; transition: background-color 0.2s; color: white;">
+                                    <div class="sp-spinner-loader" style="position: absolute; transform: scale(0.9); margin: 0; pointer-events: none;"></div>
+                                    <svg viewBox="0 0 24 24" style="position: absolute; width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; z-index: 3;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                                 </div>
                             </div>
                             ` : ''}
@@ -6937,9 +7634,10 @@
                         </div>
                     `;
                 } else {
-                    let innerGalleryHTML = parsedAttachments.map((parsed, idx) => {
-                        let imgSrc = parsed.hasImage ? (cachedUrls[idx] || parsed.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${parsed.width||800} ${parsed.height||600}' width='${parsed.width||800}' height='${parsed.height||600}' style='background:%231e1e1e;'%3E%3C/svg%3E`) : parsed.url;
-                        let isLazy = parsed.hasImage && !cachedUrls[idx];
+                    let innerGalleryHTML = imageAttachments.map((parsed, idx) => {
+                        const absoluteIdx = parsedAttachments.indexOf(parsed);
+                        let imgSrc = parsed.hasImage ? (cachedUrls[absoluteIdx] || parsed.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${parsed.width||800} ${parsed.height||600}' width='${parsed.width||800}' height='${parsed.height||600}' style='background:%231e1e1e;'%3E%3C/svg%3E`) : parsed.url;
+                        let isLazy = parsed.hasImage && !cachedUrls[absoluteIdx];
                         
                         let boxRatio = ((count === 3 || count === 5) && idx === 0) ? 2 : 1;
                         let imgRatio = (parsed.width && parsed.height) ? (parsed.width / parsed.height) : 1;
@@ -6949,19 +7647,20 @@
                         
                         return `
                             <div style="position: relative; display: flex; justify-content: center; align-items: center; overflow: hidden; background-color: #1e1e1e; width: 100%; height: 100%;">
-                                <img src="${imgSrc}" class="sp-chat-attachment-bg ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${idx}"` : `data-index="${idx}"`} style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(0.6); transform: scale(1.1); cursor: pointer; z-index: 0;" aria-hidden="true" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
-                                <img src="${imgSrc}" class="sp-chat-attachment ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${idx}"` : `data-index="${idx}"`} alt="Attached Image" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset; ${isSendingAttachment ? 'filter: blur(4px);' : ''}" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                                <img src="${imgSrc}" class="sp-chat-attachment-bg ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${absoluteIdx}"` : `data-index="${absoluteIdx}"`} style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(16px) brightness(0.6); transform: scale(1.1); cursor: pointer; z-index: 0;" aria-hidden="true" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
+                                <img src="${imgSrc}" class="sp-chat-attachment ${isLazy ? 'lazy-attachment' : ''}" ${isLazy ? `data-id="${m.id}" data-index="${absoluteIdx}"` : `data-index="${absoluteIdx}"`} alt="Attached Image" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset; ${isSendingAttachment ? 'filter: blur(4px);' : ''}" loading="${isLazy ? 'eager' : 'lazy'}" decoding="async" />
                             </div>
                         `;
                     }).join('');
 
                     attachmentHTML = `
-                        <div class="sp-chat-msg-gallery count-${count}" style="position: relative; width: 300px; margin-left: -11px; margin-right: -10px; margin-top: ${attMarginTop}; margin-bottom: ${attMarginBottom};">
+                        <div class="sp-chat-msg-gallery count-${count} ${attClasses}" style="position: relative; min-width: 280px; max-width: calc(100% + 21px); margin-left: -11px; margin-right: -10px; margin-top: ${attMarginTop}; margin-bottom: ${attMarginBottom};">
                             ${innerGalleryHTML}
                             ${isSendingAttachment ? `
-                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 2; pointer-events: none;">
-                                <div style="background: rgba(0,0,0,0.6); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4);">
-                                    <div class="sp-spinner-loader" style="transform: scale(0.9); margin: 0;"></div>
+                            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; z-index: 2;">
+                                <div class="sp-chat-cancel-upload-btn" data-id="${m.id}" title="Cancel upload" style="background: rgba(0,0,0,0.6); border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.4); cursor: pointer; transition: background-color 0.2s; color: white;">
+                                    <div class="sp-spinner-loader" style="position: absolute; transform: scale(0.9); margin: 0; pointer-events: none;"></div>
+                                    <svg viewBox="0 0 24 24" style="position: absolute; width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; z-index: 3;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                                 </div>
                             </div>
                             ` : ''}
@@ -6970,41 +7669,83 @@
                     `;
                 }
             }
+            
+            if (fileAttachments.length > 0) {
+                const filesHTML = fileAttachments.map((file, fileIdx) => {
+                    const absoluteIdx = parsedAttachments.indexOf(file);
+                    const sizeStr = file.size ? (file.size < 1024 ? `${file.size} B` : file.size < 1048576 ? `${(file.size/1024).toFixed(1)} KB` : `${(file.size/1048576).toFixed(2)} MB`) : 'File';
+                    const isSendingAttachment = isMe && m.status === 'sending';
+                    
+                    return `
+                        <div class="sp-chat-file-attachment sp-chat-file-dl" data-id="${m.id}" data-index="${absoluteIdx}" style="${isSendingAttachment ? 'opacity: 0.7;' : ''}">
+                            <div class="sp-chat-file-icon">
+                                ${isSendingAttachment ? `
+                                    <div class="sp-chat-cancel-upload-btn" data-id="${m.id}" style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: white;" title="Cancel upload">
+                                        <div class="sp-spinner-loader" style="position: absolute; width:16px;height:16px;border-width:2px;margin:0;transform:scale(0.8);pointer-events:none;"></div>
+                                        <svg viewBox="0 0 24 24" style="position: absolute; width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; z-index: 2;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </div>
+                                ` : '<svg viewBox="0 0 24 24"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>'}
+                            </div>
+                            <div class="sp-chat-file-info">
+                                <span class="sp-chat-file-name">${escapeHTML(file.name || 'Attachment')}</span>
+                                <span class="sp-chat-file-size">${sizeStr}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                attachmentHTML += `<div style="display:flex;flex-direction:column;gap:4px;margin-top:4px;">${filesHTML}</div>`;
+            }
 
             return `
                ${dateSeparatorHTML}
                <div class="sp-chat-msg ${groupWithNext ? 'sp-chat-msg-group' : ''} ${!showAuthor ? 'sp-chat-msg-continued' : ''} ${isMe ? 'sp-chat-msg-me' : ''} ${isImageOnly ? 'image-only-msg' : ''} ${isReplyToMe ? 'sp-chat-msg-mentioned' : ''}" data-id="${m.id}" style="${m.status === 'deleting' ? 'opacity: 0.4; pointer-events: none;' : ''}">
-                  <div class="sp-chat-bubble">
+                  <div class="sp-chat-bubble-wrap" style="position: relative; max-width: 85%; min-width: 60px;">
+                     <div class="sp-chat-bubble" style="max-width: 100%; min-width: 100%;">
                      ${showAuthor ? `<div class="sp-chat-author" style="color: ${authorColor};">${escapeHTML(m.user)}${m.isAdmin ? '' : `<span style="opacity: 0.5; font-size: 0.85em; font-weight: 500; margin-left: 2px;">#${authorTag}</span>`}</div>` : ''}
                      ${(() => {
                          if (!safeReply) return '';
                          let replyImgHTML = '';
                          if (safeReply.hasAttachment && safeReply.attachmentId) {
-                             let replyImgSrc = '';
-                             let replyImgLazy = false;
-                             if (imageCache.has(safeReply.attachmentId)) {
-                                 const cached = imageCache.get(safeReply.attachmentId);
-                                 replyImgSrc = Array.isArray(cached) ? cached[0] : cached;
-                             } else {
-                                 replyImgSrc = safeReply.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30' width='30' height='30' style='background:%231e1e1e;'%3E%3C/svg%3E`;
-                                 replyImgLazy = true;
-                             }
-                             
-                             let imgRatio = (safeReply.width && safeReply.height) ? (safeReply.width / safeReply.height) : 1;
-                             let sizingStyle = imgRatio > 1 
-                                 ? "height: 100%; width: auto; max-width: none;" 
-                                 : "width: 100%; height: auto; max-height: none;";
+                             if (safeReply.isFile) {
+                                 replyImgHTML = `
+                                     <div style="position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: transparent; flex-shrink: 0; margin-left: -4px;">
+                                         <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: #1db954; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                                     </div>
+                                 `;
+                              } else {
+                                 let replyImgSrc = '';
+                                 let replyImgLazy = false;
+                                 let cachedUrl = imageCache.has(safeReply.attachmentId) ? (Array.isArray(imageCache.get(safeReply.attachmentId)) ? imageCache.get(safeReply.attachmentId)[0] : imageCache.get(safeReply.attachmentId)) : null;
+                                    
+                                 if (cachedUrl) {
+                                     replyImgSrc = cachedUrl;
+                                 } else if (safeReply.url && !safeReply.url.startsWith('data:')) {
+                                     replyImgSrc = safeReply.url;
+                                 } else {
+                                     replyImgSrc = safeReply.preview || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30' width='30' height='30' style='background:%231e1e1e;'%3E%3C/svg%3E`;
+                                     replyImgLazy = true;
+                                 }
                                  
-                             replyImgHTML = `
-                                 <div class="sp-chat-reply-img-wrapper">
-                                     <img src="${replyImgSrc}" class="sp-chat-reply-img ${replyImgLazy ? 'lazy-attachment' : ''}" ${replyImgLazy ? `data-id="${safeReply.attachmentId}" data-index="0"` : ''} alt="" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset;" loading="${replyImgLazy ? 'eager' : 'lazy'}" decoding="async" />
-                                 </div>
-                             `;
+                                 let imgRatio = (safeReply.width && safeReply.height) ? (safeReply.width / safeReply.height) : 1;
+                                 let sizingStyle = imgRatio > 1 
+                                     ? "height: 100%; width: auto; max-width: none;" 
+                                     : "width: 100%; height: auto; max-height: none;";
+                                     
+                                 replyImgHTML = `
+                                     <div class="sp-chat-reply-img-wrapper">
+                                         <img src="${replyImgSrc}" class="sp-chat-reply-img ${replyImgLazy ? 'lazy-attachment' : ''}" ${replyImgLazy ? `data-id="${safeReply.attachmentId}" data-index="0"` : ''} alt="" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset;" loading="${replyImgLazy ? 'eager' : 'lazy'}" decoding="async" />
+                                     </div>
+                                 `;
+                             }
                          }
                          
                          let replyTextContent = (safeReply.text || '').trim();
                          if (!replyTextContent && safeReply.hasAttachment) {
-                             replyTextContent = "Photo";
+                             if (safeReply.attachmentCount > 1) {
+                                 replyTextContent = `${safeReply.attachmentCount} files`;
+                             } else {
+                                 replyTextContent = safeReply.isFile ? safeReply.fileName : "Photo";
+                             }
                          }
                          if (safeReply.isDeleted) {
                              replyTextContent = `<span style="font-style: italic;">Deleted message</span>`;
@@ -7024,13 +7765,28 @@
                          `;
                      })()}
                      ${attachmentHTML}
-                     ${safeText ? `<div class="sp-chat-text">${safeText}${!isImageOnly ? metaHTML : ''}</div>` : (!isImageOnly ? metaHTML : '')}
+                     ${safeText ? `<div class="sp-chat-text">${safeText}${reactionsHTML}${!isImageOnly ? metaHTML : ''}</div>` : `${reactionsHTML}${!isImageOnly ? metaHTML : ''}`}
+                     <div style="clear: both;"></div>
+                     </div>
+                     <div class="sp-chat-quick-react-wrap">
+                         <button class="sp-chat-menu-reaction-btn sp-chat-react-action" data-id="${m.id}" data-emoji="${PRIMARY_REACTION}">${PRIMARY_REACTION}</button>
+                         <div class="sp-chat-quick-react-menu">
+                             ${SECONDARY_REACTIONS.map(emoji => `
+                                 <button class="sp-chat-menu-reaction-btn sp-chat-react-action" data-id="${m.id}" data-emoji="${emoji}">${emoji}</button>
+                             `).join('')}
+                         </div>
+                     </div>
                   </div>
                   <div class="sp-chat-actions">
                       <button class="sp-chat-dots-btn" title="More options">
                           ${chatDotsIconSvg}
                       </button>
                       <div class="sp-chat-menu">
+                          <div class="sp-chat-menu-reactions">
+                              ${CHAT_REACTIONS.map(emoji => `
+                                  <button class="sp-chat-menu-reaction-btn sp-chat-react-action" data-id="${m.id}" data-emoji="${emoji}">${emoji}</button>
+                              `).join('')}
+                          </div>
                           <button class="sp-chat-action-btn reply-btn" data-id="${m.id}">Reply</button>
                           ${canEdit && m.status !== 'sending' ? `
                               <button class="sp-chat-action-btn edit-btn" data-id="${m.id}" data-text="${escapeHTML(m.text)}">Edit</button>
@@ -7041,10 +7797,13 @@
                           ${safeText ? `
                               <button class="sp-chat-action-btn copy-btn" data-id="${m.id}">Copy text</button>
                           ` : ''}
-                          ${m.attachment ? `
-                              <button class="sp-chat-action-btn copy-img-btn" data-id="${m.id}" data-index="0" style="${count > 1 ? 'display:none;' : ''}">Copy image</button>
-                              <button class="sp-chat-action-btn dl-img-btn" data-id="${m.id}" data-index="0" style="${count > 1 ? 'display:none;' : ''}">Download image</button>
-                          ` : ''}
+                          ${imageAttachments.length > 0 ? (() => {
+                              const firstImageIdx = parsedAttachments.indexOf(imageAttachments[0]);
+                              return `
+                                  <button class="sp-chat-action-btn copy-img-btn" data-id="${m.id}" data-index="${firstImageIdx}" style="${imageAttachments.length > 1 ? 'display:none;' : ''}">Copy image</button>
+                                  <button class="sp-chat-action-btn dl-img-btn" data-id="${m.id}" data-index="${firstImageIdx}" style="${imageAttachments.length > 1 ? 'display:none;' : ''}">Download image</button>
+                              `;
+                          })() : ''}
                       </div>
                   </div>
                </div>
@@ -7071,52 +7830,66 @@
                 e.stopPropagation();
                 const msg = serverMessages.find(m => m.id === btn.dataset.id);
                 if (msg) {
-                    let previewData = null;
-                    let attWidth = null;
-                    let attHeight = null;
+                    let previewData = null; let attWidth = null; let attHeight = null;
+                    let isFile = false; let fileName = "Attachment";
+                    let parsedUrl = null; let hasImage = false;
+                    let attachmentCount = 0;
                     if (msg.attachment) {
                         try {
                             let parsed = JSON.parse(msg.attachment);
-                            if (Array.isArray(parsed)) parsed = parsed[0];
-                            previewData = parsed.preview;
-                            attWidth = parsed.width;
-                            attHeight = parsed.height;
-                        } catch(e) {}
+                            let arr = Array.isArray(parsed) ? parsed : [parsed];
+                            attachmentCount = arr.length;
+                            let first = arr[0];
+                            previewData = first.preview; attWidth = first.width; attHeight = first.height;
+                            parsedUrl = first.url; hasImage = first.hasImage;
+                            if (first.isFile || first.hasFile) {
+                                isFile = true;
+                                fileName = first.name || "File";
+                            }
+                        } catch(err) {}
                     }
                     replyingTo = { 
-                        user: msg.user, 
-                        text: msg.text, 
-                        authorId: msg.authorId, 
-                        isAdmin: msg.isAdmin,
-                        hasAttachment: !!msg.attachment,
-                        attachmentId: msg.id,
-                        messageId: msg.id,
-                        preview: previewData,
-                        width: attWidth,
-                        height: attHeight
+                        user: msg.user, text: msg.text, authorId: msg.authorId, isAdmin: msg.isAdmin,
+                        hasAttachment: !!msg.attachment, attachmentId: msg.id, messageId: msg.id,
+                        preview: previewData, width: attWidth, height: attHeight, isFile, fileName,
+                        attachmentCount, url: parsedUrl, hasImage
                     };
                     editingId = null;
                     
                     let replyImgHTML = '';
                     if (msg.attachment) {
-                        let cachedUrl = imageCache.has(msg.id) ? imageCache.get(msg.id)[0] : null;
-                        let isLazy = !cachedUrl;
-                        let replyImgSrc = cachedUrl || (previewData || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30' width='30' height='30' style='background:%231e1e1e;'%3E%3C/svg%3E`);
-                        
-                        let imgRatio = (attWidth && attHeight) ? (attWidth / attHeight) : 1;
-                        let sizingStyle = imgRatio > 1 
-                            ? "height: 100%; width: auto; max-width: none;" 
-                            : "width: 100%; height: auto; max-height: none;";
+                        if (isFile) {
+                            replyImgHTML = `
+                                <div style="position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: transparent; flex-shrink: 0; margin-right: 4px;">
+                                    <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: #1db954; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
+                                </div>
+                            `;
+                        } else {
+                            let cachedUrl = imageCache.has(msg.id) ? imageCache.get(msg.id)[0] : null;
+                            let isLazy = hasImage && !cachedUrl;
+                            let replyImgSrc = hasImage ? (cachedUrl || previewData || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30' width='30' height='30' style='background:%231e1e1e;'%3E%3C/svg%3E`) : parsedUrl;
                             
-                        replyImgHTML = `
-                            <div style="position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e; flex-shrink: 0; margin-right: 8px;">
-                                <img src="${replyImgSrc}" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset; ${isLazy ? 'filter: blur(4px);' : ''}" />
-                            </div>
-                        `;
+                            let imgRatio = (attWidth && attHeight) ? (attWidth / attHeight) : 1;
+                            let sizingStyle = imgRatio > 1 
+                                ? "height: 100%; width: auto; max-width: none;" 
+                                : "width: 100%; height: auto; max-height: none;";
+                                
+                            replyImgHTML = `
+                                <div style="position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e; flex-shrink: 0; margin-right: 8px;">
+                                    <img src="${replyImgSrc}" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset; ${isLazy ? 'filter: blur(4px);' : ''}" />
+                                </div>
+                            `;
+                        }
                     }
                     
                     let replyTextContent = (msg.text || '').trim();
-                    if (!replyTextContent && msg.attachment) replyTextContent = "Photo";
+                    if (!replyTextContent && msg.attachment) {
+                        if (attachmentCount > 1) {
+                            replyTextContent = `${attachmentCount} files`;
+                        } else {
+                            replyTextContent = isFile ? fileName : "Photo";
+                        }
+                    }
                     
                     replyText.innerHTML = `
                         <div style="display: flex; flex-direction: row; align-items: center; overflow: hidden; width: 100%;">
@@ -7131,54 +7904,163 @@
                     replyBanner.style.display = 'flex';
                     input.focus();
                     
-                    const menu = btn.closest('.sp-chat-menu');
-                    if (menu) {
-                        menu.classList.remove('show');
-                        menu.closest('.sp-chat-actions').classList.remove('active');
-                    }
+                    closeChatMenus();
                 }
             });
         });
 
         msgList.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                closeChatMenus();
+                const msg = serverMessages.find(m => m.id === btn.dataset.id);
+                
+                let needsFetch = false;
+                if (msg && msg.attachment) {
+                    try {
+                        let arr = JSON.parse(msg.attachment);
+                        if (!Array.isArray(arr)) arr = [arr];
+                        const cachedUrls = imageCache.get(msg.id) || [];
+                        arr.forEach((p, idx) => {
+                            if ((p.hasImage || p.hasFile) && !cachedUrls[idx]) needsFetch = true;
+                        });
+                    } catch(e) {}
+                }
+
+                if (needsFetch) {
+                    document.body.style.cursor = 'wait';
+                    try {
+                        const res = await fetch(`${CHAT_API_URL}/attachments?ids=${msg.id}`);
+                        if (res.ok) {
+                            const map = await res.json();
+                            if (map[msg.id]) {
+                                const urls = Array.isArray(map[msg.id]) ? map[msg.id] : [map[msg.id]];
+                                imageCache.set(msg.id, urls);
+                            }
+                        }
+                    } catch(err) {}
+                    document.body.style.cursor = '';
+                }
+
                 editingId = btn.dataset.id;
                 replyingTo = null;
                 input.value = btn.dataset.text;
-                input.style.height = '40px';
-                let newHeight = input.scrollHeight;
-                input.style.height = (newHeight > 40 ? newHeight : 40) + 'px';
-                replyText.innerHTML = `<div style="font-weight: 600;">Editing message</div>`;
+                input.dispatchEvent(new Event('input'));
+                
+                let replyImgHTML = '';
+                let replyTextContent = btn.dataset.text;
+                if (msg) {
+                    let previewData = null; let attWidth = null; let attHeight = null;
+                    pendingAttachments = [];
+                    let isFile = false;
+                    let attachmentCount = 0;
+                    let firstFileName = "File";
+                    if (msg.attachment) {
+                        try {
+                            let parsed = JSON.parse(msg.attachment);
+                            let arr = Array.isArray(parsed) ? parsed : [parsed];
+                            attachmentCount = arr.length;
+                            if (arr.length > 0) {
+                                previewData = arr[0].preview; attWidth = arr[0].width; attHeight = arr[0].height;
+                                isFile = arr[0].isFile || arr[0].hasFile;
+                                firstFileName = arr[0].name || "File";
+                            }
+                            
+                            const cachedUrls = imageCache.get(msg.id) || [];
+                            pendingAttachments = arr.map((p, idx) => ({
+                                url: (p.hasImage || p.hasFile) ? cachedUrls[idx] : p.url,
+                                width: p.width,
+                                height: p.height,
+                                preview: p.preview,
+                                isFile: p.isFile || p.hasFile,
+                                name: p.name,
+                                size: p.size,
+                                mime: p.mime
+                            })).filter(a => a.url);
+                        } catch(e) {}
+                        
+                        if (isFile) {
+                            replyImgHTML = `<div style="position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: transparent; flex-shrink: 0; margin-right: 4px;"><svg viewBox="0 0 24 24" style="width: 18px; height: 18px; stroke: #1db954; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg></div>`;
+                        } else {
+                            let cachedUrl = imageCache.has(msg.id) ? imageCache.get(msg.id)[0] : null;
+                            let isLazy = !cachedUrl;
+                            let replyImgSrc = cachedUrl || (previewData || `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30' width='30' height='30' style='background:%231e1e1e;'%3E%3C/svg%3E`);
+                            let imgRatio = (attWidth && attHeight) ? (attWidth / attHeight) : 1;
+                            let sizingStyle = imgRatio > 1 ? "height: 100%; width: auto; max-width: none;" : "width: 100%; height: auto; max-height: none;";
+                            replyImgHTML = `<div style="position: relative; width: 30px; height: 30px; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background-color: #1e1e1e; flex-shrink: 0; margin-right: 8px;"><img src="${replyImgSrc}" style="${sizingStyle} position: relative; z-index: 1; margin: 0; flex-shrink: 0; object-fit: unset; ${isLazy ? 'filter: blur(4px);' : ''}" /></div>`;
+                        }
+                    }
+                    if (!replyTextContent && msg.attachment) {
+                        if (attachmentCount > 1) {
+                            replyTextContent = `${attachmentCount} files`;
+                        } else {
+                            replyTextContent = isFile ? firstFileName : "Photo";
+                        }
+                    }
+                    updateAttachBannerUI();
+                }
+
+                replyText.innerHTML = `
+                    <div style="display: flex; flex-direction: row; align-items: center; overflow: hidden; width: 100%;">
+                        ${replyImgHTML}
+                        <div style="display: flex; flex-direction: column; overflow: hidden; flex: 1;">
+                            <div style="font-size: 11px; color: #1db954; font-weight: 700; margin-bottom: 1px; line-height: 1.2;">Editing message</div>
+                            <div style="font-size: 12px; color: #b3b3b3; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHTML(replyTextContent)}</div>
+                        </div>
+                    </div>
+                `;
                 replyBanner.style.display = 'flex';
                 input.focus();
             });
         });
 
         msgList.querySelectorAll('.del-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeChatMenus();
                 const msg = serverMessages.find(m => m.id === btn.dataset.id);
                 if (msg && msg.status === 'sending') {
-                    msg.status = 'cancelled';
-                    serverMessages = serverMessages.filter(m => m.id !== msg.id);
-                    renderMessages(true);
-                    return;
+                    if (msg.isNew) {
+                        msg.status = 'cancelled';
+                        if (msg.abortController) msg.abortController.abort();
+                        serverMessages = serverMessages.filter(m => m.id !== msg.id);
+                        renderMessages(true);
+                        return;
+                    } else {
+                        msg.status = 'cancelled';
+                        if (msg.abortController) msg.abortController.abort();
+                        return;
+                    }
                 }
                 messageToDelete = btn.dataset.id;
                 delOverlay.style.display = 'flex';
             });
         });
 
+        msgList.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeChatMenus();
+                const msg = serverMessages.find(m => m.id === btn.dataset.id);
+                if (msg) navigator.clipboard.writeText(msg.text);
+            });
+        });
+
         msgList.querySelectorAll('.sp-chat-dots-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const menu = btn.nextElementSibling;
+                let menu = btn.nextElementSibling;
+                if (!menu || !menu.classList.contains('sp-chat-menu')) {
+                    const openMenu = document.querySelector('.sp-chat-menu.show');
+                    if (openMenu && openMenu._sourceActions === btn.closest('.sp-chat-actions')) {
+                        menu = openMenu;
+                    }
+                }
+                if (!menu) return;
+                
                 const isShowing = menu.classList.contains('show');
                 
-                msgList.querySelectorAll('.sp-chat-menu.show').forEach(m => {
-                    m.classList.remove('show');
-                    m.style.position = ''; m.style.left = ''; m.style.top = ''; m.style.right = ''; m.style.bottom = '';
-                    m.closest('.sp-chat-actions').classList.remove('active');
-                });
+                closeChatMenus(isShowing ? null : menu);
                 
                 if (!isShowing) {
                     const copyImgBtn = menu.querySelector('.copy-img-btn');
@@ -7191,30 +8073,38 @@
                             dlImgBtn.style.display = 'none';
                         } else {
                             copyImgBtn.style.display = 'block';
-                            copyImgBtn.dataset.index = "0";
                             dlImgBtn.style.display = 'block';
-                            dlImgBtn.dataset.index = "0";
                         }
                     }
 
                     menu.style.position = 'fixed';
                     menu.style.visibility = 'hidden';
                     menu.classList.add('show');
+                    hasOpenChatMenu = true;
+                    
+                    menu._sourceActions = btn.closest('.sp-chat-actions');
+                    menu.classList.add('sort-play-font-scope');
+                    document.body.appendChild(menu);
                     
                     const menuRect = menu.getBoundingClientRect();
                     const btnRect = btn.getBoundingClientRect();
                     menu.style.visibility = '';
                     
+                    const panel = document.getElementById('sort-play-chat-panel');
+                    const panelRect = panel ? panel.getBoundingClientRect() : { bottom: window.innerHeight };
+
                     let top = btnRect.bottom + 4;
                     let left = btnRect.right - menuRect.width;
                     
-                    if (top + menuRect.height > window.innerHeight) {
+                    if (top + menuRect.height > panelRect.bottom) {
                         top = btnRect.top - menuRect.height - 4;
                         menu.classList.add('open-up');
                         menu.classList.remove('open-down');
+                        menu.style.transformOrigin = 'bottom right';
                     } else {
                         menu.classList.remove('open-up');
                         menu.classList.add('open-down');
+                        menu.style.transformOrigin = 'top right';
                     }
                     
                     menu.style.left = left + 'px';
@@ -7222,7 +8112,7 @@
                     menu.style.right = 'auto';
                     menu.style.bottom = 'auto';
 
-                    btn.closest('.sp-chat-actions').classList.add('active');
+                    if (menu._sourceActions) menu._sourceActions.classList.add('active');
                 }
             });
         });
@@ -7230,6 +8120,7 @@
         msgList.querySelectorAll('.copy-img-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                closeChatMenus();
                 const msg = serverMessages.find(m => m.id === btn.dataset.id);
                 if (msg && msg.attachment) {
                     let imgSrc = msg.attachment;
@@ -7259,11 +8150,6 @@
                         };
                         img.src = imgSrc;
                     }
-                    const menu = btn.closest('.sp-chat-menu');
-                    if (menu) {
-                        menu.classList.remove('show');
-                        menu.closest('.sp-chat-actions').classList.remove('active');
-                    }
                 }
             });
         });
@@ -7272,11 +8158,7 @@
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 
-                const menu = btn.closest('.sp-chat-menu');
-                if (menu) {
-                    menu.classList.remove('show');
-                    menu.closest('.sp-chat-actions').classList.remove('active');
-                }
+                closeChatMenus();
 
                 const msg = serverMessages.find(m => m.id === btn.dataset.id);
                 if (msg && msg.attachment) {
@@ -7315,6 +8197,21 @@
                         }
                     }
                 }
+            });
+        });
+        msgList.querySelectorAll('.sp-chat-react-action').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                closeChatMenus();
+                toggleReaction(btn.dataset.id, btn.dataset.emoji);
+            });
+        });
+
+        msgList.querySelectorAll('.sp-chat-reaction-pill').forEach(pill => {
+            pill.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (e.target.closest('.sp-chat-reaction-tooltip')) return;
+                toggleReaction(pill.dataset.id, pill.dataset.emoji);
             });
         });
     };
@@ -7374,6 +8271,7 @@
     });
 
     let pollTimer = null;
+    let isFetchingMessages = false;
     let currentPollInterval = 10000;
     const MAX_POLL_INTERVAL = 60000;
 
@@ -7390,6 +8288,7 @@
     };
 
     const fetchMessages = async () => {
+        if (isFetchingMessages) return;
         if (!document.body.contains(chatPanel)) {
             if (pollTimer) clearTimeout(pollTimer);
             return;
@@ -7400,6 +8299,7 @@
             scheduleNextPoll();
             return;
         }
+        isFetchingMessages = true;
 
         try {
             const headers = {};
@@ -7441,10 +8341,22 @@
                 const idx = newServerMessages.findIndex(m => m.id === inMsg.id);
                 if (idx > -1) {
                     const oldMsg = newServerMessages[idx];
-                    if (oldMsg.text !== inMsg.text || oldMsg.edited !== inMsg.edited || oldMsg.attachment !== inMsg.attachment || oldMsg.replyTo !== inMsg.replyTo) {
+                    
+                    if (oldMsg.status === 'sending' || oldMsg.status === 'deleting' || oldMsg.status === 'cancelled') {
+                        return;
+                    }
+
+                    if (oldMsg.deviceId) inMsg.deviceId = oldMsg.deviceId;
+                    
+                    if (oldMsg.pendingReactionUntil && oldMsg.pendingReactionUntil > Date.now()) {
+                        inMsg.reactions = oldMsg.reactions;
+                        inMsg.pendingReactionUntil = oldMsg.pendingReactionUntil;
+                    }
+
+                    if (oldMsg.text !== inMsg.text || oldMsg.edited !== inMsg.edited || oldMsg.attachment !== inMsg.attachment || oldMsg.replyTo !== inMsg.replyTo || oldMsg.reactions !== inMsg.reactions) {
                         newServerMessages[idx] = inMsg;
                         changed = true;
-                    } else if (oldMsg.status === 'sent' || oldMsg.deviceId) {
+                    } else if (oldMsg.status === 'sent') {
                         newServerMessages[idx] = inMsg;
                         changed = true;
                     }
@@ -7453,6 +8365,11 @@
                     changed = true;
                 }
             });
+
+            if (initialFontLoadPromise) {
+                await initialFontLoadPromise;
+                initialFontLoadPromise = null;
+            }
 
             const isFirstLoad = serverMessages.length === 0;
             if (changed || (isFirstLoad && msgs.length > 0)) {
@@ -7476,6 +8393,7 @@
             console.warn("Failed to fetch chat", e);
             currentPollInterval = Math.min(currentPollInterval + 10000, MAX_POLL_INTERVAL);
         } finally {
+            isFetchingMessages = false;
             scheduleNextPoll();
         }
     };
@@ -7508,19 +8426,52 @@
         }
     }, { signal: chatPanelAbortController.signal });
 
+    const inputContainerObj = chatPanel.querySelector('.sp-chat-input-container');
+    const textareaObj = chatPanel.querySelector('#sp-chat-input');
+    const replyBannerObj = chatPanel.querySelector('#sp-chat-reply-banner');
+    const attachBannerObj = chatPanel.querySelector('#sp-chat-attach-banner');
+    const inputContainerObserver = new ResizeObserver(() => {
+        const footer = document.querySelector('.sort-play-settings-footer');
+        if (footer && inputContainerObj && textareaObj) {
+            const extraHeight = Math.max(0, Math.round(textareaObj.getBoundingClientRect().height) - 40);
+            let bannersHeight = 0;
+            if (replyBannerObj && replyBannerObj.style.display !== 'none') bannersHeight += Math.round(replyBannerObj.getBoundingClientRect().height) + 8;
+            if (attachBannerObj && attachBannerObj.style.display !== 'none') bannersHeight += Math.round(attachBannerObj.getBoundingClientRect().height) + 8;
+            const baseHeight = Math.round(inputContainerObj.getBoundingClientRect().height) - extraHeight - bannersHeight;
+            footer.style.height = baseHeight === 61 ? '' : `${baseHeight}px`;
+        }
+    });
+    if (inputContainerObj) inputContainerObserver.observe(inputContainerObj);
+
     chatPanel.cleanup = () => {
         if (pollTimer) clearTimeout(pollTimer);
         if (attachmentTimer) clearTimeout(attachmentTimer);
+        if (scrollStopTimer) clearTimeout(scrollStopTimer);
         observer.disconnect();
         if (typeof msgListResizeObserver !== 'undefined') msgListResizeObserver.disconnect();
         if (typeof attachmentObserver !== 'undefined') attachmentObserver.disconnect();
+        inputContainerObserver.disconnect();
+        
+        document.body.querySelectorAll('.sp-chat-menu').forEach(m => {
+            if (m._sourceActions && chatPanel.contains(m._sourceActions)) {
+                m.remove();
+            }
+        });
+
+        const footer = document.querySelector('.sort-play-settings-footer');
+        if (footer) {
+            if (footer.dataset.defaultHeight) {
+                footer.style.height = footer.dataset.defaultHeight;
+            } else {
+                footer.style.height = '';
+            }
+        }
         chatPanelAbortController.abort();
     };
 
     chatPanel.addEventListener('mouseenter', resetPollInterval);
     input.addEventListener('focus', resetPollInterval);
 
-    const scrollBottomBtn = chatPanel.querySelector('#sp-chat-scroll-bottom-btn');
     scrollBottomBtn.addEventListener('click', () => {
         if (jumpBackId) {
             const el = scrollContainer.querySelector(`.sp-chat-msg[data-id="${jumpBackId}"]`);
@@ -7538,42 +8489,111 @@
         }
     });
 
-    scrollContainer.addEventListener('scroll', async () => {
-        updateScrollBtnState();
-
-        if (scrollContainer.scrollTop < 10 && hasMoreMessages && !isFetchingOlder && serverMessages.length > 0) {
-            isFetchingOlder = true;
-            
-            let currentScrollTop = scrollContainer.scrollTop;
-            let currentScrollHeight = scrollContainer.scrollHeight;
-            renderMessages(true);
-            scrollContainer.scrollTop = currentScrollTop + (scrollContainer.scrollHeight - currentScrollHeight);
-            
-            const oldest = serverMessages[0].timestamp;
-            
-            try {
-                const res = await fetch(`${CHAT_API_URL}/messages?before=${oldest}`);
-                if (res.ok) {
-                    const olderMsgs = await res.json();
-                    if (olderMsgs.length < 40) hasMoreMessages = false;
-                    
-                    if (olderMsgs.length > 0) {
-                        const newOlder = olderMsgs.filter(om => !serverMessages.some(sm => sm.id === om.id));
-                        serverMessages = [...newOlder, ...serverMessages];
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to load older messages", e);
-            }
-            
-            isFetchingOlder = false;
-            
-            currentScrollTop = scrollContainer.scrollTop;
-            currentScrollHeight = scrollContainer.scrollHeight;
-            renderMessages(true);
-            scrollContainer.scrollTop = currentScrollTop + (scrollContainer.scrollHeight - currentScrollHeight);
+    scrollContainer.addEventListener('scroll', () => {
+        if (!scrollContainer.classList.contains('sp-is-scrolling')) {
+            scrollContainer.classList.add('sp-is-scrolling');
         }
-    });
+        if (scrollStopTimer) clearTimeout(scrollStopTimer);
+        scrollStopTimer = setTimeout(() => {
+            scrollContainer.classList.remove('sp-is-scrolling');
+        }, 120);
+
+        if (!scrollTicking) {
+            window.requestAnimationFrame(() => {
+                if (hasOpenChatMenu) closeChatMenus();
+                updateScrollBtnState();
+
+                if (scrollContainer.scrollTop < 10 && hasMoreMessages && !isFetchingOlder && serverMessages.length > 0) {
+                    isFetchingOlder = true;
+                    
+                    (async () => {
+                        const loadMoreEl = msgList.querySelector('#sp-chat-load-more');
+                        let prevHeight = scrollContainer.scrollHeight;
+                        if (loadMoreEl) loadMoreEl.style.display = 'flex';
+                        scrollContainer.scrollTop += (scrollContainer.scrollHeight - prevHeight);
+                        
+                        const oldest = serverMessages[0].timestamp;
+                        let newOlder = null;
+                        
+                        try {
+                            const res = await fetch(`${CHAT_API_URL}/messages?before=${oldest}`);
+                            if (res.ok) {
+                                const olderMsgs = await res.json();
+                                if (olderMsgs.length < 40) hasMoreMessages = false;
+                                
+                                if (olderMsgs.length > 0) {
+                                    newOlder = olderMsgs.filter(om => !serverMessages.some(sm => sm.id === om.id));
+                                    serverMessages = [...newOlder, ...serverMessages];
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Failed to load older messages", e);
+                        }
+                        
+                        isFetchingOlder = false;
+                        
+                        if (newOlder && newOlder.length > 0) {
+                            const currentScrollTop = scrollContainer.scrollTop;
+                            const currentScrollHeight = scrollContainer.scrollHeight;
+                            renderMessages(true);
+                            scrollContainer.scrollTop = currentScrollTop + (scrollContainer.scrollHeight - currentScrollHeight);
+                        } else {
+                            if (loadMoreEl) {
+                                let prevH = scrollContainer.scrollHeight;
+                                loadMoreEl.style.display = 'none';
+                                scrollContainer.scrollTop += (scrollContainer.scrollHeight - prevH);
+                            }
+                        }
+                    })();
+                }
+                scrollTicking = false;
+            });
+            scrollTicking = true;
+        }
+    }, { passive: true, signal: chatPanelAbortController.signal });
+    
+    const toggleReaction = async (msgId, emoji) => {
+        const msg = serverMessages.find(m => m.id === msgId);
+        if (!msg) return;
+
+        let reactionsData = {};
+        if (msg.reactions) {
+            try { reactionsData = typeof msg.reactions === 'string' ? JSON.parse(msg.reactions) : msg.reactions; } catch(e) {}
+        }
+        
+        const currentReaction = reactionsData[deviceId];
+        const isRemoving = currentReaction && currentReaction.emoji === emoji;
+        const newEmoji = isRemoving ? null : emoji;
+
+        if (isRemoving) {
+            delete reactionsData[deviceId];
+        } else {
+            reactionsData[deviceId] = { emoji: newEmoji, name: getCurrentName() };
+        }
+        
+        const oldReactions = msg.reactions;
+        msg.reactions = JSON.stringify(reactionsData);
+        msg.pendingReactionUntil = Date.now() + 5000;
+        
+        const prevScrollTop = scrollContainer.scrollTop;
+        renderMessages(true);
+        scrollContainer.scrollTop = prevScrollTop;
+
+        try {
+            const res = await fetchWithRetry(`${CHAT_API_URL}/react`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: msgId, emoji: newEmoji, deviceId, userName: getCurrentName() })
+            });
+            if (!res.ok) throw new Error("Failed");
+        } catch(e) {
+            msg.reactions = oldReactions;
+            msg.pendingReactionUntil = 0;
+            const st = scrollContainer.scrollTop;
+            renderMessages(true);
+            scrollContainer.scrollTop = st;
+        }
+    };
     
     const performSend = async (tempMsg, text, replyPayload, attachmentPayload) => {
         let delay = 1000;
@@ -7594,7 +8614,8 @@
                         replyTo: replyPayload, 
                         attachment: attachmentPayload, 
                         deviceId 
-                    })
+                    }),
+                    signal: tempMsg.abortController ? tempMsg.abortController.signal : undefined
                 });
                 
                 if (res.ok) {
@@ -7604,7 +8625,10 @@
                         try {
                             const parsedArray = JSON.parse(attachmentPayload);
                             const finalArray = parsedArray.map(p => {
-                                if (p.url) return { width: p.width, height: p.height, preview: p.preview, hasImage: true };
+                                if (p.url) {
+                                    if (p.isFile) return { isFile: true, name: p.name, size: p.size, mime: p.mime, hasFile: true };
+                                    return { width: p.width, height: p.height, preview: p.preview, hasImage: true };
+                                }
                                 return p;
                             });
                             tempMsg.attachment = JSON.stringify(finalArray);
@@ -7617,18 +8641,16 @@
                 
                 if (res.status >= 400 && res.status < 500) {
                     if (res.status === 429) {
-                        showNotification("Rate limit exceeded. Please slow down.", true);
+                        if (typeof showNotification === 'function') showNotification("Rate limit exceeded. Please slow down.", true);
+                        else alert("Rate limit exceeded. Please slow down.");
                         if (!input.value && text) {
                             input.value = text;
                             input.dispatchEvent(new Event('input'));
                         }
-                        if (attachmentPayload && !pendingAttachment) {
-                            pendingAttachment = attachmentPayload;
+                        if (attachmentPayload && pendingAttachments.length === 0) {
                             try {
-                                const parsed = JSON.parse(attachmentPayload);
-                                attachPreview.src = parsed.url;
-                                if (attachPreviewBg) attachPreviewBg.src = parsed.url;
-                                attachBanner.style.display = 'flex';
+                                pendingAttachments = JSON.parse(attachmentPayload);
+                                updateAttachBannerUI();
                             } catch(e) {}
                         }
                     } else {
@@ -7636,7 +8658,8 @@
                     }
                     break;
                 }
-            } catch (e) { 
+            } catch (e) {
+                if (e.name === 'AbortError') return;
                 console.warn(`Send attempt ${attempts} failed due to network issue, retrying in background...`, e); 
             }
             
@@ -7662,22 +8685,53 @@
         input.style.overflowY = "hidden";
         sendBtn.disabled = true;
 
+        const serverPayloadAttachments = pendingAttachments.map(p => {
+            if (p.url && p.url.startsWith('data:')) return p;
+            if (p.isFile) return { isFile: true, hasFile: true, name: p.name, size: p.size, mime: p.mime };
+            return { hasImage: true, width: p.width, height: p.height, preview: p.preview };
+        });
+        const attachmentPayload = serverPayloadAttachments.length > 0 ? JSON.stringify(serverPayloadAttachments) : null;
+
         if (editingId) {
             const msgToEdit = serverMessages.find(m => m.id === editingId);
             let oldText = "";
+            let oldAttachment = null;
+
             if (msgToEdit) {
                 oldText = msgToEdit.text;
+                oldAttachment = msgToEdit.attachment;
                 msgToEdit.text = text;
+                
+                if (attachmentPayload) {
+                    try {
+                        imageCache.set(editingId, pendingAttachments.map(p => p.url).filter(Boolean));
+                        const parsedArray = JSON.parse(attachmentPayload);
+                        const finalArray = parsedArray.map(p => {
+                            if (p.url && p.url.startsWith('data:')) {
+                                if (p.isFile) return { isFile: true, name: p.name, size: p.size, mime: p.mime, hasFile: true };
+                                return { width: p.width, height: p.height, preview: p.preview, hasImage: true };
+                            }
+                            return p;
+                        });
+                        msgToEdit.attachment = JSON.stringify(finalArray);
+                    } catch(e) {}
+                } else {
+                    msgToEdit.attachment = null;
+                    imageCache.delete(editingId);
+                }
+                
                 msgToEdit.status = 'sending';
                 msgToEdit.edited = true;
                 msgToEdit.editedAt = Date.now();
+                msgToEdit.abortController = new AbortController();
                 renderMessages(true);
             }
 
             fetchWithRetry(`${CHAT_API_URL}/edit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: editingId, text, deviceId, adminToken, authorId: getCurrentAuthorId() })
+                body: JSON.stringify({ id: editingId, text, attachment: attachmentPayload, deviceId, adminToken, authorId: getCurrentAuthorId() }),
+                signal: msgToEdit ? msgToEdit.abortController.signal : undefined
             }).then(async res => {
                 if (res.ok && msgToEdit) {
                     msgToEdit.status = 'sent';
@@ -7687,13 +8741,24 @@
                     } catch(err) {}
                 } else if (msgToEdit) {
                     msgToEdit.text = oldText;
+                    msgToEdit.attachment = oldAttachment;
                     msgToEdit.status = 'sent';
                 }
                 renderMessages(true);
             }).catch(e => {
+                if (e.name === 'AbortError') {
+                    if (msgToEdit) {
+                        msgToEdit.text = oldText;
+                        msgToEdit.attachment = oldAttachment;
+                        msgToEdit.status = 'sent';
+                        renderMessages(true);
+                    }
+                    return;
+                }
                 console.error("Edit failed", e);
                 if (msgToEdit) {
                     msgToEdit.text = oldText;
+                    msgToEdit.attachment = oldAttachment;
                     msgToEdit.status = 'sent';
                     renderMessages(true);
                 }
@@ -7701,15 +8766,15 @@
 
             editingId = null;
             replyBanner.style.display = 'none';
+            pendingAttachments = [];
+            updateAttachBannerUI();
         } else {
             const replyPayload = replyingTo ? JSON.stringify(replyingTo) : null;
-            const attachmentPayload = pendingAttachments.length > 0 ? JSON.stringify(pendingAttachments) : null;
             const realId = crypto.randomUUID();
             
             if (attachmentPayload) {
                 try {
-                    const parsedArray = JSON.parse(attachmentPayload);
-                    imageCache.set(realId, parsedArray.map(p => p.url).filter(Boolean));
+                    imageCache.set(realId, pendingAttachments.map(p => p.url).filter(Boolean));
                 } catch(e) {}
             }
 
@@ -7717,7 +8782,9 @@
                 id: realId,
                 text, user: getCurrentName(), authorId: getCurrentAuthorId(),
                 replyTo: replyPayload, attachment: attachmentPayload, timestamp: Date.now(),
-                deviceId, status: 'sending', isAdmin
+                deviceId, status: 'sending', isAdmin,
+                isNew: true,
+                abortController: new AbortController()
             };
             
             serverMessages.push(tempMsg);
@@ -7748,7 +8815,25 @@
         }
     });
 
+    replyText.style.cursor = 'pointer';
+    replyText.addEventListener('click', () => {
+        const targetId = editingId || (replyingTo ? replyingTo.messageId : null);
+        if (targetId) {
+            const el = scrollContainer.querySelector(`.sp-chat-msg[data-id="${targetId}"]`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.remove('sp-chat-msg-highlight');
+                void el.offsetWidth;
+                el.classList.add('sp-chat-msg-highlight');
+            }
+        }
+    });
+
     replyCancel.addEventListener('click', () => {
+        if (editingId) {
+            pendingAttachments = [];
+            updateAttachBannerUI();
+        }
         replyingTo = null;
         editingId = null;
         replyBanner.style.display = 'none';
@@ -7787,7 +8872,7 @@
         .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; }
         .setting-label { color: #c1c1c1; font-size: 15px; font-weight: 500; }
         .section-header { font-weight: bold; font-size: 16px; color: white; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 4px; }
-        .separator-container { position: relative; display: flex; gap: 6px; }
+        .sp-separator-container { position: relative; display: flex; gap: 6px; }
         .np-input { background: #181818; border: 1px solid #444; color: white; padding: 4px 8px; border-radius: 4px; font-family: inherit; font-size: 13px; width: 50px; text-align: center; }
         .np-input:focus { border-color: #888; outline: none; }
         .toggle-sep-menu-btn { background: #333; border: 1px solid #444; color: #ccc; border-radius: 4px; width: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -7852,7 +8937,7 @@
                               <div style="display: flex; align-items: center;">
                                   <label class="setting-label">Now Playing Separator</label>
                               </div>
-                              <div class="separator-container">
+                              <div class="sp-separator-container">
                                   <input type="text" class="np-input" id="genreSeparatorInput" value="${genreSeparator.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}" placeholder="," maxlength="10">
                                   <button class="toggle-sep-menu-btn" id="genreSeparatorBtn" title="Presets">▼</button>
                                   <div class="separator-dropdown" id="genreSeparatorDropdown">
@@ -8790,7 +9875,7 @@
         
         const actualDefaultName = DEDICATED_PLAYLIST_DEFAULTS[cardId]?.name || defaultCardData.name;
 
-        let tempName = custom.name || actualDefaultName;
+        let tempName = (custom.name && custom.name !== actualDefaultName && custom.name !== defaultCardData.name) ? custom.name : actualDefaultName;
         let tempImageData = null;
 
         modalContainer.innerHTML = `
@@ -8894,6 +9979,11 @@
                 delete overrides[cardId];
                 localStorage.setItem(STORAGE_KEY_DEDICATED_OVERRIDES, JSON.stringify(overrides));
                 await idb.del('generatedCovers', `custom_image_${cardId}`);
+                try {
+                    const currentMeta = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
+                    delete currentMeta[cardId];
+                    localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(currentMeta));
+                } catch(e) {}
                 
                 try {
                     const dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
@@ -8942,13 +10032,24 @@
             saveBtn.innerText = "Saving...";
             
             const newName = modalContainer.querySelector('#app-name-input').value.trim();
+            const isCustomName = newName && newName !== actualDefaultName && newName !== defaultCardData.name;
+            const hasCustomImg = tempImageData ? true : (custom.hasCustomImage || false);
             
-            overrides[cardId] = {
-                name: newName,
-                hasCustomImage: tempImageData ? true : (custom.hasCustomImage || false)
-            };
+            if (isCustomName || hasCustomImg) {
+                overrides[cardId] = {
+                    ...(isCustomName ? { name: newName } : {}),
+                    hasCustomImage: hasCustomImg
+                };
+            } else {
+                delete overrides[cardId];
+            }
             
             localStorage.setItem(STORAGE_KEY_DEDICATED_OVERRIDES, JSON.stringify(overrides));
+            try {
+                const currentMeta = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
+                delete currentMeta[cardId];
+                localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(currentMeta));
+            } catch(e) {}
             
             if (tempImageData) {
                 await idb.set('generatedCovers', `custom_image_${cardId}`, tempImageData);
@@ -8961,7 +10062,7 @@
                      const activeSet = await getActiveUserPlaylistUris();
                      if (activeSet.has(playlistUri)) {
                          const playlistId = playlistUri.split(':')[2];
-                         const targetName = newName || actualDefaultName;
+                         const targetName = isCustomName ? newName : actualDefaultName;
                          
                          await Spicetify.Platform.PlaylistAPI.setAttributes(`spotify:playlist:${playlistId}`, { name: targetName });
                          
@@ -9956,12 +11057,24 @@
             const allowSettings = card.id !== 'tastemakerProfile' && !isBroken;
 
             const custom = overrides[card.id] || {};
-            let displayTitle = custom.name || card.name;
+            const defaultCreationName = DEDICATED_PLAYLIST_DEFAULTS[card.id]?.name;
+            const hasValidCustomName = custom.name && custom.name !== defaultCreationName && custom.name !== card.name;
+            if (custom.name && (custom.name === defaultCreationName || custom.name === card.name)) {
+                delete overrides[card.id].name;
+                if (!overrides[card.id].hasCustomImage) delete overrides[card.id];
+                try { localStorage.setItem(STORAGE_KEY_DEDICATED_OVERRIDES, JSON.stringify(overrides)); } catch(e) {}
+            }
+            let displayTitle = hasValidCustomName ? custom.name : card.name;
             let displayThumbnail = card.thumbnailUrl;
 
             const cachedMeta = dedicatedPlaylistMeta[card.id];
-            if ((behavior === 'replace' || behavior === 'autoUpdate') && cachedMeta) {
-                if (!custom.name && cachedMeta.name) displayTitle = cachedMeta.name;
+            const isDefaultCachedName = cachedMeta?.name && (cachedMeta.name === defaultCreationName || cachedMeta.name === card.name);
+            if (isDefaultCachedName) {
+                delete dedicatedPlaylistMeta[card.id];
+                try { localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta)); } catch(e) {}
+            }
+            if ((behavior === 'replace' || behavior === 'autoUpdate') && cachedMeta && !isDefaultCachedName) {
+                if (!hasValidCustomName && cachedMeta.name) displayTitle = cachedMeta.name;
             }
             
             const needsIdbCover = custom.hasCustomImage === true;
@@ -9977,7 +11090,7 @@
             const countText = hasCached ? cachedCount.toLocaleString() : '';
 
             return `
-                <div class="slim-card ${isBroken ? 'broken-card' : ''} ${customCoverClass}" data-id="${card.id}" data-name="${card.name}" data-needs-idb-cover="${needsIdbCover ? 'true' : 'false'}" style="--overlay-color: ${rgbColor};">
+                <div class="slim-card ${isBroken ? 'broken-card' : ''} ${customCoverClass}" data-id="${card.id}" data-name="${escapeHtml(displayTitle, "")}" data-needs-idb-cover="${needsIdbCover ? 'true' : 'false'}" style="--overlay-color: ${rgbColor};">
                     <div class="card-bg" style="background-image: url('${displayThumbnail}');"></div>
                     <div class="card-overlay"></div>
                     ${isBroken ? `<div class="broken-overlay"><span>Unavailable</span></div>` : ''}
@@ -10116,13 +11229,14 @@
         .slim-card:hover .card-overlay::after, .slim-card:has(.settings-overlay-panel.active) .card-overlay::after { opacity: 1; }
         .card-content-wrapper { position: relative; z-index: 2; height: 100%; display: flex; align-items: center; padding: 0 40px 0 12px; }
         .card-text { display: flex; flex-direction: column; justify-content: center; width: 100%; }
-        .card-title-row { display: flex; align-items: center; gap: 5px; }
-        .card-title { color: #fff; font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
-        .card-version-tag { font-size: 9px; font-weight: 700; color: #b3b3b3; background-color: rgb(255 255 255 / 9%); padding: 1px 4px; border-radius: 4px; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .badge-container { display: flex; align-items: center; transition: opacity 0.2s ease; }
-        .mode-badge { font-size: 10px; font-weight: 800; padding: 2px 5px; border-radius: 3px; letter-spacing: 0.3px; text-transform: uppercase; display: inline-block; line-height: 1.1; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        .mode-badge.replace { background-color: #3e2a0f; color: #ffaa00; border: 1px solid #5e431d; }
-        .mode-badge.auto { background-color: #0f3318; color: #1ed760; border: 1px solid #184f25; }
+        .card-title-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .card-title { color: #fff; font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,0.8); min-width: 0; flex-shrink: 1; }
+        .card-version-tag { font-size: 9px; font-weight: 600; color: rgba(255, 255, 255, 0.45); background-color: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); padding: 0 4px; height: 15px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; box-sizing: border-box; }
+        .badge-container { display: inline-flex; align-items: center; flex-shrink: 0; transition: opacity 0.2s ease; }
+        .badge-container:empty { display: none; }
+        .mode-badge { font-size: 9px; font-weight: 800; padding: 0 5px; height: 16px; border-radius: 3px; letter-spacing: 0.3px; text-transform: uppercase; display: inline-flex; align-items: center; justify-content: center; line-height: 1; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.3); flex-shrink: 0; }
+        .mode-badge.replace { background-color: #3e2a0f; color: #ffaa00; border: 1px solid #6b4d1e; }
+        .mode-badge.auto { background-color: #0f3318; color: #1ed760; border: 1px solid #1a5e2c; }
         .card-desc { color: #ddd; font-size: 12px; opacity: 0.8; margin-top: 3px; text-shadow: 0 1px 2px rgba(0,0,0,0.8); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; line-height: 1.2; }
         .card-action-triggers { position: absolute; top: 0; right: 0; height: 100%; width: 34px; display: flex; flex-direction: column; z-index: 10; opacity: 0; transition: opacity 0.2s; border-left: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; }
         .slim-card:hover .card-action-triggers, .slim-card:has(.settings-overlay-panel.active) .card-action-triggers { opacity: 1; }
@@ -10317,9 +11431,12 @@
                             if (defaultCard) {
                                 const titleEl = cardEl.querySelector('.card-title');
                                 if (titleEl) {
-                                    const targetTitle = custom.name || defaultCard.name;
+                                    const defaultCreationName = DEDICATED_PLAYLIST_DEFAULTS[cardId]?.name;
+                                    const hasValidCustomName = custom.name && custom.name !== defaultCreationName && custom.name !== defaultCard.name;
+                                    const targetTitle = hasValidCustomName ? custom.name : defaultCard.name;
                                     titleEl.innerText = targetTitle;
                                     titleEl.title = targetTitle;
+                                    cardEl.dataset.name = targetTitle;
                                 }
                             }
                         }
@@ -10330,26 +11447,41 @@
                 Spicetify.Platform.PlaylistAPI.getMetadata(uri).then(meta => {
                     if (meta) {
                         const cardEl = modalContainer.querySelector(`.slim-card[data-id="${cardId}"]`);
-                        let cacheNeedsUpdate = false;
-                        let newName = meta.name;
+                        const newName = meta.name ? meta.name.trim() : "";
                         
                         const cached = dedicatedPlaylistMeta[cardId] || {};
                         const custom = overrides[cardId] || {};
-                        
-                        if (newName && cached.name !== newName && !custom.name) {
-                            cacheNeedsUpdate = true;
+                        const defaultCard = playlistCardsData.flatMap(s => s.cards).find(c => c.id === cardId);
+                        const defaultCreationName = DEDICATED_PLAYLIST_DEFAULTS[cardId]?.name;
+                        const defaultCardName = defaultCard?.name || DEDICATED_PLAYLIST_DEFAULTS[cardId]?.uiName;
+                        const hasValidCustomName = custom.name && custom.name !== defaultCreationName && custom.name !== defaultCardName;
+
+                        const isDefaultName = !newName || newName === defaultCreationName || newName === defaultCardName;
+
+                        if (isDefaultName) {
+                            if (cached.name) {
+                                delete dedicatedPlaylistMeta[cardId];
+                                localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
+                            }
+                            if (cardEl && !hasValidCustomName) {
+                                const titleEl = cardEl.querySelector('.card-title');
+                                if (titleEl && defaultCardName) {
+                                    titleEl.innerText = defaultCardName;
+                                    titleEl.title = defaultCardName;
+                                    cardEl.dataset.name = defaultCardName;
+                                }
+                            }
+                        } else if (!hasValidCustomName && cached.name !== newName) {
+                            dedicatedPlaylistMeta[cardId] = { name: newName };
+                            localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
                             if (cardEl) {
                                 const titleEl = cardEl.querySelector('.card-title');
                                 if (titleEl) {
                                     titleEl.innerText = newName;
                                     titleEl.title = newName;
+                                    cardEl.dataset.name = newName;
                                 }
                             }
-                        }
-
-                        if (cacheNeedsUpdate) {
-                            dedicatedPlaylistMeta[cardId] = { name: newName };
-                            localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(dedicatedPlaylistMeta));
                         }
                     }
                 }).catch(e => {
@@ -17460,6 +18592,12 @@
   }
 
   async function showCustomFilterModal(tracks, currentUri, fetchOptions = {}) {
+    const existing = document.getElementById("custom-filter-overlay");
+    if (existing) {
+        existing._cleanup?.();
+        existing.remove();
+    }
+
     const hasLfmUser = !!loadLastFmUsername();
     const { fetchPop = cfFetchPopularity, fetchPers = hasLfmUser && cfFetchLastFm, fetchGlob = cfFetchLastFm } = fetchOptions;
     const abortController = new AbortController();
@@ -17474,16 +18612,18 @@
         background-color: rgba(0, 0, 0, 0.7); z-index: 2006;
         display: flex; justify-content: center; align-items: center;
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        box-sizing: border-box; padding: 20px 0;
     `;
 
     const modalContainer = document.createElement("div");
     modalContainer.className = "custom-filter-modal main-embedWidgetGenerator-container";
     modalContainer.style.cssText = `
         z-index: 2007;
-        width: 70vw !important;
+        width: clamp(850px, 92vw, 1260px) !important;
         max-width: 95vw !important;
         height: 92vh;
-        max-height: 92vh;
+        max-height: calc(100vh - 40px);
+        margin: auto !important;
         background-color: #121212 !important;
         border: 1px solid #333;
         display: flex;
@@ -19305,7 +20445,7 @@
       .tracklist-table.compact-mode .title-col { width: 230px; }
       .tracklist-table.compact-mode .artist-col { left: 282px; }
       .tracklist-table .actions-col { width: 60px; right: 0; text-align: center; vertical-align: middle; box-shadow: 2px 0 2px #121212; }
-      .top-right-controls { position: absolute; top: 20px; right: 24px; display: flex; gap: 8px; z-index: 10; }
+      .top-right-controls { position: absolute; top: 20px; right: 24px; display: flex; gap: 8px; z-index: 10; transition: transform 0.2s ease; }
       .custom-tooltip-bottom { top: 100% !important; bottom: auto !important; margin-top: 8px !important; margin-bottom: 0 !important; }
       .custom-tooltip-bottom::after { top: auto !important; bottom: 100% !important; border-color: transparent transparent #373737 transparent !important; }
       .custom-tooltip-bottom::before { content: ""; position: absolute; bottom: 100%; left: 0; width: 100%; height: 8px; background: transparent; }
@@ -19387,6 +20527,7 @@
       .max-rows-label { color: #b3b3b3; font-size: 12px; font-weight: 600; }
       .max-rows-select { padding: 0px 4px; border-radius: 4px; border: 1px solid #434343; background: #282828; color: white; cursor: pointer; height: 26px; font-size: 12px; font-family: inherit; outline: none; }
       .filter-settings-container { display: grid; grid-template-columns: 0.95fr 1.05fr 1.25fr; grid-template-rows: minmax(0, 1fr); gap: 15px; height: 100%; }
+      @media (max-width: 860px) { .filter-settings-container { grid-template-columns: 1fr !important; grid-template-rows: auto !important; overflow-y: auto !important; } .settings-right-wrapper { grid-column: 1 !important; grid-row: auto !important; } .settings-column-wrapper { grid-column: 1 !important; grid-row: auto !important; } }
       .summary-content { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; align-content: flex-start; flex: 1; overflow-y: auto; padding-right: 4px; scrollbar-gutter: stable; }
       .summary-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); padding: 0 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; height: 26px; box-sizing: border-box; }
       .settings-column-wrapper { display: flex; flex-direction: column; gap: 15px; position: relative; min-height: 0; }
@@ -19554,7 +20695,7 @@
         <button id="closeCustomFilterModalBtn" class="top-icon-btn" title="Close">${closeIconSmall2Svg}</button>
     </div>
 
-    <div class="main-trackCreditsModal-header" style="padding: 24px 32px 0 !important; display: flex; flex-direction: column; align-items: stretch; border-bottom: none; flex-shrink: 0;">
+    <div class="main-trackCreditsModal-header" style="padding: 24px 100px 0 32px !important; display: flex; flex-direction: column; align-items: stretch; border-bottom: none; flex-shrink: 0;">
         <h1 class="main-trackCreditsModal-title" style="margin: 0; display: flex; align-items: baseline; gap: 10px; overflow: hidden;">
             <span style='font-size: 22px; color: white; font-weight: 800; flex-shrink: 0;'>Custom Filter</span>
             <span style='color: #b3b3b3; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;'>${escapeHtml(sourceName)}</span>
@@ -19945,20 +21086,65 @@
 
     updatePlaylistStats();
 
+    const controlsEl = modalContainer.querySelector('.top-right-controls');
+    const headerEl = modalContainer.querySelector('.main-trackCreditsModal-header');
+
+    const updatePosition = () => {
+        if (!controlsEl || !overlay.isConnected) return;
+        const modalTop = modalContainer.getBoundingClientRect().top;
+        const unshiftedTop = modalTop + 20;
+
+        if (unshiftedTop < 46) {
+            const maxShift = headerEl ? Math.max(0, headerEl.offsetHeight - 52) : 35;
+            const delta = Math.min(Math.max(0, (54 - unshiftedTop)), maxShift);
+            controlsEl.style.transform = `translateY(${delta}px)`;
+        } else {
+            controlsEl.style.transform = "";
+        }
+    };
+
+    const onKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            if (document.querySelector('#sort-play-confirmation-overlay, .load-keywords-dropdown, .sp-col-selector-dropdown')) return;
+            const openModals = document.querySelectorAll('.main-embedWidgetGenerator-container');
+            if (openModals.length > 1) return;
+            e.preventDefault();
+            e.stopPropagation();
+            cleanup();
+        }
+    };
+
+    let isCleanedUp = false;
     const cleanup = () => {
+        if (isCleanedUp) return;
+        isCleanedUp = true;
         if (observer) {
             observer.disconnect();
         }
         clearInterval(progressInterval);
         Spicetify.Player.removeEventListener('onplaypause', playerStateHandler);
+        window.removeEventListener('resize', updatePosition);
+        document.removeEventListener('keydown', onKeyDown);
 
         abortController.abort();
         activeRow = null;
 
         overlay.remove();
     };
+    overlay._cleanup = cleanup;
 
-    modalContainer.querySelector("#closeCustomFilterModalBtn").addEventListener("click", cleanup);
+    window.addEventListener('resize', updatePosition);
+    document.addEventListener('keydown', onKeyDown);
+
+    requestAnimationFrame(updatePosition);
+
+    const closeBtn = modalContainer.querySelector("#closeCustomFilterModalBtn");
+    if (closeBtn) {
+        closeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            cleanup();
+        });
+    }
 
     modalContainer.querySelector('#cfSettingsBtn').addEventListener('click', () => {
         showCustomFilterSettingsModal(async (results) => {
@@ -21832,7 +23018,7 @@
                 if (!isHeadless) mainButton.innerText = msg;
             };
             
-            const { trackGenreMap } = await fetchAllTrackGenres(uniqueTracks, updateProgressText);
+            const { trackGenreMap } = await fetchAllTrackGenres(uniqueTracks, updateProgressText, null, { spotify_track: true });
             
             updateProgressText("Audio...");
             const trackIds = uniqueTracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || (t.uri ? t.uri.split(":")[2] : null))).filter(Boolean);
@@ -34300,7 +35486,10 @@
 
   async function showPlaylistAnalysisModal(tracks, sourceDetails, contextType = 'playlist', updateProgressCallback = null) {
     const existing = document.getElementById("sort-play-analysis-overlay");
-    if (existing) existing.remove();
+    if (existing) {
+      existing._cleanup?.();
+      existing.remove();
+    }
 
     const updateProgress = (msg) => { if(updateProgressCallback) updateProgressCallback(msg); };
 
@@ -35696,9 +36885,21 @@
         background-color: rgba(0, 0, 0, 0.7) !important; z-index: 2005;
         display: flex; justify-content: center; align-items: center;
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        box-sizing: border-box; padding: 20px 0;
       `;
 
-      const closeModal = () => overlay.remove();
+      let removeListeners = null;
+      let isCleanedUp = false;
+      const cleanup = () => {
+        if (isCleanedUp) return;
+        isCleanedUp = true;
+        removeListeners?.();
+      };
+      const closeModal = () => {
+        cleanup();
+        overlay.remove();
+      };
+      overlay._cleanup = cleanup;
 
       const modalContainer = document.createElement("div");
       modalContainer.className = "main-embedWidgetGenerator-container sort-play-font-scope";
@@ -35716,7 +36917,9 @@
         position: relative;
         overflow: hidden;
         height: 85vh;
-        min-height: 650px;
+        min-height: min(650px, calc(100vh - 40px));
+        max-height: calc(100vh - 40px);
+        margin: auto !important;
         animation: none !important;
         transform: none !important;
         opacity: 1 !important;
@@ -35963,7 +37166,7 @@
           .sp-bento-panel::before { z-index: -2; }
           .sp-bento-panel::after { filter: blur(12px); z-index: -1; transform: scale(1.01); }
           
-          .sp-bento-header { padding: 30px 40px; display: flex; align-items: center; z-index: 1; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+          .sp-bento-header { padding: 30px 80px 30px 40px; display: flex; align-items: center; z-index: 1; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; transition: padding-right 0.2s ease; }
           .sp-bento-cover { width: 80px; height: 80px; border-radius: 8px; margin-right: 24px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); object-fit: cover; flex-shrink: 0; }
           .sp-bento-title-wrapper { display: flex; flex-direction: column; justify-content: center; overflow: visible; flex: 1; min-width: 120px; margin-right: 32px; }
           .sp-bento-title { font-weight: 800; color: white; margin: -10px -12px -8px -10px; padding: 10px 12px 10px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 2px 10px rgba(0,0,0,0.4); }
@@ -35971,12 +37174,12 @@
           
           .sp-bento-header-divider { width: 1px; height: 60px; background-color: rgba(255,255,255,0.1); margin-right: 32px; flex-shrink: 0; }
           
-          .sp-bento-header-stats { display: flex; justify-content: space-between; gap: 15px; align-items: center; flex: 0 0 55%; max-width: 55%; width: 55%; overflow-x: auto; scrollbar-width: none; padding-right: 50px; padding-top: 10px; margin-top: -10px; padding-bottom: 10px; margin-bottom: -10px; }
+          .sp-bento-header-stats { display: flex; justify-content: space-between; gap: 15px; align-items: center; flex: 0 0 55%; max-width: 55%; width: 55%; overflow-x: auto; scrollbar-width: none; padding-top: 10px; margin-top: -10px; padding-bottom: 10px; margin-bottom: -10px; }
           .sp-header-stat { display: flex; flex-direction: column; gap: 4px; align-items: center; }
           .sp-stat-val { font-size: 24px; font-weight: 800; color: white; letter-spacing: -0.5px; white-space: nowrap; text-shadow: 0 2px 10px rgba(0,0,0,0.4); }
           .sp-stat-lbl { font-size: 11px; color: rgba(255,255,255,0.5); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; text-shadow: 0 1px 5px rgba(0,0,0,0.3); }
           
-          .top-right-controls { position: absolute; top: 20px; right: 24px; display: flex; gap: 8px; z-index: 10; }
+          .top-right-controls { position: absolute; top: 20px; right: 24px; display: flex; gap: 8px; z-index: 10; transition: transform 0.2s ease; }
           .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex; align-items: center; justify-content: center; transition: background 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
           .top-icon-btn:hover { background: rgba(${cR}, ${cG}, ${cB}, 0.6) !important; border-color: rgba(255,255,255,0.3) !important; }
           
@@ -36047,7 +37250,7 @@
           <div class="sp-bento-header">
             <img src="${coverImage}" class="sp-bento-cover">
             <div class="sp-bento-title-wrapper">
-              <h2 class="sp-bento-title" title="${plName}" style="font-size: clamp(20px, 3vw, ${idealFontSize}px);">${plName}</h2>
+              <h2 class="sp-bento-title" title="${plName}" style="font-size: clamp(16px, 2.5vw, ${idealFontSize}px);">${plName}</h2>
               <div class="sp-bento-subtitle">${escapeHtml(subtitleText)}</div>
             </div>
             
@@ -36314,7 +37517,53 @@
           if (vibeChartHeatmap) vibeChartHeatmap.style.display = 'none';
       }
 
-      modalContainer.querySelector('#closeAnalysisX').onclick = closeModal;
+      const closeBtn = modalContainer.querySelector('#closeAnalysisX');
+      if (closeBtn) {
+        closeBtn.onclick = (e) => {
+          e.stopPropagation();
+          closeModal();
+        };
+      }
+
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          if (document.querySelector('#sort-play-confirmation-overlay, [id*="vibe-filter"]')) return;
+          e.preventDefault();
+          e.stopPropagation();
+          closeModal();
+        }
+      };
+
+      const controlsEl = modalContainer.querySelector('.top-right-controls');
+      const headerEl = modalContainer.querySelector('.sp-bento-header');
+
+      const updatePosition = () => {
+        if (!controlsEl || !overlay.isConnected) return;
+        const modalTop = modalContainer.getBoundingClientRect().top;
+        const unshiftedTop = modalTop + 20;
+        const windowH = window.innerHeight;
+        const deadZoneCeiling = Math.max(65, Math.min(windowH * 0.10, 85));
+
+        if (unshiftedTop < deadZoneCeiling) {
+          const maxShift = headerEl ? Math.max(0, headerEl.offsetHeight - 52) : 40;
+          const delta = Math.min(Math.max(0, (deadZoneCeiling - unshiftedTop) + 8), maxShift);
+          controlsEl.style.transform = `translateY(${delta}px)`;
+          if (headerEl) headerEl.style.paddingRight = "85px";
+        } else {
+          controlsEl.style.transform = "";
+          if (headerEl) headerEl.style.paddingRight = "";
+        }
+      };
+
+      window.addEventListener('resize', updatePosition);
+      document.addEventListener('keydown', onKeyDown);
+
+      removeListeners = () => {
+        window.removeEventListener('resize', updatePosition);
+        document.removeEventListener('keydown', onKeyDown);
+      };
+
+      requestAnimationFrame(updatePosition);
 
       const openVibeFilterBtn = modalContainer.querySelector('#sp-analysis-open-vibe-filter');
       if (openVibeFilterBtn) {
@@ -36653,14 +37902,42 @@
           let lastDelta = 0;
           let lastNavTime = 0;
           let wheelResetTimeout = null;
+          let innerScrollAccumulator = 0;
+          let innerScrollResetTimer = null;
+          let lastInnerDirection = 0;
 
           carouselViewport.addEventListener('wheel', (e) => {
               const innerScroll = e.target.closest('.scrollable-content');
               if (innerScroll) {
-                  const canScrollUp = innerScroll.scrollTop > 0;
-                  const canScrollDown = Math.ceil(innerScroll.scrollTop + innerScroll.clientHeight) < innerScroll.scrollHeight;
-                  if ((e.deltaY < 0 && canScrollUp) || (e.deltaY > 0 && canScrollDown)) {
-                      return; 
+                  const hasScrollbar = innerScroll.scrollHeight > innerScroll.clientHeight + 2;
+                  if (hasScrollbar) {
+                      const canScrollUp = innerScroll.scrollTop > 0;
+                      const canScrollDown = Math.ceil(innerScroll.scrollTop + innerScroll.clientHeight) < innerScroll.scrollHeight;
+                      if ((e.deltaY < 0 && canScrollUp) || (e.deltaY > 0 && canScrollDown)) {
+                          innerScrollAccumulator = 0;
+                          return;
+                      }
+
+                      e.preventDefault();
+
+                      const currentDirection = Math.sign(e.deltaY);
+                      if (currentDirection !== lastInnerDirection) {
+                          innerScrollAccumulator = 0;
+                          lastInnerDirection = currentDirection;
+                      }
+
+                      innerScrollAccumulator += Math.abs(e.deltaY);
+
+                      clearTimeout(innerScrollResetTimer);
+                      innerScrollResetTimer = setTimeout(() => {
+                          innerScrollAccumulator = 0;
+                      }, 350);
+
+                      if (innerScrollAccumulator < 280) {
+                          return;
+                      }
+
+                      innerScrollAccumulator = 0;
                   }
               }
 
@@ -36904,11 +38181,12 @@
                 delete dedicatedPlaylistMap[sortType];
                 localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
                 
-                let currentMetaMap = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
-                if (currentMetaMap[sortType]) {
+                try {
+                    let currentMetaMap = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
+                    delete currentMetaMap[actualSortType];
                     delete currentMetaMap[sortType];
                     localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(currentMetaMap));
-                }
+                } catch(e) {}
             }
         }
     }
@@ -36949,6 +38227,12 @@
             let dedicatedPlaylistMap = JSON.parse(localStorage.getItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP) || '{}');
             dedicatedPlaylistMap[sortType] = newPlaylist.uri;
             localStorage.setItem(STORAGE_KEY_DEDICATED_PLAYLIST_MAP, JSON.stringify(dedicatedPlaylistMap));
+            try {
+                let currentMetaMap = JSON.parse(localStorage.getItem("sort-play-dedicated-playlist-meta") || '{}');
+                delete currentMetaMap[actualSortType];
+                delete currentMetaMap[sortType];
+                localStorage.setItem("sort-play-dedicated-playlist-meta", JSON.stringify(currentMetaMap));
+            } catch(e) {}
         }
         
         fetch(`${STATS_URL}/increment?key=${actualSortType}`, { method: 'POST', mode: 'no-cors' }).catch(() => {});
@@ -37235,6 +38519,93 @@
         return [];
   }
 
+  async function getRecentlyPlayedTracks() {
+    const PlayHistoryAPI = Spicetify.Platform?.PlayHistoryAPI;
+    if (!PlayHistoryAPI || typeof PlayHistoryAPI.getContents !== "function") return [];
+    try {
+      const history = await PlayHistoryAPI.getContents();
+      const rawItems = history?.items || (Array.isArray(history) ? history : []);
+      return rawItems
+        .map(item => {
+          if (!item) return null;
+          const t = (item.track && item.track.uri) ? item.track : item;
+          if (!t || !t.uri || !t.uri.startsWith("spotify:track:")) return null;
+
+          const rawArtists = t.artists || [];
+          const artists = rawArtists.map(a => ({
+            id: a.id || (a.uri ? a.uri.split(":")[2] : null),
+            uri: a.uri || (a.id ? `spotify:artist:${a.id}` : null),
+            name: a.name || "Unknown Artist"
+          }));
+          const artistName = artists[0]?.name || "Unknown Artist";
+          const allArtists = typeof normalizeArtistNames === "function" ? normalizeArtistNames(artists) : (artists.map(a => a.name).join(", ") || artistName);
+          
+          const albumUri = t.album?.uri || (t.album?.id ? `spotify:album:${t.album.id}` : null);
+          const albumId = albumUri ? albumUri.split(":")[2] : (t.album?.id || null);
+          const albumName = t.album?.name || "Unknown Album";
+          const albumType = t.album?.album_type || t.album?.type || "album";
+
+          const durationMs = t.duration?.milliseconds || t.duration_ms || t.durationMs || t.durationMilis || 0;
+          const trackId = t.uri.split(":")[2];
+          const trackNumber = t.trackNumber || t.track_number || t.album?.trackNumber || 0;
+          const discNumber = t.discNumber || t.disc_number || t.album?.discNumber || 1;
+          const explicit = t.isExplicit || t.explicit || false;
+          const isPlayable = t.is_playable !== false && t.isPlayable !== false;
+          const playedAt = item.playedAt || item.timestamp || item.addedAt || null;
+
+          return {
+            uri: t.uri,
+            id: trackId,
+            trackId: trackId,
+            uid: item.uid || t.uid || null,
+            name: t.name || "Unknown Title",
+            songTitle: t.name || "Unknown Title",
+            artistName: artistName,
+            allArtists: allArtists,
+            artistUris: artists.map(a => a.uri).filter(Boolean),
+            artists: artists,
+            albumName: albumName,
+            albumUri: albumUri,
+            albumId: albumId,
+            albumType: albumType,
+            album_type: albumType,
+            durationMs: durationMs,
+            durationMilis: durationMs,
+            playCount: "N/A",
+            playcount: 0,
+            popularity: null,
+            releaseDate: null,
+            addedAt: playedAt,
+            trackNumber: trackNumber,
+            discNumber: discNumber,
+            explicit: explicit,
+            is_playable: isPlayable,
+            isPlayable: isPlayable,
+            track: {
+              id: trackId,
+              name: t.name || "Unknown Title",
+              duration_ms: durationMs,
+              explicit: explicit,
+              trackNumber: trackNumber,
+              discNumber: discNumber,
+              artists: artists,
+              external_ids: t.external_ids || {},
+              album: {
+                id: albumId,
+                name: albumName,
+                uri: albumUri,
+                album_type: albumType,
+                images: t.album?.images || []
+              }
+            }
+          };
+        })
+        .filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  }
+  
   async function getComprehensiveKnownArtistsSet(options = {}) {
     const { isHeadless = false } = options;
     if (!isHeadless) {
@@ -37366,11 +38737,26 @@
       let m = 0, u = 0, s = 0, i = 0, c = 0;
       let weightSum = 0;
 
+      const resolveModel = (name) => {
+          if (!name) return null;
+          const lower = name.toLowerCase().trim();
+          if (MUSIC_MODEL_MAP[lower]) return MUSIC_MODEL_MAP[lower];
+          for (const key in MUSIC_MODEL_MAP) {
+              if (lower.includes(key) || key.includes(lower)) return MUSIC_MODEL_MAP[key];
+          }
+          const tokens = lower.split(/\s+/);
+          for (const tok of tokens) {
+              if (tok.length > 2 && MUSIC_MODEL_MAP[tok]) return MUSIC_MODEL_MAP[tok];
+          }
+          return null;
+      };
+
       if (genres && genres.length > 0) {
           genres.forEach(g => {
-              const model = MUSIC_MODEL_MAP[g.name];
+              const gName = typeof g === 'string' ? g : g.name;
+              const model = resolveModel(gName);
               if (model) {
-                  const w = g.score || 1;
+                  const w = g.score ?? 1;
                   if (model.M) m += model.M * w;
                   if (model.U) u += model.U * w;
                   if (model.S) s += model.S * w;
@@ -37579,7 +38965,7 @@
       };
 
       const disc = {};
-      for(const k in entropies) disc[k] = Math.max(0, 1 - entropies[k]);
+      for (const k in entropies) disc[k] = Math.max(0, Math.min(1.0, 1 - (Number(entropies[k]) || 0)));
 
       let weights = {
           genre: 25,
@@ -37591,7 +38977,7 @@
           key: 4
       };
 
-      for(const k in weights) {
+      for (const k in weights) {
           weights[k] = weights[k] * (0.4 + 0.6 * disc[k]);
       }
 
@@ -37648,10 +39034,9 @@
           });
       }
       
-      const maxEntropy = Math.max(1e-9, Math.min(entropies.vibe, entropies.archetype));
-      const redundancy = mutualInformation / maxEntropy;
-      
-      if (redundancy > 0.5) {
+      const meanEntropy = (entropies.vibe + entropies.archetype) / 2;
+      if (meanEntropy > 0.05) {
+          const redundancy = spMath.clamp(mutualInformation / meanEntropy, 0, 1);
           weights.archetype *= (1.0 - 0.3 * redundancy);
       }
 
@@ -37659,12 +39044,15 @@
           weights.key = 0;
       }
 
+      for (const k in weights) {
+          weights[k] = Math.max(0.01, weights[k]);
+      }
+
       let sum = Object.values(weights).reduce((a,b) => a + b, 0);
-      
       if (sum > 0) {
-          for(const k in weights) weights[k] /= sum;
+          for (const k in weights) weights[k] /= sum;
       } else {
-          for(const k in weights) weights[k] = 1 / Object.keys(weights).length;
+          for (const k in weights) weights[k] = 1 / Object.keys(weights).length;
       }
 
       return weights;
@@ -37769,14 +39157,14 @@
           if (k >= 0 && k < 12) keyDist[k] += tw.weight;
       });
 
-      const logPlays = trackWeights.map(tw => ({ val: Math.log10((tw.item.playCount || 0) + 1), weight: tw.weight }));
+      const logPlays = trackWeights.map(tw => ({ val: Math.log10((Number(tw.item.playCount) || 0) + 1), weight: tw.weight }));
       const globalPlaysHist = spKDE.estimate1D(logPlays, 0.3, 40, 0, 10);
       
       const genrePlayMap = new Map();
       trackWeights.forEach(tw => {
           tw.item.genres.forEach(g => {
               if (!genrePlayMap.has(g.name)) genrePlayMap.set(g.name, []);
-              genrePlayMap.get(g.name).push(tw.item.playCount || 0);
+              genrePlayMap.get(g.name).push(Number(tw.item.playCount) || 0);
           });
       });
       const genreMedians = {};
@@ -37796,7 +39184,7 @@
               if(genreMedians[g.name] !== undefined) { sumMedian += Math.log10(genreMedians[g.name]+1); c++; }
           });
           const expectedLog = c > 0 ? sumMedian / c : 5.0; 
-          const actualLog = Math.log10((tw.item.playCount || 0) + 1);
+          const actualLog = Math.log10((Number(tw.item.playCount) || 0) + 1);
           const z = (actualLog - expectedLog) / 1.5; 
           return { val: z, weight: tw.weight };
       });
@@ -37830,7 +39218,7 @@
           featureVars.i += (diffI * diffI) * tw.weight;
       });
       
-      for(let k in featureVars) featureVars[k] = Math.max(0.01, featureVars[k]);
+      for(let k in featureVars) featureVars[k] = Math.max(0.0225, featureVars[k]);
 
       let musicProfileSum = [0, 0, 0, 0, 0];
       trackWeights.forEach(tw => {
@@ -37957,7 +39345,8 @@
       if (corpus.length < 5 || projected[0].length === 0) {
           bestGMM = { k: 1, predict: () => [1.0] };
       } else {
-          for (let k = 1; k <= 5; k++) {
+          const maxK = Math.min(5, Math.max(1, Math.floor(corpus.length / 15)));
+          for (let k = 1; k <= maxK; k++) {
               const gmm = new spDiagonalGMM(k);
               if (gmm.fit(projected)) {
                   if (gmm.bic < bestBIC) {
@@ -38073,7 +39462,7 @@
         const peak = Math.max(...hist, 1e-9);
         let idx = Math.floor(((val - min) / (max - min)) * bins);
         idx = spMath.clamp(idx, 0, bins - 1);
-        return (hist[idx] / peak) * 100;
+        return ((hist[idx] + 1e-3 * peak) / (peak * 1.001)) * 100;
     }
 
     function getDensityScore2D(grid, vx, vy, min, max) {
@@ -38085,12 +39474,20 @@
         let iy = Math.floor(((vy - min) / (max - min)) * bins);
         ix = spMath.clamp(ix, 0, bins - 1);
         iy = spMath.clamp(iy, 0, bins - 1);
-        return (grid[ix][iy] / maxVal) * 100;
+        return ((grid[ix][iy] + 1e-3 * maxVal) / (maxVal * 1.001)) * 100;
     }
 
     function buildContextProfile(tracks, likedUris = new Set(), likedIsrcs = new Set()) {
         const totalCount = tracks.length;
         if (totalCount === 0) return { isValid: false };
+
+        const artistFreqMap = new Map();
+        tracks.forEach(t => {
+            const aId = t.artistId || t.artistUris?.[0]?.split(':')[2] || t.artists?.[0]?.id || t.artistName || t.artists?.[0]?.name;
+            if (aId) artistFreqMap.set(aId, (artistFreqMap.get(aId) || 0) + 1);
+        });
+        const maxArtistFreq = artistFreqMap.size > 0 ? Math.max(...artistFreqMap.values()) : 0;
+        const isSingleArtistContext = totalCount >= 10 && (maxArtistFreq / totalCount) >= 0.85;
 
         let hasAnyLiked = false;
         for (const t of tracks) {
@@ -38181,7 +39578,8 @@
 
         totalVar += calcVar('e') + calcVar('v') + calcVar('d') + calcVar('a');
         
-        const coherence = Math.max(0.0, Math.min(1.0, 1.0 - (totalVar / 0.25)));
+        const rawCoherence = Math.max(0.0, Math.min(1.0, 1.0 - (totalVar / 0.25)));
+        const coherence = isSingleArtistContext ? Math.min(rawCoherence, 0.05) : Math.min(rawCoherence, 0.15);
 
         const topGenres = Array.from(genreCounts.entries())
             .sort((a, b) => b[1] - a[1])
@@ -38247,19 +39645,27 @@
 
         let genreScore = 50;
         if (track.genres && track.genres.length > 0) {
-            const trackTokens = {};
+            const rootMatches = [];
             track.genres.forEach(g => {
-                const hierTokens = getHierarchicalTokens(g.name);
+                const gName = (typeof g === 'string' ? g : g.name) || "";
+                const directWeight = context.genreProfile[gName] || 0;
+                
+                let subMatch = 0;
+                const hierTokens = getHierarchicalTokens(gName);
                 hierTokens.forEach(ht => {
-                    trackTokens[ht.name] = Math.max(trackTokens[ht.name] || 0, ht.weight);
+                    if (ht.name !== gName) {
+                        const sw = context.genreProfile[ht.name] || 0;
+                        subMatch = Math.max(subMatch, sw * 0.6);
+                    }
                 });
+                rootMatches.push(Math.max(directWeight, subMatch));
             });
 
-            const allKeys = Array.from(new Set([...Object.keys(trackTokens), ...Object.keys(context.genreProfile)]));
-            const vecA = allKeys.map(k => trackTokens[k] || 0);
-            const vecB = allKeys.map(k => context.genreProfile[k] || 0);
-            
-            genreScore = spMath.cosineSimilarity(vecA, vecB) * 100;
+            if (rootMatches.length > 0) {
+                const peakMatch = Math.max(...rootMatches);
+                const avgMatch = rootMatches.reduce((a, b) => a + b, 0) / rootMatches.length;
+                genreScore = (0.60 * peakMatch + 0.40 * avgMatch) * 100;
+            }
         } else {
             genreScore = vibeScore;
         }
@@ -38282,46 +39688,54 @@
     }
 
     function scoreTrackAgainstCluster(track, cluster, pmiMatrix) {
-        let genreScore = 0, genreConf = 0.3, noveltyContrib = 0;
+        let genreScore = 0, genreConf = 0.0, noveltyContrib = 0;
         if (track.genres && track.genres.length > 0) {
-            const trackTokens = {};
+            const rootMatches = [];
             track.genres.forEach(g => {
-                const hierTokens = getHierarchicalTokens(g.name);
+                const gName = (typeof g === 'string' ? g : g.name) || "";
+                const directWeight = cluster.genreProfile[gName] || 0;
+                const isKnown = directWeight > 0;
+                
+                let subMatch = 0;
+                const hierTokens = getHierarchicalTokens(gName);
                 hierTokens.forEach(ht => {
-                    trackTokens[ht.name] = Math.max(trackTokens[ht.name] || 0, ht.weight);
+                    if (ht.name !== gName) {
+                        const sw = cluster.genreProfile[ht.name] || 0;
+                        subMatch = Math.max(subMatch, sw * 0.6);
+                    }
                 });
-            });
-            const expandedTokens = { ...trackTokens };
-            
-            Object.keys(trackTokens).forEach(T => {
-                let knownToProfile = cluster.genreProfile[T] > 0;
-                let maxPmiWithProfile = 0;
 
-                const pmiMap = pmiMatrix[T];
+                let pmiMatch = 0;
+                let maxPmiForGenre = 0;
+                const pmiMap = pmiMatrix?.[gName];
                 if (pmiMap) {
                     Object.entries(pmiMap).forEach(([U, pmiVal]) => {
-                        const addedWeight = trackTokens[T] * pmiVal * 0.25;
-                        expandedTokens[U] = Math.min(1.0, (expandedTokens[U] || 0) + addedWeight);
-                        
-                        if (!knownToProfile && cluster.genreProfile[U] > 0) {
-                            maxPmiWithProfile = Math.max(maxPmiWithProfile, pmiVal);
+                        const uWeight = cluster.genreProfile[U] || 0;
+                        if (uWeight > 0) {
+                            pmiMatch = Math.max(pmiMatch, uWeight * Math.min(1.0, pmiVal * 0.3));
+                            if (!isKnown) {
+                                maxPmiForGenre = Math.max(maxPmiForGenre, pmiVal);
+                            }
                         }
                     });
                 }
-                if (!knownToProfile && maxPmiWithProfile > 0) {
-                    noveltyContrib += maxPmiWithProfile * 0.5;
+
+                if (!isKnown && maxPmiForGenre > 0) {
+                    noveltyContrib += maxPmiForGenre * 0.5;
                 }
+
+                rootMatches.push(Math.max(directWeight, subMatch, pmiMatch));
             });
 
-            const allKeys = Array.from(new Set([...Object.keys(expandedTokens), ...Object.keys(cluster.genreProfile)]));
-            const vecA = allKeys.map(k => expandedTokens[k] || 0);
-            const vecB = allKeys.map(k => cluster.genreProfile[k] || 0);
-            
-            genreScore = spMath.cosineSimilarity(vecA, vecB) * 100;
-            genreConf = track.genres.length >= 2 ? 1.0 : 0.75;
+            if (rootMatches.length > 0) {
+                const peakMatch = Math.max(...rootMatches);
+                const avgMatch = rootMatches.reduce((a, b) => a + b, 0) / rootMatches.length;
+                genreScore = (0.60 * peakMatch + 0.40 * avgMatch) * 100;
+                genreConf = track.genres.length >= 2 ? 1.0 : 0.8;
+            }
         }
 
-        let vibeScore = 50, vibeConf = 0.3;
+        let vibeScore = 50, vibeConf = 0.0;
         let hardGateMultiplier = 1.0;
         const f = track.features;
         if (f && f.energy !== null && f.valence !== null && f.danceability !== null && f.acousticness !== null) {
@@ -38350,7 +39764,7 @@
             const mA = Math.max(getDensityScore1D(cluster.vibe1D.acousticness, a, 0, 1), distA);
             const mS = Math.max(getDensityScore1D(cluster.vibe1D.speechiness, s, 0, 1), distS);
             const mI = Math.max(getDensityScore1D(cluster.vibe1D.instrumentalness, i, 0, 1), distI);
-            const marginalScore = (mE + mV + mD + mA + mS + mI) / 6;
+            const marginalScore = (1.5 * mE + 1.0 * mV + 1.0 * mA + 0.8 * mI + 0.6 * mS + 0.4 * mD) / 5.3;
 
             const jEV = getDensityScore2D(cluster.vibe2D.ev, e, v, 0, 1);
             const jED = getDensityScore2D(cluster.vibe2D.ed, e, d, 0, 1);
@@ -38381,7 +39795,7 @@
             vibeScore = count > 0 ? sum / count : 0;
         }
 
-        let archScore = 50, archConf = 0.3;
+        let archScore = 50, archConf = 0.0;
         if (vibeConf >= 0.6) {
             const normF = { 
                 energy: f.energy !== null ? f.energy/100 : 0.5, 
@@ -38401,7 +39815,7 @@
             archConf = vibeConf;
         }
 
-        let streamScore = 40, streamConf = 0.3;
+        let streamScore = 40, streamConf = 0.0;
         if (track.playCount !== undefined && track.playCount !== null && track.playCount !== "N/A" && track.playCount > 0) {
             const safePlayCount = Number(track.playCount) || 0;
             const logPc = Math.log10(safePlayCount + 1);
@@ -38412,8 +39826,9 @@
             if (track.genres) {
                 let sumMedians = 0;
                 track.genres.forEach(g => {
-                    if (cluster.genreMedians[g.name] !== undefined) {
-                        sumMedians += Math.log10(cluster.genreMedians[g.name] + 1);
+                    const gName = typeof g === 'string' ? g : g.name;
+                    if (cluster.genreMedians[gName] !== undefined) {
+                        sumMedians += Math.log10(cluster.genreMedians[gName] + 1);
                         matchCount++;
                     }
                 });
@@ -38427,7 +39842,7 @@
             streamConf = 1.0;
         }
 
-        let tempoScore = 50, tempoConf = 0.3;
+        let tempoScore = 50, tempoConf = 0.0;
         if (f && f.tempo) {
             const t = f.tempo;
             const normT = spMath.clamp((t - 40) / 180, 0, 1);
@@ -38466,9 +39881,10 @@
             keyConf = 1.0;
         }
 
+        const hasMusicData = (track.genres && track.genres.length > 0) || (f && f.energy != null);
         const mVec = track.musicVector || getTrackMusicProfile(track.genres, track.features);
         const musicModelScore = spMath.cosineSimilarity(mVec, cluster.musicProfile) * 100;
-        const musicModelConf = 1.0;
+        const musicModelConf = hasMusicData ? 1.0 : 0.0;
 
         if (genreScore < 25 && musicModelScore > 80) {
             noveltyContrib += (musicModelScore - genreScore) * 0.05; 
@@ -38498,7 +39914,7 @@
         
         let maxDeviation = 0;
         for (const dim in cluster.adaptiveWeights) {
-            if (confs[dim] > 0) {
+            if (confs[dim] >= 0.5) {
                 const deviation = meanScore - scores[dim];
                 if (deviation > maxDeviation) maxDeviation = deviation;
             }
@@ -38562,7 +39978,7 @@
             const winningIdx = clusterScores.indexOf(maxScore);
             const winningMass = profile.clusters[winningIdx].mass;
             
-            const dampingFactor = Math.max(0.80, Math.min(1.0, 0.85 + 0.15 * Math.log10(Math.max(0.001, winningMass) * 100)));
+            const dampingFactor = Math.max(0.95, Math.min(1.0, 0.90 + 0.10 * Math.log10(Math.max(0.001, winningMass) * 100)));
             aggregatedScore *= dampingFactor;
 
             const noveltyContrib = clusterResults[winningIdx].noveltyContrib;
@@ -38576,8 +39992,7 @@
 
             if (contextProfile.isValid) {
                 const contextScore = scoreTrackAgainstContext(track, contextProfile);
-                
-                const contextWeight = 0.40 * contextProfile.coherence;
+                const contextWeight = contextProfile.coherence;
                 const globalWeight = 1.0 - contextWeight;
 
                 aggregatedScore = (aggregatedScore * globalWeight) + (contextScore * contextWeight);
@@ -38592,15 +40007,18 @@
         if (total > 0) {
             const minScore = sortedByScore[0].tasteMatchScore;
             const maxScore = sortedByScore[total - 1].tasteMatchScore;
-            const range = Math.max(maxScore - minScore, 1);
+            const range = maxScore - minScore;
             
             sortedByScore.forEach(t => {
-                const normalized = (t.tasteMatchScore - minScore) / range;
-                const stretchMin = Math.min(minScore, 20);
-                const stretchMax = Math.max(maxScore, 85);
-                const stretched = stretchMin + normalized * (stretchMax - stretchMin);
-                
-                t.calibratedTasteMatch = 0.7 * t.tasteMatchScore + 0.3 * stretched;
+                if (range >= 8.0) {
+                    const normalized = (t.tasteMatchScore - minScore) / range;
+                    const stretchMin = Math.min(minScore, 20);
+                    const stretchMax = Math.max(maxScore, 85);
+                    const stretched = stretchMin + normalized * (stretchMax - stretchMin);
+                    t.calibratedTasteMatch = 0.7 * t.tasteMatchScore + 0.3 * stretched;
+                } else {
+                    t.calibratedTasteMatch = t.tasteMatchScore;
+                }
             });
         }
 
@@ -38739,14 +40157,15 @@
             }
         });
 
-        const fetchRadioTracks = async (seedUris) => {
+        const fetchRadioTracks = async (seedUris, earlyStopThreshold = Infinity) => {
             if (!seedUris || seedUris.length === 0) return [];
             const results = [];
             const CONCURRENCY_LIMIT = 10;
             const queue = [...seedUris];
+            let shouldStop = false;
             
             const worker = async () => {
-                while (queue.length > 0) {
+                while (queue.length > 0 && !shouldStop) {
                     const uri = queue.shift();
                     try {
                         let token = Spicetify.Platform.Session.accessToken;
@@ -38787,10 +40206,14 @@
                                         artists: t.artists.map(a => ({ id: a.uri.split(":")[2], uri: a.uri, name: a.name })),
                                         duration_ms: t.duration.milliseconds,
                                         explicit: t.isExplicit || t.explicit || false,
-                                        is_playable: t.isPlayable !== false
+                                        is_playable: t.isPlayable !== false,
+                                        _seedUri: uri
                                     });
                                 }
                             });
+                            if (results.length >= earlyStopThreshold) {
+                                shouldStop = true;
+                            }
                         }
                     } catch (e) {}
                     await new Promise(r => setTimeout(r, 10));
@@ -39004,7 +40427,7 @@
             }
 
             if (!isHeadless) mainButton.innerText = "Picking...";
-            const directPickCount = Math.floor(discoveryPlaylistSize / 2);
+            const directCandidateTarget = 40;
             
             let l4Pct = (Math.random() * (0.10 - 0.05)) + 0.05;
             let l3Pct = (Math.random() * (0.50 - 0.35)) + 0.35;
@@ -39023,10 +40446,10 @@
                 l2Pct -= deficit * 0.4;
             }
 
-            const targetL4 = Math.round(directPickCount * l4Pct);
-            const targetL3 = Math.round(directPickCount * l3Pct);
-            const targetL2 = Math.round(directPickCount * l2Pct);
-            const targetL1 = Math.max(0, directPickCount - targetL4 - targetL3 - targetL2);
+            const targetL4 = Math.round(directCandidateTarget * l4Pct);
+            const targetL3 = Math.round(directCandidateTarget * l3Pct);
+            const targetL2 = Math.round(directCandidateTarget * l2Pct);
+            const targetL1 = Math.max(0, directCandidateTarget - targetL4 - targetL3 - targetL2);
 
             const directTracks = [];
             const processedArtistIds = new Set(); 
@@ -39078,7 +40501,10 @@
                                 for (let i = 0; i < mappedCandidates.length; i++) {
                                     const t = mappedCandidates[i];
                                     if (!completeLikedSongUrisSet.has(t.uri) && availabilityChecks[i] && !isTrashFiltered(t)) {
-                                        validTracks.push(t);
+                                        const hasKnownArtist = (t.artists || []).some(a => knownArtistIds.has(a.id));
+                                        if (!hasKnownArtist) {
+                                            validTracks.push(t);
+                                        }
                                     }
                                 }
 
@@ -39122,28 +40548,22 @@
             await fillQuotaFromPool(level1, targetL1 + deficitL2);
 
             if (!isHeadless) mainButton.innerText = "Expanding...";
-            
-            const makeRecRequest = async (seeds) => {
-                const fallbackCount = discoveryPlaylistSize > 50 ? 6 : 3;
-                const finalSeeds = (seeds && seeds.length > 0) ? seeds : shuffleArray(topArtistsForSeeding).slice(0, fallbackCount);
-                const seedUris = finalSeeds.map(a => `spotify:artist:${a.id}`);
-                return await fetchRadioTracks(seedUris);
+
+            const seedCount = discoveryPlaylistSize > 50 ? 6 : 4;
+            const getValidSeeds = (primaryList, fallbackListA, fallbackListB) => {
+                if (primaryList && primaryList.length > 0) return shuffleArray(primaryList).slice(0, seedCount);
+                if (fallbackListA && fallbackListA.length > 0) return shuffleArray(fallbackListA).slice(0, seedCount);
+                if (fallbackListB && fallbackListB.length > 0) return shuffleArray(fallbackListB).slice(0, seedCount);
+                return [];
             };
 
-            const seedCount = discoveryPlaylistSize > 50 ? 6 : 3;
-            const seedsL1 = shuffleArray(level1).slice(0, seedCount);
-            const seedsL2 = shuffleArray(level2).slice(0, seedCount);
-            const seedsL3 = shuffleArray(level3).slice(0, seedCount);
-            const seedsL4 = shuffleArray(level4).slice(0, seedCount > 3 ? 2 : 1);
+            const seedsL4 = getValidSeeds(level4, level3, level2);
+            const seedsL3 = getValidSeeds(level3, level2, level1);
+            const seedsL2 = getValidSeeds(level2, level1, level3);
+            const seedsL1 = getValidSeeds(level1, level2, level3);
 
-            const [recsL1, recsL2, recsL3, recsL4] = await Promise.all([
-                makeRecRequest(seedsL1),
-                makeRecRequest(seedsL2),
-                makeRecRequest(seedsL3),
-                makeRecRequest(seedsL4)
-            ]);
-
-            const rawApiTracks = [...recsL1, ...recsL2, ...recsL3, ...recsL4];
+            const allRadioSeeds = [...new Set([...seedsL4, ...seedsL3, ...seedsL2, ...seedsL1].map(a => `spotify:artist:${a.id}`))];
+            const rawApiTracks = await fetchRadioTracks(allRadioSeeds, 300);
             
             let apiRecommendedTracks = [];
             if (rawApiTracks.length > 0) {
@@ -39185,49 +40605,201 @@
                 }
             }
 
+            allCandidates = allCandidates.filter(track => {
+                if (track.album?.name) {
+                    const cleanAlbum = getCleanTitle(track.album.name);
+                    const primaryArtistUri = track.artists?.[0]?.uri || track.artists?.[0]?.name || "Unknown";
+                    const fingerprint = `${cleanAlbum}|${primaryArtistUri}`;
+
+                    const likedOnAlbum = albumFingerprintMap.get(fingerprint);
+                    if (likedOnAlbum) {
+                        if (discoveryStrictAlbumExclusion && likedOnAlbum.size >= 1) {
+                            return false;
+                        } else if (!discoveryStrictAlbumExclusion && likedOnAlbum.size >= 2) {
+                            return false;
+                        } else if (!discoveryStrictAlbumExclusion && likedOnAlbum.size === 1) {
+                            const likedUri = likedOnAlbum.values().next().value;
+                            const likedId = likedUri ? likedUri.split(':')[2] : null;
+                            const meta = likedId ? cachedLikedMetadata.get(likedId) : null;
+                            if (meta && meta.popularity !== undefined && meta.popularity !== null && meta.popularity < 75) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            });
+
             if (allCandidates.length === 0) throw new Error("Could not find enough tracks matching discovery criteria.");
             
             if (!isHeadless) mainButton.innerText = "Evaluating...";
             
             const profileTrackIds = [...new Set(tracksToProfile.map(t => t.id || t.uri.split(':')[2]))].filter(Boolean);
             const candidateTrackIds = allCandidates.map(t => t.id || t.uri.split(':')[2]).filter(Boolean);
-            
-            const allAudioStats = await getBatchTrackStats([...profileTrackIds, ...candidateTrackIds]);
-            
-            tracksToProfile.forEach(t => t.features = allAudioStats[t.id || t.uri.split(':')[2]]);
-            const tracksToProfileWithPop = await fetchPopularityForMultipleTracks(tracksToProfile, null);
-            const contextProfile = buildContextProfile(tracksToProfileWithPop, completeLikedSongUrisSet, likedIsrcs);
-            
-            const candidatesWithFeatures = allCandidates.map(t => ({ ...t, features: allAudioStats[t.id || t.uri.split(':')[2]] }));
-            const candidatesWithPop = await fetchPopularityForMultipleTracks(candidatesWithFeatures, null);
-            
-            candidatesWithPop.forEach(t => {
-                let score = scoreTrackAgainstContext(t, contextProfile);
-                
-                if (t.popularity !== null && contextProfile.popProfile) {
-                    const bucketIdx = Math.min(9, Math.floor(t.popularity / 10));
-                    const popWeight = contextProfile.popProfile[bucketIdx] || 0;
-                    score += (15 * popWeight);
-                }
-                t.finalScore = score;
+            const allUrisForGenres = [...new Set([...tracksToProfile.map(t => t.uri), ...allCandidates.map(t => t.uri)])].filter(Boolean);
+
+            const [allAudioStats, nativeGenresMap] = await Promise.all([
+                getBatchTrackStats([...profileTrackIds, ...candidateTrackIds]),
+                fetchNativeSpotifyTrackGenresBatch(allUrisForGenres)
+            ]);
+
+            const assignGenres = (t) => {
+                const raw = nativeGenresMap.get(t.uri) || [];
+                t.genres = raw.map(g => ({ name: normalizeGenre(g.name), score: g.score || 0.85 }));
+            };
+
+            tracksToProfile.forEach(t => {
+                t.features = allAudioStats[t.id || t.uri.split(':')[2]];
+                assignGenres(t);
             });
-            
+
+            const validProfiling = tracksToProfile.filter(t => t.features && t.features.energy !== null);
+            const dataVectors = validProfiling.map(t => {
+                const f = t.features;
+                return [
+                    (f.energy ?? 50) / 100,
+                    (f.valence ?? 50) / 100,
+                    (f.danceability ?? 50) / 100,
+                    (f.acousticness ?? 50) / 100,
+                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1),
+                    t.genres && t.genres.length > 0 ? 1.0 : 0.0
+                ];
+            });
+
+            const pcaResult = spMath.pca(dataVectors, 0.85, 4);
+            let projected = pcaResult.projected;
+            if (!projected || projected.length === 0 || !projected[0] || projected[0].length === 0) {
+                projected = dataVectors;
+            }
+
+            let maxK = validProfiling.length < 25 ? 1 : Math.min(3, Math.max(1, Math.floor(validProfiling.length / 15)));
+            let bestGMM = null;
+            let bestBIC = Infinity;
+
+            for (let k = 1; k <= maxK; k++) {
+                const gmm = new spDiagonalGMM(k);
+                if (gmm.fit(projected)) {
+                    if (gmm.bic < bestBIC) {
+                        bestBIC = gmm.bic;
+                        bestGMM = gmm;
+                    }
+                }
+            }
+
+            if (!bestGMM) bestGMM = { k: 1, predict: () => [1.0] };
+
+            const exemplars = [];
+            for (let c = 0; c < bestGMM.k; c++) {
+                let clusterWeight = 0;
+                const members = [];
+                validProfiling.forEach((item, i) => {
+                    const resps = bestGMM.predict(projected[i]);
+                    const w = resps[c];
+                    clusterWeight += w;
+                    members.push({ item, weight: w });
+                });
+
+                if (clusterWeight <= 0.01) continue;
+                members.forEach(m => m.normWeight = m.weight / clusterWeight);
+
+                const featureMeans = { e: 0, v: 0, d: 0, a: 0, t: 0 };
+                const genreWeights = new Map();
+
+                members.forEach(m => {
+                    const f = m.item.features;
+                    featureMeans.e += ((f.energy ?? 50) / 100) * m.normWeight;
+                    featureMeans.v += ((f.valence ?? 50) / 100) * m.normWeight;
+                    featureMeans.d += ((f.danceability ?? 50) / 100) * m.normWeight;
+                    featureMeans.a += ((f.acousticness ?? 50) / 100) * m.normWeight;
+                    featureMeans.t += (((f.tempo || 120) / 220)) * m.normWeight;
+
+                    (m.item.genres || []).forEach(g => {
+                        genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + ((g.score || 0.85) * m.normWeight));
+                    });
+                });
+
+                const maxGWeight = Math.max(...genreWeights.values(), 1e-6);
+                const genreProfile = Object.fromEntries(
+                    Array.from(genreWeights.entries())
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 35)
+                        .map(([name, weight]) => [name, weight / maxGWeight])
+                );
+
+                exemplars.push({ featureMeans, genreProfile });
+            }
+
+            if (exemplars.length === 0) {
+                exemplars.push({
+                    featureMeans: { e: 0.5, v: 0.5, d: 0.5, a: 0.5, t: 0.54 },
+                    genreProfile: {}
+                });
+            }
+
+            const candidatesWithFeatures = allCandidates.map(t => {
+                const withFeat = { ...t, features: allAudioStats[t.id || t.uri.split(':')[2]] };
+                assignGenres(withFeat);
+                return withFeat;
+            });
+            const candidatesWithPop = await fetchPopularityForMultipleTracks(candidatesWithFeatures, null);
+
+            const scoreAgainstExemplar = (track, exemplar) => {
+                const f = track.features;
+                let vibeScore = 50;
+                if (f && f.energy !== null) {
+                    const e = f.energy / 100;
+                    const v = (f.valence ?? 50) / 100;
+                    const d = (f.danceability ?? 50) / 100;
+                    const a = (f.acousticness ?? 50) / 100;
+                    const t = (f.tempo || 120) / 220;
+
+                    const diffE = Math.pow(e - exemplar.featureMeans.e, 2) * 1.8;
+                    const diffV = Math.pow(Math.abs(v - exemplar.featureMeans.v), 1.8);
+                    const diffT = Math.pow(Math.abs(t - exemplar.featureMeans.t), 1.4);
+                    const diffA = Math.pow(Math.abs(a - exemplar.featureMeans.a), 1.2);
+                    const diffD = Math.pow(Math.abs(d - exemplar.featureMeans.d), 0.6);
+
+                    vibeScore = Math.max(0, 100 * Math.exp(-(diffE + diffV + diffT + diffA + diffD) * 1.4));
+                }
+
+                let genreScore = 50;
+                if (track.genres && track.genres.length > 0) {
+                    const matches = track.genres.map(g => exemplar.genreProfile[g.name] || 0);
+                    if (matches.length > 0) {
+                        const peak = Math.max(...matches);
+                        const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
+                        genreScore = (peak * 0.70 + avg * 0.30) * 100;
+                    }
+                    return (vibeScore * 0.50) + (genreScore * 0.50);
+                } else {
+                    return vibeScore;
+                }
+            };
+
             candidatesWithPop.forEach(t => {
+                const exemplarScores = exemplars.map(e => scoreAgainstExemplar(t, e));
+                let peakScore = Math.max(...exemplarScores);
+
+                if (t.popularity !== null && t.popularity !== undefined && t.popularity < 45) {
+                    peakScore += Math.max(0, (45 - t.popularity) * 0.22);
+                }
+
+                t.finalScore = Math.min(100, Math.max(0, peakScore));
                 const fuzz = 0.85 + (Math.random() * 0.30);
                 t.lotteryWeight = Math.pow(Math.max(0.1, t.finalScore * fuzz), 2);
             });
-            
+
             if (!isHeadless) mainButton.innerText = "Selecting...";
             const finalSelected = [];
             const seenArtists = new Set();
             const seenAlbums = new Set();
             let candidatePool = [...candidatesWithPop];
             const targetPlaylistCount = discoveryPlaylistSize;
-            
+
             while (finalSelected.length < targetPlaylistCount && candidatePool.length > 0) {
                 let totalWeight = candidatePool.reduce((sum, t) => sum + t.lotteryWeight, 0);
                 if (totalWeight <= 0) break;
-                
+
                 let r = Math.random() * totalWeight;
                 let selectedIdx = candidatePool.length - 1;
                 for (let i = 0; i < candidatePool.length; i++) {
@@ -39237,25 +40809,25 @@
                         break;
                     }
                 }
-                
+
                 const track = candidatePool[selectedIdx];
                 candidatePool.splice(selectedIdx, 1);
-                
-                let albumIdentifier = track.album?.id || track.album?.uri || track.album?.name?.toLowerCase().trim() || track.albumName?.toLowerCase().trim();
-                let artistIdentifier = track.artists?.[0]?.id || track.artists?.[0]?.uri || track.artists?.[0]?.name?.toLowerCase().trim() || track.artistName?.toLowerCase().trim();
-                
-                const relaxLimits = candidatePool.length < (targetPlaylistCount - finalSelected.length) + 10;
-                
-                if (!relaxLimits) {
-                    if (seenAlbums.has(albumIdentifier) || seenArtists.has(artistIdentifier)) {
-                        continue;
-                    }
-                } else if (seenAlbums.has(albumIdentifier)) {
+
+                const albumIdentifier = track.album?.id || track.album?.uri || track.album?.name?.toLowerCase().trim() || track.albumName?.toLowerCase().trim();
+                const allArtistIds = track.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                if (allArtistIds.length === 0 && track.artistName) {
+                    allArtistIds.push(track.artistName.toLowerCase().trim());
+                }
+
+                const hasArtistCollision = allArtistIds.some(id => seenArtists.has(id));
+                const hasAlbumCollision = albumIdentifier && seenAlbums.has(albumIdentifier);
+
+                if (hasArtistCollision || hasAlbumCollision) {
                     continue;
                 }
-                
+
+                allArtistIds.forEach(id => seenArtists.add(id));
                 if (albumIdentifier) seenAlbums.add(albumIdentifier);
-                if (artistIdentifier) seenArtists.add(artistIdentifier);
                 finalSelected.push(track);
             }
             
@@ -39280,645 +40852,1336 @@
             }
             
             showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
-            await navigateToPlaylist(newPlaylist);
+            if (!isHeadless) await navigateToPlaylist(newPlaylist);
             return;
         }
 
-        let time_range = 'medium_term';
-        let contrast_time_range = 'long_term';
-        let top_pool_size = 100;
-
         if (vibeType === 'recommendRecentVibe') {
             playlistName = "Discovery: Recent Taste";
-            playlistDescription = "Discover tracks matching your recent vibe. Created by Sort-Play.";
-            time_range = 'short_term';
-            contrast_time_range = 'long_term';
-        } else if (vibeType === 'recommendAllTime') {
-            playlistName = "Discovery: All-Time Taste";
-            playlistDescription = "Discover tracks matching your long-term taste. Created by Sort-Play.";
-            time_range = 'long_term';
-            contrast_time_range = 'short_term';
-            top_pool_size = 250;
-        }
+            playlistDescription = "Discover tracks matching your multi-genre recent vibe. Created by Sort-Play.";
 
-        if (!isHeadless) mainButton.innerText = "Get top...";
-        let [topArtists, topTracks, contrastTopTracks] = await Promise.all([
-            getTopItems('artists', time_range, top_pool_size),
-            getTopItems('tracks', time_range, top_pool_size),
-            getTopItems('tracks', contrast_time_range, 1)
-        ]);
+            if (!isHeadless) mainButton.innerText = "Profiling...";
 
-        if (topArtists.length < 2 || topTracks.length < 2) {
-             [topArtists, topTracks] = await Promise.all([
-                getTopItems('artists', 'short_term', top_pool_size),
-                getTopItems('tracks', 'short_term', top_pool_size)
+            const [playedTracksRaw, shortTermTracks] = await Promise.all([
+                getRecentlyPlayedTracks(),
+                getTopItems('tracks', 'short_term', 50)
             ]);
-        }
 
-        if (topArtists.length < 1 || topTracks.length < 1) {
-            throw new Error("Not enough listening history for diverse recommendations.");
-        }
-
-        if (!isHeadless) mainButton.innerText = "Profiling...";
-
-        let primarySeedTracks = [];
-        let primarySeedArtistIds = new Set();
-        let likedSample = [];
-        let unknownRadioSeeds = [];
-
-        if (vibeType === 'recommendAllTime') {
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const historicalLikes = allLikedSongs.filter(t => !t.addedAt || new Date(t.addedAt) < thirtyDaysAgo);
-            const likedPool = historicalLikes.length >= 20 ? historicalLikes : allLikedSongs;
-            
-            const mappedLiked = shuffleArray(likedPool).slice(0, 200).map(t => ({
-                id: t.uri.split(':')[2],
-                uri: t.uri,
-                name: t.name,
-                artists: (t.artistUris || []).map(u => ({ id: u.split(':')[2], uri: u })),
-                popularity: t.popularity || 50,
-                _isLikedSong: true
-            }));
-            
-            likedSample = mappedLiked;
-            let likedPortion = Math.ceil(top_pool_size * 0.70);
-            let topPortion = Math.floor(top_pool_size * 0.30);
-            
-            primarySeedTracks = [
-                ...shuffleArray(mappedLiked).slice(0, likedPortion),
-                ...shuffleArray(topTracks).slice(0, topPortion)
-            ];
-            mappedLiked.slice(0, likedPortion).forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
-
-            const walkSeeds = shuffleArray(likedPool).slice(0, 15).flatMap(t => (t.artistUris || []).map(u => ({ id: u.split(':')[2] })));
-            const l1 = await fetchRelatedBatch(walkSeeds, 15);
-            const l2 = await fetchRelatedBatch(l1, 15);
-            const l3 = await fetchRelatedBatch(l2, 20);
-            
-            const unknownL3 = l3.filter(a => !knownArtistIds.has(a.id));
-            unknownRadioSeeds = shuffleArray(unknownL3).slice(0, 5).map(a => `spotify:artist:${a.id}`);
-            
-        } else if (vibeType === 'recommendRecentVibe') {
+            const now = Date.now();
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - 30);
             
             const recentLikes = allLikedSongs.filter(t => t.addedAt && new Date(t.addedAt) >= cutoffDate);
-            const recentLikesCount = recentLikes.length;
-            
-            let likedPortion = 0;
-            let topPortion = 0;
-            let poolToSample = [];
-            
-            if (recentLikesCount >= 10) {
-                likedPortion = Math.ceil(top_pool_size * 0.65);
-                topPortion = Math.floor(top_pool_size * 0.35);
-                poolToSample = recentLikes;
-            } else {
-                likedPortion = Math.ceil(top_pool_size * 0.65);
-                topPortion = Math.floor(top_pool_size * 0.35);
-                
-                poolToSample = [...allLikedSongs]
-                    .sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0))
-                    .slice(0, 50);
-            }
-            
-            const now = Date.now();
-            const weightedTracks = poolToSample.map(t => {
-                const daysAgo = (now - new Date(t.addedAt || now).getTime()) / (1000 * 60 * 60 * 24);
-                const weight = Math.exp(-0.05 * Math.max(0, daysAgo)); 
-                return { track: t, weight };
+            const poolLikes = recentLikes.length >= 15 ? recentLikes : allLikedSongs.slice(0, 50);
+
+            const corpusMap = new Map();
+            const playOccurrenceMap = new Map();
+            playedTracksRaw.forEach(t => {
+                if (t?.uri) playOccurrenceMap.set(t.uri, (playOccurrenceMap.get(t.uri) || 0) + 1);
             });
 
-            const selected = [];
-            const pool = [...weightedTracks];
-            
-            for (let i = pool.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [pool[i], pool[j]] = [pool[j], pool[i]];
-            }
+            const playedTrackUris = new Set();
 
-            const sampleSize = Math.min(pool.length, 80);
-            
-            for (let i = 0; i < sampleSize && pool.length > 0; i++) {
-                let totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
-                let r = Math.random() * totalWeight;
-                let idx = 0;
-                for (let j = 0; j < pool.length; j++) {
-                    r -= pool[j].weight;
-                    if (r <= 0) { idx = j; break; }
+            playedTracksRaw.forEach((t, idx) => {
+                if (Spicetify.URI.isLocal(t.uri)) return;
+
+                const isLiked = completeLikedSongUrisSet.has(t.uri) || (t.isrc && likedIsrcs.has(t.isrc));
+                const playCount = playOccurrenceMap.get(t.uri) || 1;
+
+                if (!isLiked && playCount < 2) return;
+
+                playedTrackUris.add(t.uri);
+
+                const recencyRank = Math.exp(-idx / 25);
+                const repeatMultiplier = playCount >= 2 ? 1.25 : 1.0;
+                const addedWeight = 1.4 * recencyRank * repeatMultiplier;
+
+                if (corpusMap.has(t.uri)) {
+                    const entry = corpusMap.get(t.uri);
+                    entry.weight += addedWeight;
+                    entry.isPlayed = true;
+                } else {
+                    corpusMap.set(t.uri, {
+                        track: t,
+                        weight: addedWeight,
+                        isPlayed: true
+                    });
                 }
-                selected.push(pool[idx].track);
-                pool.splice(idx, 1);
-            }
-            likedSample = selected;
-            
-            const mappedRecent = likedSample.map(t => ({
-                id: t.uri.split(':')[2],
-                uri: t.uri,
-                name: t.name,
-                artists: (t.artistUris || []).map(u => ({ id: u.split(':')[2], uri: u })),
-                popularity: t.popularity || 50,
-                _isLikedSong: true
-            }));
-            
-            primarySeedTracks = [
-                ...mappedRecent.slice(0, likedPortion),
-                ...shuffleArray(topTracks).slice(0, topPortion)
-            ];
-            
-            mappedRecent.slice(0, likedPortion).forEach(t => t.artists.forEach(a => primarySeedArtistIds.add(a.id)));
+            });
 
-            const walkSeeds = shuffleArray(poolToSample).slice(0, 15).flatMap(t => (t.artistUris || []).map(u => ({ id: u.split(':')[2] })));
-            const l1 = await fetchRelatedBatch(walkSeeds, 15);
-            const l2 = await fetchRelatedBatch(l1, 15);
-            
-            const unknownL1L2 = [...l1, ...l2].filter(a => !knownArtistIds.has(a.id));
-            unknownRadioSeeds = shuffleArray(unknownL1L2).slice(0, 5).map(a => `spotify:artist:${a.id}`);
-            
-        } else {
-            likedSample = shuffleArray(allLikedSongs).slice(0, 50);
-            primarySeedTracks = [...topTracks];
-        }
+            poolLikes.forEach(t => {
+                if (Spicetify.URI.isLocal(t.uri)) return;
+                const daysAgo = (now - new Date(t.addedAt || now).getTime()) / (1000 * 60 * 60 * 24);
+                const decayWeight = Math.exp(-0.05 * Math.max(0, daysAgo));
+                if (corpusMap.has(t.uri)) {
+                    const entry = corpusMap.get(t.uri);
+                    entry.weight += decayWeight;
+                } else {
+                    corpusMap.set(t.uri, { track: t, weight: decayWeight, isPlayed: false });
+                }
+            });
 
-        const originalTopTracks = [...topTracks];
-        topTracks = primarySeedTracks.length > 0 ? primarySeedTracks : topTracks;
+            shortTermTracks.forEach((t, idx) => {
+                if (Spicetify.URI.isLocal(t.uri)) return;
+                const rankWeight = Math.exp(-idx / 30);
+                if (corpusMap.has(t.uri)) {
+                    const entry = corpusMap.get(t.uri);
+                    entry.weight += rankWeight;
+                } else {
+                    corpusMap.set(t.uri, { track: t, weight: rankWeight * 0.9, isPlayed: false });
+                }
+            });
 
-        if (primarySeedArtistIds.size > 0) {
-            const additionalArtistIds = Array.from(primarySeedArtistIds)
-                .filter(id => !topArtists.some(a => a.id === id));
-            
-            const additionalArtists = additionalArtistIds.slice(0, 50).map(id => ({ 
-                id, 
-                genres: [],
-                _fromLikedSongs: true 
-            }));
-            
-            if (vibeType === 'recommendRecentVibe') {
-                topArtists = [...additionalArtists, ...topArtists].slice(0, 150);
-            } else {
-                topArtists = shuffleArray([...topArtists, ...additionalArtists]).slice(0, 150);
-            }
-        }
+            const corpus = Array.from(corpusMap.values());
+            if (corpus.length === 0) throw new Error("Not enough listening history to build a recent taste profile.");
 
-        const tracksToProfile = [...originalTopTracks];
-        if (likedSample.length > 0) {
-            tracksToProfile.push(...likedSample.map(t => ({...t, id: t.uri.split(':')[2]})));
-        }
+            const corpusTracks = corpus.map(c => c.track);
+            const corpusTrackIds = corpusTracks.map(t => t.id || t.uri.split(':')[2]).filter(Boolean);
+            const corpusTrackUris = corpusTracks.map(t => t.uri);
 
-        const profileTrackIds = [...new Set(tracksToProfile.map(t => t.id))];
-        const allAudioStats = await getBatchTrackStats(profileTrackIds);
+            const [corpusAudioStats, corpusNativeGenres, corpusTracksWithPop] = await Promise.all([
+                getBatchTrackStats(corpusTrackIds),
+                fetchNativeSpotifyTrackGenresBatch(corpusTrackUris),
+                fetchPopularityForMultipleTracks(corpusTracks, null)
+            ]);
 
-        tracksToProfile.forEach(t => t.features = allAudioStats[t.id]);
-        originalTopTracks.forEach(t => t.features = allAudioStats[t.id]);
-        topTracks.forEach(t => {
-            if (!t.features) t.features = allAudioStats[t.id];
-        });
+            const corpusPopMap = new Map(corpusTracksWithPop.map(t => [t.uri, t.popularity]));
 
-        const profilingSource = primarySeedTracks.length > 0 ? primarySeedTracks : originalTopTracks;
-        const tracksWithFeatureProfiles = profilingSource.filter(t => t.features);
-        const userAudioProfile = calculateAudioStatistics(tracksWithFeatureProfiles);
+            const validCorpus = [];
+            let totalCorpusWeight = 0;
 
-        const allGenres = new Set(topArtists.flatMap(a => a.genres));
-        const shuffledGenres = shuffleArray(Array.from(allGenres));
-        let genreBridgeSeeds = [];
+            corpus.forEach(item => {
+                const id = item.track.id || item.track.uri.split(':')[2];
+                const stats = corpusAudioStats[id];
+                if (!stats || stats.energy === null) return;
+                
+                item.features = stats;
+                item.track.popularity = corpusPopMap.get(item.track.uri) ?? item.track.popularity ?? 50;
 
-        if (shuffledGenres.length >= 2) {
-            const genre1 = shuffledGenres[0];
-            const genre2 = shuffledGenres[1];
-            
-            const artistsForGenre1 = shuffleArray(topArtists.filter(a => a.genres.includes(genre1))).slice(0, 3);
-            const artistsForGenre2 = shuffleArray(topArtists.filter(a => a.genres.includes(genre2))).slice(0, 2);
-            genreBridgeSeeds = [...artistsForGenre1, ...artistsForGenre2].map(a => a.id);
-        }
-
-        const sortedByPopAsc = [...topTracks].sort((a, b) => a.popularity - b.popularity);
-        const deepCutPool = sortedByPopAsc.slice(0, 50);
-        const deepCutSeeds = shuffleArray(deepCutPool).slice(0, 5).map(t => t.id);
-
-        let likedSongSeedUris = [];
-        if (vibeType === 'recommendRecentVibe') {
-            const cutoffDate = new Date();
-            cutoffDate.setDate(cutoffDate.getDate() - 28);
-            
-            const recentLikes = allLikedSongs.filter(t => t.addedAt && new Date(t.addedAt) >= cutoffDate);
-            
-            if (recentLikes.length < 10) {
-                const recentPool = [...allLikedSongs]
-                    .sort((a, b) => new Date(b.addedAt || 0) - new Date(a.addedAt || 0))
-                    .slice(0, 15);
-                likedSongSeedUris = shuffleArray(recentPool).slice(0, 5).map(t => t.uri.split(':')[2]);
-            } else {
-                const now = Date.now();
-                const weightedTracks = recentLikes.map(t => {
-                    const daysAgo = (now - new Date(t.addedAt || now).getTime()) / (1000 * 60 * 60 * 24);
-                    const weight = Math.exp(-0.08 * Math.max(0, daysAgo));
-                    return { track: t, weight };
+                const rawGenres = corpusNativeGenres.get(item.track.uri) || [];
+                const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
+                item.genres = mappedGenres.map(m => {
+                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
+                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
                 });
 
-                const selectedSeeds = [];
-                const pool = [...weightedTracks];
-                for (let i = pool.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [pool[i], pool[j]] = [pool[j], pool[i]];
-                }
+                validCorpus.push(item);
+                totalCorpusWeight += item.weight;
+            });
 
-                const seedCount = Math.min(5, pool.length);
+            if (validCorpus.length === 0) throw new Error("Could not extract audio features for recent tracks.");
+            validCorpus.forEach(item => item.weight /= totalCorpusWeight);
 
-                for (let i = 0; i < seedCount; i++) {
-                    let totalWeight = pool.reduce((sum, item) => sum + item.weight, 0);
-                    let r = Math.random() * totalWeight;
-                    let idx = 0;
-                    for (let j = 0; j < pool.length; j++) {
-                        r -= pool[j].weight;
-                        if (r <= 0) { idx = j; break; }
-                    }
-                    selectedSeeds.push(pool[idx].track);
-                    pool.splice(idx, 1);
-                }
-                likedSongSeedUris = selectedSeeds.map(t => t.uri.split(':')[2]);
+            const dataVectors = validCorpus.map(item => {
+                const f = item.features;
+                return [
+                    (f.energy ?? 50) / 100,
+                    (f.valence ?? 50) / 100,
+                    (f.danceability ?? 50) / 100,
+                    (f.acousticness ?? 50) / 100,
+                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1),
+                    item.genres.length > 0 ? 1.0 : 0.0
+                ];
+            });
+
+            const pcaResult = spMath.pca(dataVectors, 0.85, 4);
+            let projected = pcaResult.projected;
+            if (!projected || projected.length === 0 || !projected[0] || projected[0].length === 0) {
+                projected = dataVectors;
             }
-        } else if (vibeType === 'recommendAllTime') {
-            likedSongSeedUris = shuffleArray(allLikedSongs).slice(0, 5).map(t => t.uri.split(':')[2]);
-        } else {
-            likedSongSeedUris = shuffleArray(allLikedSongs.slice(-100)).slice(0, 5).map(t => t.uri.split(':')[2]);
-        }
 
-        const smartSongSeeds = new Set();
-        if (vibeType === 'recommendAllTime') smartSongSeeds.add(shuffleArray(topTracks.slice(0, 20))[0]);
-        else smartSongSeeds.add(shuffleArray(topTracks.slice(0, 5))[0]);
-        
-        if (topTracks.length > 0) smartSongSeeds.add([...topTracks].sort((a, b) => b.popularity - a.popularity)[0]);
-        if (deepCutPool.length > 0) smartSongSeeds.add(deepCutPool[0]);
-        if (contrastTopTracks.length > 0) smartSongSeeds.add(contrastTopTracks[0]);
-        const randomLikedTopTrackPool = topTracks.filter(t => completeLikedSongUrisSet.has(t.uri));
-        if(randomLikedTopTrackPool.length > 0) smartSongSeeds.add(shuffleArray(randomLikedTopTrackPool)[0]);
-        
-        const finalSmartSeeds = Array.from(smartSongSeeds).filter(Boolean);
-        let seedIdx = 0;
-        while (finalSmartSeeds.length < 5 && seedIdx < topTracks.length) {
-            if (!finalSmartSeeds.some(s => s.uri === topTracks[seedIdx].uri)) finalSmartSeeds.push(topTracks[seedIdx]);
-            seedIdx++;
-        }
-        const smartSeedUris = finalSmartSeeds.slice(0, 5).map(t => t.id);
+            let maxK = validCorpus.length < 25 ? 1 : Math.min(3, Math.max(1, Math.floor(validCorpus.length / 15)));
+            let bestGMM = null;
+            let bestBIC = Infinity;
 
-        let edgeExplorerSeeds = shuffleArray(topTracks).slice(0, 5).map(t => t.id);
-
-        if (!isHeadless) mainButton.innerText = "Expanding...";
-        
-        let allSeedUris = [];
-        const addUris = (arr, prefix) => arr.forEach(id => allSeedUris.push(`${prefix}:${id}`));
-        
-        let artistSeedPool = vibeType === 'recommendRecentVibe' ? topArtists.slice(0, 30) : topArtists;
-        addUris(shuffleArray(artistSeedPool).slice(0, 5).map(a => a.id), 'spotify:artist');
-        addUris(shuffleArray(topTracks).slice(0, 5).map(t => t.id), 'spotify:track');
-        addUris(genreBridgeSeeds, 'spotify:artist');
-        addUris(deepCutSeeds, 'spotify:track');
-        addUris(likedSongSeedUris, 'spotify:track');
-        addUris(smartSeedUris, 'spotify:track');
-        addUris(edgeExplorerSeeds, 'spotify:track');
-        
-        if (typeof unknownRadioSeeds !== 'undefined' && unknownRadioSeeds.length > 0) {
-            unknownRadioSeeds.forEach(uri => allSeedUris.push(uri));
-        }
-        
-        allSeedUris = [...new Set(allSeedUris)];
-
-        const rawApiTracks = await fetchRadioTracks(allSeedUris);
-
-        if (rawApiTracks.length === 0) {
-            throw new Error("Spotify Radio API didn't return any recommendations. Try again!");
-        }
-
-        if (!isHeadless) mainButton.innerText = "Mixing...";
-        
-        const seenUris = new Set();
-        const uniqueMixedTracks = rawApiTracks.filter(track => {
-            if (seenUris.has(track.uri)) return false;
-            seenUris.add(track.uri);
-            return true;
-        });
-
-        if (!isHeadless) mainButton.innerText = "Excluding...";
-        const recommendedUris = uniqueMixedTracks.map(t => t.uri);
-        
-        const fetchedRecommendedMetaMap = new Map();
-        const initialMetaPromises = [];
-        for (let i = 0; i < recommendedUris.length; i += 500) {
-            const batch = recommendedUris.slice(i, i + 500);
-            initialMetaPromises.push(
-                fetchCoreMetadataBatch(batch).then(res => {
-                    res.forEach((val, key) => fetchedRecommendedMetaMap.set(key, val));
-                }).catch(e => console.warn(e))
-            );
-        }
-        await Promise.all(initialMetaPromises);
-        
-        uniqueMixedTracks.forEach(t => {
-            const meta = fetchedRecommendedMetaMap.get(t.uri);
-            if (meta?.isrc) t.isrc = meta.isrc;
-        });
-
-        const availabilityChecks = await Promise.all(uniqueMixedTracks.map(track => isTrackAvailable(track)));
-        
-        let preFilteredTracks = uniqueMixedTracks.filter((track, index) => {
-            if (!availabilityChecks[index]) return false;
-            if (completeLikedSongUrisSet.has(track.uri)) return false;
-            if (track.isrc && likedIsrcs.has(track.isrc)) return false;
-            if (isTrashFiltered(track)) return false;
-            
-            const title = track.name.toLowerCase().trim();
-            const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
-            if (likedArtistUrisForTitle) {
-                const recommendedArtistUris = track.artists.map(a => a.uri);
-                if (recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri))) {
-                    return false;
-                }
-            }
-            return true;
-        });
-
-        const excludedAlbumIds = new Set();
-        const albumsToCheck = new Set();
-        
-        preFilteredTracks.forEach(track => {
-            let albumId = track.album?.id || track.album?.uri?.split(':')[2];
-            if (!albumId) return;
-
-            if (track.album?.name) {
-                const cleanAlbum = getCleanTitle(track.album.name);
-                const primaryArtistUri = track.artists?.[0]?.uri || track.artists?.[0]?.name || "Unknown";
-                const fingerprint = `${cleanAlbum}|${primaryArtistUri}`;
-                
-                const likedOnAlbum = albumFingerprintMap.get(fingerprint);
-                if (likedOnAlbum) {
-                    if (discoveryStrictAlbumExclusion && likedOnAlbum.size >= 1) {
-                        excludedAlbumIds.add(albumId);
-                        return; 
-                    } else if (!discoveryStrictAlbumExclusion && likedOnAlbum.size >= 2) {
-                        excludedAlbumIds.add(albumId);
-                        return; 
+            for (let k = 1; k <= maxK; k++) {
+                const gmm = new spDiagonalGMM(k);
+                if (gmm.fit(projected)) {
+                    if (gmm.bic < bestBIC) {
+                        bestBIC = gmm.bic;
+                        bestGMM = gmm;
                     }
                 }
             }
-            albumsToCheck.add(albumId);
-        });
 
-        const albumIdsArray = Array.from(albumsToCheck).filter(id => !excludedAlbumIds.has(id));
-        
-        const CONCURRENCY = 50; 
-        const albumTrackUrisMap = new Map();
-        
-        for (let i = 0; i < albumIdsArray.length; i += CONCURRENCY) {
-            const batch = albumIdsArray.slice(i, i + CONCURRENCY);
-            await Promise.all(batch.map(async (albumId) => {
-                let uris = [];
-                try {
-                    const hexId = spotifyHex(albumId);
-                    let token = Spicetify.Platform.Session.accessToken;
-                    let res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
-                        headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
+            if (!bestGMM) bestGMM = { k: 1, predict: () => [1.0] };
+
+            let clusters = [];
+            for (let c = 0; c < bestGMM.k; c++) {
+                let clusterWeight = 0;
+                const members = [];
+                validCorpus.forEach((item, i) => {
+                    const resps = bestGMM.predict(projected[i]);
+                    const w = item.weight * resps[c];
+                    clusterWeight += w;
+                    members.push({ item, resp: resps[c], weight: w });
+                });
+
+                if (clusterWeight <= 0.01) continue;
+                members.forEach(m => m.normWeight = m.weight / clusterWeight);
+
+                const featureMeans = { e: 0, v: 0, d: 0, a: 0, t: 0 };
+                const genreWeights = new Map();
+                let momentumScore = 0;
+
+                members.forEach(m => {
+                    const f = m.item.features;
+                    featureMeans.e += ((f.energy ?? 50) / 100) * m.normWeight;
+                    featureMeans.v += ((f.valence ?? 50) / 100) * m.normWeight;
+                    featureMeans.d += ((f.danceability ?? 50) / 100) * m.normWeight;
+                    featureMeans.a += ((f.acousticness ?? 50) / 100) * m.normWeight;
+                    featureMeans.t += (((f.tempo || 120) / 220)) * m.normWeight;
+
+                    m.item.genres.forEach(g => {
+                        genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
                     });
-                    if (res.status === 401) {
-                         if (!internalTokenRefreshPromise) {
-                              internalTokenRefreshPromise = (async () => {
-                                  const tData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
-                                  Spicetify.Platform.Session.accessToken = tData.accessToken;
-                                  await new Promise(r => setTimeout(r, 500));
-                                  return tData.accessToken;
-                              })();
-                          }
-                          await internalTokenRefreshPromise;
-                          token = Spicetify.Platform.Session.accessToken;
-                          res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
-                              headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
-                          });
+
+                    if (m.item.isPlayed) {
+                        momentumScore += m.resp;
                     }
-                    if (res.ok) {
-                        const body = await res.json();
-                        if (body.disc) {
-                            for (const disc of body.disc) {
-                                if (disc.track) {
-                                    for (const track of disc.track) {
-                                        if (track.gid) uris.push(`spotify:track:${hexToBase62(track.gid)}`);
+                });
+
+                const maxGWeight = Math.max(...genreWeights.values(), 1e-6);
+                const normalizedGenreEntries = Array.from(genreWeights.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 35)
+                    .map(([name, weight]) => [name, weight / maxGWeight]);
+
+                const popProfile = new Array(10).fill(0);
+                members.forEach(m => {
+                    const pop = m.item.track.popularity ?? 50;
+                    const bucket = Math.min(9, Math.floor(pop / 10));
+                    popProfile[bucket] += m.normWeight;
+                });
+
+                clusters.push({
+                    id: c,
+                    mass: clusterWeight,
+                    members,
+                    featureMeans,
+                    genreProfile: Object.fromEntries(normalizedGenreEntries),
+                    popProfile,
+                    momentumScore
+                });
+            }
+
+            if (clusters.length === 0) {
+                const members = validCorpus.map(item => ({ item, resp: 1.0, weight: item.weight, normWeight: item.weight }));
+                const featureMeans = { e: 0.5, v: 0.5, d: 0.5, a: 0.5, t: 0.54 };
+                clusters.push({
+                    id: 0,
+                    mass: 1.0,
+                    members,
+                    featureMeans,
+                    genreProfile: {},
+                    popProfile: new Array(10).fill(0.1),
+                    momentumScore: 1.0
+                });
+            }
+
+            const minMassThreshold = 0.20;
+            if (clusters.length > 1) {
+                const viableClusters = clusters.filter(c => c.mass >= minMassThreshold);
+                if (viableClusters.length > 0 && viableClusters.length < clusters.length) {
+                    clusters = viableClusters;
+                    let totalViableMass = clusters.reduce((sum, c) => sum + c.mass, 0);
+                    clusters.forEach(c => c.mass /= totalViableMass);
+                } else if (viableClusters.length === 0) {
+                    clusters.sort((a, b) => b.mass - a.mass);
+                    clusters = [clusters[0]];
+                    clusters[0].mass = 1.0;
+                }
+            }
+
+            let primaryAnchorCluster = clusters[0];
+            let highestMomentum = -1;
+            clusters.forEach(c => {
+                if (c.momentumScore > highestMomentum) {
+                    highestMomentum = c.momentumScore;
+                    primaryAnchorCluster = c;
+                }
+            });
+
+            const targetPlaylistCount = discoveryPlaylistSize;
+            const dynamicFloor = Math.max(6, Math.floor(targetPlaylistCount * 0.20));
+            let assignedTotal = 0;
+            clusters.forEach(c => {
+                c.quota = Math.max(dynamicFloor, Math.round(targetPlaylistCount * c.mass));
+                assignedTotal += c.quota;
+            });
+
+            while (assignedTotal > targetPlaylistCount) {
+                const largest = clusters.reduce((max, c) => c.quota > max.quota ? c : max, clusters[0]);
+                largest.quota--;
+                assignedTotal--;
+            }
+            while (assignedTotal < targetPlaylistCount) {
+                primaryAnchorCluster.quota++;
+                assignedTotal++;
+            }
+
+            if (!isHeadless) mainButton.innerText = "Expanding...";
+
+            const clusterSeedMap = new Map();
+            const totalTargetSeeds = 32;
+            const seedAuditReport = { clusters: [] };
+
+            for (const cluster of clusters) {
+                const clusterSeedUris = [];
+                const sortedMembers = [...cluster.members].sort((a, b) => b.normWeight - a.normWeight);
+                
+                const clusterTracks = sortedMembers.map(m => m.item.track);
+                const deepCuts = clusterTracks.filter(t => (t.popularity ?? 50) < 50);
+                const playedInCluster = clusterTracks.filter(t => playedTrackUris.has(t.uri));
+                const likedInCluster = clusterTracks.filter(t => !playedTrackUris.has(t.uri));
+
+                const detailedSeedsChosen = [];
+
+                const addTrackSeed = (t, reason) => {
+                    if (t && t.uri && !clusterSeedUris.includes(t.uri)) {
+                        clusterSeedUris.push(t.uri);
+                        detailedSeedsChosen.push({
+                            uri: t.uri,
+                            type: "track",
+                            title: t.songTitle || t.name,
+                            artist: t.artistName || t.artists?.[0]?.name,
+                            reason: reason
+                        });
+                    }
+                };
+
+                shuffleArray(playedInCluster).slice(0, 3).forEach(t => addTrackSeed(t, "recent_played_momentum"));
+                shuffleArray(likedInCluster).slice(0, 4).forEach(t => addTrackSeed(t, "recent_liked"));
+                shuffleArray(deepCuts).slice(0, 3).forEach(t => addTrackSeed(t, "cluster_deep_cut"));
+
+                const clusterArtists = [];
+                clusterTracks.forEach(t => {
+                    const aId = t.artistUris?.[0]?.split(':')[2] || t.artists?.[0]?.id;
+                    if (aId && !clusterArtists.some(a => a.id === aId)) clusterArtists.push({ id: aId });
+                });
+
+                if (clusterArtists.length > 0) {
+                    const l1 = await fetchRelatedBatch(clusterArtists, 12);
+                    const l2 = await fetchRelatedBatch(l1, 12);
+
+                    const uniqueUnknownsMap = new Map();
+                    [...l1, ...l2].forEach(a => {
+                        if (!knownArtistIds.has(a.id) && !uniqueUnknownsMap.has(a.id)) {
+                            uniqueUnknownsMap.set(a.id, a);
+                        }
+                    });
+
+                    const unknownL1L2 = Array.from(uniqueUnknownsMap.values());
+                    const chosenUnknownArtists = shuffleArray(unknownL1L2).slice(0, 6);
+                    chosenUnknownArtists.forEach(a => {
+                        clusterSeedUris.push(`spotify:artist:${a.id}`);
+                        detailedSeedsChosen.push({
+                            uri: `spotify:artist:${a.id}`,
+                            type: "artist",
+                            artistName: a.name,
+                            reason: "2_hop_unknown_related_artist"
+                        });
+                    });
+                }
+
+                let fillIdx = 0;
+                const perClusterTarget = Math.max(14, Math.floor(totalTargetSeeds / clusters.length));
+                while (clusterSeedUris.length < perClusterTarget && fillIdx < clusterTracks.length) {
+                    addTrackSeed(clusterTracks[fillIdx], "cluster_member_topup");
+                    fillIdx++;
+                }
+
+                clusterSeedMap.set(cluster.id, clusterSeedUris);
+
+                const topCorpusTracksWithGenres = sortedMembers.slice(0, 20).map(m => ({
+                    title: m.item.track.songTitle || m.item.track.name,
+                    artist: m.item.track.artistName || m.item.track.artists?.[0]?.name,
+                    weightInCluster: Math.round(m.normWeight * 1000) / 1000,
+                    nativeSpotifyGenres: m.item.genres.map(g => `${g.name} (${Math.round(g.score * 100)}%)`)
+                }));
+
+                seedAuditReport.clusters.push({
+                    clusterId: cluster.id,
+                    massPct: Math.round(cluster.mass * 100),
+                    momentumScore: cluster.momentumScore,
+                    topClusterGenres: Object.entries(cluster.genreProfile).slice(0, 8),
+                    topCorpusTracksThatBuiltThisCluster: topCorpusTracksWithGenres,
+                    seedsDispatchedToRadio: detailedSeedsChosen
+                });
+            }
+
+            window.__SORT_PLAY_SEED_AUDIT__ = seedAuditReport;
+            console.log("%c=== [SORT-PLAY] SEED & GENRE ORIGIN AUDIT (COPY BELOW) ===", "color: #1ed760; font-size: 14px; font-weight: bold;");
+            console.log(JSON.stringify(seedAuditReport, null, 2));
+            console.log("%c==========================================================", "color: #1ed760; font-size: 14px; font-weight: bold;");
+
+            const allSeededUrisWithCluster = [];
+            clusterSeedMap.forEach((seedUris, clusterId) => {
+                seedUris.forEach(uri => allSeededUrisWithCluster.push({ uri, clusterId }));
+            });
+
+            const uniqueSeedsToFetch = [...new Set(allSeededUrisWithCluster.map(s => s.uri))];
+            const rawApiTracks = await fetchRadioTracks(uniqueSeedsToFetch, 400);
+
+            if (rawApiTracks.length === 0) throw new Error("Spotify Radio API didn't return recommendations. Try again!");
+
+            if (!isHeadless) mainButton.innerText = "Excluding...";
+
+            const recommendedUris = rawApiTracks.map(t => t.uri);
+            const fetchedRecommendedMetaMap = new Map();
+            for (let i = 0; i < recommendedUris.length; i += 500) {
+                const batch = recommendedUris.slice(i, i + 500);
+                try {
+                    const res = await fetchCoreMetadataBatch(batch);
+                    res.forEach((val, key) => fetchedRecommendedMetaMap.set(key, val));
+                } catch(e) {}
+            }
+
+            rawApiTracks.forEach(t => {
+                const meta = fetchedRecommendedMetaMap.get(t.uri);
+                if (meta?.isrc) t.isrc = meta.isrc;
+            });
+
+            const availabilityChecks = await Promise.all(rawApiTracks.map(track => isTrackAvailable(track)));
+
+            const seedToClusterMap = new Map();
+            allSeededUrisWithCluster.forEach(s => seedToClusterMap.set(s.uri, s.clusterId));
+
+            const seenCandidateUris = new Set();
+            const preFilteredTracks = rawApiTracks.filter((track, index) => {
+                if (!availabilityChecks[index]) return false;
+                if (seenCandidateUris.has(track.uri)) return false;
+                seenCandidateUris.add(track.uri);
+
+                if (completeLikedSongUrisSet.has(track.uri)) return false;
+                if (track.isrc && likedIsrcs.has(track.isrc)) return false;
+                if (isTrashFiltered(track)) return false;
+
+                const title = track.name.toLowerCase().trim();
+                const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
+                if (likedArtistUrisForTitle) {
+                    const recommendedArtistUris = track.artists.map(a => a.uri);
+                    if (recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri))) return false;
+                }
+                return true;
+            });
+
+            const excludedAlbumIds = new Set();
+            const albumsToCheck = new Set();
+
+            preFilteredTracks.forEach(track => {
+                const albumId = track.album?.id || track.album?.uri?.split(':')[2];
+                if (!albumId) return;
+
+                if (track.album?.name) {
+                    const cleanAlbum = getCleanTitle(track.album.name);
+                    const primaryArtistUri = track.artists?.[0]?.uri || track.artists?.[0]?.name || "Unknown";
+                    const fingerprint = `${cleanAlbum}|${primaryArtistUri}`;
+
+                    const likedOnAlbum = albumFingerprintMap.get(fingerprint);
+                    if (likedOnAlbum) {
+                        if (discoveryStrictAlbumExclusion && likedOnAlbum.size >= 1) {
+                            excludedAlbumIds.add(albumId);
+                            return;
+                        } else if (!discoveryStrictAlbumExclusion && likedOnAlbum.size >= 2) {
+                            excludedAlbumIds.add(albumId);
+                            return;
+                        } else if (!discoveryStrictAlbumExclusion && likedOnAlbum.size === 1) {
+                            const likedUri = likedOnAlbum.values().next().value;
+                            const likedId = likedUri ? likedUri.split(':')[2] : null;
+                            const meta = likedId ? cachedLikedMetadata.get(likedId) : null;
+                            if (meta && meta.popularity !== undefined && meta.popularity !== null && meta.popularity < 75) {
+                                excludedAlbumIds.add(albumId);
+                                return;
+                            }
+                        }
+                    }
+                }
+                albumsToCheck.add(albumId);
+            });
+
+            const albumIdsArray = Array.from(albumsToCheck).filter(id => !excludedAlbumIds.has(id));
+            const albumTrackUrisMap = new Map();
+            const CONCURRENCY = 40;
+
+            for (let i = 0; i < albumIdsArray.length; i += CONCURRENCY) {
+                const batch = albumIdsArray.slice(i, i + CONCURRENCY);
+                await Promise.all(batch.map(async (albumId) => {
+                    let uris = [];
+                    try {
+                        const hexId = spotifyHex(albumId);
+                        let token = Spicetify.Platform.Session.accessToken;
+                        let res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
+                            headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
+                        });
+                        if (res.ok) {
+                            const body = await res.json();
+                            if (body.disc) {
+                                for (const disc of body.disc) {
+                                    if (disc.track) {
+                                        for (const track of disc.track) {
+                                            if (track.gid) uris.push(`spotify:track:${hexToBase62(track.gid)}`);
+                                        }
                                     }
                                 }
                             }
                         }
+                    } catch (err) {}
+                    if (uris.length === 0) {
+                        try {
+                            const fallbackTracks = await getAlbumTracks(albumId);
+                            if (fallbackTracks) uris = fallbackTracks.map(t => t.uri);
+                        } catch(e) {}
                     }
-                } catch (err) {}
-                
-                if (uris.length === 0) {
-                    try {
-                        const fallbackTracks = await getAlbumTracks(albumId);
-                        if (fallbackTracks) uris = fallbackTracks.map(t => t.uri);
-                    } catch(e) {}
+                    if (uris.length > 0) albumTrackUrisMap.set(albumId, uris);
+                }));
+            }
+
+            for (const [albumId, uris] of albumTrackUrisMap.entries()) {
+                let likedCount = 0;
+                let singleLikedUri = null;
+                for (const uri of uris) {
+                    if (completeLikedSongUrisSet.has(uri)) {
+                        likedCount++;
+                        singleLikedUri = uri;
+                        if (discoveryStrictAlbumExclusion || likedCount >= 2) {
+                            excludedAlbumIds.add(albumId);
+                            break;
+                        }
+                    }
                 }
-                
-                if (uris.length > 0) albumTrackUrisMap.set(albumId, uris);
-            }));
+                if (!discoveryStrictAlbumExclusion && likedCount === 1 && singleLikedUri) {
+                    const likedId = singleLikedUri.split(':')[2];
+                    const meta = cachedLikedMetadata.get(likedId);
+                    if (meta && meta.popularity !== undefined && meta.popularity !== null && meta.popularity < 75) {
+                        excludedAlbumIds.add(albumId);
+                    }
+                }
+            }
+
+            const cleanCandidatePool = preFilteredTracks.filter(track => {
+                const albumId = track.album?.id || track.album?.uri?.split(':')[2];
+                return !albumId || !excludedAlbumIds.has(albumId);
+            });
+
+            if (cleanCandidatePool.length === 0) throw new Error("All recommended tracks were filtered out by existing library rules.");
+
+            if (!isHeadless) mainButton.innerText = "Evaluating...";
+
+            const candidateTrackIds = cleanCandidatePool.map(t => t.id);
+            const candidateUrisForGenres = cleanCandidatePool.map(t => t.uri);
+
+            const [candidateStats, candidateGenresMap] = await Promise.all([
+                getBatchTrackStats(candidateTrackIds),
+                fetchNativeSpotifyTrackGenresBatch(candidateUrisForGenres)
+            ]);
+
+            const evaluatedCandidates = cleanCandidatePool.map(t => {
+                const stats = candidateStats[t.id];
+                const rawGenres = candidateGenresMap.get(t.uri) || [];
+                const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
+                const genres = mappedGenres.map(m => {
+                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
+                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
+                });
+
+                const nativeClusterId = seedToClusterMap.get(t._seedUri) ?? primaryAnchorCluster.id;
+                return { ...t, features: stats, genres, assignedClusterId: nativeClusterId };
+            });
+
+            const candidatesWithPop = await fetchPopularityForMultipleTracks(evaluatedCandidates, null);
+
+            const scoreTrackAgainstClusterProfile = (track, cluster) => {
+                const f = track.features;
+                let vibeScore = 50;
+                if (f && f.energy !== null) {
+                    const e = f.energy / 100;
+                    const v = (f.valence ?? 50) / 100;
+                    const d = (f.danceability ?? 50) / 100;
+                    const a = (f.acousticness ?? 50) / 100;
+                    const t = (f.tempo || 120) / 220;
+
+                    const diffE = Math.pow(e - cluster.featureMeans.e, 2) * 1.8;
+                    const diffV = Math.pow(Math.abs(v - cluster.featureMeans.v), 1.8);
+                    const diffT = Math.pow(Math.abs(t - cluster.featureMeans.t), 1.4);
+                    const diffA = Math.pow(Math.abs(a - cluster.featureMeans.a), 1.2);
+                    const diffD = Math.pow(Math.abs(d - cluster.featureMeans.d), 0.6);
+
+                    vibeScore = Math.max(0, 100 * Math.exp(-(diffE + diffV + diffT + diffA + diffD) * 1.4));
+                }
+
+                let genreScore = 50;
+                if (track.genres && track.genres.length > 0) {
+                    const matches = track.genres.map(g => cluster.genreProfile[g.name] || 0);
+                    if (matches.length > 0) {
+                        const peak = Math.max(...matches);
+                        const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
+                        genreScore = (peak * 0.70 + avg * 0.30) * 100;
+                    }
+                } else {
+                    genreScore = vibeScore;
+                }
+
+                let combinedScore = (vibeScore * 0.50) + (genreScore * 0.50);
+
+                if (track.popularity !== null && track.popularity !== undefined && cluster.popProfile) {
+                    const bucket = Math.min(9, Math.floor(track.popularity / 10));
+                    const popWeight = cluster.popProfile[bucket] || 0;
+                    combinedScore = (combinedScore * 0.85) + (popWeight * 15);
+                }
+
+                return Math.min(100, Math.max(0, combinedScore));
+            };
+
+            candidatesWithPop.forEach(t => {
+                let nativeCluster = clusters.find(c => c.id === t.assignedClusterId) || primaryAnchorCluster;
+                let nativeScore = scoreTrackAgainstClusterProfile(t, nativeCluster);
+
+                if (nativeScore < 60 && clusters.length > 1) {
+                    for (const sibling of clusters) {
+                        if (sibling.id === nativeCluster.id) continue;
+                        const siblingScore = scoreTrackAgainstClusterProfile(t, sibling);
+                        if (siblingScore > 78) {
+                            t.assignedClusterId = sibling.id;
+                            nativeScore = siblingScore;
+                            break;
+                        }
+                    }
+                }
+
+                const fuzz = 0.85 + (Math.random() * 0.30);
+                t.finalScore = nativeScore;
+                t.lotteryWeight = Math.pow(Math.max(0.1, nativeScore * fuzz), 2);
+            });
+
+            if (!isHeadless) mainButton.innerText = "Selecting...";
+
+            const finalSelected = [];
+            const globalSeenArtists = new Set();
+            const globalSeenAlbums = new Set();
+            const anchorClusterSelectedUris = new Set();
+
+            for (const cluster of clusters) {
+                const clusterCandidates = candidatesWithPop.filter(t => t.assignedClusterId === cluster.id);
+                let needed = cluster.quota;
+
+                while (needed > 0 && clusterCandidates.length > 0) {
+                    const totalWeight = clusterCandidates.reduce((sum, t) => sum + t.lotteryWeight, 0);
+                    if (totalWeight <= 0) break;
+
+                    let r = Math.random() * totalWeight;
+                    let pickIdx = clusterCandidates.length - 1;
+                    for (let i = 0; i < clusterCandidates.length; i++) {
+                        r -= clusterCandidates[i].lotteryWeight;
+                        if (r <= 0) {
+                            pickIdx = i;
+                            break;
+                        }
+                    }
+
+                    const candidate = clusterCandidates[pickIdx];
+                    clusterCandidates.splice(pickIdx, 1);
+
+                    const albumId = candidate.album?.id || candidate.album?.uri || candidate.album?.name?.toLowerCase().trim();
+                    const allArtistIds = candidate.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                    if (allArtistIds.length === 0 && candidate.artistName) {
+                        allArtistIds.push(candidate.artistName.toLowerCase().trim());
+                    }
+
+                    const hasArtistCollision = allArtistIds.some(id => globalSeenArtists.has(id));
+                    const hasAlbumCollision = albumId && globalSeenAlbums.has(albumId);
+
+                    if (hasArtistCollision || hasAlbumCollision) continue;
+
+                    allArtistIds.forEach(id => globalSeenArtists.add(id));
+                    if (albumId) globalSeenAlbums.add(albumId);
+
+                    finalSelected.push(candidate);
+                    if (cluster.id === primaryAnchorCluster.id) {
+                        anchorClusterSelectedUris.add(candidate.uri);
+                    }
+                    needed--;
+                }
+            }
+
+            if (finalSelected.length < targetPlaylistCount) {
+                const remainingPool = candidatesWithPop.filter(t => !finalSelected.some(s => s.uri === t.uri));
+                remainingPool.sort((a, b) => b.finalScore - a.finalScore);
+
+                for (const candidate of remainingPool) {
+                    if (finalSelected.length >= targetPlaylistCount) break;
+                    const allArtistIds = candidate.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                    if (allArtistIds.length === 0 && candidate.artistName) {
+                        allArtistIds.push(candidate.artistName.toLowerCase().trim());
+                    }
+                    const hasArtistCollision = allArtistIds.some(id => globalSeenArtists.has(id));
+                    if (hasArtistCollision) continue;
+
+                    allArtistIds.forEach(id => globalSeenArtists.add(id));
+                    finalSelected.push(candidate);
+                }
+
+                if (finalSelected.length < targetPlaylistCount) {
+                    const secondarySeenArtists = new Set(finalSelected.map(t => t.artists?.[0]?.id || t.artists?.[0]?.uri || t.artistName?.toLowerCase().trim()).filter(Boolean));
+                    for (const candidate of remainingPool) {
+                        if (finalSelected.length >= targetPlaylistCount) break;
+                        if (finalSelected.some(s => s.uri === candidate.uri)) continue;
+                        const leadArtistId = candidate.artists?.[0]?.id || candidate.artists?.[0]?.uri || candidate.artistName?.toLowerCase().trim();
+                        if (leadArtistId && secondarySeenArtists.has(leadArtistId)) continue;
+
+                        if (leadArtistId) secondarySeenArtists.add(leadArtistId);
+                        finalSelected.push(candidate);
+                    }
+                }
+
+                if (finalSelected.length < targetPlaylistCount) {
+                    for (const candidate of remainingPool) {
+                        if (finalSelected.length >= targetPlaylistCount) break;
+                        if (finalSelected.some(s => s.uri === candidate.uri)) continue;
+                        finalSelected.push(candidate);
+                    }
+                }
+            }
+
+            if (!isHeadless) mainButton.innerText = "Sorting...";
+
+            const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
+            const others = finalSelected.filter(t => !t.features || t.features.energy == null);
+
+            const sortedTracks = await energyWaveSort(validForWave, 'discovery', { anchorUris: anchorClusterSelectedUris });
+            const finalTracks = [...sortedTracks, ...others].slice(0, targetPlaylistCount);
+            const trackUris = finalTracks.map(track => track.uri);
+
+            if (!isHeadless) mainButton.innerText = "Creating...";
+            const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
+
+            if (wasUpdated) {
+                await replacePlaylistTracks(newPlaylist.id, trackUris);
+            } else {
+                await addTracksToPlaylist(newPlaylist.id, trackUris);
+            }
+
+            showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
+            if (!isHeadless) await navigateToPlaylist(newPlaylist);
+            return;
         }
 
-        const allUrisToFetchIsrc = [];
-        albumTrackUrisMap.forEach(uris => {
-            uris.forEach(uri => {
-                if (!completeLikedSongUrisSet.has(uri)) {
-                    allUrisToFetchIsrc.push(uri);
+        if (vibeType === 'recommendAllTime') {
+            playlistName = "Discovery: All-Time Taste";
+            playlistDescription = "Discover tracks matching your long-term taste. Created by Sort-Play.";
+
+            if (!isHeadless) mainButton.innerText = "Profiling...";
+
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            let longTermTracks = await getTopItems('tracks', 'long_term', 250);
+            if (longTermTracks.length < 10) {
+                const fallbackTracks = await getTopItems('tracks', 'medium_term', 150);
+                longTermTracks = [...longTermTracks, ...fallbackTracks];
+            }
+
+            const historicalLikes = allLikedSongs.filter(t => !t.addedAt || new Date(t.addedAt) < thirtyDaysAgo);
+            const likedPool = historicalLikes.length >= 20 ? historicalLikes : allLikedSongs;
+
+            const corpusMap = new Map();
+
+            longTermTracks.forEach((t, idx) => {
+                if (Spicetify.URI.isLocal(t.uri)) return;
+                const rankWeight = Math.exp(-idx / 80) * 1.5;
+                corpusMap.set(t.uri, {
+                    track: t,
+                    weight: rankWeight
+                });
+            });
+
+            shuffleArray(likedPool).slice(0, 200).forEach(t => {
+                if (Spicetify.URI.isLocal(t.uri)) return;
+                if (corpusMap.has(t.uri)) {
+                    corpusMap.get(t.uri).weight += 1.0;
+                } else {
+                    corpusMap.set(t.uri, {
+                        track: t,
+                        weight: 1.0
+                    });
                 }
             });
-        });
 
-        const uniqueUrisToFetch = [...new Set(allUrisToFetchIsrc)];
-        let fetchedMetaMap = new Map();
-        
-        const isrcFetchPromises = [];
-        for (let i = 0; i < uniqueUrisToFetch.length; i += 500) {
-            const batch = uniqueUrisToFetch.slice(i, i + 500);
-            isrcFetchPromises.push(
-                fetchCoreMetadataBatch(batch).then(res => {
-                    res.forEach((val, key) => fetchedMetaMap.set(key, val));
-                }).catch(err => {
-                    console.warn("[Sort-Play] Batch ISRC fetch failed during optimization", err);
-                })
-            );
-        }
-        await Promise.all(isrcFetchPromises);
+            const corpus = Array.from(corpusMap.values());
+            if (corpus.length === 0) throw new Error("Not enough listening history to build an all-time taste profile.");
 
-        const popChecks = [];
+            const corpusTracks = corpus.map(c => c.track);
+            const corpusTrackIds = corpusTracks.map(t => t.id || t.uri.split(':')[2]).filter(Boolean);
+            const corpusTrackUris = corpusTracks.map(t => t.uri);
 
-        for (const [albumId, uris] of albumTrackUrisMap.entries()) {
-            let likedCount = 0;
-            let lowestPopLikedUri = null;
+            const [corpusAudioStats, corpusNativeGenres, corpusTracksWithPop] = await Promise.all([
+                getBatchTrackStats(corpusTrackIds),
+                fetchNativeSpotifyTrackGenresBatch(corpusTrackUris),
+                fetchPopularityForMultipleTracks(corpusTracks, null)
+            ]);
 
-            for (const uri of uris) {
-                let isLiked = false;
-                if (completeLikedSongUrisSet.has(uri)) {
-                    isLiked = true;
-                } else {
-                    const meta = fetchedMetaMap.get(uri);
-                    if (meta && meta.isrc && likedIsrcs.has(meta.isrc)) {
-                        isLiked = true;
-                    }
-                }
-                
-                if (isLiked) {
-                    likedCount++;
-                    lowestPopLikedUri = uri;
-                    
-                    if (discoveryStrictAlbumExclusion) {
-                        excludedAlbumIds.add(albumId);
-                        break; 
+            const corpusPopMap = new Map(corpusTracksWithPop.map(t => [t.uri, t.popularity]));
+            const validCorpus = [];
+            let totalCorpusWeight = 0;
+
+            corpus.forEach(item => {
+                const id = item.track.id || item.track.uri.split(':')[2];
+                const stats = corpusAudioStats[id];
+                if (!stats || stats.energy === null) return;
+
+                item.features = stats;
+                item.track.popularity = corpusPopMap.get(item.track.uri) ?? item.track.popularity ?? 50;
+
+                const rawGenres = corpusNativeGenres.get(item.track.uri) || [];
+                const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
+                item.genres = mappedGenres.map(m => {
+                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
+                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
+                });
+
+                validCorpus.push(item);
+                totalCorpusWeight += item.weight;
+            });
+
+            if (validCorpus.length === 0) throw new Error("Could not extract audio features for all-time tracks.");
+            validCorpus.forEach(item => item.weight /= totalCorpusWeight);
+
+            const dataVectors = validCorpus.map(item => {
+                const f = item.features;
+                return [
+                    (f.energy ?? 50) / 100,
+                    (f.valence ?? 50) / 100,
+                    (f.danceability ?? 50) / 100,
+                    (f.acousticness ?? 50) / 100,
+                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1),
+                    item.genres.length > 0 ? 1.0 : 0.0
+                ];
+            });
+
+            const pcaResult = spMath.pca(dataVectors, 0.85, 4);
+            let projected = pcaResult.projected;
+            if (!projected || projected.length === 0 || !projected[0] || projected[0].length === 0) {
+                projected = dataVectors;
+            }
+
+            let maxK = validCorpus.length < 30 ? 1 : Math.min(3, Math.max(1, Math.floor(validCorpus.length / 25)));
+            let bestGMM = null;
+            let bestBIC = Infinity;
+
+            for (let k = 1; k <= maxK; k++) {
+                const gmm = new spDiagonalGMM(k);
+                if (gmm.fit(projected)) {
+                    if (gmm.bic < bestBIC) {
+                        bestBIC = gmm.bic;
+                        bestGMM = gmm;
                     }
                 }
             }
-            
-            if (!discoveryStrictAlbumExclusion && likedCount > 0) {
-                if (likedCount >= 2) {
-                    excludedAlbumIds.add(albumId);
-                } else if (likedCount === 1 && lowestPopLikedUri) {
-                    popChecks.push((async () => {
-                        try {
-                            const tId = lowestPopLikedUri.split(':')[2];
-                            const meta = await fetchInternalTrackMetadata(tId);
-                            const pop = meta?.popularity || 0;
-                            if (pop < 75) {
+
+            if (!bestGMM) bestGMM = { k: 1, predict: () => [1.0] };
+
+            let pillars = [];
+            for (let c = 0; c < bestGMM.k; c++) {
+                let clusterWeight = 0;
+                const members = [];
+                validCorpus.forEach((item, i) => {
+                    const resps = bestGMM.predict(projected[i]);
+                    const w = item.weight * resps[c];
+                    clusterWeight += w;
+                    members.push({ item, resp: resps[c], weight: w });
+                });
+
+                if (clusterWeight <= 0.01) continue;
+                members.forEach(m => m.normWeight = m.weight / clusterWeight);
+
+                const featureMeans = { e: 0, v: 0, d: 0, a: 0, t: 0 };
+                const genreWeights = new Map();
+
+                members.forEach(m => {
+                    const f = m.item.features;
+                    featureMeans.e += ((f.energy ?? 50) / 100) * m.normWeight;
+                    featureMeans.v += ((f.valence ?? 50) / 100) * m.normWeight;
+                    featureMeans.d += ((f.danceability ?? 50) / 100) * m.normWeight;
+                    featureMeans.a += ((f.acousticness ?? 50) / 100) * m.normWeight;
+                    featureMeans.t += (((f.tempo || 120) / 220)) * m.normWeight;
+
+                    m.item.genres.forEach(g => {
+                        genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                    });
+                });
+
+                const maxGWeight = Math.max(...genreWeights.values(), 1e-6);
+                const normalizedGenreEntries = Array.from(genreWeights.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 35)
+                    .map(([name, weight]) => [name, weight / maxGWeight]);
+
+                const popProfile = new Array(10).fill(0);
+                members.forEach(m => {
+                    const pop = m.item.track.popularity ?? 50;
+                    const bucket = Math.min(9, Math.floor(pop / 10));
+                    popProfile[bucket] += m.normWeight;
+                });
+
+                pillars.push({
+                    id: c,
+                    mass: clusterWeight,
+                    members,
+                    featureMeans,
+                    genreProfile: Object.fromEntries(normalizedGenreEntries),
+                    popProfile
+                });
+            }
+
+            if (pillars.length === 0) {
+                const members = validCorpus.map(item => ({ item, resp: 1.0, weight: item.weight, normWeight: item.weight }));
+                pillars.push({
+                    id: 0,
+                    mass: 1.0,
+                    members,
+                    featureMeans: { e: 0.5, v: 0.5, d: 0.5, a: 0.5, t: 0.54 },
+                    genreProfile: {},
+                    popProfile: new Array(10).fill(0.1)
+                });
+            }
+
+            const minMassThreshold = 0.18;
+            if (pillars.length > 1) {
+                const viablePillars = pillars.filter(p => p.mass >= minMassThreshold);
+                if (viablePillars.length > 0 && viablePillars.length < pillars.length) {
+                    pillars = viablePillars;
+                    let totalViableMass = pillars.reduce((sum, p) => sum + p.mass, 0);
+                    pillars.forEach(p => p.mass /= totalViableMass);
+                } else if (viablePillars.length === 0) {
+                    pillars.sort((a, b) => b.mass - a.mass);
+                    pillars = [pillars[0]];
+                    pillars[0].mass = 1.0;
+                }
+            }
+
+            let dominantPillar = pillars.reduce((max, p) => p.mass > max.mass ? p : max, pillars[0]);
+
+            const targetPlaylistCount = discoveryPlaylistSize;
+            const dynamicFloor = Math.max(8, Math.floor(targetPlaylistCount * 0.20));
+            let assignedTotal = 0;
+            pillars.forEach(p => {
+                p.quota = Math.max(dynamicFloor, Math.round(targetPlaylistCount * p.mass));
+                assignedTotal += p.quota;
+            });
+
+            while (assignedTotal > targetPlaylistCount) {
+                const largest = pillars.reduce((max, p) => p.quota > max.quota ? p : max, pillars[0]);
+                largest.quota--;
+                assignedTotal--;
+            }
+            while (assignedTotal < targetPlaylistCount) {
+                dominantPillar.quota++;
+                assignedTotal++;
+            }
+
+            if (!isHeadless) mainButton.innerText = "Expanding...";
+
+            const pillarSeedMap = new Map();
+            const totalTargetSeeds = 34;
+
+            for (const pillar of pillars) {
+                const pillarSeedUris = [];
+                const sortedMembers = [...pillar.members].sort((a, b) => b.normWeight - a.normWeight);
+                const pillarTracks = sortedMembers.map(m => m.item.track);
+
+                const deepCuts = pillarTracks.filter(t => (t.popularity ?? 50) < 50);
+                const stapleTracks = pillarTracks.slice(0, 15);
+
+                const addTrackSeed = (t) => {
+                    if (t && t.uri && !pillarSeedUris.includes(t.uri)) pillarSeedUris.push(t.uri);
+                };
+
+                shuffleArray(stapleTracks).slice(0, 3).forEach(addTrackSeed);
+                shuffleArray(deepCuts).slice(0, 3).forEach(addTrackSeed);
+
+                const pillarArtists = [];
+                pillarTracks.forEach(t => {
+                    const aId = t.artistUris?.[0]?.split(':')[2] || t.artists?.[0]?.id;
+                    if (aId && !pillarArtists.some(a => a.id === aId)) pillarArtists.push({ id: aId });
+                });
+
+                if (pillarArtists.length > 0) {
+                    const l1 = await fetchRelatedBatch(pillarArtists, 12);
+                    const l2 = await fetchRelatedBatch(l1, 12);
+
+                    const uniqueUnknownsMap = new Map();
+                    [...l1, ...l2].forEach(a => {
+                        if (!knownArtistIds.has(a.id) && !uniqueUnknownsMap.has(a.id)) {
+                            uniqueUnknownsMap.set(a.id, a);
+                        }
+                    });
+
+                    const unknownL1L2 = Array.from(uniqueUnknownsMap.values());
+                    shuffleArray(unknownL1L2).slice(0, 4).forEach(a => {
+                        pillarSeedUris.push(`spotify:artist:${a.id}`);
+                    });
+                }
+
+                let fillIdx = 0;
+                const perPillarTarget = Math.max(10, Math.floor(totalTargetSeeds / pillars.length));
+                while (pillarSeedUris.length < perPillarTarget && fillIdx < pillarTracks.length) {
+                    addTrackSeed(pillarTracks[fillIdx]);
+                    fillIdx++;
+                }
+
+                pillarSeedMap.set(pillar.id, pillarSeedUris);
+            }
+
+            const allSeededUrisWithPillar = [];
+            pillarSeedMap.forEach((seedUris, pillarId) => {
+                seedUris.forEach(uri => allSeededUrisWithPillar.push({ uri, pillarId }));
+            });
+
+            const uniqueSeedsToFetch = [...new Set(allSeededUrisWithPillar.map(s => s.uri))];
+            const rawApiTracks = await fetchRadioTracks(uniqueSeedsToFetch, 350);
+
+            if (rawApiTracks.length === 0) throw new Error("Spotify Radio API didn't return recommendations. Try again!");
+
+            if (!isHeadless) mainButton.innerText = "Excluding...";
+
+            const recommendedUris = rawApiTracks.map(t => t.uri);
+            const fetchedRecommendedMetaMap = new Map();
+            for (let i = 0; i < recommendedUris.length; i += 500) {
+                const batch = recommendedUris.slice(i, i + 500);
+                try {
+                    const res = await fetchCoreMetadataBatch(batch);
+                    res.forEach((val, key) => fetchedRecommendedMetaMap.set(key, val));
+                } catch(e) {}
+            }
+
+            rawApiTracks.forEach(t => {
+                const meta = fetchedRecommendedMetaMap.get(t.uri);
+                if (meta?.isrc) t.isrc = meta.isrc;
+            });
+
+            const availabilityChecks = await Promise.all(rawApiTracks.map(track => isTrackAvailable(track)));
+
+            const seedToPillarMap = new Map();
+            allSeededUrisWithPillar.forEach(s => seedToPillarMap.set(s.uri, s.pillarId));
+
+            const seenCandidateUris = new Set();
+            const preFilteredTracks = rawApiTracks.filter((track, index) => {
+                if (!availabilityChecks[index]) return false;
+                if (seenCandidateUris.has(track.uri)) return false;
+                seenCandidateUris.add(track.uri);
+
+                if (completeLikedSongUrisSet.has(track.uri)) return false;
+                if (track.isrc && likedIsrcs.has(track.isrc)) return false;
+                if (isTrashFiltered(track)) return false;
+
+                const title = track.name.toLowerCase().trim();
+                const likedArtistUrisForTitle = likedSongsFingerprintMap.get(title);
+                if (likedArtistUrisForTitle) {
+                    const recommendedArtistUris = track.artists.map(a => a.uri);
+                    if (recommendedArtistUris.some(uri => likedArtistUrisForTitle.has(uri))) return false;
+                }
+                return true;
+            });
+
+            const excludedAlbumIds = new Set();
+            const albumsToCheck = new Set();
+
+            preFilteredTracks.forEach(track => {
+                const albumId = track.album?.id || track.album?.uri?.split(':')[2];
+                if (!albumId) return;
+
+                if (track.album?.name) {
+                    const cleanAlbum = getCleanTitle(track.album.name);
+                    const primaryArtistUri = track.artists?.[0]?.uri || track.artists?.[0]?.name || "Unknown";
+                    const fingerprint = `${cleanAlbum}|${primaryArtistUri}`;
+
+                    const likedOnAlbum = albumFingerprintMap.get(fingerprint);
+                    if (likedOnAlbum) {
+                        if (discoveryStrictAlbumExclusion && likedOnAlbum.size >= 1) {
+                            excludedAlbumIds.add(albumId);
+                            return;
+                        } else if (!discoveryStrictAlbumExclusion && likedOnAlbum.size >= 2) {
+                            excludedAlbumIds.add(albumId);
+                            return;
+                        } else if (!discoveryStrictAlbumExclusion && likedOnAlbum.size === 1) {
+                            const likedUri = likedOnAlbum.values().next().value;
+                            const likedId = likedUri ? likedUri.split(':')[2] : null;
+                            const meta = likedId ? cachedLikedMetadata.get(likedId) : null;
+                            if (meta && meta.popularity !== undefined && meta.popularity !== null && meta.popularity < 75) {
                                 excludedAlbumIds.add(albumId);
-                            }
-                        } catch(e) {}
-                    })());
-                }
-            }
-        }
-        
-        await Promise.all(popChecks);
-
-        let newRecommendedTracks = preFilteredTracks.filter(track => {
-            let albumId = null;
-            if (track.album && track.album.id) albumId = track.album.id;
-            else if (track.album && track.album.uri) albumId = track.album.uri.split(':')[2];
-            
-            if (albumId && excludedAlbumIds.has(albumId)) {
-                return false;
-            }
-            return true;
-        });
-
-        const uniqueMainArtists = new Set();
-        newRecommendedTracks = newRecommendedTracks.filter(track => {
-            const mainArtistId = track.artists?.[0]?.id;
-            if (mainArtistId) {
-                if (uniqueMainArtists.has(mainArtistId)) return false;
-                uniqueMainArtists.add(mainArtistId);
-            }
-            return true;
-        });
-
-        if (newRecommendedTracks.length === 0) throw new Error("All recommended tracks were already known to you or filtered out.");
-        
-        if (!isHeadless) mainButton.innerText = "Profiling...";
-        const trackIdsToScore = newRecommendedTracks.map(t => t.id);
-        const statsToScore = await getBatchTrackStats(trackIdsToScore);
-        const tracksWithFeatures = newRecommendedTracks.map(t => ({ ...t, features: statsToScore[t.id] }));
-        const tracksWithPop = await fetchPopularityForMultipleTracks(tracksWithFeatures, null);
-        
-        const tracksToProfileWithPop = await fetchPopularityForMultipleTracks(tracksToProfile, null);
-        const contextProfile = buildContextProfile(tracksToProfileWithPop, completeLikedSongUrisSet, new Set()); 
-        
-        tracksWithPop.forEach(t => {
-            let score = scoreTrackAgainstContext(t, contextProfile);
-            
-            if (t.popularity !== null && contextProfile.popProfile) {
-                const bucketIdx = Math.min(9, Math.floor(t.popularity / 10));
-                const popWeight = contextProfile.popProfile[bucketIdx] || 0;
-                score += (15 * popWeight);
-            }
-            
-            if (userAudioProfile && t.features) {
-                ['energy', 'valence', 'acousticness'].forEach(f => {
-                    const val = t.features[f];
-                    if (val !== undefined && val !== null) {
-                        const range = userAudioProfile.ranges[f];
-                        if (range) {
-                            if (val >= range.min && val <= range.max) {
-                                score += 12;
-                            } else {
-                                score -= 12;
+                                return;
                             }
                         }
                     }
+                }
+                albumsToCheck.add(albumId);
+            });
+
+            const albumIdsArray = Array.from(albumsToCheck).filter(id => !excludedAlbumIds.has(id));
+            const albumTrackUrisMap = new Map();
+            const CONCURRENCY = 40;
+
+            for (let i = 0; i < albumIdsArray.length; i += CONCURRENCY) {
+                const batch = albumIdsArray.slice(i, i + CONCURRENCY);
+                await Promise.all(batch.map(async (albumId) => {
+                    let uris = [];
+                    try {
+                        const hexId = spotifyHex(albumId);
+                        let token = Spicetify.Platform.Session.accessToken;
+                        let res = await fetch(`https://spclient.wg.spotify.com/metadata/4/album/${hexId}?market=from_token&alt=json`, {
+                            headers: { "Authorization": `Bearer ${token}`, "Accept": "application/json" }
+                        });
+                        if (res.ok) {
+                            const body = await res.json();
+                            if (body.disc) {
+                                for (const disc of body.disc) {
+                                    if (disc.track) {
+                                        for (const track of disc.track) {
+                                            if (track.gid) uris.push(`spotify:track:${hexToBase62(track.gid)}`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (err) {}
+                    if (uris.length === 0) {
+                        try {
+                            const fallbackTracks = await getAlbumTracks(albumId);
+                            if (fallbackTracks) uris = fallbackTracks.map(t => t.uri);
+                        } catch(e) {}
+                    }
+                    if (uris.length > 0) albumTrackUrisMap.set(albumId, uris);
+                }));
+            }
+
+            for (const [albumId, uris] of albumTrackUrisMap.entries()) {
+                let likedCount = 0;
+                let singleLikedUri = null;
+                for (const uri of uris) {
+                    if (completeLikedSongUrisSet.has(uri)) {
+                        likedCount++;
+                        singleLikedUri = uri;
+                        if (discoveryStrictAlbumExclusion || likedCount >= 2) {
+                            excludedAlbumIds.add(albumId);
+                            break;
+                        }
+                    }
+                }
+                if (!discoveryStrictAlbumExclusion && likedCount === 1 && singleLikedUri) {
+                    const likedId = singleLikedUri.split(':')[2];
+                    const meta = cachedLikedMetadata.get(likedId);
+                    if (meta && meta.popularity !== undefined && meta.popularity !== null && meta.popularity < 75) {
+                        excludedAlbumIds.add(albumId);
+                    }
+                }
+            }
+
+            const cleanCandidatePool = preFilteredTracks.filter(track => {
+                const albumId = track.album?.id || track.album?.uri?.split(':')[2];
+                return !albumId || !excludedAlbumIds.has(albumId);
+            });
+
+            if (cleanCandidatePool.length === 0) throw new Error("All recommended tracks were already known or filtered out.");
+
+            if (!isHeadless) mainButton.innerText = "Evaluating...";
+
+            const candidateTrackIds = cleanCandidatePool.map(t => t.id);
+            const candidateUrisForGenres = cleanCandidatePool.map(t => t.uri);
+
+            const [candidateStats, candidateGenresMap] = await Promise.all([
+                getBatchTrackStats(candidateTrackIds),
+                fetchNativeSpotifyTrackGenresBatch(candidateUrisForGenres)
+            ]);
+
+            const evaluatedCandidates = cleanCandidatePool.map(t => {
+                const stats = candidateStats[t.id];
+                const rawGenres = candidateGenresMap.get(t.uri) || [];
+                const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
+                const genres = mappedGenres.map(m => {
+                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
+                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
                 });
-            }
-            t.finalScore = score;
-        });
-        
-        tracksWithPop.forEach(t => {
-            const fuzz = 0.85 + (Math.random() * 0.30);
-            t.lotteryWeight = Math.pow(Math.max(0.1, t.finalScore * fuzz), 2);
-        });
-        
-        const finalSelected = [];
-        const seenArtists = new Set();
-        const seenAlbums = new Set();
-        let candidatePool = [...tracksWithPop];
-        const targetPlaylistCount = discoveryPlaylistSize;
-        
-        while (finalSelected.length < targetPlaylistCount && candidatePool.length > 0) {
-            let totalWeight = candidatePool.reduce((sum, t) => sum + t.lotteryWeight, 0);
-            if (totalWeight <= 0) break;
-            
-            let r = Math.random() * totalWeight;
-            let selectedIdx = candidatePool.length - 1;
-            for (let i = 0; i < candidatePool.length; i++) {
-                r -= candidatePool[i].lotteryWeight;
-                if (r <= 0) {
-                    selectedIdx = i;
-                    break;
+
+                const nativePillarId = seedToPillarMap.get(t._seedUri) ?? dominantPillar.id;
+                return { ...t, features: stats, genres, assignedPillarId: nativePillarId };
+            });
+
+            const candidatesWithPop = await fetchPopularityForMultipleTracks(evaluatedCandidates, null);
+
+            const scoreTrackAgainstPillarProfile = (track, pillar) => {
+                const f = track.features;
+                let vibeScore = 50;
+                if (f && f.energy !== null) {
+                    const e = f.energy / 100;
+                    const v = (f.valence ?? 50) / 100;
+                    const d = (f.danceability ?? 50) / 100;
+                    const a = (f.acousticness ?? 50) / 100;
+                    const t = (f.tempo || 120) / 220;
+
+                    const diffE = Math.pow(e - pillar.featureMeans.e, 2) * 1.8;
+                    const diffV = Math.pow(Math.abs(v - pillar.featureMeans.v), 1.8);
+                    const diffT = Math.pow(Math.abs(t - pillar.featureMeans.t), 1.4);
+                    const diffA = Math.pow(Math.abs(a - pillar.featureMeans.a), 1.2);
+                    const diffD = Math.pow(Math.abs(d - pillar.featureMeans.d), 0.6);
+
+                    vibeScore = Math.max(0, 100 * Math.exp(-(diffE + diffV + diffT + diffA + diffD) * 1.4));
+                }
+
+                let genreScore = 50;
+                if (track.genres && track.genres.length > 0) {
+                    const matches = track.genres.map(g => pillar.genreProfile[g.name] || 0);
+                    if (matches.length > 0) {
+                        const peak = Math.max(...matches);
+                        const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
+                        genreScore = (peak * 0.70 + avg * 0.30) * 100;
+                    }
+                } else {
+                    genreScore = vibeScore;
+                }
+
+                let combinedScore = (vibeScore * 0.50) + (genreScore * 0.50);
+
+                if (track.popularity !== null && track.popularity !== undefined && pillar.popProfile) {
+                    const bucket = Math.min(9, Math.floor(track.popularity / 10));
+                    const popWeight = pillar.popProfile[bucket] || 0;
+                    combinedScore = (combinedScore * 0.85) + (popWeight * 15);
+                }
+
+                return Math.min(100, Math.max(0, combinedScore));
+            };
+
+            candidatesWithPop.forEach(t => {
+                let nativePillar = pillars.find(p => p.id === t.assignedPillarId) || dominantPillar;
+                let nativeScore = scoreTrackAgainstPillarProfile(t, nativePillar);
+
+                if (nativeScore < 60 && pillars.length > 1) {
+                    for (const sibling of pillars) {
+                        if (sibling.id === nativePillar.id) continue;
+                        const siblingScore = scoreTrackAgainstPillarProfile(t, sibling);
+                        if (siblingScore > 78) {
+                            t.assignedPillarId = sibling.id;
+                            nativeScore = siblingScore;
+                            break;
+                        }
+                    }
+                }
+
+                const fuzz = 0.85 + (Math.random() * 0.30);
+                t.finalScore = nativeScore;
+                t.lotteryWeight = Math.pow(Math.max(0.1, nativeScore * fuzz), 2);
+            });
+
+            if (!isHeadless) mainButton.innerText = "Selecting...";
+
+            const finalSelected = [];
+            const globalSeenArtists = new Set();
+            const globalSeenAlbums = new Set();
+            const dominantPillarSelectedUris = new Set();
+
+            for (const pillar of pillars) {
+                const pillarCandidates = candidatesWithPop.filter(t => t.assignedPillarId === pillar.id);
+                let needed = pillar.quota;
+
+                while (needed > 0 && pillarCandidates.length > 0) {
+                    const totalWeight = pillarCandidates.reduce((sum, t) => sum + t.lotteryWeight, 0);
+                    if (totalWeight <= 0) break;
+
+                    let r = Math.random() * totalWeight;
+                    let pickIdx = pillarCandidates.length - 1;
+                    for (let i = 0; i < pillarCandidates.length; i++) {
+                        r -= pillarCandidates[i].lotteryWeight;
+                        if (r <= 0) {
+                            pickIdx = i;
+                            break;
+                        }
+                    }
+
+                    const candidate = pillarCandidates[pickIdx];
+                    pillarCandidates.splice(pickIdx, 1);
+
+                    const albumId = candidate.album?.id || candidate.album?.uri || candidate.album?.name?.toLowerCase().trim();
+                    const allArtistIds = candidate.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                    if (allArtistIds.length === 0 && candidate.artistName) {
+                        allArtistIds.push(candidate.artistName.toLowerCase().trim());
+                    }
+
+                    const hasArtistCollision = allArtistIds.some(id => globalSeenArtists.has(id));
+                    const hasAlbumCollision = albumId && globalSeenAlbums.has(albumId);
+
+                    if (hasArtistCollision || hasAlbumCollision) continue;
+
+                    allArtistIds.forEach(id => globalSeenArtists.add(id));
+                    if (albumId) globalSeenAlbums.add(albumId);
+
+                    finalSelected.push(candidate);
+                    if (pillar.id === dominantPillar.id) {
+                        dominantPillarSelectedUris.add(candidate.uri);
+                    }
+                    needed--;
                 }
             }
-            
-            const track = candidatePool[selectedIdx];
-            candidatePool.splice(selectedIdx, 1);
-            
-            let albumIdentifier = track.album?.id || track.album?.uri || track.album?.name?.toLowerCase().trim() || track.albumName?.toLowerCase().trim();
-            let artistIdentifier = track.artists?.[0]?.id || track.artists?.[0]?.uri || track.artists?.[0]?.name?.toLowerCase().trim() || track.artistName?.toLowerCase().trim();
-            
-            const relaxLimits = candidatePool.length < (targetPlaylistCount - finalSelected.length) + 10;
-            
-            if (!relaxLimits) {
-                if (seenAlbums.has(albumIdentifier) || seenArtists.has(artistIdentifier)) {
-                    continue;
+
+            if (finalSelected.length < targetPlaylistCount) {
+                const remainingPool = candidatesWithPop.filter(t => !finalSelected.some(s => s.uri === t.uri));
+                remainingPool.sort((a, b) => b.finalScore - a.finalScore);
+
+                for (const candidate of remainingPool) {
+                    if (finalSelected.length >= targetPlaylistCount) break;
+                    const allArtistIds = candidate.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                    if (allArtistIds.length === 0 && candidate.artistName) {
+                        allArtistIds.push(candidate.artistName.toLowerCase().trim());
+                    }
+                    const hasArtistCollision = allArtistIds.some(id => globalSeenArtists.has(id));
+                    if (hasArtistCollision) continue;
+
+                    allArtistIds.forEach(id => globalSeenArtists.add(id));
+                    finalSelected.push(candidate);
                 }
-            } else if (seenAlbums.has(albumIdentifier)) {
-                continue;
+
+                if (finalSelected.length < targetPlaylistCount) {
+                    const secondarySeenArtists = new Set(finalSelected.map(t => t.artists?.[0]?.id || t.artists?.[0]?.uri || t.artistName?.toLowerCase().trim()).filter(Boolean));
+                    for (const candidate of remainingPool) {
+                        if (finalSelected.length >= targetPlaylistCount) break;
+                        if (finalSelected.some(s => s.uri === candidate.uri)) continue;
+                        const leadArtistId = candidate.artists?.[0]?.id || candidate.artists?.[0]?.uri || candidate.artistName?.toLowerCase().trim();
+                        if (leadArtistId && secondarySeenArtists.has(leadArtistId)) continue;
+
+                        if (leadArtistId) secondarySeenArtists.add(leadArtistId);
+                        finalSelected.push(candidate);
+                    }
+                }
+
+                if (finalSelected.length < targetPlaylistCount) {
+                    for (const candidate of remainingPool) {
+                        if (finalSelected.length >= targetPlaylistCount) break;
+                        if (finalSelected.some(s => s.uri === candidate.uri)) continue;
+                        finalSelected.push(candidate);
+                    }
+                }
             }
-            
-            if (albumIdentifier) seenAlbums.add(albumIdentifier);
-            if (artistIdentifier) seenArtists.add(artistIdentifier);
-            finalSelected.push(track);
+
+            if (!isHeadless) mainButton.innerText = "Sorting...";
+
+            const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
+            const others = finalSelected.filter(t => !t.features || t.features.energy == null);
+
+            const sortedTracks = await energyWaveSort(validForWave, 'wave', { anchorUris: dominantPillarSelectedUris });
+            const finalTracks = [...sortedTracks, ...others].slice(0, targetPlaylistCount);
+            const trackUris = finalTracks.map(track => track.uri);
+
+            if (!isHeadless) mainButton.innerText = "Creating...";
+            const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
+
+            if (wasUpdated) {
+                await replacePlaylistTracks(newPlaylist.id, trackUris);
+            } else {
+                await addTracksToPlaylist(newPlaylist.id, trackUris);
+            }
+
+            showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
+            if (!isHeadless) await navigateToPlaylist(newPlaylist);
+            return;
         }
-
-        const tracksToSort = finalSelected.slice(0, targetPlaylistCount);
-        
-        if (!isHeadless) mainButton.innerText = "Sorting...";
-        const validForWave = tracksToSort.filter(t => t.features && t.features.energy != null);
-        const others = tracksToSort.filter(t => !t.features || t.features.energy == null);
-        
-        const sortedTracks = await energyWaveSort(validForWave);
-        const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
-
-        const trackUris = finalTracks.map(track => track.uri);
-        
-        if (!isHeadless) mainButton.innerText = "Creating...";
-        const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
-        
-        if (wasUpdated) {
-            await replacePlaylistTracks(newPlaylist.id, trackUris);
-        } else {
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
-        }
-
-        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
-        await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error(`Error in generateSpotifyRecommendations (${vibeType}):`, error);
@@ -40261,7 +42524,7 @@
         
         showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
 
-        await navigateToPlaylist(newPlaylist);
+        if (!isHeadless) await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error generating Chronological Followed Releases:", error);
@@ -40713,7 +42976,7 @@
         }
 
         showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
-        await navigateToPlaylist(newPlaylist);
+        if (!isHeadless) await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error generating Infinite Vibe:", error);
@@ -41047,7 +43310,7 @@
           }
 
           showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
-          await navigateToPlaylist(newPlaylist);
+          if (!isHeadless) await navigateToPlaylist(newPlaylist);
 
       } catch (error) {
           console.error("Error generating Tastemaker Profile:", error);
@@ -41311,7 +43574,7 @@
         }
 
         showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
-        await navigateToPlaylist(newPlaylist);
+        if (!isHeadless) await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error generating Neighbors Mix:", error);
@@ -41408,7 +43671,7 @@
         }
 
         showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'}!`);
-        await navigateToPlaylist(newPlaylist);
+        if (!isHeadless) await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
         console.error("Error in Random Genre Explorer:", error);
@@ -41743,7 +44006,7 @@
             
             showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
 
-            await navigateToPlaylist(newPlaylist);
+            if (!isHeadless) await navigateToPlaylist(newPlaylist);
         } catch (error) {
             console.error("Error creating top tracks playlist:", error);
             showNotification("Failed to create top tracks playlist.", true);
@@ -41911,33 +44174,70 @@
             const trackCount = tracks.length;
             let extremeIgnored = localStorage.getItem('sort-play-ignore-extreme-warning') === 'true';
             let finalChoice = null;
-
-            if (preserveDateBehavior === 'fast') {
+    
+            const isGrouping = ['filterAlbums', 'filterAlbumsEPs', 'filterAlbumsCompilations', 'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles'].includes(sortType);
+            const isFilterOnly = ['deduplicateOnly', 'filterOnePerArtist', 'filterLiked', 'keepLiked', 'filterSingles', 'filterEPs', 'filterSinglesEPs', 'filterAlbumsEPs', 'filterAlbums', 'filterAlbumsCompilations', 'filterAlbumsEPsCompilations', 'filterAlbumsEPsSingles', 'filterCompilations', 'removeTrashed', 'excludeByPlaylist', 'filterFollowedMain', 'filterFollowedAny', 'removeFollowed'].includes(sortType) && !(isGrouping && isAscending);
+    
+            if (isFilterOnly) {
+                finalChoice = 'preserve';
+            } else if (preserveDateBehavior === 'fast') {
                 finalChoice = 'fast';
             } else if (preserveDateBehavior === 'preserve') {
-                if (trackCount >= massiveThreshold && !extremeIgnored) {
-                    const extremeChoice = await showConfirmationModal({
-                        title: `${warningIcon}Massive Playlist`,
-                        description: `Preserving 'Date Added' for ${trackCount} tracks may lag Spotify. Fast Sort is instant but resets the dates.`,
-                        confirmText: "Fast Sort",
-                        neutralText: "Keep 'Date Added'",
-                        cancelText: "Cancel",
-                        checkboxLabel: "Don't warn me again for massive playlists"
-                    });
-                    if (extremeChoice.action === 'cancel') {
-                        showNotification("Sorting cancelled.");
-                        if (!isHeadless && !progressCallback) resetButtons();
-                        return;
+                if (trackCount >= massiveThreshold) {
+                    const savedMassiveAction = localStorage.getItem('sort-play-massive-playlist-action');
+                    if (savedMassiveAction === 'fast' || savedMassiveAction === 'preserve') {
+                        finalChoice = savedMassiveAction;
+                    } else if (!extremeIgnored) {
+                        const extremeChoice = await showConfirmationModal({
+                            title: `${warningIcon}Massive Playlist`,
+                            description: `Preserving 'Date Added' for ${trackCount} tracks requires heavy background processing to prevent freezing. Fast Sort is instant but resets dates to now.`,
+                            confirmText: "Keep 'Date Added'",
+                            neutralText: "Fast Sort",
+                            cancelText: "Cancel",
+                            checkboxLabel: "Don't warn me again for massive playlists"
+                        });
+                        if (extremeChoice.action === 'cancel') {
+                            showNotification("Sorting cancelled.");
+                            if (!isHeadless && !progressCallback) resetButtons();
+                            return;
+                        }
+                        finalChoice = extremeChoice.action === 'confirm' ? 'preserve' : 'fast';
+                        if (extremeChoice.checked) {
+                            localStorage.setItem('sort-play-massive-playlist-action', finalChoice);
+                            if (finalChoice === 'preserve') {
+                                localStorage.setItem('sort-play-ignore-extreme-warning', 'true');
+                            }
+                        }
+                    } else {
+                        finalChoice = 'preserve';
                     }
-                    finalChoice = extremeChoice.action === 'confirm' ? 'fast' : 'preserve';
-                    if (extremeChoice.checked && finalChoice === 'preserve') {
-                        localStorage.setItem('sort-play-ignore-extreme-warning', 'true');
+                } else if (trackCount > hardwareLimit) {
+                    const savedLargeAction = localStorage.getItem('sort-play-large-playlist-action');
+                    if (savedLargeAction === 'fast' || savedLargeAction === 'preserve') {
+                        finalChoice = savedLargeAction;
+                    } else {
+                        const promptChoice = await showConfirmationModal({
+                            title: `${warningIcon}Preserve 'Date Added'?`,
+                            description: `Preserving 'Date Added' for ${trackCount} tracks takes longer due to in-place moves. Fast Sort is instant but resets timestamps to now.`,
+                            confirmText: "Keep 'Date Added'",
+                            neutralText: "Fast Sort",
+                            cancelText: "Cancel",
+                            checkboxLabel: "Remember my choice for large playlists"
+                        });
+                        if (promptChoice.action === 'cancel') {
+                            showNotification("Sorting cancelled.");
+                            if (!isHeadless && !progressCallback) resetButtons();
+                            return;
+                        }
+                        finalChoice = promptChoice.action === 'confirm' ? 'preserve' : 'fast';
+                        if (promptChoice.checked) {
+                            localStorage.setItem('sort-play-large-playlist-action', finalChoice);
+                        }
                     }
                 } else {
                     finalChoice = 'preserve';
                 }
             } else {
-                let isCurated = false;
                 const validDates = [];
                 for (let i = 0; i < trackCount; i++) {
                     const addedAt = tracks[i].addedAt;
@@ -41948,73 +44248,97 @@
                 }
                 validDates.sort((a, b) => a - b);
 
-                if (validDates.length >= 2) {
-                    const diffMs = validDates[validDates.length - 1] - validDates[0];
-                    if (diffMs < 60000) {
-                        isCurated = false;
-                    } else {
-                        let isBulkDumpFound = false;
-                        const bulkDumpIndices = new Set();
+                let isFreshBatch = false;
+                if (validDates.length >= 2 && (validDates.length / trackCount) >= 0.8) {
+                    const now = Date.now();
+                    const newestDate = validDates[validDates.length - 1];
+                    const FORTY_EIGHT_HOURS = 172800000;
+                    const TWO_HOURS = 7200000;
+
+                    if ((now - newestDate) <= FORTY_EIGHT_HOURS) {
+                        let maxInWindow = 0;
                         let left = 0;
                         for (let right = 0; right < validDates.length; right++) {
-                            while (validDates[right] - validDates[left] > 60000) {
+                            while (validDates[right] - validDates[left] > TWO_HOURS) {
                                 left++;
                             }
-                            const countInWindow = right - left + 1;
-                            if (countInWindow > 15) {
-                                isBulkDumpFound = true;
-                                for (let i = left; i <= right; i++) {
-                                    bulkDumpIndices.add(i);
-                                }
-                            }
+                            const count = right - left + 1;
+                            if (count > maxInWindow) maxInWindow = count;
                         }
-                        const curatedCount = validDates.length - bulkDumpIndices.size;
-                        if (isBulkDumpFound && curatedCount < 5) {
-                            isCurated = false;
-                        } else {
-                            isCurated = true;
+                        if ((maxInWindow / validDates.length) >= 0.98) {
+                            isFreshBatch = true;
                         }
                     }
-                } else {
-                    isCurated = false;
                 }
 
-                if (trackCount <= hardwareLimit) {
-                    finalChoice = isCurated ? 'preserve' : 'fast';
+                if (isFreshBatch) {
+                    finalChoice = 'fast';
                 } else {
-                    if (isCurated) {
+                    let isCurated = true;
+                    if (validDates.length >= 2) {
+                        const spanMs = validDates[validDates.length - 1] - validDates[0];
+                        const ONE_HOUR = 3600000;
+                        const ONE_DAY = 86400000;
+        
+                        if (spanMs < ONE_HOUR) {
+                            isCurated = false;
+                        } else {
+                            let maxInHour = 0;
+                            let left = 0;
+                            for (let right = 0; right < validDates.length; right++) {
+                                while (validDates[right] - validDates[left] > ONE_HOUR) {
+                                    left++;
+                                }
+                                const count = right - left + 1;
+                                if (count > maxInHour) maxInHour = count;
+                            }
+                            if (maxInHour / validDates.length >= 0.95 && spanMs < ONE_DAY) {
+                                isCurated = false;
+                            } else {
+                                isCurated = true;
+                            }
+                        }
+                    } else {
+                        isCurated = true;
+                    }
+        
+                    if (trackCount <= hardwareLimit) {
+                        finalChoice = isCurated ? 'preserve' : 'fast';
+                    } else {
                         const isExtreme = trackCount >= massiveThreshold;
                         const askChoice = await showConfirmationModal({
                             title: isExtreme ? `${warningIcon}Massive Playlist` : `${warningIcon}Keep 'Date Added'?`,
                             description: isExtreme 
-                                ? `Preserving 'Date Added' for ${trackCount} tracks may lag Spotify. Fast Sort is instant but resets the dates.`
-                                : `Fast Sort resets the 'Date Added' of all tracks. Preserving the original dates is slower.`,
-                            confirmText: "Fast Sort",
-                            neutralText: "Keep 'Date Added'",
+                                ? `Preserving 'Date Added' for ${trackCount} tracks requires heavy background processing to prevent freezing. Fast Sort is instant but resets dates to now.`
+                                : `Preserving 'Date Added' for ${trackCount} tracks takes longer due to in-place moves. Fast Sort is instant but resets timestamps to now.`,
+                            confirmText: "Keep 'Date Added'",
+                            neutralText: "Fast Sort",
                             cancelText: "Cancel",
                             checkboxLabel: "Remember my choice"
                         });
-
+        
                         if (askChoice.action === 'cancel') {
                             showNotification("Sorting cancelled.");
                             if (!isHeadless && !progressCallback) resetButtons();
                             return;
                         }
                         
-                        finalChoice = askChoice.action === 'confirm' ? 'fast' : 'preserve';
+                        finalChoice = askChoice.action === 'confirm' ? 'preserve' : 'fast';
                         if (askChoice.checked) {
                             preserveDateBehavior = finalChoice;
                             localStorage.setItem(STORAGE_KEY_PRESERVE_DATE_ADDED, finalChoice);
-                            if (isExtreme && finalChoice === 'preserve') {
-                                localStorage.setItem('sort-play-ignore-extreme-warning', 'true');
+                            localStorage.setItem('sort-play-large-playlist-action', finalChoice);
+                            if (isExtreme) {
+                                localStorage.setItem('sort-play-massive-playlist-action', finalChoice);
+                                if (finalChoice === 'preserve') {
+                                    localStorage.setItem('sort-play-ignore-extreme-warning', 'true');
+                                }
                             }
                         }
-                    } else {
-                        finalChoice = 'fast';
                     }
                 }
             }
-
+    
             if (finalChoice === 'preserve') {
                 useMoveOperation = true;
             }
@@ -42178,7 +44502,7 @@
           if (sortType === "playCount" || sortType === "popularity" || sortType === "releaseDate" || sortType === "trueReleaseDate") {
             sortedTracks = applyStandardSort(uniqueTracks, sortType, isAscending);
           } else if (sortType === "tasteMatch") {
-              const { trackGenreMap } = await fetchAllTrackGenres(uniqueTracks, updateProgressText);
+              const { trackGenreMap } = await fetchAllTrackGenres(uniqueTracks, updateProgressText, null, { spotify_track: true });
               
               updateProgressText("Audio...");
               const trackIds = uniqueTracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || t.uri.split(":")[2])).filter(Boolean);
@@ -42259,32 +44583,6 @@
                           return (colorA.s - colorB.s) * sortOrder;
                       }
                   });
-          } else if (sortType === "shuffle") {
-            const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
-
-            if (useEnergyWaveShuffle && !containsLocalFiles) {
-                updateProgressText("Analyzing...");
-                const trackIds = uniqueTracks.map(t => t.trackId);
-                const allStats = await getBatchTrackStats(trackIds);
-
-                const tracksWithAudioFeatures = uniqueTracks.map(track => {
-                    const stats = allStats[track.trackId] || {};
-                    return { ...track, ...stats, features: stats };
-                });
-                
-                const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-                const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
-                missingDataCount = tracksWithoutData.length;
-
-                const waveSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
-
-                sortedTracks = [...waveSortedTracks, ...shuffleArray(tracksWithoutData)];
-            } else {
-                if (useEnergyWaveShuffle && containsLocalFiles && !isHeadless) {
-                    showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
-                }
-                sortedTracks = shuffleArray(uniqueTracks);
-            }
         } else if (sortType === "deduplicateOnly") {
             if (removedTracks.length === 0) {
                 showNotification("No duplicate tracks found.");
@@ -42831,19 +45129,6 @@
                 showNotification(error.message);
                 return;
               }
-        } else if (sortType === "lastScrobbled") { 
-            try {
-                const result = await handleLastScrobbledSorting(
-                    tracks, (progress) => { updateProgressText(`${progress}%`); }, isAscending
-                );
-                sortedTracks = result.sortedTracks;
-                removedTracks = result.removedTracks;
-                updateProgressText("100%");
-            } catch (error) {
-                if (!isHeadless && !progressCallback) resetButtons();
-                showNotification(error.message, true);
-                return;
-            }
         }
       }
 
@@ -43424,7 +45709,7 @@
                   Spicetify.Platform.History.push(modifiedPlaylistOriginalPath); 
               }
           } else if (newPlaylistObjectForNavigation) { 
-              await navigateToPlaylist(newPlaylistObjectForNavigation);
+              if (!isHeadless) await navigateToPlaylist(newPlaylistObjectForNavigation);
           }
       }
 
@@ -43767,7 +46052,7 @@
     return journeyMap;
   }
   
-  async function energyWaveSort(tracks, persona = 'wave') {
+  async function energyWaveSort(tracks, persona = 'wave', options = {}) {
     if (tracks.length < 3) {
         return tracks;
     }
@@ -43923,7 +46208,13 @@
         else if (targetValenceTier === 'Neutral-Valence') { idealValenceMin = 0.33; idealValenceMax = 0.66; }
         else { idealValenceMin = 0.0; idealValenceMax = 0.33; }
 
-        const candidates = trackProfiles.map(t => {
+        let pool = trackProfiles;
+        if (options.anchorUris && options.anchorUris.size > 0) {
+            const anchorMatches = trackProfiles.filter(t => options.anchorUris.has(t.uri));
+            if (anchorMatches.length > 0) pool = anchorMatches;
+        }
+
+        const candidates = pool.map(t => {
             let score = 0;
             
             score += getMoodMatchScore(t.profile.moodBucket, targetStart);
