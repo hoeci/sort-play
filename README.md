@@ -31,12 +31,14 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 *   **Popularity:** Spotify's internal 0-100 popularity index.
 *   **Release Date:** The track's official album release date.
 *   **True Release Date:** The track's actual historical debut. Automatically bypasses later re-issues, compilations, and remasters to find the original release date, while preserving accurate dates for live tracks and remixes (Note: accuracy is limited to the oldest available track on Spotify and may not be 100% accurate).
+*   **Artist & Release Date:** Sorts tracks alphabetically by artist, then chronologically by release date.
 *   **Last.fm Scrobbles:** The track's total global scrobbles on Last.fm.
 *   **My Scrobbles:** Your personal scrobble count for each track (requires Last.fm username).
 *   **Scrobble Range:** Your personal scrobbles within a specific custom date range (requires Last.fm username).
 *   **Last Scrobbled:** The date you personally last scrobbled a track (requires Last.fm username).
 *   **Taste Match:** Sorts tracks by how well they align with your unique listening history and personal taste profile.
 *   **Energy Wave:** Creates a dynamic listening journey by arranging tracks to smoothly transition through different energy levels and moods.
+*   **Liked Status:** Sorts tracks based on whether they are liked in your library.
 *   **Album Color:** The dominant color of the album artwork, with modes for perceptual grouping or a pure hue gradient.
 *   **Audio Features:**
     *   **Tempo (BPM):** The speed of the track measured in beats per minute.
@@ -45,6 +47,7 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
     *   **Valence:** The musical positivity conveyed by a track (happy vs. sad).
     *   **Acousticness:** The likelihood that a track was recorded with acoustic instruments.
     *   **Instrumentalness:** The amount of vocals present (higher values indicate more instrumental tracks).
+    *   **Key (Camelot):** The musical key of the track arranged harmonically using the Camelot wheel.
 </details>
 
 <details>
@@ -60,9 +63,9 @@ Apply instant filters to your current view without opening complex menus.
 *   **Followed Artists:**
     *   **Followed (Main/Any):** Keep tracks where you follow the primary artist or any credited artist.
     *   **Not Followed:** Remove tracks by artists you already follow to find new music.
-*   **Release Type:** Isolate specific release formats. Options include Albums, EPs, Singles, Compilations, and various combinations (e.g., "Albums & EPs").
+*   **Release Type:** Isolate specific release formats. Options include Albums, EPs, Singles, Compilations, and various combinations (e.g., "Albums & EPs"), with an optional toggle to group tracks by album.
 *   **Remove Trashed:** Instantly remove songs you've banned using the Trashbin extension.
-*   **Exclude via Playlist:** Filter out tracks that already exist in another playlist of your choice.
+*   **Exclude via Playlist:** Filter out tracks that already exist in another playlist or folder of your choice.
 </details>
 
 <details>
@@ -70,10 +73,10 @@ Apply instant filters to your current view without opening complex menus.
 <br>
 
 Enhance your music views with more information.
-*   **Playlist Columns:** Add up to **two** extra data columns to any playlist view.
+*   **Playlist Columns:** Add up to **two** extra data columns to any playlist or search view.
 *   **Album & Artist Columns:** Add one extra data column to album and artist pages.
-*   **Data Types:** Display Play Count, Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence and DJ Info (Key + BPM + Energy).
-*   **Custom Formatting:** Configure the format for release dates and how your personal scrobbles are displayed (number vs. checkmark).
+*   **Data Types:** Display Play Count, Release Date, True Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info (Key + BPM + Energy).
+*   **Custom Formatting:** Configure formats for release dates, personal scrobbles (number vs. checkmark), keys (Camelot, Standard, Open Key), and Last Scrobbled (relative vs. date).
 *   **Quick Column Switching:** Click the header of any extra column to instantly switch its data type.
 *   **Interactive Cells:** Click on a True Release Date cell to instantly navigate to that exact album. Click on Scrobble data cells to instantly view detailed Last.fm stats.
 </details>
@@ -82,11 +85,12 @@ Enhance your music views with more information.
 <summary><b>➕ UI & Enhancements</b> - Genre tags, now playing data, old like button, and other tweaks.</summary>
 <br>
 
-*   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, and Now Playing sidebar.
-*   **Interactive Genre Tags:** Displays clickable tags on the Now Playing bar and Artist pages linking to EveryNoise.
-*   **Now Playing Data:** Display extra track info like Release Date, Play Count, and BPM directly in the player bar.
+*   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, Now Playing sidebar, and  track previews feed, with intelligent ISRC matching.
+*   **Interactive Genre Tags:** Displays clickable tags on the Now Playing bar and Artist pages linking to EveryNoise playlists or Spotify search.
+*   **Now Playing Data:** Display extra track info (Release Date, Play Count, BPM, Key, Energy, Scrobbles, etc.) directly in the player bar next to the title or artist, with customizable formatting and separators.
 *   **Configurable Sorting:** Easily toggle ascending/descending order for all applicable sort types.
-*   **Last.fm Overrides Manager:** Manually fix mismatched Last.fm links, complete with JSON import/export for backups.
+*   **Last.fm Overrides Manager:** Manually fix mismatched Last.fm track links, edit overrides, and import/export override backups as JSON.
+*   **Update History:** View changelogs and release commits directly inside the extension settings.
 *   **Live Chat:** Access a live chat panel directly within the settings to talk with other Sort-Play users.
 </details>
 
@@ -95,11 +99,11 @@ Enhance your music views with more information.
 <br>
 
 Access tools directly from Spotify's native right-click menus.
-*   **Track Menu: Show Genres:** Instantly view detailed, multi-source genre tags for any track in a popup window.
-*   **Track Menu: Last.fm Details:** View Last.fm listeners, scrobbles, track tags, and Shoutbox comments directly inside Spotify.
-*   **Artist Menu: Last.fm Details:** View global listeners, total scrobbles, and top community tags for any artist.
-*   **Artist Menu: Create Discography:** Generate a fully sorted and deduplicated discography playlist right from an artist's context menu.
-*   **All Menus: Shuffle & Play:** Instantly shuffle and play any playlist, album, or artist (with optional Vibe & Flow) directly from the right-click menu.
+*   **Create Discography (Artist Menu):** Generate a fully sorted and deduplicated discography playlist right from an artist's context menu.
+*   **Show Genres (Track/Playlist/Album Menus):** View detailed, multi-source genre tags for individual tracks, or open an aggregated breakdown of ranked genres across entire playlists and albums with search filtering, source indicators, and percentage bars.
+*   **Last.fm Details (Track Menu):** View Last.fm listeners, scrobbles, track tags, listening trends, and Shoutbox comments directly inside Spotify, with manual link override support.
+*   **Last.fm Details (Artist Menu):** View global listeners, total scrobbles, and top community tags for any artist.
+*   **Shuffle & Play (All Menus):** Instantly shuffle and play any playlist, album, or artist (with optional Vibe & Flow) directly from the right-click menu.
 </details>
 
 <details>
@@ -123,7 +127,7 @@ Apply any sort or filter option while on an Artist page to automatically fetch a
 
 Randomize your listening with advanced options.
 *   **Intelligent Shuffle:** Prevents multiple songs by the same artist from playing back-to-back for a more varied listening session.
-*   **Vibe & Flow Shuffle:** An optional mode that creates a dynamic listening journey by arranging shuffled tracks based on their energy and mood.
+*   **Vibe & Flow Shuffle:** An optional mode that creates a dynamic listening journey by arranging shuffled tracks based on energy wave patterns, tempo transitions, and harmonic key matching.
 </details>
 
 <details>
@@ -145,7 +149,9 @@ Generate a variety of curated playlists with a single click.
         *   **Tastemaker Profile:** Enter a Last.fm username to clone their top tracks, loved tracks, and obsessions into a fresh discovery playlist.
         *   **Neighbors Mix:** A balanced mix of obsessions, trends, and favorites from your Last.fm neighbors, filtered for discovery.
 *   **Automated Updates:** Schedule your dedicated playlists to update automatically (e.g., daily, weekly on Fridays) to always keep them fresh.
+*   **Advanced Filtering for New Releases:** Filter new releases by keywords, track versions (Live, Remix, Acoustic, Instrumental), specific followed artists, and album limits.
 *   **Customizable Limits:** Configure the size of your Top Tracks and Discovery playlists, the time window for New Releases, and the number of tracks to pull from each new album.
+*   **Appearance Customization:** Set custom names and upload custom cover images for any dedicated playlist card.
 </details>
 
 <details>
@@ -153,18 +159,20 @@ Generate a variety of curated playlists with a single click.
 <br>
 
 Build powerful, self-updating playlists that manage themselves.
-*   **Multi-Source:** Combine tracks from any number of playlists, artists, albums, folders, or your Liked Songs.
-*   **Automated Scheduling:** Set a custom schedule (e.g., every 3 hours, daily, weekly on Fridays) for automatic updates.
-*   **Advanced Filtering:** Automatically filter tracks based on rules:
-    *   Exclude songs you have already liked.
-    *   Exclude songs you have already listened to (via Last.fm scrobbles).
-    *   Filter by Genre: Include or exclude specific genres.
-    *   Exclude songs based on keywords or a maximum play count.
+*   **Multi-Source:** Combine tracks from any number of playlists, artists, albums, folders, Liked Songs, or Local Files.
+*   **Automated Scheduling:** Set an update schedule (e.g., every 3 hours, daily, weekly on Fridays) or custom intervals, with on-demand manual runs.
+*   **Customizable Sorting:** Apply any sort method (Play Count, Release Date, Scrobbles, Taste Match, Audio Features, Shuffle, etc.) with standard or reversed direction, plus track deduplication.
+*   **Advanced Filtering:** Automatically filter source tracks based on rules:
+    *   **Track Status:** Filter by Liked Status, Followed Artists, and Scrobble History (Last.fm).
+    *   **Range Rules:** Filter by Play Count, Scrobbles, Release Date, Date Added, Duration, Popularity, and Audio Features (Tempo, Energy, Danceability, Valence).
+    *   **Keywords:** Keep or exclude matches across track title, album, and artist, with whole-word matching.
+    *   **Genre Filtering:** Include or exclude genres with automatic source scanning, genre grouping, and "match all" mode.
+    *   **Filter Presets:** Save and load filter configurations.
 *   **Flexible Update Modes:**
     *   **Replace:** Overwrites all tracks in the playlist with fresh ones on each update.
     *   **Merge:** Adds new tracks to the existing ones and re-sorts the entire playlist.
     *   **Append:** Adds new tracks to the top of the playlist without removing old ones.
-*   **Track Sampling (optional):** Limit the number of random tracks pulled from each source on every update to keep the playlist fresh and varied.
+*   **Track Sampling:** Limit the number or percentage of random tracks pulled from each source on every update, with automatic rotation to prevent repeats.
 </details>
 
 <details>
@@ -173,7 +181,7 @@ Build powerful, self-updating playlists that manage themselves.
 
 Generate a dashboard of the current tracklist (Playlist/Artist/Album) with visual insights and charts.
 *   **Top Artists, Albums & Genres:** Explore interactive Treemaps showcasing the most prominent artists and albums, alongside genre distributions.
-*   **Quick Stats:** View metrics like total duration, average popularity, and total/median streams.
+*   **Quick Stats:** View metrics like total duration, and total/median streams.
 *   **Timeline & Eras:** See when the tracks were released using a Release Year Bar Chart, or use the Decades Analysis to see the defining eras (e.g., 80s, 90s, 00s) of the list.
 *   **Vibe Map (Mood Analysis):** View the emotional tone of the tracks via a categorized Mood Ring, or explore the interactive Heatmap that maps track density based on Positivity (Valence) vs. Intensity (Energy).
 *   **Audio Profile & Musicality:** View the Tempo (BPM) distribution, Top Musical Keys displayed on an interactive Camelot Wheel, and a Radar Chart breaking down acousticness, danceability, energy, and more.
@@ -185,7 +193,8 @@ Generate a dashboard of the current tracklist (Playlist/Artist/Album) with visua
 <br>
 
 Analyze and filter tracks based on their raw emotional tone and audio features.
-*   **Grid Mode:** Select multiple vibes (e.g., Upbeat, Chill, Focus) to easily filter and include tracks that match any of the selected moods.
+*   **9 Distinct Vibes:** Filter across Workout (Hype), Party, Focus, Chill, Late Night Drive, Morning Coffee, Gaming, Rainy, and Festival (Pregame).
+*   **Grid Mode:** Select multiple vibes to easily filter and include tracks that match any of the selected moods.
 *   **Mixer Mode:** Act like a DJ by dialing in exact percentages for each vibe to craft the perfect blended playlist.
 *   **Match Strictness:** Choose between Broad, Balanced, or Strict match levels to control how closely tracks must fit your chosen vibes.
 </details>
@@ -195,13 +204,15 @@ Analyze and filter tracks based on their raw emotional tone and audio features.
 <br>
 
 A completely redesigned, powerful modal to meticulously filter any playlist or discography.
-*   **Range Sliders:** Apply precise range sliders for attributes like Release Date, Duration, Play Count, Popularity, and Audio Features.
+*   **Range Sliders:** Apply precise dual range sliders with empty-range indicators for attributes like Release Date, Date Added, Duration, Play Count, Popularity, Scrobbles, and Audio Features.
 *   **Track Versions & Status:** Filter precisely by Live, Remix, Acoustic, and Instrumental versions, as well as Explicit, Liked, Followed, and Scrobble History status.
-*   **Release Types & Quick Actions:** Instantly isolate Albums, EPs, Singles, or Compilations, and apply quick deduplication directly in the modal.
+*   **Release Types & Quick Actions:** Instantly isolate Albums, EPs, Singles, or Compilations, apply quick deduplication, one track per artist, and remove trashed songs.
+*   **Harmonic Key Filtering:** Filter tracks by musical key using an interactive Camelot wheel with optional harmonic mixing.
 *   **Keyword Filtering:** Use keywords to filter by track title, album, and artist, with options to keep or exclude matches and match whole words.
 *   **Interactive Tracklist:** View, sort, and manually remove tracks from your filtered selection in a detailed Tracklist before creating the playlist.
 *   **Save & Load Keywords:** Save your favorite keyword sets into named groups and load them instantly for future use.
 *   **Integrated Mini-Player:** Preview and listen to tracks directly within the Tracklist to help make your selections.
+*   **Flexible Output:** Save as a new playlist, modify the current playlist, or send directly to the playback queue.
 </details>
 
 <details>
@@ -209,13 +220,13 @@ A completely redesigned, powerful modal to meticulously filter any playlist or d
 <br>
 
 Filter any playlist or discography by genre with a powerful, interactive modal.
-*   **Multi-Source Data:** Uses lightning-fast Spotify Track genres by default, with optional toggles to use genre data from Last.fm and Deezer.
+*   **Multi-Source Data:** Uses lightning-fast Spotify Track genres by default, with optional toggles to use genre data from Last.fm, Deezer, and EveryNoise.
 *   **Cloud Caching:** Uses a smart, community-driven database. Once a track is processed by any user, its genres load instantly for everyone else.
 *   **Intelligent Mapping:** Automatically groups hundreds of specific sub-genres into broader, easy-to-understand main genres.
 *   **Include & Exclude Modes:** Offers dual-action filtering to include genres (left-click) or exclude them (right-click).
 *   **Intuitive Interface:** Easily browse, search, and select genres, complete with track counts for each genre and a "select all" option.
 *   **Match All Option:** An advanced setting to only include tracks that match *all* of your selected genres instead of just any.
-*   **Sort Your Selection:** Choose how to sort the final filtered playlist, whether by play count, release date, or shuffle.
+*   **Sort & Output Selection:** Choose how to sort and output the filtered tracks, with options to create a new playlist, modify the current playlist, or add to queue.
 </details>
 
 <details>
@@ -236,9 +247,10 @@ Use AI to select specific songs from your current list based on your prompt.
 <br>
 
 *   **Universal Support:** Fully supported across sorting, custom/genre filtering, dynamic playlists, and analysis tools. Automatically converts local tracks in playlists to their Spotify versions on-the-fly.
-*   **Dedicated Conversion Tool:** Convert your entire 'Local Files' library into a new, streamable Spotify playlist.
+*   **Dedicated Conversion Tool:** Convert your entire 'Local Files' library into a new, streamable Spotify playlist directly from the menu.
 *   **Detailed Report:** After converting your Local Files, view a report of which tracks were found and which couldn't be matched.
 *   **Export Report:** Download the detailed conversion report as a JSON file for your records.
+*   **Configurable Handling:** Choose how to handle local tracks during sorting (convert and keep, convert and remove, or preserve original local files).
 </details>
 
 <details>
@@ -247,7 +259,7 @@ Use AI to select specific songs from your current list based on your prompt.
 
 Choose what happens after sorting and how your library is managed.
 *   **Save as New Playlist:** Create a brand new playlist with the sorted tracks.
-*   **Modify Current Playlist:** Directly overwrite your own playlist with the sorted version.
+*   **Modify Current Playlist:** Directly update your own playlist with the sorted order while preserving original "Date Added" dates.
 *   **Add to Queue:** Send the sorted tracks directly to your playback queue.
 *   **Playlist Organization:** Automatically organizes all created playlists into a dedicated "Sort-Play Library" folder.
 *   **Open After Sorting:** Automatically navigate to the new or modified playlist once the process is complete.
