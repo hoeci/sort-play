@@ -17,19 +17,19 @@
 ## ⚡️ Features
 
 ### ➕ Comprehensive Sorting
-Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, True Release Date, Last.fm Scrobbles, My Scrobbles, Last Scrobbled, Taste Match, Energy Wave, Album Color, and audio features (Tempo, Energy, etc.).
+Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, True Release Date, Artist & Release Date, Last.fm Scrobbles, My Scrobbles, Scrobble Range, Last Scrobbled, Taste Match, Energy Wave, Liked Status, Album Color, and audio features (Tempo, Key, Energy, etc.).
 
 ### ➕ Quick Filters
-Instantly apply filters. Deduplicate tracks, keep one track per artist, keep only singles or albums, exclude liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist.
+Instantly apply filters. Deduplicate tracks, keep one track per artist, filter by followed artists, filter by release type (albums, EPs, singles, compilations), exclude or keep liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist or folder.
 
 ### ➕ Extra Data Columns
-Add up to two extra data columns to playlists and one to albums/artists. Display Play Count, Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info with custom formatting.
+Add up to two extra data columns to playlists or search views, and one to albums/artists. Display Play Count, Release Date, True Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info with custom formatting.
 
 ### ➕ UI & Enhancements
-Old Like Button returns the heart icon. Display Now Playing Data and Interactive Genre Tags in the player bar.
+Old Like Button returns the heart icon in track lists, player bar, and Now Playing views. Display Now Playing Data and Interactive Genre Tags in the player bar.
 
 ### ➕ Context Menus
-Access powerful tools directly from Spotify's right-click menus. View detailed track genres or Last.fm stats, generate a full artist discography, or instantly shuffle and play any playlist or album.
+Access powerful tools directly from Spotify's right-click menus. View detailed multi-source genres for tracks, playlists, and albums, explore Last.fm stats, generate a full artist discography, or instantly shuffle and play any playlist or album.
 
 ### ➕ Full Artist Discography
 Load complete collections from all releases with intelligent deduplication that keeps the most popular versions.
@@ -38,22 +38,22 @@ Load complete collections from all releases with intelligent deduplication that 
 Intelligent Shuffle prevents artist repeats. Vibe & Flow Shuffle, if enabled, creates dynamic listening journeys based on energy and mood.
 
 ### ➕ Dedicated Playlist Creation
-Generate My Top Tracks, New Releases from Followed Artists, Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery), Genre Tree/Random Explorer, and Last.fm Generators (Infinite Vibe, Tastemaker Profile, Neighbors Mix) with automated updates and customizable limits.
+Generate My Top Tracks, New Releases from Followed Artists, Discovery Mixes (Recent Taste, All-Time Taste, Pure Discovery), Random Genre Explorer, and Last.fm Generators (Infinite Vibe, Tastemaker Profile, Neighbors Mix) with automated updates, custom appearances, and customizable limits.
 
 ### ➕ Dynamic Playlists
-Self-updating playlists from multiple sources with automated scheduling. Advanced filtering excludes liked/listened tracks and applies genre or keyword rules. Choose Replace, Merge, or Append update modes with optional track sampling.
+Self-updating playlists from multiple sources with automated scheduling. Apply custom sorting and filter by track status, range rules, keywords, and genres. Choose Replace, Merge, or Append update modes with track sampling.
 
 ### ➕ Playlist Analyzer
 Get visual insights and charts for any playlist, album, or artist. Includes Top Artists & Albums Treemaps, Quick Stats, Timeline & Eras (release year distributions), Vibe Maps (including a Heatmap of Positivity vs. Energy), Audio Profiles (Radar charts, Tempo, Musical Keys), and a Setting Predictor.
 
 ### ➕ Vibe Filter
-Filter tracks by mood using an interactive grid or mixer. Dial in exact percentages of specific vibes (Upbeat, Chill, Focus, etc.) and adjust match strictness (Broad, Balanced, Strict) to craft the perfect playlist.
+Filter tracks across 9 distinct vibe categories (Workout, Party, Focus, Chill, Drive, Morning, Gaming, Rainy, Pregame) using an interactive grid or mixer. Dial in exact percentages for each vibe and adjust match strictness (Broad, Balanced, Strict) to craft the perfect playlist.
 
 ### ➕ Advanced Custom Filter
-Filter by range sliders (Release Date, Duration, Play Count, Popularity, Audio Features), track versions & status (Live, Remix, Acoustic, Instrumental, Explicit, Liked, Followed, Scrobble History), release types, and keywords. Apply quick deduplication and view results in an interactive tracklist with an integrated mini-player.
+Filter by range sliders (Release Date, Date Added, Duration, Play Count, Popularity, Scrobbles, Audio Features), harmonic keys (Camelot wheel), track versions & status, release types, and keywords. Apply quick actions (deduplication, one track per artist) and view results in an interactive tracklist with an integrated mini-player.
 
 ### ➕ Genre Filtering
-Filter by genre using Spotify Track data (with optional toggles for Last.fm and Deezer). Browse with track counts, search, and "match all" option.
+Filter by genre using Spotify Track data (with optional toggles for Last.fm, Deezer, and EveryNoise). Browse with track counts, search, include/exclude modes, and "match all" option.
 
 ### ➕ AI Pick
 Use AI to select specific songs from your current list based on natural language prompts. Powered by Google Gemini with customizable instructions, model selection, and data toggles.
@@ -62,7 +62,7 @@ Use AI to select specific songs from your current list based on natural language
 Fully supported across sorting, custom/genre filtering, dynamic playlists, and analysis tools. Automatic conversion to Spotify tracks when processing. Dedicated tool converts Local Files library to a Spotify playlist with detailed export reports.
 
 ### ➕ Flexible Output Options
-Save as new playlist, modify current playlist, add to queue. Configure playlist privacy and automatic titling. Automatic playlist organization into "Sort-Play Library" folder.
+Save as new playlist, modify current playlist while preserving "Date Added" dates, add to queue. Configure playlist privacy and automatic titling. Automatic playlist organization into "Sort-Play Library" folder.
 
 ## 📷 Screenshots 
 <table>
