@@ -51,11 +51,15 @@ Sort playlists, albums, and artist pages by a wide range of metrics.
 </details>
 
 <details>
-<summary><b>➕ Quick Filters</b> - Instantly filter by liked status, followed artists, release type, and more.</summary>
+<summary><b>➕ Quick Filters</b> - Filter duplicates, unavailable tracks, release types, followed artists, and more.</summary>
 <br>
 
-Apply instant filters to your current view without opening complex menus.
-*   **Remove Duplicates:** Instantly identify and remove duplicate tracks from the current list.
+Clean, filter, and audit your playlists with quick actions and interactive review modals.
+*   **Remove Duplicates:** Opens an interactive Duplicate Tracks Manager to audit, preview, and resolve duplicates before modifying your library:
+    *   **Exact Duplicates:** Verified duplicates pre-selected for removal, sorted from highest review priority down to 100% identical recordings.
+    *   **Possible Duplicates:** Detects potential duplicate candidates, ranked from most likely duplicate to least with similarity explanation badges.
+    *   **Interactive Review Tools:** Side-by-side play count, ISRC, and duration comparisons, built-in audio previewing, a "Keep ⇄" swap button to choose which version stays, and flexible actions to remove duplicates from playlists, unlike them from Liked Songs, create a clean deduplicated copy, archive duplicates into a backup playlist, or export metadata as Text/JSON.
+*   **Remove Unavailable:** Find and manage regionally unplayable (greyed-out) songs through a dedicated audit modal. Selectively remove them from your playlist, unlike them from Liked Songs, create a clean copy, export as Text/JSON, or archive them into a backup playlist.
 *   **One Track per Artist:** Keep only a single track for each unique artist, automatically prioritizing the most played or most popular track.
 *   **Liked Status:**
     *   **Remove Liked:** Remove tracks you have already saved to your library (uses intelligent ISRC matching).
@@ -85,7 +89,7 @@ Enhance your music views with more information.
 <summary><b>➕ UI & Enhancements</b> - Genre tags, now playing data, old like button, and other tweaks.</summary>
 <br>
 
-*   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, Now Playing sidebar, and  track previews feed, with intelligent ISRC matching.
+*   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, Now Playing sidebar, and track previews feed, with intelligent ISRC matching. Right-clicking the like button opens a menu to view alternate versions, jump to albums, and copy ISRCs.
 *   **Interactive Genre Tags:** Displays clickable tags on the Now Playing bar and Artist pages linking to EveryNoise playlists or Spotify search.
 *   **Now Playing Data:** Display extra track info (Release Date, Play Count, BPM, Key, Energy, Scrobbles, etc.) directly in the player bar next to the title or artist, with customizable formatting and separators.
 *   **Configurable Sorting:** Easily toggle ascending/descending order for all applicable sort types.
