@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.6.0";
+  const SORT_PLAY_VERSION = "6.7.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -71,7 +71,7 @@
   const STORAGE_KEY_DYNAMIC_UPDATE_SOURCE = "sort-play-dynamic-update-source";
   const STORAGE_KEY_RANDOM_GENRE_HISTORY = "sort-play-random-genre-history";
   const STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE = "sort-play-use-energy-wave-shuffle";
-  const STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT = "sort-play-energy-wave-shuffle-limit";
+  const STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT = "sort-play-energy-wave-shuffle-size";
   const STORAGE_KEY_SHOW_NOW_PLAYING_DATA = "sort-play-show-now-playing-data";
   const STORAGE_KEY_NP_CONFIG = "sort-play-np-config-v2";
   const STORAGE_KEY_NOW_PLAYING_DATA_TYPE = "sort-play-now-playing-data-type";
@@ -144,6 +144,8 @@
   const STORAGE_KEY_CF_KEY_MODE = "sort-play-cf-key-mode";
   const STORAGE_KEY_PRESERVE_DATE_ADDED = "sort-play-preserve-date-added";
   const STORAGE_KEY_DEDICATED_OVERRIDES = "sort-play-dedicated-overrides";
+  const STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE = "sort-play-backup-unavailable-on-remove";
+  const STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE = "sort-play-backup-duplicates-on-remove";
 
   const SYNCABLE_SETTINGS_KEYS = [
     STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
@@ -202,13 +204,14 @@
     STORAGE_KEY_LOCAL_FILES_HANDLING, STORAGE_KEY_FOLLOWED_RELEASES_CONFIG,
     STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM,
     STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
-    STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_DEDICATED_OVERRIDES
+    STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_DEDICATED_OVERRIDES, STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
+    STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE
   ];
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
     { id: "gemini-flash-latest", label: "Gemini Flash Latest", requiresCustomKey: false },
-    { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash", requiresCustomKey: false },
-    { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", requiresCustomKey: false },
+    { id: "gemini-3.8-flash", label: "Gemini 3.8 Flash", requiresCustomKey: false },
+    { id: "gemini-3.7-flash", label: "Gemini 3.7 Flash", requiresCustomKey: false },
     { id: "gemini-flash-lite-latest", label: "Gemini Flash-Lite Latest", requiresCustomKey: false }
   ];
   const DEFAULT_AI_MODEL = AI_MODELS[1].id;
@@ -254,7 +257,7 @@
   let colorSortMode = 'perceptual';
   let discoveryStrictAlbumExclusion = false;
   let useEnergyWaveShuffle = false;
-  let energyWaveShuffleLimit = 6000;
+  let energyWaveShuffleLimit = 'all';
   let includeSongStats = true;
   let includeLyrics = false;
   let useLfmGateway = false;
@@ -335,6 +338,8 @@
   let likeButton_tracklistObserver;
   let likeButton_observerInitialized = false;
   let likeButton_connectObserver = () => {};
+  let likeButton_hideTooltip = () => {};
+  let closeLikeButtonMenu = () => {};
   let updateDebounceTimeout;
   let mountLikeButton_debounceTimer = null;
   let mountLikeButton_isRunning = false;
@@ -378,10 +383,21 @@
   const lfmDetailsCache = new Map();
   const spotifyImageCache = new Map();
   const dominantColorCache = new Map();
+  let cachedNativeMenuStyles = null;
+  let cachedLikedSongs = null;
+  let cachedLikedSongsTimestamp = 0;
+  let activeLikedSongsPromise = null;
+  const CACHE_EXPIRE_LIKED_SONGS = 2 * 60 * 1000;
+
+  function invalidateLikedSongsCache() {
+    cachedLikedSongs = null;
+    cachedLikedSongsTimestamp = 0;
+    activeLikedSongsPromise = null;
+  }
 
   let cachedTasteProfile = null;
   let cachedTasteProfileTimestamp = 0;
-  const TASTE_PROFILE_VERSION = "4";
+  const TASTE_PROFILE_VERSION = "5";
   const TASTE_PROFILE_UPDATE_INTERVAL = 24 * 60 * 60 * 1000;
   const TASTE_PROFILE_FULL_REBUILD_INTERVAL = 30 * 24 * 60 * 60 * 1000;
   let isBuildingTasteProfile = false;
@@ -412,6 +428,100 @@
   const STATS_URL = "https://sp-stats.niko2nio2.workers.dev";
   const TOKEN_SP_PROXY_URL = "https://sp-token-proxy.niko2nio2.workers.dev"; 
   const CHAT_API_URL = "https://sort-play-chat.niko2nio2.workers.dev";
+
+  const GRAPHQL_DEFINITIONS = {
+    queryArtistDiscographyAll: {
+      name: "queryArtistDiscographyAll",
+      operation: "query",
+      sha256Hash: "5e07d323febb57b4a56a42abbf781490e58764aa45feb6e3dc0591564fc56599",
+      value: null
+    },
+    queryArtistAppearsOn: {
+      name: "queryArtistAppearsOn",
+      operation: "query",
+      sha256Hash: "9a4bb7a20d6720fe52d7b47bc001cfa91940ddf5e7113761460b4a288d18a4c1",
+      value: null
+    },
+    queryArtistOverview: {
+      name: "queryArtistOverview",
+      operation: "query",
+      sha256Hash: "7bdc7185c219898c7a2b659cfff2f8ce066dd2d9a97f8b7c4bde92ccfec28310",
+      value: null
+    },
+    searchTracks: {
+      name: "searchTracks",
+      operation: "query",
+      sha256Hash: "59ee4a659c32e9ad894a71308207594a65ba67bb6b632b183abe97303a51fa55",
+      value: null
+    },
+    searchDesktop: {
+      name: "searchDesktop",
+      operation: "query",
+      sha256Hash: "db61238974d27839a136c9dc02bfdbe3fab7635f21cf85976ebff9a1ee281345",
+      value: null
+    },
+    userTopContent: {
+      name: "userTopContent",
+      operation: "query",
+      sha256Hash: "49ee15704de4a7fdeac65a02db20604aa11e46f02e809c55d9a89f6db9754356",
+      value: null
+    },
+    queryArtistRelated: {
+      name: "queryArtistRelated",
+      operation: "query",
+      sha256Hash: "3d031d6cb22a2aa7c8d203d49b49df731f58b1e2799cc38d9876d58771aa66f3",
+      value: null
+    },
+    fetchExtractedColorForPlaylistEntity: {
+      name: "fetchExtractedColorForPlaylistEntity",
+      operation: "query",
+      sha256Hash: "b2d6d99fb6237952dfa6638385f9c6085f1b1fb9d0468753ca6ad98ff45adc6f",
+      value: null
+    },
+    fetchExtractedColorForAlbumEntity: {
+      name: "fetchExtractedColorForAlbumEntity",
+      operation: "query",
+      sha256Hash: "b2d6d99fb6237952dfa6638385f9c6085f1b1fb9d0468753ca6ad98ff45adc6f",
+      value: null
+    },
+    fetchExtractedColorForArtistEntity: {
+      name: "fetchExtractedColorForArtistEntity",
+      operation: "query",
+      sha256Hash: "b2d6d99fb6237952dfa6638385f9c6085f1b1fb9d0468753ca6ad98ff45adc6f",
+      value: null
+    },
+    getAlbum: {
+      name: "getAlbum",
+      operation: "query",
+      sha256Hash: "6a74b456cd1735c9193d9e8ec8cc5184cad7ce13572210315229db3975964361",
+      value: null
+    },
+    queryAlbumTracks: {
+      name: "queryAlbumTracks",
+      operation: "query",
+      sha256Hash: "6a74b456cd1735c9193d9e8ec8cc5184cad7ce13572210315229db3975964361",
+      value: null
+    },
+    getTrack: {
+      name: "getTrack",
+      operation: "query",
+      sha256Hash: "a8ef9e9f02b836feb0da3003c31dbb30decc6f4b473ef89ca88c882386d668de",
+      value: null
+    },
+    decorateContextTracks: {
+      name: "decorateContextTracks",
+      operation: "query",
+      sha256Hash: "383de00240775c39a6afe0b1055dc562b2a3930894201f9762f3fc32a74971c7",
+      value: null
+    }
+  };
+
+  GraphQL.Definitions = GraphQL.Definitions || {};
+  for (const [key, def] of Object.entries(GRAPHQL_DEFINITIONS)) {
+    if (!GraphQL.Definitions[key]) {
+      GraphQL.Definitions[key] = def;
+    }
+  }
   
   const DEVELOPER_HAS_SPOTIFY_PREMIUM = false;
   const SPOTIFY_TRACK_GENRES_WORKING = true;
@@ -591,6 +701,7 @@
   const plusSvgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>`;
   const removeSvgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
   const checkSvgIcon = `<svg viewBox="0 0 24 24" width="14px" height="14px" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const lockIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="4"/><path d="M7 10V8a5 5 0 0 1 10 0v2"/></svg>`;
   
   const VIBE_DEFS = [
     { id: 'workout', label: 'Hype / Adrenaline', icon: flameSvg, color: '#D16666', desc: 'High energy, fast tempo, and a heavy beat to get your adrenaline pumping and keep you energized.', long_desc: 'Focuses on high energy, fast tempos, and strong rhythmic elements. Tracks with heavy beats and intense drops perfect for feeling unstoppable, powering through tasks, or intense exercise.' },
@@ -603,6 +714,15 @@
     { id: 'rainy', label: 'Rainy / Melancholy', icon: rainyIconSvg, color: '#4A6FA5', desc: 'Sad, slow-tempo, and moody tracks ideal for quiet, thoughtful moments or a grey day.', long_desc: 'Low energy combined with low valence. Moody, sad, and thoughtful tracks ideal for quiet moments or staying indoors on a rainy day.' },
     { id: 'pregame', label: 'Festival / Anthem', icon: pregameIconSvg, color: '#F15BB5', desc: 'Very high energy and highly danceable tracks with massive drops designed to bring pure excitement.', long_desc: 'Very high energy and highly danceable. Build-up hype tracks with massive drops and driving beats designed to bring pure joy, excitement, and festival-level energy.' }
   ];
+  
+  const likeMenuStatusLikedIconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">${LIKE_BUTTON_ICON_LIKED}</svg>`;
+  const likeMenuStatusAlternateIconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">${LIKE_BUTTON_ICON_ISRC_LIKED}</svg>`;
+  const likeMenuStatusWarningIconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8.884 1.55a1.014 1.014 0 0 0-1.768 0l-6.87 11.9A1.015 1.015 0 0 0 1.13 15h13.74a1.015 1.015 0 0 0 .884-1.55l-6.87-11.9zM7.25 6a.75.75 0 0 1 1.5 0v3.5a.75.75 0 0 1-1.5 0V6zM8 13.1a.85.85 0 1 0 0-1.7.85.85 0 0 0 0 1.7z"/></svg>`;
+  const likeMenuStatusUnlikedIconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">${LIKE_BUTTON_ICON_NOT_LIKED}</svg>`;
+  const likeMenuGoToAlbumIconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path fill-rule="evenodd" d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm0 1.4a6.6 6.6 0 1 1 0 13.2 6.6 6.6 0 0 1 0-13.2zM8 5.2a2.8 2.8 0 1 0 0 5.6 2.8 2.8 0 0 0 0-5.6zM8 6.6a1.4 1.4 0 1 1 0 2.8 1.4 1.4 0 0 1 0-2.8z"></path></svg>`;
+  const likeMenuViewVersionsIconSvg = `<svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M 7 1.75 a 5.25 5.25 0 1 0 0 10.5 a 5.25 5.25 0 0 0 0 -10.5 M 0.25 7 a 6.75 6.75 0 1 1 12.096 4.12 l 3.184 3.185 a 0.75 0.75 0 1 1 -1.06 1.06 L 11.304 12.2 A 6.75 6.75 0 0 1 0.25 7"></path></svg>`;
+  const likeMenuCopyIsrcIconSvg = copyIconSVG;
+  const likeMenuUnlikeIconSvg = deleteJobIconSvg;
   
   const ICON_PATHS = {
     sortAsc: "M.998 8.81A.749.749 0 0 1 .47 7.53L7.99 0l7.522 7.53a.75.75 0 1 1-1.06 1.06L8.74 2.87v12.38a.75.75 0 1 1-1.498 0V2.87L1.528 8.59a.751.751 0 0 1-.53.22z",
@@ -995,7 +1115,7 @@
       }
   }
 
-    function formatLastScrobbled(timestamp, format) {
+  function formatLastScrobbled(timestamp, format) {
       if (timestamp === null || timestamp === undefined || timestamp === -1) return 'Err';
       if (timestamp === 0) return '—';
 
@@ -1146,6 +1266,285 @@
     }
   }
 
+  function normalizeDateInputString(val) {
+    if (!val) return "";
+    const cleanVal = String(val).trim().replace(/\//g, '-');
+    if (/^\d{4}$/.test(cleanVal)) {
+      const y = parseInt(cleanVal, 10);
+      return (y >= 1000 && y <= 9999) ? `${y}` : "";
+    }
+    if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
+      const [yStr, mStr] = cleanVal.split('-');
+      const y = parseInt(yStr, 10);
+      const m = parseInt(mStr, 10);
+      return (y >= 1000 && y <= 9999 && m >= 1 && m <= 12) ? `${y}-${String(m).padStart(2, '0')}` : "";
+    }
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+      const [yStr, mStr, dStr] = cleanVal.split('-');
+      const y = parseInt(yStr, 10);
+      const m = parseInt(mStr, 10);
+      const d = parseInt(dStr, 10);
+      const dateObj = new Date(y, m - 1, d);
+      return (dateObj.getFullYear() === y && dateObj.getMonth() === m - 1 && dateObj.getDate() === d)
+        ? `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` : "";
+    }
+    const d = new Date(cleanVal);
+    if (!isNaN(d.getTime()) && d.getFullYear() >= 1000 && d.getFullYear() <= 9999) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    return "";
+  }
+
+  function formatDatePickerValue(val) {
+    const norm = normalizeDateInputString(val);
+    if (!norm) return "";
+    if (/^\d{4}$/.test(norm)) return `${norm}-01-01`;
+    if (/^\d{4}-\d{2}$/.test(norm)) return `${norm}-01`;
+    return norm;
+  }
+
+  function parseDateFilterString(val, isMax = false, isLocal = false) {
+    if (!val) return NaN;
+    const cleanVal = String(val).trim().replace(/\//g, '-');
+    let y, m, d;
+    if (/^\d{4}$/.test(cleanVal)) {
+      y = parseInt(cleanVal, 10);
+      if (y < 1000 || y > 9999) return NaN;
+      m = isMax ? 11 : 0;
+      d = isMax ? 31 : 1;
+    } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
+      const parts = cleanVal.split('-');
+      y = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10) - 1;
+      if (y < 1000 || y > 9999 || m < 0 || m > 11) return NaN;
+      if (isMax) { m += 1; d = 0; } else { d = 1; }
+    } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
+      const parts = cleanVal.split('-');
+      y = parseInt(parts[0], 10);
+      m = parseInt(parts[1], 10) - 1;
+      d = parseInt(parts[2], 10);
+      if (y < 1000 || y > 9999 || m < 0 || m > 11 || d < 1 || d > 31) return NaN;
+    } else {
+      const parsed = new Date(cleanVal);
+      if (isNaN(parsed.getTime())) return NaN;
+      const isISO = /^\d{4}-\d{2}-\d{2}/.test(cleanVal);
+      if (isISO) {
+        y = parsed.getUTCFullYear();
+        m = parsed.getUTCMonth();
+        d = parsed.getUTCDate();
+      } else {
+        y = parsed.getFullYear();
+        m = parsed.getMonth();
+        d = parsed.getDate();
+      }
+      if (y < 1000 || y > 9999) return NaN;
+    }
+    const h = isMax ? 23 : 0, min = isMax ? 59 : 0, s = isMax ? 59 : 0, ms = isMax ? 999 : 0;
+    return isLocal ? new Date(y, m, d, h, min, s, ms).getTime() : Date.UTC(y, m, d, h, min, s, ms);
+  }
+
+  function setupDatePicker(root, inputId, pickerId, btnId) {
+    const input = root.querySelector(`#${inputId}`);
+    const picker = root.querySelector(`#${pickerId}`);
+    const btn = root.querySelector(`#${btnId}`);
+    if (!picker || !input || !btn) return;
+
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const pVal = formatDatePickerValue(input.value);
+      picker.value = pVal || "";
+      try {
+        picker.showPicker();
+      } catch (err) {
+        console.warn("[Sort-Play] showPicker not supported or element blocked.", err);
+      }
+    });
+
+    picker.addEventListener('change', (e) => {
+      if (e.target.value) {
+        input.value = e.target.value;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+      }
+    });
+  }
+  
+  async function exportJsonFile(data, fileName, successNotification = null) {
+    const jsonString = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        if (successNotification) showNotification(successNotification);
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('Error saving file:', err);
+        showNotification('Failed to export data.', true);
+        return;
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (successNotification) showNotification(successNotification);
+  }
+  
+  function createTrackRowMenu(shadowRoot, modalContainer, getBottomOffset = 0) {
+    let activeMenu = null;
+    const close = () => {
+      if (activeMenu) {
+        activeMenu._triggerBtn?.classList.remove("is-active");
+        activeMenu.remove();
+        activeMenu = null;
+      }
+    };
+    const open = (btn) => {
+      if (!btn) return;
+      if (activeMenu && activeMenu._triggerBtn === btn) {
+        close();
+        return;
+      }
+      close();
+
+      const title = btn.dataset.title || "";
+      const artist = btn.dataset.artist || "";
+      const trackLink = btn.dataset.trackLink || "";
+      const albumLink = btn.dataset.albumLink || "";
+
+      const menuEl = document.createElement("div");
+      menuEl.className = "sp-row-menu";
+      menuEl._triggerBtn = btn;
+      btn.classList.add("is-active");
+
+      let itemsHtml = `<button class="sp-row-menu-item" data-action="copy-info">${copyIconSVG}<span>Copy Track Info</span></button>`;
+      if (trackLink) itemsHtml += `<button class="sp-row-menu-item" data-action="copy-track-link">${linkIconSVG}<span>Copy Song Link</span></button>`;
+      if (albumLink) itemsHtml += `<button class="sp-row-menu-item" data-action="copy-album-link">${linkIconSVG}<span>Copy Album Link</span></button>`;
+      menuEl.innerHTML = itemsHtml;
+
+      menuEl.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        const item = evt.target.closest(".sp-row-menu-item");
+        if (!item) return;
+        const action = item.dataset.action;
+        let textToCopy = "";
+        if (action === "copy-info") textToCopy = `${title} - ${artist}`;
+        else if (action === "copy-track-link") textToCopy = trackLink;
+        else if (action === "copy-album-link") textToCopy = albumLink;
+        if (textToCopy) navigator.clipboard.writeText(textToCopy);
+        close();
+      });
+
+      shadowRoot.appendChild(menuEl);
+      activeMenu = menuEl;
+
+      const btnRect = btn.getBoundingClientRect();
+      const modalRect = modalContainer.getBoundingClientRect();
+      const menuHeight = menuEl.offsetHeight || 110;
+      const extraOffset = typeof getBottomOffset === 'function' ? getBottomOffset() : (getBottomOffset || 0);
+      const availableBelow = modalRect.bottom - extraOffset - btnRect.bottom;
+
+      menuEl.style.top = availableBelow < menuHeight + 10
+        ? `${btnRect.top - modalRect.top - menuHeight - 4}px`
+        : `${btnRect.bottom - modalRect.top + 4}px`;
+      menuEl.style.right = `${modalRect.right - btnRect.right}px`;
+    };
+    return {
+      close,
+      open,
+      isOpen: () => !!activeMenu
+    };
+  }
+
+  function getCachedSpotifyImage(key, minSize = 0) {
+      if (!key || !spotifyImageCache.has(key)) return null;
+      const entry = spotifyImageCache.get(key);
+      if (typeof entry === 'string') return entry;
+      if (entry && typeof entry === 'object' && entry.data) {
+          if (minSize > 0 && entry.width && entry.width < minSize) return null;
+          return entry.data;
+      }
+      return null;
+  }
+
+  const inFlightCoverRequests = new Map();
+
+  async function fetchTrackCoverUrl(uri, minSize = 32) {
+      if (!uri || !uri.startsWith("spotify:track:")) return FALLBACK_COVER_URI;
+      const cached = getCachedSpotifyImage(uri, minSize);
+      if (cached && cached !== FALLBACK_COVER_URI) return cached;
+
+      if (inFlightCoverRequests.has(uri)) {
+          return inFlightCoverRequests.get(uri);
+      }
+
+      const requestPromise = (async () => {
+          try {
+              const res = await Spicetify.GraphQL.Request(Spicetify.GraphQL.Definitions.decorateContextTracks, { uris: [uri] });
+              const sources = res?.data?.tracks?.[0]?.albumOfTrack?.coverArt?.sources;
+              if (sources?.length > 0) {
+                  const valid = sources.filter(s => s && (s.width || 0) >= minSize && (s.height || 0) >= minSize);
+                  const best = valid.length > 0
+                      ? valid.reduce((acc, s) => s.width < acc.width ? s : acc, valid[0])
+                      : sources.reduce((acc, s) => (s?.width || 0) > (acc?.width || 0) ? s : acc, sources[0]);
+                  const url = best?.url;
+                  if (url) {
+                      spotifyImageCache.set(uri, { ts: Date.now(), data: url, width: best.width });
+                      return url;
+                  }
+              }
+          } catch (e) {} finally {
+              inFlightCoverRequests.delete(uri);
+          }
+          return FALLBACK_COVER_URI;
+      })();
+
+      inFlightCoverRequests.set(uri, requestPromise);
+      return requestPromise;
+  }
+
+  function createTrackImageObserver(rootElement, minSize = 32, rootMargin = "1000px") {
+      return new IntersectionObserver((entries, obs) => {
+          entries.forEach(entry => {
+              if (!entry.isIntersecting) return;
+              const img = entry.target;
+              obs.unobserve(img);
+              if (img.style.opacity === "1") return;
+
+              const uri = img.dataset.trackUri;
+              if (!uri || !uri.startsWith("spotify:track:")) {
+                  img.style.opacity = "1";
+                  return;
+              }
+
+              const cached = getCachedSpotifyImage(uri);
+              if (cached) {
+                  img.src = cached;
+                  img.style.opacity = "1";
+                  return;
+              }
+
+              fetchTrackCoverUrl(uri, minSize).then(url => {
+                  img.src = url;
+                  img.style.opacity = "1";
+              });
+          });
+      }, { root: rootElement, rootMargin });
+  }
+  
   const spMath = {
     dot: (a, b) => a.reduce((sum, val, i) => sum + val * b[i], 0),
     norm: (a) => Math.sqrt(a.reduce((sum, val) => sum + val * val, 0)),
@@ -1937,14 +2336,7 @@
   }
 
   async function searchTracks(query, limit = 5) {
-      const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
-
-      const res = await Spicetify.GraphQL.Request({
-          name: "searchTracks",
-          operation: "query",
-          sha256Hash: SEARCH_HASH,
-          value: null
-      }, {
+      const res = await Spicetify.GraphQL.Request(GraphQL.Definitions.searchTracks, {
           searchTerm: query,
           offset: 0,
           limit: limit,
@@ -2596,6 +2988,7 @@
   }
   
   const possibleSuffixes = [
+    "\\(Unavailable\\)",
     "\\(PlayCount\\)",
     "\\(Popularity\\)",
     "\\(ReleaseDate\\)",
@@ -2876,7 +3269,7 @@
         } catch(e) {}
     }
     useEnergyWaveShuffle = localStorage.getItem(STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE) === "true";
-    energyWaveShuffleLimit = parseInt(localStorage.getItem(STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT), 10) || 6000;
+    energyWaveShuffleLimit = localStorage.getItem(STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT) || 'all';
     showNowPlayingData = localStorage.getItem(STORAGE_KEY_SHOW_NOW_PLAYING_DATA) === "true";
     selectedNowPlayingDataType = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DATA_TYPE) || 'releaseDate';
     selectedNowPlayingDataPosition = localStorage.getItem(STORAGE_KEY_NOW_PLAYING_DATA_POSITION) || '.main-trackInfo-name';
@@ -3116,7 +3509,7 @@
           [STORAGE_KEY_DYNAMIC_UPDATE_SOURCE]: "true",
           [STORAGE_KEY_RANDOM_GENRE_HISTORY]: "[]",
           [STORAGE_KEY_USE_ENERGY_WAVE_SHUFFLE]: "false",
-          [STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT]: "6000",
+          [STORAGE_KEY_ENERGY_WAVE_SHUFFLE_LIMIT]: "all",
           [STORAGE_KEY_SHOW_NOW_PLAYING_DATA]: "false",
           [STORAGE_KEY_NOW_PLAYING_DATA_TYPE]: "releaseDate",
           [STORAGE_KEY_NOW_PLAYING_DATA_POSITION]: ".main-trackInfo-name",
@@ -3181,7 +3574,9 @@
           [STORAGE_KEY_CF_MY_SCROBBLES_MODE]: "number",
           [STORAGE_KEY_CF_KEY_MODE]: "standard",
           [STORAGE_KEY_PRESERVE_DATE_ADDED]: "ask",
-          [STORAGE_KEY_DEDICATED_OVERRIDES]: "{}"
+          [STORAGE_KEY_DEDICATED_OVERRIDES]: "{}",
+          [STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE]: "false",
+          [STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE]: "false"
         };
     
         if (key === STORAGE_KEY_NP_CONFIG) {
@@ -3712,6 +4107,7 @@
         abortController.abort();
         clearTimeout(notifHoverTimeout);
         overlay.style.opacity = "0";
+        overlay.style.pointerEvents = "none";
         
         const chatPanel = document.getElementById('sort-play-chat-panel');
         if (chatPanel) {
@@ -3773,6 +4169,64 @@
       </div>
     `;
 
+    const extraColumnConfigs = [
+        {
+            id: 'additionalColumnSetting',
+            pfx: '',
+            label: 'Playlist Extra Column',
+            getVisible: () => showAdditionalColumn,
+            setVisible: v => { showAdditionalColumn = v; },
+            getType: () => selectedColumnType,
+            setType: v => { selectedColumnType = v; },
+            includePlayCount: true,
+            isPlaylistCol: true,
+            onUpdate: () => updateTracklist()
+        },
+        {
+            id: 'secondAdditionalColumnSetting',
+            pfx: 'second',
+            label: 'Playlist Second Extra Column',
+            getVisible: () => showSecondAdditionalColumn,
+            setVisible: v => { showSecondAdditionalColumn = v; },
+            getType: () => selectedSecondColumnType,
+            setType: v => { selectedSecondColumnType = v; },
+            includePlayCount: true,
+            isPlaylistCol: true,
+            onUpdate: () => updateTracklist()
+        },
+        {
+            id: 'albumColumnSetting',
+            pfx: 'album',
+            label: 'Album Extra Column',
+            getVisible: () => showAlbumColumn,
+            setVisible: v => { showAlbumColumn = v; },
+            getType: () => selectedAlbumColumnType,
+            setType: v => { selectedAlbumColumnType = v; },
+            includePlayCount: false,
+            isPlaylistCol: false,
+            onUpdate: () => onPageChange()
+        },
+        {
+            id: 'artistColumnSetting',
+            pfx: 'artist',
+            label: 'Artist Extra Column',
+            getVisible: () => showArtistColumn,
+            setVisible: v => { showArtistColumn = v; },
+            getType: () => selectedArtistColumnType,
+            setType: v => { selectedArtistColumnType = v; },
+            includePlayCount: false,
+            isPlaylistCol: false,
+            onUpdate: () => onPageChange()
+        }
+    ];
+
+    const FORMAT_SPECS = [
+        { id: 'dateFormat', typeMatch: t => t === 'releaseDate' || t === 'trueReleaseDate', attr: 'format', update: v => { releaseDateFormat = v; } },
+        { id: 'myScrobbles', typeMatch: t => t === 'personalScrobbles', attr: 'mode', update: v => { myScrobblesDisplayMode = v; } },
+        { id: 'key', typeMatch: t => t === 'key', attr: 'mode', update: v => { keyDisplayMode = v; } },
+        { id: 'lastScrobbled', typeMatch: t => t === 'lastScrobbled', attr: 'format', update: v => { lastScrobbledFormat = v; } }
+    ];
+
     const getColumnOptionsHtml = (selectedValue, includePlayCount = true) => `
         ${includePlayCount ? `<option value="playCount" ${selectedValue === 'playCount' ? 'selected' : ''}>Play Count</option>` : ''}
         <option value="popularity" ${selectedValue === 'popularity' ? 'selected' : ''}>Popularity</option>
@@ -3788,6 +4242,34 @@
         <option value="danceability" ${selectedValue === 'danceability' ? 'selected' : ''}>Danceability</option>
         <option value="valence" ${selectedValue === 'valence' ? 'selected' : ''}>Valence</option>
     `;
+
+    const renderExtraColumnRowHtml = (cfg) => {
+        const makeId = (name) => cfg.pfx ? `${cfg.pfx}${name}` : `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
+        const selectId = cfg.pfx ? `${cfg.pfx}ColumnTypeSelect` : 'columnTypeSelect';
+        const toggleId = cfg.pfx ? `show${cfg.pfx.charAt(0).toUpperCase() + cfg.pfx.slice(1)}ColumnToggle` : 'showAdditionalColumnToggle';
+
+        return `
+        <div class="setting-row" id="${cfg.id}">
+            <label class="col description">${cfg.label}</label>
+            <div class="col action" style="position: relative;">
+                <button id="${makeId('DateFormatSettingsBtn')}" class="column-settings-button" title="Release Date Format Settings" style="display: none;">${settingsSvg}</button>
+                <button id="${makeId('MyScrobblesSettingsBtn')}" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">${settingsSvg}</button>
+                <button id="${makeId('KeySettingsBtn')}" class="column-settings-button" title="Key Display Settings" style="display: none;">${settingsSvg}</button>
+                <button id="${makeId('LastScrobbledSettingsBtn')}" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">${settingsSvg}</button>
+                <select id="${selectId}" class="column-type-select" ${!cfg.getVisible() ? 'disabled' : ''}>
+                    ${getColumnOptionsHtml(cfg.getType(), cfg.includePlayCount)}
+                </select>
+                <label class="switch">
+                    <input type="checkbox" id="${toggleId}" ${cfg.getVisible() ? 'checked' : ''}>
+                    <span class="sliderx"></span>
+                </label>
+                <div id="${makeId('DateFormatDropdownContainer')}" class="column-settings-dropdown">${getDateFormatDropdownHtml(releaseDateFormat)}</div>
+                <div id="${makeId('MyScrobblesDropdownContainer')}" class="column-settings-dropdown">${getMyScrobblesDropdownHtml(myScrobblesDisplayMode)}</div>
+                <div id="${makeId('KeyDropdownContainer')}" class="column-settings-dropdown">${getKeyDropdownHtml(keyDisplayMode)}</div>
+                <div id="${makeId('LastScrobbledDropdownContainer')}" class="column-settings-dropdown">${getLastScrobbledDropdownHtml(lastScrobbledFormat)}</div>
+            </div>
+        </div>`;
+    };
 
     shadowRoot.innerHTML = `
     <style>
@@ -3946,7 +4428,7 @@
             Preserve "Date Added" on Modify
             <span class="tooltip-container">
                 ${infoIconSvg}
-                <span class="custom-tooltip wide">Controls how 'Date Added' is handled.<br><br>• <strong>Smart (Ask)</strong>: Detects multi-day curation and prompts on bulk dumps or large lists.<br>• <strong>Preserve</strong>: Keeps original dates; prompts on large playlists.<br>• <strong>Fast (Reset)</strong>: Instant sort, but resets 'Date Added' to now.</span>
+                <span class="custom-tooltip wide">Controls how 'Date Added' is handled.<br><br>• <strong>Smart (Ask)</strong>: Automatically preserves multi-day curation, fast-sorts bulk dumps, and prompts on large lists.<br>• <strong>Preserve</strong>: Keeps original dates; prompts on large playlists.<br>• <strong>Fast (Reset)</strong>: Instant sort, but resets 'Date Added' to now.</span>
             </span>
         </label>
         <div class="col action">
@@ -4055,161 +4537,7 @@
     </div>
     <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
 
-    <div class="setting-row" id="additionalColumnSetting">
-        <label class="col description">
-          Playlist Extra Column
-        </label>
-        <div class="col action" style="position: relative;">
-            <button id="dateFormatSettingsBtn" class="column-settings-button" title="Release Date Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="myScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="keySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="lastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <select id="columnTypeSelect" class="column-type-select" ${!showAdditionalColumn ? 'disabled' : ''}>
-                ${getColumnOptionsHtml(selectedColumnType, true)}
-            </select>
-            <label class="switch">
-                <input type="checkbox" id="showAdditionalColumnToggle" ${showAdditionalColumn ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-            <div id="dateFormatDropdownContainer" class="column-settings-dropdown">
-                ${getDateFormatDropdownHtml()}
-            </div>
-            <div id="myScrobblesDropdownContainer" class="column-settings-dropdown">
-                ${getMyScrobblesDropdownHtml()}
-            </div>
-            <div id="keyDropdownContainer" class="column-settings-dropdown">
-                ${getKeyDropdownHtml()}
-            </div>
-            <div id="lastScrobbledDropdownContainer" class="column-settings-dropdown">
-                ${getLastScrobbledDropdownHtml()}
-            </div>
-        </div>
-    </div>
-    
-    <div class="setting-row" id="secondAdditionalColumnSetting">
-        <label class="col description">
-          Playlist Second Extra Column
-        </label>
-        <div class="col action" style="position: relative;">
-            <button id="secondDateFormatSettingsBtn" class="column-settings-button" title="Release Date Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="secondMyScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="secondKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="secondLastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <select id="secondColumnTypeSelect" class="column-type-select" ${!showSecondAdditionalColumn ? 'disabled' : ''}>
-                ${getColumnOptionsHtml(selectedSecondColumnType, true)}
-            </select>
-            <label class="switch">
-                <input type="checkbox" id="showSecondAdditionalColumnToggle" ${showSecondAdditionalColumn ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-            <div id="secondDateFormatDropdownContainer" class="column-settings-dropdown">
-                ${getDateFormatDropdownHtml()}
-            </div>
-            <div id="secondMyScrobblesDropdownContainer" class="column-settings-dropdown">
-                ${getMyScrobblesDropdownHtml()}
-            </div>
-            <div id="secondKeyDropdownContainer" class="column-settings-dropdown">
-                ${getKeyDropdownHtml()}
-            </div>
-            <div id="secondLastScrobbledDropdownContainer" class="column-settings-dropdown">
-                ${getLastScrobbledDropdownHtml()}
-            </div>
-        </div>
-    </div>
-
-    <div class="setting-row" id="albumColumnSetting">
-        <label class="col description">
-            Album Extra Column
-        </label>
-        <div class="col action">
-            <button id="albumDateFormatSettingsBtn" class="column-settings-button" title="Release Date Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="albumMyScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="albumKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="albumLastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <select id="albumColumnTypeSelect" class="column-type-select" ${!showAlbumColumn ? 'disabled' : ''}>
-                ${getColumnOptionsHtml(selectedAlbumColumnType, false)}
-            </select>
-            <label class="switch">
-                <input type="checkbox" id="showAlbumColumnToggle" ${showAlbumColumn ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-            <div id="albumDateFormatDropdownContainer" class="column-settings-dropdown">
-                ${getDateFormatDropdownHtml()}
-            </div>
-            <div id="albumMyScrobblesDropdownContainer" class="column-settings-dropdown">
-                ${getMyScrobblesDropdownHtml()}
-            </div>
-            <div id="albumKeyDropdownContainer" class="column-settings-dropdown">
-                ${getKeyDropdownHtml()}
-            </div>
-            <div id="albumLastScrobbledDropdownContainer" class="column-settings-dropdown">
-                ${getLastScrobbledDropdownHtml()}
-            </div>
-        </div>
-    </div>
-
-    <div class="setting-row" id="artistColumnSetting">
-        <label class="col description">
-            Artist Extra Column
-        </label>
-        <div class="col action">
-            <button id="artistDateFormatSettingsBtn" class="column-settings-button" title="Release Date Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="artistMyScrobblesSettingsBtn" class="column-settings-button" title="My Scrobbles Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="artistKeySettingsBtn" class="column-settings-button" title="Key Display Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <button id="artistLastScrobbledSettingsBtn" class="column-settings-button" title="Last Scrobbled Format Settings" style="display: none;">
-                ${settingsSvg}
-            </button>
-            <select id="artistColumnTypeSelect" class="column-type-select" ${!showArtistColumn ? 'disabled' : ''}>
-                ${getColumnOptionsHtml(selectedArtistColumnType, false)}
-            </select>
-            <label class="switch">
-                <input type="checkbox" id="showArtistColumnToggle" ${showArtistColumn ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-            <div id="artistDateFormatDropdownContainer" class="column-settings-dropdown">
-                ${getDateFormatDropdownHtml()}
-            </div>
-            <div id="artistMyScrobblesDropdownContainer" class="column-settings-dropdown">
-                ${getMyScrobblesDropdownHtml()}
-            </div>
-            <div id="artistKeyDropdownContainer" class="column-settings-dropdown">
-                ${getKeyDropdownHtml()}
-            </div>
-            <div id="artistLastScrobbledDropdownContainer" class="column-settings-dropdown">
-                ${getLastScrobbledDropdownHtml()}
-            </div>
-        </div>
-    </div>
+    ${extraColumnConfigs.map(renderExtraColumnRowHtml).join('')}
     
     <div class="setting-row" id="removeDateAdded">
         <label class="col description">Remove Playlist "Date Added" Column</label>
@@ -4663,40 +4991,6 @@
             showUpdateHistoryModal();
         });
     }
-    const showAdditionalColumnToggle = modalContainer.querySelector("#showAdditionalColumnToggle");
-    const showAlbumColumnToggle = modalContainer.querySelector("#showAlbumColumnToggle");
-    const showArtistColumnToggle = modalContainer.querySelector("#showArtistColumnToggle");
-    const columnTypeSelect = modalContainer.querySelector("#columnTypeSelect");
-    const albumColumnTypeSelect = modalContainer.querySelector("#albumColumnTypeSelect");
-    const artistColumnTypeSelect = modalContainer.querySelector("#artistColumnTypeSelect");
-    const dateFormatSettingsBtn = modalContainer.querySelector("#dateFormatSettingsBtn");
-    const myScrobblesSettingsBtn = modalContainer.querySelector("#myScrobblesSettingsBtn");
-    const albumDateFormatSettingsBtn = modalContainer.querySelector("#albumDateFormatSettingsBtn");
-    const albumMyScrobblesSettingsBtn = modalContainer.querySelector("#albumMyScrobblesSettingsBtn");
-    const artistDateFormatSettingsBtn = modalContainer.querySelector("#artistDateFormatSettingsBtn");
-    const artistMyScrobblesSettingsBtn = modalContainer.querySelector("#artistMyScrobblesSettingsBtn");
-    const dateFormatDropdownContainer = modalContainer.querySelector("#dateFormatDropdownContainer");
-    const myScrobblesDropdownContainer = modalContainer.querySelector("#myScrobblesDropdownContainer");
-    const albumDateFormatDropdownContainer = modalContainer.querySelector("#albumDateFormatDropdownContainer");
-    const albumMyScrobblesDropdownContainer = modalContainer.querySelector("#albumMyScrobblesDropdownContainer");
-    const artistDateFormatDropdownContainer = modalContainer.querySelector("#artistDateFormatDropdownContainer");
-    const artistMyScrobblesDropdownContainer = modalContainer.querySelector("#artistMyScrobblesDropdownContainer");
-    const keySettingsBtn = modalContainer.querySelector("#keySettingsBtn");
-    const secondKeySettingsBtn = modalContainer.querySelector("#secondKeySettingsBtn");
-    const albumKeySettingsBtn = modalContainer.querySelector("#albumKeySettingsBtn");
-    const artistKeySettingsBtn = modalContainer.querySelector("#artistKeySettingsBtn");
-    const keyDropdownContainer = modalContainer.querySelector("#keyDropdownContainer");
-    const secondKeyDropdownContainer = modalContainer.querySelector("#secondKeyDropdownContainer");
-    const albumKeyDropdownContainer = modalContainer.querySelector("#albumKeyDropdownContainer");
-    const artistKeyDropdownContainer = modalContainer.querySelector("#artistKeyDropdownContainer");
-    const lastScrobbledSettingsBtn = modalContainer.querySelector("#lastScrobbledSettingsBtn");
-    const secondLastScrobbledSettingsBtn = modalContainer.querySelector("#secondLastScrobbledSettingsBtn");
-    const albumLastScrobbledSettingsBtn = modalContainer.querySelector("#albumLastScrobbledSettingsBtn");
-    const artistLastScrobbledSettingsBtn = modalContainer.querySelector("#artistLastScrobbledSettingsBtn");
-    const lastScrobbledDropdownContainer = modalContainer.querySelector("#lastScrobbledDropdownContainer");
-    const secondLastScrobbledDropdownContainer = modalContainer.querySelector("#secondLastScrobbledDropdownContainer");
-    const albumLastScrobbledDropdownContainer = modalContainer.querySelector("#albumLastScrobbledDropdownContainer");
-    const artistLastScrobbledDropdownContainer = modalContainer.querySelector("#artistLastScrobbledDropdownContainer");
     const removeDateAddedToggle = modalContainer.querySelector("#removeDateAdded input");
     const setGeminiApiKeyButton = modalContainer.querySelector("#setGeminiApiKey");
     const setLastFmUsernameButton = modalContainer.querySelector("#setLastFmUsername");
@@ -4728,12 +5022,6 @@
     const changeTitleOnModifyToggle = modalContainer.querySelector("#changeTitleOnModifyToggle");
     const changeDescriptionOnModifyToggle = modalContainer.querySelector("#changeDescriptionOnModifyToggle");
     const overwriteCustomDescriptionToggle = modalContainer.querySelector("#overwriteCustomDescriptionToggle");
-    const showSecondAdditionalColumnToggle = modalContainer.querySelector("#showSecondAdditionalColumnToggle");
-    const secondColumnTypeSelect = modalContainer.querySelector("#secondColumnTypeSelect");
-    const secondDateFormatSettingsBtn = modalContainer.querySelector("#secondDateFormatSettingsBtn");
-    const secondMyScrobblesSettingsBtn = modalContainer.querySelector("#secondMyScrobblesSettingsBtn");
-    const secondDateFormatDropdownContainer = modalContainer.querySelector("#secondDateFormatDropdownContainer");
-    const secondMyScrobblesDropdownContainer = modalContainer.querySelector("#secondMyScrobblesDropdownContainer");
     const showLikeButtonToggle = modalContainer.querySelector("#showLikeButtonToggle");
     const likeButtonSettingsBtn = modalContainer.querySelector("#likeButtonSettingsBtn");
     const showGenreTagsToggle = modalContainer.querySelector("#showGenreTagsToggle");
@@ -5210,122 +5498,106 @@
         }
     });
 
-    removeDateAddedToggle.disabled = !showAdditionalColumn && !showSecondAdditionalColumn;
-    removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn && !showSecondAdditionalColumn);
-    columnTypeSelect.disabled = !showAdditionalColumn;
-    secondColumnTypeSelect.disabled = !showSecondAdditionalColumn;
-    albumColumnTypeSelect.disabled = !showAlbumColumn;
-    artistColumnTypeSelect.disabled = !showArtistColumn;
+    const extraColumnInstances = extraColumnConfigs.map(cfg => {
+        const makeId = (name) => cfg.pfx ? `${cfg.pfx}${name}` : `${name.charAt(0).toLowerCase()}${name.slice(1)}`;
+        const selectId = cfg.pfx ? `${cfg.pfx}ColumnTypeSelect` : 'columnTypeSelect';
+        const toggleId = cfg.pfx ? `show${cfg.pfx.charAt(0).toUpperCase() + cfg.pfx.slice(1)}ColumnToggle` : 'showAdditionalColumnToggle';
+
+        const toggle = modalContainer.querySelector(`#${toggleId}`);
+        const select = modalContainer.querySelector(`#${selectId}`);
+        const formats = FORMAT_SPECS.map(spec => {
+            const cap = spec.id.charAt(0).toUpperCase() + spec.id.slice(1);
+            return {
+                spec,
+                btn: modalContainer.querySelector(`#${makeId(`${cap}SettingsBtn`)}`),
+                drop: modalContainer.querySelector(`#${makeId(`${cap}DropdownContainer`)}`)
+            };
+        });
+
+        return { cfg, toggle, select, formats };
+    });
+
+    const allDropdowns = extraColumnInstances.flatMap(inst => inst.formats.map(f => f.drop));
+
+    const updateColumnVisibility = (inst) => {
+        const isShown = inst.cfg.getVisible();
+        const type = inst.cfg.getType();
+        inst.formats.forEach(({ spec, btn, drop }) => {
+            const matches = isShown && spec.typeMatch(type);
+            btn.style.display = matches ? 'flex' : 'none';
+            btn.disabled = !matches;
+            if (!matches) drop.style.display = 'none';
+        });
+    };
+
+    const updateRemoveDateAddedState = () => {
+        const anyPlaylistExtra = showAdditionalColumn || showSecondAdditionalColumn;
+        removeDateAddedToggle.disabled = !anyPlaylistExtra;
+        removeDateAddedToggle.parentElement.classList.toggle("disabled", !anyPlaylistExtra);
+        if (!anyPlaylistExtra) {
+            removeDateAdded = false;
+            removeDateAddedToggle.checked = false;
+        }
+    };
+
+    updateRemoveDateAddedState();
+    extraColumnInstances.forEach(updateColumnVisibility);
 
     setTimeout(() => {
-        const sliderxs = modalContainer.querySelectorAll('.sliderx');
-        sliderxs.forEach(sliderx => {
+        modalContainer.querySelectorAll('.sliderx').forEach(sliderx => {
             sliderx.style.transition = '.3s';
         });
     }, 50);
 
-    const updateColumnSettingsVisibility = (isShown, type, dateBtn, dateDrop, scrobbleBtn, scrobbleDrop, keyBtn, keyDrop, lastScrobbleBtn, lastScrobbleDrop) => {
-        const showDateSettings = isShown && (type === 'releaseDate' || type === 'trueReleaseDate');
-        dateBtn.style.display = showDateSettings ? 'flex' : 'none';
-        dateBtn.disabled = !showDateSettings;
-        if (!showDateSettings) dateDrop.style.display = 'none';
-
-        const showScrobbleSettings = isShown && type === 'personalScrobbles';
-        scrobbleBtn.style.display = showScrobbleSettings ? 'flex' : 'none';
-        scrobbleBtn.disabled = !showScrobbleSettings;
-        if (!showScrobbleSettings) scrobbleDrop.style.display = 'none';
-
-        const showKeySettings = isShown && type === 'key';
-        keyBtn.style.display = showKeySettings ? 'flex' : 'none';
-        keyBtn.disabled = !showKeySettings;
-        if (!showKeySettings) keyDrop.style.display = 'none';
-
-        const showLastScrobbledSettings = isShown && type === 'lastScrobbled';
-        lastScrobbleBtn.style.display = showLastScrobbledSettings ? 'flex' : 'none';
-        lastScrobbleBtn.disabled = !showLastScrobbledSettings;
-        if (!showLastScrobbledSettings) lastScrobbleDrop.style.display = 'none';
-    };
-
-    const updatePlaylistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showAdditionalColumn, selectedColumnType, dateFormatSettingsBtn, dateFormatDropdownContainer, myScrobblesSettingsBtn, myScrobblesDropdownContainer, keySettingsBtn, keyDropdownContainer, lastScrobbledSettingsBtn, lastScrobbledDropdownContainer);
-    const updateSecondPlaylistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showSecondAdditionalColumn, selectedSecondColumnType, secondDateFormatSettingsBtn, secondDateFormatDropdownContainer, secondMyScrobblesSettingsBtn, secondMyScrobblesDropdownContainer, secondKeySettingsBtn, secondKeyDropdownContainer, secondLastScrobbledSettingsBtn, secondLastScrobbledDropdownContainer);
-    const updateAlbumColumnSettingsVisibility = () => updateColumnSettingsVisibility(showAlbumColumn, selectedAlbumColumnType, albumDateFormatSettingsBtn, albumDateFormatDropdownContainer, albumMyScrobblesSettingsBtn, albumMyScrobblesDropdownContainer, albumKeySettingsBtn, albumKeyDropdownContainer, albumLastScrobbledSettingsBtn, albumLastScrobbledDropdownContainer);
-    const updateArtistColumnSettingsVisibility = () => updateColumnSettingsVisibility(showArtistColumn, selectedArtistColumnType, artistDateFormatSettingsBtn, artistDateFormatDropdownContainer, artistMyScrobblesSettingsBtn, artistMyScrobblesDropdownContainer, artistKeySettingsBtn, artistKeyDropdownContainer, artistLastScrobbledSettingsBtn, artistLastScrobbledDropdownContainer);
-
-    updatePlaylistColumnSettingsVisibility();
-    updateSecondPlaylistColumnSettingsVisibility();
-    updateAlbumColumnSettingsVisibility();
-    updateArtistColumnSettingsVisibility();
-
-    const allDropdownsForScroll = [
-        dateFormatDropdownContainer, myScrobblesDropdownContainer, keyDropdownContainer, lastScrobbledDropdownContainer,
-        albumDateFormatDropdownContainer, albumMyScrobblesDropdownContainer, albumKeyDropdownContainer, albumLastScrobbledDropdownContainer,
-        artistDateFormatDropdownContainer, artistMyScrobblesDropdownContainer, artistKeyDropdownContainer, artistLastScrobbledDropdownContainer,
-        secondDateFormatDropdownContainer, secondMyScrobblesDropdownContainer, secondKeyDropdownContainer, secondLastScrobbledDropdownContainer
-    ];
-    
-    allDropdownsForScroll.forEach(dropdown => {
-        if (dropdown) {
-            dropdown.addEventListener('wheel', (event) => {
-                const { scrollTop, clientHeight, scrollHeight } = dropdown;
-                if (event.deltaY < 0 && scrollTop === 0) {
-                    event.preventDefault();
-                }
-                else if (event.deltaY > 0 && Math.abs(scrollHeight - clientHeight - scrollTop) < 1) {
-                    event.preventDefault();
-                }
-            }, { passive: false });
-        }
+    allDropdowns.forEach(dropdown => {
+        if (!dropdown) return;
+        dropdown.addEventListener('wheel', (event) => {
+            const { scrollTop, clientHeight, scrollHeight } = dropdown;
+            if ((event.deltaY < 0 && scrollTop === 0) || (event.deltaY > 0 && Math.abs(scrollHeight - clientHeight - scrollTop) < 1)) {
+                event.preventDefault();
+            }
+        }, { passive: false });
     });
 
-    showAdditionalColumnToggle.addEventListener("change", () => {
-        showAdditionalColumn = showAdditionalColumnToggle.checked;
-        columnTypeSelect.disabled = !showAdditionalColumn;
-        removeDateAddedToggle.disabled = !showAdditionalColumn && !showSecondAdditionalColumn;
-        removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn && !showSecondAdditionalColumn);
-        if (!showAdditionalColumn && !showSecondAdditionalColumn) {
-            removeDateAdded = false;
-            removeDateAddedToggle.checked = false;
-        }
-        updatePlaylistColumnSettingsVisibility();
-        saveSettings();
-        updateTracklist();
+    FORMAT_SPECS.forEach(spec => {
+        const drops = extraColumnInstances.map(inst => inst.formats.find(f => f.spec === spec).drop);
+        drops.forEach(container => {
+            container.querySelectorAll("button").forEach(button => {
+                button.addEventListener("click", (event) => {
+                    event.stopPropagation();
+                    const newValue = button.getAttribute(`data-${spec.attr}`);
+                    spec.update(newValue);
+                    drops.forEach(c => {
+                        c.querySelectorAll("button").forEach(btn => btn.classList.toggle("selected", btn.getAttribute(`data-${spec.attr}`) === newValue));
+                    });
+                    allDropdowns.forEach(c => { c.style.display = 'none'; });
+                    document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
+                        el.textContent = "";
+                        delete el.dataset.spProcessed;
+                    });
+                    saveSettings();
+                    onPageChange();
+                });
+            });
+        });
     });
 
-    showSecondAdditionalColumnToggle.addEventListener("change", () => {
-        showSecondAdditionalColumn = showSecondAdditionalColumnToggle.checked;
-        secondColumnTypeSelect.disabled = !showSecondAdditionalColumn;
-        removeDateAddedToggle.disabled = !showAdditionalColumn && !showSecondAdditionalColumn;
-        removeDateAddedToggle.parentElement.classList.toggle("disabled", !showAdditionalColumn && !showSecondAdditionalColumn);
-        if (!showAdditionalColumn && !showSecondAdditionalColumn) {
-            removeDateAdded = false;
-            removeDateAddedToggle.checked = false;
-        }
-        updateSecondPlaylistColumnSettingsVisibility();
-        saveSettings();
-        updateTracklist();
-    });
+    extraColumnInstances.forEach(inst => {
+        inst.toggle.addEventListener("change", () => {
+            inst.cfg.setVisible(inst.toggle.checked);
+            inst.select.disabled = !inst.toggle.checked;
+            if (inst.cfg.isPlaylistCol) updateRemoveDateAddedState();
+            updateColumnVisibility(inst);
+            saveSettings();
+            inst.cfg.onUpdate();
+        });
 
-    secondColumnTypeSelect.addEventListener("change", () => {
-        selectedSecondColumnType = secondColumnTypeSelect.value;
-        updateSecondPlaylistColumnSettingsVisibility();
-        saveSettings();
-        updateTracklist();
-    });
-
-    showAlbumColumnToggle.addEventListener("change", () => {
-        showAlbumColumn = showAlbumColumnToggle.checked;
-        albumColumnTypeSelect.disabled = !showAlbumColumn;
-        updateAlbumColumnSettingsVisibility();
-        saveSettings();
-        onPageChange();
-    });
-
-    showArtistColumnToggle.addEventListener("change", () => {
-        showArtistColumn = showArtistColumnToggle.checked;
-        artistColumnTypeSelect.disabled = !showArtistColumn;
-        updateArtistColumnSettingsVisibility();
-        saveSettings();
-        onPageChange();
+        inst.select.addEventListener("change", () => {
+            inst.cfg.setType(inst.select.value);
+            updateColumnVisibility(inst);
+            saveSettings();
+            inst.cfg.onUpdate();
+        });
     });
 
     removeDateAddedToggle.addEventListener("change", () => {
@@ -5334,73 +5606,6 @@
             saveSettings();
             updateTracklist();
         }
-    });
-
-    columnTypeSelect.addEventListener("change", () => {
-        selectedColumnType = columnTypeSelect.value;
-        updatePlaylistColumnSettingsVisibility();
-        saveSettings();
-        updateTracklist();
-    });
-
-    albumColumnTypeSelect.addEventListener("change", () => {
-        selectedAlbumColumnType = albumColumnTypeSelect.value;
-        updateAlbumColumnSettingsVisibility();
-        saveSettings();
-        onPageChange();
-    });
-
-    artistColumnTypeSelect.addEventListener("change", () => {
-        selectedArtistColumnType = artistColumnTypeSelect.value;
-        updateArtistColumnSettingsVisibility();
-        saveSettings();
-        onPageChange();
-    });
-
-    const allDateFormatContainers = [dateFormatDropdownContainer, albumDateFormatDropdownContainer, artistDateFormatDropdownContainer, secondDateFormatDropdownContainer];
-    const allScrobbleContainers = [myScrobblesDropdownContainer, albumMyScrobblesDropdownContainer, artistMyScrobblesDropdownContainer, secondMyScrobblesDropdownContainer];
-    const allKeyContainers = [keyDropdownContainer, albumKeyDropdownContainer, artistKeyDropdownContainer, secondKeyDropdownContainer];
-    const allLastScrobbledContainers = [lastScrobbledDropdownContainer, albumLastScrobbledDropdownContainer, artistLastScrobbledDropdownContainer, secondLastScrobbledDropdownContainer];
-
-    const setupGlobalSettingListeners = (containers, settingKey, updateFunc) => {
-        containers.forEach(container => {
-            container.querySelectorAll("button").forEach(button => {
-                button.addEventListener("click", (event) => {
-                    event.stopPropagation();
-                    const newValue = button.getAttribute(`data-${settingKey}`);
-                    updateFunc(newValue);
-                    containers.forEach(c => {
-                        c.querySelectorAll("button").forEach(btn => btn.classList.remove("selected"));
-                        const matchingButton = c.querySelector(`[data-${settingKey}="${newValue}"]`);
-                        if (matchingButton) matchingButton.classList.add("selected");
-                    });
-                    
-                    const allContainers = [...allDateFormatContainers, ...allScrobbleContainers, ...allKeyContainers];
-                    allContainers.forEach(c => c.style.display = 'none');
-                    
-                    document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
-                        el.textContent = "";
-                        delete el.dataset.spProcessed;
-                    });
-                    
-                    saveSettings();
-                    onPageChange();
-                });
-            });
-        });
-    };
-
-    setupGlobalSettingListeners(allDateFormatContainers, 'format', (value) => {
-        releaseDateFormat = value;
-    });
-    setupGlobalSettingListeners(allScrobbleContainers, 'mode', (value) => {
-        myScrobblesDisplayMode = value;
-    });
-    setupGlobalSettingListeners(allKeyContainers, 'mode', (value) => {
-        keyDisplayMode = value;
-    });
-    setupGlobalSettingListeners(allLastScrobbledContainers, 'format', (value) => {
-        lastScrobbledFormat = value;
     });
 
     const setupSettingsButtonToggle = (button, dropdown, otherDropdowns) => {
@@ -5463,23 +5668,11 @@
         });
     };
 
-    const allDropdowns = [...allDateFormatContainers, ...allScrobbleContainers, ...allKeyContainers, ...allLastScrobbledContainers];
-    setupSettingsButtonToggle(dateFormatSettingsBtn, dateFormatDropdownContainer, allDropdowns.filter(d => d !== dateFormatDropdownContainer));
-    setupSettingsButtonToggle(myScrobblesSettingsBtn, myScrobblesDropdownContainer, allDropdowns.filter(d => d !== myScrobblesDropdownContainer));
-    setupSettingsButtonToggle(albumDateFormatSettingsBtn, albumDateFormatDropdownContainer, allDropdowns.filter(d => d !== albumDateFormatDropdownContainer));
-    setupSettingsButtonToggle(albumMyScrobblesSettingsBtn, albumMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== albumMyScrobblesDropdownContainer));
-    setupSettingsButtonToggle(artistDateFormatSettingsBtn, artistDateFormatDropdownContainer, allDropdowns.filter(d => d !== artistDateFormatDropdownContainer));
-    setupSettingsButtonToggle(artistMyScrobblesSettingsBtn, artistMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== artistMyScrobblesDropdownContainer));
-    setupSettingsButtonToggle(secondDateFormatSettingsBtn, secondDateFormatDropdownContainer, allDropdowns.filter(d => d !== secondDateFormatDropdownContainer));
-    setupSettingsButtonToggle(secondMyScrobblesSettingsBtn, secondMyScrobblesDropdownContainer, allDropdowns.filter(d => d !== secondMyScrobblesDropdownContainer));
-    setupSettingsButtonToggle(keySettingsBtn, keyDropdownContainer, allDropdowns.filter(d => d !== keyDropdownContainer));
-    setupSettingsButtonToggle(secondKeySettingsBtn, secondKeyDropdownContainer, allDropdowns.filter(d => d !== secondKeyDropdownContainer));
-    setupSettingsButtonToggle(albumKeySettingsBtn, albumKeyDropdownContainer, allDropdowns.filter(d => d !== albumKeyDropdownContainer));
-    setupSettingsButtonToggle(artistKeySettingsBtn, artistKeyDropdownContainer, allDropdowns.filter(d => d !== artistKeyDropdownContainer));
-    setupSettingsButtonToggle(lastScrobbledSettingsBtn, lastScrobbledDropdownContainer, allDropdowns.filter(d => d !== lastScrobbledDropdownContainer));
-    setupSettingsButtonToggle(secondLastScrobbledSettingsBtn, secondLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== secondLastScrobbledDropdownContainer));
-    setupSettingsButtonToggle(albumLastScrobbledSettingsBtn, albumLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== albumLastScrobbledDropdownContainer));
-    setupSettingsButtonToggle(artistLastScrobbledSettingsBtn, artistLastScrobbledDropdownContainer, allDropdowns.filter(d => d !== artistLastScrobbledDropdownContainer));
+    extraColumnInstances.forEach(inst => {
+        inst.formats.forEach(({ btn, drop }) => {
+            setupSettingsButtonToggle(btn, drop, allDropdowns.filter(d => d !== drop));
+        });
+    });
 
     const notifBtn = modalContainer.querySelector("#notificationHistoryBtn");
     const notifDropdown = modalContainer.querySelector("#notificationHistoryDropdown");
@@ -7348,7 +7541,7 @@
             return `\x02S${idx}\x02`;
         });
 
-        const urlRegex = /(https?:\/\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])+)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::\d+)?(?:\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])*)?)/gi;
+        const urlRegex = /(https?:\/\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])+)|(\bwww\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?::\d+)?(?:\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])*)?)|(\b(?:youtu\.be|t\.me|bit\.ly)\b(?::\d+)?(?:\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])*)?)|(\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+(?:(?:co|com|org|edu|gov|net)\.[a-zA-Z]{2}|com|org|net|edu|gov|io|dev|app|gg|xyz|info|site|tech|online|store|live|fm|tv|co)(?!\.[a-zA-Z])\b(?::\d+)?(?:\/(?:(?!&(?:quot|lt|gt|#39);)[^\s<>"'`\x02])*)?)/gi;
         text = text.replace(urlRegex, (match) => {
             let clean = match;
             let trailing = '';
@@ -9338,19 +9531,18 @@
   function showEnergyWaveSettingsModal() {
     showSimpleInputModal({
         title: "Vibe & Flow Config",
-        inputLabel: "Max tracks for 'Shuffle and Play':",
-        inputType: "number",
+        inputLabel: "Queue size for large playlists:",
         inputValue: energyWaveShuffleLimit,
-        subtextHtml: `<span style="font-size: 12px; color: #888; line-height: 1.4;">If a playlist exceeds this size, standard shuffle will be used instead to avoid long wait times. Normal sorting is unaffected.</span>`,
+        dropdownOptions: [
+            { value: "all", label: "All Tracks (Uncapped)" },
+            { value: "1000", label: "1,000 Tracks (Fastest)" },
+            { value: "3000", label: "3,000 Tracks (Faster)" }
+        ],
+        subtextHtml: `<span style="font-size: 12px; color: #888; line-height: 1.4;">Select how many tracks to queue for large playlists. Smaller sizes start faster.</span>`,
         onSave: (val, saveBtn, closeModal) => {
-            const newLimit = parseInt(val, 10);
-            if (!isNaN(newLimit) && newLimit > 0) {
-                energyWaveShuffleLimit = newLimit;
-                saveSettings();
-                closeModal();
-            } else {
-                showNotification("Please enter a valid number.", true);
-            }
+            energyWaveShuffleLimit = val;
+            saveSettings();
+            closeModal();
         }
     });
   }
@@ -12056,6 +12248,113 @@
     overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
 
+  const CUSTOM_SCHEDULE_PICKER_HTML = `
+      <div id="custom-schedule-container" class="custom-schedule-container">
+          <input type="number" id="days" min="0" value="0"><label for="days">d</label>
+          <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
+          <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
+          <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
+      </div>
+      <div id="custom-schedule-error" style="color: #f15e6c; font-size: 12px; text-align: right; margin-top: 4px; display: none;"></div>
+      <label id="custom-schedule-min-label" style="font-size: 12px; color: #b3b3b3; text-align: right; display: none; margin-top: 4px;">Minimum: ${SCHEDULER_INTERVAL_MINUTES} minutes</label>
+  `;
+
+  function getCustomScheduleDropdownHtml(currentSchedule) {
+      const customSchedules = getCustomSchedules();
+      const customOptions = customSchedules.map(s => `<option value="${s.value}" ${String(currentSchedule) === String(s.value) ? 'selected' : ''}>${s.text}</option>`).join('');
+      const clearOption = customSchedules.length > 0 ? `<option value="clear-custom" style="color: #f15e6c; font-style: italic;">Clear Custom Schedules...</option>` : '';
+      return `${customOptions}<option value="custom">+ Custom</option>${clearOption}`;
+  }
+
+  function setupCustomSchedulePicker({ root, selectId, onScheduleChange, onClearSchedules }) {
+      const select = root.querySelector(`#${selectId}`);
+      const container = root.querySelector('#custom-schedule-container');
+      const minLabel = root.querySelector('#custom-schedule-min-label');
+      const setBtn = root.querySelector('#set-custom-schedule-btn');
+      if (!select || !container || !setBtn) return;
+
+      let previousValue = select.value;
+
+      select.addEventListener('change', async (e) => {
+          const val = e.target.value;
+          if (val === 'clear-custom') {
+              e.target.value = previousValue;
+              const confirmed = await showConfirmationModal({
+                  title: "Clear Custom Schedules?",
+                  description: "This will permanently remove all of your saved custom schedules. This action cannot be undone.",
+                  confirmText: "Clear All",
+                  cancelText: "Cancel"
+              });
+              if (confirmed === 'confirm') {
+                  saveCustomSchedules([]);
+                  showNotification("All custom schedules have been cleared.");
+                  onClearSchedules?.();
+              }
+              return;
+          }
+
+          const isCustom = val === 'custom';
+          container.classList.toggle('visible', isCustom);
+          if (minLabel) minLabel.style.display = isCustom ? 'block' : 'none';
+          if (!isCustom) {
+              previousValue = val;
+              onScheduleChange?.(val);
+          }
+      });
+
+      setBtn.addEventListener('click', () => {
+          const days = parseInt(root.querySelector('#days')?.value, 10) || 0;
+          const hours = parseInt(root.querySelector('#hours')?.value, 10) || 0;
+          const minutes = parseInt(root.querySelector('#minutes')?.value, 10) || 0;
+
+          const totalMs = (days * 86400000) + (hours * 3600000) + (minutes * 60000);
+          const minMs = SCHEDULER_INTERVAL_MINUTES * 60 * 1000;
+
+          if (totalMs < minMs) {
+              showNotification(`Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`, true);
+              return;
+          }
+
+          let text = 'Every ';
+          if (days > 0) text += `${days}d `;
+          if (hours > 0) text += `${hours}h `;
+          if (minutes > 0) text += `${minutes}m`;
+          text = text.trim();
+
+          const customSchedules = getCustomSchedules();
+          if (!customSchedules.some(s => s.value === totalMs)) {
+              customSchedules.push({ value: totalMs, text });
+              saveCustomSchedules(customSchedules);
+          }
+
+          let customOption = select.querySelector(`option[value="${totalMs}"]`);
+          if (!customOption) {
+              customOption = document.createElement('option');
+              customOption.value = totalMs;
+              customOption.textContent = text;
+              const customRef = select.querySelector('option[value="custom"]');
+              if (customRef) select.insertBefore(customOption, customRef);
+              else select.appendChild(customOption);
+          }
+
+          if (!select.querySelector('option[value="clear-custom"]')) {
+              const clearOption = document.createElement('option');
+              clearOption.value = 'clear-custom';
+              clearOption.textContent = 'Clear Custom Schedules...';
+              clearOption.style.color = '#f15e6c';
+              clearOption.style.fontStyle = 'italic';
+              select.appendChild(clearOption);
+          }
+
+          select.value = totalMs;
+          previousValue = totalMs;
+          container.classList.remove('visible');
+          if (minLabel) minLabel.style.display = 'none';
+
+          onScheduleChange?.(totalMs);
+      });
+  }
+  
   function showDedicatedScheduleModal(cardId, cardName) {
     return new Promise((resolve) => {
         const overlay = document.createElement("div");
@@ -12103,16 +12402,6 @@
         const job = jobs.find(j => j.dedicatedType === cardId);
         const currentSchedule = job ? job.schedule : '86400000';
 
-        const customSchedules = getCustomSchedules();
-        const customScheduleOptions = customSchedules.map(s => `<option value="${s.value}" ${String(currentSchedule) === String(s.value) ? 'selected' : ''}>${s.text}</option>`).join('');
-
-        let clearAndSeparatorHtml = '';
-        if (customSchedules.length > 0) {
-            clearAndSeparatorHtml = `
-                <option value="clear-custom" style="color: #f15e6c; font-style: italic;">Clear Custom Schedules...</option>
-            `;
-        }
-
         shadowRoot.innerHTML = `
           <style>
             :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
@@ -12150,18 +12439,9 @@
                   <option value="release-every-two-weeks" ${currentSchedule === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
                   <option value="release-monthly" ${currentSchedule === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
                   <option disabled>- Custom Schedules -</option>
-                  ${customScheduleOptions}
-                  <option value="custom">+ Custom</option>
-                  ${clearAndSeparatorHtml}
+                  ${getCustomScheduleDropdownHtml(currentSchedule)}
               </select>
-              <div id="custom-schedule-container" class="custom-schedule-container">
-                  <input type="number" id="days" min="0" value="0"><label for="days">d</label>
-                  <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
-                  <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
-                  <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
-              </div>
-              <div id="custom-schedule-error" style="color: #f15e6c; font-size: 12px; text-align: right; margin-top: 4px; display: none;"></div>
-              <label id="custom-schedule-min-label" style="font-size: 12px; color: #b3b3b3; text-align: right; display: none; margin-top: 4px;">Minimum: ${SCHEDULER_INTERVAL_MINUTES} minutes</label>
+              ${CUSTOM_SCHEDULE_PICKER_HTML}
               <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                   <button id="cancel-schedule" class="sp-sched-btn sp-sched-btn-secondary">Cancel</button>
                   <button id="save-schedule" class="sp-sched-btn sp-sched-btn-primary">Save</button>
@@ -12182,70 +12462,13 @@
         };
 
         const scheduleSelect = modalContainer.querySelector('#dedicated-schedule-select');
-        const customScheduleContainer = modalContainer.querySelector('#custom-schedule-container');
-        const minLabel = modalContainer.querySelector('#custom-schedule-min-label');
-        let previousScheduleValue = scheduleSelect.value;
-
-        scheduleSelect.addEventListener('change', async (e) => {
-            const selectedValue = e.target.value;
-
-            if (selectedValue === 'clear-custom') {
-                e.target.value = previousScheduleValue;
-                const confirmed = await showConfirmationModal({
-                    title: "Clear Custom Schedules?",
-                    description: "This will permanently remove all of your saved custom schedules. This action cannot be undone.",
-                    confirmText: "Clear All",
-                    cancelText: "Cancel",
-                });
-                if (confirmed === 'confirm') {
-                    saveCustomSchedules([]);
-                    showNotification("All custom schedules have been cleared.");
-                    closeModal();
-                    resolve(await showDedicatedScheduleModal(cardId, cardName));
-                }
-            } else {
-                const isCustom = selectedValue === 'custom';
-                customScheduleContainer.classList.toggle('visible', isCustom);
-                minLabel.style.display = isCustom ? 'block' : 'none';
-                if (!isCustom) {
-                    previousScheduleValue = selectedValue;
-                }
+        setupCustomSchedulePicker({
+            root: modalContainer,
+            selectId: 'dedicated-schedule-select',
+            onClearSchedules: async () => {
+                closeModal();
+                resolve(await showDedicatedScheduleModal(cardId, cardName));
             }
-        });
-
-        modalContainer.querySelector('#set-custom-schedule-btn').addEventListener('click', () => {
-            const days = parseInt(modalContainer.querySelector('#days').value) || 0;
-            const hours = parseInt(modalContainer.querySelector('#hours').value) || 0;
-            const minutes = parseInt(modalContainer.querySelector('#minutes').value) || 0;
-            
-            const totalMs = (days * 86400000) + (hours * 3600000) + (minutes * 60000);
-            const minMs = SCHEDULER_INTERVAL_MINUTES * 60 * 1000;
-
-            if (totalMs < minMs) {
-                showNotification(`Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`, true);
-                return;
-            }
-
-            let text = 'Every ';
-            if (days > 0) text += `${days}d `;
-            if (hours > 0) text += `${hours}h `;
-            if (minutes > 0) text += `${minutes}m`;
-            text = text.trim();
-
-            const customSchedules = getCustomSchedules();
-            if (!customSchedules.some(s => s.value === totalMs)) {
-                customSchedules.push({ value: totalMs, text });
-                saveCustomSchedules(customSchedules);
-            }
-
-            const customOption = document.createElement('option');
-            customOption.value = totalMs;
-            customOption.textContent = text;
-            scheduleSelect.insertBefore(customOption, scheduleSelect.querySelector('option[value="custom"]'));
-            scheduleSelect.value = totalMs;
-            previousScheduleValue = totalMs;
-            customScheduleContainer.classList.remove('visible');
-            minLabel.style.display = 'none';
         });
 
         modalContainer.querySelector("#save-schedule").addEventListener("click", () => {
@@ -12604,7 +12827,7 @@
       });
   }
   
-  async function showConfirmationModal({ title, description, confirmText, cancelText, neutralText, checkboxLabel }) {
+  async function showConfirmationModal({ title, description, confirmText, cancelText, neutralText, checkboxLabel, checkboxChecked = false }) {
     return new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.id = "sort-play-confirmation-overlay";
@@ -12647,7 +12870,7 @@
 
       const checkboxHtml = checkboxLabel 
         ? `<label style="color: #b3b3b3; font-size: 13px; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; margin-top: 20px; margin-bottom: 5px;">
-             <input type="checkbox" id="confirmCheckbox" style="accent-color: #1db954; width: 16px; height: 16px; margin: 0;">
+             <input type="checkbox" id="confirmCheckbox" ${checkboxChecked ? 'checked' : ''} style="accent-color: #1db954; width: 16px; height: 16px; margin: 0;">
              ${checkboxLabel}
            </label>`
         : '';
@@ -12779,12 +13002,7 @@
               }
 
               if (queryName) {
-                  const res = await Spicetify.GraphQL.Request({
-                      name: queryName,
-                      operation: "query",
-                      sha256Hash: "b2d6d99fb6237952dfa6638385f9c6085f1b1fb9d0468753ca6ad98ff45adc6f",
-                      value: null
-                  }, { uri: entityUri });
+                  const res = await Spicetify.GraphQL.Request(GraphQL.Definitions[queryName], { uri: entityUri });
 
                   let current = res.data;
                   for (const key of dataPath) {
@@ -13089,7 +13307,10 @@
 
               let result = null;
               if (!isCountryOnly(lower) && isWhitelistedGenre(lower, genreMap)) {
-                  result = normalizeGenre(lower) || null;
+                  const normalized = normalizeGenre(lower);
+                  if (normalized && !MOOD_DESCRIPTORS_SET.has(normalized)) {
+                      result = normalized;
+                  }
               }
               genreValidationCache.set(lower, result);
               return result;
@@ -13345,7 +13566,7 @@
           .sp-pg-metric-group { position: relative; width: 40%; height: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 6px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: help; margin-left: auto; margin-right: 4px; transition: background 0.15s ease, filter 0.15s ease; }
           .sp-pg-metric-group:hover { background: rgba(255, 255, 255, 0.05); filter: brightness(1.15); }
           .sp-pg-bar-track { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: transparent; border-radius: 6px; overflow: hidden; pointer-events: none; }
-          .sp-pg-bar-fill { height: 100%; background: linear-gradient(90deg, rgba(var(--sp-pg-accent, 155, 81, 224), 0.1) 0%, rgba(var(--sp-pg-accent, 155, 81, 224), 0.4) 100%); border-radius: 6px; transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
+          .sp-pg-bar-fill { height: 100%; background: linear-gradient(90deg, rgba(var(--sp-pg-accent, 155, 81, 224), 0.1) 0%, rgba(var(--sp-pg-accent, 155, 81, 224), 0.55) 100%); border-radius: 6px; transition: width 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
           .sp-pg-stats-badge { position: relative; z-index: 1; width: 100%; height: 100%; font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.95) !important; background: transparent !important; border: none !important; padding: 0 8px; text-align: center; justify-content: center; display: inline-flex; align-items: center; font-family: var(--font-family, 'SpotifyMixUI', 'CircularSp', sans-serif); box-sizing: border-box; letter-spacing: 0.2px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04); border-radius: 6px; pointer-events: auto; cursor: help; user-select: none; white-space: nowrap; -webkit-font-smoothing: antialiased; }
           .sp-pg-genre-row .genre-copy-btn { position: absolute; right: 0; top: 0; bottom: 0; width: 36px; height: 100%; background: transparent; border: none; color: rgba(255,255,255,0.4); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 0 6px 6px 0; transition: all 0.15s ease; flex-shrink: 0; z-index: 2; margin: 0; }
           .sp-pg-genre-row:hover .genre-copy-btn { color: rgba(255,255,255,0.8); }
@@ -14075,7 +14296,7 @@
             .genre-detail-tag { height: 28px; box-sizing: border-box; padding: 0 0 0 12px; border-radius: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.05); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; user-select: none; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; position: relative; }
             .genre-detail-tag:hover { background-color: rgba(255,255,255,0.14) !important; border-color: rgba(255,255,255,0.18) !important; }
             .genre-detail-tag.animated { animation: sp-tag-pop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; opacity: 0; }
-            .genre-detail-score { background: rgba(var(--sp-pg-accent, 255, 255, 255), 0.14); color: rgb(var(--sp-pg-accent-light, 255, 255, 255)); padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500; line-height: 1; display: inline-flex; align-items: center; letter-spacing: 0.2px; font-family: var(--font-family, 'SpotifyMixUI', 'CircularSp', sans-serif); flex-shrink: 0; -webkit-font-smoothing: antialiased; transition: background 0.3s ease, color 0.3s ease; }
+            .genre-detail-score { background: rgba(var(--sp-pg-accent, 255, 255, 255), 0.14); border: 1px solid rgba(255, 255, 255, 0.07); color: rgb(var(--sp-pg-accent-light, 255, 255, 255)); padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500; line-height: 1; display: inline-flex; align-items: center; letter-spacing: 0.2px; font-family: var(--font-family, 'SpotifyMixUI', 'CircularSp', sans-serif); flex-shrink: 0; -webkit-font-smoothing: antialiased; transition: background 0.3s ease, color 0.3s ease; }
             .genre-detail-tag:hover .genre-detail-score { background: rgba(var(--sp-pg-accent, 255, 255, 255), 0.28); color: #fff; }
             .genre-detail-tag .genre-copy-btn { position: relative !important; right: auto !important; top: auto !important; bottom: auto !important; height: 100% !important; width: 22px !important; background: transparent !important; border: none !important; color: rgba(255,255,255,0.5); cursor: pointer; padding: 0 5px 0 2px !important; display: flex; align-items: center; justify-content: center; border-radius: 0 13px 13px 0; transition: background-color 0.15s ease, color 0.15s ease; flex-shrink: 0; margin: 0; }
             .genre-detail-tag:hover .genre-copy-btn { color: rgba(255,255,255,0.85); }
@@ -14606,7 +14827,8 @@
     "country": ["country", "country music", "country's", "countrymusic"],
     "classical": ["classic", "classical", "classical music", "classical's", "classics", "orchestra", "orchestral", "orchestral music", "orchestras"],
     "world": ["world", "world music"],
-    "christian": ["christian", "christian music", "ccm"],
+    "christian": ["christian", "christian music"],
+    "christian pop": ["christian pop", "ccm", "deep ccm"],
     "rock": ["rock", "rock music", "rock's", "rockmusic", "rocks", "rockin", "rockin'"],
     "indie": ["indie", "indie's", "indiemusic", "indies"],
     "dance": ["dance", "dance music", "dance's", "dances", "dancey"],
@@ -14647,6 +14869,14 @@
           .replace(/&/g, 'and')
           .replace(/\s+/g, ' ');
   }
+
+  const MOOD_DESCRIPTORS_SET = new Set([
+      "chill", "relaxing", "calm", "love", "fast", "slow", "soothing", "peaceful", "tranquil",
+      "mellow", "soft", "smooth", "quiet", "energetic", "sad", "upbeat", "pump up", "romantic",
+      "moody", "melancholy", "nostalgia", "emotional", "cozy", "gentle", "happy", "rain",
+      "motivation", "angst", "aggressive", "atmospheric", "nature", "angry", "dark", "classy",
+      "funny", "spooky", "epic", "sensual", "ethereal", "beats", "ibiza", "club", "gaming", "spiritual", "soulful"
+  ]);
 
   let isCountryOnly_Set = null;
   function isCountryOnly(tag) {
@@ -14690,157 +14920,192 @@
       return isMapped || isInJson;
   }
 
+  const nativeConceptTextDecoder = new TextDecoder();
+
+  function parseNativeTrackConceptsBuffer(rawBytes) {
+      if (!rawBytes) return [];
+      const bytes = rawBytes instanceof Uint8Array
+          ? rawBytes
+          : (rawBytes instanceof ArrayBuffer
+              ? new Uint8Array(rawBytes)
+              : (typeof rawBytes.length === "number"
+                  ? new Uint8Array(rawBytes)
+                  : new Uint8Array(Object.values(rawBytes))));
+
+      if (bytes.byteLength === 0) return [];
+      const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const results = [];
+      let pos = 0;
+
+      const readVarint = () => {
+          let val = 0, shift = 0;
+          while (pos < bytes.byteLength) {
+              const b = bytes[pos++];
+              val = (val + ((b & 0x7f) << shift)) >>> 0;
+              if (!(b & 0x80) || shift > 35) break;
+              shift += 7;
+          }
+          return val;
+      };
+
+      while (pos < bytes.byteLength) {
+          const tag = readVarint();
+          if (tag === 0) break;
+          const field = tag >>> 3;
+          const wire = tag & 7;
+
+          if (field === 1 && wire === 2) {
+              const len = readVarint();
+              if (len < 0 || pos + len > bytes.byteLength) break;
+              const end = pos + len;
+              let conceptName = "";
+              let score = 0.5;
+
+              while (pos < end) {
+                  const subTag = readVarint();
+                  if (subTag === 0) break;
+                  const subField = subTag >>> 3;
+                  const subWire = subTag & 7;
+
+                  if (subField === 1 && subWire === 2) {
+                      const sLen = readVarint();
+                      if (pos + sLen <= end) {
+                          conceptName = nativeConceptTextDecoder.decode(bytes.subarray(pos, pos + sLen)).toLowerCase().trim();
+                          pos += sLen;
+                      } else {
+                          break;
+                      }
+                  } else if (subField === 2 && subWire === 5) {
+                      if (pos + 4 <= end) {
+                          const fVal = view.getFloat32(pos, true);
+                          score = Number.isFinite(fVal) ? fVal : 0.5;
+                          pos += 4;
+                      } else {
+                          break;
+                      }
+                  } else if (subField === 2 && subWire === 1) {
+                      if (pos + 8 <= end) {
+                          const fVal = view.getFloat64(pos, true);
+                          score = Number.isFinite(fVal) ? fVal : 0.5;
+                          pos += 8;
+                      } else {
+                          break;
+                      }
+                  } else if (subWire === 0) {
+                      readVarint();
+                  } else if (subWire === 1) {
+                      pos += 8;
+                  } else if (subWire === 2) {
+                      const skipLen = readVarint();
+                      if (pos + skipLen <= end) {
+                          pos += skipLen;
+                      } else {
+                          break;
+                      }
+                  } else if (subWire === 5) {
+                      pos += 4;
+                  } else {
+                      break;
+                  }
+              }
+              pos = end;
+
+              if (conceptName.startsWith("spotify:concept:")) {
+                  conceptName = conceptName.slice(16).trim();
+              }
+              conceptName = conceptName.replace(/_/g, ' ').trim();
+
+              if (conceptName && conceptName !== "track") {
+                  results.push({ name: conceptName, score: Math.max(0.01, Math.min(1.0, score)) });
+              }
+          } else if (wire === 0) {
+              readVarint();
+          } else if (wire === 1) {
+              pos += 8;
+          } else if (wire === 2) {
+              const skipLen = readVarint();
+              if (pos + skipLen <= bytes.byteLength) {
+                  pos += skipLen;
+              } else {
+                  break;
+              }
+          } else if (wire === 5) {
+              pos += 4;
+          } else {
+              break;
+          }
+      }
+
+      if (results.length === 0) return [];
+      const uniqueMap = new Map();
+      results.forEach(r => {
+          if (!uniqueMap.has(r.name) || r.score > uniqueMap.get(r.name)) {
+              uniqueMap.set(r.name, r.score);
+          }
+      });
+
+      return Array.from(uniqueMap.entries())
+          .map(([name, score]) => ({ name, score }))
+          .sort((a, b) => b.score - a.score);
+  }
+
   async function fetchNativeSpotifyTrackGenres(trackUri) {
+      if (!trackUri || !trackUri.startsWith("spotify:track:")) return [];
       try {
           const client = getMetadataClient();
           if (!client) return [];
-          
+
           const response = await client.fetch({ extensionQuery: [
-              { extensionKind: 6, entityUri: [trackUri] },
-              { extensionKind: 28, entityUri: [trackUri] }
+              { extensionKind: 6, entityUri: [trackUri] }
           ]});
-          
-          let concepts = [];
-          let scores = [];
-          
-          if (response.extension) {
-              response.extension.forEach(ext => {
-                  if (ext.extensionKind === 6 && ext.entityExtension && ext.entityExtension[0] && ext.entityExtension[0].extensionData) {
-                      const text = new TextDecoder().decode(ext.entityExtension[0].extensionData.value);
-                      const rawMatches = text.match(/[A-Za-z0-9 _\-\&']{3,}/g);
-                      if (rawMatches) {
-                          const matches = rawMatches.filter(s => {
-                              const l = s.toLowerCase();
-                              return !l.startsWith('spotify') && !l.startsWith('&spotify') && l !== 'concept';
-                          });
-                          for (let j = 0; j < matches.length; j++) {
-                              if (/^[a-zA-Z0-9]{22}$/.test(matches[j]) && j > 0) {
-                                  const concept = matches[j - 1].toLowerCase().trim();
-                                  if (concept !== 'track') {
-                                      concepts.push(concept);
-                                  }
-                              }
-                          }
-                      }
-                  }
-                  if (ext.extensionKind === 28 && ext.entityExtension && ext.entityExtension[0] && ext.entityExtension[0].extensionData) {
-                      const buffer = new Uint8Array(Object.values(ext.entityExtension[0].extensionData.value)).buffer;
-                      const dataView = new DataView(buffer);
-                      for(let i = 0; i < buffer.byteLength - 8; i++) {
-                          try {
-                              let val = dataView.getFloat64(i, true);
-                              if (val > 0.001 && val <= 1.0) scores.push(val);
-                          } catch(e){}
-                      }
-                  }
-              });
-          }
-          
-          const uniqueConcepts = [...new Set(concepts.map(c => c.toLowerCase()))];
-          return uniqueConcepts.map((concept, index) => {
-              let score = scores[index] || 0;
-              return { name: concept, score: score };
-          });
+
+          const ext = response?.extension?.find(e => e.extensionKind === 6) || response?.extension?.[0];
+          const item = ext?.entityExtension?.find(e => e.entityUri === trackUri) || ext?.entityExtension?.[0];
+          return parseNativeTrackConceptsBuffer(item?.extensionData?.value);
       } catch (e) {
           console.warn("[Sort-Play] Failed to fetch Native Spotify Track Genres:", e);
           return [];
       }
   }
-  
+
   async function fetchNativeSpotifyTrackGenresBatch(trackUris) {
+      const finalMap = new Map();
+      if (!trackUris || trackUris.length === 0) return finalMap;
+      trackUris.forEach(uri => finalMap.set(uri, []));
+
       try {
           const client = getMetadataClient();
-          if (!client) return new Map();
-          
-          const validUris = trackUris.filter(uri => uri && uri.startsWith("spotify:track:"));
-          if (validUris.length === 0) return new Map();
+          if (!client) return finalMap;
 
-          const finalMap = new Map();
+          const validUris = [...new Set(trackUris.filter(uri => uri && uri.startsWith("spotify:track:")))];
+          if (validUris.length === 0) return finalMap;
+
           const BATCH_SIZE = 500;
-
           for (let i = 0; i < validUris.length; i += BATCH_SIZE) {
               const batch = validUris.slice(i, i + BATCH_SIZE);
-              
+
               try {
                   const response = await client.fetch({ extensionQuery: [
-                      { extensionKind: 6, entityUri: batch },
-                      { extensionKind: 28, entityUri: batch }
+                      { extensionKind: 6, entityUri: batch }
                   ]});
-                  
-                  const batchResults = new Map();
-                  batch.forEach(uri => batchResults.set(uri, { concepts: [], scores: [] }));
 
-                  if (response.extension) {
-                      response.extension.forEach(ext => {
-                          const kind = ext.extensionKind;
-                          if ((kind === 6 || kind === 28) && ext.entityExtension) {
-                              ext.entityExtension.forEach(item => {
-                                  if (item.extensionData && item.extensionData.value) {
-                                      const uri = item.entityUri;
-                                      const res = batchResults.get(uri) || { concepts: [], scores: [] };
-                                      
-                                      if (kind === 6) {
-                                          const text = new TextDecoder().decode(item.extensionData.value);
-                                          const rawMatches = text.match(/[A-Za-z0-9 _\-\&']{3,}/g);
-                                          if (rawMatches) {
-                                              const matches = rawMatches.filter(s => {
-                                                  const l = s.toLowerCase();
-                                                  return !l.startsWith('spotify') && !l.startsWith('&spotify') && l !== 'concept';
-                                              });
-                                              for (let j = 0; j < matches.length; j++) {
-                                                  if (/^[a-zA-Z0-9]{22}$/.test(matches[j]) && j > 0) {
-                                                      const concept = matches[j - 1].toLowerCase().trim();
-                                                      if (concept !== 'track') {
-                                                          res.concepts.push(concept);
-                                                      }
-                                                  }
-                                              }
-                                          }
-                                      } else if (kind === 28) {
-                                          const buffer = new Uint8Array(Object.values(item.extensionData.value)).buffer;
-                                          const dataView = new DataView(buffer);
-                                          for(let k = 0; k < buffer.byteLength - 8; k++) {
-                                              try {
-                                                  let val = dataView.getFloat64(k, true);
-                                                  if (val > 0.001 && val <= 1.0) res.scores.push(val);
-                                              } catch(e){}
-                                          }
-                                      }
-                                      batchResults.set(uri, res);
-                                  }
-                              });
-                          }
+                  const ext = response?.extension?.find(e => e.extensionKind === 6) || response?.extension?.[0];
+                  if (ext?.entityExtension) {
+                      ext.entityExtension.forEach(item => {
+                          if (!item?.entityUri) return;
+                          const parsed = parseNativeTrackConceptsBuffer(item?.extensionData?.value);
+                          finalMap.set(item.entityUri, parsed);
                       });
                   }
-                  
-                  batchResults.forEach((data, uri) => {
-                      const uniqueConceptsMap = new Map();
-                      data.concepts.forEach((concept, index) => {
-                          const lower = concept.toLowerCase();
-                          if (!uniqueConceptsMap.has(lower)) {
-                              uniqueConceptsMap.set(lower, data.scores[index] || 0);
-                          }
-                      });
-                      
-                      const genres = Array.from(uniqueConceptsMap.entries()).map(([name, score]) => ({
-                          name,
-                          score
-                      }));
-                      
-                      finalMap.set(uri, genres);
-                  });
               } catch (batchError) {
                   console.warn(`[Sort-Play] Failed to fetch Native Spotify Track Genres Batch for slice ${i}-${i + BATCH_SIZE}:`, batchError);
-                  batch.forEach(uri => {
-                      if (!finalMap.has(uri)) finalMap.set(uri, []);
-                  });
               }
           }
-          
+
           return finalMap;
       } catch (e) {
           console.warn("[Sort-Play] Failed to fetch Native Spotify Track Genres Batch:", e);
-          return new Map();
+          return finalMap;
       }
   }
   
@@ -14881,7 +15146,7 @@
                           const nativeGenres = await fetchNativeSpotifyTrackGenres(track.uri);
                           const validNative = nativeGenres.filter(g => {
                               const name = g.name.toLowerCase();
-                              return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap);
+                              return !/^\d+$/.test(name) && !isCountryOnly(name) && isWhitelistedGenre(name, genreMap) && (g.score * 100) >= 5;
                           });
                           
                           if (validNative.length > 0) {
@@ -14890,7 +15155,7 @@
                                   if (!genreSourcesMap.has(normalized)) {
                                       genreSourcesMap.set(normalized, { name: normalized, sources: new Set() });
                                   }
-                                  const pct = (g.score * 100).toFixed(1);
+                                  const pct = Math.round(g.score * 100);
                                   genreSourcesMap.get(normalized).sources.add(`Spotify Track (${pct}%)`);
                               });
                           }
@@ -15379,7 +15644,7 @@
             
             if (onlySpotifyTrack) {
                 const score = getSpotifyTrackScore(item.sources);
-                if (maxSpotifyScoreOverall > 0 && score !== -1 && score < 1) return false;
+                if (maxSpotifyScoreOverall > 0 && score !== -1 && score < 5) return false;
             }
             return true;
         });
@@ -15426,7 +15691,10 @@
 
         const orderedGenres = validGenreItems.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
         
-        const genreLinks = orderedGenres.map(item => {
+        const nonMoodGenres = orderedGenres.filter(item => !MOOD_DESCRIPTORS_SET.has(normalizeGenre(item.name)));
+        const finalDisplayGenres = nonMoodGenres.length > 0 ? nonMoodGenres : orderedGenres;
+
+        const genreLinks = finalDisplayGenres.map(item => {
             const rawName = item.name;
             const sources = Array.from(item.sources).join(' & ');
             
@@ -15750,7 +16018,7 @@
                                   const data = await res.json();
                                   
                                   const rawGenres = Array.isArray(data) ? data : (data?.[artistId] || []);
-                                  const validGenres = rawGenres.filter(g => !isCountryOnly(g) && isWhitelistedGenre(g, genreMap));
+                                  const validGenres = rawGenres.filter(g => !isCountryOnly(g) && isWhitelistedGenre(g, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(g)));
 
                                   everyNoiseCache.set(artistId, validGenres);
                                   idb.set('everyNoiseArtistTags', artistId, validGenres);
@@ -15823,7 +16091,7 @@
                                   const data = await artistRes.json();
                                   if (data?.artist?.tags?.tag) {
                                       const rawTags = data.artist.tags.tag.map(t => t.name.toLowerCase());
-                                      validTags = rawTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
+                                      validTags = rawTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
                                   }
                               }
 
@@ -16339,7 +16607,7 @@
         const count = tracksToPlay.length;
         const trackWord = count === 1 ? 'track' : 'tracks';
         const message = source === 'shuffle' 
-            ? `Shuffled ${count} ${trackWord} and added to queue.`
+            ? `Shuffled ${count} ${trackWord}${useEnergyWaveShuffle ? ' with Vibe & Flow' : ''} and added to queue.`
             : `Sorted tracks added to queue.`;
         showNotification(message);
 
@@ -18053,7 +18321,7 @@ shadowRoot.innerHTML = `
     updateProgress("Popularity...");
 
     const requiresGlobalPopularity = [
-        'popularity', 'tasteMatch', 'energyWave', 'aiPick', 'filterOnePerArtist'
+        'popularity', 'energyWave', 'aiPick', 'filterOnePerArtist'
     ].includes(sortType) || (sortType === 'shuffle' && useEnergyWaveShuffle);
 
     const skipNetworkForIds = new Set();
@@ -18744,19 +19012,22 @@ shadowRoot.innerHTML = `
           
           try {
               let tracksToPlay = finalTracks;
-              const containsLocalFiles = finalTracks.some(track => Spicetify.URI.isLocal(track.uri));
+              const queueLimit = energyWaveShuffleLimit === 'all' ? Infinity : (parseInt(energyWaveShuffleLimit, 10) || Infinity);
 
-              if (useEnergyWaveShuffle && !containsLocalFiles && finalTracks.length <= energyWaveShuffleLimit) {
+              if (useEnergyWaveShuffle) {
+                  if (queueLimit < tracksToPlay.length) {
+                      tracksToPlay = shuffleArray(tracksToPlay).slice(0, queueLimit);
+                  }
                   const activeKeys = Object.keys(activeVibesMap);
                   const isSingleVibe = activeKeys.length === 1;
                   
                   showNotification(isSingleVibe ? `Applying Vibe Flow...` : "Performing Randomized Energy Wave Shuffle...");
                   
-                  const tracksWithData = finalTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-                  const tracksWithoutData = finalTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+                  const tracksWithData = tracksToPlay.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
+                  const tracksWithoutData = tracksToPlay.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
 
                   if (tracksWithData.length < 3) {
-                      tracksToPlay = shuffleArray(finalTracks);
+                      tracksToPlay = shuffleArray(tracksToPlay);
                   } else {
                       let waveSorted;
                       if (isSingleVibe) {
@@ -19178,6 +19449,2702 @@ shadowRoot.innerHTML = `
     } finally {
         resetButtons();
     }
+  }
+
+  async function handleUnavailableTracksAudit() {
+    const currentUri = getCurrentUri();
+    if (!currentUri) {
+        showNotification("Please select a playlist, album, or artist first.", true);
+        return;
+    }
+
+    if (isLocalFilesPage(currentUri)) {
+        showNotification("Regional availability only applies to Spotify catalogue tracks.", "warning");
+        return;
+    }
+
+    startProcessing();
+
+    try {
+        let tracks = [];
+        let isOwnedPlaylist = false;
+        let playlistMetadata = null;
+
+        if (URI.isPlaylistV1OrV2(currentUri)) {
+            const playlistId = currentUri.split(":")[2];
+            tracks = await getPlaylistTracks(playlistId);
+            try {
+                const user = await Spicetify.Platform.UserAPI.getUser();
+                const userId = user?.username || user?.id;
+                playlistMetadata = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUri);
+                const ownerUri = playlistMetadata?.owner?.uri || "";
+                const ownerUsername = playlistMetadata?.owner?.username || playlistMetadata?.owner?.id;
+                const isOwner = userId && (ownerUsername === userId || ownerUri.includes(userId));
+                if (isOwner || playlistMetadata?.canEdit || playlistMetadata?.canModify) {
+                    isOwnedPlaylist = true;
+                }
+            } catch (e) {}
+        } else if (URI.isArtist(currentUri)) {
+            tracks = await getArtistTracks(currentUri, false, (msg) => { mainButton.innerText = msg; });
+        } else if (isLikedSongsPage(currentUri)) {
+            tracks = await getLikedSongs();
+        } else if (URI.isAlbum(currentUri)) {
+            tracks = await getAlbumTracks(currentUri.split(":")[2]);
+        } else {
+            throw new Error("Unsupported view type for availability audit.");
+        }
+
+        if (!tracks || tracks.length === 0) {
+            showNotification("No tracks found to audit.", "warning");
+            return;
+        }
+
+        const unavailableTracks = tracks.filter(t => {
+            if (Spicetify.URI.isLocal(t.uri)) return false;
+            return t.isPlayable === false || t.is_playable === false || t.playability?.playable === false || t.track?.isPlayable === false || t.track?.is_playable === false || t.track?.playability?.playable === false;
+        });
+
+        if (unavailableTracks.length === 0) {
+            showNotification("All tracks are available in your region!");
+            return;
+        }
+
+        const { sourceName } = await fetchCleanSourceNameAndArtist(currentUri);
+        resetButtons();
+        await showUnavailableTracksModal({
+            unavailableTracks,
+            allTracks: tracks,
+            currentUri,
+            sourceName,
+            isOwnedPlaylist
+        });
+
+    } catch (err) {
+        console.error("[Sort-Play] Unavailable tracks audit failed:", err);
+        showNotification(err.message || "Failed to audit track availability.", true);
+    } finally {
+        resetButtons();
+    }
+  }
+
+  function getAuditTrackInfo(track) {
+    if (!track) return null;
+    const title = track.songTitle || track.name || "Unknown Title";
+    const artist = track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
+    const album = track.albumName || track.album?.name || track.track?.album?.name || "Unknown Album";
+    const uri = track.uri || "";
+    const isLocal = Boolean(uri && uri.startsWith("spotify:local:"));
+    const trackLink = (!isLocal && uri.startsWith("spotify:track:")) ? uri.replace("spotify:track:", "https://open.spotify.com/track/") : "";
+    const rawAlbumId = track.albumId || track.album?.id || track.track?.album?.id || (track.albumUri?.startsWith("spotify:album:") ? track.albumUri.split(":")[2] : (track.track?.album?.uri?.startsWith("spotify:album:") ? track.track.album.uri.split(":")[2] : null));
+    const cleanAlbumId = rawAlbumId ? String(rawAlbumId).replace(/^spotify:album:/, "") : "";
+    const albumLink = (!isLocal && cleanAlbumId && !cleanAlbumId.startsWith("spotify:")) ? `https://open.spotify.com/album/${cleanAlbumId}` : "";
+    const durationMs = track.durationMs || track.durationMilis || track.track?.duration_ms || 0;
+    const duration = formatDuration(durationMs);
+    const images = track.track?.album?.images || track.album?.images || [];
+    let coverUrl = FALLBACK_COVER_URI;
+    if (!isLocal) {
+      if (images.length > 0) coverUrl = images[images.length - 1]?.url || images[0]?.url;
+      else if (getCachedSpotifyImage(uri)) coverUrl = getCachedSpotifyImage(uri);
+    }
+    const needsCoverLoad = !isLocal && (coverUrl === FALLBACK_COVER_URI);
+    const isrc = track.isrc || track.track?.external_ids?.isrc || track.external_ids?.isrc || null;
+    const isExplicit = Boolean(track.explicit || track.track?.explicit);
+    const rawPlays = track.playCount ?? track.playcount ?? null;
+
+    return {
+      title,
+      artist,
+      album,
+      uri,
+      isLocal,
+      trackLink,
+      albumLink,
+      durationMs,
+      duration,
+      coverUrl,
+      needsCoverLoad,
+      isrc,
+      isExplicit,
+      rawPlays
+    };
+  }
+
+  const SP_AUDIT_POPOVER_CSS = `
+    .sp-audit-popover-wrapper { position: relative; display: inline-flex; }
+    .sp-audit-popover-menu { position: absolute; bottom: calc(100% + 10px); left: 0; background: #282828; border: 1px solid #383838; border-radius: 8px; padding: 6px; box-shadow: 0 12px 32px rgba(0,0,0,0.7); display: none; flex-direction: column; min-width: 290px; z-index: 9999; backdrop-filter: blur(12px); }
+    .sp-audit-popover-menu.is-open { display: flex; }
+    .sp-audit-popover-item { background: transparent; border: none; border-radius: 6px; padding: 8px 10px; text-align: left; cursor: pointer; display: flex; align-items: flex-start; gap: 10px; transition: background-color 0.15s; width: 100%; box-sizing: border-box; }
+    .sp-audit-popover-item:hover { background-color: rgba(255,255,255,0.08); }
+    .sp-audit-popover-icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; color: #1ed760; display: flex; align-items: center; justify-content: center; }
+    .sp-audit-popover-icon svg { width: 16px; height: 16px; }
+    .sp-audit-popover-icon svg:not([fill="none"]) { fill: currentColor; }
+    .sp-audit-popover-text { display: flex; flex-direction: column; min-width: 0; }
+    .sp-audit-popover-title { color: #ffffff; font-size: 13px; font-weight: 500; }
+    .sp-audit-popover-desc { color: #a0a0a0; font-size: 11px; margin-top: 2px; line-height: 1.3; }
+  `;
+
+  function renderAuditPopoverHtml({ itemTypeTitle, itemTypeLower, btnClass }) {
+    return `
+      <div class="sp-audit-popover-wrapper">
+        <button id="backupExportBtn" class="${btnClass}" style="display: flex; align-items: center; gap: 6px;">
+          <span id="backupExportLabel">Backup &amp; Export</span>
+          <span id="backupExportCaret" style="font-size: 9px; transition: transform 0.2s ease;">▼</span>
+        </button>
+        <div id="backupExportMenu" class="sp-audit-popover-menu">
+          <button id="menuBackupBtn" class="sp-audit-popover-item">
+            <span class="sp-audit-popover-icon">${createPlaylistIconSvg}</span>
+            <div class="sp-audit-popover-text">
+              <span class="sp-audit-popover-title">Backup ${itemTypeTitle} as Playlist</span>
+              <span class="sp-audit-popover-desc" id="menuBackupDesc">Save selected ${itemTypeLower} into a new playlist</span>
+            </div>
+          </button>
+          <button id="menuCopyBtn" class="sp-audit-popover-item">
+            <span class="sp-audit-popover-icon">${copyIconSVG}</span>
+            <div class="sp-audit-popover-text">
+              <span class="sp-audit-popover-title">Copy Tracklist Text</span>
+              <span class="sp-audit-popover-desc">Copy names, artists, and Spotify links of selected tracks to clipboard</span>
+            </div>
+          </button>
+          <button id="menuExportBtn" class="sp-audit-popover-item">
+            <span class="sp-audit-popover-icon">${saveIconSVG}</span>
+            <div class="sp-audit-popover-text">
+              <span class="sp-audit-popover-title">Export JSON Data</span>
+              <span class="sp-audit-popover-desc">Download ${itemTypeLower} metadata as a JSON file</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  function createAuditBackupExportController({
+    shadowRoot,
+    sourceName,
+    itemTypeName,
+    backupSuffix,
+    exportFileName,
+    getSelectedTracks,
+    closeRowMenu
+  }) {
+    const backupExportBtn = shadowRoot.querySelector("#backupExportBtn");
+    const backupExportLabel = shadowRoot.querySelector("#backupExportLabel");
+    const backupExportCaret = shadowRoot.querySelector("#backupExportCaret");
+    const backupExportMenu = shadowRoot.querySelector("#backupExportMenu");
+    const menuBackupBtn = shadowRoot.querySelector("#menuBackupBtn");
+    const menuBackupDesc = shadowRoot.querySelector("#menuBackupDesc");
+    const menuCopyBtn = shadowRoot.querySelector("#menuCopyBtn");
+    const menuExportBtn = shadowRoot.querySelector("#menuExportBtn");
+
+    let backupResetTimer = null;
+
+    const close = () => {
+      if (backupExportMenu?.classList.contains("is-open")) {
+        backupExportMenu.classList.remove("is-open");
+        backupExportBtn?.classList.remove("is-active");
+        if (backupExportCaret) backupExportCaret.style.transform = "rotate(0deg)";
+      }
+    };
+
+    const toggle = (e) => {
+      e?.stopPropagation();
+      closeRowMenu?.();
+      const isOpen = backupExportMenu?.classList.contains("is-open");
+      if (isOpen) {
+        close();
+      } else {
+        backupExportMenu?.classList.add("is-open");
+        backupExportBtn?.classList.add("is-active");
+        if (backupExportCaret) backupExportCaret.style.transform = "rotate(180deg)";
+      }
+    };
+
+    const resetButton = (count = 0) => {
+      if (backupResetTimer) {
+        clearTimeout(backupResetTimer);
+        backupResetTimer = null;
+      }
+      if (backupExportLabel?.textContent === "Saved ✓") {
+        backupExportLabel.textContent = "Backup & Export";
+        if (backupExportCaret) backupExportCaret.style.display = "";
+        if (backupExportBtn) backupExportBtn.disabled = count === 0;
+      }
+    };
+
+    const updateSelectedCount = (count) => {
+      resetButton(count);
+      const isSaving = backupExportLabel?.textContent === "Saving...";
+      if (backupExportBtn) backupExportBtn.disabled = count === 0 || isSaving;
+      if (menuBackupDesc) {
+        const plural = count === 1 ? "track" : "tracks";
+        menuBackupDesc.textContent = `Save ${count} selected ${itemTypeName.toLowerCase()} ${plural} into a new playlist`;
+      }
+    };
+
+    menuCopyBtn?.addEventListener("click", () => {
+      close();
+      const tracks = getSelectedTracks();
+      if (!tracks.length) return;
+      const list = tracks.map((t, num) => {
+        const info = getAuditTrackInfo(t);
+        const link = info.trackLink || info.uri;
+        return `${num + 1}. ${info.title} - ${info.artist} - ${info.album} - (${link})`;
+      }).join("\n");
+      navigator.clipboard.writeText(list).then(() => showNotification(`Copied selected ${itemTypeName.toLowerCase()} to clipboard!`));
+    });
+
+    menuExportBtn?.addEventListener("click", async () => {
+      close();
+      const tracks = getSelectedTracks();
+      if (!tracks.length) return;
+      const data = tracks.map(t => {
+        const info = getAuditTrackInfo(t);
+        return {
+          title: info.title,
+          artist: info.artist,
+          album: info.album,
+          uri: info.uri,
+          ...(info.isrc ? { isrc: info.isrc } : {}),
+          durationMs: info.durationMs
+        };
+      });
+      await exportJsonFile(data, exportFileName);
+    });
+
+    menuBackupBtn?.addEventListener("click", async () => {
+      close();
+      const tracks = getSelectedTracks();
+      if (!tracks.length) return;
+      const targetUris = tracks.map(t => t.uri);
+      const backupName = `${sourceName} ${backupSuffix}`;
+
+      if (backupExportBtn) backupExportBtn.disabled = true;
+      if (backupExportLabel) backupExportLabel.textContent = "Saving...";
+      if (backupExportCaret) backupExportCaret.style.display = "none";
+
+      try {
+        const newPlaylist = await createPlaylist(backupName, `Archived ${itemTypeName.toLowerCase()} from ${sourceName}. Created by Sort-Play.`);
+        await addTracksToPlaylist(newPlaylist.id, targetUris);
+        await addPlaylistToLibrary(newPlaylist.uri);
+        showNotification(`Created playlist "${backupName}" with ${targetUris.length} tracks.`);
+        if (backupExportLabel) backupExportLabel.textContent = "Saved ✓";
+        backupResetTimer = setTimeout(() => resetButton(tracks.length), 2500);
+      } catch (err) {
+        console.error("[Sort-Play] Backup playlist creation failed:", err);
+        showNotification("Failed to create backup playlist.", true);
+        if (backupExportLabel) backupExportLabel.textContent = "Backup & Export";
+        if (backupExportCaret) backupExportCaret.style.display = "";
+        if (backupExportBtn) backupExportBtn.disabled = tracks.length === 0;
+      }
+    });
+
+    backupExportBtn?.addEventListener("click", toggle);
+
+    return {
+      toggle,
+      close,
+      resetButton,
+      isOpen: () => Boolean(backupExportMenu?.classList.contains("is-open")),
+      updateSelectedCount,
+      destroy: () => {
+        if (backupResetTimer) clearTimeout(backupResetTimer);
+      }
+    };
+  }
+
+  async function executeAuditCleanCopy({
+    cleanTracks,
+    cleanName,
+    playlistDescription,
+    closeModal,
+    resolve
+  }) {
+    if (!cleanTracks.length) {
+      showNotification("No available tracks to create a clean playlist.", "warning");
+      return;
+    }
+
+    closeModal(true);
+    startProcessing("Creating...");
+
+    try {
+      const newPlaylist = await createPlaylist(cleanName, playlistDescription);
+      startProcessing("Saving...");
+      await addTracksToPlaylist(newPlaylist.id, cleanTracks.map(t => t.uri));
+      await addPlaylistToLibrary(newPlaylist.uri);
+      showNotification(`Created clean playlist "${cleanName}" with ${cleanTracks.length} tracks.`);
+      if (openPlaylistAfterSortEnabled) {
+        await navigateToPlaylist(newPlaylist);
+      }
+    } catch (err) {
+      console.error("[Sort-Play] Clean copy creation failed:", err);
+      showNotification("Failed to create clean playlist.", true);
+    } finally {
+      resetButtons();
+      resolve();
+    }
+  }
+
+  async function executeAuditTrackRemoval({
+    isLikedSongs,
+    chosenTracks,
+    sourceName,
+    itemTypeName,
+    backupSuffix,
+    storageKeyBackup,
+    currentUri,
+    closeModal,
+    resolve
+  }) {
+    if (!chosenTracks.length) return;
+    const defaultBackup = localStorage.getItem(storageKeyBackup) === "true";
+    const result = await showConfirmationModal({
+      title: isLikedSongs ? `Unlike ${itemTypeName}?` : `Remove ${itemTypeName}?`,
+      description: isLikedSongs
+        ? `Are you sure you want to unlike ${chosenTracks.length} ${itemTypeName.toLowerCase()} from your Liked Songs?`
+        : `Are you sure you want to remove ${chosenTracks.length} ${itemTypeName.toLowerCase()} from "${sourceName}"?`,
+      confirmText: isLikedSongs ? "Unlike" : "Remove",
+      cancelText: "Cancel",
+      checkboxLabel: "Create a backup playlist of these tracks first",
+      checkboxChecked: defaultBackup
+    });
+
+    if (result.action !== "confirm") return;
+
+    closeModal(true);
+    const actionLabel = isLikedSongs ? "Unliking..." : "Removing...";
+    startProcessing(result.checked ? "Backing up..." : actionLabel);
+
+    localStorage.setItem(storageKeyBackup, result.checked ? "true" : "false");
+
+    try {
+      if (result.checked) {
+        try {
+          const backupName = `${sourceName} ${backupSuffix}`;
+          const newPlaylist = await createPlaylist(backupName, `Archived ${itemTypeName.toLowerCase()} from ${sourceName}. Created by Sort-Play.`);
+          await addTracksToPlaylist(newPlaylist.id, chosenTracks.map(t => t.uri));
+          await addPlaylistToLibrary(newPlaylist.uri);
+        } catch (e) {
+          console.warn("[Sort-Play] Auto-backup failed before removal:", e);
+        }
+        startProcessing(actionLabel);
+      }
+
+      if (isLikedSongs) {
+        const toUnlike = chosenTracks.map(t => t.uri).filter(u => typeof u === "string" && u.startsWith("spotify:track:"));
+        if (toUnlike.length > 0) {
+          await unlikeTracksFromLibrary(toUnlike, (p) => { mainButton.innerText = p; });
+        }
+        const notifText = result.checked 
+          ? `Unliked ${chosenTracks.length} ${itemTypeName.toLowerCase()} from Liked Songs (Backed up to "${sourceName} ${backupSuffix}").`
+          : `Unliked ${chosenTracks.length} ${itemTypeName.toLowerCase()} from Liked Songs.`;
+        showNotification(notifText);
+      } else {
+        const toRemove = chosenTracks
+          .filter(t => t.uid)
+          .map(t => ({ uri: t.uri, uid: t.uid }));
+
+        if (toRemove.length > 0) {
+          await removeTracksFromPlaylist(currentUri, toRemove);
+          if (typeof Spicetify.Platform.PlaylistAPI.resync === "function") {
+            await Spicetify.Platform.PlaylistAPI.resync(currentUri);
+          }
+        }
+
+        const notifText = result.checked 
+          ? `Removed ${chosenTracks.length} ${itemTypeName.toLowerCase()} from "${sourceName}" (Backed up to "${sourceName} ${backupSuffix}").`
+          : `Removed ${chosenTracks.length} ${itemTypeName.toLowerCase()} from "${sourceName}".`;
+        showNotification(notifText);
+      }
+    } catch (err) {
+      console.error("[Sort-Play] Removal failed:", err);
+      showNotification(isLikedSongs ? `Failed to unlike ${itemTypeName.toLowerCase()}.` : `Failed to remove ${itemTypeName.toLowerCase()}.`, true);
+    } finally {
+      resetButtons();
+      resolve();
+    }
+  }
+  
+  function showUnavailableTracksModal({ unavailableTracks, allTracks, currentUri, sourceName, isOwnedPlaylist }) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement("div");
+        overlay.id = "sort-play-unavailable-tracks-overlay";
+        overlay.className = "sort-play-font-scope";
+        overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 2002; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.2s ease;`;
+
+        const modalContainer = document.createElement("div");
+        modalContainer.className = "sort-play-unavailable-tracks-modal sort-play-modal-container sort-play-font-scope";
+        modalContainer.style.cssText = `box-sizing: border-box !important; position: relative !important; z-index: 2003; width: min(1000px, 95vw) !important; max-width: 1000px !important; min-width: 340px !important; min-height: 0 !important; max-height: 90vh !important; flex-shrink: 0 !important; display: flex; flex-direction: column; border-radius: 30px; overflow: hidden; background-color: #181818 !important; color: var(--spice-text, #ffffff); border: 1px solid #282828; box-shadow: 0 20px 50px rgba(0,0,0,0.6);`;
+
+        const shadowRoot = modalContainer.attachShadow({ mode: "open" });
+
+        const isLikedSongs = isLikedSongsPage(currentUri);
+        const canModifyDirectly = isOwnedPlaylist || isLikedSongs;
+        const selectedSet = new Set(unavailableTracks.map((_, i) => i));
+
+        const renderRows = () => unavailableTracks.map((track, idx) => {
+            const { title, artist, album, uri, duration, trackLink, albumLink, coverUrl, needsCoverLoad } = getAuditTrackInfo(track);
+
+            return `
+                <div class="track-item" data-index="${idx}">
+                    <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex-grow: 1;">
+                        <label class="sp-checkbox-hitbox"><input type="checkbox" class="sp-checkbox row-select" data-index="${idx}" ${selectedSet.has(idx) ? "checked" : ""}></label>
+                        <div class="main-image-container">
+                            <img aria-hidden="false" draggable="false" loading="eager" src="${coverUrl}" alt="" class="main-image-image2 main-trackList-rowImage track-item-cover" width="36" height="36" style="border-radius: 4px; opacity: ${needsCoverLoad ? "0" : "1"};" data-track-uri="${uri}" onerror="this.src='${FALLBACK_COVER_URI}'; this.style.opacity='1';">
+                        </div>
+                        <div class="track-text-wrapper">
+                            <span class="track-item-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
+                            <div class="track-item-artist-wrapper" title="${escapeHtml(artist)} • ${escapeHtml(album)}">
+                                <span class="track-item-artist-names">${escapeHtml(artist)}</span>
+                                <span class="track-item-album-name"><span style="margin: 0 4px;">•</span>${escapeHtml(album)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 24px; flex-shrink: 0;">
+                        <span class="track-badge unavailable-badge">Unavailable</span>
+                        <div style="width: 56px; text-align: center; color: #b3b3b3; font-size: 13px; font-variant-numeric: tabular-nums;">${duration}</div>
+                        <div style="display: flex; gap: 6px; justify-content: flex-end; width: 32px;">
+                            <button class="row-menu-btn" data-title="${escapeHtml(title)}" data-artist="${escapeHtml(artist)}" data-track-link="${trackLink}" data-album-link="${albumLink}" title="More options">${threeDotsSvg}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+
+        shadowRoot.innerHTML = `
+            <style>
+                :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+                *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+                .sp-ua-header { display: flex; justify-content: space-between; align-items: center; padding: 27px 32px 12px !important; border-bottom: 1px solid #282828; flex-shrink: 0; }
+                .sp-ua-title { margin: 0; }
+                .sp-ua-close-btn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+                .sp-ua-close-btn:hover { color: #ffffff; }
+                .sp-ua-body { padding: 16px 24px !important; overflow: auto; flex: 1; }
+                .sp-ua-footer { padding: 14px 24px !important; border-top: 1px solid #282828; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; row-gap: 10px; background-color: #181818; }
+                ${SP_AUDIT_POPOVER_CSS}
+                .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; background-color: #282828; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+                .summary-item { text-align: center; }
+                .summary-value { font-size: 24px; font-weight: bold; }
+                .summary-label { font-size: 12px; color: #b3b3b3; text-transform: uppercase; margin-top: 4px; font-weight: 700; letter-spacing: 0.5px; }
+                .conversion-list-container { max-height: 416px; overflow-y: auto; background-color: #282828; border-radius: 6px; padding: 8px; scrollbar-width: thin; scrollbar-color: #535353 #282828; }
+                .conversion-list-container::-webkit-scrollbar { width: 8px; }
+                .conversion-list-container::-webkit-scrollbar-track { background: #282828; }
+                .conversion-list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+                .track-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; flex: 1; min-width: 0; background-color: rgba(255,255,255,0.02); border-bottom: 1px solid rgba(255,255,255,0.03); border-radius: 4px; }
+                .track-item:hover { background-color: rgba(241, 94, 108, 0.08); }
+                .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding-right: 12px; }
+                .main-image-container { width: 36px; height: 36px; min-width: 36px; min-height: 36px; border-radius: 4px; background-color: #282828; position: relative; aspect-ratio: 1 / 1; flex-shrink: 0; }
+                .main-image-image2 { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.3s ease; object-fit: cover; border-radius: 4px; }
+                .track-item-title { color: #e0e0e0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+                .track-item-artist-wrapper { display: flex; font-size: 12px; color: #b3b3b3; min-width: 0; margin-top: 2px; }
+                .track-item-artist-names { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+                .track-item-album-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; max-width: 60%; }
+                .track-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 3px 0; border-radius: 4px; letter-spacing: 0.5px; width: 96px; text-align: center; display: inline-block; box-sizing: border-box; }
+                .unavailable-badge { background-color: rgba(241, 94, 108, 0.15); color: #f15e6c; border: 1px solid rgba(241, 94, 108, 0.3); }
+                .row-menu-btn { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); cursor: pointer; color: #b3b3b3; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 5px; width: 28px; height: 28px; transition: all 0.15s ease; }
+                .row-menu-btn:hover, .row-menu-btn.is-active { color: white; background-color: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
+                .row-menu-btn svg { width: 14px; height: 14px; flex-shrink: 0; fill: currentColor; }
+                .row-menu-btn svg * { fill: currentColor; }
+                .sp-row-menu { position: absolute; z-index: 9999; background: #282828; border: 1px solid #383838; border-radius: 6px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: flex; flex-direction: column; min-width: 165px; backdrop-filter: blur(8px); }
+                .sp-row-menu-item { background: transparent; border: none; color: #e0e0e0; font-size: 12.5px; font-weight: 500; padding: 7px 10px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; transition: background-color 0.15s, color 0.15s; }
+                .sp-row-menu-item:hover { background-color: rgba(255,255,255,0.1); color: #ffffff; }
+                .sp-row-menu-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+                .sp-ua-btn { padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+                .sp-ua-btn:active { transform: scale(0.97); }
+                .sp-ua-btn-primary { background-color: #1ED760; color: black; }
+                .sp-ua-btn-primary:hover { background-color: #3BE377; }
+                .sp-ua-btn-danger { background-color: #e91429; color: white; }
+                .sp-ua-btn-danger:hover { background-color: #f15e6c; }
+                .sp-ua-btn-secondary { background-color: #333333; color: white; padding: 8px 18px; }
+                .sp-ua-btn-secondary:hover { background-color: #444444; }
+                .sp-ua-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+                .sp-checkbox-hitbox { display: flex; align-items: center; justify-content: center; width: 62px; height: 48px; margin: -7px -10px -7px -36px; padding: 0 10px 0 36px; box-sizing: border-box; cursor: pointer; flex-shrink: 0; z-index: 1; }
+                .sp-checkbox { accent-color: #1db954; width: 16px; height: 16px; cursor: pointer; margin: 0; flex-shrink: 0; }
+            </style>
+            <div class="sp-ua-header">
+                <h1 class="sp-ua-title"><span style="font-size: 25px;">Unavailable Tracks</span></h1>
+                <button id="closeModalX" aria-label="Close" class="sp-ua-close-btn">${closeModalIcon18Svg}</button>
+            </div>
+            <div class="sp-ua-body">
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: white;">${allTracks.length}</div>
+                        <div class="summary-label">Total Audited</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: #f15e6c;">${unavailableTracks.length}</div>
+                        <div class="summary-label">Unavailable in Region</div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-value" style="color: #1ED760;">${allTracks.length - unavailableTracks.length}</div>
+                        <div class="summary-label">Available Remaining</div>
+                    </div>
+                </div>
+                <div id="uaHeaderRow" style="display: flex; justify-content: space-between; align-items: center; padding: 0 20px 8px 20px; border-bottom: 1px solid #3e3e3e; margin-bottom: 8px; box-sizing: border-box;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <input type="checkbox" id="selectAllCheckbox" class="sp-checkbox" checked>
+                        <span style="color: white; font-size: 14px; font-weight: 500;">Select All (${unavailableTracks.length})</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 24px; flex-shrink: 0;">
+                        <span style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 96px; text-align: center;">Status</span>
+                        <span style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 56px; text-align: center;">Duration</span>
+                        <div style="width: 32px;"></div>
+                    </div>
+                </div>
+                <div class="conversion-list-container" id="tracksContainer">
+                    ${renderRows()}
+                </div>
+            </div>
+            <div class="sp-ua-footer">
+                ${renderAuditPopoverHtml({ itemTypeTitle: "Unavailable", itemTypeLower: "unavailable tracks", btnClass: "sp-ua-btn sp-ua-btn-secondary" })}
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <button id="closeModalBtn" class="sp-ua-btn sp-ua-btn-secondary">Close</button>
+                    ${canModifyDirectly ? `<button id="createCopyBtn" class="sp-ua-btn sp-ua-btn-secondary">Create Clean Copy (${allTracks.length - selectedSet.size})</button>` : ""}
+                    <button id="actionBtn" class="sp-ua-btn ${canModifyDirectly ? "sp-ua-btn-danger" : "sp-ua-btn-primary"}">
+                        ${isLikedSongs ? `Unlike Selected (${selectedSet.size})` : (isOwnedPlaylist ? `Remove Selected (${selectedSet.size})` : `Create Clean Copy (${allTracks.length - selectedSet.size})`)}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+        overlay.appendChild(modalContainer);
+
+        requestAnimationFrame(() => { overlay.style.opacity = "1"; });
+
+        const { close: closeRowMenu, open: openRowMenu, isOpen: isRowMenuOpen } = createTrackRowMenu(shadowRoot, modalContainer);
+
+        const tracksContainer = shadowRoot.querySelector("#tracksContainer");
+        const uaHeaderRow = shadowRoot.querySelector("#uaHeaderRow");
+        const selectAllCheckbox = shadowRoot.querySelector("#selectAllCheckbox");
+
+        const updateHeaderPadding = () => {
+            if (uaHeaderRow && tracksContainer) {
+                const scrollbarWidth = tracksContainer.offsetWidth - tracksContainer.clientWidth;
+                uaHeaderRow.style.paddingRight = `${20 + scrollbarWidth}px`;
+            }
+        };
+        requestAnimationFrame(updateHeaderPadding);
+        window.addEventListener("resize", updateHeaderPadding, { passive: true });
+        
+        const actionBtn = shadowRoot.querySelector("#actionBtn");
+        const createCopyBtn = shadowRoot.querySelector("#createCopyBtn");
+
+        const auditBackupController = createAuditBackupExportController({
+            shadowRoot,
+            sourceName,
+            itemTypeName: "Unavailable Tracks",
+            backupSuffix: "(Unavailable)",
+            exportFileName: `sort-play_unavailable_${sourceName.toLowerCase().replace(/[^a-z0-9]/g, "_")}.json`,
+            getSelectedTracks: () => Array.from(selectedSet).map(i => unavailableTracks[i]),
+            closeRowMenu
+        });
+
+        const imgObserver = createTrackImageObserver(tracksContainer, 32);
+
+        shadowRoot.querySelectorAll("img[data-track-uri]").forEach(img => {
+            if (img.style.opacity === "0") {
+                imgObserver.observe(img);
+            }
+        });
+
+        const updateActionState = () => {
+            const count = selectedSet.size;
+            const remainingCount = allTracks.length - count;
+            selectAllCheckbox.checked = count === unavailableTracks.length && count > 0;
+            selectAllCheckbox.indeterminate = count > 0 && count < unavailableTracks.length;
+            actionBtn.disabled = canModifyDirectly ? (count === 0) : (count === 0 || remainingCount === 0);
+            if (createCopyBtn) createCopyBtn.disabled = count === 0 || remainingCount === 0;
+            auditBackupController.updateSelectedCount(count);
+            if (isLikedSongs) {
+                actionBtn.textContent = `Unlike Selected (${count})`;
+                if (createCopyBtn) createCopyBtn.textContent = `Create Clean Copy (${remainingCount})`;
+            } else if (isOwnedPlaylist) {
+                actionBtn.textContent = `Remove Selected (${count})`;
+                if (createCopyBtn) createCopyBtn.textContent = `Create Clean Copy (${remainingCount})`;
+            } else {
+                actionBtn.textContent = `Create Clean Copy (${remainingCount})`;
+            }
+        };
+
+        selectAllCheckbox.addEventListener("change", (e) => {
+            closeRowMenu();
+            auditBackupController.close();
+            const checked = e.target.checked;
+            selectedSet.clear();
+            if (checked) {
+                unavailableTracks.forEach((_, i) => selectedSet.add(i));
+            }
+            shadowRoot.querySelectorAll(".row-select").forEach(cb => { cb.checked = checked; });
+            updateActionState();
+        });
+
+        tracksContainer.addEventListener("change", (e) => {
+            if (e.target.classList.contains("row-select")) {
+                const idx = parseInt(e.target.dataset.index, 10);
+                if (e.target.checked) selectedSet.add(idx);
+                else selectedSet.delete(idx);
+                updateActionState();
+            }
+        });
+
+        tracksContainer.addEventListener("scroll", () => {
+            closeRowMenu();
+            auditBackupController.close();
+        }, { passive: true });
+
+        tracksContainer.addEventListener("click", (e) => {
+            auditBackupController.close();
+            const rowMenuBtn = e.target.closest(".row-menu-btn");
+            if (rowMenuBtn) {
+                openRowMenu(rowMenuBtn);
+                return;
+            }
+            closeRowMenu();
+        });
+
+        shadowRoot.addEventListener("click", (e) => {
+            if (!e.target.closest(".row-menu-btn, .sp-row-menu")) {
+                closeRowMenu();
+            }
+            if (!e.target.closest(".sp-audit-popover-wrapper")) {
+                auditBackupController.close();
+            }
+        });
+
+        const closeModal = (skipResolve = false) => {
+            closeRowMenu();
+            auditBackupController.close();
+            auditBackupController.destroy();
+            imgObserver.disconnect();
+            window.removeEventListener("resize", updateHeaderPadding);
+            window.removeEventListener("keydown", handleKeyDown);
+            overlay.style.opacity = "0";
+            setTimeout(() => {
+                overlay.remove();
+                if (!skipResolve) resolve();
+            }, 200);
+        };
+
+        const handleKeyDown = (e) => {
+            if (e.key === "Escape") {
+                if (auditBackupController.isOpen()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    auditBackupController.close();
+                    return;
+                }
+                if (isRowMenuOpen()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    closeRowMenu();
+                    return;
+                }
+                if (document.getElementById("sort-play-confirmation-overlay")) return;
+                e.preventDefault();
+                closeModal();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+
+        shadowRoot.querySelector("#closeModalX").addEventListener("click", () => closeModal());
+        shadowRoot.querySelector("#closeModalBtn").addEventListener("click", () => closeModal());
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) {
+                closeRowMenu();
+                auditBackupController.close();
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        const handleCreateCleanCopy = () => {
+            if (selectedSet.size === 0) return;
+            const chosenIndices = Array.from(selectedSet);
+            const chosenTracks = chosenIndices.map(i => unavailableTracks[i]);
+            const chosenUids = new Set(chosenTracks.map(t => t.uid).filter(Boolean));
+            const chosenUris = new Set(chosenTracks.map(t => t.uri));
+            const cleanTracks = chosenUids.size > 0
+                ? allTracks.filter(t => !chosenUids.has(t.uid))
+                : allTracks.filter(t => !chosenUris.has(t.uri));
+            executeAuditCleanCopy({
+                cleanTracks,
+                cleanName: `${sourceName} (Clean)`,
+                playlistDescription: `Clean copy of ${sourceName} without regionally unavailable tracks. Created by Sort-Play.`,
+                closeModal,
+                resolve
+            });
+        };
+
+        if (createCopyBtn) {
+            createCopyBtn.addEventListener("click", handleCreateCleanCopy);
+        }
+
+        actionBtn.addEventListener("click", async () => {
+            if (selectedSet.size === 0) return;
+            if (!canModifyDirectly) {
+                handleCreateCleanCopy();
+                return;
+            }
+            const chosenTracks = Array.from(selectedSet).map(i => unavailableTracks[i]);
+            executeAuditTrackRemoval({
+                isLikedSongs,
+                chosenTracks,
+                sourceName,
+                itemTypeName: "Unavailable Tracks",
+                backupSuffix: "(Unavailable)",
+                storageKeyBackup: STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
+                currentUri,
+                closeModal,
+                resolve
+            });
+        });
+
+        updateActionState();
+    });
+  }
+  
+  function getBigramDiceSimilarity(str1, str2) {
+      const s1 = (str1 || "").replace(/\s+/g, "").toLowerCase();
+      const s2 = (str2 || "").replace(/\s+/g, "").toLowerCase();
+      if (s1 === s2) return 1.0;
+      if (s1.length < 2 || s2.length < 2) return 0.0;
+      const bgMap = new Map();
+      for (let i = 0; i < s1.length - 1; i++) {
+          const bg = s1.substring(i, i + 2);
+          bgMap.set(bg, (bgMap.get(bg) || 0) + 1);
+      }
+      let intersection = 0;
+      for (let i = 0; i < s2.length - 1; i++) {
+          const bg = s2.substring(i, i + 2);
+          const count = bgMap.get(bg) || 0;
+          if (count > 0) {
+              bgMap.set(bg, count - 1);
+              intersection++;
+          }
+      }
+      return (2 * intersection) / (s1.length + s2.length - 2);
+  }
+
+  function getRootTitle(rawTitle) {
+      if (!rawTitle) return "";
+      let stripped = rawTitle.replace(/\(.*?\)|\[.*?\]/g, "").replace(/[-—–].*$/g, "").trim();
+      if (stripped.length < 2) stripped = rawTitle;
+      return getCleanTitle(stripped);
+  }
+
+  function getTrackArtistInfo(track) {
+      const norm = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['’ʼ]/g, "").replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, ' ').trim();
+      
+      let primaryRaw = track.artists?.[0]?.name || track.track?.artists?.[0]?.name || track.artistName || (track.allArtists ? track.allArtists.split(/[,;]/)[0] : "");
+      if (primaryRaw.includes(';')) primaryRaw = primaryRaw.split(';')[0].trim();
+      if (primaryRaw.includes(',')) primaryRaw = primaryRaw.split(',')[0].trim();
+      const primary = norm(primaryRaw);
+      const primaryId = track.artistUris?.[0]?.split(':')[2] || track.artists?.[0]?.id || (track.artists?.[0]?.uri ? track.artists[0].uri.split(':')[2] : null) || track.track?.artists?.[0]?.id || (track.track?.artists?.[0]?.uri ? track.track.artists[0].uri.split(':')[2] : null) || primary;
+
+      const artistSet = new Set();
+      const idSet = new Set();
+
+      if (primary) artistSet.add(primary);
+      if (primaryId) idSet.add(primaryId);
+
+      const rawArtistsList = track.artists || track.track?.artists || [];
+      if (Array.isArray(rawArtistsList)) {
+          rawArtistsList.forEach(a => {
+              if (a.name) {
+                  a.name.split(';').forEach(subName => {
+                      const cName = norm(subName);
+                      if (cName) artistSet.add(cName);
+                  });
+              }
+              const aId = a.id || (a.uri ? a.uri.split(':')[2] : null);
+              if (aId) idSet.add(aId);
+          });
+      }
+
+      if (track.allArtists && typeof track.allArtists === 'string') {
+          track.allArtists.split(/[,;]/).forEach(a => {
+              const cleaned = norm(a);
+              if (cleaned) artistSet.add(cleaned);
+          });
+      }
+
+      const rawTitle = track.songTitle || track.name || "";
+      const featMatch = rawTitle.match(/(?:\(|\[|\-\s*)\s*(?:feat\.?|ft\.?|featuring|with)\s+([^()\[\]\-]+)[)\]]?/i);
+      if (featMatch && featMatch[1]) {
+          featMatch[1].split(/[,&+/]|\band\b/i).forEach(featName => {
+              const cleaned = norm(featName);
+              if (cleaned && cleaned.length > 1) artistSet.add(cleaned);
+          });
+      }
+
+      return { primary, primaryId, artistSet, idSet };
+  }
+
+  function compareDuplicateKeepers(a, b, sortType = null) {
+      if (!a && !b) return 0;
+      if (!a) return 1;
+      if (!b) return -1;
+      if (a === b) return 0;
+
+      if (sortType === 'excludeByPlaylist') {
+          if (a._isExclusion && !b._isExclusion) return -1;
+          if (!a._isExclusion && b._isExclusion) return 1;
+      }
+
+      if (a.uri && b.uri && a.uri === b.uri && a._instanceId && b._instanceId && a._instanceId === b._instanceId) return 0;
+
+      const isPlayableA = a.isPlayable !== false && a.is_playable !== false && a.track?.isPlayable !== false && a.track?.is_playable !== false;
+      const isPlayableB = b.isPlayable !== false && b.is_playable !== false && b.track?.isPlayable !== false && b.track?.is_playable !== false;
+      if (isPlayableA !== isPlayableB) return isPlayableA ? -1 : 1;
+
+      const isLocalA = Boolean(a.uri?.startsWith("spotify:local:"));
+      const isLocalB = Boolean(b.uri?.startsWith("spotify:local:"));
+      if (isLocalA !== isLocalB) return isLocalA ? 1 : -1;
+
+      const altVersionRegex = /(?:[\(\[\-—–\u2010-\u2015\u2212]\s*.*?\b(instrumental|acoustic|live(\s+(at|in|from|on))?|karaoke|demo|a\s*cappella|acapella|sped\s*up|slowed|remix|mashup|commentary|orchestral|stripped)\b|\b(live\s+(at|in|from|on)|acoustic\s+(version|mix)|instrumental\s+(version|mix)|sped\s*up\s+version)\b)/i;
+      const rawTitleA = a.songTitle || a.name || a.track?.name || "";
+      const rawTitleB = b.songTitle || b.name || b.track?.name || "";
+      const isAltA = altVersionRegex.test(rawTitleA) ? 1 : 0;
+      const isAltB = altVersionRegex.test(rawTitleB) ? 1 : 0;
+      if (isAltA !== isAltB) return isAltA - isAltB;
+
+      const isExpA = a.explicit || (a.track && a.track.explicit) ? 1 : 0;
+      const isExpB = b.explicit || (b.track && b.track.explicit) ? 1 : 0;
+      if (isExpA !== isExpB) return isExpB - isExpA;
+
+      const typeA = (a.albumType || a.album_type || a.track?.album?.album_type || 'album').toLowerCase();
+      const typeB = (b.albumType || b.album_type || b.track?.album?.album_type || 'album').toLowerCase();
+
+      const albumA = a._originalAlbumName || a.trueAlbumName || a.albumName || a.track?.album?.name || "";
+      const albumB = b._originalAlbumName || b.trueAlbumName || b.albumName || b.track?.album?.name || "";
+
+      const isCompA = typeA === 'compilation' || typeA === 'appears_on' || Boolean(a._isAppearsOn) || (a.allArtists || '').toLowerCase().includes('various artists');
+      const isCompB = typeB === 'compilation' || typeB === 'appears_on' || Boolean(b._isAppearsOn) || (b.allArtists || '').toLowerCase().includes('various artists');
+
+      if (sortType === 'filterSingles' || sortType === 'filterSinglesEPs') {
+          const isSingleA = (typeA === 'single' || (sortType === 'filterSinglesEPs' && typeA === 'ep')) ? 1 : 0;
+          const isSingleB = (typeB === 'single' || (sortType === 'filterSinglesEPs' && typeB === 'ep')) ? 1 : 0;
+          if (isSingleA !== isSingleB) return isSingleB - isSingleA;
+      } else if (sortType === 'filterEPs') {
+          const isEpA = typeA === 'ep' ? 1 : 0;
+          const isEpB = typeB === 'ep' ? 1 : 0;
+          if (isEpA !== isEpB) return isEpB - isEpA;
+      } else if (sortType === 'filterCompilations') {
+          const cA = isCompA ? 1 : 0;
+          const cB = isCompB ? 1 : 0;
+          if (cA !== cB) return cB - cA;
+      }
+
+      const ostRegex = /\b(soundtrack|ost|motion picture|music from|original score)\b/i;
+      const isGenericCompA = isCompA && !ostRegex.test(albumA);
+      const isGenericCompB = isCompB && !ostRegex.test(albumB);
+
+      const popA = a.popularity ?? 0;
+      const popB = b.popularity ?? 0;
+
+      const getRank = (type, isGenComp, isComp) => {
+          if (isGenComp) return 5;
+          if (isComp) return 4;
+          if (type === 'single') return 3;
+          if (type === 'ep') return 2;
+          if (type === 'album') return 1;
+          return 3;
+      };
+
+      const rankA = getRank(typeA, isGenericCompA, isCompA);
+      const rankB = getRank(typeB, isGenericCompB, isCompB);
+
+      if (rankA !== rankB) {
+          if (isGenericCompA && !isGenericCompB) {
+              return (popA - popB >= 20) ? -1 : 1;
+          }
+          if (!isGenericCompA && isGenericCompB) {
+              return (popB - popA >= 20) ? 1 : -1;
+          }
+          if (rankA < rankB) {
+              return (popB - popA >= 20) ? 1 : -1;
+          }
+          if (rankA > rankB) {
+              return (popA - popB >= 20) ? -1 : 1;
+          }
+      }
+
+      const cleanAlbum = (name) => (name || "").trim()
+          .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '')
+          .replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
+          .replace(/\s*(?:[\(\[\-:\u2010-\u2015\u2212]\s*.*?(deluxe|expanded|anniversary|special|bonus|tour|definitive|complete|remaster|international|gold|platinum|diamond|scary hours|edition|version|commentary)\b.*|(?:\s+(deluxe|deluxe edition|scary hours edition|bonus tracks|extended version)\b.*))$/i, '')
+          .replace(/\s+\d{1,2}(?:th|nd|rd|st)?\s+(?:anniversary|deluxe|super deluxe)(?:\s+edition)?$/i, '')
+          .replace(/\s+(10|15|20|25|30|35|40|45|50)$/, '')
+          .replace(/\s*\+$/, '');
+
+      const baseA = getNormalizedTitle(cleanAlbum(albumA));
+      const baseB = getNormalizedTitle(cleanAlbum(albumB));
+
+      const dateA = a.trueReleaseDate || a.releaseDate;
+      const dateB = b.trueReleaseDate || b.releaseDate;
+      const msA = dateA ? new Date(dateA).getTime() : Infinity;
+      const msB = dateB ? new Date(dateB).getTime() : Infinity;
+
+      if (baseA && baseB && baseA === baseB) {
+          if (!isNaN(msA) && !isNaN(msB) && msA !== msB) return msA - msB;
+          if (albumA.length !== albumB.length) return albumA.length - albumB.length;
+      }
+
+      const playsA = (a.playCount !== "N/A" && a.playCount != null) ? Number(a.playCount) : -1;
+      const playsB = (b.playCount !== "N/A" && b.playCount != null) ? Number(b.playCount) : -1;
+      if (playsA !== playsB && playsA !== -1 && playsB !== -1) return playsB - playsA;
+
+      if (popB !== popA) return popB - popA;
+
+      if (!isNaN(msA) && !isNaN(msB) && msA !== msB) return msA - msB;
+
+      if (albumA.length !== albumB.length) return albumA.length - albumB.length;
+
+      return (a.uri || "").localeCompare(b.uri || "");
+  }
+  
+  function calculatePossibleDuplicateScore(keeper, candidate) {
+      const rawK = keeper.songTitle || keeper.name || "";
+      const rawC = candidate.songTitle || candidate.name || "";
+      const cleanK = getCleanTitle(rawK);
+      const cleanC = getCleanTitle(rawC);
+      const rootK = getRootTitle(rawK);
+      const rootC = getRootTitle(rawC);
+
+      const durK = keeper.durationMs || keeper.durationMilis || keeper.track?.duration_ms || 0;
+      const durC = candidate.durationMs || candidate.durationMilis || candidate.track?.duration_ms || 0;
+      const durDiffMs = Math.abs(durC - durK);
+      const durDiffSec = Math.round(durDiffMs / 1000);
+
+      let titleScore = 10;
+      if (cleanK && cleanC && cleanK === cleanC) {
+          titleScore = 45;
+      } else if (rootK && rootC && rootK === rootC) {
+          titleScore = 40;
+      } else {
+          const dice = getBigramDiceSimilarity(cleanK, cleanC);
+          if (dice >= 0.85) titleScore = 32;
+          else if (dice >= 0.70) titleScore = 22;
+      }
+
+      let durScore = 0;
+      if (durDiffSec <= 2) durScore = 40;
+      else if (durDiffSec <= 5) durScore = 30;
+      else if (durDiffSec <= 12) durScore = 18;
+      else if (durDiffSec <= 30) durScore = 8;
+
+      const VERSION_TAGS = [
+          { pattern: /\b(acapella|a\s*cappella)\b/i, label: "Acapella" },
+          { pattern: /\b(instrumental)\b/i, label: "Instrumental" },
+          { pattern: /\b(acoustic|stripped)\b/i, label: "Acoustic" },
+          { pattern: /\b(sing[\s-]along)\b/i, label: "Sing-Along" },
+          { pattern: /\b(sped\s*up|speed\s*up)\b/i, label: "Sped Up" },
+          { pattern: /\b(slowed(\s*[\+\&]\s*reverb)?|slowed\s*down)\b/i, label: "Slowed" },
+          { pattern: /\b(remix|mashup)\b/i, label: "Remix" },
+          { pattern: /(?:[\(\[\-—–\u2010-\u2015\u2212]\s*.*?\blive\b|\blive\s+(at|in|from|on)\b)/i, label: "Live" },
+          { pattern: /\b(karaoke)\b/i, label: "Karaoke" },
+          { pattern: /\b(demo)\b/i, label: "Demo" },
+          { pattern: /\b(vocals?)\b/i, label: "Vocal" },
+          { pattern: /\b(orchestral|symphonic)\b/i, label: "Orchestral" },
+          { pattern: /\b(piano\s*(version|mix)?)\b/i, label: "Piano" },
+          { pattern: /\b(extended(\s*(mix|version))?)\b/i, label: "Extended" }
+      ];
+
+      const getVersionTag = (str) => {
+          const match = VERSION_TAGS.find(v => v.pattern.test(str));
+          return match ? match.label : null;
+      };
+
+      const kTag = getVersionTag(rawK);
+      const cTag = getVersionTag(rawC);
+
+      let versionPenalty = 15;
+      let versionLabel = "";
+      if (cTag && (!kTag || cTag !== kTag)) {
+          versionPenalty = -25;
+          versionLabel = cTag;
+      } else if (!cTag && kTag) {
+          versionPenalty = -25;
+      }
+
+      const isrcK = keeper.isrc || keeper.track?.external_ids?.isrc || null;
+      const isrcC = candidate.isrc || candidate.track?.external_ids?.isrc || null;
+      let isrcBonus = 0;
+      if (isrcK && isrcC && isrcK === isrcC) {
+          isrcBonus = 10;
+      }
+
+      const kPlays = keeper.playCount !== "N/A" && keeper.playCount != null ? Number(keeper.playCount) : null;
+      const cPlays = candidate.playCount !== "N/A" && candidate.playCount != null ? Number(candidate.playCount) : null;
+      const playCountBonus = (kPlays !== null && cPlays !== null && kPlays === cPlays && kPlays > 0) ? 40 : 0;
+
+      const totalScore = Math.max(10, Math.min(99, titleScore + durScore + versionPenalty + isrcBonus + playCountBonus));
+
+      let reason = "";
+      if (versionLabel) {
+          reason = versionLabel.replace(/\s+version$/i, "");
+      } else {
+          const kType = (keeper.albumType || keeper.album_type || keeper.track?.album?.album_type || '').toLowerCase();
+          const cType = (candidate.albumType || candidate.album_type || candidate.track?.album?.album_type || '').toLowerCase();
+          const cIsComp = cType === 'compilation' || cType === 'appears_on' || Boolean(candidate._isAppearsOn) || (candidate.allArtists || '').toLowerCase().includes('various artists');
+          const kIsComp = kType === 'compilation' || kType === 'appears_on' || Boolean(keeper._isAppearsOn) || (keeper.allArtists || '').toLowerCase().includes('various artists');
+          if (cIsComp && !kIsComp) {
+              reason = "Compilation";
+          } else {
+              const kInfo = getTrackArtistInfo(keeper);
+              const cInfo = getTrackArtistInfo(candidate);
+              const isSamePrimary = (kInfo.primaryId && cInfo.primaryId && kInfo.primaryId === cInfo.primaryId) || (kInfo.primary && kInfo.primary === cInfo.primary);
+              if (!isSamePrimary) {
+                  const primaryKInC = (kInfo.primaryId && cInfo.idSet.has(kInfo.primaryId)) || (kInfo.primary && cInfo.artistSet.has(kInfo.primary));
+                  const primaryCInK = (cInfo.primaryId && kInfo.idSet.has(cInfo.primaryId)) || (cInfo.primary && kInfo.artistSet.has(cInfo.primary));
+                  if (primaryKInC && primaryCInK) {
+                      reason = "Swapped Artists";
+                  } else if (primaryKInC || primaryCInK) {
+                      reason = "Shared Artist";
+                  }
+              }
+          }
+      }
+
+      return { score: totalScore, reason };
+  }
+
+  function calculateConfidentSuspicionScore(keeper, candidate) {
+      if (!keeper || !candidate) return 0;
+      if (candidate.uri && keeper.uri && candidate.uri === keeper.uri) return -1000;
+
+      const isrcK = keeper.isrc || keeper.track?.external_ids?.isrc || null;
+      const isrcC = candidate.isrc || candidate.track?.external_ids?.isrc || null;
+      const hasBothIsrc = Boolean(isrcK && isrcC);
+      const isIsrcDiff = hasBothIsrc && isrcK !== isrcC;
+
+      let score = 0;
+      if (isIsrcDiff) score += 35;
+      else if (!hasBothIsrc) score += 10;
+
+      const durK = keeper.durationMs || keeper.durationMilis || keeper.track?.duration_ms || 0;
+      const durC = candidate.durationMs || candidate.durationMilis || candidate.track?.duration_ms || 0;
+      const durDiffSec = (durK > 0 && durC > 0) ? Math.round(Math.abs(durC - durK) / 1000) : 0;
+      if (durDiffSec > 3) score += 25;
+      else if (durDiffSec > 1) score += 15;
+      else if (durDiffSec > 0) score += 5;
+
+      const rawK = keeper.songTitle || keeper.name || "";
+      const rawC = candidate.songTitle || candidate.name || "";
+      const featRegex = /(?:[\(\[]\s*(?:feat\.?|ft\.?|featuring|with)\s+([^\)\]]+)[\)\]]|\-\s*(?:feat\.?|ft\.?|featuring|with)\s+(.*?)(?:\s+-\s+|$))/i;
+      const matchK = rawK.match(featRegex);
+      const matchC = rawC.match(featRegex);
+      const infoK = getTrackArtistInfo(keeper);
+      const infoC = getTrackArtistInfo(candidate);
+
+      const stripThe = (s) => (s || "").replace(/^the\s+/, "");
+      const norm = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/['’ʼ]/g, "").replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, ' ').trim();
+      const hasArtist = (set, name) => set.has(name) || [...set].some(a => stripThe(a) === stripThe(name));
+
+      const hasForeignFeat = (match, otherInfo) => {
+          const featStr = match?.[1] || match?.[2];
+          if (!featStr) return false;
+          const names = featStr.split(/[,&+/]|\band\b/i).map(norm).filter(s => s.length > 1);
+          return names.some(n => !hasArtist(otherInfo.artistSet, n));
+      };
+
+      const isTitleFeatAsymmetric = hasForeignFeat(matchC, infoK) || hasForeignFeat(matchK, infoC);
+
+      if (isTitleFeatAsymmetric) {
+          score += isIsrcDiff ? 45 : 25;
+      } else {
+          const isMetaDiff = stripThe(infoK.primary) !== stripThe(infoC.primary) || [...infoC.artistSet].some(a => !hasArtist(infoK.artistSet, a)) || [...infoK.artistSet].some(a => !hasArtist(infoC.artistSet, a));
+          if (isMetaDiff) score += 15;
+      }
+
+      const cleanK = getCleanTitle(rawK);
+      const cleanC = getCleanTitle(rawC);
+      if (rawK.toLowerCase().trim() !== rawC.toLowerCase().trim()) {
+          score += (cleanK === cleanC) ? 10 : 15;
+      }
+
+      return Math.max(0, score);
+  }
+
+  async function handleDuplicateAudit() {
+    const currentUri = getCurrentUri();
+    if (!currentUri) {
+        showNotification("Please select a playlist, album, or artist first.", true);
+        return;
+    }
+
+    startProcessing();
+
+    try {
+        let tracks = [];
+        let isOwnedPlaylist = false;
+        let isArtistPage = false;
+        let playlistMetadata = null;
+
+        if (URI.isPlaylistV1OrV2(currentUri)) {
+            const playlistId = currentUri.split(":")[2];
+            tracks = await getPlaylistTracks(playlistId);
+            try {
+                const user = await Spicetify.Platform.UserAPI.getUser();
+                const userId = user?.username || user?.id;
+                playlistMetadata = await Spicetify.Platform.PlaylistAPI.getMetadata(currentUri);
+                const ownerUri = playlistMetadata?.owner?.uri || "";
+                const ownerUsername = playlistMetadata?.owner?.username || playlistMetadata?.owner?.id;
+                const isOwner = userId && (ownerUsername === userId || ownerUri.includes(userId));
+                if (isOwner || playlistMetadata?.canEdit || playlistMetadata?.canModify) {
+                    isOwnedPlaylist = true;
+                }
+            } catch (e) {}
+        } else if (URI.isArtist(currentUri)) {
+            tracks = await getArtistTracks(currentUri, false, (msg) => { mainButton.innerText = msg; });
+            isArtistPage = true;
+        } else if (isLikedSongsPage(currentUri)) {
+            tracks = await getLikedSongs();
+        } else if (isLocalFilesPage(currentUri)) {
+            tracks = await getLocalFilesTracks();
+        } else if (URI.isAlbum(currentUri)) {
+            tracks = await getAlbumTracks(currentUri.split(":")[2]);
+        } else {
+            throw new Error("Unsupported view type for duplicate audit.");
+        }
+
+        if (!tracks || tracks.length === 0) {
+            showNotification("No tracks found to audit.", "warning");
+            return;
+        }
+
+        tracks.forEach((t, idx) => {
+            t._instanceId = t.uid || `inst_${idx}_${t.uri || t.id || Math.random()}`;
+        });
+
+        let tracksChecked = tracks;
+        if (!isLocalFilesPage(currentUri)) {
+            mainButton.innerText = "Plays...";
+            const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks, (p) => {
+                mainButton.innerText = `Plays ${Math.floor(p)}%`;
+            });
+
+            mainButton.innerText = "Checking...";
+            tracksChecked = await refreshTrackAlbumInfo(tracksWithPlayCounts, (p) => {
+                mainButton.innerText = `${Math.floor(p)}%`;
+            });
+
+            const collidingIds = new Set();
+            const uriBuckets = new Map();
+            const isrcBuckets = new Map();
+            const playBuckets = new Map();
+            const artistBuckets = new Map();
+            const titleBuckets = new Map();
+            const trackMetaCache = new Map();
+
+            for (const t of tracksChecked) {
+                t.isrc = t.isrc || t.track?.external_ids?.isrc || null;
+                if (t.isrc && t.track) {
+                    if (!t.track.external_ids) t.track.external_ids = {};
+                    t.track.external_ids.isrc = t.isrc;
+                }
+
+                const uri = t.uri;
+                if (uri) {
+                    if (!uriBuckets.has(uri)) uriBuckets.set(uri, []);
+                    uriBuckets.get(uri).push(t);
+                }
+
+                if (t.isrc) {
+                    if (!isrcBuckets.has(t.isrc)) isrcBuckets.set(t.isrc, []);
+                    isrcBuckets.get(t.isrc).push(t);
+                }
+
+                const pc = t.playCount;
+                if (pc !== "N/A" && pc != null && Number(pc) > 0) {
+                    const numPc = Number(pc);
+                    if (!playBuckets.has(numPc)) playBuckets.set(numPc, []);
+                    playBuckets.get(numPc).push(t);
+                }
+
+                const rawTitle = t.songTitle || t.name || "";
+                const clean = getCleanTitle(rawTitle);
+                const root = getRootTitle(rawTitle);
+                const base = rawTitle.split(/[-(\[\/\u2010-\u2015\u2212]/)[0].trim().toLowerCase();
+                const dur = t.durationMs || t.durationMilis || t.track?.duration_ms || 0;
+                const artInfo = getTrackArtistInfo(t);
+
+                trackMetaCache.set(t, { clean, root, base, dur, artInfo });
+
+                if (clean) {
+                    if (!titleBuckets.has(clean)) titleBuckets.set(clean, []);
+                    titleBuckets.get(clean).push(t);
+                }
+                if (root && root !== clean) {
+                    if (!titleBuckets.has(root)) titleBuckets.set(root, []);
+                    titleBuckets.get(root).push(t);
+                }
+                if (base && base.length > 2 && base !== clean && base !== root) {
+                    if (!titleBuckets.has(base)) titleBuckets.set(base, []);
+                    titleBuckets.get(base).push(t);
+                }
+
+                const primaryArt = artInfo.primary || (t.artistName || "").toLowerCase().trim() || "unknown";
+                if (!artistBuckets.has(primaryArt)) artistBuckets.set(primaryArt, []);
+                artistBuckets.get(primaryArt).push(t);
+            }
+
+            for (const group of uriBuckets.values()) {
+                if (group.length > 1) group.forEach(t => { const id = t.trackId || t.uri?.split(':')[2]; if (id) collidingIds.add(id); });
+            }
+
+            for (const group of isrcBuckets.values()) {
+                if (group.length > 1) group.forEach(t => { const id = t.trackId || t.uri?.split(':')[2]; if (id) collidingIds.add(id); });
+            }
+
+            for (const group of playBuckets.values()) {
+                if (group.length > 1) {
+                    for (let i = 0; i < group.length; i++) {
+                        const a = group[i];
+                        const metaA = trackMetaCache.get(a);
+                        for (let j = i + 1; j < group.length; j++) {
+                            const b = group[j];
+                            const metaB = trackMetaCache.get(b);
+                            if (Math.abs(metaA.dur - metaB.dur) <= 3500) {
+                                const idA = a.trackId || a.uri?.split(':')[2];
+                                const idB = b.trackId || b.uri?.split(':')[2];
+                                if (idA) collidingIds.add(idA);
+                                if (idB) collidingIds.add(idB);
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (const group of artistBuckets.values()) {
+                if (group.length > 1) {
+                    for (let i = 0; i < group.length; i++) {
+                        const a = group[i];
+                        const metaA = trackMetaCache.get(a);
+                        if (!metaA.clean) continue;
+
+                        for (let j = i + 1; j < group.length; j++) {
+                            const b = group[j];
+                            const metaB = trackMetaCache.get(b);
+                            if (!metaB.clean) continue;
+
+                            const isExactMatch = metaA.clean === metaB.clean;
+                            const isRootMatch = metaA.root && metaB.root && metaA.root === metaB.root;
+                            const isBaseMatch = metaA.base && metaB.base && metaA.base === metaB.base && metaA.base.length > 2;
+
+                            if (isExactMatch || isRootMatch || isBaseMatch || getBigramDiceSimilarity(metaA.clean, metaB.clean) >= 0.70) {
+                                const idA = a.trackId || a.uri?.split(':')[2];
+                                const idB = b.trackId || b.uri?.split(':')[2];
+                                if (idA) collidingIds.add(idA);
+                                if (idB) collidingIds.add(idB);
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (const group of titleBuckets.values()) {
+                if (group.length > 1) {
+                    for (let i = 0; i < group.length; i++) {
+                        const a = group[i];
+                        const infoA = trackMetaCache.get(a).artInfo;
+                        for (let j = i + 1; j < group.length; j++) {
+                            const b = group[j];
+                            const infoB = trackMetaCache.get(b).artInfo;
+                            const primaryAInB = (infoA.primaryId && infoB.idSet.has(infoA.primaryId)) || (infoA.primary && infoB.artistSet.has(infoA.primary));
+                            const primaryBInA = (infoB.primaryId && infoA.idSet.has(infoB.primaryId)) || (infoB.primary && infoA.artistSet.has(infoB.primary));
+                            const hasArtistOverlap = primaryAInB || primaryBInA || [...infoA.artistSet].some(art => infoB.artistSet.has(art));
+                            if (hasArtistOverlap) {
+                                const idA = a.trackId || a.uri?.split(':')[2];
+                                const idB = b.trackId || b.uri?.split(':')[2];
+                                if (idA) collidingIds.add(idA);
+                                if (idB) collidingIds.add(idB);
+                            }
+                        }
+                    }
+                }
+            }
+
+            const skipNetworkForIds = new Set();
+            for (const t of tracksChecked) {
+                const id = t.trackId || (t.uri ? t.uri.split(':')[2] : null);
+                if (id && !collidingIds.has(id)) {
+                    skipNetworkForIds.add(id);
+                }
+            }
+
+            mainButton.innerText = "Popularity...";
+            tracksChecked = await fetchPopularityForMultipleTracks(
+                tracksChecked,
+                (p) => { mainButton.innerText = `Pop ${Math.floor(p)}%`; },
+                1,
+                skipNetworkForIds
+            );
+        }
+
+        mainButton.innerText = "Dedup...";
+        const { unique, removed } = await deduplicateTracks(
+            tracksChecked, 
+            true, 
+            isArtistPage, 
+            (p) => { mainButton.innerText = `Dedup ${p}%`; },
+            'deduplicateOnly'
+        );
+
+        const allIds = tracksChecked.map(t => (t.uri && t.uri.startsWith("spotify:local:")) ? null : t.uri.split(':')[2]).filter(Boolean);
+        const metaMap = await idb.getMany('trackMetadata', allIds);
+        tracksChecked.forEach(t => {
+            const id = (t.uri && t.uri.startsWith("spotify:local:")) ? null : t.uri.split(':')[2];
+            const meta = id ? metaMap.get(id) : null;
+            t.isrc = t.isrc || t.track?.external_ids?.isrc || meta?.external_ids?.isrc || null;
+            if (t.isrc && t.track) {
+                if (!t.track.external_ids) t.track.external_ids = {};
+                t.track.external_ids.isrc = t.isrc;
+            }
+        });
+
+        const familiesMap = new Map();
+        const trackToFamilyMap = new Map();
+
+        const uniqueUriMap = new Map();
+        unique.forEach(t => {
+            if (!uniqueUriMap.has(t.uri)) uniqueUriMap.set(t.uri, t);
+        });
+
+        removed.forEach(dupTrack => {
+            let keeper = dupTrack._keptTrack;
+            if (!keeper && dupTrack.uri) {
+                keeper = uniqueUriMap.get(dupTrack.uri) || null;
+                if (keeper) dupTrack._keptTrack = keeper;
+            }
+            if (!keeper) return;
+            const familyKey = keeper._instanceId;
+            if (!familiesMap.has(familyKey)) {
+                const newFam = {
+                    familyId: familyKey,
+                    keeper: keeper,
+                    confidentDuplicates: [],
+                    possibleDuplicates: []
+                };
+                familiesMap.set(familyKey, newFam);
+                trackToFamilyMap.set(keeper._instanceId, newFam);
+            }
+            const family = familiesMap.get(familyKey);
+            family.confidentDuplicates.push(dupTrack);
+            trackToFamilyMap.set(dupTrack._instanceId, family);
+        });
+
+        const genericStructuralTitles = new Set(['intro', 'outro', 'interlude', 'prelude', 'skit']);
+        const artistBuckets = new Map();
+
+        unique.forEach(uTrack => {
+            const artistKey = getTrackArtistInfo(uTrack).primary || (uTrack.artistName || "").toLowerCase().trim() || "unknown";
+            if (!artistBuckets.has(artistKey)) artistBuckets.set(artistKey, []);
+            artistBuckets.get(artistKey).push(uTrack);
+        });
+
+        const linkDuplicatePair = (trackA, trackB) => {
+            let familyA = trackToFamilyMap.get(trackA._instanceId);
+            let familyB = trackToFamilyMap.get(trackB._instanceId);
+
+            if (familyA && familyB) {
+                return;
+            }
+
+            let targetFamily = familyA || familyB;
+            let targetCandidate = familyA ? trackB : trackA;
+
+            if (!targetFamily) {
+                const comp = compareDuplicateKeepers(trackA, trackB);
+                const keeper = comp <= 0 ? trackA : trackB;
+                targetCandidate = comp <= 0 ? trackB : trackA;
+
+                targetFamily = {
+                    familyId: keeper._instanceId,
+                    keeper: keeper,
+                    confidentDuplicates: [],
+                    possibleDuplicates: []
+                };
+                familiesMap.set(targetFamily.familyId, targetFamily);
+                trackToFamilyMap.set(keeper._instanceId, targetFamily);
+            } else if (targetFamily.confidentDuplicates.length === 0 && compareDuplicateKeepers(targetCandidate, targetFamily.keeper) < 0) {
+                const oldKeeper = targetFamily.keeper;
+                familiesMap.delete(oldKeeper._instanceId);
+                targetFamily.keeper = targetCandidate;
+                targetFamily.familyId = targetCandidate._instanceId;
+                familiesMap.set(targetFamily.familyId, targetFamily);
+                trackToFamilyMap.set(targetFamily.familyId, targetFamily);
+                targetCandidate = oldKeeper;
+
+                targetFamily.possibleDuplicates.forEach(pd => {
+                    const scoreObj = calculatePossibleDuplicateScore(targetFamily.keeper, pd);
+                    pd._possibleScore = scoreObj.score;
+                    pd._possibleReason = scoreObj.reason;
+                });
+            }
+
+            if (targetCandidate._instanceId === targetFamily.keeper._instanceId) return;
+
+            if (!targetFamily.confidentDuplicates.some(cd => cd._instanceId === targetCandidate._instanceId) &&
+                !targetFamily.possibleDuplicates.some(pd => pd._instanceId === targetCandidate._instanceId)) {
+                const scoreObj = calculatePossibleDuplicateScore(targetFamily.keeper, targetCandidate);
+                targetCandidate._possibleScore = scoreObj.score;
+                targetCandidate._possibleReason = scoreObj.reason;
+                targetFamily.possibleDuplicates.push(targetCandidate);
+                trackToFamilyMap.set(targetCandidate._instanceId, targetFamily);
+            }
+        };
+
+        artistBuckets.forEach(artistTracks => {
+            if (artistTracks.length < 2) return;
+
+            for (let a = 0; a < artistTracks.length; a++) {
+                const trackA = artistTracks[a];
+                const rawA = trackA.songTitle || trackA.name || "";
+                const cleanA = getCleanTitle(rawA);
+                const rootA = getRootTitle(rawA);
+                if (!cleanA) continue;
+
+                for (let b = a + 1; b < artistTracks.length; b++) {
+                    const trackB = artistTracks[b];
+                    const rawB = trackB.songTitle || trackB.name || "";
+                    const cleanB = getCleanTitle(rawB);
+                    const rootB = getRootTitle(rawB);
+                    if (!cleanB) continue;
+
+                    let isMatch = false;
+                    if (cleanA === cleanB) {
+                        isMatch = true;
+                    } else if (rootA && rootB && rootA === rootB) {
+                        isMatch = true;
+                    } else if (getBigramDiceSimilarity(cleanA, cleanB) >= 0.70) {
+                        isMatch = true;
+                    }
+
+                    if (!isMatch) continue;
+
+                    if (genericStructuralTitles.has(rootA || cleanA)) {
+                        const albumA = (trackA.albumName || trackA.album?.name || "").toLowerCase();
+                        const albumB = (trackB.albumName || trackB.album?.name || "").toLowerCase();
+                        const durDiff = Math.abs((trackA.durationMs || 0) - (trackB.durationMs || 0));
+                        if (albumA !== albumB && durDiff > 10000) continue;
+                    }
+
+                    linkDuplicatePair(trackA, trackB);
+                }
+            }
+        });
+
+        const titleBuckets = new Map();
+        const isrcBuckets = new Map();
+
+        unique.forEach(uTrack => {
+            const raw = uTrack.songTitle || uTrack.name || "";
+            const root = getRootTitle(raw);
+            const clean = getCleanTitle(raw);
+            const titleKeys = new Set();
+            if (root) titleKeys.add(root);
+            if (clean) titleKeys.add(clean);
+            titleKeys.forEach(k => {
+                if (!titleBuckets.has(k)) titleBuckets.set(k, []);
+                titleBuckets.get(k).push(uTrack);
+            });
+            const isrc = uTrack.isrc || uTrack.track?.external_ids?.isrc;
+            if (isrc) {
+                if (!isrcBuckets.has(isrc)) isrcBuckets.set(isrc, []);
+                isrcBuckets.get(isrc).push(uTrack);
+            }
+        });
+
+        isrcBuckets.forEach(isrcTracks => {
+            if (isrcTracks.length < 2) return;
+            for (let a = 0; a < isrcTracks.length; a++) {
+                const trackA = isrcTracks[a];
+                for (let b = a + 1; b < isrcTracks.length; b++) {
+                    linkDuplicatePair(trackA, isrcTracks[b]);
+                }
+            }
+        });
+
+        titleBuckets.forEach((bucketTracks, rootTitleKey) => {
+            if (bucketTracks.length < 2) return;
+            const isGeneric = genericStructuralTitles.has(rootTitleKey);
+
+            for (let a = 0; a < bucketTracks.length; a++) {
+                const trackA = bucketTracks[a];
+                const infoA = getTrackArtistInfo(trackA);
+
+                for (let b = a + 1; b < bucketTracks.length; b++) {
+                    const trackB = bucketTracks[b];
+                    const infoB = getTrackArtistInfo(trackB);
+                    const isSamePrimary = (infoA.primaryId && infoB.primaryId && infoA.primaryId === infoB.primaryId) || (infoA.primary && infoA.primary === infoB.primary);
+                    if (isSamePrimary) continue;
+
+                    const isrcA = trackA.isrc || trackA.track?.external_ids?.isrc;
+                    const isrcB = trackB.isrc || trackB.track?.external_ids?.isrc;
+                    const hasSameIsrc = isrcA && isrcB && isrcA === isrcB;
+
+                    const pcA = trackA.playCount !== "N/A" && trackA.playCount != null ? Number(trackA.playCount) : null;
+                    const pcB = trackB.playCount !== "N/A" && trackB.playCount != null ? Number(trackB.playCount) : null;
+                    const hasSamePlays = pcA !== null && pcB !== null && pcA === pcB && pcA > 0;
+
+                    if (isGeneric && !hasSameIsrc && !hasSamePlays) continue;
+
+                    const primaryAInB = (infoA.primaryId && infoB.idSet.has(infoA.primaryId)) || (infoA.primary && infoB.artistSet.has(infoA.primary));
+                    const primaryBInA = (infoB.primaryId && infoA.idSet.has(infoB.primaryId)) || (infoB.primary && infoA.artistSet.has(infoB.primary));
+
+                    const durA = trackA.durationMs || trackA.durationMilis || trackA.track?.duration_ms || 0;
+                    const durB = trackB.durationMs || trackB.durationMilis || trackB.track?.duration_ms || 0;
+                    const durDiffSec = Math.abs(durA - durB) / 1000;
+
+                    const isSwapped = primaryAInB && primaryBInA;
+                    const isOneWay = primaryAInB || primaryBInA;
+
+                    let shouldLink = false;
+                    if (hasSameIsrc) {
+                        shouldLink = true;
+                    } else if (hasSamePlays && isOneWay) {
+                        shouldLink = true;
+                    } else if (isSwapped) {
+                        shouldLink = true;
+                    } else if (isOneWay && durDiffSec <= 3.5) {
+                        shouldLink = true;
+                    }
+
+                    if (shouldLink) {
+                        linkDuplicatePair(trackA, trackB);
+                    }
+                }
+            }
+        });
+
+        familiesMap.forEach(f => {
+            f._maxPossibleScore = f.possibleDuplicates.length > 0 
+                ? Math.max(0, ...f.possibleDuplicates.map(pd => pd._possibleScore || 0))
+                : 0;
+            f.possibleDuplicates.sort((a, b) => (b._possibleScore || 0) - (a._possibleScore || 0));
+        });
+
+        const allFamilies = Array.from(familiesMap.values());
+        const totalConfidentCount = allFamilies.reduce((sum, f) => sum + f.confidentDuplicates.length, 0);
+        const totalPossibleCount = allFamilies.reduce((sum, f) => sum + f.possibleDuplicates.length, 0);
+
+        if (totalConfidentCount === 0 && totalPossibleCount === 0) {
+            showNotification(isLocalFilesPage(currentUri) ? "No duplicate tracks found in Local Files!" : "No duplicate tracks found in this playlist!");
+            return;
+        }
+
+        const { sourceName } = await fetchCleanSourceNameAndArtist(currentUri);
+        resetButtons();
+
+        await showDuplicateAuditModal({
+            families: allFamilies,
+            allTracks: tracksChecked,
+            currentUri,
+            sourceName,
+            isOwnedPlaylist
+        });
+
+    } catch (err) {
+        console.error("[Sort-Play] Duplicate audit failed:", err);
+        showNotification(err.message || "Failed to audit duplicates.", true);
+    } finally {
+        resetButtons();
+    }
+  }
+
+  function showDuplicateAuditModal({ families, allTracks, currentUri, sourceName, isOwnedPlaylist }) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement("div");
+        overlay.id = "sort-play-duplicate-audit-overlay";
+        overlay.className = "sort-play-font-scope";
+        overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 2002; display: flex; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.2s ease;`;
+
+        const modalContainer = document.createElement("div");
+        modalContainer.className = "sort-play-duplicate-audit-modal sort-play-modal-container sort-play-font-scope";
+        modalContainer.style.cssText = `box-sizing: border-box !important; position: relative !important; z-index: 2003; width: min(1150px, 95vw) !important; max-width: 1150px !important; min-width: 340px !important; min-height: 0 !important; max-height: 90vh !important; flex-shrink: 0 !important; display: flex; flex-direction: column; border-radius: 30px; overflow: hidden; background-color: #181818 !important; color: var(--spice-text, #ffffff); border: 1px solid #282828; box-shadow: 0 20px 50px rgba(0,0,0,0.6);`;
+
+        const shadowRoot = modalContainer.attachShadow({ mode: "open" });
+        const abortController = new AbortController();
+
+        const familiesState = families.map(f => {
+            const confidentDuplicates = f.confidentDuplicates.map(t => {
+                const cd = { ...t };
+                cd._suspicionScore = calculateConfidentSuspicionScore(f.keeper, cd);
+                return cd;
+            });
+            confidentDuplicates.sort((a, b) => (b._suspicionScore ?? 0) - (a._suspicionScore ?? 0));
+            const maxSusp = confidentDuplicates.length > 0 
+                ? Math.max(...confidentDuplicates.map(cd => cd._suspicionScore ?? -1000))
+                : -1000;
+            return {
+                familyId: f.familyId,
+                keeper: { ...f.keeper },
+                confidentDuplicates,
+                possibleDuplicates: f.possibleDuplicates.map(t => ({ ...t })),
+                _maxPossibleScore: f._maxPossibleScore || 0,
+                _maxSuspicionScore: maxSusp
+            };
+        });
+        familiesState.sort((a, b) => (b._maxSuspicionScore ?? -1000) - (a._maxSuspicionScore ?? -1000));
+
+        const totalConfidentCount = familiesState.reduce((sum, f) => sum + f.confidentDuplicates.length, 0);
+        const totalPossibleCount = familiesState.reduce((sum, f) => sum + f.possibleDuplicates.length, 0);
+
+        let activeTab = totalConfidentCount > 0 ? 'confident' : 'possible';
+        let searchQuery = "";
+        let currentlyPlayingUri = Spicetify.Player.data?.item?.uri || null;
+        const tabScrollPositions = { confident: 0, possible: 0 };
+
+        const isLikedSongs = isLikedSongsPage(currentUri);
+        const canModifyDirectly = isOwnedPlaylist || isLikedSongs;
+        const selectedSet = new Set();
+        familiesState.forEach(f => {
+            f.confidentDuplicates.forEach(t => selectedSet.add(t._instanceId));
+        });
+        let isDraggingCheckboxes = false;
+        let dragTargetState = false;
+        let lastDraggedInstanceId = null;
+
+        shadowRoot.innerHTML = `
+            <style>
+                :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; height: 100%; }
+                *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+                .sp-da-header { display: flex; justify-content: space-between; align-items: center; padding: 24px 32px 12px !important; border-bottom: 1px solid #282828; flex-shrink: 0; }
+                .sp-da-title { margin: 0; }
+                .sp-da-close-btn { background: transparent; border: 0; padding: 0; color: #b3b3b3; cursor: pointer; transition: color 0.2s ease; display: flex; align-items: center; justify-content: center; }
+                .sp-da-close-btn:hover { color: #ffffff; }
+                .sp-da-body { padding: 15px 24px 8px !important; overflow-y: auto; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+                .sp-da-footer { padding: 14px 24px !important; border-top: 1px solid #282828; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; row-gap: 10px; background-color: #181818; }
+                ${SP_AUDIT_POPOVER_CSS}
+                .sp-da-audit-pill-group { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 7px; padding: 4px 10px; height: 30px; box-sizing: border-box; flex-shrink: 0; user-select: none; }
+                .sp-da-audit-chip { display: flex; align-items: baseline; gap: 5px; font-size: 13px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+                .sp-da-audit-chip-label { font-size: 10px; text-transform: uppercase; color: #888888; letter-spacing: 0.5px; font-weight: 700; }
+                .sp-da-audit-divider { width: 1px; height: 12px; background: rgba(255,255,255,0.1); }
+                .sp-mini-player-right-slot { max-width: calc(50% - 215px); }
+                @media (max-width: 950px) { .sp-da-audit-chip-label { display: none; } }
+                .toolbar-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-shrink: 0; }
+                .tabs-wrapper { display: inline-flex; align-items: center; gap: 2px; background-color: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; box-sizing: border-box; height: 34px; }
+                .tab-btn { background: transparent; border: none; color: #b3b3b3; padding: 0 16px; border-radius: 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 0.18s ease, color 0.18s ease; display: inline-flex; align-items: center; gap: 6px; height: 100%; white-space: nowrap; user-select: none; }
+                .tab-btn:not(.active):not(.is-disabled):hover { color: #ffffff; }
+                .tab-btn.active { background-color: #ffffff; color: #000000; }
+                .tab-btn.is-disabled { opacity: 0.38; cursor: not-allowed; }
+                .tab-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px; font-weight: 700; border-radius: 9px; background-color: rgba(255,255,255,0.12); color: #ffffff; font-variant-numeric: tabular-nums; cursor: help; transition: background-color 0.18s ease, color 0.18s ease; }
+                .tab-btn.active .tab-badge { background-color: rgba(0,0,0,0.15); color: #000000; }
+                .search-input { background: #222222; border: 1px solid #383838; border-radius: 20px; color: #ffffff; padding: 0 14px; font-size: 13px; width: 220px; height: 34px; box-sizing: border-box; outline: none; transition: border-color 0.2s ease; }
+                .search-input:focus { border-color: #1ed760; }
+                .tab-subtitle { font-size: 12px; color: #a0a0a0; margin: 0 0 13px 4px; line-height: 1.4; display: none; }
+                .sp-da-unified-frame { display: flex; flex-direction: column; flex: 1; min-height: 180px; background-color: #222222; border: 1px solid #2e2e2e; border-radius: 8px; overflow: hidden; position: relative; }
+                .table-header-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 17px; border-bottom: 1px solid rgba(255,255,255,0.06); background-color: rgba(255,255,255,0.02); margin-bottom: 0; flex-shrink: 0; box-sizing: border-box; }
+                .list-container { flex: 1; overflow-y: auto; background-color: transparent; border-radius: 0; padding: 6px; min-height: 140px; scrollbar-width: thin; scrollbar-color: #535353 transparent; position: relative; }
+                .list-container::-webkit-scrollbar { width: 8px; }
+                .list-container::-webkit-scrollbar-track { background: transparent; }
+                .list-container::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+                .sp-da-virtual-wrap { position: relative; width: 100%; min-height: 100%; contain: layout; }
+                .family-card { position: absolute; left: 0; width: 100%; box-sizing: border-box; background-color: rgba(255,255,255,0.02); border: 1px solid #2e2e2e; border-radius: 8px; margin: 0; overflow: hidden; display: flex; flex-direction: column; }
+                .track-row { height: 48px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; flex: 1; min-width: 0; user-select: none; cursor: default; }
+                .track-row.kept-row { position: relative; background-color: rgba(30, 215, 96, 0.06); border-bottom: 1px solid rgba(255,255,255,0.04); }
+                .track-row.kept-row::after { content: ''; position: absolute; left: 18px; top: 50%; bottom: 0; border-left: 2px solid #444444; }
+                .tree-root-slot { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
+                .tree-root-dot { width: 7px; height: 7px; background-color: #1ed760; border-radius: 50%; box-shadow: 0 0 5px rgba(30, 215, 96, 0.5); }
+                .track-row.candidate-row { background-color: transparent; border-bottom: 1px solid rgba(255,255,255,0.02); padding-left: 36px; position: relative; }
+                .track-row.candidate-row:hover { background-color: rgba(241, 94, 108, 0.08); }
+                .track-row.candidate-row:last-child { border-bottom: none; }
+                .track-row.candidate-row::before { content: ''; position: absolute; left: 18px; top: 0; bottom: 50%; width: 12px; border-left: 2px solid #444444; border-bottom: 2px solid #444444; border-bottom-left-radius: 6px; }
+                .track-row.candidate-row:not(:last-child)::after { content: ''; position: absolute; left: 18px; top: 50%; bottom: 0; border-left: 2px solid #444444; }
+                .track-row.ghost-row { background-color: rgba(255,255,255,0.015); }
+                .track-row.ghost-row:hover { background-color: rgba(255,255,255,0.04); }
+                .track-row.ghost-row > div:first-child > :not(.ghost-lock-icon), .track-row.ghost-row .plays-col, .track-row.ghost-row .date-col, .track-row.ghost-row .dur-col, .track-row.ghost-row .copy-btn { opacity: 0.4; transition: opacity 0.2s ease; }
+                .track-row.ghost-row:hover > div:first-child > :not(.ghost-lock-icon), .track-row.ghost-row:hover .plays-col, .track-row.ghost-row:hover .date-col, .track-row.ghost-row:hover .dur-col, .track-row.ghost-row:hover .copy-btn { opacity: 0.6; }
+                .ghost-lock-icon { display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; color: #b3b3b3; cursor: help; flex-shrink: 0; opacity: 0.7; transition: opacity 0.2s ease; }
+                .ghost-lock-icon:hover { opacity: 1; }
+                .ghost-lock-icon svg { width: 16px; height: 16px; pointer-events: none; }
+                .sp-lock-tooltip { position: fixed; background-color: #282828; color: #ffffff; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 1px solid #383838; pointer-events: none; white-space: nowrap; opacity: 0; visibility: hidden; transition: opacity 0.1s ease; z-index: 99999; }
+                .sp-lock-tooltip.visible { opacity: 1; visibility: visible; }
+                .jump-exact-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #b3b3b3; font-size: 11px; padding: 2px 8px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
+                .jump-exact-btn:hover { background: rgba(30, 215, 96, 0.2); border-color: #1ed760; color: #1ed760; }
+                @keyframes spCardPulse { 0% { border-color: rgba(30, 215, 96, 0.9); box-shadow: 0 0 16px rgba(30, 215, 96, 0.4); } 70% { border-color: rgba(30, 215, 96, 0.9); box-shadow: 0 0 16px rgba(30, 215, 96, 0.4); } 100% { border-color: #2e2e2e; box-shadow: none; } }
+                .family-card.jump-highlight { animation: spCardPulse 1.4s ease-out forwards; }
+                .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding-right: 10px; min-width: 0; }
+                .main-image-container { width: 34px; height: 34px; min-width: 34px; min-height: 34px; border-radius: 4px; background-color: #282828; position: relative; aspect-ratio: 1 / 1; flex-shrink: 0; }
+                .main-image-image2 { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.3s ease; object-fit: cover; border-radius: 4px; }
+                .track-title { color: #ffffff; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+                .track-explicit-tag { background: rgba(255,255,255,0.2); color: #fff; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 2px; height: 13px; line-height: 12px; flex-shrink: 0; }
+                .track-artist-line { display: flex; font-size: 12px; color: #b3b3b3; min-width: 0; margin-top: 2px; }
+                .track-artist-names { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
+                .track-album-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; max-width: 55%; }
+                .track-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.5px; text-align: center; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+                .kept-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); }
+                .dup-badge { background-color: rgba(241, 94, 108, 0.15); color: #f15e6c; border: 1px solid rgba(241, 94, 108, 0.3); }
+                .reason-badge { background-color: rgba(232, 160, 57, 0.15); color: #e8a039; border: 1px solid rgba(232, 160, 57, 0.3); }
+                .isrc-tag { font-size: 10px; color: #888888; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px; cursor: pointer; transition: all 0.15s ease; }
+                .isrc-tag:hover { color: #ffffff; background: rgba(255,255,255,0.12); }
+                .isrc-tag.isrc-match { background-color: rgba(30, 215, 96, 0.15); color: #1ed760; border: 1px solid rgba(30, 215, 96, 0.3); font-weight: 600; }
+                .isrc-tag.isrc-match:hover { background-color: rgba(30, 215, 96, 0.25); color: #3be377; }
+                .isrc-tag.isrc-diff { background-color: rgba(232, 160, 57, 0.15); color: #e8a039; border: 1px solid rgba(232, 160, 57, 0.3); }
+                .isrc-tag.isrc-diff:hover { background-color: rgba(232, 160, 57, 0.25); }
+                .track-cover-btn { position: relative; width: 34px; height: 34px; border-radius: 4px; border: none; padding: 0; background: transparent; cursor: pointer; flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+                .track-play-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; opacity: 0; border-radius: 4px; color: #ffffff; pointer-events: none; z-index: 2; }
+                .track-play-overlay svg { width: 14px; height: 14px; fill: currentColor; }
+                .track-row:hover .track-play-overlay { opacity: 1; }
+                .track-row.is-playing .track-play-overlay { color: #1ed760; }
+                .track-row.is-active .track-title { color: #1ed760; }
+                .swap-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; color: #b3b3b3; font-size: 11px; padding: 2px 8px; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
+                .swap-btn:hover { background: rgba(30, 215, 96, 0.2); border-color: #1ed760; color: #1ed760; }
+                .row-menu-btn { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); cursor: pointer; color: #b3b3b3; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 5px; width: 28px; height: 28px; transition: all 0.15s ease; }
+                .row-menu-btn:hover, .row-menu-btn.is-active { color: white; background-color: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
+                .row-menu-btn svg, .row-menu-btn svg * { width: 14px; height: 14px; fill: currentColor; }
+                .sp-row-menu { position: absolute; z-index: 9999; background: #282828; border: 1px solid #383838; border-radius: 6px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: flex; flex-direction: column; min-width: 165px; backdrop-filter: blur(8px); }
+                .sp-row-menu-item { background: transparent; border: none; color: #e0e0e0; font-size: 12.5px; font-weight: 500; padding: 7px 10px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; transition: background-color 0.15s, color 0.15s; }
+                .sp-row-menu-item:hover { background-color: rgba(255,255,255,0.1); color: #ffffff; }
+                .sp-row-menu-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+                .sp-da-btn { padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer; transition: background-color 0.2s, transform 0.1s; }
+                .sp-da-btn:active { transform: scale(0.97); }
+                .sp-da-btn-primary { background-color: #1ED760; color: black; }
+                .sp-da-btn-primary:hover { background-color: #3BE377; }
+                .sp-da-btn-danger { background-color: #e91429; color: white; }
+                .sp-da-btn-danger:hover { background-color: #f15e6c; }
+                .sp-da-btn-secondary { background-color: #333333; color: white; padding: 8px 18px; }
+                .sp-da-btn-secondary:hover, .sp-da-btn-secondary.is-active { background-color: #444444; }
+                .sp-da-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+                .sp-checkbox-hitbox { display: flex; align-items: center; justify-content: center; width: 62px; height: 48px; margin: -7px -10px -7px -36px; padding: 0 10px 0 36px; box-sizing: border-box; cursor: pointer; flex-shrink: 0; z-index: 1; }
+                .sp-checkbox { accent-color: #1db954; width: 16px; height: 16px; cursor: pointer; margin: 0; flex-shrink: 0; }
+                .date-col { width: 55px; text-align: center; color: #b3b3b3; font-size: 12.5px; font-variant-numeric: tabular-nums; cursor: help; }
+                .plays-col { width: 85px; text-align: center; color: #b3b3b3; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .plays-col.plays-match { color: #1ed760; font-weight: 600; }
+                .plays-col.plays-diff { color: #e8a039; }
+                .dur-col { width: 50px; text-align: center; position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                .dur-main { color: #b3b3b3; font-size: 12.5px; font-variant-numeric: tabular-nums; line-height: 1; }
+                .dur-main.dur-match { color: #1ed760; font-weight: 600; }
+                .dur-diff { position: absolute; top: calc(50% + 10px); left: 50%; transform: translateX(-50%); font-size: 10px; font-variant-numeric: tabular-nums; font-weight: 500; color: #888888; white-space: nowrap; line-height: 1; pointer-events: none; }
+                .dur-diff.dur-diff-amber { color: #e8a039; }
+            </style>
+
+            <div class="sp-da-header">
+                <h1 class="sp-da-title"><span style="font-size: 24px;">Duplicate Tracks Manager</span></h1>
+                <button id="closeModalX" aria-label="Close" class="sp-da-close-btn">${closeModalIcon18Svg}</button>
+            </div>
+
+            <div class="sp-da-body">
+                <div class="toolbar-row">
+                    <div class="tabs-wrapper">
+                        <button class="tab-btn ${activeTab === 'confident' ? 'active' : ''} ${totalConfidentCount === 0 ? 'is-disabled' : ''}" id="tabConfidentBtn" data-tab="confident" ${totalConfidentCount === 0 ? 'aria-disabled="true" tabindex="-1"' : ''}>
+                            <span>Exact Duplicates</span>
+                            <span class="tab-badge" data-tooltip="Total verified exact duplicate tracks detected in this playlist">${totalConfidentCount}</span>
+                        </button>
+                        <button class="tab-btn ${activeTab === 'possible' ? 'active' : ''} ${totalPossibleCount === 0 ? 'is-disabled' : ''}" id="tabPossibleBtn" data-tab="possible" ${totalPossibleCount === 0 ? 'aria-disabled="true" tabindex="-1"' : ''}>
+                            <span>Possible Duplicates</span>
+                            <span class="tab-badge" data-tooltip="Total potential duplicate tracks detected in this playlist">${totalPossibleCount}</span>
+                        </button>
+                    </div>
+                    <input type="text" class="search-input" id="searchBox" placeholder="Filter tracks or artists...">
+                </div>
+
+                <div class="tab-subtitle" id="exactSubtitle" style="display: ${activeTab === 'confident' ? 'block' : 'none'};">
+                    Verified duplicates pre-selected for removal, ordered from highest review priority down to 100% identical matches.
+                </div>
+                <div class="tab-subtitle" id="possibleSubtitle" style="display: ${activeTab === 'possible' ? 'block' : 'none'};">
+                    These tracks share the same title and artist, but have different play counts, durations, or recordings (ISRC). Ranked from most likely duplicate to least.
+                </div>
+
+                <div class="sp-da-unified-frame">
+                    <div class="table-header-row" id="tableHeaderRow">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <input type="checkbox" id="selectAllCheckbox" class="sp-checkbox">
+                            <span id="selectAllLabel" style="color: #ffffff; font-size: 13px; font-weight: 500;">Select All</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0;">
+                            <span style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 85px; text-align: center;">Plays</span>
+                            <span style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 55px; text-align: center;">Year</span>
+                            <span style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 50px; text-align: center;">Duration</span>
+                            <div style="width: 95px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="list-container" id="listContainer"></div>
+                </div>
+            </div>
+
+            <div id="miniPlayerSlot"></div>
+
+            <div class="sp-da-footer">
+                ${renderAuditPopoverHtml({ itemTypeTitle: "Duplicates", itemTypeLower: "duplicate tracks", btnClass: "sp-da-btn sp-da-btn-secondary" })}
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                    <button id="closeModalBtn" class="sp-da-btn sp-da-btn-secondary">Close</button>
+                    ${canModifyDirectly ? `<button id="createCopyBtn" class="sp-da-btn sp-da-btn-secondary">Create Clean Copy (${allTracks.length - selectedSet.size})</button>` : ""}
+                    <button id="actionBtn" class="sp-da-btn ${canModifyDirectly ? "sp-da-btn-danger" : "sp-da-btn-primary"}">
+                        ${isLikedSongs ? `Unlike Selected (${selectedSet.size})` : (isOwnedPlaylist ? `Remove Selected (${selectedSet.size})` : `Create Clean Copy (${allTracks.length - selectedSet.size})`)}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+        overlay.appendChild(modalContainer);
+
+        requestAnimationFrame(() => { overlay.style.opacity = "1"; });
+
+        function updatePlaybackIcons() {
+            const isPlaying = Spicetify.Player?.isPlaying ? Spicetify.Player.isPlaying() : false;
+            shadowRoot.querySelectorAll(".track-row").forEach(row => {
+                const uri = row.dataset.trackUri;
+                const isCurrent = uri && uri === currentlyPlayingUri;
+                const showPause = isCurrent && isPlaying;
+                row.classList.toggle("is-active", isCurrent);
+                row.classList.toggle("is-playing", showPause);
+                const overlay = row.querySelector(".track-play-overlay");
+                if (overlay) overlay.innerHTML = showPause ? pauseIconSvg : playIconSvg;
+            });
+        }
+
+        function onPlayerStateChange() {
+            const item = Spicetify.Player.data?.item;
+            if (item?.uri) currentlyPlayingUri = item.uri;
+            updatePlaybackIcons();
+        }
+
+        Spicetify.Player.addEventListener("onplaypause", onPlayerStateChange);
+        Spicetify.Player.addEventListener("songchange", onPlayerStateChange);
+
+        const summaryPillGroup = document.createElement("div");
+        summaryPillGroup.className = "sp-da-audit-pill-group";
+        summaryPillGroup.innerHTML = `
+            <div class="sp-da-audit-chip" title="Total tracks in playlist"><span class="sp-da-audit-chip-label">Total</span><span id="summaryTotal" style="color: #ffffff;">${allTracks.length}</span></div>
+            <div class="sp-da-audit-divider"></div>
+            <div class="sp-da-audit-chip" title="${isLikedSongs ? "Selected duplicates to unlike" : "Selected duplicates to remove"}"><span class="sp-da-audit-chip-label">${isLikedSongs ? "Unlike" : "Remove"}</span><span id="summarySelected" style="color: #f15e6c;">${selectedSet.size}</span></div>
+            <div class="sp-da-audit-divider"></div>
+            <div class="sp-da-audit-chip" title="Remaining tracks after cleanup"><span class="sp-da-audit-chip-label">Kept</span><span id="summaryRemaining" style="color: #1ED760;">${allTracks.length - selectedSet.size}</span></div>
+        `;
+        const summarySelectedEl = summaryPillGroup.querySelector("#summarySelected");
+        const summaryRemainingEl = summaryPillGroup.querySelector("#summaryRemaining");
+
+        const miniPlayer = createMiniPlayerController({
+            root: shadowRoot,
+            rightSlotContent: summaryPillGroup,
+            signal: abortController.signal,
+            onTrackChange: (uri) => {
+                currentlyPlayingUri = uri;
+                updatePlaybackIcons();
+            }
+        });
+
+        shadowRoot.querySelector("#miniPlayerSlot").appendChild(miniPlayer.element);
+
+        const listContainer = shadowRoot.querySelector("#listContainer");
+        const tableHeaderRow = shadowRoot.querySelector("#tableHeaderRow");
+        const selectAllCheckbox = shadowRoot.querySelector("#selectAllCheckbox");
+        const selectAllLabel = shadowRoot.querySelector("#selectAllLabel");
+        const actionBtn = shadowRoot.querySelector("#actionBtn");
+        const createCopyBtn = shadowRoot.querySelector("#createCopyBtn");
+        const searchBox = shadowRoot.querySelector("#searchBox");
+        const tabConfidentBtn = shadowRoot.querySelector("#tabConfidentBtn");
+        const tabPossibleBtn = shadowRoot.querySelector("#tabPossibleBtn");
+        const exactSubtitle = shadowRoot.querySelector("#exactSubtitle");
+        const possibleSubtitle = shadowRoot.querySelector("#possibleSubtitle");
+        const lockTooltip = document.createElement("div");
+        lockTooltip.className = "sp-lock-tooltip";
+        shadowRoot.appendChild(lockTooltip);
+
+        const positionAndShowTooltip = (targetEl, text) => {
+            lockTooltip.textContent = text;
+            const rect = targetEl.getBoundingClientRect();
+            const xCenter = rect.left + rect.width / 2;
+            const halfTip = (lockTooltip.offsetWidth || 340) / 2;
+            lockTooltip.style.left = `${Math.max(halfTip + 12, Math.min(window.innerWidth - halfTip - 12, xCenter))}px`;
+            if (rect.top < 65) {
+                lockTooltip.style.top = `${rect.bottom + 6}px`;
+                lockTooltip.style.transform = "translate(-50%, 0)";
+            } else {
+                lockTooltip.style.top = `${rect.top - 6}px`;
+                lockTooltip.style.transform = "translate(-50%, -100%)";
+            }
+            lockTooltip.classList.add("visible");
+        };
+
+        let badgeTooltipTimer = null;
+        const tabsWrapper = shadowRoot.querySelector(".tabs-wrapper");
+        if (tabsWrapper) {
+            tabsWrapper.addEventListener("mouseover", (e) => {
+                const badge = e.target.closest(".tab-badge");
+                if (!badge || !badge.dataset.tooltip) return;
+                if (badgeTooltipTimer) clearTimeout(badgeTooltipTimer);
+                badgeTooltipTimer = setTimeout(() => {
+                    if (badge.isConnected) {
+                        positionAndShowTooltip(badge, badge.dataset.tooltip);
+                    }
+                }, 400);
+            });
+
+            tabsWrapper.addEventListener("mouseout", (e) => {
+                const badge = e.target.closest(".tab-badge");
+                if (badge && (!e.relatedTarget || !badge.contains(e.relatedTarget))) {
+                    if (badgeTooltipTimer) {
+                        clearTimeout(badgeTooltipTimer);
+                        badgeTooltipTimer = null;
+                    }
+                    lockTooltip.classList.remove("visible");
+                }
+            });
+
+            tabsWrapper.addEventListener("click", () => {
+                if (badgeTooltipTimer) {
+                    clearTimeout(badgeTooltipTimer);
+                    badgeTooltipTimer = null;
+                }
+                lockTooltip.classList.remove("visible");
+            });
+        }
+
+        listContainer.addEventListener("mouseover", (e) => {
+            if (badgeTooltipTimer) {
+                clearTimeout(badgeTooltipTimer);
+                badgeTooltipTimer = null;
+            }
+            const icon = e.target.closest(".ghost-lock-icon");
+            if (!icon) return;
+            positionAndShowTooltip(icon, "Exact duplicate queued for removal in Exact Duplicates tab");
+        });
+
+        listContainer.addEventListener("mouseout", (e) => {
+            const icon = e.target.closest(".ghost-lock-icon");
+            if (icon && (!e.relatedTarget || !icon.contains(e.relatedTarget))) {
+                lockTooltip.classList.remove("visible");
+            }
+        });
+
+        listContainer.addEventListener("scroll", () => {
+            lockTooltip.classList.remove("visible");
+        }, { passive: true });
+
+        const { close: closeRowMenu, open: openRowMenu, isOpen: isRowMenuOpen } = createTrackRowMenu(shadowRoot, modalContainer, () => shadowRoot.querySelector("#miniPlayerSlot")?.offsetHeight || 0);
+
+        const auditBackupController = createAuditBackupExportController({
+            shadowRoot,
+            sourceName,
+            itemTypeName: "Duplicate Tracks",
+            backupSuffix: "(Duplicates Backup)",
+            exportFileName: `sort-play_duplicates_${sourceName.toLowerCase().replace(/[^a-z0-9]/g, "_")}.json`,
+            getSelectedTracks: () => allTracks.filter(t => selectedSet.has(t._instanceId)),
+            closeRowMenu
+        });
+
+        const updateSummary = () => {
+            const count = selectedSet.size;
+            const remainingCount = allTracks.length - count;
+            if (summarySelectedEl) summarySelectedEl.textContent = count;
+            if (summaryRemainingEl) summaryRemainingEl.textContent = remainingCount;
+            actionBtn.disabled = count === 0;
+            if (createCopyBtn) createCopyBtn.disabled = count === 0 || remainingCount === 0;
+            auditBackupController.updateSelectedCount(count);
+            if (isLikedSongs) {
+                actionBtn.textContent = `Unlike Selected (${count})`;
+                if (createCopyBtn) createCopyBtn.textContent = `Create Clean Copy (${remainingCount})`;
+            } else if (isOwnedPlaylist) {
+                actionBtn.textContent = `Remove Selected (${count})`;
+                if (createCopyBtn) createCopyBtn.textContent = `Create Clean Copy (${remainingCount})`;
+            } else {
+                actionBtn.textContent = `Create Clean Copy (${remainingCount})`;
+            }
+        };
+
+        const renderTrackRowHtml = (track, isKept, familyId, candidateType, keeperTrack = null) => {
+            const { title, artist, album, uri, isrc, isExplicit, durationMs, duration, rawPlays, isLocal, coverUrl, needsCoverLoad, trackLink, albumLink } = getAuditTrackInfo(track);
+            const keeperIsrc = keeperTrack ? (keeperTrack.isrc || keeperTrack.track?.external_ids?.isrc || keeperTrack.external_ids?.isrc || null) : null;
+            const plays = formatPlayCount(rawPlays, "rounded_abbreviated");
+            
+            const releaseDate = track.trueReleaseDate || track.releaseDate || track.track?.album?.release_date || null;
+            const year = formatReleaseDate(releaseDate, "YYYY");
+            const fullDate = formatReleaseDate(releaseDate, "MMM D, YYYY");
+            const hoverDateTitle = (fullDate && fullDate !== "―") ? `Released: ${fullDate}` : "Release Date Unavailable";
+
+            const isChecked = selectedSet.has(track._instanceId);
+            const isPlaying = Spicetify.Player?.isPlaying ? Spicetify.Player.isPlaying() : false;
+            const isCurrent = uri && uri === currentlyPlayingUri;
+            const showPause = isCurrent && isPlaying;
+
+            let badgeHtml = '';
+            if (isKept) {
+                badgeHtml = `<span class="track-badge kept-badge">Kept</span>`;
+            } else if (candidateType === 'confident') {
+                badgeHtml = `<span class="track-badge dup-badge">Duplicate</span>`;
+            } else if (candidateType === 'ghost') {
+                badgeHtml = `<span class="track-badge dup-badge" style="opacity: 0.85;" title="Managed in Exact Duplicates tab">Exact Duplicate</span>`;
+            } else if (track._possibleReason) {
+                badgeHtml = `<span class="track-badge reason-badge">${escapeHtml(track._possibleReason)}</span>`;
+            }
+
+            const targetFamily = familiesState.find(f => f.familyId === familyId);
+            const activePool = targetFamily ? (candidateType === 'confident' ? targetFamily.confidentDuplicates : [...targetFamily.confidentDuplicates, ...targetFamily.possibleDuplicates]) : [];
+            const keeperUri = keeperTrack?.uri || null;
+            const isSameUri = !isKept && uri && keeperUri && uri === keeperUri;
+            const hasSharedMatchInFamily = activePool.some(d => (uri && d.uri === uri) || (isrc && (d.isrc || d.track?.external_ids?.isrc) === isrc));
+
+            let isrcBadgeHtml = '';
+            if (isSameUri) {
+                const sameUriTitle = isLocal ? `Identical Local File (URI: ${uri} • Click to copy)` : `Identical Spotify Track (URI: ${uri} • Click to copy)`;
+                isrcBadgeHtml = `<span class="isrc-tag isrc-match" data-copy-text="${uri}" title="${sameUriTitle}">Same URI</span>`;
+            } else if (isLocal) {
+                isrcBadgeHtml = `<span class="isrc-tag isrc-diff" data-copy-text="${uri}" title="Local Audio File (URI: ${uri} • Click to copy)">Local File</span>`;
+            } else if (isKept && isrc) {
+                const keeperClass = hasSharedMatchInFamily ? "isrc-tag isrc-match" : "isrc-tag";
+                isrcBadgeHtml = `<span class="${keeperClass}" data-copy-text="${isrc}" data-isrc="${isrc}" title="ISRC: ${isrc} (Click to copy)">ISRC</span>`;
+            } else if (!isKept && keeperIsrc && isrc && isrc === keeperIsrc) {
+                isrcBadgeHtml = `<span class="isrc-tag isrc-match" data-copy-text="${isrc}" data-isrc="${isrc}" title="Shared Recording Master (ISRC: ${isrc} • Click to copy)">Same ISRC</span>`;
+            } else if (!isKept && keeperIsrc && isrc && isrc !== keeperIsrc) {
+                isrcBadgeHtml = `<span class="isrc-tag isrc-diff" data-copy-text="${isrc}" data-isrc="${isrc}" title="Different Recording Master (ISRC: ${isrc} • Click to copy)">Diff ISRC</span>`;
+            } else if (isrc) {
+                isrcBadgeHtml = `<span class="isrc-tag" data-copy-text="${isrc}" data-isrc="${isrc}" title="ISRC: ${isrc} (Click to copy)">ISRC</span>`;
+            }
+
+            const rawKeeperPlays = keeperTrack ? (keeperTrack.playCount || keeperTrack.playcount) : null;
+            const hasBothPlays = !isKept && rawPlays && rawKeeperPlays && rawPlays !== "N/A" && rawKeeperPlays !== "N/A";
+            const isPlaysMatch = hasBothPlays && Number(rawPlays) === Number(rawKeeperPlays) && Number(rawPlays) > 0;
+            const isPlaysDiff = hasBothPlays && Number(rawPlays) !== Number(rawKeeperPlays);
+
+            let playsClass = "";
+            let playsTitle = `Stream Count: ${rawPlays || 'N/A'}`;
+            if (isPlaysMatch) {
+                playsClass = "plays-match";
+                playsTitle = `Shared Spotify stream count: ${Number(rawPlays).toLocaleString()}`;
+            } else if (isPlaysDiff) {
+                playsClass = "plays-diff";
+                playsTitle = `Different stream count (Candidate: ${plays} vs Kept: ${formatPlayCount(rawKeeperPlays, "rounded_abbreviated")})`;
+            }
+
+            const durK = keeperTrack ? (keeperTrack.durationMs || keeperTrack.durationMilis || keeperTrack.track?.duration_ms || 0) : 0;
+            const keeperDuration = keeperTrack ? formatDuration(durK) : null;
+            const isDurationMatch = !isKept && keeperDuration && duration === keeperDuration;
+            const durDiffSec = !isKept && durK > 0 ? Math.round((durationMs - durK) / 1000) : 0;
+
+            let durDiffHtml = '';
+            if (!isKept && durK > 0 && !isDurationMatch) {
+                const absSec = Math.abs(durDiffSec);
+                const isLonger = durDiffSec > 0;
+                let formattedDiff = '';
+                if (absSec >= 60) {
+                    const m = Math.floor(absSec / 60);
+                    const s = absSec % 60;
+                    formattedDiff = `${isLonger ? '+' : '-'}${m}:${s.toString().padStart(2, '0')}`;
+                } else {
+                    formattedDiff = `${isLonger ? '+' : '-'}${absSec}s`;
+                }
+
+                const diffColorClass = absSec >= 3 ? 'dur-diff-amber' : '';
+                durDiffHtml = `<span class="dur-diff ${diffColorClass}">${formattedDiff}</span>`;
+            }
+
+            const durTitle = isDurationMatch 
+                ? `Duration matches keeper (${duration})` 
+                : (!isKept && durK > 0 
+                    ? `Duration: ${duration} (${durDiffSec > 0 ? '+' : ''}${durDiffSec}s vs keeper)` 
+                    : `Duration: ${duration}`);
+
+            const isGhost = candidateType === 'ghost';
+            const showSwapBtn = !isKept && !isGhost && (candidateType === 'confident' || (targetFamily && targetFamily.confidentDuplicates.length === 0));
+            return `
+                <div class="track-row ${isKept ? 'kept-row' : (isGhost ? 'candidate-row ghost-row' : 'candidate-row')} ${isCurrent ? 'is-active' : ''} ${showPause ? 'is-playing' : ''}" data-instance-id="${track._instanceId}" data-family-id="${familyId}" data-track-uri="${uri}">
+                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-grow: 1;">
+                        ${isKept ? `<div class="tree-root-slot"><div class="tree-root-dot"></div></div>` : (isGhost ? `<div class="ghost-lock-icon">${lockIconSvg}</div>` : `<label class="sp-checkbox-hitbox"><input type="checkbox" class="sp-checkbox row-checkbox" data-instance-id="${track._instanceId}" ${isChecked ? 'checked' : ''}></label>`)}
+                        <button class="track-cover-btn" data-track-uri="${uri}" data-track-title="${escapeHtml(title)}" data-track-artist="${escapeHtml(artist)}" title="Play preview">
+                            <div class="main-image-container">
+                                <img aria-hidden="false" draggable="false" loading="eager" src="${coverUrl}" alt="" class="main-image-image2 main-trackList-rowImage track-cover" width="34" height="34" style="border-radius: 4px; opacity: ${needsCoverLoad ? '0' : '1'};" data-track-uri="${uri}">
+                            </div>
+                            <div class="track-play-overlay">${showPause ? pauseIconSvg : playIconSvg}</div>
+                        </button>
+                        <div class="track-text-wrapper">
+                            <span class="track-title" title="${escapeHtml(title)}">
+                                ${escapeHtml(title)}
+                                ${isExplicit ? `<span class="track-explicit-tag">E</span>` : ''}
+                            </span>
+                            <div class="track-artist-line" title="${escapeHtml(artist)} • ${escapeHtml(album)}">
+                                <span class="track-artist-names">${escapeHtml(artist)}</span>
+                                <span class="track-album-name"><span style="margin: 0 4px;">•</span>${escapeHtml(album)}</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: 8px;">
+                            ${badgeHtml}
+                            ${isrcBadgeHtml}
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0; padding-left: 12px;">
+                        <span class="plays-col ${playsClass}" title="${playsTitle}">${plays}</span>
+                        <span class="date-col" title="${hoverDateTitle}">${year}</span>
+                        <div class="dur-col" title="${durTitle}">
+                            <span class="dur-main ${isDurationMatch ? 'dur-match' : ''}">${duration}</span>
+                            ${durDiffHtml}
+                        </div>
+                        <div style="display: flex; gap: 6px; justify-content: flex-end; width: 95px; align-items: center;">
+                            ${!isKept ? (isGhost ? `<button class="jump-exact-btn" data-family-id="${familyId}" title="View in Exact Duplicates tab to manage or keep this version">Manage</button>` : (showSwapBtn ? `<button class="swap-btn" data-instance-id="${track._instanceId}" data-family-id="${familyId}">Keep ⇄</button>` : '')) : ''}
+                            <button class="row-menu-btn" data-title="${escapeHtml(title)}" data-artist="${escapeHtml(artist)}" data-track-link="${trackLink}" data-album-link="${albumLink}" title="More options">${threeDotsSvg}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        let currentFilteredFamilies = [];
+        let familyOffsets = [];
+        let familyHeights = [];
+        let totalListHeight = 0;
+        const renderedCardsMap = new Map();
+
+        const imgObserver = createTrackImageObserver(listContainer, 34);
+
+        const renderVisibleWindow = () => {
+            const virtualWrap = listContainer.querySelector("#virtualWrap");
+            if (!virtualWrap || currentFilteredFamilies.length === 0) return;
+
+            const scrollTop = listContainer.scrollTop;
+            const clientHeight = listContainer.clientHeight || 500;
+            const bufferPx = 1000;
+
+            let startIndex = 0;
+            while (startIndex < currentFilteredFamilies.length && (familyOffsets[startIndex] + familyHeights[startIndex]) < (scrollTop - bufferPx)) {
+                startIndex++;
+            }
+
+            let endIndex = startIndex;
+            while (endIndex < currentFilteredFamilies.length && familyOffsets[endIndex] <= (scrollTop + clientHeight + bufferPx)) {
+                endIndex++;
+            }
+            endIndex = Math.min(currentFilteredFamilies.length - 1, endIndex);
+
+            const visibleFamilyIds = new Set();
+            for (let i = startIndex; i <= endIndex; i++) {
+                visibleFamilyIds.add(currentFilteredFamilies[i].familyId);
+            }
+
+            for (const [fId, cardEl] of renderedCardsMap.entries()) {
+                if (!visibleFamilyIds.has(fId)) {
+                    cardEl.querySelectorAll("img.track-cover[data-track-uri]").forEach(img => imgObserver.unobserve(img));
+                    cardEl.remove();
+                    renderedCardsMap.delete(fId);
+                }
+            }
+
+            for (let i = startIndex; i <= endIndex; i++) {
+                const f = currentFilteredFamilies[i];
+                if (!renderedCardsMap.has(f.familyId)) {
+                    let cardInnerHtml = '';
+                    if (activeTab === "confident") {
+                        cardInnerHtml = `
+                            ${renderTrackRowHtml(f.keeper, true, f.familyId, 'confident', f.keeper)}
+                            ${f.confidentDuplicates.map(t => renderTrackRowHtml(t, false, f.familyId, 'confident', f.keeper)).join("")}
+                        `;
+                    } else {
+                        cardInnerHtml = `
+                            ${renderTrackRowHtml(f.keeper, true, f.familyId, 'possible', f.keeper)}
+                            ${f.confidentDuplicates.map(t => renderTrackRowHtml(t, false, f.familyId, 'ghost', f.keeper)).join("")}
+                            ${f.possibleDuplicates.map(t => renderTrackRowHtml(t, false, f.familyId, 'possible', f.keeper)).join("")}
+                        `;
+                    }
+                    const cardHtml = `
+                        <div class="family-card" data-family-id="${f.familyId}" style="position: absolute; top: ${familyOffsets[i]}px; left: 0; width: 100%; height: ${familyHeights[i]}px; box-sizing: border-box;">
+                            ${cardInnerHtml}
+                        </div>
+                    `;
+                    virtualWrap.insertAdjacentHTML("beforeend", cardHtml);
+                    const cardEl = virtualWrap.lastElementChild;
+                    renderedCardsMap.set(f.familyId, cardEl);
+                    cardEl.querySelectorAll("img.track-cover[data-track-uri]").forEach(img => {
+                        if (img.style.opacity === "0") imgObserver.observe(img);
+                    });
+                }
+            }
+        };
+
+        const renderList = (resetScroll = false) => {
+            const q = searchQuery.toLowerCase().trim();
+            currentFilteredFamilies = familiesState.filter(f => {
+                const candidates = activeTab === "confident" ? f.confidentDuplicates : f.possibleDuplicates;
+                if (candidates.length === 0) return false;
+                if (!q) return true;
+                const matchTrack = (t) => {
+                    const title = (t.songTitle || t.name || "").toLowerCase();
+                    const artist = (t.allArtists || t.artistName || "").toLowerCase();
+                    const album = (t.albumName || "").toLowerCase();
+                    return title.includes(q) || artist.includes(q) || album.includes(q);
+                };
+                return matchTrack(f.keeper) || candidates.some(matchTrack) || (activeTab === "possible" && f.confidentDuplicates.some(matchTrack));
+            });
+
+            if (activeTab === "possible") {
+                currentFilteredFamilies.sort((a, b) => (b._maxPossibleScore || 0) - (a._maxPossibleScore || 0));
+                currentFilteredFamilies.forEach(f => {
+                    f.possibleDuplicates.sort((a, b) => (b._possibleScore || 0) - (a._possibleScore || 0));
+                });
+            }
+
+            if (currentFilteredFamilies.length === 0) {
+                for (const cardEl of renderedCardsMap.values()) {
+                    cardEl.querySelectorAll("img.track-cover[data-track-uri]").forEach(img => imgObserver.unobserve(img));
+                }
+                renderedCardsMap.clear();
+                listContainer.innerHTML = `<div style="text-align: center; padding: 40px 10px; color: #888888; font-size: 14px;">No ${activeTab === "confident" ? "exact duplicates" : "possible duplicates"} found${q ? " matching your filter" : ""}.</div>`;
+                updateSelectAllState();
+                return;
+            }
+
+            familyHeights = new Array(currentFilteredFamilies.length);
+            familyOffsets = new Array(currentFilteredFamilies.length);
+            let runningTop = 0;
+            for (let i = 0; i < currentFilteredFamilies.length; i++) {
+                const f = currentFilteredFamilies[i];
+                const candCount = (activeTab === "confident" ? f.confidentDuplicates : f.possibleDuplicates).length;
+                const ghostCount = activeTab === "possible" ? f.confidentDuplicates.length : 0;
+                const h = (candCount + ghostCount + 1) * 48 + 2;
+                familyHeights[i] = h;
+                familyOffsets[i] = runningTop;
+                runningTop += h + 8;
+            }
+            totalListHeight = runningTop;
+
+            for (const cardEl of renderedCardsMap.values()) {
+                cardEl.querySelectorAll("img.track-cover[data-track-uri]").forEach(img => imgObserver.unobserve(img));
+            }
+            renderedCardsMap.clear();
+
+            let virtualWrap = listContainer.querySelector("#virtualWrap");
+            if (!virtualWrap) {
+                listContainer.innerHTML = '<div class="sp-da-virtual-wrap" id="virtualWrap"></div>';
+                virtualWrap = listContainer.querySelector("#virtualWrap");
+            } else {
+                virtualWrap.innerHTML = "";
+            }
+            virtualWrap.style.height = `${totalListHeight}px`;
+
+            if (resetScroll) {
+                tabScrollPositions[activeTab] = 0;
+                listContainer.scrollTop = 0;
+            } else {
+                const maxScroll = Math.max(0, totalListHeight - (listContainer.clientHeight || 500));
+                const targetScroll = Math.min(tabScrollPositions[activeTab] || 0, maxScroll);
+                listContainer.scrollTop = targetScroll;
+            }
+
+            renderVisibleWindow();
+
+            requestAnimationFrame(() => {
+                if (tableHeaderRow && listContainer) {
+                    const scrollbarWidth = listContainer.offsetWidth - listContainer.clientWidth;
+                    tableHeaderRow.style.paddingRight = `${17 + scrollbarWidth}px`;
+                }
+            });
+
+            updateSelectAllState();
+            updatePlaybackIcons();
+        };
+
+        const updateSelectAllState = () => {
+            let totalCandidates = 0;
+            let selectedCandidates = 0;
+            for (let i = 0; i < currentFilteredFamilies.length; i++) {
+                const candidates = activeTab === "confident" ? currentFilteredFamilies[i].confidentDuplicates : currentFilteredFamilies[i].possibleDuplicates;
+                for (let j = 0; j < candidates.length; j++) {
+                    totalCandidates++;
+                    if (selectedSet.has(candidates[j]._instanceId)) {
+                        selectedCandidates++;
+                    }
+                }
+            }
+
+            if (totalCandidates === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+                selectAllCheckbox.disabled = true;
+                selectAllLabel.textContent = "Select All (0)";
+                return;
+            }
+            selectAllCheckbox.disabled = false;
+            selectAllCheckbox.checked = selectedCandidates === totalCandidates;
+            selectAllCheckbox.indeterminate = selectedCandidates > 0 && selectedCandidates < totalCandidates;
+            selectAllLabel.textContent = `Select All (${totalCandidates})`;
+        };
+
+        tabConfidentBtn.addEventListener("click", () => {
+            if (totalConfidentCount === 0 || activeTab === "confident") return;
+            closeRowMenu();
+            auditBackupController.close();
+            auditBackupController.resetButton(selectedSet.size);
+            tabScrollPositions[activeTab] = listContainer.scrollTop;
+            activeTab = "confident";
+            tabConfidentBtn.classList.add("active");
+            tabPossibleBtn.classList.remove("active");
+            if (exactSubtitle) exactSubtitle.style.display = "block";
+            if (possibleSubtitle) possibleSubtitle.style.display = "none";
+            renderList(false);
+        });
+
+        tabPossibleBtn.addEventListener("click", () => {
+            if (totalPossibleCount === 0 || activeTab === "possible") return;
+            closeRowMenu();
+            auditBackupController.close();
+            auditBackupController.resetButton(selectedSet.size);
+            tabScrollPositions[activeTab] = listContainer.scrollTop;
+            activeTab = "possible";
+            tabPossibleBtn.classList.add("active");
+            tabConfidentBtn.classList.remove("active");
+            if (exactSubtitle) exactSubtitle.style.display = "none";
+            if (possibleSubtitle) possibleSubtitle.style.display = "block";
+            renderList(false);
+        });
+
+        let searchDebounceTimer = null;
+        searchBox.addEventListener("input", (e) => {
+            closeRowMenu();
+            auditBackupController.close();
+            searchQuery = e.target.value;
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                renderList(true);
+            }, 120);
+        });
+
+        selectAllCheckbox.addEventListener("change", (e) => {
+            closeRowMenu();
+            auditBackupController.close();
+            const checked = e.target.checked;
+            for (let i = 0; i < currentFilteredFamilies.length; i++) {
+                const candidates = activeTab === "confident" ? currentFilteredFamilies[i].confidentDuplicates : currentFilteredFamilies[i].possibleDuplicates;
+                for (let j = 0; j < candidates.length; j++) {
+                    const id = candidates[j]._instanceId;
+                    if (checked) selectedSet.add(id);
+                    else selectedSet.delete(id);
+                }
+            }
+            listContainer.querySelectorAll(".row-checkbox").forEach(cb => {
+                cb.checked = checked;
+            });
+            updateSummary();
+            updateSelectAllState();
+        });
+
+        let scrollTicking = false;
+        listContainer.addEventListener("scroll", () => {
+            closeRowMenu();
+            auditBackupController.close();
+            if (!scrollTicking) {
+                requestAnimationFrame(() => {
+                    renderVisibleWindow();
+                    scrollTicking = false;
+                });
+                scrollTicking = true;
+            }
+        }, { passive: true });
+
+        const onResize = () => {
+            renderVisibleWindow();
+            if (tableHeaderRow && listContainer) {
+                const scrollbarWidth = listContainer.offsetWidth - listContainer.clientWidth;
+                tableHeaderRow.style.paddingRight = `${17 + scrollbarWidth}px`;
+            }
+        };
+        window.addEventListener("resize", onResize, { passive: true });
+        window.addEventListener("mouseup", () => { isDraggingCheckboxes = false; lastDraggedInstanceId = null; }, { signal: abortController.signal });
+        window.addEventListener("blur", () => { isDraggingCheckboxes = false; lastDraggedInstanceId = null; }, { signal: abortController.signal });
+
+        listContainer.addEventListener("mousedown", (e) => {
+            if (e.button !== 0) return;
+            const hitbox = e.target.closest(".sp-checkbox-hitbox");
+            if (!hitbox) return;
+            const cb = hitbox.querySelector(".row-checkbox");
+            if (!cb) return;
+            const id = cb.dataset.instanceId;
+            if (!id) return;
+            e.preventDefault();
+            dragTargetState = !selectedSet.has(id);
+            isDraggingCheckboxes = true;
+            lastDraggedInstanceId = id;
+            if (dragTargetState) selectedSet.add(id);
+            else selectedSet.delete(id);
+            cb.checked = dragTargetState;
+            updateSummary();
+            updateSelectAllState();
+        });
+
+        listContainer.addEventListener("mouseover", (e) => {
+            if (!isDraggingCheckboxes) return;
+            const hitbox = e.target.closest(".sp-checkbox-hitbox");
+            if (!hitbox) return;
+            const cb = hitbox.querySelector(".row-checkbox");
+            if (!cb) return;
+            const id = cb.dataset.instanceId;
+            if (!id || id === lastDraggedInstanceId) return;
+            lastDraggedInstanceId = id;
+            if (selectedSet.has(id) !== dragTargetState) {
+                if (dragTargetState) selectedSet.add(id);
+                else selectedSet.delete(id);
+                cb.checked = dragTargetState;
+                updateSummary();
+                updateSelectAllState();
+            }
+        });
+
+        listContainer.addEventListener("change", (e) => {
+            if (e.target.classList.contains("row-checkbox")) {
+                const id = e.target.dataset.instanceId;
+                if (e.target.checked) selectedSet.add(id);
+                else selectedSet.delete(id);
+                updateSummary();
+                updateSelectAllState();
+            }
+        });
+
+        listContainer.addEventListener("click", (e) => {
+            const hitbox = e.target.closest(".sp-checkbox-hitbox");
+            if (hitbox && e.detail > 0) {
+                e.preventDefault();
+                return;
+            }
+            if (!e.target.closest(".row-menu-btn")) closeRowMenu();
+            auditBackupController.close();
+            const coverBtn = e.target.closest(".track-cover-btn");
+            if (coverBtn) {
+                const uri = coverBtn.dataset.trackUri;
+                if (currentlyPlayingUri === uri && Spicetify.Player.isPlaying()) {
+                    Spicetify.Player.pause();
+                } else if (currentlyPlayingUri === uri && !Spicetify.Player.isPlaying()) {
+                    Spicetify.Player.play();
+                } else {
+                    const row = coverBtn.closest(".track-row");
+                    const title = coverBtn.dataset.trackTitle || row.querySelector(".track-title")?.textContent?.trim() || "";
+                    const artist = coverBtn.dataset.trackArtist || row.querySelector(".track-artist-names")?.textContent?.trim() || "";
+                    const img = row.querySelector(".track-cover")?.src || null;
+                    miniPlayer.playTrack(uri, { uri, name: title, songTitle: title, artistName: artist, allArtists: artist, images: img ? [{ url: img }] : [] });
+                }
+                return;
+            }
+
+            const jumpBtn = e.target.closest(".jump-exact-btn");
+            if (jumpBtn) {
+                const targetFamilyId = jumpBtn.dataset.familyId;
+                if (!targetFamilyId) return;
+
+                tabScrollPositions[activeTab] = listContainer.scrollTop;
+                searchQuery = "";
+                searchBox.value = "";
+
+                activeTab = "confident";
+                tabConfidentBtn.classList.add("active");
+                tabPossibleBtn.classList.remove("active");
+                if (exactSubtitle) exactSubtitle.style.display = "block";
+                if (possibleSubtitle) possibleSubtitle.style.display = "none";
+
+                renderList(false);
+
+                const targetIndex = currentFilteredFamilies.findIndex(f => f.familyId === targetFamilyId);
+                if (targetIndex !== -1) {
+                    const targetTop = familyOffsets[targetIndex] || 0;
+                    const containerHeight = listContainer.clientHeight || 500;
+                    const cardHeight = familyHeights[targetIndex] || 100;
+                    const centeredTop = Math.max(0, targetTop - Math.floor((containerHeight - cardHeight) / 2));
+
+                    listContainer.scrollTop = centeredTop;
+                    tabScrollPositions["confident"] = centeredTop;
+                    renderVisibleWindow();
+
+                    const targetCardEl = renderedCardsMap.get(targetFamilyId);
+                    if (targetCardEl) {
+                        targetCardEl.classList.remove("jump-highlight");
+                        void targetCardEl.offsetWidth;
+                        targetCardEl.classList.add("jump-highlight");
+                        setTimeout(() => targetCardEl.classList.remove("jump-highlight"), 1500);
+                    }
+                }
+                return;
+            }
+
+            const swapBtn = e.target.closest(".swap-btn");
+            if (swapBtn) {
+                closeRowMenu();
+                const familyId = swapBtn.dataset.familyId;
+                const targetInstanceId = swapBtn.dataset.instanceId;
+                const family = familiesState.find(f => f.familyId === familyId);
+                if (!family) return;
+
+                const isConfident = activeTab === 'confident';
+                const candidatePool = isConfident ? family.confidentDuplicates : family.possibleDuplicates;
+                const candidateIndex = candidatePool.findIndex(t => t._instanceId === targetInstanceId);
+                if (candidateIndex === -1) return;
+
+                const oldKeeper = family.keeper;
+                const newKeeper = candidatePool[candidateIndex];
+
+                selectedSet.delete(newKeeper._instanceId);
+                selectedSet.add(oldKeeper._instanceId);
+
+                family.keeper = newKeeper;
+                candidatePool[candidateIndex] = oldKeeper;
+
+                if (isConfident) {
+                    family.confidentDuplicates.forEach(cand => {
+                        cand._suspicionScore = calculateConfidentSuspicionScore(family.keeper, cand);
+                    });
+                    family.confidentDuplicates.sort((a, b) => (b._suspicionScore ?? 0) - (a._suspicionScore ?? 0));
+                    family._maxSuspicionScore = family.confidentDuplicates.length > 0 
+                        ? Math.max(...family.confidentDuplicates.map(cd => cd._suspicionScore ?? -1000))
+                        : -1000;
+                } else {
+                    family.possibleDuplicates.forEach(cand => {
+                        const scoreObj = calculatePossibleDuplicateScore(family.keeper, cand);
+                        cand._possibleScore = scoreObj.score;
+                        cand._possibleReason = scoreObj.reason;
+                    });
+                    family._maxPossibleScore = family.possibleDuplicates.length > 0 
+                        ? Math.max(0, ...family.possibleDuplicates.map(pd => pd._possibleScore || 0))
+                        : 0;
+                    family.possibleDuplicates.sort((a, b) => (b._possibleScore || 0) - (a._possibleScore || 0));
+                }
+                const oldCardEl = renderedCardsMap.get(familyId);
+                if (oldCardEl) {
+                    oldCardEl.querySelectorAll("img.track-cover[data-track-uri]").forEach(img => imgObserver.unobserve(img));
+                    oldCardEl.remove();
+                    renderedCardsMap.delete(familyId);
+                }
+                updateSummary();
+                updateSelectAllState();
+                renderVisibleWindow();
+                return;
+            }
+
+            const isrcTag = e.target.closest(".isrc-tag");
+            if (isrcTag) {
+                const textToCopy = isrcTag.dataset.copyText || isrcTag.dataset.isrc || "";
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const original = isrcTag.textContent;
+                    isrcTag.textContent = "Copied!";
+                    setTimeout(() => { isrcTag.textContent = original; }, 1000);
+                });
+                return;
+            }
+
+            const rowMenuBtn = e.target.closest(".row-menu-btn");
+            if (rowMenuBtn) {
+                openRowMenu(rowMenuBtn);
+                return;
+            }
+        });
+
+        listContainer.addEventListener("dblclick", (e) => {
+            if (e.target.closest(".sp-checkbox-hitbox, .row-checkbox, .swap-btn, .jump-exact-btn, .row-menu-btn, .isrc-tag")) return;
+            const row = e.target.closest(".track-row");
+            if (!row) return;
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
+            const uri = row.dataset.trackUri;
+            if (!uri) return;
+            if (currentlyPlayingUri === uri && Spicetify.Player.isPlaying()) {
+                Spicetify.Player.pause();
+            } else if (currentlyPlayingUri === uri && !Spicetify.Player.isPlaying()) {
+                Spicetify.Player.play();
+            } else {
+                const coverBtn = row.querySelector(".track-cover-btn");
+                const title = coverBtn?.dataset.trackTitle || row.querySelector(".track-title")?.textContent?.trim() || "";
+                const artist = coverBtn?.dataset.trackArtist || row.querySelector(".track-artist-names")?.textContent?.trim() || "";
+                const img = row.querySelector(".track-cover")?.src || null;
+                miniPlayer.playTrack(uri, { uri, name: title, songTitle: title, artistName: artist, allArtists: artist, images: img ? [{ url: img }] : [] });
+            }
+        });
+
+        shadowRoot.addEventListener("click", (e) => {
+            if (!e.target.closest(".row-menu-btn, .sp-row-menu")) {
+                closeRowMenu();
+            }
+            if (!e.target.closest(".sp-audit-popover-wrapper")) {
+                auditBackupController.close();
+            }
+        });
+
+        const closeModal = (skipResolve = false) => {
+            closeRowMenu();
+            auditBackupController.close();
+            auditBackupController.destroy();
+            abortController.abort();
+            clearTimeout(searchDebounceTimer);
+            miniPlayer.destroy();
+            if (imgObserver) imgObserver.disconnect();
+            window.removeEventListener("resize", onResize);
+            Spicetify.Player.removeEventListener("onplaypause", onPlayerStateChange);
+            Spicetify.Player.removeEventListener("songchange", onPlayerStateChange);
+            window.removeEventListener("keydown", handleKeyDown);
+            overlay.style.opacity = "0";
+            setTimeout(() => {
+                overlay.remove();
+                if (!skipResolve) resolve();
+            }, 200);
+        };
+
+        const handleKeyDown = (e) => {
+            if (e.key === "Escape") {
+                if (auditBackupController.isOpen()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    auditBackupController.close();
+                    return;
+                }
+                if (isRowMenuOpen()) {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    closeRowMenu();
+                    return;
+                }
+                if (document.getElementById("sort-play-confirmation-overlay")) return;
+                e.preventDefault();
+                closeModal();
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+
+        shadowRoot.querySelector("#closeModalX").addEventListener("click", () => closeModal());
+        shadowRoot.querySelector("#closeModalBtn").addEventListener("click", () => closeModal());
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) {
+                closeRowMenu();
+                auditBackupController.close();
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
+        const handleCreateCleanCopy = () => {
+            if (selectedSet.size === 0) return;
+            const cleanTracks = allTracks.filter(t => !selectedSet.has(t._instanceId));
+            executeAuditCleanCopy({
+                cleanTracks,
+                cleanName: `${sourceName} (Deduplicated)`,
+                playlistDescription: `Deduplicated copy of ${sourceName}. Created by Sort-Play.`,
+                closeModal,
+                resolve
+            });
+        };
+
+        if (createCopyBtn) {
+            createCopyBtn.addEventListener("click", handleCreateCleanCopy);
+        }
+
+        actionBtn.addEventListener("click", async () => {
+            if (selectedSet.size === 0) return;
+            if (!canModifyDirectly) {
+                handleCreateCleanCopy();
+                return;
+            }
+            const chosenTracks = allTracks.filter(t => selectedSet.has(t._instanceId));
+            executeAuditTrackRemoval({
+                isLikedSongs,
+                chosenTracks,
+                sourceName,
+                itemTypeName: "Duplicate Tracks",
+                backupSuffix: "(Duplicates Backup)",
+                storageKeyBackup: STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE,
+                currentUri,
+                closeModal,
+                resolve
+            });
+        });
+
+        renderList();
+        updateSummary();
+    });
   }
 
   async function convertLocalTracksToSpotify(tracks, updateProgress = () => {}, mode = 'convert_keep') {
@@ -19691,6 +22658,375 @@ shadowRoot.innerHTML = `
       return { titleAlbumKeywords, artistKeywords };
     }
 
+  function createMiniPlayerController(options = {}) {
+    const { root = document.body, rightSlotContent = null, onTrackChange = null, signal = null } = options;
+    const styleId = "sp-mini-player-style";
+    const targetRoot = root.shadowRoot || root;
+
+    if (!targetRoot.querySelector(`#${styleId}`)) {
+      const style = document.createElement("style");
+      style.id = styleId;
+      style.textContent = `
+        .sp-mini-player { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 24px; flex-shrink: 0; border-top: 1px solid #333; background-color: #1c1c1c; box-sizing: border-box; width: 100%; position: relative; }
+        .sp-mini-player-track-info { display: flex; align-items: center; gap: 12px; max-width: 300px; min-width: 200px; overflow: hidden; }
+        .sp-mini-player-album-art { width: 40px; height: 40px; border-radius: 4px; background-color: #282828; flex-shrink: 0; object-fit: cover; }
+        .sp-mini-player-text { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+        .sp-mini-player-title { color: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sp-mini-player-artist { color: #b3b3b3; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sp-mini-player-progress-container { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; color: #b3b3b3; font-size: 12px; width: min(400px, 35vw); }
+        .sp-mini-player-btn { background-color: transparent; border: 0; color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s ease; padding: 0; }
+        .sp-mini-player-btn:hover { color: #1db954; }
+        .sp-mini-player-time { min-width: 45px; font-variant-numeric: tabular-nums; }
+        .sp-mini-player-time.current { text-align: right; }
+        .sp-mini-player-time.duration { text-align: left; }
+        .sp-mini-player-progress-bar { flex: 1; height: 4px; background-color: #4d4d4d; border-radius: 2px; cursor: pointer; position: relative; min-width: 0; }
+        .sp-mini-player-progress-bar::before { content: ""; position: absolute; top: -8px; bottom: -8px; left: 0; right: 0; cursor: pointer; }
+        .sp-mini-player-progress-hover { position: absolute; height: 100%; background-color: rgba(255, 255, 255, 0.4); border-radius: 2px; width: 0%; pointer-events: none; opacity: 0; transition: opacity 0.1s ease; }
+        .sp-mini-player-progress-bar:hover .sp-mini-player-progress-hover { opacity: 1; }
+        .sp-mini-player-progress-inner { position: absolute; height: 100%; background-color: #ffffff; border-radius: 2px; width: 0%; pointer-events: none; z-index: 1; will-change: width; }
+        .sp-mini-player-progress-bar:hover .sp-mini-player-progress-inner { background-color: #1db954; }
+        .sp-mini-player-progress-inner::after { content: ""; position: absolute; left: 100%; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background-color: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); opacity: 0; transition: opacity 0.1s ease; pointer-events: none; will-change: transform; }
+        .sp-mini-player-progress-bar:hover .sp-mini-player-progress-inner::after, .sp-mini-player-progress-bar.is-dragging .sp-mini-player-progress-inner::after { opacity: 1; }
+        .sp-mini-player-progress-tooltip { position: absolute; bottom: 100%; margin-bottom: 8px; transform: translateX(-50%); background-color: #242424; color: #ffffff; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; pointer-events: none; opacity: 0; transition: opacity 0.15s ease; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5); z-index: 10; white-space: nowrap; left: 0%; }
+        .sp-mini-player-progress-bar:hover .sp-mini-player-progress-tooltip, .sp-mini-player-progress-bar.is-dragging .sp-mini-player-progress-tooltip { opacity: 1; }
+        .sp-mini-player-right-slot { display: flex; align-items: center; justify-content: flex-end; margin-left: auto; }
+      `;
+      targetRoot.appendChild(style);
+    }
+
+    const element = document.createElement("div");
+    element.className = "sp-mini-player";
+    element.innerHTML = `
+      <div class="sp-mini-player-track-info">
+        <img class="sp-mini-player-album-art" src="/api/placeholder/40/40" alt="" />
+        <div class="sp-mini-player-text">
+          <span class="sp-mini-player-title">Nothing Playing</span>
+          <span class="sp-mini-player-artist">Unknown Artist</span>
+        </div>
+      </div>
+      <div class="sp-mini-player-progress-container">
+        <button class="sp-mini-player-btn" aria-label="Play/Pause">${playIconSvg}</button>
+        <span class="sp-mini-player-time current">0:00</span>
+        <div class="sp-mini-player-progress-bar">
+          <div class="sp-mini-player-progress-hover"></div>
+          <div class="sp-mini-player-progress-inner"></div>
+          <div class="sp-mini-player-progress-tooltip">0:00</div>
+        </div>
+        <span class="sp-mini-player-time duration">0:00</span>
+      </div>
+      <div class="sp-mini-player-right-slot"></div>
+    `;
+
+    const artEl = element.querySelector(".sp-mini-player-album-art");
+    const titleEl = element.querySelector(".sp-mini-player-title");
+    const artistEl = element.querySelector(".sp-mini-player-artist");
+    const playBtn = element.querySelector(".sp-mini-player-btn");
+    const currTimeEl = element.querySelector(".sp-mini-player-time.current");
+    const durationEl = element.querySelector(".sp-mini-player-time.duration");
+    const progressBar = element.querySelector(".sp-mini-player-progress-bar");
+    const progressHover = element.querySelector(".sp-mini-player-progress-hover");
+    const progressInner = element.querySelector(".sp-mini-player-progress-inner");
+    const tooltipEl = element.querySelector(".sp-mini-player-progress-tooltip");
+    const rightSlot = element.querySelector(".sp-mini-player-right-slot");
+
+    artEl.onerror = () => { artEl.src = "/api/placeholder/40/40"; };
+
+    if (rightSlotContent) {
+      rightSlot.appendChild(rightSlotContent);
+    }
+
+    let currentTrack = null;
+    let isDragging = false;
+    let dragProgressRatio = 0;
+    let activeDurationMs = 0;
+    let pollTimer = null;
+    let imgRequestId = 0;
+    let isDestroyed = false;
+    let lastSeekTime = 0;
+    let lastSeekTargetMs = 0;
+
+    const normalizeImgUrl = (url) => {
+      if (!url) return null;
+      if (url.startsWith("spotify:image:")) return `https://i.scdn.co/image/${url.split(":")[2]}`;
+      return url;
+    };
+
+    const fmtTime = (ms) => {
+      if (!ms || isNaN(ms) || ms <= 0 || ms > 86400000) return "0:00";
+      const totalSec = Math.floor(ms / 1000);
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      return h > 0 
+        ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
+        : `${m}:${s.toString().padStart(2, "0")}`;
+    };
+
+    const updateVisualProgress = (ratio, currMs) => {
+      const clamped = Math.max(0, Math.min(1, ratio));
+      progressInner.style.width = `${clamped * 100}%`;
+      const dur = activeDurationMs || Spicetify.Player.getDuration() || 0;
+      const safeMs = (currMs != null && currMs >= 0 && currMs <= (dur || Infinity) && currMs < 86400000)
+        ? currMs
+        : (clamped * dur);
+      currTimeEl.textContent = fmtTime(safeMs);
+    };
+
+    const resolveArtwork = async (track) => {
+      const currentToken = ++imgRequestId;
+      if (!track?.uri) {
+        artEl.src = "/api/placeholder/40/40";
+        return;
+      }
+      if (track.uri.startsWith("spotify:local:")) {
+        artEl.src = FALLBACK_COVER_URI;
+        return;
+      }
+      const rawDirect = track.images?.[0]?.url || track.album?.images?.[0]?.url || track.track?.album?.images?.[0]?.url;
+      const directImg = normalizeImgUrl(rawDirect);
+      if (directImg) {
+        artEl.src = directImg;
+        return;
+      }
+      if (track.uri.startsWith("spotify:track:")) {
+        const resolvedUrl = await fetchTrackCoverUrl(track.uri, 40);
+        if (currentToken !== imgRequestId) return;
+        if (resolvedUrl && resolvedUrl !== FALLBACK_COVER_URI) {
+          artEl.src = normalizeImgUrl(resolvedUrl);
+          return;
+        }
+      }
+      if (currentToken === imgRequestId) artEl.src = "/api/placeholder/40/40";
+    };
+
+    const getPlayerActiveTrack = () => {
+      const item = Spicetify.Player.data?.item;
+      if (!item) return null;
+      const isLocal = item.isLocal || (item.uri && (item.uri.startsWith("spotify:local:") || (Spicetify.URI.isLocal && Spicetify.URI.isLocal(item.uri))));
+      const name = item.name || item.metadata?.title || "Unknown Title";
+      const artist = isLocal
+        ? (item.metadata?.artist_name || "Unknown Artist")
+        : (item.artists?.map(a => a.name).join(", ") || item.metadata?.artist_name || "Unknown Artist");
+      const durationMs = item.duration?.milliseconds ?? (typeof item.duration === "number" ? item.duration : (Spicetify.Player.getDuration() || 0));
+      const rawImg = item.album?.images?.[0]?.url || item.metadata?.image_url;
+      const images = rawImg ? [{ url: normalizeImgUrl(rawImg) }] : [];
+      return { uri: item.uri, name, songTitle: name, allArtists: artist, artistName: artist, durationMs, images };
+    };
+
+    const setTrack = (track, play = false) => {
+      if (!track) return;
+      currentTrack = track;
+      const title = track.songTitle || track.name || "Unknown Title";
+      const artist = track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
+      activeDurationMs = track.durationMs || track.durationMilis || (track.track && track.track.duration_ms) || Spicetify.Player.getDuration() || 0;
+
+      titleEl.textContent = title;
+      titleEl.title = title;
+      artistEl.textContent = artist;
+      artistEl.title = artist;
+      durationEl.textContent = fmtTime(activeDurationMs);
+
+      lastSeekTime = 0;
+      lastSeekTargetMs = 0;
+      updateVisualProgress(0, 0);
+
+      resolveArtwork(track);
+
+      if (play) {
+        updatePlayButton(true);
+        if (track.uri) Spicetify.Player.playUri(track.uri);
+      }
+
+      if (onTrackChange) onTrackChange(track.uri, track);
+    };
+
+    const tick = () => {
+      if (isDragging) return;
+      const rawProg = Spicetify.Player.getProgress() || 0;
+      const dur = Spicetify.Player.getDuration() || activeDurationMs || 0;
+
+      const prog = (rawProg > 86400000 || rawProg < 0) ? 0 : rawProg;
+
+      if (Date.now() - lastSeekTime < 500) {
+        if (Math.abs(prog - lastSeekTargetMs) < 1500) {
+          lastSeekTime = 0;
+        } else {
+          return;
+        }
+      }
+
+      const safeProg = (dur > 0 && prog > dur) ? 0 : prog;
+      const ratio = dur > 0 ? (safeProg / dur) : 0;
+      updateVisualProgress(ratio, safeProg);
+      durationEl.textContent = fmtTime(dur);
+    };
+
+    const startPolling = () => {
+      if (!pollTimer) pollTimer = setInterval(tick, 50);
+    };
+
+    const stopPolling = () => {
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+      }
+    };
+
+    const updatePlayButton = (isPlaying) => {
+      playBtn.innerHTML = isPlaying ? pauseIconSvg : playIconSvg;
+      if (isPlaying) {
+        startPolling();
+      } else {
+        stopPolling();
+        tick();
+      }
+    };
+
+    const onPlayPause = (e) => {
+      const isPaused = e?.data ? e.data.isPaused : !Spicetify.Player.isPlaying();
+      updatePlayButton(!isPaused);
+    };
+
+    const onSongChange = () => {
+      const active = getPlayerActiveTrack();
+      if (active) setTrack(active, false);
+    };
+
+    const onBarHoverMove = (e) => {
+      if (isDragging) return;
+      const clientX = e.touches?.[0]?.clientX ?? e.clientX;
+      if (clientX == null) return;
+      const rect = progressBar.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / (rect.width || 1)));
+      const dur = Spicetify.Player.getDuration() || activeDurationMs || 0;
+      progressHover.style.width = `${ratio * 100}%`;
+      tooltipEl.textContent = fmtTime(ratio * dur);
+      tooltipEl.style.left = `${ratio * 100}%`;
+    };
+
+    const onBarHoverLeave = () => {
+      if (isDragging) return;
+      progressHover.style.width = "0%";
+    };
+
+    const onDragMove = (e) => {
+      if (!isDragging) return;
+      if (e.cancelable && e.type === "touchmove") e.preventDefault();
+      const clientX = e.touches?.[0]?.clientX ?? e.clientX;
+      if (clientX == null) return;
+      const rect = progressBar.getBoundingClientRect();
+      dragProgressRatio = Math.max(0, Math.min(1, (clientX - rect.left) / (rect.width || 1)));
+      updateVisualProgress(dragProgressRatio);
+      progressHover.style.width = `${dragProgressRatio * 100}%`;
+      const dur = Spicetify.Player.getDuration() || activeDurationMs || 0;
+      tooltipEl.textContent = fmtTime(dragProgressRatio * dur);
+      tooltipEl.style.left = `${dragProgressRatio * 100}%`;
+    };
+
+    const onDragEnd = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      progressBar.classList.remove("is-dragging");
+      progressHover.style.width = "0%";
+      window.removeEventListener("mousemove", onDragMove);
+      window.removeEventListener("mouseup", onDragEnd);
+      window.removeEventListener("touchmove", onDragMove);
+      window.removeEventListener("touchend", onDragEnd);
+      window.removeEventListener("touchcancel", onDragEnd);
+      window.removeEventListener("blur", onDragEnd);
+      document.removeEventListener("mouseleave", onDragEnd);
+
+      const dur = Spicetify.Player.getDuration() || activeDurationMs || 0;
+      const seekMs = dragProgressRatio * dur;
+      lastSeekTime = Date.now();
+      lastSeekTargetMs = seekMs;
+      Spicetify.Player.seek(seekMs);
+      updateVisualProgress(dragProgressRatio, seekMs);
+    };
+
+    const onDragStart = (e) => {
+      e.stopPropagation();
+      isDragging = true;
+      progressBar.classList.add("is-dragging");
+      activeDurationMs = currentTrack?.durationMs || Spicetify.Player.getDuration() || 0;
+      const clientX = e.touches?.[0]?.clientX ?? e.clientX;
+      if (clientX == null) return;
+      const rect = progressBar.getBoundingClientRect();
+      dragProgressRatio = Math.max(0, Math.min(1, (clientX - rect.left) / (rect.width || 1)));
+      lastSeekTime = Date.now();
+      lastSeekTargetMs = dragProgressRatio * activeDurationMs;
+      updateVisualProgress(dragProgressRatio);
+      progressHover.style.width = `${dragProgressRatio * 100}%`;
+      tooltipEl.textContent = fmtTime(dragProgressRatio * activeDurationMs);
+      tooltipEl.style.left = `${dragProgressRatio * 100}%`;
+
+      window.addEventListener("mousemove", onDragMove);
+      window.addEventListener("mouseup", onDragEnd);
+      window.addEventListener("touchmove", onDragMove, { passive: false });
+      window.addEventListener("touchend", onDragEnd);
+      window.addEventListener("touchcancel", onDragEnd);
+      window.addEventListener("blur", onDragEnd);
+      document.addEventListener("mouseleave", onDragEnd);
+    };
+
+    progressBar.addEventListener("mousemove", onBarHoverMove);
+    progressBar.addEventListener("mouseleave", onBarHoverLeave);
+    progressBar.addEventListener("mousedown", onDragStart);
+    progressBar.addEventListener("touchstart", onDragStart, { passive: false });
+
+    playBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const activeUri = Spicetify.Player.data?.item?.uri;
+      if (currentTrack?.uri && activeUri !== currentTrack.uri) {
+        Spicetify.Player.playUri(currentTrack.uri);
+      } else if (Spicetify.Player.data?.item) {
+        Spicetify.Player.togglePlay();
+      } else if (currentTrack?.uri) {
+        Spicetify.Player.playUri(currentTrack.uri);
+      }
+    });
+
+    Spicetify.Player.addEventListener("onplaypause", onPlayPause);
+    Spicetify.Player.addEventListener("songchange", onSongChange);
+
+    const initialTrack = getPlayerActiveTrack();
+    if (initialTrack) {
+      setTrack(initialTrack, false);
+    }
+    updatePlayButton(Spicetify.Player.isPlaying());
+
+    const destroy = () => {
+      if (isDestroyed) return;
+      isDestroyed = true;
+      stopPolling();
+      window.removeEventListener("mousemove", onDragMove);
+      window.removeEventListener("mouseup", onDragEnd);
+      window.removeEventListener("touchmove", onDragMove);
+      window.removeEventListener("touchend", onDragEnd);
+      window.removeEventListener("touchcancel", onDragEnd);
+      window.removeEventListener("blur", onDragEnd);
+      document.removeEventListener("mouseleave", onDragEnd);
+      Spicetify.Player.removeEventListener("onplaypause", onPlayPause);
+      Spicetify.Player.removeEventListener("songchange", onSongChange);
+      element.remove();
+    };
+
+    if (signal) {
+      signal.addEventListener("abort", destroy, { once: true });
+    }
+
+    return {
+      element,
+      setTrack,
+      playTrack: (uri, track) => setTrack({ ...(track || {}), uri }, true),
+      syncWithPlayer: () => {
+        const active = getPlayerActiveTrack();
+        if (active) setTrack(active, false);
+      },
+      destroy
+    };
+  }
+
   function showColumnManagementModal(currentLayout, onSave, onFormatChange) {
       const overlay = document.createElement("div");
       overlay.className = "sort-play-font-scope";
@@ -20138,6 +23474,8 @@ shadowRoot.innerHTML = `
     
     let tableHeaders = getHeadersHtml(currentColumnLayout);
 
+    let miniPlayer = null;
+    let currentPlayingUri = Spicetify.Player.data?.item?.uri || null;
     let observer = null;
     let titleAlbumKeywords = new Set();
     let artistKeywords = new Set();
@@ -20206,7 +23544,7 @@ shadowRoot.innerHTML = `
             const durationDisplay = isCalculating ? `<div class="sp-spinner-loader" style="width: 14px; height: 14px; border-width: 2px; display: inline-block;"></div>` : formatTotalDuration(displayedDuration);
 
             statsContainer.innerHTML = `
-                ${hasDeferred ? `<span class="tooltip-container" style="display: inline-flex; align-self: center; cursor: help; font-size: 16px; top: -2px;">⚠️<span class="custom-tooltip" style="bottom: 140%; max-width: 200px; text-align: center;">Some filters apply during creation. Final size may vary.</span></span>` : ''}
+                ${hasDeferred ? `<span class="tooltip-container" style="display: inline-flex; align-self: center; cursor: help; font-size: 16px; top: -2px;">\u26A0\uFE0F<span class="custom-tooltip" style="bottom: 140%; max-width: 200px; text-align: center;">Some filters apply during creation. Final size may vary.</span></span>` : ''}
                 <div style="display: flex; align-items: baseline; gap: 4px;">
                     <span style="display: inline-flex; align-items: center; justify-content: flex-end; min-width: 48px; text-align: right; font-size: 18px; font-weight: 800; color: ${displayedTracksCount > 0 || isCalculating ? '#1ed760' : '#f15e6c'}; font-variant-numeric: tabular-nums; line-height: 1;">${countDisplay}</span>
                     <span style="font-size: 13px; font-weight: 700; color: #b3b3b3;">/ ${totalTracks} tracks</span>
@@ -20222,6 +23560,13 @@ shadowRoot.innerHTML = `
 
     function loadAlbumArt(track, imgElement, maxRetries = 3, baseDelay = 200) {
         if (imgElement.style.opacity === '1') {
+            return;
+        }
+
+        const cached = getCachedSpotifyImage(track.uri);
+        if (cached && cached !== FALLBACK_COVER_URI) {
+            imgElement.src = cached;
+            imgElement.style.opacity = '1';
             return;
         }
     
@@ -20262,6 +23607,9 @@ shadowRoot.innerHTML = `
                         }
                     }
                     const albumArtSrc = bestSource ? bestSource.url : sources[sources.length - 1].url;
+                    if (albumArtSrc) {
+                        spotifyImageCache.set(track.uri, { ts: Date.now(), data: albumArtSrc });
+                    }
     
                     const tempImage = new Image();
                     tempImage.onload = () => {
@@ -20296,9 +23644,10 @@ shadowRoot.innerHTML = `
     function generateTableRows(tracksToDisplay) {
         return tracksToDisplay.map((track, index) => {
             const displayedIndex = startIndex + index;
-            const originalIndex = originalTracks.findIndex(t => t.uri === track.uri);
+            const originalIndex = track.originalIndex ?? originalTracks.findIndex(t => t.uri === track.uri);
+            const isPlaying = currentPlayingUri && track.uri === currentPlayingUri;
 
-            let row = `<tr data-track-uri="${track.uri}" data-row-index="${originalIndex}" class="${track.isRemoved ? 'removed' : ''}">`;
+            let row = `<tr data-track-uri="${track.uri}" data-row-index="${originalIndex}" class="${track.isRemoved ? 'removed' : ''} ${isPlaying ? 'is-playing' : ''}">`;
             
             currentColumnLayout.filter(col => col.visible).forEach(col => {
                 if (col.id === "popularity" && !fetchPop) return;
@@ -20658,24 +24007,9 @@ shadowRoot.innerHTML = `
         if (!formattedNumber) return 0;
         formattedNumber = formattedNumber.trim();
 
-        const isoDateMatch = formattedNumber.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-        if (isoDateMatch) {
-            const year = parseInt(isoDateMatch[1]);
-            const month = parseInt(isoDateMatch[2]) - 1;
-            const day = parseInt(isoDateMatch[3]);
-            const ts = Date.UTC(year, month, day);
-            if (isNaN(ts)) return 0; 
-            return ts;
-        }
-
-        const dateMatch = formattedNumber.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (dateMatch) {
-            const month = parseInt(dateMatch[1]) - 1;
-            const day = parseInt(dateMatch[2]);
-            const year = parseInt(dateMatch[3]);
-            const ts = Date.UTC(year, month, day);
-            if (isNaN(ts)) return 0; 
-            return ts;
+        if (formattedNumber.includes('-') || formattedNumber.includes('/')) {
+            const ts = parseDateFilterString(formattedNumber, false);
+            if (!isNaN(ts)) return ts;
         }
 
         const durationMatch = formattedNumber.match(/^(\d+):(\d+)$/);
@@ -21530,51 +24864,8 @@ shadowRoot.innerHTML = `
             const handleInputBlur = () => {
                 let v1, v2;
                 if (type === 'releaseDate' || type === 'addedAt') {
-                    const parseDateStrLocal = (val, isMax) => {
-                        if (!val) return NaN;
-                        let cleanVal = val.toString().trim().replace(/\//g, '-');
-                        
-                        let y, m, d;
-                        if (/^\d{4}$/.test(cleanVal)) {
-                            y = parseInt(cleanVal);
-                            if (y < 1000 || y > 9999) return NaN;
-                            m = isMax ? 11 : 0;
-                            d = isMax ? 31 : 1;
-                        } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
-                            const parts = cleanVal.split('-');
-                            y = parseInt(parts[0]);
-                            m = parseInt(parts[1]) - 1;
-                            if (y < 1000 || y > 9999 || m < 0 || m > 11) return NaN;
-                            if (isMax) { m += 1; d = 0; } else { d = 1; }
-                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
-                            const parts = cleanVal.split('-');
-                            y = parseInt(parts[0]);
-                            m = parseInt(parts[1]) - 1;
-                            d = parseInt(parts[2]);
-                            if (y < 1000 || y > 9999) return NaN;
-                        } else {
-                            const parsed = new Date(val); 
-                            if (isNaN(parsed.getTime())) return NaN;
-                            const isISO = /^\d{4}-\d{2}-\d{2}/.test(val);
-                            if (isISO) {
-                                y = parsed.getUTCFullYear();
-                                m = parsed.getUTCMonth();
-                                d = parsed.getUTCDate();
-                            } else {
-                                y = parsed.getFullYear();
-                                m = parsed.getMonth();
-                                d = parsed.getDate();
-                            }
-                            if (y < 1000 || y > 9999) return NaN;
-                        }
-                        
-                        return isMax 
-                            ? Date.UTC(y, m, d, 23, 59, 59, 999) 
-                            : Date.UTC(y, m, d, 0, 0, 0, 0);
-                    };
-
-                    v1 = parseDateStrLocal(inputMin.value, false);
-                    v2 = parseDateStrLocal(inputMax.value, true);
+                    v1 = parseDateFilterString(inputMin.value, false);
+                    v2 = parseDateFilterString(inputMax.value, true);
 
                     if (isNaN(v1)) v1 = parseFloat(sliderMin.dataset.realValue);
                     if (isNaN(v2)) v2 = parseFloat(sliderMax.dataset.realValue);
@@ -21911,26 +25202,13 @@ shadowRoot.innerHTML = `
       .song-info img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
       .song-title-artist-wrapper { display: flex; flex-direction: column; overflow: hidden; justify-content: center; min-width: 0; flex: 1; }
       .song-title { color: #fff; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+      .tracklist-table tr.is-playing .song-title { color: #1ed760 !important; }
       .track-item-artist-sub { display: block; color: #b3b3b3; font-size: 13px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .tracklist-table.compact-mode .track-item-artist-sub { display: none; }
       .sp-cf-main-section { padding: 0 !important; overflow: hidden; flex: 1; min-height: 0; display: flex; flex-direction: column; }
       .sp-cf-header { padding: 24px 32px 0 !important; display: flex; flex-direction: column; align-items: stretch; border-bottom: none; flex-shrink: 0; }
       .sp-cf-title { font-size: 22px; font-weight: 700; color: white; margin: 0; }
       .playlist-stats-container { display: flex; gap: 12px; color: #b3b3b3; font-size: 14px; font-weight: bold; margin-left: 20px; }
-      .player-controls2 { display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: 12px 20px; flex-shrink: 0; border-top: 1px solid #333; }
-      .control-button2 { background-color: transparent; border: 0; color: #ffffff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.2s ease; }
-      .progress-bar2-container { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; color: #b3b3b3; font-size: 12px; width: 450px; max-width: 400px; }
-      #currentTime, #duration { min-width: 45px; text-align: center; font-variant-numeric: tabular-nums; }
-      #currentTime { text-align: right; }
-      #duration { text-align: left; }
-      .progress-bar2 { flex: 1; height: 4px; background-color: #4d4d4d; border-radius: 2px; cursor: pointer; position: relative; min-width: 0; }
-      .progress-bar2-inner { position: absolute; height: 100%; background-color: #ffffff; border-radius: 2px; transition: width 0.1s linear; }
-      .progress-bar2:hover .progress-bar2-inner { background-color: #1db954; }
-      .track-info-container { display: flex; align-items: center; gap: 12px; max-width: 300px; min-width: 200px; }
-      .track-info-text { display: flex; flex-direction: column; min-width: 0; }
-      .track-title { color: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .track-artist { color: #b3b3b3; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      .track-album-art { width: 40px; height: 40px; border-radius: 4px; background-color: #282828; flex-shrink: 0; }
       .view-controls-container { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
       .view-control-btn { background: transparent; border: 1px solid #434343; color: #b3b3b3; border-radius: 4px; height: 26px; padding: 0 10px; display: flex; align-items: center; gap: 6px; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 600; transition: color 0.2s, border-color 0.2s, background-color 0.2s; }
       .view-control-btn:hover { color: #fff; border-color: #666; background: rgba(255,255,255,0.05); }
@@ -22404,52 +25682,32 @@ shadowRoot.innerHTML = `
                       </tbody>
                   </table>
               </div>
-              <div class="player-controls2">
-                  <div class="track-info-container">
-                      <div class="track-album-art">
-                      </div>
-                      <div class="track-info-text">
-                          <span class="track-title">Track Title</span>
-                          <span class="track-artist">Artist Name</span>
-                      </div>
-                  </div>
-                  <div class="progress-bar2-container">
-                      <button class="control-button2" id="playPauseButton">
-                          ${playIconSvg}
-                      </button>
-                      <span id="currentTime">0:00</span>
-                      <div class="progress-bar2" id="progressBar">
-                          <div class="progress-bar2-inner" id="progressBarInner"></div>
-                      </div>
-                      <span id="duration">0:00</span>
-                  </div>
-                  <div class="view-controls-container">
-                      <button id="manageColumnsBtn" class="view-control-btn" title="Manage Columns">
-                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
-                          <span>Columns</span>
-                      </button>
-                      
-                      <button id="compactModeToggleBtn" class="view-control-btn icon-only ${isCompactMode ? 'active' : ''}" title="${isCompactMode ? 'Switch to Normal View' : 'Switch to Compact View'}">
-                          ${isCompactMode ? 
-                            `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M4 9.6h16M4 14.3h16M4 19h16" /></svg>` : 
-                            `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>`
-                          }
-                      </button>
-                      
-                      <div class="view-controls-divider"></div>
-                      
-                      <span class="max-rows-label">Rows:</span>
-                      <select class="max-rows-select">
-                          <option value="50">50</option>
-                          <option value="100">100</option>
-                          <option value="200">200</option>
-                          <option value="300">300</option>
-                          <option value="500">500</option>
-                          <option value="700">800</option>
-                          <option value="1000">1000</option>
-                          <option value="all">All</option>
-                      </select>
-                  </div>
+              <div class="view-controls-container" style="display: none;">
+                  <button id="manageColumnsBtn" class="view-control-btn" title="Manage Columns">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                      <span>Columns</span>
+                  </button>
+                  
+                  <button id="compactModeToggleBtn" class="view-control-btn icon-only ${isCompactMode ? 'active' : ''}" title="${isCompactMode ? 'Switch to Normal View' : 'Switch to Compact View'}">
+                      ${isCompactMode ? 
+                        `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 5h16M4 9.6h16M4 14.3h16M4 19h16" /></svg>` : 
+                        `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>`
+                      }
+                  </button>
+                  
+                  <div class="view-controls-divider"></div>
+                  
+                  <span class="max-rows-label">Rows:</span>
+                  <select class="max-rows-select">
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                      <option value="200">200</option>
+                      <option value="300">300</option>
+                      <option value="500">500</option>
+                      <option value="700">800</option>
+                      <option value="1000">1000</option>
+                      <option value="all">All</option>
+                  </select>
               </div>
             </div>
         </div>
@@ -22538,8 +25796,7 @@ shadowRoot.innerHTML = `
         if (observer) {
             observer.disconnect();
         }
-        clearInterval(progressInterval);
-        Spicetify.Player.removeEventListener('onplaypause', playerStateHandler);
+        miniPlayer?.destroy();
         window.removeEventListener('resize', updatePosition);
         document.removeEventListener('keydown', onKeyDown);
 
@@ -22797,161 +26054,6 @@ shadowRoot.innerHTML = `
 
     updateSummary();
 
-    tableBody.addEventListener("click", (event) => {
-        const row = event.target.closest("tr");
-        if (!row) return;
-
-        if (event.target.closest(".actions-col")) {
-            return;
-        }
-
-        if (activeRow) {
-            activeRow.classList.remove("active");
-        }
-
-        row.classList.add("active");
-        activeRow = row;
-    });
-
-    function updateTrackInfo(track) {
-        const trackTitleElement = modalContainer.querySelector(".track-title");
-        const trackArtistElement = modalContainer.querySelector(".track-artist");
-        const trackAlbumArtElement = modalContainer.querySelector(".track-album-art");
-
-        trackTitleElement.textContent = track.songTitle || track.name;
-        trackTitleElement.title = track.songTitle || track.name;
-        trackArtistElement.textContent = track.allArtists;
-        trackArtistElement.title = track.allArtists;
-
-        trackAlbumArtElement.innerHTML = '';
-
-        const newAlbumArt = document.createElement("img");
-        newAlbumArt.src = "/api/placeholder/40/40";
-        newAlbumArt.alt = "";
-        newAlbumArt.className = "player-album-art";
-        newAlbumArt.width = 40;
-        newAlbumArt.height = 40;
-        newAlbumArt.style.borderRadius = "4px";
-        newAlbumArt.dataset.trackUri = track.uri;
-
-        trackAlbumArtElement.appendChild(newAlbumArt);
-        trackAlbumArtElement.title = `${track.songTitle || track.name} - ${track.allArtists}`;
-        loadAlbumArt(track, newAlbumArt);
-    }
-
-    tableBody.addEventListener("dblclick", async (event) => {
-        const row = event.target.closest("tr");
-        if (!row) return;
-
-        const trackUri = row.dataset.trackUri;
-        if (trackUri) {
-
-            if (activeRow && activeRow !== row) {
-                activeRow.classList.remove("active");
-            }
-
-            row.classList.add("active");
-            activeRow = row;
-            await Spicetify.Player.playUri(trackUri);
-
-            const track = originalTracks.find(t => t.uri === trackUri);
-            if (track) {
-                updateTrackInfo(track);
-            }
-        }
-    });
-
-    tableBody.addEventListener("click", (event) => {
-        if (event.target.tagName === "svg" || event.target.tagName === "path") {
-            event.stopPropagation();
-        }
-
-        const removeButton = event.target.closest(".remove-button");
-        if (!removeButton) return;
-
-        const row = removeButton.closest("tr");
-        const trackUri = row.dataset.trackUri;
-        const track = originalTracks.find(t => t.uri === trackUri);
-
-        if (track) {
-            track.isRemoved = !track.isRemoved;
-            row.classList.toggle("removed");
-            const svgIcon = removeButton.querySelector("svg");
-            svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
-            updatePlaylistStats();
-        }
-    });
-
-    let isRemoveDragging = false;
-    let lastRemovedState = null;
-
-    tableBody.addEventListener("mousedown", (event) => {
-        const removeButton = event.target.closest(".remove-button");
-        if (!removeButton) return;
-
-        isRemoveDragging = true;
-        const row = removeButton.closest("tr");
-        const trackUri = row.dataset.trackUri;
-        const track = originalTracks.find(t => t.uri === trackUri);
-
-        if (track) {
-            track.isRemoved = !track.isRemoved;
-            lastRemovedState = track.isRemoved;
-            row.classList.toggle("removed");
-
-            const svgIcon = removeButton.querySelector("svg");
-            svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
-        }
-
-        event.preventDefault();
-    });
-
-    tableBody.addEventListener("mouseover", (event) => {
-        if (!isRemoveDragging) return;
-
-        const removeButton = event.target.closest(".remove-button");
-        if (!removeButton) return;
-
-        const row = removeButton.closest("tr");
-        const trackUri = row.dataset.trackUri;
-        const track = originalTracks.find(t => t.uri === trackUri);
-
-        if (track && track.isRemoved !== lastRemovedState) {
-            track.isRemoved = lastRemovedState;
-            row.classList.toggle("removed", lastRemovedState);
-
-            const svgIcon = removeButton.querySelector("svg");
-            svgIcon.outerHTML = lastRemovedState ? restoreIconSVG : removeIconSVG;
-        }
-    });
-
-    document.addEventListener("mouseup", () => {
-        isRemoveDragging = false;
-        lastRemovedState = null;
-    }, { signal: abortController.signal });
-
-    tableBody.addEventListener("click", (event) => {
-        if (event.target.tagName === "svg" || event.target.tagName === "path") {
-            event.stopPropagation();
-        }
-
-        const removeButton = event.target.closest(".remove-button");
-        if (!removeButton) return;
-
-        const row = removeButton.closest("tr");
-        const trackUri = row.dataset.trackUri;
-        const track = originalTracks.find(t => t.uri === trackUri);
-
-        if (track) {
-            track.isRemoved = !track.isRemoved;
-            row.classList.toggle("removed");
-
-            const svgIcon = removeButton.querySelector("svg");
-            svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
-            updatePlaylistStats();
-        }
-    });
-
     let currentSort = { key: null, direction: 'none' };
     function updateHeaderText(header, direction) {
         const baseText = header.textContent.replace(' ▲', '').replace(' ▼', '');
@@ -23006,6 +26108,24 @@ shadowRoot.innerHTML = `
     updateTable(displayedTracks);
     attachSortListeners();
 
+    const viewControls = modalContainer.querySelector(".view-controls-container");
+    if (viewControls) viewControls.style.display = "flex";
+
+    miniPlayer = createMiniPlayerController({
+      root: shadowRoot,
+      rightSlotContent: viewControls,
+      signal: abortController.signal,
+      onTrackChange: (uri) => {
+        currentPlayingUri = uri;
+        if (!tableBody) return;
+        const rows = tableBody.querySelectorAll("tr[data-track-uri]");
+        rows.forEach(r => r.classList.toggle("is-playing", r.dataset.trackUri === uri));
+      }
+    });
+
+    const playerWrapper = modalContainer.querySelector(".playlist-player-wrapper");
+    if (playerWrapper) playerWrapper.appendChild(miniPlayer.element);
+
     modalContainer.querySelector("#manageColumnsBtn").addEventListener("click", () => {
         showColumnManagementModal(currentColumnLayout, (newLayout) => {
             currentColumnLayout = newLayout;
@@ -23037,123 +26157,12 @@ shadowRoot.innerHTML = `
         });
     });
 
-    const playPauseButton = modalContainer.querySelector('#playPauseButton');
-    const progressBar = modalContainer.querySelector('#progressBar');
-    const progressBarInner = modalContainer.querySelector('#progressBarInner');
-    const currentTimeElement = modalContainer.querySelector('#currentTime');
-    const durationElement = modalContainer.querySelector('#duration');
-
-    let isDragging = false;
-
-    function updatePlayButton(isPlaying) {
-        playPauseButton.innerHTML = isPlaying
-            ? `${pauseIconSvg}`
-            : `${playIconSvg}`;
-    }
-
-    updatePlayButton(Spicetify.Player.isPlaying());
-
-    playPauseButton.addEventListener('click', () => {
-        Spicetify.Player.togglePlay();
-    });
-
-    progressBar.addEventListener('mousedown', (e) => {
-        e.stopPropagation();
-        isDragging = true;
-        const rect = progressBar.getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
-        const duration = Spicetify.Player.getDuration();
-        Spicetify.Player.seek(pos * duration);
-    });
-
-    progressBar.addEventListener('mousemove', (e) => {
-        e.stopPropagation();
-        if (!isDragging) return;
-        const rect = progressBar.getBoundingClientRect();
-        const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        progressBarInner.style.width = `${pos * 100}%`;
-    });
-
-    document.addEventListener('mouseup', () => {
-        isDragging = false;
-    }, { signal: abortController.signal });
-
-    function updateProgress() {
-        if (!isDragging) {
-            const progress = Spicetify.Player.getProgress();
-            const duration = Spicetify.Player.getDuration();
-            const progressPercent = (progress / duration) * 100;
-            progressBarInner.style.width = `${progressPercent}%`;
-            currentTimeElement.textContent = Spicetify.Player.formatTime(progress);
-            durationElement.textContent = Spicetify.Player.formatTime(duration);
-        }
-    }
-
-    const playerStateHandler = (event) => {
-        if (event?.data) {
-            updatePlayButton(!event.data.isPaused);
-        }
-    };
-
-    Spicetify.Player.addEventListener('onplaypause', playerStateHandler);
-
-    const progressInterval = setInterval(updateProgress, 100);
-
     initializeRangeFilters(abortController.signal);
 
-    const setupDatePicker = (inputId, pickerId, btnId) => {
-        const input = modalContainer.querySelector(`#${inputId}`);
-        const picker = modalContainer.querySelector(`#${pickerId}`);
-        const btn = modalContainer.querySelector(`#${btnId}`);
-        
-        if (picker && input && btn) {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const val = input.value.trim().replace(/\//g, '-');
-                if (val) {
-                    if (/^\d{4}$/.test(val)) {
-                        picker.value = `${val}-01-01`;
-                    } else if (/^\d{4}-\d{1,2}$/.test(val)) {
-                        const [y, m] = val.split('-');
-                        picker.value = `${y}-${m.padStart(2, '0')}-01`;
-                    } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(val)) {
-                        const [y, m, d] = val.split('-');
-                        picker.value = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                    } else {
-                        const parsed = Date.parse(val);
-                        if (!isNaN(parsed)) {
-                            const dObj = new Date(parsed);
-                            const y = dObj.getFullYear();
-                            const m = (dObj.getMonth() + 1).toString().padStart(2, '0');
-                            const dStr = dObj.getDate().toString().padStart(2, '0');
-                            picker.value = `${y}-${m}-${dStr}`;
-                        }
-                    }
-                }
-                
-                try {
-                    picker.showPicker();
-                } catch (err) {
-                    console.warn("[Sort-Play] showPicker not supported or element blocked.", err);
-                }
-            });
-
-            picker.addEventListener('change', (e) => {
-                if (e.target.value) {
-                    input.value = e.target.value;
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                    input.dispatchEvent(new Event('blur', { bubbles: true }));
-                }
-            });
-        }
-    };
-    
     rangeFiltersConfig.forEach(cfg => {
         if (cfg.type === 'date') {
-            setupDatePicker(`cf-min-val-${cfg.id.replace('.','-')}`, `cf-min-picker-${cfg.id.replace('.','-')}`, `cf-min-btn-${cfg.id.replace('.','-')}`);
-            setupDatePicker(`cf-max-val-${cfg.id.replace('.','-')}`, `cf-max-picker-${cfg.id.replace('.','-')}`, `cf-max-btn-${cfg.id.replace('.','-')}`);
+            setupDatePicker(modalContainer, `cf-min-val-${cfg.id.replace('.','-')}`, `cf-min-picker-${cfg.id.replace('.','-')}`, `cf-min-btn-${cfg.id.replace('.','-')}`);
+            setupDatePicker(modalContainer, `cf-max-val-${cfg.id.replace('.','-')}`, `cf-max-picker-${cfg.id.replace('.','-')}`, `cf-max-btn-${cfg.id.replace('.','-')}`);
         }
     });
 
@@ -23414,101 +26423,112 @@ shadowRoot.innerHTML = `
       if (!tableBody) return;
 
       let isRemoveDragging = false;
-      let lastRemovedState = null;
+      let dragTargetState = false;
+      let lastProcessedRowIndex = null;
       let activeRow = null;
+      let statsScheduled = false;
+
+      const scheduleStatsUpdate = () => {
+        if (statsScheduled) return;
+        statsScheduled = true;
+        requestAnimationFrame(() => {
+          updatePlaylistStats();
+          statsScheduled = false;
+        });
+      };
+
+      const getTrackFromRow = (row) => {
+        if (!row || row.classList.contains("load-more-row")) return null;
+        const idx = parseInt(row.dataset.rowIndex, 10);
+        return (!isNaN(idx) && originalTracks[idx]) ? originalTracks[idx] : originalTracks.find(t => t.uri === row.dataset.trackUri);
+      };
+
+      const applyRowRemovalState = (row, track, targetState) => {
+        if (track.isRemoved === targetState) return false;
+        track.isRemoved = targetState;
+        row.classList.toggle("removed", targetState);
+        const btn = row.querySelector(".remove-button");
+        if (btn) btn.innerHTML = targetState ? restoreIconSVG : removeIconSVG;
+        return true;
+      };
 
       tableBody.addEventListener("mousedown", (event) => {
-          const removeButton = event.target.closest(".remove-button");
-          if (!removeButton) return;
-
-          isRemoveDragging = true;
-          const row = removeButton.closest("tr");
-          const trackUri = row.dataset.trackUri;
-          const track = originalTracks.find(t => t.uri === trackUri);
-
-          if (track) {
-              track.isRemoved = !track.isRemoved;
-              lastRemovedState = track.isRemoved;
-              row.classList.toggle("removed");
-
-              const svgIcon = removeButton.querySelector("svg");
-              svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
-              updatePlaylistStats(); 
-          }
-
-          event.preventDefault();
+        if (event.button !== 0) return;
+        const actionsCell = event.target.closest(".actions-col");
+        if (!actionsCell) return;
+        const row = actionsCell.closest("tr");
+        const track = getTrackFromRow(row);
+        if (!track) return;
+        event.preventDefault();
+        dragTargetState = !track.isRemoved;
+        isRemoveDragging = true;
+        lastProcessedRowIndex = row.dataset.rowIndex ?? row.dataset.trackUri;
+        if (applyRowRemovalState(row, track, dragTargetState)) {
+          scheduleStatsUpdate();
+        }
       });
 
       tableBody.addEventListener("mouseover", (event) => {
-          if (!isRemoveDragging) return;
-
-          const removeButton = event.target.closest(".remove-button");
-          if (!removeButton) return;
-
-          const row = removeButton.closest("tr");
-          const trackUri = row.dataset.trackUri;
-          const track = originalTracks.find(t => t.uri === trackUri);
-
-          if (track && track.isRemoved !== lastRemovedState) {
-              track.isRemoved = lastRemovedState;
-              row.classList.toggle("removed", lastRemovedState);
-
-              const svgIcon = removeButton.querySelector("svg");
-              svgIcon.outerHTML = lastRemovedState ? restoreIconSVG : removeIconSVG;
-              updatePlaylistStats(); 
-          }
+        if (!isRemoveDragging) return;
+        const actionsCell = event.target.closest(".actions-col");
+        if (!actionsCell) return;
+        const row = actionsCell.closest("tr");
+        const rowId = row?.dataset.rowIndex ?? row?.dataset.trackUri;
+        if (!rowId || rowId === lastProcessedRowIndex) return;
+        lastProcessedRowIndex = rowId;
+        const track = getTrackFromRow(row);
+        if (!track) return;
+        if (applyRowRemovalState(row, track, dragTargetState)) {
+          scheduleStatsUpdate();
+        }
       });
 
-      document.addEventListener("mouseup", () => {
+      const stopDragging = () => {
+        if (isRemoveDragging) {
           isRemoveDragging = false;
-          lastRemovedState = null;
+          lastProcessedRowIndex = null;
           updatePlaylistStats();
-      }, { signal });
-
-      tableBody.addEventListener("click", async (event) => {
-        const row = event.target.closest("tr");
-        if (!row) return;
-
-        const removeButton = event.target.closest(".remove-button");
-        if (removeButton) {
-            const trackUri = row.dataset.trackUri;
-            const track = originalTracks.find(t => t.uri === trackUri);
-
-            if (track) {
-                track.isRemoved = !track.isRemoved;
-                row.classList.toggle("removed", track.isRemoved);
-                const svgIcon = removeButton.querySelector("svg");
-                svgIcon.outerHTML = track.isRemoved ? restoreIconSVG : removeIconSVG;
-            }
-            return; 
         }
+      };
 
-        if (!event.target.closest(".actions-col")) {
-          if (activeRow) {
-            activeRow.classList.remove("active");
+      window.addEventListener("mouseup", stopDragging, { signal });
+      window.addEventListener("blur", stopDragging, { signal });
+
+      tableBody.addEventListener("click", (event) => {
+        const actionsCell = event.target.closest(".actions-col");
+        if (actionsCell) {
+          if (event.detail > 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
           }
-          row.classList.add("active");
-          activeRow = row;
+          const row = actionsCell.closest("tr");
+          const track = getTrackFromRow(row);
+          if (track) {
+            applyRowRemovalState(row, track, !track.isRemoved);
+            updatePlaylistStats();
+          }
+          return;
         }
+
+        const row = event.target.closest("tr");
+        if (!row || row.classList.contains("load-more-row")) return;
+        if (activeRow) activeRow.classList.remove("active");
+        row.classList.add("active");
+        activeRow = row;
       });
 
-      tableBody.addEventListener("dblclick", async (event) => {
+      tableBody.addEventListener("dblclick", (event) => {
+        if (event.target.closest(".actions-col")) return;
         const row = event.target.closest("tr");
-        if (!row) return;
-
+        if (!row || row.classList.contains("load-more-row")) return;
         const trackUri = row.dataset.trackUri;
         if (trackUri) {
-          if (activeRow && activeRow !== row) {
-            activeRow.classList.remove("active");
-          }
+          if (activeRow && activeRow !== row) activeRow.classList.remove("active");
           row.classList.add("active");
           activeRow = row;
-          await Spicetify.Player.playUri(trackUri);
-
-          const track = originalTracks.find(t => t.uri === trackUri);
-          if (track) {
-            updateTrackInfo(track);
-          }
+          const track = getTrackFromRow(row);
+          miniPlayer?.playTrack(trackUri, track);
         }
       });
     }
@@ -23640,18 +26660,18 @@ shadowRoot.innerHTML = `
             } else if (selectedSortType === "current") {
                 sortedTracksForPlaylist = [...filteredTracks];
             } else if (selectedSortType === "shuffle") {
-                const containsLocalFiles = filteredTracks.some(track => Spicetify.URI.isLocal(track.uri));
-                if (useEnergyWaveShuffle && !containsLocalFiles) {
-                    mainButton.innerText = "Analyzing...";
-                    const trackIds = filteredTracks.map(t => t.trackId || (t.uri ? t.uri.split(':')[2] : null)).filter(Boolean);
+                if (useEnergyWaveShuffle) {
+                    mainButton.innerText = "Audio...";
+                    const trackIds = filteredTracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || (t.uri ? t.uri.split(':')[2] : null))).filter(Boolean);
                     const allStats = await getBatchTrackStats(trackIds, (p) => { mainButton.innerText = `Audio ${Math.floor(p)}%`; });
                     const tracksWithFeatures = filteredTracks.map(t => {
-                        const id = t.trackId || (t.uri ? t.uri.split(':')[2] : null);
+                        const id = Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || (t.uri ? t.uri.split(':')[2] : null));
                         return { ...t, features: id ? allStats[id] : null };
                     });
                     const withData = tracksWithFeatures.filter(t => t.features && t.features.energy !== null && t.features.valence !== null);
                     const withoutData = tracksWithFeatures.filter(t => !t.features || t.features.energy === null || t.features.valence === null);
                     if (withData.length >= 3) {
+                        mainButton.innerText = "Vibe...";
                         const waveSorted = await randomizedEnergyWaveSort(withData);
                         sortedTracksForPlaylist = [...waveSorted, ...shuffleArray(withoutData)];
                     } else {
@@ -23675,6 +26695,7 @@ shadowRoot.innerHTML = `
             const trackUris = sortedTracksForPlaylist.map((track) => track.uri);
 
             if (actionType === 'queue') {
+                mainButton.innerText = "Queue...";
                 await setQueueFromTracks(sortedTracksForPlaylist, currentUri, selectedSortType === 'shuffle' ? 'shuffle' : 'default');
             } 
             else if (actionType === 'modify') {
@@ -24285,7 +27306,7 @@ shadowRoot.innerHTML = `
     const tracksWithPlayCounts = await enrichTracksWithPlayCounts(tracks);
     
     const requiresGlobalPopularity = [
-        'popularity', 'tasteMatch', 'energyWave', 'aiPick', 'filterOnePerArtist'
+        'popularity', 'energyWave', 'aiPick', 'filterOnePerArtist'
     ].includes(sortType) || 
     (sortType === 'shuffle' && useEnergyWaveShuffle) ||
     (filters.minPopularity !== undefined && filters.minPopularity !== null && filters.minPopularity !== '') ||
@@ -24427,6 +27448,21 @@ shadowRoot.innerHTML = `
             if (invalidKeyTracks.length > 0 && !isHeadless) {
                  showNotification(`${invalidKeyTracks.length} tracks missing key data.`, 'warning');
             }
+            break;
+        }
+        case "energyWave": {
+            const eWaveTrackIds = uniqueTracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || t.uri.split(":")[2])).filter(Boolean);
+            const eWaveStats = await getBatchTrackStats(eWaveTrackIds);
+            const eWaveWithData = uniqueTracks.map(t => {
+                const id = Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || t.uri.split(":")[2]);
+                const f = id ? (eWaveStats[id] || {}) : {};
+                return { ...t, features: f, ...f };
+            });
+            const eWaveValid = eWaveWithData.filter(t => t.features && t.features.energy != null && t.features.valence != null);
+            const eWaveInvalid = eWaveWithData.filter(t => !t.features || t.features.energy == null || t.features.valence == null);
+            let eWaveSorted = await energyWaveSort(eWaveValid);
+            if (isAscending) eWaveSorted.reverse();
+            sortedTracks = [...eWaveSorted, ...eWaveInvalid];
             break;
         }
         case "shuffle":
@@ -25718,14 +28754,7 @@ shadowRoot.innerHTML = `
             if (text.length > 1 && !looksLikeLink) {
                 searchDebounce = setTimeout(async () => {
                     try {
-                        const searchReq = {
-                            name: "searchDesktop",
-                            operation: "query",
-                            sha256Hash: "3c9d3f60dac5dea3876b6db3f534192b1c1d90032c4233c1bbaba526db41eb31",
-                            value: null
-                        };
-
-                        const res = await Spicetify.GraphQL.Request(searchReq, {
+                        const res = await Spicetify.GraphQL.Request(GraphQL.Definitions.searchDesktop, {
                             searchTerm: text,
                             offset: 0,
                             limit: 15,
@@ -27119,58 +30148,10 @@ shadowRoot.innerHTML = `
             }, 200);
         };
 
-        const setupDatePicker = (inputId, pickerId, btnId) => {
-            const input = modalContainer.querySelector(`#${inputId}`);
-            const picker = modalContainer.querySelector(`#${pickerId}`);
-            const btn = modalContainer.querySelector(`#${btnId}`);
-            
-            if (picker && input && btn) {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    const val = input.value.trim().replace(/\//g, '-');
-                    if (val) {
-                        if (/^\d{4}$/.test(val)) {
-                            picker.value = `${val}-01-01`;
-                        } else if (/^\d{4}-\d{1,2}$/.test(val)) {
-                            const [y, m] = val.split('-');
-                            picker.value = `${y}-${m.padStart(2, '0')}-01`;
-                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(val)) {
-                            const [y, m, d] = val.split('-');
-                            picker.value = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-                        } else {
-                            const parsed = Date.parse(val);
-                            if (!isNaN(parsed)) {
-                                const dObj = new Date(parsed);
-                                const y = dObj.getFullYear();
-                                const m = (dObj.getMonth() + 1).toString().padStart(2, '0');
-                                const dStr = dObj.getDate().toString().padStart(2, '0');
-                                picker.value = `${y}-${m}-${dStr}`;
-                            }
-                        }
-                    }
-                    
-                    try {
-                        picker.showPicker();
-                    } catch (err) {
-                        console.warn("[Sort-Play] showPicker not supported or element blocked.", err);
-                    }
-                });
-
-                picker.addEventListener('change', (e) => {
-                    if (e.target.value) {
-                        input.value = e.target.value;
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                    }
-                });
-            }
-        };
-        setupDatePicker('filter-min-year', 'min-date-picker', 'min-date-btn');
-        setupDatePicker('filter-max-year', 'max-date-picker', 'max-date-btn');
-        setupDatePicker('filter-min-addedAt', 'min-added-date-picker', 'min-added-date-btn');
-        setupDatePicker('filter-max-addedAt', 'max-added-date-picker', 'max-added-date-btn');
+        setupDatePicker(modalContainer, 'filter-min-year', 'min-date-picker', 'min-date-btn');
+        setupDatePicker(modalContainer, 'filter-max-year', 'max-date-picker', 'max-date-btn');
+        setupDatePicker(modalContainer, 'filter-min-addedAt', 'min-added-date-picker', 'min-added-date-btn');
+        setupDatePicker(modalContainer, 'filter-max-addedAt', 'max-added-date-picker', 'max-added-date-btn');
 
         const keywordFilterWrapper = modalContainer.querySelectorAll('.settings-wrapper')[1];
         const keywordFilterToggle = modalContainer.querySelector("#keywordFilterToggle");
@@ -27570,46 +30551,7 @@ shadowRoot.innerHTML = `
                 const isDateInput = el.id === 'filter-min-year' || el.id === 'filter-max-year' || el.id === 'filter-min-addedAt' || el.id === 'filter-max-addedAt';
                 
                 if (isDateInput) {
-                    if (el.value) {
-                        let cleanVal = el.value.trim().replace(/\//g, '-');
-                        let isValid = false;
-                        
-                        if (/^\d{4}$/.test(cleanVal)) {
-                            const y = parseInt(cleanVal);
-                            if (y >= 1000 && y <= 9999) isValid = true;
-                        } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
-                            const [yStr, mStr] = cleanVal.split('-');
-                            const y = parseInt(yStr);
-                            const m = parseInt(mStr);
-                            if (y >= 1000 && y <= 9999 && m >= 1 && m <= 12) {
-                                isValid = true;
-                                el.value = `${y}-${m.toString().padStart(2, '0')}`;
-                            }
-                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
-                            const [yStr, mStr, dStr] = cleanVal.split('-');
-                            const y = parseInt(yStr);
-                            const m = parseInt(mStr);
-                            const d = parseInt(dStr);
-                            const dateObj = new Date(y, m - 1, d);
-                            if (dateObj.getFullYear() === y && dateObj.getMonth() === m - 1 && dateObj.getDate() === d) {
-                                isValid = true;
-                                el.value = `${y}-${m.toString().padStart(2, '0')}-${d.toString().padStart(2, '0')}`;
-                            }
-                        } else {
-                            const d = new Date(cleanVal);
-                            if (!isNaN(d.getTime()) && d.getFullYear() >= 1000 && d.getFullYear() <= 9999) {
-                                isValid = true;
-                                const y = d.getFullYear();
-                                const m = (d.getMonth() + 1).toString().padStart(2, '0');
-                                const day = d.getDate().toString().padStart(2, '0');
-                                el.value = `${y}-${m}-${day}`;
-                            }
-                        }
-                        
-                        if (!isValid) {
-                            el.value = '';
-                        }
-                    }
+                    el.value = normalizeDateInputString(el.value);
                 } else {
                     if (el.value !== '') {
                         let val = parseFloat(el.value);
@@ -27633,58 +30575,9 @@ shadowRoot.innerHTML = `
             
             const validate = (e) => {
                 if (minId === 'filter-min-year' || minId === 'filter-min-addedAt') {
-                    const parseDateStr = (val, isMax) => {
-                        if (!val) return NaN;
-                        let cleanVal = val.trim().replace(/\//g, '-');
-                        
-                        let y, m, d;
-                        if (/^\d{4}$/.test(cleanVal)) {
-                            y = parseInt(cleanVal);
-                            if (y < 1000 || y > 9999) return NaN;
-                            m = isMax ? 11 : 0;
-                            d = isMax ? 31 : 1;
-                        } else if (/^\d{4}-\d{1,2}$/.test(cleanVal)) {
-                            const parts = cleanVal.split('-');
-                            y = parseInt(parts[0]);
-                            m = parseInt(parts[1]) - 1;
-                            if (y < 1000 || y > 9999 || m < 0 || m > 11) return NaN;
-                            if (isMax) { m += 1; d = 0; } else { d = 1; }
-                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanVal)) {
-                            const parts = cleanVal.split('-');
-                            y = parseInt(parts[0]);
-                            m = parseInt(parts[1]) - 1;
-                            d = parseInt(parts[2]);
-                            if (y < 1000 || y > 9999) return NaN;
-                        } else {
-                            const parsed = new Date(val); 
-                            if (isNaN(parsed.getTime())) return NaN;
-                            const isISO = /^\d{4}-\d{2}-\d{2}/.test(val);
-                            if (isISO) {
-                                y = parsed.getUTCFullYear();
-                                m = parsed.getUTCMonth();
-                                d = parsed.getUTCDate();
-                            } else {
-                                y = parsed.getFullYear();
-                                m = parsed.getMonth();
-                                d = parsed.getDate();
-                            }
-                            if (y < 1000 || y > 9999) return NaN;
-                        }
-                        
-                        const isLocal = minId === 'filter-min-addedAt';
-                        if (isLocal) {
-                            return isMax 
-                                ? new Date(y, m, d, 23, 59, 59, 999).getTime()
-                                : new Date(y, m, d, 0, 0, 0, 0).getTime();
-                        } else {
-                            return isMax 
-                                ? Date.UTC(y, m, d, 23, 59, 59, 999)
-                                : Date.UTC(y, m, d, 0, 0, 0, 0);
-                        }
-                    };
-                    
-                    const minVal = parseDateStr(minEl.value, false);
-                    const maxVal = parseDateStr(maxEl.value, true);
+                    const isLocal = minId === 'filter-min-addedAt';
+                    const minVal = parseDateFilterString(minEl.value, false, isLocal);
+                    const maxVal = parseDateFilterString(maxEl.value, true, isLocal);
                     
                     if (!isNaN(minVal) && !isNaN(maxVal)) {
                         if (e.target === minEl && minVal > maxVal) {
@@ -28171,15 +31064,6 @@ shadowRoot.innerHTML = `
             return [];
         }).join('');
 
-        const customSchedules = getCustomSchedules();
-        const customScheduleOptions = customSchedules.map(s => `<option value="${s.value}" ${ (isEditing ? String(jobToEdit.schedule) : savedSchedule) === String(s.value) ? 'selected' : ''}>${s.text}</option>`).join('');
-        
-        let clearAndSeparatorHtml = '';
-        if (customSchedules.length > 0) {
-            clearAndSeparatorHtml = `
-                <option value="clear-custom" style="color: #f15e6c; font-style: italic;">Clear Custom Schedules...</option>
-            `;
-        }
         shadowRoot.innerHTML = `
           <style>
             :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; font-size: 16px; font-weight: 400; }
@@ -28336,18 +31220,9 @@ shadowRoot.innerHTML = `
                                         <option value="release-every-two-weeks" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-every-two-weeks' ? 'selected' : ''}>Every Two Weeks (on Friday)</option>
                                         <option value="release-monthly" ${ (isEditing ? jobToEdit.schedule : savedSchedule) === 'release-monthly' ? 'selected' : ''}>Monthly (on a Friday)</option>
                                         <option disabled>- Custom Schedules -</option>
-                                        ${customScheduleOptions}
-                                        <option value="custom">+ Custom</option>
-                                        ${clearAndSeparatorHtml}
+                                        ${getCustomScheduleDropdownHtml(isEditing ? jobToEdit.schedule : savedSchedule)}
                                     </select>
-                                    <div id="custom-schedule-container" class="custom-schedule-container">
-                                        <input type="number" id="days" min="0" value="0"><label for="days">d</label>
-                                        <input type="number" id="hours" min="0" max="23" value="0"><label for="hours">h</label>
-                                        <input type="number" id="minutes" min="0" max="59" value="0"><label for="minutes">m</label>
-                                        <button id="set-custom-schedule-btn" class="custom-schedule-ok-btn">Set</button>
-                                    </div>
-                                    <div id="custom-schedule-error" style="color: #f15e6c; font-size: 12px; text-align: right; margin-top: 4px; display: none;"></div>
-                                    <label id="custom-schedule-min-label" style="font-size: 12px; color: #b3b3b3; text-align: right; display: none; margin-top: 4px;">Minimum: ${SCHEDULER_INTERVAL_MINUTES} minutes</label>
+                                    ${CUSTOM_SCHEDULE_PICKER_HTML}
                                 </div>
                             </div>
                         </div>
@@ -28798,11 +31673,7 @@ shadowRoot.innerHTML = `
             );
         });
 
-        const scheduleSelect = modalContainer.querySelector('#schedule-select');
-        const customScheduleContainer = modalContainer.querySelector('#custom-schedule-container');
-        
         modalContainer.querySelector('#sort-type-select').addEventListener('change', (e) => localStorage.setItem(STORAGE_KEY_DYNAMIC_SORT_TYPE, e.target.value));
-        scheduleSelect.addEventListener('change', (e) => localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, e.target.value));
         sortDirectionSelectUI.addEventListener('change', (e) => localStorage.setItem('sort-play-dynamic-sort-direction', e.target.value));
         
         const updateSortDirectionVisibility = () => {
@@ -28842,84 +31713,16 @@ shadowRoot.innerHTML = `
         };
         sortTypeSelectUI.addEventListener('change', updateSortDirectionVisibility);
         updateSortDirectionVisibility();
-        
-        let previousScheduleValue = scheduleSelect.value;
-        
-        const minLabel = modalContainer.querySelector('#custom-schedule-min-label');
 
-        scheduleSelect.addEventListener('change', async (e) => {
-            const selectedValue = e.target.value;
-
-            if (selectedValue === 'clear-custom') {
-                e.target.value = previousScheduleValue;
-
-                const customSchedules = getCustomSchedules();
-                if (customSchedules.length === 0) {
-                    showNotification("No custom schedules to clear.");
-                    return;
-                }
-
-                const confirmed = await showConfirmationModal({
-                    title: "Clear Custom Schedules?",
-                    description: "This will permanently remove all of your saved custom schedules. This action cannot be undone. Are you sure?",
-                    confirmText: "Clear All",
-                    cancelText: "Cancel",
-                });
-
-                if (confirmed === 'confirm') {
-                    saveCustomSchedules([]);
-                    showNotification("All custom schedules have been cleared.");
-                    await renderJobForm(jobToEdit);
-                }
-            } else {
-                const isCustom = selectedValue === 'custom';
-                customScheduleContainer.classList.toggle('visible', isCustom);
-                minLabel.style.display = isCustom ? 'block' : 'none';
-                if (!isCustom) {
-                    previousScheduleValue = selectedValue;
-                    localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, selectedValue);
-                }
+        setupCustomSchedulePicker({
+            root: modalContainer,
+            selectId: 'schedule-select',
+            onScheduleChange: (val) => {
+                localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, val);
+            },
+            onClearSchedules: () => {
+                renderJobForm(jobToEdit);
             }
-        });
-
-        scheduleSelect.addEventListener('change', () => {
-            customScheduleContainer.classList.toggle('visible', scheduleSelect.value === 'custom');
-        });
-
-        modalContainer.querySelector('#set-custom-schedule-btn').addEventListener('click', () => {
-            const days = parseInt(modalContainer.querySelector('#days').value) || 0;
-            const hours = parseInt(modalContainer.querySelector('#hours').value) || 0;
-            const minutes = parseInt(modalContainer.querySelector('#minutes').value) || 0;
-            
-            const totalMs = (days * 86400000) + (hours * 3600000) + (minutes * 60000);
-            const minMs = SCHEDULER_INTERVAL_MINUTES * 60 * 1000;
-
-            if (totalMs < minMs) {
-                showNotification(`Schedule must be at least ${SCHEDULER_INTERVAL_MINUTES} minutes.`, true);
-                return;
-            }
-
-            let text = 'Every ';
-            if (days > 0) text += `${days}d `;
-            if (hours > 0) text += `${hours}h `;
-            if (minutes > 0) text += `${minutes}m`;
-            text = text.trim();
-
-            const customSchedules = getCustomSchedules();
-            if (!customSchedules.some(s => s.value === totalMs)) {
-                customSchedules.push({ value: totalMs, text });
-                saveCustomSchedules(customSchedules);
-            }
-
-            const customOption = document.createElement('option');
-            customOption.value = totalMs;
-            customOption.textContent = text;
-            scheduleSelect.insertBefore(customOption, scheduleSelect.querySelector('option[value="custom"]'));
-            scheduleSelect.value = totalMs;
-            localStorage.setItem(STORAGE_KEY_DYNAMIC_SCHEDULE, totalMs);
-            customScheduleContainer.classList.remove('visible');
-            minLabel.style.display = 'none';
-            renderJobForm(jobToEdit); 
         });
 
         const transitionToList = () => {
@@ -29091,7 +31894,7 @@ shadowRoot.innerHTML = `
     "classical": ["baroque", "baroque's", "classic", "classical", "classical music", "classical's", "classics", "minimalism", "orchestra", "orchestral", "orchestral music", "orchestras", "symphonic", "symphonies", "symphony"],
     "conscious hip hop": ["conscious hip hop", "political hip hop", "rap conscient", "underground hip hop"],
     "contemporary r&b": ["contemporary r and b", "contemporary r&b", "contemporary rhythm and blues", "contemporary rnb", "modern r&b", "modern rnb"],
-    "corridos tumbados": ["corridos alternativos", "corridos belicos", "corridos tumbados", "sad sierreno", "sierreno"],
+    "corridos tumbados": ["corridos alternativos", "corridos belicos", "corridos tumbados", "sad sierreno", "sierre", "sierreno"],
     "country": ["country", "country & western music", "country blues", "country music", "country's", "countrymusic"],
     "cumbia": ["cumbia", "cumbia 420", "cumbia andina mexicana", "cumbia boliviana", "cumbia chilena", "cumbia del sureste", "cumbia lagunera", "cumbia peruana", "cumbia pop", "cumbia ranchera", "cumbia salvadorena", "cumbia santafesina", "cumbia sonidera", "cumbia uruguaya", "cumbia villera", "nu-cumbia", "tecnocumbia"],
     "dance": ["dance", "dance's", "dances", "dancey"],
@@ -29100,7 +31903,7 @@ shadowRoot.innerHTML = `
     "dembow": ["dembow", "dembow dominicano"],
     "disco": ["disco", "disco music", "disco's", "discomusic", "discos", "future funk"],
     "doom metal": ["doom metal", "drone metal", "epic doom", "funeral doom", "psychedelic doom", "sludge metal"],
-    "dream pop": ["dream pop", "ethereal wave"],
+    "dream pop": ["dream pop", "ethereal", "ethereal wave"],
     "drill": ["aussie drill", "bronx drill", "brooklyn drill", "chicago drill", "classical drill", "drill", "drill chileno", "drill espanol", "drill francais", "drill tuga", "florida drill", "german drill", "melodic drill", "ny drill", "uk drill"],
     "drone": ["drone", "drone's", "dronemusic", "drones"],
     "drum and bass": ["d&b", "dnb", "drum & bass", "drum and bass", "drum n bass", "drumandbass", "Drum'n'bass"],
@@ -29128,7 +31931,7 @@ shadowRoot.innerHTML = `
     "german pop": ["deutschrock", "german pop", "neue deutsche welle", "ostrock"],
     "glam rock": ["glam metal", "glam punk", "glam rock", "hard glam", "sleaze rock"],
     "global christian": ["african gospel", "celtic worship", "global christian", "latin christian", "reggae cristao", "tagalog worship", "world worship"],
-    "gospel": ["black gospel", "brazilian gospel", "choir", "gospel", "gospel r&b", "gospel soul", "naija worship", "southern gospel", "spirituals"],
+    "gospel": ["black gospel", "brazilian gospel", "choir", "gospel", "gospel r&b", "gospel soul", "naija worship", "southern gospel", "spiritual", "spirituals"],
     "gothic metal": ["gothic", "gothic metal", "gothic symphonic metal", "metal gotico"],
     "gothic rock": ["dark post-punk", "deathrock", "gothabilly", "gothic", "gothic rock"],
     "grime": ["eskibeat", "grime", "sublow", "uk grime"],
@@ -29158,7 +31961,7 @@ shadowRoot.innerHTML = `
     "k-rock": ["k-indie", "k-rock", "korean indie rock"],
     "latin": ["latin", "latin's", "latina", "latinas", "latinmusic", "latino", "latinos"],
     "latin trap": ["trap argentino", "trap boricua", "trap chileno", "trap colombiano", "trap latino", "trap mexicano", "trap venezolano"],
-    "lofi": ["chillhop", "lo fi", "lo-fi", "lo-fi beats", "lo-fi chill", "lo-fi cover", "lo-fi jazzhop", "lo-fi sleep", "lo-fi study", "lofi", "sad lo-fi"],
+    "lofi": ["chill beats", "chillhop", "lo fi", "lo-fi", "lo-fi beats", "lo-fi chill", "lo-fi cover", "lo-fi jazzhop", "lo-fi sleep", "lo-fi study", "lofi", "sad lo-fi"],
     "medieval": ["early music", "gregorian chant", "medieval", "renaissance"],
     "metal": ["metal", "metal rock", "metal's", "metalhead", "metallic", "metalmusic", "metals"],
     "metalcore": ["chaotic hardcore", "deathcore", "electronicore", "mathcore", "melodic metalcore", "metalcore", "nintendocore", "progressive metalcore"],
@@ -29189,7 +31992,7 @@ shadowRoot.innerHTML = `
     "rap": ["rap", "rapper", "rappers", "raps"],
     "reggae": ["reggae", "reggae music", "reggae's", "reggaemusic", "roots reggae"],
     "reggaeton": ["dembow", "neoperreo", "perreo", "pop reggaeton", "reggaeton", "reggaeton chileno", "reggaeton colombiano", "reggaeton flow", "reggaeton mexicano"],
-    "regional mexican": ["banda", "banda sinaloense", "corrido", "grupera", "mariachi", "musica mexicana", "norteno", "norteno-sax", "ranchera", "regional mexican", "tejano"],
+    "regional mexican": ["banda", "banda sinaloense", "corrido", "grupera", "mariachi", "musica mexicana", "norte", "norteno", "norteno-sax", "ranchera", "regional mexican", "tejano"],
     "rock": ["power pop", "rock", "rock music", "rock's", "rockin", "rockin'", "rockmusic", "rocks"],
     "salsa": ["boogaloo", "modern salsa", "salsa", "salsa choke", "salsa colombiana", "salsa cubana", "salsa puertorriquena", "salsa urbana", "salsa venezolana", "timba"],
     "samba": ["samba", "samba paulista", "samba-enredo", "samba-rock"],
@@ -29210,7 +32013,7 @@ shadowRoot.innerHTML = `
     "turkish folk": ["turkish folk"],
     "turkish pop": ["arabesk", "turkish pop"],
     "turkish rock": ["anadolu rock", "turkish alternative", "turkish psych", "turkish rock"],
-    "uk garage": ["2-step", "bassline", "future garage", "speed garage", "uk garage"],
+    "uk garage": ["2-step", "bassline", "future garage", "garage", "speed garage", "uk garage"],
     "vaporwave": ["broken transmission", "future funk", "mallsoft", "slushwave", "utopian virtual", "vapor trap", "vaporwave"],
     "vgm": ["anime game", "anime score", "gamecore", "indie game soundtrack", "japanese vgm", "nintendocore", "otacore", "rhythm game", "scorecore", "vgm", "vgm remix", "video game music"],
     "vocal jazz": ["crooner", "jazz singing", "lounge music", "vocal jazz"],
@@ -29259,7 +32062,7 @@ shadowRoot.innerHTML = `
     "french house": ["filter house", "french house", "french touch"],
     "noise": ["harsh noise", "japanoise", "noise", "noise rock", "power electronics"],
     "progressive metal": ["djent", "math metal", "progressive metal", "progressive metalcore"],
-    "show tunes": ["broadway", "hollywood", "musical", "show tunes", "theatre", "west end"],
+    "show tunes": ["broadway", "hollywood", "musical", "musicals", "show tunes", "theatre", "west end"],
     "thrash metal": ["crossover thrash", "speed metal", "teutonic thrash metal", "thrash metal", "trash metal"],
     "tropical house": ["tropical house", "sax house", "deep tropical house"],
     "children's music": ["children's music", "disney", "kids", "kindermusik", "nursery rhymes"],
@@ -31690,7 +34493,7 @@ shadowRoot.innerHTML = `
 
       const extData = externalResult.externalMap.get(uri) || sessionGenreCache.get(uri) || {};
 
-      let nativeGenres = extData.spotify_track_genres || [];
+      let nativeGenres = isLocal ? [] : extData.spotify_track_genres;
       if (reqSources.spotify_track && !isLocal) {
         nativeGenres = nativeTrackMap.get(uri) || extData.spotify_track_genres || [];
       }
@@ -31735,7 +34538,7 @@ shadowRoot.innerHTML = `
       if (trackRecord.isrc) sessionGenreCache.set(trackRecord.isrc, trackRecord);
 
       const combined = [];
-      if (reqSources.spotify_track) combined.push(...nativeGenres.map(g => ({ name: g, source: 'spotify_track' })));
+      if (reqSources.spotify_track && nativeGenres?.length) combined.push(...nativeGenres.map(g => ({ name: g, source: 'spotify_track' })));
       if (reqSources.lastfm_track) combined.push(...trackRecord.lastfm_track_genres.map(g => ({ name: g, source: 'lastfm_track' })));
       if (reqSources.spotify_artist) combined.push(...trackRecord.spotify_artist_genres.map(g => ({ name: g, source: 'spotify' })));
       if (reqSources.lastfm_artist) combined.push(...trackRecord.lastfm_artist_genres.map(g => ({ name: g, source: 'lastfm_artist' })));
@@ -32095,54 +34898,99 @@ shadowRoot.innerHTML = `
     return null;
   }
   
-  async function getLikedSongs() {
-    try {
-      const likedTracksData = await Spicetify.Platform.LibraryAPI.getTracks({
-        limit: Number.MAX_SAFE_INTEGER,
-      });
-
-      if (!likedTracksData || !likedTracksData.items) {
-        throw new Error("Failed to fetch liked songs data.");
-      }
-
-      const likedTracks = likedTracksData.items.map((item) => ({
-        uri: item.uri,
-        uid: item.uid,
-        name: item.name,
-        albumUri: item.album.uri,
-        albumName: item.album.name,
-        artistUris: item.artists.map((artist) => artist.uri),
-        artistName: item.artists[0]?.name,
-        allArtists: normalizeArtistNames(item.artists),
-        durationMilis: item.duration.milliseconds,
-        durationMs: item.duration.milliseconds,
-        playCount: "N/A",
-        popularity: null,
-        releaseDate: null,
-        addedAt: item.addedAt || null,
-        explicit: item.isExplicit || item.explicit || false,
-        trackNumber: item.trackNumber || item.album?.trackNumber || 0,
-        discNumber: item.discNumber || item.album?.discNumber || 1,
-        track: {
-            album: {
-                id: item.album.uri ? item.album.uri.split(":")[2] : null
-            },
-            name: item.name,
-            duration_ms: item.duration.milliseconds,
-            id: Spicetify.URI.isLocal(item.uri) ? item.uri : item.uri.split(":")[2],
-            explicit: item.isExplicit || item.explicit || false,
-            trackNumber: item.trackNumber || item.album?.trackNumber || 0,
-            discNumber: item.discNumber || item.album?.discNumber || 1
-          }
-      }));
-
-      return likedTracks;
-
-    } catch (error)      {
-      console.error("Error fetching liked songs:", error);
-      showNotification("Failed to fetch liked songs.", true);
-      return [];
+  async function getLikedSongs(forceRefresh = false) {
+    if (!forceRefresh && cachedLikedSongs && (Date.now() - cachedLikedSongsTimestamp < CACHE_EXPIRE_LIKED_SONGS)) {
+      return cachedLikedSongs;
     }
+
+    if (activeLikedSongsPromise) {
+      return await activeLikedSongsPromise;
+    }
+
+    activeLikedSongsPromise = (async () => {
+      try {
+        let rawItems = null;
+
+        try {
+          if (Spicetify.Platform?.PlaylistAPI?.getContents) {
+            const playlistRes = await Spicetify.Platform.PlaylistAPI.getContents("spotify:user:@me:collection");
+            if (playlistRes && Array.isArray(playlistRes.items)) {
+              rawItems = playlistRes.items;
+            }
+          }
+        } catch (_) {}
+
+        if (!rawItems) {
+          const libraryRes = await Spicetify.Platform.LibraryAPI.getTracks({
+            limit: Number.MAX_SAFE_INTEGER,
+          });
+          rawItems = libraryRes?.items || [];
+        }
+
+        const validRawItems = (rawItems || []).filter((item) => item && item.uri);
+
+        const likedTracks = validRawItems.map((item) => {
+          const durationMs = item.duration?.milliseconds || item.duration_ms || item.durationMs || 0;
+          const albumUri = item.album?.uri || (item.album?.id ? `spotify:album:${item.album.id}` : null);
+          const albumId = albumUri ? albumUri.split(":")[2] : (item.album?.id || null);
+          const isPlayable = item.isPlayable ?? item.playable ?? item.playability?.playable ?? true;
+          const rawReleaseDate = item.release?.isoString || item.releaseDate || item.album?.release_date || null;
+          const artists = item.artists || [];
+          const artistUris = artists.map((a) => a.uri).filter(Boolean);
+
+          return {
+            uri: item.uri,
+            uid: item.uid || null,
+            name: item.name,
+            songTitle: item.name,
+            albumUri: albumUri,
+            albumName: item.album?.name || "Unknown Album",
+            artistUris: artistUris,
+            artists: artists,
+            artistName: artists[0]?.name || "Unknown Artist",
+            allArtists: normalizeArtistNames(artists),
+            durationMilis: durationMs,
+            durationMs: durationMs,
+            playcount: 0,
+            playCount: "N/A",
+            popularity: null,
+            releaseDate: rawReleaseDate,
+            addedAt: item.addedAt || null,
+            explicit: item.isExplicit || item.explicit || false,
+            trackNumber: item.trackNumber || parseInt(item.album?.trackNumber, 10) || 0,
+            discNumber: item.discNumber || parseInt(item.album?.discNumber, 10) || 1,
+            isPlayable: isPlayable,
+            is_playable: isPlayable,
+            track: {
+              album: {
+                id: albumId,
+                name: item.album?.name || "Unknown Album"
+              },
+              name: item.name,
+              duration_ms: durationMs,
+              id: Spicetify.URI.isLocal(item.uri) ? item.uri : item.uri.split(":")[2],
+              explicit: item.isExplicit || item.explicit || false,
+              trackNumber: item.trackNumber || parseInt(item.album?.trackNumber, 10) || 0,
+              discNumber: item.discNumber || parseInt(item.album?.discNumber, 10) || 1,
+              isPlayable: isPlayable,
+              is_playable: isPlayable
+            }
+          };
+        });
+
+        cachedLikedSongs = likedTracks;
+        cachedLikedSongsTimestamp = Date.now();
+        return likedTracks;
+      } catch (error) {
+        console.error("Error fetching liked songs:", error);
+        showNotification("Failed to fetch liked songs.", true);
+        return [];
+      } finally {
+        activeLikedSongsPromise = null;
+      }
+    })();
+
+    return await activeLikedSongsPromise;
   }
     
   async function getLocalFilesTracks() {
@@ -32210,6 +35058,8 @@ shadowRoot.innerHTML = `
     trackNumber: track.album?.trackNumber || track.trackNumber || 0,
     discNumber: track.discNumber || track.album?.discNumber || 1,
     explicit: track.isExplicit || track.explicit || false,
+    isPlayable: track.isPlayable ?? track.playable ?? track.playability?.playable ?? true,
+    is_playable: track.isPlayable ?? track.playable ?? track.playability?.playable ?? true,
     track: {
       album: {
         id: track.album.uri ? track.album.uri.split(":")[2] : null
@@ -32219,7 +35069,9 @@ shadowRoot.innerHTML = `
       id: Spicetify.URI.isLocal(track.uri) ? track.uri : track.uri.split(":")[2],
       explicit: track.isExplicit || track.explicit || false,
       trackNumber: track.album?.trackNumber || track.trackNumber || 0,
-      discNumber: track.discNumber || track.album?.discNumber || 1
+      discNumber: track.discNumber || track.album?.discNumber || 1,
+      isPlayable: track.isPlayable ?? track.playable ?? track.playability?.playable ?? true,
+      is_playable: track.isPlayable ?? track.playable ?? track.playability?.playable ?? true
     }
   });
 
@@ -32633,6 +35485,8 @@ shadowRoot.innerHTML = `
                 trackNumber: item.trackNumber || parseInt(item.album?.trackNumber, 10) || 0,
                 discNumber: item.discNumber || parseInt(item.album?.discNumber, 10) || 1,
                 explicit: isExplicit,
+                isPlayable: item.isPlayable ?? item.playable ?? item.playability?.playable ?? true,
+                is_playable: item.isPlayable ?? item.playable ?? item.playability?.playable ?? true,
                 track: {
                     album: { 
                         id: albumId, 
@@ -32647,7 +35501,9 @@ shadowRoot.innerHTML = `
                     external_ids: {},
                     trackNumber: item.trackNumber || parseInt(item.album?.trackNumber, 10) || 0,
                     discNumber: item.discNumber || parseInt(item.album?.discNumber, 10) || 1,
-                    explicit: isExplicit
+                    explicit: isExplicit,
+                    isPlayable: item.isPlayable ?? item.playable ?? item.playability?.playable ?? true,
+                    is_playable: item.isPlayable ?? item.playable ?? item.playability?.playable ?? true
                 }
             };
         });
@@ -32702,6 +35558,8 @@ shadowRoot.innerHTML = `
                 trackNumber: parseInt(t.trackNumber, 10) || 0,
                 discNumber: parseInt(t.discNumber, 10) || 1,
                 explicit: isExplicit,
+                isPlayable: t.playability?.playable ?? t.is_playable ?? t.isPlayable ?? true,
+                is_playable: t.playability?.playable ?? t.is_playable ?? t.isPlayable ?? true,
                 track: {
                     album: { 
                         id: albumId, 
@@ -32716,7 +35574,9 @@ shadowRoot.innerHTML = `
                     external_ids: {},
                     trackNumber: parseInt(t.trackNumber, 10) || 0,
                     discNumber: parseInt(t.discNumber, 10) || 1,
-                    explicit: isExplicit
+                    explicit: isExplicit,
+                    isPlayable: t.playability?.playable ?? t.is_playable ?? t.isPlayable ?? true,
+                    is_playable: t.playability?.playable ?? t.is_playable ?? t.isPlayable ?? true
                 }
             };
         });
@@ -32742,19 +35602,13 @@ shadowRoot.innerHTML = `
   async function getArtistTracks(artistUri, isHeadless = false, progressCallback = null) {
     const { Locale, GraphQL, CosmosAsync } = Spicetify;
   
-    const queryArtistOverview = Spicetify.GraphQL.Definitions.queryArtistOverview || {
-      name: "queryArtistOverview",
-      operation: "query",
-      sha256Hash: "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497",
-    };
-  
     if (!isHeadless) {
         mainButton.innerHTML = '<div class="loader"></div>';
         setButtonProcessing(true);
     }
   
     try {
-      const artistData = await GraphQL.Request(queryArtistOverview, {
+      const artistData = await GraphQL.Request(GraphQL.Definitions.queryArtistOverview, {
         uri: artistUri,
         locale: Locale.getLocale(),
         includePrerelease: false,
@@ -32841,7 +35695,6 @@ shadowRoot.innerHTML = `
       const fetchAppearsOnViaSearch = async () => {
           if (artistName.toLowerCase() === "various artists") return;
           
-          const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
           const currentYear = new Date().getFullYear();
           const timeSlices = ["0-1989", "1990-1999"];
           for (let y = 2000; y <= currentYear + 1; y++) {
@@ -32859,12 +35712,7 @@ shadowRoot.innerHTML = `
                   let limit = 50;
                   while (offset < 1000) {
                       try {
-                          const res = await GraphQL.Request({
-                              name: "searchTracks",
-                              operation: "query",
-                              sha256Hash: SEARCH_HASH,
-                              value: null
-                          }, {
+                          const res = await GraphQL.Request(GraphQL.Definitions.searchTracks, {
                               searchTerm: `artist:"${safeArtistName}" year:${slice}`,
                               offset: offset,
                               limit: limit,
@@ -33052,14 +35900,8 @@ shadowRoot.innerHTML = `
   async function getArtistTracksForShuffle(artistUri) {
     const { Locale, GraphQL, CosmosAsync } = Spicetify;
   
-    const queryArtistOverview = Spicetify.GraphQL.Definitions.queryArtistOverview || {
-      name: "queryArtistOverview",
-      operation: "query",
-      sha256Hash: "35648a112beb1794e39ab931365f6ae4a8d45e65396d641eeda94e4003d41497",
-    };
-  
     try {
-      const artistData = await GraphQL.Request(queryArtistOverview, {
+      const artistData = await GraphQL.Request(GraphQL.Definitions.queryArtistOverview, {
         uri: artistUri,
         locale: Locale.getLocale(),
         includePrerelease: false,
@@ -33144,7 +35986,6 @@ shadowRoot.innerHTML = `
       const fetchAppearsOnViaSearch = async () => {
           if (artistName.toLowerCase() === "various artists") return;
           
-          const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
           const currentYear = new Date().getFullYear();
           const timeSlices = ["0-1989", "1990-1999"];
           for (let y = 2000; y <= currentYear + 1; y++) {
@@ -33162,12 +36003,7 @@ shadowRoot.innerHTML = `
                   let limit = 50;
                   while (offset < 1000) {
                       try {
-                          const res = await GraphQL.Request({
-                              name: "searchTracks",
-                              operation: "query",
-                              sha256Hash: SEARCH_HASH,
-                              value: null
-                          }, {
+                          const res = await GraphQL.Request(GraphQL.Definitions.searchTracks, {
                               searchTerm: `artist:"${safeArtistName}" year:${slice}`,
                               offset: offset,
                               limit: limit,
@@ -34950,7 +37786,16 @@ shadowRoot.innerHTML = `
         text: "Quick Filters",
         sortType: "quickFiltersParent",
         children: [
-             { backgroundColor: "transparent", color: "white", text: "Remove Duplicates", sortType: "deduplicateOnly" },
+             { backgroundColor: "transparent", color: "white", text: "Remove Duplicates...", sortType: "deduplicateOnly", onClick: async function(event) {
+                event.stopPropagation();
+                closeAllMenus();
+                await handleDuplicateAudit();
+             }},
+             { backgroundColor: "transparent", color: "white", text: "Remove Unavailable...", sortType: "unavailableTracks", onClick: async function(event) {
+                event.stopPropagation();
+                closeAllMenus();
+                await handleUnavailableTracksAudit();
+             }},
              { backgroundColor: "transparent", color: "white", text: "One Track per Artist", sortType: "filterOnePerArtist" },
              {
                 type: "divider",
@@ -34971,9 +37816,6 @@ shadowRoot.innerHTML = `
                 ]
              },
              {
-                type: "divider",
-             },
-             {
                 type: "parent",
                 text: "Release Type",
                 sortType: "albumTypeFiltersParent",
@@ -34989,13 +37831,12 @@ shadowRoot.innerHTML = `
                     { backgroundColor: "transparent", color: "white", text: "Compilations", sortType: "filterCompilations" }
                 ]
              },
-             ...( (localStorage.getItem("TrashSongList") || (Spicetify.LocalStorage && Spicetify.LocalStorage.get("TrashSongList"))) ? [
-                { type: "divider" },
-                { backgroundColor: "transparent", color: "white", text: "Remove Trashed", sortType: "removeTrashed" }
-             ] : []),
              {
                 type: "divider",
              },
+             ...( (localStorage.getItem("TrashSongList") || (Spicetify.LocalStorage && Spicetify.LocalStorage.get("TrashSongList"))) ? [
+                { backgroundColor: "transparent", color: "white", text: "Remove Trashed", sortType: "removeTrashed" }
+             ] : []),
              { backgroundColor: "transparent", color: "white", text: "Exclude via Playlist...", sortType: "excludeByPlaylist" }
         ]
       },
@@ -35155,7 +37996,7 @@ shadowRoot.innerHTML = `
             const isAlbum = uri && URI.isAlbum(uri);
 
             if (isPlaylist || isArtist || isAlbum) {
-                startProcessing("Loading...");
+                startProcessing();
                 try {
                     let tracks = [];
                     let sourceDetails = { name: "Current View", ownerName: "", coverImage: null, id: null };
@@ -35433,7 +38274,7 @@ shadowRoot.innerHTML = `
   menuContainer.style.position = "fixed";
   menuContainer.style.display = "none";
   menuContainer.style.flexDirection = "column";
-  menuContainer.style.zIndex = "1";
+  menuContainer.style.zIndex = "2000";
   menuContainer.style.padding = "4px 4px";
   menuContainer.style.transform = "translateX(-50%)";
   menuContainer.style.borderRadius = "4px";
@@ -35763,12 +38604,24 @@ shadowRoot.innerHTML = `
       window.mainMenuAbortController = new AbortController();
       const signal = window.mainMenuAbortController.signal;
 
-      document.addEventListener("click", (event) => {
-        if (isMenuOpen && !mainButton.contains(event.target) && !menuContainer.contains(event.target)) {
-          closeAllMenus(); 
+      const isTargetInsideMenu = (target) => !!(target && (mainButton.contains(target) || menuContainer.contains(target) || target.closest('.submenu')));
+      const handleOutsideInteraction = (event) => {
+        if (isMenuOpen && !isTargetInsideMenu(event.target)) {
+          closeAllMenus();
+        }
+      };
+
+      document.addEventListener("pointerdown", handleOutsideInteraction, { signal });
+      document.addEventListener("contextmenu", handleOutsideInteraction, { signal });
+      document.addEventListener("click", handleOutsideInteraction, { signal });
+      document.addEventListener("keydown", (event) => {
+        if (isMenuOpen && event.key === "Escape") {
+          closeAllMenus();
+          mainButton.focus();
         }
       }, { signal });
 
+      window.addEventListener('blur', closeAllMenus, { signal });
       window.addEventListener('resize', closeAllMenus, { signal });
       window.addEventListener('wheel', preventScroll, { passive: false, signal });
       window.addEventListener('touchmove', preventScroll, { passive: false, signal });
@@ -35790,6 +38643,7 @@ shadowRoot.innerHTML = `
       activeSubMenuParent = null;
     }
     hideAllSubMenus();
+    closeLikeButtonMenu();
     
     mainButton.style.filter = "brightness(1)";
 
@@ -35845,7 +38699,7 @@ shadowRoot.innerHTML = `
     subMenu.style.position = "fixed";
     subMenu.style.display = "none";
     subMenu.style.flexDirection = "column";
-    subMenu.style.zIndex = "2000";
+    subMenu.style.zIndex = "2001";
     subMenu.style.padding = "4px";
     subMenu.style.borderRadius = "4px";
     subMenu.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
@@ -36335,6 +39189,63 @@ shadowRoot.innerHTML = `
     }
   }
 
+  async function unlikeTracksFromLibrary(trackUris, updateProgress = () => {}, batchSize = 100) {
+    if (!Spicetify.Platform?.LibraryAPI?.remove) {
+      throw new Error("LibraryAPI.remove is not available in this Spicetify version.");
+    }
+    const validUris = [...new Set(trackUris.filter(u => typeof u === "string" && u.startsWith("spotify:track:"))) ];
+    if (validUris.length === 0) return { unlikedCount: 0, failedCount: 0 };
+
+    let unlikedCount = 0;
+    let failedCount = 0;
+    const MAX_RETRIES = 3;
+    const DELAY_BETWEEN_BATCHES_MS = 50;
+
+    for (let i = 0; i < validUris.length; i += batchSize) {
+      const batch = validUris.slice(i, i + batchSize);
+      let success = false;
+      let attempt = 0;
+      let delayMs = 400;
+
+      while (!success && attempt < MAX_RETRIES) {
+        try {
+          await Spicetify.Platform.LibraryAPI.remove({ uris: batch });
+          success = true;
+          unlikedCount += batch.length;
+        } catch (err) {
+          attempt++;
+          if (attempt >= MAX_RETRIES) {
+            console.warn(`[Sort-Play] Failed to unlike batch of ${batch.length} tracks:`, err);
+            failedCount += batch.length;
+            break;
+          }
+          await new Promise(res => setTimeout(res, delayMs));
+          delayMs *= 2;
+        }
+      }
+
+      const pct = Math.floor(((i + batch.length) / validUris.length) * 100);
+      updateProgress(`Unliking ${Math.min(100, pct)}%`);
+
+      if (i + batchSize < validUris.length) {
+        await new Promise(res => setTimeout(res, DELAY_BETWEEN_BATCHES_MS));
+      }
+    }
+
+    invalidateLikedSongsCache();
+    try {
+      if (typeof Spicetify.Platform?.PlaylistAPI?.resync === 'function') {
+        Spicetify.Platform.PlaylistAPI.resync("spotify:user:@me:collection");
+      }
+    } catch (_) {}
+
+    try {
+      document.dispatchEvent(new CustomEvent('likeButton_likedTracksChange'));
+    } catch (_) {}
+
+    return { unlikedCount, failedCount };
+  }
+  
   async function replacePlaylistTracks(playlistId, trackUris, maxRetries = 10, initialDelay = 2000) {
     const validUris = trackUris.filter(uri => typeof uri === 'string' && (uri.startsWith("spotify:track:") || Spicetify.URI.isLocal(uri)));
     const playlistUri = `spotify:playlist:${playlistId}`;
@@ -36611,8 +39522,6 @@ shadowRoot.innerHTML = `
       throw new Error('No tracks found to shuffle');
     }
 
-    const containsLocalFiles = tracks.some(track => Spicetify.URI.isLocal(track.uri));
-
     let tracksToProcess;
 
     if (isArtistPage) {
@@ -36633,18 +39542,27 @@ shadowRoot.innerHTML = `
 
     let finalSortedTracks;
 
-    if (useEnergyWaveShuffle && !containsLocalFiles && tracks.length <= energyWaveShuffleLimit) {
-        const trackIds = tracksToProcess.map(t => t.trackId || t.uri.split(":")[2]);
-        const allStats = await getBatchTrackStats(trackIds);
+    if (useEnergyWaveShuffle) {
+        const queueLimit = energyWaveShuffleLimit === 'all' ? Infinity : (parseInt(energyWaveShuffleLimit, 10) || Infinity);
+        if (queueLimit < tracksToProcess.length) {
+            tracksToProcess = shuffleArray(tracksToProcess).slice(0, queueLimit);
+        }
+
+        mainButton.innerText = "Audio...";
+        const trackIds = tracksToProcess.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || (t.uri ? t.uri.split(":")[2] : null))).filter(Boolean);
+        const allStats = await getBatchTrackStats(trackIds, (p) => {
+            mainButton.innerText = `Audio ${Math.floor(p)}%`;
+        });
         
         const tracksWithAudioFeatures = tracksToProcess.map(track => {
-            const stats = allStats[track.trackId || track.uri.split(":")[2]] || {};
+            const id = Spicetify.URI.isLocal(track.uri) ? null : (track.trackId || (track.uri ? track.uri.split(":")[2] : null));
+            const stats = id ? (allStats[id] || {}) : {};
             return { ...track, ...stats, features: stats };
         });
 
-        showNotification("Performing Randomized Energy Wave Shuffle...");
-        const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-        const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+        mainButton.innerText = "Vibe...";
+        const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy != null && track.features.valence != null);
+        const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy == null || track.features.valence == null);
         
         if (tracksWithData.length < 3) {
             finalSortedTracks = shuffleArray(tracksToProcess);
@@ -36653,16 +39571,10 @@ shadowRoot.innerHTML = `
             finalSortedTracks = [...waveSorted, ...shuffleArray(tracksWithoutData)];
         }
     } else {
-        if (useEnergyWaveShuffle) {
-            if (containsLocalFiles) {
-                showNotification("Local files detected. Reverting to standard shuffle.", 'warning');
-            } else if (tracks.length > energyWaveShuffleLimit) {
-                showNotification(`Playlist too large (>${energyWaveShuffleLimit}). Reverting to standard shuffle.`, 'warning');
-            }
-        }
         finalSortedTracks = shuffleArray(tracksToProcess);
     }
 
+    mainButton.innerText = "Queue...";
     await setQueueFromTracks(finalSortedTracks, contextUri, 'shuffle');
   }
 
@@ -37193,37 +40105,7 @@ shadowRoot.innerHTML = `
             });
         });
 
-        const jsonString = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-
-        if (window.showSaveFilePicker) {
-            try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: 'sort-play_conversion_report.json',
-                    types: [{
-                        description: 'JSON Files',
-                        accept: { 'application/json': ['.json'] },
-                    }],
-                });
-                const writable = await handle.createWritable();
-                await writable.write(blob);
-                await writable.close();
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.error('Error saving file:', err);
-                    showNotification("Failed to export data.", true);
-                }
-            }
-        } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'sort-play_conversion_report.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
+        await exportJsonFile(exportData, 'sort-play_conversion_report.json');
     });
 
     const closeModal = (navigate = true) => {
@@ -40150,12 +43032,7 @@ shadowRoot.innerHTML = `
                         }
                     };
 
-                    const res = await Spicetify.GraphQL.Request({
-                        name: "userTopContent",
-                        operation: "query",
-                        sha256Hash: "49ee15704de4a7fdeac65a02db20604aa11e46f02e809c55d9a89f6db9754356",
-                        value: null,
-                    }, variables);
+                    const res = await Spicetify.GraphQL.Request(GraphQL.Definitions.userTopContent, variables);
 
                     let items = [];
                     if (type === 'artists' && res?.data?.me?.profile?.topArtists?.items) {
@@ -40403,30 +43280,30 @@ shadowRoot.innerHTML = `
     "emotional": { M: 1.0 }, "new age": { M: 0.8, S: 0.2 }, "downtempo": { M: 0.7, C: 0.3 }, "soothing": { M: 1.0 },
     "peaceful": { M: 1.0 }, "gentle": { M: 1.0 }, "atmospheric": { M: 0.8, S: 0.2 }, "cozy": { M: 1.0 },
     "sensual": { M: 1.0 }, "ambient": { M: 0.9, S: 0.1 }, "children's music": { M: 0.8, U: 0.2 }, "ethereal": { M: 0.8, S: 0.2 },
-    "nature": { M: 1.0 }, "rain": { M: 1.0 }, "lullaby": { M: 1.0 }, "chanson": { M: 0.7, S: 0.3 }, "spiritual": { M: 0.6, U: 0.4 },
+    "nature": { M: 1.0 }, "rain": { M: 1.0 }, "lullaby": { M: 1.0 }, "chanson": { M: 0.7, S: 0.3 }, "spiritual": { M: 0.6, U: 0.4 }, "soulful": { M: 0.6, S: 0.4 },
     "country": { U: 1.0 }, "singer-songwriter": { U: 0.7, M: 0.3 }, "folk": { U: 0.9, M: 0.1 }, "americana": { U: 1.0 },
-    "gospel": { U: 0.8, S: 0.2 }, "bluegrass": { S: 0.6, U: 0.4 }, "worship": { U: 0.8, M: 0.2 }, "sertanejo": { U: 1.0 },
-    "tejano": { U: 1.0 }, "norte": { U: 1.0 }, "sierre": { U: 1.0 }, "banda": { U: 1.0 },
+    "gospel": { U: 0.8, S: 0.2 }, "bluegrass": { S: 0.6, U: 0.4 }, "worship": { U: 0.8, M: 0.2 }, "devotional": { U: 0.8, M: 0.2 }, "ccm": { U: 0.6, C: 0.4 }, "sertanejo": { U: 1.0 },
+    "tejano": { U: 1.0 }, "norte": { U: 1.0 }, "sierre": { U: 1.0 }, "banda": { U: 1.0 }, "country blues": { U: 0.7, S: 0.3 },
     "classical": { S: 1.0 }, "jazz": { S: 1.0 }, "blues": { S: 0.8, U: 0.2 }, "classy": { S: 1.0 },
     "soundtrack": { S: 0.8, M: 0.2 }, "soul funk": { S: 0.6, C: 0.4 }, "latin": { S: 0.5, C: 0.5 },
     "orchestral": { S: 1.0 }, "symphony": { S: 1.0 }, "acid jazz": { S: 0.7, C: 0.3 }, "epic": { S: 0.6, I: 0.4 },
     "swing music": { S: 0.8, C: 0.2 }, "classical piano": { S: 0.9, M: 0.1 }, "gregorian chant": { S: 0.8, M: 0.2 },
     "tango": { S: 0.9, I: 0.1 }, "bolero": { S: 0.8, M: 0.2 }, "cumbia": { S: 0.6, C: 0.4 }, "mariachi": { S: 0.8, U: 0.2 },
-    "bossa nova": { S: 0.7, M: 0.3 }, "flamenco": { S: 0.8, I: 0.2 }, "samba": { S: 0.7, C: 0.3 }, "big band": { S: 1.0 },
-    "cabaret": { S: 1.0 }, "minimalism": { S: 0.8, M: 0.2 }, "opera": { S: 1.0 },
+    "bossa nova": { S: 0.7, M: 0.3 }, "flamenco": { S: 0.8, I: 0.2 }, "samba": { S: 0.7, C: 0.3 }, "salsa": { S: 0.6, C: 0.4 }, "pagode": { C: 0.6, S: 0.4 }, "big band": { S: 1.0 },
+    "cabaret": { S: 1.0 }, "minimalism": { S: 0.8, M: 0.2 }, "opera": { S: 1.0 }, "musicals": { S: 0.8, M: 0.2 }, "a cappella": { S: 0.7, M: 0.3 }, "progressive rock": { S: 0.7, I: 0.3 },
     "rock": { I: 1.0 }, "rock and roll": { U: 0.6, I: 0.4 }, "metal": { I: 1.0 }, "hard rock": { I: 1.0 },
     "aggressive": { I: 1.0 }, "punk": { I: 1.0 }, "angst": { I: 1.0 }, "emo": { I: 0.7, M: 0.3 },
-    "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "rock en espa": { I: 0.9, C: 0.1 },
-    "grunge": { I: 1.0 }, "death metal": { I: 1.0 }, "metalcore": { I: 1.0 }, "screamo": { I: 1.0 },
+    "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "alternative metal": { I: 0.9, C: 0.1 }, "rock en espa": { I: 0.9, C: 0.1 },
+    "grunge": { I: 1.0 }, "death metal": { I: 1.0 }, "metalcore": { I: 1.0 }, "screamo": { I: 1.0 }, "post-hardcore": { I: 0.9, C: 0.1 },
     "rockabilly": { I: 0.8, U: 0.2 }, "industrial": { I: 0.8, C: 0.2 }, "hardcore punk": { I: 1.0 },
     "black metal": { I: 1.0 }, "doom metal": { I: 1.0 },
     "pop": { U: 0.4, C: 0.4, M: 0.2 }, "electronic": { M: 0.6, C: 0.4 }, "electronica": { M: 0.6, C: 0.4 }, "dance pop": { C: 0.6, U: 0.4 },
-    "dance": { C: 0.6, M: 0.4 }, "electropop": { C: 0.8, M: 0.2 }, "upbeat": { C: 1.0 }, "electro": { C: 0.8, M: 0.2 },
-    "edm": { C: 1.0 }, "fast": { C: 1.0 }, "happy": { C: 0.7, M: 0.3 }, "pump up": { C: 0.8, I: 0.2 },
+    "dance": { C: 0.6, M: 0.4 }, "electropop": { C: 0.8, M: 0.2 }, "upbeat": { C: 1.0 }, "energetic": { C: 0.7, I: 0.3 }, "electro": { C: 0.8, M: 0.2 },
+    "edm": { C: 1.0 }, "fast": { C: 1.0 }, "happy": { C: 0.7, M: 0.3 }, "pump up": { C: 0.8, I: 0.2 }, "anime": { C: 0.7, I: 0.3 },
     "beats": { C: 0.8, M: 0.2 }, "hip hop": { C: 1.0 }, "club": { C: 1.0 }, "rap": { C: 1.0 },
     "disco": { C: 1.0 }, "house": { C: 1.0 }, "garage": { C: 1.0 }, "gaming": { C: 0.7, I: 0.3 },
-    "bubblegum pop": { C: 1.0 }, "ibiza": { C: 1.0 }, "funk": { C: 0.8, S: 0.2 }, "techno": { C: 1.0 },
-    "motivation": { C: 0.8, I: 0.2 }, "trap": { C: 1.0 }, "trance": { C: 1.0 }, "funny": { C: 0.8, U: 0.2 },
+    "bubblegum pop": { C: 1.0 }, "ibiza": { C: 1.0 }, "funk": { C: 0.8, S: 0.2 }, "techno": { C: 1.0 }, "minimal techno": { C: 0.7, M: 0.3 },
+    "motivation": { C: 0.8, I: 0.2 }, "trap": { C: 1.0 }, "trance": { C: 1.0 }, "goa trance": { C: 0.8, I: 0.2 }, "funny": { C: 0.8, U: 0.2 },
     "motown": { C: 0.6, S: 0.4 }, "reggaeton": { C: 1.0 }, "reggae": { S: 0.5, C: 0.5 }, "k-pop": { C: 1.0 },
     "dub": { C: 0.8, M: 0.2 }, "ska": { C: 0.7, I: 0.3 }, "drum and bass": { C: 0.8, I: 0.2 }, "j-pop": { C: 1.0 },
     "dubstep": { C: 0.8, I: 0.2 }, "trap latino": { C: 1.0 }, "gangster rap": { C: 1.0 }, "crunk": { C: 1.0 },
@@ -40483,13 +43360,14 @@ shadowRoot.innerHTML = `
       const resolveModel = (name) => {
           if (!name) return null;
           const lower = name.toLowerCase().trim();
+          if (MOOD_DESCRIPTORS_SET.has(lower)) return null;
           if (MUSIC_MODEL_MAP[lower]) return MUSIC_MODEL_MAP[lower];
           for (const key in MUSIC_MODEL_MAP) {
-              if (lower.includes(key) || key.includes(lower)) return MUSIC_MODEL_MAP[key];
+              if (!MOOD_DESCRIPTORS_SET.has(key) && (lower.includes(key) || key.includes(lower))) return MUSIC_MODEL_MAP[key];
           }
           const tokens = lower.split(/\s+/);
           for (const tok of tokens) {
-              if (tok.length > 2 && MUSIC_MODEL_MAP[tok]) return MUSIC_MODEL_MAP[tok];
+              if (tok.length > 2 && !MOOD_DESCRIPTORS_SET.has(tok) && MUSIC_MODEL_MAP[tok]) return MUSIC_MODEL_MAP[tok];
           }
           return null;
       };
@@ -40497,6 +43375,7 @@ shadowRoot.innerHTML = `
       if (genres && genres.length > 0) {
           genres.forEach(g => {
               const gName = typeof g === 'string' ? g : g.name;
+              if (MOOD_DESCRIPTORS_SET.has((gName || "").toLowerCase().trim())) return;
               const model = resolveModel(gName);
               if (model) {
                   const w = g.score ?? 1;
@@ -40583,6 +43462,27 @@ shadowRoot.innerHTML = `
               }
           });
       };
+
+      const topIds = [...new Set([...topShort, ...topMed, ...topLong].map(t => t.id || t.uri.split(':')[2]).filter(Boolean))];
+      const cachedTopMeta = await idb.getMany('trackMetadata', topIds);
+      const getTopIsrc = (t) => t.external_ids?.isrc || t.track?.external_ids?.isrc || cachedTopMeta.get(t.id || t.uri.split(':')[2])?.external_ids?.isrc;
+
+      const personalAffinityMap = { uris: {}, isrcs: {} };
+      topShort.forEach(t => { 
+          personalAffinityMap.uris[t.uri] = 1.0; 
+          const isrc = getTopIsrc(t);
+          if (isrc) personalAffinityMap.isrcs[isrc] = 1.0;
+      });
+      topMed.forEach(t => { 
+          if (!personalAffinityMap.uris[t.uri]) personalAffinityMap.uris[t.uri] = 0.8; 
+          const isrc = getTopIsrc(t);
+          if (isrc && !personalAffinityMap.isrcs[isrc]) personalAffinityMap.isrcs[isrc] = 0.8;
+      });
+      topLong.forEach(t => { 
+          if (!personalAffinityMap.uris[t.uri]) personalAffinityMap.uris[t.uri] = 0.6; 
+          const isrc = getTopIsrc(t);
+          if (isrc && !personalAffinityMap.isrcs[isrc]) personalAffinityMap.isrcs[isrc] = 0.6;
+      });
 
       processTopPool(topLong, 2.0, 250);
       processTopPool(topMed, 1.5, 150);
@@ -40692,7 +43592,7 @@ shadowRoot.innerHTML = `
       }
 
       enrichedCorpus.forEach(item => item.weight /= totalWeight);
-      return { enrichedCorpus, updatedEnrichedData: newCachedEnrichedData };
+      return { enrichedCorpus, updatedEnrichedData: newCachedEnrichedData, personalAffinityMap };
   }
 
   function calculateAdaptiveWeights(profile, trackWeights) {
@@ -40711,18 +43611,19 @@ shadowRoot.innerHTML = `
       for (const k in entropies) disc[k] = Math.max(0, Math.min(1.0, 1 - (Number(entropies[k]) || 0)));
 
       let weights = {
-          genre: 25,
+          genre: 35,
           musicModel: 15,
-          vibe: 25,
-          archetype: 8,
-          streamCount: 11,
-          tempo: 12,
+          vibe: 26,
+          archetype: 7,
+          streamCount: 5,
+          tempo: 8,
           key: 4
       };
 
       for (const k in weights) {
-          weights[k] = weights[k] * (0.4 + 0.6 * disc[k]);
+          weights[k] = weights[k] * (0.5 + 0.5 * disc[k]);
       }
+      weights.genre = Math.max(weights.genre, 30);
 
       const jointXY = new Map();
       const margX = new Map();
@@ -40975,7 +43876,9 @@ shadowRoot.innerHTML = `
       });
       const musicProfile = spMath.normalize(musicProfileSum);
 
-      let topLabelTokens = topGenres.slice(0, 3).map(g => g[0].replace(/\b\w/g, l => l.toUpperCase())).join(' / ');
+      const labelGenreCandidates = topGenres.filter(g => !MOOD_DESCRIPTORS_SET.has(g[0]));
+      const chosenLabelTokens = (labelGenreCandidates.length > 0 ? labelGenreCandidates : topGenres).slice(0, 3);
+      let topLabelTokens = chosenLabelTokens.map(g => g[0].replace(/\b\w/g, l => l.toUpperCase())).join(' / ');
       if (!topLabelTokens) topLabelTokens = "Mixed Vibe";
       let topArchetype = Object.entries(archetypes).sort((a,b) => b[1] - a[1])[0];
       let labelArchetype = topArchetype && topArchetype[1] > 0.1 ? topArchetype[0].replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : "Balanced";
@@ -41021,9 +43924,21 @@ shadowRoot.innerHTML = `
       corpus.forEach(item => {
           item.tfidf = new Map();
           item.genres.forEach(g => {
-              item.tfidf.set(g.name, g.score * idf.get(g.name));
+              if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
+                  item.tfidf.set(g.name, Math.sqrt(g.score || 0.85) * idf.get(g.name));
+              }
           });
       });
+
+      let totalTfIdfCount = 0;
+      corpus.forEach(item => { totalTfIdfCount += item.tfidf.size; });
+      if (totalTfIdfCount === 0) {
+          corpus.forEach(item => {
+              item.genres.forEach(g => {
+                  item.tfidf.set(g.name, Math.sqrt(g.score || 0.85) * idf.get(g.name));
+              });
+          });
+      }
 
       updateProgress("Mapping...");
       const coOccur = new Map();
@@ -41093,8 +44008,9 @@ shadowRoot.innerHTML = `
       if (corpus.length < 5 || projected[0].length === 0) {
           bestGMM = { k: 1, predict: () => [1.0] };
       } else {
-          const maxK = Math.min(5, Math.max(1, Math.floor(corpus.length / 15)));
-          for (let k = 1; k <= maxK; k++) {
+          const minK = corpus.length >= 300 ? 3 : 1;
+          const maxK = Math.min(7, Math.max(minK, Math.floor(corpus.length / 25)));
+          for (let k = minK; k <= maxK; k++) {
               const gmm = new spDiagonalGMM(k);
               if (gmm.fit(projected)) {
                   if (gmm.bic < bestBIC) {
@@ -41104,7 +44020,11 @@ shadowRoot.innerHTML = `
               }
               await fastYield();
           }
-          if (!bestGMM) bestGMM = { k: 1, predict: () => [1.0] };
+          if (!bestGMM) {
+              const fallbackGmm = new spDiagonalGMM(minK);
+              if (fallbackGmm.fit(projected)) bestGMM = fallbackGmm;
+              else bestGMM = { k: 1, predict: () => [1.0] };
+          }
       }
 
       updateProgress("Profiles...");
@@ -41177,13 +44097,14 @@ shadowRoot.innerHTML = `
 
       isBuildingTasteProfile = true;
       try {
-          const { enrichedCorpus, updatedEnrichedData } = await buildWeightedTasteCorpus(updateProgress, cachedEnrichedDataMap, needFullRebuild);
+          const { enrichedCorpus, updatedEnrichedData, personalAffinityMap } = await buildWeightedTasteCorpus(updateProgress, cachedEnrichedDataMap, needFullRebuild);
           updateProgress("Mapping...");
           const result = await buildTasteProfileClusters(enrichedCorpus, updateProgress);
           
           cachedTasteProfile = {
               clusters: result.clusters,
-              pmiMatrix: result.pmiMatrix
+              pmiMatrix: result.pmiMatrix,
+              personalAffinityMap: personalAffinityMap || { uris: {}, isrcs: {} }
           };
           cachedTasteProfileTimestamp = Date.now();
           
@@ -41298,7 +44219,9 @@ shadowRoot.innerHTML = `
 
             if (t.genres && Array.isArray(t.genres)) {
                 t.genres.forEach(g => {
-                    genreCounts.set(g.name, (genreCounts.get(g.name) || 0) + ((g.score || 1) * weight));
+                    if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
+                        genreCounts.set(g.name, (genreCounts.get(g.name) || 0) + ((g.score || 1) * weight));
+                    }
                 });
             }
 
@@ -41331,6 +44254,19 @@ shadowRoot.innerHTML = `
         
         const rawCoherence = Math.max(0.0, Math.min(1.0, 1.0 - (totalVar / 0.25)));
         const coherence = isSingleArtistContext ? Math.min(rawCoherence, 0.05) : Math.min(rawCoherence, 0.15);
+
+        if (genreCounts.size === 0) {
+            tracks.forEach(t => {
+                if (t.genres && Array.isArray(t.genres)) {
+                    const isrc = t.track?.external_ids?.isrc || t.isrc;
+                    const isLiked = (t.uri && likedUris.has(t.uri)) || (isrc && likedIsrcs.has(isrc));
+                    const weight = (hasAnyLiked && isLiked) ? 1.7 : 1.0;
+                    t.genres.forEach(g => {
+                        genreCounts.set(g.name, (genreCounts.get(g.name) || 0) + ((g.score || 1) * weight));
+                    });
+                }
+            });
+        }
 
         const topGenres = Array.from(genreCounts.entries())
             .sort((a, b) => b[1] - a[1])
@@ -41383,21 +44319,24 @@ shadowRoot.innerHTML = `
 
             const calcDist = (val, mean, weight = 1.0) => weight * Math.pow(val - mean, 2);
             
-            let dist = calcDist(e, context.featureMeans.e, 1.6) +
-                       calcDist(v, context.featureMeans.v, 1.6) +
-                       calcDist(t, context.featureMeans.t, 1.3) +
+            let dist = calcDist(e, context.featureMeans.e, 1.2) +
+                       calcDist(v, context.featureMeans.v, 1.1) +
+                       calcDist(t, context.featureMeans.t, 1.0) +
                        calcDist(a, context.featureMeans.a, 1.1) +
-                       calcDist(d, context.featureMeans.d, 0.4) +
-                       calcDist(s, context.featureMeans.s, 0.5) +
-                       calcDist(i, context.featureMeans.i, 0.5);
+                       calcDist(d, context.featureMeans.d, 1.2) +
+                       calcDist(s, context.featureMeans.s, 1.0) +
+                       calcDist(i, context.featureMeans.i, 0.8);
             
             vibeScore = Math.max(0, 100 * Math.exp(-dist * 1.35));
         }
 
         let genreScore = 50;
-        if (track.genres && track.genres.length > 0) {
+        const candidateMusicalGenres = (track.genres || []).filter(g => !MOOD_DESCRIPTORS_SET.has(((typeof g === 'string' ? g : g.name) || "").toLowerCase().trim()));
+        const hasValidContextGenres = Object.keys(context.genreProfile || {}).length > 0;
+
+        if (candidateMusicalGenres.length > 0 && hasValidContextGenres) {
             const rootMatches = [];
-            track.genres.forEach(g => {
+            candidateMusicalGenres.forEach(g => {
                 const gName = (typeof g === 'string' ? g : g.name) || "";
                 const directWeight = context.genreProfile[gName] || 0;
                 
@@ -41430,21 +44369,27 @@ shadowRoot.innerHTML = `
         const musicModelScore = spMath.cosineSimilarity(mVec, context.musicProfile) * 100;
 
         let baseScore = ((vibeScore * vibeWeight) + (genreScore * genreWeight) + (musicModelScore * musicModelWeight)) * hardGateMultiplier;
-
-        if (genreScore < 25 && musicModelScore > 80) {
-            baseScore += (musicModelScore - genreScore) * 0.25; 
-        }
-
         return Math.min(100, baseScore);
     }
 
     function scoreTrackAgainstCluster(track, cluster, pmiMatrix) {
-        let genreScore = 0, genreConf = 0.0, noveltyContrib = 0;
-        if (track.genres && track.genres.length > 0) {
+        let genreScore = 40, genreConf = 0.5, noveltyContrib = 0;
+        const candidateMusicalGenres = (track.genres || []).filter(g => {
+            const name = (typeof g === 'string' ? g : g.name) || "";
+            return !MOOD_DESCRIPTORS_SET.has(name.toLowerCase().trim());
+        });
+
+        if (candidateMusicalGenres.length > 0) {
+            const sortedByScore = [...candidateMusicalGenres].sort((a, b) => (b.score ?? 0.5) - (a.score ?? 0.5));
+            const primaryScore = sortedByScore[0].score ?? 1.0;
+            const threshold = Math.min(primaryScore, Math.max(0.08, primaryScore * 0.20));
+            const gatedGenres = sortedByScore.filter(g => (g.score ?? 0.5) >= threshold);
+
             const rootMatches = [];
-            track.genres.forEach(g => {
-                const gName = (typeof g === 'string' ? g : g.name) || "";
-                const directWeight = cluster.genreProfile[gName] || 0;
+            gatedGenres.forEach(g => {
+                const rawName = (typeof g === 'string' ? g : g.name) || "";
+                const gName = normalizeGenre(rawName);
+                const directWeight = cluster.genreProfile[gName] || cluster.genreProfile[rawName] || 0;
                 const isKnown = directWeight > 0;
                 
                 let subMatch = 0;
@@ -41463,26 +44408,22 @@ shadowRoot.innerHTML = `
                     Object.entries(pmiMap).forEach(([U, pmiVal]) => {
                         const uWeight = cluster.genreProfile[U] || 0;
                         if (uWeight > 0) {
-                            pmiMatch = Math.max(pmiMatch, uWeight * Math.min(1.0, pmiVal * 0.3));
-                            if (!isKnown) {
-                                maxPmiForGenre = Math.max(maxPmiForGenre, pmiVal);
-                            }
+                            pmiMatch = Math.max(pmiMatch, uWeight * Math.min(0.40, pmiVal * 0.12));
+                            if (!isKnown) maxPmiForGenre = Math.max(maxPmiForGenre, pmiVal);
                         }
                     });
                 }
 
-                if (!isKnown && maxPmiForGenre > 0) {
-                    noveltyContrib += maxPmiForGenre * 0.5;
-                }
-
+                if (!isKnown && maxPmiForGenre > 0) noveltyContrib += Math.min(2.0, maxPmiForGenre * 0.3);
                 rootMatches.push(Math.max(directWeight, subMatch, pmiMatch));
             });
 
             if (rootMatches.length > 0) {
-                const peakMatch = Math.max(...rootMatches);
-                const avgMatch = rootMatches.reduce((a, b) => a + b, 0) / rootMatches.length;
-                genreScore = (0.60 * peakMatch + 0.40 * avgMatch) * 100;
-                genreConf = track.genres.length >= 2 ? 1.0 : 0.8;
+                rootMatches.sort((a, b) => b - a);
+                const top1 = rootMatches[0];
+                const top2 = rootMatches.length > 1 ? rootMatches[1] : top1;
+                genreScore = (0.75 * top1 + 0.25 * top2) * 100;
+                genreConf = 1.0;
             }
         }
 
@@ -41494,11 +44435,8 @@ shadowRoot.innerHTML = `
                   a = f.acousticness / 100, s = f.speechiness !== null ? f.speechiness / 100 : 0.1, 
                   i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
 
-            if (cluster.featureMeans.i > 0.80) {
-                if (s > 0.15) hardGateMultiplier *= Math.exp(-(s - 0.15) * 8);
-            } else if (cluster.featureMeans.s > 0.40) {
-                if (i > 0.50) hardGateMultiplier *= Math.exp(-(i - 0.50) * 6);
-            }
+            if (cluster.featureMeans.i > 0.80 && s > 0.15) hardGateMultiplier *= Math.exp(-(s - 0.15) * 8);
+            else if (cluster.featureMeans.s > 0.40 && i > 0.50) hardGateMultiplier *= Math.exp(-(i - 0.50) * 6);
 
             const getGaussianDistance = (val, mean, variance) => Math.exp(-Math.pow(val - mean, 2) / (2 * variance)) * 100;
             
@@ -41515,7 +44453,7 @@ shadowRoot.innerHTML = `
             const mA = Math.max(getDensityScore1D(cluster.vibe1D.acousticness, a, 0, 1), distA);
             const mS = Math.max(getDensityScore1D(cluster.vibe1D.speechiness, s, 0, 1), distS);
             const mI = Math.max(getDensityScore1D(cluster.vibe1D.instrumentalness, i, 0, 1), distI);
-            const marginalScore = (1.5 * mE + 1.0 * mV + 1.0 * mA + 0.8 * mI + 0.6 * mS + 0.4 * mD) / 5.3;
+            const marginalScore = (1.2 * mE + 1.0 * mV + 1.2 * mD + 1.1 * mA + 1.0 * mS + 0.8 * mI) / 6.3;
 
             const jEV = getDensityScore2D(cluster.vibe2D.ev, e, v, 0, 1);
             const jED = getDensityScore2D(cluster.vibe2D.ed, e, d, 0, 1);
@@ -41526,15 +44464,8 @@ shadowRoot.innerHTML = `
             const jEI = getDensityScore2D(cluster.vibe2D.ei, e, i, 0, 1);
             const jES = getDensityScore2D(cluster.vibe2D.es, e, s, 0, 1);
             
-            const avgDistJoint = (distE*distV + distE*distD + distE*distA + distV*distD + distV*distA + distD*distA + distE*distI + distE*distS) / (8 * 100); 
-            let jointScore = ((jEV * 1.5) + (jEA * 1.2) + (jVA * 1.2) + (jEI * 1.0) + (jES * 1.0) + (jED * 0.4) + (jVD * 0.4) + (jDA * 0.3)) / 7.0;
-            jointScore = Math.max(jointScore, avgDistJoint);
-
-            if (cluster.trackCount < 200) {
-                vibeScore = 0.7 * marginalScore + 0.3 * jointScore;
-            } else {
-                vibeScore = 0.4 * marginalScore + 0.6 * jointScore;
-            }
+            const jointScore = ((jEV * 1.2) + (jEA * 1.1) + (jVA * 1.0) + (jEI * 0.8) + (jES * 0.9) + (jED * 1.2) + (jVD * 1.1) + (jDA * 1.0)) / 8.3;
+            vibeScore = 0.60 * marginalScore + 0.40 * jointScore;
             vibeConf = 1.0;
         } else if (f && (f.energy !== null || f.valence !== null)) {
             vibeConf = 0.6;
@@ -41561,12 +44492,18 @@ shadowRoot.innerHTML = `
             const trackArchVec = TASTE_ARCHETYPES.map(arch => arch.affinity(normF));
             const profileArchVec = TASTE_ARCHETYPES.map(arch => cluster.archetypes[arch.id] || 0);
             
-            const rawCos = spMath.cosineSimilarity(trackArchVec, profileArchVec);
-            archScore = Math.pow(rawCos, 3) * 100;
-            archConf = vibeConf;
+            const normA = spMath.norm(trackArchVec);
+            if (normA >= 0.25) {
+                const rawCos = spMath.cosineSimilarity(trackArchVec, profileArchVec);
+                archScore = Math.pow(rawCos, 2) * 100;
+                archConf = vibeConf;
+            } else {
+                archScore = 50;
+                archConf = 0.0;
+            }
         }
 
-        let streamScore = 40, streamConf = 0.0;
+        let streamScore = 50, streamConf = 0.0;
         if (track.playCount !== undefined && track.playCount !== null && track.playCount !== "N/A" && track.playCount > 0) {
             const safePlayCount = Number(track.playCount) || 0;
             const logPc = Math.log10(safePlayCount + 1);
@@ -41587,9 +44524,12 @@ shadowRoot.innerHTML = `
             }
             
             const zScore = (logPc - expectedLog) / 1.5;
-            const relativeScore = getDensityScore1D(cluster.relativePlaysHist, zScore, -3.0, 3.0);
-
-            streamScore = 0.6 * globalScore + 0.4 * relativeScore;
+            let relativeScore = getDensityScore1D(cluster.relativePlaysHist, zScore, -3.0, 3.0);
+            if (zScore > 0) relativeScore = Math.max(relativeScore, Math.min(100, 75 + zScore * 12.5));
+            let adjustedGlobal = globalScore;
+            if (logPc >= 7.0) adjustedGlobal = Math.max(globalScore, Math.min(100, 75 + (logPc - 7.0) * 10));
+            const rawStreamScore = 0.6 * adjustedGlobal + 0.4 * relativeScore;
+            streamScore = safePlayCount > 1000 ? Math.max(50, rawStreamScore) : rawStreamScore;
             streamConf = 1.0;
         }
 
@@ -41611,7 +44551,7 @@ shadowRoot.innerHTML = `
             const te3 = t*2 <= 220 ? getDensityScore2D(cluster.vibe2D.te, normTd, e, 0, 1) : 0;
             const kde2D = Math.max(te1, te2, te3);
             
-            tempoScore = 0.3 * kde1D + 0.7 * kde2D;
+            tempoScore = 0.4 * kde1D + 0.6 * kde2D;
             tempoConf = 1.0; 
         }
 
@@ -41627,19 +44567,14 @@ shadowRoot.innerHTML = `
             }
             let modePeak = Math.max(...cluster.modeDist, 1e-9);
             const modeFactor = cluster.modeDist[tMode] / modePeak;
-            
             keyScore = Math.min(100, harmonicSum * 100 * (0.7 + 0.3 * modeFactor));
             keyConf = 1.0;
         }
 
-        const hasMusicData = (track.genres && track.genres.length > 0) || (f && f.energy != null);
-        const mVec = track.musicVector || getTrackMusicProfile(track.genres, track.features);
+        const hasMusicData = (candidateMusicalGenres.length > 0) || (f && f.energy != null);
+        const mVec = track.musicVector || getTrackMusicProfile(candidateMusicalGenres, track.features);
         const musicModelScore = spMath.cosineSimilarity(mVec, cluster.musicProfile) * 100;
         const musicModelConf = hasMusicData ? 1.0 : 0.0;
-
-        if (genreScore < 25 && musicModelScore > 80) {
-            noveltyContrib += (musicModelScore - genreScore) * 0.05; 
-        }
 
         const scores = { 
             genre: spMath.clamp(genreScore, 0, 100), 
@@ -41662,21 +44597,7 @@ shadowRoot.innerHTML = `
         }
         
         const meanScore = weightSum > 0 ? rawSum / weightSum : 50.0;
-        
-        let maxDeviation = 0;
-        for (const dim in cluster.adaptiveWeights) {
-            if (confs[dim] >= 0.5) {
-                const deviation = meanScore - scores[dim];
-                if (deviation > maxDeviation) maxDeviation = deviation;
-            }
-        }
-        
-        let penalty = 1.0;
-        if (maxDeviation > 25) {
-            penalty = Math.max(0.70, 1.0 - 0.30 * ((maxDeviation - 25) / 75));
-        }
-        
-        penalty *= hardGateMultiplier;
+        const penalty = hardGateMultiplier;
 
         return { rawScore: meanScore, penalty, noveltyContrib };
     }
@@ -41700,7 +44621,12 @@ shadowRoot.innerHTML = `
         });
 
         updateProgress("Anchoring...");
-        const contextProfile = buildContextProfile(tracks, likedUris, likedIsrcs);
+        const currentUri = getCurrentUri();
+        const currentPath = Spicetify.Platform.History.location?.pathname || "";
+        const isMacroSort = tracks.length > 1000 || isLikedSongsPage(currentUri) || currentPath.includes("/collection/tracks") || currentPath.includes("liked");
+        const contextProfile = isMacroSort ? { isValid: false } : buildContextProfile(tracks, likedUris, likedIsrcs);
+
+        const maxClusterMass = Math.max(...profile.clusters.map(c => c.mass || 0.01), 0.01);
 
         updateProgress("Matching...");
         const scoredTracks = [];
@@ -41712,31 +44638,33 @@ shadowRoot.innerHTML = `
             }
 
             const track = tracks[idx];
-            const clusterResults = profile.clusters.map(cluster => 
-                scoreTrackAgainstCluster(track, cluster, profile.pmiMatrix)
-            );
+            const clusterResults = profile.clusters.map(cluster => {
+                const res = scoreTrackAgainstCluster(track, cluster, profile.pmiMatrix);
+                const clusterMass = cluster.mass || 0.01;
+                const massRatio = Math.min(1.0, clusterMass / Math.max(0.24, maxClusterMass * 0.75));
+                const dietMultiplier = 0.82 + 0.18 * Math.sqrt(massRatio);
+                const effectiveScore = res.rawScore * res.penalty * dietMultiplier;
+                return { ...res, effectiveScore, dietMultiplier };
+            });
 
-            const clusterScores = clusterResults.map(r => r.rawScore * r.penalty);
-            const temperature = 5.0; 
-            const maxScore = Math.max(...clusterScores);
-            
-            let sumExp = 0;
-            for (const s of clusterScores) {
-                sumExp += Math.exp((s - maxScore) / temperature);
+            let bestResult = clusterResults[0];
+            for (let c = 1; c < clusterResults.length; c++) {
+                if (clusterResults[c].effectiveScore > bestResult.effectiveScore) {
+                    bestResult = clusterResults[c];
+                }
             }
-            let aggregatedScore = maxScore + temperature * Math.log(sumExp);
 
-            const winningIdx = clusterScores.indexOf(maxScore);
-            const winningMass = profile.clusters[winningIdx].mass;
-            
-            const dampingFactor = Math.max(0.95, Math.min(1.0, 0.90 + 0.10 * Math.log10(Math.max(0.001, winningMass) * 100)));
-            aggregatedScore *= dampingFactor;
+            let aggregatedScore = bestResult.effectiveScore;
 
-            const noveltyContrib = clusterResults[winningIdx].noveltyContrib;
-            const noveltyBonus = Math.min(6, noveltyContrib * 2.0); 
+            const noveltyBonus = Math.min(4, (bestResult.noveltyContrib || 0) * 1.5);
+            if (aggregatedScore >= 65) aggregatedScore += noveltyBonus;
 
-            if (aggregatedScore >= 55) {
-                aggregatedScore += noveltyBonus;
+            const trackId = track.trackId || (track.uri ? track.uri.split(':')[2] : null);
+            const trackIsrc = track.isrc || track.external_ids?.isrc || track.track?.external_ids?.isrc || (trackId ? cachedLikedMetadata.get(trackId)?.external_ids?.isrc : null);
+            const personalAffinity = profile.personalAffinityMap?.uris?.[track.uri] 
+                ?? (trackIsrc ? profile.personalAffinityMap?.isrcs?.[trackIsrc] : null);
+            if (personalAffinity) {
+                aggregatedScore = Math.min(100, aggregatedScore + (personalAffinity * 8.5));
             }
 
             aggregatedScore = spMath.clamp(aggregatedScore, 0, 100);
@@ -41745,7 +44673,6 @@ shadowRoot.innerHTML = `
                 const contextScore = scoreTrackAgainstContext(track, contextProfile);
                 const contextWeight = contextProfile.coherence;
                 const globalWeight = 1.0 - contextWeight;
-
                 aggregatedScore = (aggregatedScore * globalWeight) + (contextScore * contextWeight);
             }
 
@@ -41831,33 +44758,6 @@ shadowRoot.innerHTML = `
       
       return maxWeightedScore >= strictness;
   }
-  
-  function calculateAudioStatistics(tracksWithFeatures) {
-    const features = ['energy', 'valence', 'danceability', 'acousticness', 'tempo'];
-    const stats = {
-        averages: {},
-        ranges: {}
-    };
-
-    const validTracks = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-    if (validTracks.length === 0) return null;
-
-    features.forEach(feature => {
-        const sum = validTracks.reduce((acc, t) => acc + (t.features[feature] || 0), 0);
-        stats.averages[feature] = sum / validTracks.length;
-
-        const sorted = validTracks.map(t => t.features[feature] || 0).sort((a, b) => a - b);
-        const p10Index = Math.floor(sorted.length * 0.1);
-        const p90Index = Math.floor(sorted.length * 0.9);
-        
-        stats.ranges[feature] = {
-            min: sorted[p10Index],
-            max: sorted[p90Index]
-        };
-    });
-
-    return stats;
-  }
 
   async function generateSpotifyRecommendations(vibeType, options = {}) {
     const { isHeadless = false } = options;
@@ -41919,12 +44819,16 @@ shadowRoot.innerHTML = `
                 while (queue.length > 0 && !shouldStop) {
                     const uri = queue.shift();
                     try {
+                        if (internalTokenRefreshPromise) {
+                            await internalTokenRefreshPromise;
+                        }
                         let token = Spicetify.Platform.Session.accessToken;
                         const url = `https://spclient.wg.spotify.com/inspiredby-mix/v2/seed_to_playlist/${uri}?response-format=json`;
                         let res = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
                         
                         if (res.status === 401) {
                             if (!internalTokenRefreshPromise) {
+                                console.warn("[Sort-Play] Token 401 in fetchRadioTracks. Refreshing token...");
                                 internalTokenRefreshPromise = (async () => {
                                     try {
                                         const tokenData = await Spicetify.CosmosAsync.get('sp://auth/v2/token');
@@ -41981,12 +44885,7 @@ shadowRoot.innerHTML = `
             const results = new Map();
             const promises = shuffled.map(async (artist) => {
                 try {
-                    const res = await Spicetify.GraphQL.Request({
-                        name: "queryArtistRelated",
-                        operation: "query",
-                        sha256Hash: "3d031d6cb22a2aa7c8d203d49b49df731f58b1e2799cc38d9876d58771aa66f3",
-                        value: null
-                    }, { uri: `spotify:artist:${artist.id}` });
+                    const res = await Spicetify.GraphQL.Request(GraphQL.Definitions.queryArtistRelated, { uri: `spotify:artist:${artist.id}` });
                     const items = res?.data?.artistUnion?.relatedContent?.relatedArtists?.items;
                     if (items) {
                         items.forEach(item => {
@@ -42070,163 +44969,129 @@ shadowRoot.innerHTML = `
             playlistDescription = "Discover tracks from new artists that match your musical taste. Created by Sort-Play.";
 
             if (!isHeadless) mainButton.innerText = "Profiling...";
-            
-            const [shortTermArtists, shortTermTracks] = await Promise.all([
+
+            const [shortTermArtists, shortTermTracks, medTermArtists, medTermTracks, longTermArtists, longTermTracks] = await Promise.all([
                 getTopItems('artists', 'short_term', 50),
-                getTopItems('tracks', 'short_term', 50)
+                getTopItems('tracks', 'short_term', 50),
+                getTopItems('artists', 'medium_term', 50),
+                getTopItems('tracks', 'medium_term', 50),
+                getTopItems('artists', 'long_term', 50),
+                getTopItems('tracks', 'long_term', 50)
             ]);
-            
+
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            
+
             const recentLikes = allLikedSongs.filter(t => t.addedAt && new Date(t.addedAt) >= thirtyDaysAgo);
-            const recentLikesCount = recentLikes.length;
-            
-            let recentSample = [];
-            let randomSample = [];
-            
-            if (recentLikesCount >= 30) {
-                recentSample = shuffleArray(recentLikes).slice(0, 25);
-                const recentSampleSet = new Set(recentSample);
-                const remaining = allLikedSongs.filter(t => !recentSampleSet.has(t));
-                randomSample = shuffleArray(remaining).slice(0, 15);
-            } else if (recentLikesCount >= 10) {
-                const takeCount = Math.max(10, Math.floor(recentLikesCount * 0.8));
-                recentSample = shuffleArray(recentLikes).slice(0, takeCount);
-                const recentSampleSet = new Set(recentSample);
-                const remaining = allLikedSongs.filter(t => !recentSampleSet.has(t));
-                randomSample = shuffleArray(remaining).slice(0, 10);
-            } else {
-                recentSample = recentLikes;
-                const recentSampleSet = new Set(recentSample);
-                const remaining = allLikedSongs.filter(t => !recentSampleSet.has(t));
-                
-                if (shortTermArtists.length < 10) {
-                    randomSample = shuffleArray(remaining).slice(0, 30);
-                } else {
-                    randomSample = shuffleArray(remaining).slice(0, 5);
-                }
-            }
-            
-            const combinedLikedSample = [...recentSample, ...randomSample];
-            const tracksToProfile = [...shortTermTracks, ...combinedLikedSample];
+            const historicalLikes = allLikedSongs.filter(t => !t.addedAt || new Date(t.addedAt) < thirtyDaysAgo);
 
-            const recentLikedArtists = combinedLikedSample.map(song => {
-                if (song.artistUris && song.artistUris.length > 0) {
-                    return { id: song.artistUris[0].split(':')[2] };
-                }
-                return null;
-            }).filter(Boolean);
+            const recentLikedSample = shuffleArray(recentLikes).slice(0, 25);
+            const shortTracksCombined = [...shortTermTracks, ...recentLikedSample];
 
-            const combinedSeeds = new Map();
-            [...shortTermArtists, ...recentLikedArtists].forEach(a => combinedSeeds.set(a.id, a));
-            let topArtistsForSeeding = Array.from(combinedSeeds.values());
+            const shortTrackUris = new Set(shortTracksCombined.map(t => t.uri));
+            const medTracksFiltered = medTermTracks.filter(t => !shortTrackUris.has(t.uri)).slice(0, 15);
+            const longTracksFiltered = longTermTracks.filter(t => !shortTrackUris.has(t.uri)).slice(0, 10);
+            const historicalLikedSample = shuffleArray(historicalLikes).filter(t => !shortTrackUris.has(t.uri)).slice(0, 10);
 
-            if (topArtistsForSeeding.length === 0) {
+            const tracksToProfile = [
+                ...shortTracksCombined.map(t => ({ ...t, isRecent: true })),
+                ...medTracksFiltered.map(t => ({ ...t, isRecent: false })),
+                ...longTracksFiltered.map(t => ({ ...t, isRecent: false })),
+                ...historicalLikedSample.map(t => ({ ...t, isRecent: false }))
+            ];
+
+            if (tracksToProfile.length === 0) {
                 throw new Error("Need more listening history or liked songs to build a discovery profile.");
             }
-            
 
-            if (!isHeadless) mainButton.innerText = "Related...";
-            const level1Raw = await fetchRelatedBatch(topArtistsForSeeding, 20);
-            const level1 = level1Raw.filter(a => !knownArtistIds.has(a.id));
+            const activeArtistMap = new Map();
+            shortTermArtists.forEach(a => activeArtistMap.set(a.id, a));
+            recentLikedSample.forEach(t => {
+                const aId = t.artistUris?.[0]?.split(':')[2] || t.artists?.[0]?.id;
+                if (aId && !activeArtistMap.has(aId)) activeArtistMap.set(aId, { id: aId });
+            });
 
-            if (level1.length < 10) {
-                const additionalLevel1 = await fetchRelatedBatch(topArtistsForSeeding, 30);
-                const additionalUnknowns = additionalLevel1.filter(a => !knownArtistIds.has(a.id));
-                const existingIds = new Set(level1.map(a => a.id));
-                additionalUnknowns.forEach(a => {
-                    if (!existingIds.has(a.id)) { level1.push(a); existingIds.add(a.id); }
+            const foundationalArtistMap = new Map();
+            medTermArtists.forEach(a => { if (!activeArtistMap.has(a.id)) foundationalArtistMap.set(a.id, a); });
+            longTermArtists.forEach(a => { if (!activeArtistMap.has(a.id)) foundationalArtistMap.set(a.id, a); });
+            historicalLikedSample.forEach(t => {
+                const aId = t.artistUris?.[0]?.split(':')[2] || t.artists?.[0]?.id;
+                if (aId && !activeArtistMap.has(aId)) foundationalArtistMap.set(aId, { id: aId });
+            });
+
+            const activeVibeSeeds = shuffleArray(Array.from(activeArtistMap.values())).slice(0, 25);
+            const foundationalSeeds = shuffleArray(Array.from(foundationalArtistMap.values())).slice(0, 10);
+            let topArtistsForSeeding = [...activeVibeSeeds, ...foundationalSeeds];
+            if (topArtistsForSeeding.length === 0) {
+                topArtistsForSeeding = Array.from(activeArtistMap.values());
+            }
+
+            if (!isHeadless) mainButton.innerText = "Exploring...";
+            const l1Raw = await fetchRelatedBatch(topArtistsForSeeding, 25);
+            let level1 = l1Raw.filter(a => !knownArtistIds.has(a.id));
+            if (level1.length < 12 && topArtistsForSeeding.length > 10) {
+                const extraL1 = await fetchRelatedBatch(topArtistsForSeeding, 40);
+                const seenL1 = new Set(level1.map(a => a.id));
+                extraL1.filter(a => !knownArtistIds.has(a.id)).forEach(a => {
+                    if (!seenL1.has(a.id)) { level1.push(a); seenL1.add(a.id); }
                 });
             }
 
-            const level2Raw = await fetchRelatedBatch(level1, 15);
-            const level2 = level2Raw.filter(a => !knownArtistIds.has(a.id));
-
+            const l2Raw = await fetchRelatedBatch(level1, 20);
+            let level2 = l2Raw.filter(a => !knownArtistIds.has(a.id));
             if (level2.length < 10 && level1.length > 0) {
-                const additionalLevel2 = await fetchRelatedBatch(level1, 30);
-                const additionalUnknowns = additionalLevel2.filter(a => !knownArtistIds.has(a.id));
-                const existingIds = new Set(level2.map(a => a.id));
-                additionalUnknowns.forEach(a => {
-                    if (!existingIds.has(a.id)) { level2.push(a); existingIds.add(a.id); }
+                const extraL2 = await fetchRelatedBatch(level1, 30);
+                const seenL2 = new Set(level2.map(a => a.id));
+                extraL2.filter(a => !knownArtistIds.has(a.id)).forEach(a => {
+                    if (!seenL2.has(a.id)) { level2.push(a); seenL2.add(a.id); }
                 });
             }
 
-            const level3Raw = await fetchRelatedBatch(level2, 15);
-            const level3 = level3Raw.filter(a => !knownArtistIds.has(a.id));
-
+            const l3Raw = await fetchRelatedBatch(level2, 20);
+            let level3 = l3Raw.filter(a => !knownArtistIds.has(a.id));
             if (level3.length < 10 && level2.length > 0) {
-                const additionalLevel3 = await fetchRelatedBatch(level2, 30);
-                const additionalUnknowns = additionalLevel3.filter(a => !knownArtistIds.has(a.id));
-                const existingIds = new Set(level3.map(a => a.id));
-                additionalUnknowns.forEach(a => {
-                    if (!existingIds.has(a.id)) { level3.push(a); existingIds.add(a.id); }
+                const extraL3 = await fetchRelatedBatch(level2, 30);
+                const seenL3 = new Set(level3.map(a => a.id));
+                extraL3.filter(a => !knownArtistIds.has(a.id)).forEach(a => {
+                    if (!seenL3.has(a.id)) { level3.push(a); seenL3.add(a.id); }
                 });
             }
 
-            if (!isHeadless) mainButton.innerText = "Deep Cuts...";
-            const level4Raw = await fetchRelatedBatch(level3, 15);
-            const level4 = level4Raw.filter(a => !knownArtistIds.has(a.id));
-
+            const l4Raw = await fetchRelatedBatch(level3, 15);
+            let level4 = l4Raw.filter(a => !knownArtistIds.has(a.id));
             if (level4.length < 5 && level3.length > 0) {
-                const additionalLevel4 = await fetchRelatedBatch(level3, 30);
-                const additionalUnknowns = additionalLevel4.filter(a => !knownArtistIds.has(a.id));
-                const existingIds = new Set(level4.map(a => a.id));
-                additionalUnknowns.forEach(a => {
-                    if (!existingIds.has(a.id)) { level4.push(a); existingIds.add(a.id); }
+                const extraL4 = await fetchRelatedBatch(level3, 25);
+                const seenL4 = new Set(level4.map(a => a.id));
+                extraL4.filter(a => !knownArtistIds.has(a.id)).forEach(a => {
+                    if (!seenL4.has(a.id)) { level4.push(a); seenL4.add(a.id); }
                 });
             }
-
-            if (!isHeadless) mainButton.innerText = "Picking...";
-            const directCandidateTarget = 40;
-            
-            let l4Pct = (Math.random() * (0.10 - 0.05)) + 0.05;
-            let l3Pct = (Math.random() * (0.50 - 0.35)) + 0.35;
-            let l2Pct = (Math.random() * (0.30 - 0.20)) + 0.20;
-            let l1Pct = 1.0 - l4Pct - l3Pct - l2Pct;
-
-            if (l1Pct > 0.15) {
-                const excess = l1Pct - 0.15;
-                l1Pct = 0.15;
-                l3Pct += excess * 0.6;
-                l2Pct += excess * 0.4;
-            } else if (l1Pct < 0.05) {
-                const deficit = 0.05 - l1Pct;
-                l1Pct = 0.05;
-                l3Pct -= deficit * 0.6;
-                l2Pct -= deficit * 0.4;
-            }
-
-            const targetL4 = Math.round(directCandidateTarget * l4Pct);
-            const targetL3 = Math.round(directCandidateTarget * l3Pct);
-            const targetL2 = Math.round(directCandidateTarget * l2Pct);
-            const targetL1 = Math.max(0, directCandidateTarget - targetL4 - targetL3 - targetL2);
 
             const directTracks = [];
-            const processedArtistIds = new Set(); 
+            const processedArtistIds = new Set();
 
             async function fillQuotaFromPool(pool, quota) {
                 if (quota <= 0 || pool.length === 0) return 0;
                 const queue = shuffleArray([...pool]);
                 let filled = 0;
-                
+
                 const CONCURRENCY_LIMIT = 15;
                 const worker = async () => {
                     while (queue.length > 0) {
                         if (filled >= quota) break;
-                        
+
                         const artist = queue.shift();
                         if (knownArtistIds.has(artist.id) || processedArtistIds.has(artist.id)) continue;
                         processedArtistIds.add(artist.id);
 
                         try {
                             const res = await Spicetify.GraphQL.Request(
-                                Spicetify.GraphQL.Definitions.queryArtistOverview, 
+                                Spicetify.GraphQL.Definitions.queryArtistOverview,
                                 { uri: `spotify:artist:${artist.id}`, locale: "en", includePrerelease: false }
                             );
-                            
+
                             const topTracks = res?.data?.artistUnion?.discography?.topTracks?.items;
-                            
+
                             if (topTracks && topTracks.length > 0) {
                                 const mappedCandidates = topTracks.map(item => {
                                     const t = item.track;
@@ -42262,17 +45127,17 @@ shadowRoot.innerHTML = `
                                 if (validTracks.length > 0 && filled < quota) {
                                     let poolSize = 1;
                                     const maxPool = Math.min(5, validTracks.length);
-                                    
+
                                     for (let i = 0; i < maxPool - 1; i++) {
-                                        if (validTracks[i+1].playcount < (validTracks[i].playcount * 0.4)) {
+                                        if (validTracks[i + 1].playcount < (validTracks[i].playcount * 0.4)) {
                                             break;
                                         }
                                         poolSize++;
                                     }
-                                    
+
                                     const pickIndex = Math.floor(Math.random() * poolSize);
                                     const trackToPick = validTracks[pickIndex];
-                                    
+
                                     directTracks.push(trackToPick);
                                     trackToPick.artists.forEach(a => knownArtistIds.add(a.id));
                                     filled++;
@@ -42287,6 +45152,16 @@ shadowRoot.innerHTML = `
                 return filled;
             }
 
+            if (!isHeadless) mainButton.innerText = "Picking...";
+            const directCandidateTarget = 40;
+            let l4Pct = (Math.random() * (0.10 - 0.05)) + 0.05;
+            let l3Pct = (Math.random() * (0.50 - 0.35)) + 0.35;
+            let l2Pct = (Math.random() * (0.30 - 0.20)) + 0.20;
+            let targetL4 = Math.round(directCandidateTarget * l4Pct);
+            let targetL3 = Math.round(directCandidateTarget * l3Pct);
+            let targetL2 = Math.round(directCandidateTarget * l2Pct);
+            let targetL1 = Math.max(0, directCandidateTarget - targetL4 - targetL3 - targetL2);
+
             let filledL4 = await fillQuotaFromPool(level4, targetL4);
             let deficitL4 = targetL4 - filledL4;
 
@@ -42296,10 +45171,14 @@ shadowRoot.innerHTML = `
             let filledL2 = await fillQuotaFromPool(level2, targetL2 + deficitL3);
             let deficitL2 = (targetL2 + deficitL3) - filledL2;
 
-            await fillQuotaFromPool(level1, targetL1 + deficitL2);
+            let filledL1 = await fillQuotaFromPool(level1, targetL1 + deficitL2);
+            let deficitL1 = (targetL1 + deficitL2) - filledL1;
+
+            if (deficitL1 > 0) {
+                await fillQuotaFromPool(level2, deficitL1);
+            }
 
             if (!isHeadless) mainButton.innerText = "Expanding...";
-
             const seedCount = discoveryPlaylistSize > 50 ? 6 : 4;
             const getValidSeeds = (primaryList, fallbackListA, fallbackListB) => {
                 if (primaryList && primaryList.length > 0) return shuffleArray(primaryList).slice(0, seedCount);
@@ -42315,20 +45194,20 @@ shadowRoot.innerHTML = `
 
             const allRadioSeeds = [...new Set([...seedsL4, ...seedsL3, ...seedsL2, ...seedsL1].map(a => `spotify:artist:${a.id}`))];
             const rawApiTracks = await fetchRadioTracks(allRadioSeeds, 300);
-            
+
             let apiRecommendedTracks = [];
             if (rawApiTracks.length > 0) {
                 const availabilityChecks = await Promise.all(rawApiTracks.map(track => isTrackAvailable(track)));
-                
+
                 const seenApiUris = new Set();
                 apiRecommendedTracks = rawApiTracks.filter((track, index) => {
                     if (!availabilityChecks[index]) return false;
                     if (seenApiUris.has(track.uri)) return false;
                     seenApiUris.add(track.uri);
-                    
+
                     if (completeLikedSongUrisSet.has(track.uri)) return false;
                     if (isTrashFiltered(track)) return false;
-                    
+
                     const hasKnownArtist = track.artists.some(a => knownArtistIds.has(a.id));
                     if (hasKnownArtist) return false;
 
@@ -42338,17 +45217,17 @@ shadowRoot.innerHTML = `
             }
 
             if (!isHeadless) mainButton.innerText = "Combining...";
-            
+
             let allCandidates = [];
             const uniqueUriSet = new Set();
-            
+
             for (const t of directTracks) {
                 if (!uniqueUriSet.has(t.uri)) {
                     uniqueUriSet.add(t.uri);
                     allCandidates.push(t);
                 }
             }
-            
+
             for (const t of apiRecommendedTracks) {
                 if (!uniqueUriSet.has(t.uri)) {
                     uniqueUriSet.add(t.uri);
@@ -42382,9 +45261,9 @@ shadowRoot.innerHTML = `
             });
 
             if (allCandidates.length === 0) throw new Error("Could not find enough tracks matching discovery criteria.");
-            
+
             if (!isHeadless) mainButton.innerText = "Evaluating...";
-            
+
             const profileTrackIds = [...new Set(tracksToProfile.map(t => t.id || t.uri.split(':')[2]))].filter(Boolean);
             const candidateTrackIds = allCandidates.map(t => t.id || t.uri.split(':')[2]).filter(Boolean);
             const allUrisForGenres = [...new Set([...tracksToProfile.map(t => t.uri), ...allCandidates.map(t => t.uri)])].filter(Boolean);
@@ -42405,19 +45284,48 @@ shadowRoot.innerHTML = `
             });
 
             const validProfiling = tracksToProfile.filter(t => t.features && t.features.energy !== null);
+
+            const genreDocFreq = new Map();
+            validProfiling.forEach(t => {
+                const trackGenreMap = new Map();
+                (t.genres || []).forEach(g => {
+                    if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
+                        trackGenreMap.set(g.name, Math.max(trackGenreMap.get(g.name) || 0, g.score || 0.85));
+                    }
+                });
+                trackGenreMap.forEach((score, name) => {
+                    genreDocFreq.set(name, (genreDocFreq.get(name) || 0) + score);
+                });
+            });
+
+            if (genreDocFreq.size === 0) {
+                validProfiling.forEach(t => {
+                    (t.genres || []).forEach(g => {
+                        genreDocFreq.set(g.name, (genreDocFreq.get(g.name) || 0) + (g.score || 0.85));
+                    });
+                });
+            }
+
+            const topGenreTokens = Array.from(genreDocFreq.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8)
+                .map(e => e[0]);
+
             const dataVectors = validProfiling.map(t => {
                 const f = t.features;
+                const trackGenreSet = new Set((t.genres || []).map(g => g.name));
+                const genreDims = topGenreTokens.map(token => trackGenreSet.has(token) ? 0.35 : 0.0);
                 return [
+                    ...genreDims,
                     (f.energy ?? 50) / 100,
                     (f.valence ?? 50) / 100,
                     (f.danceability ?? 50) / 100,
                     (f.acousticness ?? 50) / 100,
-                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1),
-                    t.genres && t.genres.length > 0 ? 1.0 : 0.0
+                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1)
                 ];
             });
 
-            const pcaResult = spMath.pca(dataVectors, 0.85, 4);
+            const pcaResult = spMath.pca(dataVectors, 0.85, Math.min(6, dataVectors[0]?.length || 4));
             let projected = pcaResult.projected;
             if (!projected || projected.length === 0 || !projected[0] || projected[0].length === 0) {
                 projected = dataVectors;
@@ -42439,7 +45347,7 @@ shadowRoot.innerHTML = `
 
             if (!bestGMM) bestGMM = { k: 1, predict: () => [1.0] };
 
-            const exemplars = [];
+            let exemplars = [];
             for (let c = 0; c < bestGMM.k; c++) {
                 let clusterWeight = 0;
                 const members = [];
@@ -42447,7 +45355,7 @@ shadowRoot.innerHTML = `
                     const resps = bestGMM.predict(projected[i]);
                     const w = resps[c];
                     clusterWeight += w;
-                    members.push({ item, weight: w });
+                    members.push({ item, weight: w, resp: resps[c] });
                 });
 
                 if (clusterWeight <= 0.01) continue;
@@ -42455,6 +45363,7 @@ shadowRoot.innerHTML = `
 
                 const featureMeans = { e: 0, v: 0, d: 0, a: 0, t: 0 };
                 const genreWeights = new Map();
+                let momentumScore = 0;
 
                 members.forEach(m => {
                     const f = m.item.features;
@@ -42465,9 +45374,23 @@ shadowRoot.innerHTML = `
                     featureMeans.t += (((f.tempo || 120) / 220)) * m.normWeight;
 
                     (m.item.genres || []).forEach(g => {
-                        genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + ((g.score || 0.85) * m.normWeight));
+                        if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
+                            genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + ((g.score || 0.85) * m.normWeight));
+                        }
                     });
+
+                    if (m.item.isRecent) {
+                        momentumScore += m.resp;
+                    }
                 });
+
+                if (genreWeights.size === 0) {
+                    members.forEach(m => {
+                        (m.item.genres || []).forEach(g => {
+                            genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + ((g.score || 0.85) * m.normWeight));
+                        });
+                    });
+                }
 
                 const maxGWeight = Math.max(...genreWeights.values(), 1e-6);
                 const genreProfile = Object.fromEntries(
@@ -42477,14 +45400,69 @@ shadowRoot.innerHTML = `
                         .map(([name, weight]) => [name, weight / maxGWeight])
                 );
 
-                exemplars.push({ featureMeans, genreProfile });
+                const clusterMass = clusterWeight / (validProfiling.length || 1);
+                exemplars.push({ id: c, mass: clusterMass, featureMeans, genreProfile, momentumScore });
             }
 
             if (exemplars.length === 0) {
                 exemplars.push({
+                    id: 0,
+                    mass: 1.0,
                     featureMeans: { e: 0.5, v: 0.5, d: 0.5, a: 0.5, t: 0.54 },
-                    genreProfile: {}
+                    genreProfile: {},
+                    momentumScore: 1.0
                 });
+            }
+
+            const minMassThreshold = 0.18;
+            if (exemplars.length > 1) {
+                const viableExemplars = exemplars.filter(e => e.mass >= minMassThreshold);
+                if (viableExemplars.length > 0 && viableExemplars.length < exemplars.length) {
+                    exemplars = viableExemplars;
+                    let totalViableMass = exemplars.reduce((sum, e) => sum + e.mass, 0);
+                    exemplars.forEach(e => e.mass /= totalViableMass);
+                } else if (viableExemplars.length === 0) {
+                    exemplars.sort((a, b) => b.mass - a.mass);
+                    exemplars = [exemplars[0]];
+                    exemplars[0].mass = 1.0;
+                }
+            }
+
+            let primaryAnchorCluster = exemplars[0];
+            let highestMomentum = -1;
+            exemplars.forEach(e => {
+                if (e.momentumScore > highestMomentum) {
+                    highestMomentum = e.momentumScore;
+                    primaryAnchorCluster = e;
+                } else if (e.momentumScore === highestMomentum && e.mass > primaryAnchorCluster.mass) {
+                    primaryAnchorCluster = e;
+                }
+            });
+
+            const targetPlaylistCount = discoveryPlaylistSize;
+            let totalEffectiveMass = 0;
+            const totalMomentum = exemplars.reduce((sum, e) => sum + e.momentumScore, 0);
+            exemplars.forEach(e => {
+                const momentumFactor = totalMomentum > 0 ? (0.4 + 0.6 * (e.momentumScore / totalMomentum)) : 1.0;
+                e.effectiveMass = e.mass * momentumFactor;
+                totalEffectiveMass += e.effectiveMass;
+            });
+            exemplars.forEach(e => e.effectiveMass /= totalEffectiveMass);
+
+            let assignedTotal = 0;
+            exemplars.forEach(e => {
+                e.quota = Math.round(targetPlaylistCount * e.effectiveMass);
+                assignedTotal += e.quota;
+            });
+
+            while (assignedTotal > targetPlaylistCount) {
+                const largest = exemplars.reduce((max, e) => e.quota > max.quota ? e : max, exemplars[0]);
+                largest.quota--;
+                assignedTotal--;
+            }
+            while (assignedTotal < targetPlaylistCount) {
+                primaryAnchorCluster.quota++;
+                assignedTotal++;
             }
 
             const candidatesWithFeatures = allCandidates.map(t => {
@@ -42514,28 +45492,40 @@ shadowRoot.innerHTML = `
                 }
 
                 let genreScore = 50;
-                if (track.genres && track.genres.length > 0) {
-                    const matches = track.genres.map(g => exemplar.genreProfile[g.name] || 0);
+                const candidateMusicalGenres = (track.genres || []).filter(g => !MOOD_DESCRIPTORS_SET.has(g.name));
+                const genresToScore = candidateMusicalGenres.length > 0 ? candidateMusicalGenres : track.genres;
+
+                if (genresToScore && genresToScore.length > 0) {
+                    const matches = genresToScore.map(g => (exemplar.genreProfile[g.name] || 0) * Math.sqrt(g.score || 0.85));
                     if (matches.length > 0) {
                         const peak = Math.max(...matches);
                         const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
                         genreScore = (peak * 0.70 + avg * 0.30) * 100;
                     }
-                    return (vibeScore * 0.50) + (genreScore * 0.50);
+                    return candidateMusicalGenres.length > 0 ? (vibeScore * 0.50) + (genreScore * 0.50) : vibeScore;
                 } else {
                     return vibeScore;
                 }
             };
 
             candidatesWithPop.forEach(t => {
-                const exemplarScores = exemplars.map(e => scoreAgainstExemplar(t, e));
-                let peakScore = Math.max(...exemplarScores);
+                let bestScore = -1;
+                let bestClusterId = exemplars[0].id;
+
+                exemplars.forEach(e => {
+                    const sc = scoreAgainstExemplar(t, e);
+                    if (sc > bestScore) {
+                        bestScore = sc;
+                        bestClusterId = e.id;
+                    }
+                });
 
                 if (t.popularity !== null && t.popularity !== undefined && t.popularity < 45) {
-                    peakScore += Math.max(0, (45 - t.popularity) * 0.22);
+                    bestScore += Math.max(0, (45 - t.popularity) * 0.22);
                 }
 
-                t.finalScore = Math.min(100, Math.max(0, peakScore));
+                t.assignedClusterId = bestClusterId;
+                t.finalScore = Math.min(100, Math.max(0, bestScore));
                 const fuzz = 0.85 + (Math.random() * 0.30);
                 t.lotteryWeight = Math.pow(Math.max(0.1, t.finalScore * fuzz), 2);
             });
@@ -42544,64 +45534,128 @@ shadowRoot.innerHTML = `
             const finalSelected = [];
             const seenArtists = new Set();
             const seenAlbums = new Set();
-            let candidatePool = [...candidatesWithPop];
-            const targetPlaylistCount = discoveryPlaylistSize;
+            const anchorClusterSelectedUris = new Set();
 
-            while (finalSelected.length < targetPlaylistCount && candidatePool.length > 0) {
-                let totalWeight = candidatePool.reduce((sum, t) => sum + t.lotteryWeight, 0);
-                if (totalWeight <= 0) break;
+            for (const cluster of exemplars) {
+                const clusterCandidates = candidatesWithPop.filter(t => t.assignedClusterId === cluster.id && t.finalScore >= 30);
+                let needed = cluster.quota;
 
-                let r = Math.random() * totalWeight;
-                let selectedIdx = candidatePool.length - 1;
-                for (let i = 0; i < candidatePool.length; i++) {
-                    r -= candidatePool[i].lotteryWeight;
-                    if (r <= 0) {
-                        selectedIdx = i;
-                        break;
+                while (needed > 0 && clusterCandidates.length > 0) {
+                    const totalWeight = clusterCandidates.reduce((sum, t) => sum + t.lotteryWeight, 0);
+                    if (totalWeight <= 0) break;
+
+                    let r = Math.random() * totalWeight;
+                    let selectedIdx = clusterCandidates.length - 1;
+                    for (let i = 0; i < clusterCandidates.length; i++) {
+                        r -= clusterCandidates[i].lotteryWeight;
+                        if (r <= 0) {
+                            selectedIdx = i;
+                            break;
+                        }
+                    }
+
+                    const track = clusterCandidates[selectedIdx];
+                    clusterCandidates.splice(selectedIdx, 1);
+
+                    const albumIdentifier = track.album?.id || track.album?.uri || track.album?.name?.toLowerCase().trim() || track.albumName?.toLowerCase().trim();
+                    const allArtistIds = track.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                    if (allArtistIds.length === 0 && track.artistName) {
+                        allArtistIds.push(track.artistName.toLowerCase().trim());
+                    }
+
+                    const hasArtistCollision = allArtistIds.some(id => seenArtists.has(id));
+                    const hasAlbumCollision = albumIdentifier && seenAlbums.has(albumIdentifier);
+
+                    if (hasArtistCollision || hasAlbumCollision) {
+                        continue;
+                    }
+
+                    allArtistIds.forEach(id => seenArtists.add(id));
+                    if (albumIdentifier) seenAlbums.add(albumIdentifier);
+                    finalSelected.push(track);
+                    if (cluster.id === primaryAnchorCluster.id) {
+                        anchorClusterSelectedUris.add(track.uri);
+                    }
+                    needed--;
+                }
+            }
+
+            if (finalSelected.length < targetPlaylistCount) {
+                const remainingPool = candidatesWithPop.filter(t => !finalSelected.some(s => s.uri === t.uri) && t.finalScore >= 30);
+                remainingPool.sort((a, b) => {
+                    const aIsAnchor = a.assignedClusterId === primaryAnchorCluster.id ? 1 : 0;
+                    const bIsAnchor = b.assignedClusterId === primaryAnchorCluster.id ? 1 : 0;
+                    if (aIsAnchor !== bIsAnchor) return bIsAnchor - aIsAnchor;
+                    return b.finalScore - a.finalScore;
+                });
+
+                for (const candidate of remainingPool) {
+                    if (finalSelected.length >= targetPlaylistCount) break;
+                    const allArtistIds = candidate.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                    if (allArtistIds.length === 0 && candidate.artistName) {
+                        allArtistIds.push(candidate.artistName.toLowerCase().trim());
+                    }
+                    const albumIdentifier = candidate.album?.id || candidate.album?.uri || candidate.album?.name?.toLowerCase().trim() || candidate.albumName?.toLowerCase().trim();
+
+                    if (allArtistIds.some(id => seenArtists.has(id)) || (albumIdentifier && seenAlbums.has(albumIdentifier))) continue;
+
+                    allArtistIds.forEach(id => seenArtists.add(id));
+                    if (albumIdentifier) seenAlbums.add(albumIdentifier);
+                    finalSelected.push(candidate);
+                    if (candidate.assignedClusterId === primaryAnchorCluster.id) {
+                        anchorClusterSelectedUris.add(candidate.uri);
                     }
                 }
 
-                const track = candidatePool[selectedIdx];
-                candidatePool.splice(selectedIdx, 1);
-
-                const albumIdentifier = track.album?.id || track.album?.uri || track.album?.name?.toLowerCase().trim() || track.albumName?.toLowerCase().trim();
-                const allArtistIds = track.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
-                if (allArtistIds.length === 0 && track.artistName) {
-                    allArtistIds.push(track.artistName.toLowerCase().trim());
+                if (finalSelected.length < targetPlaylistCount) {
+                    const anyRemaining = candidatesWithPop.filter(t => !finalSelected.some(s => s.uri === t.uri));
+                    anyRemaining.sort((a, b) => {
+                        const aIsAnchor = a.assignedClusterId === primaryAnchorCluster.id ? 1 : 0;
+                        const bIsAnchor = b.assignedClusterId === primaryAnchorCluster.id ? 1 : 0;
+                        if (aIsAnchor !== bIsAnchor) return bIsAnchor - aIsAnchor;
+                        return b.finalScore - a.finalScore;
+                    });
+                    for (const candidate of anyRemaining) {
+                        if (finalSelected.length >= targetPlaylistCount) break;
+                        const allArtistIds = candidate.artists?.map(a => a.id || a.uri).filter(Boolean) || [];
+                        if (allArtistIds.some(id => seenArtists.has(id))) continue;
+                        allArtistIds.forEach(id => seenArtists.add(id));
+                        finalSelected.push(candidate);
+                        if (candidate.assignedClusterId === primaryAnchorCluster.id) {
+                            anchorClusterSelectedUris.add(candidate.uri);
+                        }
+                    }
                 }
 
-                const hasArtistCollision = allArtistIds.some(id => seenArtists.has(id));
-                const hasAlbumCollision = albumIdentifier && seenAlbums.has(albumIdentifier);
-
-                if (hasArtistCollision || hasAlbumCollision) {
-                    continue;
+                if (finalSelected.length < targetPlaylistCount) {
+                    for (const candidate of candidatesWithPop) {
+                        if (finalSelected.length >= targetPlaylistCount) break;
+                        if (finalSelected.some(s => s.uri === candidate.uri)) continue;
+                        finalSelected.push(candidate);
+                    }
                 }
-
-                allArtistIds.forEach(id => seenArtists.add(id));
-                if (albumIdentifier) seenAlbums.add(albumIdentifier);
-                finalSelected.push(track);
             }
-            
+
             const tracksToSort = finalSelected.slice(0, targetPlaylistCount);
-            
+
             if (!isHeadless) mainButton.innerText = "Sorting...";
             const validForWave = tracksToSort.filter(t => t.features && t.features.energy != null);
             const others = tracksToSort.filter(t => !t.features || t.features.energy == null);
-            
-            const sortedTracks = await energyWaveSort(validForWave, 'discovery');
+
+            const sortedTracks = await energyWaveSort(validForWave, 'discovery', { anchorUris: anchorClusterSelectedUris });
             const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
-            
+
             const trackUris = finalTracks.map(track => track.uri);
-            
+
             if (!isHeadless) mainButton.innerText = "Creating...";
             const { playlist: newPlaylist, wasUpdated } = await getOrCreateDedicatedPlaylist(vibeType, playlistName, playlistDescription);
-            
+
             if (wasUpdated) {
                 await replacePlaylistTracks(newPlaylist.id, trackUris);
             } else {
                 await addTracksToPlaylist(newPlaylist.id, trackUris);
             }
-            
+
             showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} successfully!`);
             if (!isHeadless) await navigateToPlaylist(newPlaylist);
             return;
@@ -42723,19 +45777,47 @@ shadowRoot.innerHTML = `
             if (validCorpus.length === 0) throw new Error("Could not extract audio features for recent tracks.");
             validCorpus.forEach(item => item.weight /= totalCorpusWeight);
 
+            const genreDocFreq = new Map();
+            validCorpus.forEach(item => {
+                const trackGenreMap = new Map();
+                (item.genres || []).forEach(g => {
+                    if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
+                        trackGenreMap.set(g.name, Math.max(trackGenreMap.get(g.name) || 0, g.score || 0.85));
+                    }
+                });
+                trackGenreMap.forEach((score, name) => {
+                    genreDocFreq.set(name, (genreDocFreq.get(name) || 0) + score);
+                });
+            });
+
+            if (genreDocFreq.size === 0) {
+                validCorpus.forEach(item => {
+                    (item.genres || []).forEach(g => {
+                        genreDocFreq.set(g.name, (genreDocFreq.get(g.name) || 0) + (g.score || 0.85));
+                    });
+                });
+            }
+
+            const topGenreTokens = Array.from(genreDocFreq.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8)
+                .map(e => e[0]);
+
             const dataVectors = validCorpus.map(item => {
                 const f = item.features;
+                const trackGenreSet = new Set((item.genres || []).map(g => g.name));
+                const genreDims = topGenreTokens.map(token => trackGenreSet.has(token) ? 0.35 : 0.0);
                 return [
+                    ...genreDims,
                     (f.energy ?? 50) / 100,
                     (f.valence ?? 50) / 100,
                     (f.danceability ?? 50) / 100,
                     (f.acousticness ?? 50) / 100,
-                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1),
-                    item.genres.length > 0 ? 1.0 : 0.0
+                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1)
                 ];
             });
 
-            const pcaResult = spMath.pca(dataVectors, 0.85, 4);
+            const pcaResult = spMath.pca(dataVectors, 0.85, Math.min(6, dataVectors[0]?.length || 4));
             let projected = pcaResult.projected;
             if (!projected || projected.length === 0 || !projected[0] || projected[0].length === 0) {
                 projected = dataVectors;
@@ -42773,6 +45855,7 @@ shadowRoot.innerHTML = `
 
                 const featureMeans = { e: 0, v: 0, d: 0, a: 0, t: 0 };
                 const genreWeights = new Map();
+                const moodWeights = new Map();
                 let momentumScore = 0;
 
                 members.forEach(m => {
@@ -42784,7 +45867,11 @@ shadowRoot.innerHTML = `
                     featureMeans.t += (((f.tempo || 120) / 220)) * m.normWeight;
 
                     m.item.genres.forEach(g => {
-                        genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                        if (MOOD_DESCRIPTORS_SET.has(g.name)) {
+                            moodWeights.set(g.name, (moodWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                        } else {
+                            genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                        }
                     });
 
                     if (m.item.isPlayed) {
@@ -42792,11 +45879,25 @@ shadowRoot.innerHTML = `
                     }
                 });
 
+                if (genreWeights.size === 0) {
+                    members.forEach(m => {
+                        (m.item.genres || []).forEach(g => {
+                            genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                        });
+                    });
+                }
+
                 const maxGWeight = Math.max(...genreWeights.values(), 1e-6);
                 const normalizedGenreEntries = Array.from(genreWeights.entries())
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 35)
                     .map(([name, weight]) => [name, weight / maxGWeight]);
+
+                const maxMWeight = Math.max(...moodWeights.values(), 1e-6);
+                const normalizedMoodEntries = Array.from(moodWeights.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 20)
+                    .map(([name, weight]) => [name, weight / maxMWeight]);
 
                 const popProfile = new Array(10).fill(0);
                 members.forEach(m => {
@@ -42811,6 +45912,7 @@ shadowRoot.innerHTML = `
                     members,
                     featureMeans,
                     genreProfile: Object.fromEntries(normalizedGenreEntries),
+                    moodProfile: Object.fromEntries(normalizedMoodEntries),
                     popProfile,
                     momentumScore
                 });
@@ -42825,6 +45927,7 @@ shadowRoot.innerHTML = `
                     members,
                     featureMeans,
                     genreProfile: {},
+                    moodProfile: {},
                     popProfile: new Array(10).fill(0.1),
                     momentumScore: 1.0
                 });
@@ -42849,6 +45952,8 @@ shadowRoot.innerHTML = `
             clusters.forEach(c => {
                 if (c.momentumScore > highestMomentum) {
                     highestMomentum = c.momentumScore;
+                    primaryAnchorCluster = c;
+                } else if (c.momentumScore === highestMomentum && c.mass > primaryAnchorCluster.mass) {
                     primaryAnchorCluster = c;
                 }
             });
@@ -42875,9 +45980,8 @@ shadowRoot.innerHTML = `
 
             const clusterSeedMap = new Map();
             const totalTargetSeeds = 32;
-            const seedAuditReport = { clusters: [] };
 
-            for (const cluster of clusters) {
+            await Promise.all(clusters.map(async (cluster) => {
                 const clusterSeedUris = [];
                 const sortedMembers = [...cluster.members].sort((a, b) => b.normWeight - a.normWeight);
                 
@@ -42886,24 +45990,13 @@ shadowRoot.innerHTML = `
                 const playedInCluster = clusterTracks.filter(t => playedTrackUris.has(t.uri));
                 const likedInCluster = clusterTracks.filter(t => !playedTrackUris.has(t.uri));
 
-                const detailedSeedsChosen = [];
-
-                const addTrackSeed = (t, reason) => {
-                    if (t && t.uri && !clusterSeedUris.includes(t.uri)) {
-                        clusterSeedUris.push(t.uri);
-                        detailedSeedsChosen.push({
-                            uri: t.uri,
-                            type: "track",
-                            title: t.songTitle || t.name,
-                            artist: t.artistName || t.artists?.[0]?.name,
-                            reason: reason
-                        });
-                    }
+                const addTrackSeed = (t) => {
+                    if (t && t.uri && !clusterSeedUris.includes(t.uri)) clusterSeedUris.push(t.uri);
                 };
 
-                shuffleArray(playedInCluster).slice(0, 3).forEach(t => addTrackSeed(t, "recent_played_momentum"));
-                shuffleArray(likedInCluster).slice(0, 4).forEach(t => addTrackSeed(t, "recent_liked"));
-                shuffleArray(deepCuts).slice(0, 3).forEach(t => addTrackSeed(t, "cluster_deep_cut"));
+                shuffleArray(playedInCluster).slice(0, 3).forEach(addTrackSeed);
+                shuffleArray(likedInCluster).slice(0, 4).forEach(addTrackSeed);
+                shuffleArray(deepCuts).slice(0, 3).forEach(addTrackSeed);
 
                 const clusterArtists = [];
                 clusterTracks.forEach(t => {
@@ -42912,12 +46005,17 @@ shadowRoot.innerHTML = `
                 });
 
                 if (clusterArtists.length > 0) {
-                    const l1 = await fetchRelatedBatch(clusterArtists, 12);
-                    const l2 = await fetchRelatedBatch(l1, 12);
+                    const l1Raw = await fetchRelatedBatch(clusterArtists, 12);
+                    const l1 = l1Raw.filter(a => !knownArtistIds.has(a.id));
+                    let l2 = [];
+                    if (l1.length > 0) {
+                        const l2Raw = await fetchRelatedBatch(l1, 12);
+                        l2 = l2Raw.filter(a => !knownArtistIds.has(a.id));
+                    }
 
                     const uniqueUnknownsMap = new Map();
                     [...l1, ...l2].forEach(a => {
-                        if (!knownArtistIds.has(a.id) && !uniqueUnknownsMap.has(a.id)) {
+                        if (!uniqueUnknownsMap.has(a.id)) {
                             uniqueUnknownsMap.set(a.id, a);
                         }
                     });
@@ -42926,45 +46024,18 @@ shadowRoot.innerHTML = `
                     const chosenUnknownArtists = shuffleArray(unknownL1L2).slice(0, 6);
                     chosenUnknownArtists.forEach(a => {
                         clusterSeedUris.push(`spotify:artist:${a.id}`);
-                        detailedSeedsChosen.push({
-                            uri: `spotify:artist:${a.id}`,
-                            type: "artist",
-                            artistName: a.name,
-                            reason: "2_hop_unknown_related_artist"
-                        });
                     });
                 }
 
                 let fillIdx = 0;
                 const perClusterTarget = Math.max(14, Math.floor(totalTargetSeeds / clusters.length));
                 while (clusterSeedUris.length < perClusterTarget && fillIdx < clusterTracks.length) {
-                    addTrackSeed(clusterTracks[fillIdx], "cluster_member_topup");
+                    addTrackSeed(clusterTracks[fillIdx]);
                     fillIdx++;
                 }
 
                 clusterSeedMap.set(cluster.id, clusterSeedUris);
-
-                const topCorpusTracksWithGenres = sortedMembers.slice(0, 20).map(m => ({
-                    title: m.item.track.songTitle || m.item.track.name,
-                    artist: m.item.track.artistName || m.item.track.artists?.[0]?.name,
-                    weightInCluster: Math.round(m.normWeight * 1000) / 1000,
-                    nativeSpotifyGenres: m.item.genres.map(g => `${g.name} (${Math.round(g.score * 100)}%)`)
-                }));
-
-                seedAuditReport.clusters.push({
-                    clusterId: cluster.id,
-                    massPct: Math.round(cluster.mass * 100),
-                    momentumScore: cluster.momentumScore,
-                    topClusterGenres: Object.entries(cluster.genreProfile).slice(0, 8),
-                    topCorpusTracksThatBuiltThisCluster: topCorpusTracksWithGenres,
-                    seedsDispatchedToRadio: detailedSeedsChosen
-                });
-            }
-
-            window.__SORT_PLAY_SEED_AUDIT__ = seedAuditReport;
-            console.log("%c=== [SORT-PLAY] SEED & GENRE ORIGIN AUDIT (COPY BELOW) ===", "color: #1ed760; font-size: 14px; font-weight: bold;");
-            console.log(JSON.stringify(seedAuditReport, null, 2));
-            console.log("%c==========================================================", "color: #1ed760; font-size: 14px; font-weight: bold;");
+            }));
 
             const allSeededUrisWithCluster = [];
             clusterSeedMap.forEach((seedUris, clusterId) => {
@@ -43161,19 +46232,37 @@ shadowRoot.innerHTML = `
                     vibeScore = Math.max(0, 100 * Math.exp(-(diffE + diffV + diffT + diffA + diffD) * 1.4));
                 }
 
-                let genreScore = 50;
-                if (track.genres && track.genres.length > 0) {
-                    const matches = track.genres.map(g => cluster.genreProfile[g.name] || 0);
-                    if (matches.length > 0) {
-                        const peak = Math.max(...matches);
-                        const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
-                        genreScore = (peak * 0.70 + avg * 0.30) * 100;
-                    }
-                } else {
-                    genreScore = vibeScore;
+                const musicalGenres = (track.genres || []).filter(g => !MOOD_DESCRIPTORS_SET.has(g.name));
+                const moodGenres = (track.genres || []).filter(g => MOOD_DESCRIPTORS_SET.has(g.name));
+
+                let musicalScore = null;
+                if (musicalGenres.length > 0) {
+                    const matches = musicalGenres.map(g => (cluster.genreProfile[g.name] || 0) * Math.sqrt(g.score || 0.85));
+                    const peak = Math.max(...matches);
+                    const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
+                    musicalScore = (peak * 0.70 + avg * 0.30) * 100;
                 }
 
-                let combinedScore = (vibeScore * 0.50) + (genreScore * 0.50);
+                let moodScore = null;
+                if (moodGenres.length > 0 && cluster.moodProfile) {
+                    const matches = moodGenres.map(g => (cluster.moodProfile[g.name] || 0) * Math.sqrt(g.score || 0.85));
+                    const peak = Math.max(...matches);
+                    const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
+                    moodScore = (peak * 0.70 + avg * 0.30) * 100;
+                }
+
+                let genreComponent;
+                if (musicalScore !== null && moodScore !== null) {
+                    genreComponent = (musicalScore * 0.75) + (moodScore * 0.25);
+                } else if (musicalScore !== null) {
+                    genreComponent = musicalScore;
+                } else if (moodScore !== null) {
+                    genreComponent = (vibeScore * 0.70) + (moodScore * 0.30);
+                } else {
+                    genreComponent = vibeScore;
+                }
+
+                let combinedScore = (vibeScore * 0.50) + (genreComponent * 0.50);
 
                 if (track.popularity !== null && track.popularity !== undefined && cluster.popProfile) {
                     const bucket = Math.min(9, Math.floor(track.popularity / 10));
@@ -43187,22 +46276,30 @@ shadowRoot.innerHTML = `
             candidatesWithPop.forEach(t => {
                 let nativeCluster = clusters.find(c => c.id === t.assignedClusterId) || primaryAnchorCluster;
                 let nativeScore = scoreTrackAgainstClusterProfile(t, nativeCluster);
+                let assignedId = nativeCluster.id;
+                let finalScore = nativeScore;
 
-                if (nativeScore < 60 && clusters.length > 1) {
+                if (clusters.length > 1) {
+                    let bestSiblingId = null;
+                    let bestSiblingScore = -1;
                     for (const sibling of clusters) {
                         if (sibling.id === nativeCluster.id) continue;
                         const siblingScore = scoreTrackAgainstClusterProfile(t, sibling);
-                        if (siblingScore > 78) {
-                            t.assignedClusterId = sibling.id;
-                            nativeScore = siblingScore;
-                            break;
+                        if (siblingScore > bestSiblingScore) {
+                            bestSiblingScore = siblingScore;
+                            bestSiblingId = sibling.id;
                         }
+                    }
+                    if (bestSiblingId !== null && (bestSiblingScore > nativeScore + 15 || (nativeScore < 55 && bestSiblingScore > 72))) {
+                        assignedId = bestSiblingId;
+                        finalScore = bestSiblingScore;
                     }
                 }
 
                 const fuzz = 0.85 + (Math.random() * 0.30);
-                t.finalScore = nativeScore;
-                t.lotteryWeight = Math.pow(Math.max(0.1, nativeScore * fuzz), 2);
+                t.assignedClusterId = assignedId;
+                t.finalScore = finalScore;
+                t.lotteryWeight = Math.pow(Math.max(0.1, finalScore * fuzz), 2);
             });
 
             if (!isHeadless) mainButton.innerText = "Selecting...";
@@ -43213,7 +46310,7 @@ shadowRoot.innerHTML = `
             const anchorClusterSelectedUris = new Set();
 
             for (const cluster of clusters) {
-                const clusterCandidates = candidatesWithPop.filter(t => t.assignedClusterId === cluster.id);
+                const clusterCandidates = candidatesWithPop.filter(t => t.assignedClusterId === cluster.id && t.finalScore >= 30);
                 let needed = cluster.quota;
 
                 while (needed > 0 && clusterCandidates.length > 0) {
@@ -43270,6 +46367,9 @@ shadowRoot.innerHTML = `
 
                     allArtistIds.forEach(id => globalSeenArtists.add(id));
                     finalSelected.push(candidate);
+                    if (candidate.assignedClusterId === primaryAnchorCluster.id) {
+                        anchorClusterSelectedUris.add(candidate.uri);
+                    }
                 }
 
                 if (finalSelected.length < targetPlaylistCount) {
@@ -43282,6 +46382,9 @@ shadowRoot.innerHTML = `
 
                         if (leadArtistId) secondarySeenArtists.add(leadArtistId);
                         finalSelected.push(candidate);
+                        if (candidate.assignedClusterId === primaryAnchorCluster.id) {
+                            anchorClusterSelectedUris.add(candidate.uri);
+                        }
                     }
                 }
 
@@ -43290,6 +46393,9 @@ shadowRoot.innerHTML = `
                         if (finalSelected.length >= targetPlaylistCount) break;
                         if (finalSelected.some(s => s.uri === candidate.uri)) continue;
                         finalSelected.push(candidate);
+                        if (candidate.assignedClusterId === primaryAnchorCluster.id) {
+                            anchorClusterSelectedUris.add(candidate.uri);
+                        }
                     }
                 }
             }
@@ -43397,19 +46503,47 @@ shadowRoot.innerHTML = `
             if (validCorpus.length === 0) throw new Error("Could not extract audio features for all-time tracks.");
             validCorpus.forEach(item => item.weight /= totalCorpusWeight);
 
+            const genreDocFreq = new Map();
+            validCorpus.forEach(item => {
+                const trackGenreMap = new Map();
+                (item.genres || []).forEach(g => {
+                    if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
+                        trackGenreMap.set(g.name, Math.max(trackGenreMap.get(g.name) || 0, g.score || 0.85));
+                    }
+                });
+                trackGenreMap.forEach((score, name) => {
+                    genreDocFreq.set(name, (genreDocFreq.get(name) || 0) + score);
+                });
+            });
+
+            if (genreDocFreq.size === 0) {
+                validCorpus.forEach(item => {
+                    (item.genres || []).forEach(g => {
+                        genreDocFreq.set(g.name, (genreDocFreq.get(g.name) || 0) + (g.score || 0.85));
+                    });
+                });
+            }
+
+            const topGenreTokens = Array.from(genreDocFreq.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8)
+                .map(e => e[0]);
+
             const dataVectors = validCorpus.map(item => {
                 const f = item.features;
+                const trackGenreSet = new Set((item.genres || []).map(g => g.name));
+                const genreDims = topGenreTokens.map(token => trackGenreSet.has(token) ? 0.35 : 0.0);
                 return [
+                    ...genreDims,
                     (f.energy ?? 50) / 100,
                     (f.valence ?? 50) / 100,
                     (f.danceability ?? 50) / 100,
                     (f.acousticness ?? 50) / 100,
-                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1),
-                    item.genres.length > 0 ? 1.0 : 0.0
+                    spMath.clamp(((f.tempo || 120) - 50) / 150, 0, 1)
                 ];
             });
 
-            const pcaResult = spMath.pca(dataVectors, 0.85, 4);
+            const pcaResult = spMath.pca(dataVectors, 0.85, Math.min(6, dataVectors[0]?.length || 4));
             let projected = pcaResult.projected;
             if (!projected || projected.length === 0 || !projected[0] || projected[0].length === 0) {
                 projected = dataVectors;
@@ -43457,9 +46591,19 @@ shadowRoot.innerHTML = `
                     featureMeans.t += (((f.tempo || 120) / 220)) * m.normWeight;
 
                     m.item.genres.forEach(g => {
-                        genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                        if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
+                            genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                        }
                     });
                 });
+
+                if (genreWeights.size === 0) {
+                    members.forEach(m => {
+                        (m.item.genres || []).forEach(g => {
+                            genreWeights.set(g.name, (genreWeights.get(g.name) || 0) + (g.score * m.normWeight));
+                        });
+                    });
+                }
 
                 const maxGWeight = Math.max(...genreWeights.values(), 1e-6);
                 const normalizedGenreEntries = Array.from(genreWeights.entries())
@@ -43535,7 +46679,7 @@ shadowRoot.innerHTML = `
             const pillarSeedMap = new Map();
             const totalTargetSeeds = 34;
 
-            for (const pillar of pillars) {
+            await Promise.all(pillars.map(async (pillar) => {
                 const pillarSeedUris = [];
                 const sortedMembers = [...pillar.members].sort((a, b) => b.normWeight - a.normWeight);
                 const pillarTracks = sortedMembers.map(m => m.item.track);
@@ -43557,18 +46701,30 @@ shadowRoot.innerHTML = `
                 });
 
                 if (pillarArtists.length > 0) {
-                    const l1 = await fetchRelatedBatch(pillarArtists, 12);
-                    const l2 = await fetchRelatedBatch(l1, 12);
+                    const l1Raw = await fetchRelatedBatch(pillarArtists, 12);
+                    const l1 = l1Raw.filter(a => !knownArtistIds.has(a.id));
+                    let l2 = [];
+                    let l3 = [];
+
+                    if (l1.length > 0) {
+                        const l2Raw = await fetchRelatedBatch(l1, 12);
+                        l2 = l2Raw.filter(a => !knownArtistIds.has(a.id));
+                    }
+
+                    if (l2.length >= 2) {
+                        const l3Raw = await fetchRelatedBatch(l2, 12);
+                        l3 = l3Raw.filter(a => !knownArtistIds.has(a.id));
+                    }
 
                     const uniqueUnknownsMap = new Map();
-                    [...l1, ...l2].forEach(a => {
-                        if (!knownArtistIds.has(a.id) && !uniqueUnknownsMap.has(a.id)) {
+                    [...l1, ...l2, ...l3].forEach(a => {
+                        if (!uniqueUnknownsMap.has(a.id)) {
                             uniqueUnknownsMap.set(a.id, a);
                         }
                     });
 
-                    const unknownL1L2 = Array.from(uniqueUnknownsMap.values());
-                    shuffleArray(unknownL1L2).slice(0, 4).forEach(a => {
+                    const unknownL1L2L3 = Array.from(uniqueUnknownsMap.values());
+                    shuffleArray(unknownL1L2L3).slice(0, 6).forEach(a => {
                         pillarSeedUris.push(`spotify:artist:${a.id}`);
                     });
                 }
@@ -43581,7 +46737,7 @@ shadowRoot.innerHTML = `
                 }
 
                 pillarSeedMap.set(pillar.id, pillarSeedUris);
-            }
+            }));
 
             const allSeededUrisWithPillar = [];
             pillarSeedMap.forEach((seedUris, pillarId) => {
@@ -43779,8 +46935,11 @@ shadowRoot.innerHTML = `
                 }
 
                 let genreScore = 50;
-                if (track.genres && track.genres.length > 0) {
-                    const matches = track.genres.map(g => pillar.genreProfile[g.name] || 0);
+                const candidateMusicalGenres = (track.genres || []).filter(g => !MOOD_DESCRIPTORS_SET.has(g.name));
+                const genresToScore = candidateMusicalGenres.length > 0 ? candidateMusicalGenres : track.genres;
+
+                if (genresToScore && genresToScore.length > 0) {
+                    const matches = genresToScore.map(g => (pillar.genreProfile[g.name] || 0) * Math.sqrt(g.score || 0.85));
                     if (matches.length > 0) {
                         const peak = Math.max(...matches);
                         const avg = matches.reduce((sum, val) => sum + val, 0) / matches.length;
@@ -43790,7 +46949,7 @@ shadowRoot.innerHTML = `
                     genreScore = vibeScore;
                 }
 
-                let combinedScore = (vibeScore * 0.50) + (genreScore * 0.50);
+                let combinedScore = candidateMusicalGenres.length > 0 ? (vibeScore * 0.50) + (genreScore * 0.50) : vibeScore;
 
                 if (track.popularity !== null && track.popularity !== undefined && pillar.popProfile) {
                     const bucket = Math.min(9, Math.floor(track.popularity / 10));
@@ -43804,22 +46963,30 @@ shadowRoot.innerHTML = `
             candidatesWithPop.forEach(t => {
                 let nativePillar = pillars.find(p => p.id === t.assignedPillarId) || dominantPillar;
                 let nativeScore = scoreTrackAgainstPillarProfile(t, nativePillar);
+                let assignedId = nativePillar.id;
+                let finalScore = nativeScore;
 
-                if (nativeScore < 60 && pillars.length > 1) {
+                if (pillars.length > 1) {
+                    let bestSiblingId = null;
+                    let bestSiblingScore = -1;
                     for (const sibling of pillars) {
                         if (sibling.id === nativePillar.id) continue;
                         const siblingScore = scoreTrackAgainstPillarProfile(t, sibling);
-                        if (siblingScore > 78) {
-                            t.assignedPillarId = sibling.id;
-                            nativeScore = siblingScore;
-                            break;
+                        if (siblingScore > bestSiblingScore) {
+                            bestSiblingScore = siblingScore;
+                            bestSiblingId = sibling.id;
                         }
+                    }
+                    if (bestSiblingId !== null && (bestSiblingScore > nativeScore + 15 || (nativeScore < 55 && bestSiblingScore > 72))) {
+                        assignedId = bestSiblingId;
+                        finalScore = bestSiblingScore;
                     }
                 }
 
                 const fuzz = 0.85 + (Math.random() * 0.30);
-                t.finalScore = nativeScore;
-                t.lotteryWeight = Math.pow(Math.max(0.1, nativeScore * fuzz), 2);
+                t.assignedPillarId = assignedId;
+                t.finalScore = finalScore;
+                t.lotteryWeight = Math.pow(Math.max(0.1, finalScore * fuzz), 2);
             });
 
             if (!isHeadless) mainButton.innerText = "Selecting...";
@@ -43830,7 +46997,7 @@ shadowRoot.innerHTML = `
             const dominantPillarSelectedUris = new Set();
 
             for (const pillar of pillars) {
-                const pillarCandidates = candidatesWithPop.filter(t => t.assignedPillarId === pillar.id);
+                const pillarCandidates = candidatesWithPop.filter(t => t.assignedPillarId === pillar.id && t.finalScore >= 30);
                 let needed = pillar.quota;
 
                 while (needed > 0 && pillarCandidates.length > 0) {
@@ -43887,6 +47054,9 @@ shadowRoot.innerHTML = `
 
                     allArtistIds.forEach(id => globalSeenArtists.add(id));
                     finalSelected.push(candidate);
+                    if (candidate.assignedPillarId === dominantPillar.id) {
+                        dominantPillarSelectedUris.add(candidate.uri);
+                    }
                 }
 
                 if (finalSelected.length < targetPlaylistCount) {
@@ -43899,6 +47069,9 @@ shadowRoot.innerHTML = `
 
                         if (leadArtistId) secondarySeenArtists.add(leadArtistId);
                         finalSelected.push(candidate);
+                        if (candidate.assignedPillarId === dominantPillar.id) {
+                            dominantPillarSelectedUris.add(candidate.uri);
+                        }
                     }
                 }
 
@@ -43907,6 +47080,9 @@ shadowRoot.innerHTML = `
                         if (finalSelected.length >= targetPlaylistCount) break;
                         if (finalSelected.some(s => s.uri === candidate.uri)) continue;
                         finalSelected.push(candidate);
+                        if (candidate.assignedPillarId === dominantPillar.id) {
+                            dominantPillarSelectedUris.add(candidate.uri);
+                        }
                     }
                 }
             }
@@ -43916,7 +47092,7 @@ shadowRoot.innerHTML = `
             const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
             const others = finalSelected.filter(t => !t.features || t.features.energy == null);
 
-            const sortedTracks = await energyWaveSort(validForWave, 'wave', { anchorUris: dominantPillarSelectedUris });
+            const sortedTracks = await energyWaveSort(validForWave, 'discovery', { anchorUris: dominantPillarSelectedUris });
             const finalTracks = [...sortedTracks, ...others].slice(0, targetPlaylistCount);
             const trackUris = finalTracks.map(track => track.uri);
 
@@ -43976,23 +47152,39 @@ shadowRoot.innerHTML = `
 
         const followedArtistIds = new Set(activeArtists.map(a => a.id));
 
-        const dateLimit = new Date();
-        dateLimit.setUTCHours(0, 0, 0, 0);
+        const now = new Date();
+        const localYear = now.getFullYear();
+        const localMonth = now.getMonth();
+        const localDate = now.getDate();
+        const localDayOfWeek = now.getDay();
         
+        let dateLimit;
         let daysDesc = "";
     
         if (String(newReleasesDaysLimit).startsWith('release-')) {
              const weeks = parseInt(newReleasesDaysLimit.split('-')[1], 10) || 1;
-             const daysSinceLastFriday = (dateLimit.getUTCDay() + 2) % 7;
+             const daysSinceLastFriday = (localDayOfWeek + 2) % 7;
              const totalDaysToSubtract = daysSinceLastFriday + (weeks - 1) * 7;
-             dateLimit.setUTCDate(dateLimit.getUTCDate() - totalDaysToSubtract);
+             const targetLocalDate = new Date(localYear, localMonth, localDate - totalDaysToSubtract);
+             dateLimit = new Date(Date.UTC(targetLocalDate.getFullYear(), targetLocalDate.getMonth(), targetLocalDate.getDate(), 0, 0, 0, 0));
              daysDesc = weeks === 1 ? "this release week" : `the last ${weeks} release weeks`;
         } else {
              const days = parseInt(newReleasesDaysLimit, 10) || 14;
-             dateLimit.setUTCDate(dateLimit.getUTCDate() - days);
+             const targetLocalDate = new Date(localYear, localMonth, localDate - days);
+             dateLimit = new Date(Date.UTC(targetLocalDate.getFullYear(), targetLocalDate.getMonth(), targetLocalDate.getDate(), 0, 0, 0, 0));
              daysDesc = `the last ${days} days`;
         }
     
+        const getAlbumReleaseDate = (dateObj) => {
+            if (!dateObj) return null;
+            if (typeof dateObj === 'string') return dateObj;
+            if (dateObj.isoString) return dateObj.isoString;
+            if (dateObj.year) {
+                return `${dateObj.year}-${String(dateObj.month || 1).padStart(2, '0')}-${String(dateObj.day || 1).padStart(2, '0')}`;
+            }
+            return null;
+        };
+
         const newReleasesMap = new Map();
         
         const BATCH_SIZE = 300;
@@ -44027,16 +47219,18 @@ shadowRoot.innerHTML = `
                 const releases = response.data.artistUnion.discography?.all?.items;
                 if (releases) {
                     for (const release of releases) {
-                        const album = release.releases.items[0];
+                        const album = release.releases?.items?.[0];
+                        if (!album) continue;
                         
                         if (hasFrKeywords && followedReleasesConfig.filterMode === 'exclude' && followedReleasesConfig.filterAlbum && album.name) {
                             const albumMatches = compiledFrRegexes.some(regex => regex.test(album.name));
                             if (albumMatches) continue; 
                         }
 
-                        if (album?.date?.isoString) {
-                            const releaseDate = new Date(album.date.isoString);
-                            if (releaseDate >= dateLimit) {
+                        const albumDate = getAlbumReleaseDate(album?.date);
+                        if (albumDate) {
+                            const releaseDate = new Date(albumDate);
+                            if (!isNaN(releaseDate.getTime()) && releaseDate >= dateLimit) {
                                 newReleasesMap.set(album.uri, album);
                             }
                         }
@@ -44065,7 +47259,7 @@ shadowRoot.innerHTML = `
             const results = await Promise.all(batch.map(async (albumMeta) => {
                 try {
                     const albumId = albumMeta.uri.split(':')[2];
-                    let tracks = await getAlbumTracks(albumId, albumMeta.date?.isoString, false, albumMeta.name);
+                    let tracks = await getAlbumTracks(albumId, getAlbumReleaseDate(albumMeta.date), false, albumMeta.name);
                     
                     if (!tracks || !Array.isArray(tracks)) tracks = [];
 
@@ -44138,7 +47332,7 @@ shadowRoot.innerHTML = `
                     artists: t.track?.artists || (t.artistUris || []).map((u, idx) => ({ id: u.split(':')[2], name: (t.allArtists || "").split(', ')[idx] || 'Unknown' })),
                     album: {
                         name: t.albumName,
-                        release_date: meta.date?.isoString || t.releaseDate,
+                        release_date: getAlbumReleaseDate(meta.date) || t.releaseDate,
                         album_type: meta.type || 'album',
                         total_tracks: 0 
                     }
@@ -44252,7 +47446,7 @@ shadowRoot.innerHTML = `
 
         const trackUris = genuinelyNewTracks.map(track => track.uri);
         const playlistName = "New Releases: Followed";
-        let playlistDescription = `All new releases from artists you follow from ${daysDesc} (since ${dateLimit.toLocaleDateString()}), sorted by release date.`;
+        let playlistDescription = `All new releases from artists you follow from ${daysDesc} (since ${dateLimit.toLocaleDateString(undefined, { timeZone: 'UTC' })}), sorted by release date.`;
         const hasVersionFilters = Object.values(followedReleasesConfig.versions).some(val => val !== 'all');
         if (hasFrKeywords && hasVersionFilters) {
             playlistDescription += ` (Filtered by keywords & versions).`;
@@ -44390,8 +47584,6 @@ shadowRoot.innerHTML = `
   async function discoverTracksViaGenreSearch(selectedGenres, numTracksNeeded, existingTracks = []) {
     const allSearchedTracks = new Map();
     const existingTrackUris = new Set(existingTracks.map(t => t.uri));
-    
-    const SEARCH_HASH = "131fd38c13431be963a851082dca0108a4200998b886e7e9d20a21fc51a36aaf";
 
     for (const genre of selectedGenres) {
         const searchPromises = [];
@@ -44405,12 +47597,7 @@ shadowRoot.innerHTML = `
             };
 
             searchPromises.push(
-                Spicetify.GraphQL.Request({
-                    name: "searchTracks",
-                    operation: "query",
-                    sha256Hash: SEARCH_HASH,
-                    value: null
-                }, variables)
+                Spicetify.GraphQL.Request(GraphQL.Definitions.searchTracks, variables)
                 .catch(e => {
                     console.warn("Internal search failed", e);
                     return null;
@@ -45673,7 +48860,7 @@ shadowRoot.innerHTML = `
     }
 
     if (sortType === "aiPick") {
-        if (!isHeadless && !progressCallback) startProcessing("Preparing...");
+        if (!isHeadless && !progressCallback) startProcessing();
         else if (progressCallback) progressCallback("Preparing...");
     
         try {
@@ -46141,14 +49328,14 @@ shadowRoot.innerHTML = `
         if (isArtistPage) {
             tracksWithPopularity = await processArtistPageTracks(tracks, isHeadless, sortType, progressCallback);
         }
-        else if (sortType === 'deduplicateOnly' || sortType === 'excludeByPlaylist' || sortType === 'filterOnePerArtist' || sortType === 'tasteMatch') {
+        else if (sortType === 'excludeByPlaylist' || sortType === 'filterOnePerArtist' || sortType === 'tasteMatch') {
             updateProgressText("Enriching...");
             
             const tracksWithPlayCounts = await enrichTracksWithPlayCounts(
-              tracks, (progress) => { updateProgressText(`${Math.floor(progress * (sortType === 'excludeByPlaylist' ? 1.0 : 0.40))}%`); }
+              tracks, (progress) => { updateProgressText(`${Math.floor(progress * (sortType === 'excludeByPlaylist' || sortType === 'tasteMatch' ? 1.0 : 0.40))}%`); }
             );
 
-            tracksWithPopularity = sortType === 'excludeByPlaylist'
+            tracksWithPopularity = (sortType === 'excludeByPlaylist' || sortType === 'tasteMatch')
               ? tracksWithPlayCounts
               : await fetchPopularityForMultipleTracks(
                   tracksWithPlayCounts, 
@@ -46246,7 +49433,7 @@ shadowRoot.innerHTML = `
               ? { unique: tracksForDeduplication, removed: [] }
               : await deduplicateTracks(
                   tracksForDeduplication, 
-                  sortType === "deduplicateOnly" || sortType === "filterOnePerArtist", 
+                  sortType === "filterOnePerArtist", 
                   isArtistPage,
                   (progress) => { updateProgressText(`Dedup ${progress}%`); },
                   sortType
@@ -46264,7 +49451,7 @@ shadowRoot.innerHTML = `
               const allStats = await getBatchTrackStats(trackIds, p => updateProgressText(`Audio ${Math.floor(p)}%`));
               
               const tracksWithAllData = uniqueTracks.map(track => {
-                  const id = Spicetify.URI.isLocal(track.uri) ? null : (track.trackId || track.uri.split(":")[2]);
+                  const id = Spicetify.URI.isLocal(track.uri) ? null : (track.trackId || (track.uri ? track.uri.split(":")[2] : null));
                   return {
                       ...track,
                       genres: trackGenreMap.get(track.uri) || [],
@@ -46279,29 +49466,28 @@ shadowRoot.innerHTML = `
               });
               updateProgressText("100%");
           } else if (sortType === "shuffle") {
-            const containsLocalFiles = uniqueTracks.some(track => Spicetify.URI.isLocal(track.uri));
-
-            if (useEnergyWaveShuffle && !containsLocalFiles) {
-                updateProgressText("Analyzing...");
-                const trackIds = uniqueTracks.map(t => t.trackId);
-                const allStats = await getBatchTrackStats(trackIds);
+            if (useEnergyWaveShuffle) {
+                updateProgressText("Audio...");
+                const trackIds = uniqueTracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || (t.uri ? t.uri.split(":")[2] : null))).filter(Boolean);
+                const allStats = await getBatchTrackStats(trackIds, (p) => {
+                    updateProgressText(`Audio ${Math.floor(p)}%`);
+                });
 
                 const tracksWithAudioFeatures = uniqueTracks.map(track => {
-                    const stats = allStats[track.trackId] || {};
+                    const id = Spicetify.URI.isLocal(track.uri) ? null : (track.trackId || (track.uri ? track.uri.split(":")[2] : null));
+                    const stats = id ? (allStats[id] || {}) : {};
                     return { ...track, ...stats, features: stats };
                 });
                 
-                const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-                const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+                const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy != null && track.features.valence != null);
+                const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy == null || track.features.valence == null);
                 missingDataCount = tracksWithoutData.length;
 
+                updateProgressText("Vibe...");
                 const waveSortedTracks = await randomizedEnergyWaveSort(tracksWithData);
 
                 sortedTracks = [...waveSortedTracks, ...shuffleArray(tracksWithoutData)];
             } else {
-                if (useEnergyWaveShuffle && containsLocalFiles && !isHeadless) {
-                    showNotification("Playlist contains local files. Using normal shuffle instead of Vibe & Flow.");
-                }
                 sortedTracks = shuffleArray(uniqueTracks);
             }
           } else if (sortType === "averageColor") {
@@ -46338,23 +49524,6 @@ shadowRoot.innerHTML = `
                           return (colorA.s - colorB.s) * sortOrder;
                       }
                   });
-        } else if (sortType === "deduplicateOnly") {
-            if (removedTracks.length === 0) {
-                showNotification("No duplicate tracks found.");
-                if (!isHeadless && !progressCallback) resetButtons();
-                return;
-            }
-            const originalOrderMap = new Map();
-            tracksForDeduplication.forEach((track, index) => {
-                if (track.uri && !originalOrderMap.has(track.uri)) {
-                    originalOrderMap.set(track.uri, index);
-                }
-            });
-            sortedTracks = uniqueTracks.sort((a, b) => {
-                const orderA = originalOrderMap.get(a.uri);
-                const orderB = originalOrderMap.get(b.uri);
-                return orderA - orderB;
-            });
         } else if (sortType === "filterOnePerArtist") {
             const artistBestTrack = new Map();
             const artistAllTracks = new Map();
@@ -46727,8 +49896,8 @@ shadowRoot.innerHTML = `
             let journeySortedTracks;
             let tracksWithData, tracksWithoutData;
 
-            tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-            tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+            tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy != null && track.features.valence != null);
+            tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy == null || track.features.valence == null);
             
             if (tracksWithData.length < 3) {
                  journeySortedTracks = [...tracksWithData];
@@ -47232,23 +50401,24 @@ shadowRoot.innerHTML = `
                 }
                 
                 if (removedTracks.length > 0 && !isArtistPage) {
-                    showRemovedTracksModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
+                    showFilterReportModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
                 }
                 
+                const vibeSuffix = useEnergyWaveShuffle ? ' with Vibe & Flow' : '';
                 let notificationMsg = sortType === 'shuffle' 
-                    ? `Playlist shuffled${useEnergyWaveShuffle ? ' with Vibe & Flow' : ''}!`
+                    ? `Playlist shuffled${vibeSuffix}!`
                     : `Playlist ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
                 if (isArtistPage) {
-                    notificationMsg = sortType === 'shuffle' ? `Discography of ${finalSourceName} shuffled!` : `Discography of ${finalSourceName} ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                    notificationMsg = sortType === 'shuffle' ? `Discography of ${finalSourceName} shuffled${vibeSuffix}!` : `Discography of ${finalSourceName} ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
                     if (targetPlaylistUriToReplace) {
                         addArtistDiscographyMap(currentUriAtStart, targetPlaylistUriToReplace);
                     }
                 } else if (isAlbumPage) {
-                    notificationMsg = sortType === 'shuffle' ? `Album shuffled!` : `Album ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                    notificationMsg = sortType === 'shuffle' ? `Album shuffled${vibeSuffix}!` : `Album ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
                 } else if (isLikedSongsPage(currentUriAtStart)) {
-                    notificationMsg = sortType === 'shuffle' ? `Liked Songs shuffled!` : `Liked Songs ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                    notificationMsg = sortType === 'shuffle' ? `Liked Songs shuffled${vibeSuffix}!` : `Liked Songs ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
                 } else if (isLocalFilesPage(currentUriAtStart)) {
-                    notificationMsg = sortType === 'shuffle' ? `Local Files shuffled!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                    notificationMsg = sortType === 'shuffle' ? `Local Files shuffled${vibeSuffix}!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
                 }
 
                 if (isArtistPage && !autoHideDiscographyNotification) {
@@ -47274,7 +50444,7 @@ shadowRoot.innerHTML = `
             }
             try {
               if (removedTracks.length > 0 && !isArtistPage) {
-                showRemovedTracksModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
+                showFilterReportModal(removedTracks, sortedTracks.length + removedTracks.length, sortType);
               }
               let playlistDescription = sortType === 'shuffle'
                   ? `Shuffled ${useEnergyWaveShuffle ? 'with Vibe & Flow' : 'randomly'} using Sort-Play`
@@ -47375,17 +50545,18 @@ shadowRoot.innerHTML = `
                   await addPlaylistToLibrary(newPlaylist.uri);
               }
 
+              const vibeSuffix = useEnergyWaveShuffle ? ' with Vibe & Flow' : '';
               let notificationMsg = sortType === 'shuffle' 
-                  ? `Playlist shuffled${useEnergyWaveShuffle ? ' with Vibe & Flow' : ''}!`
+                  ? `Playlist shuffled${vibeSuffix}!`
                   : `Playlist ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
               if (isArtistPage) {
-                  notificationMsg = sortType === 'shuffle' ? `Discography of ${finalSourceName} shuffled!` : `Discography of ${finalSourceName} ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                  notificationMsg = sortType === 'shuffle' ? `Discography of ${finalSourceName} shuffled${vibeSuffix}!` : `Discography of ${finalSourceName} ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
               } else if (isAlbumPage) {
-                  notificationMsg = sortType === 'shuffle' ? `Album shuffled!` : `Album ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                  notificationMsg = sortType === 'shuffle' ? `Album shuffled${vibeSuffix}!` : `Album ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
               } else if (isLikedSongsPage(currentUriAtStart)) {
-                  notificationMsg = sortType === 'shuffle' ? `Liked Songs shuffled!` : `Liked Songs ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                  notificationMsg = sortType === 'shuffle' ? `Liked Songs shuffled${vibeSuffix}!` : `Liked Songs ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
               } else if (isLocalFilesPage(currentUriAtStart)) {
-                  notificationMsg = sortType === 'shuffle' ? `Local Files shuffled!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
+                  notificationMsg = sortType === 'shuffle' ? `Local Files shuffled${vibeSuffix}!` : `Local Files ${actionVerbPresent} by ${sortTypeInfo.fullName}!`;
               }
 
               if (isArtistPage && !autoHideDiscographyNotification) {
@@ -47557,766 +50728,492 @@ shadowRoot.innerHTML = `
       closeAllMenus();
   }
 
-  function getHarmonicCompatibilityScore(camelotKey1, camelotKey2) {
+  function getHarmonicCompatibilityScore(camelotKey1, camelotKey2, tonalityDamping = 1.0) {
     if (!camelotKey1 || !camelotKey2) return 0;
-
-    const num1 = parseInt(camelotKey1.slice(0, -1));
-    const mode1 = camelotKey1.slice(-1); 
-    const num2 = parseInt(camelotKey2.slice(0, -1));
+    const num1 = parseInt(camelotKey1.slice(0, -1), 10);
+    const mode1 = camelotKey1.slice(-1);
+    const num2 = parseInt(camelotKey2.slice(0, -1), 10);
     const mode2 = camelotKey2.slice(-1);
-
     if (isNaN(num1) || isNaN(num2)) return 0;
 
-    if (num1 === num2 && mode1 === mode2) return 100;
-
-    if (num1 === num2 && mode1 !== mode2) return 95;
-
-    const diff = Math.min(Math.abs(num1 - num2), 12 - Math.abs(num1 - num2));
-
-    if (diff === 1 && mode1 === mode2) return 80;
-
-    const isClockwise2 = ((num1 + 2 - 1) % 12 + 1) === num2;
-    if (isClockwise2 && mode1 === mode2) return 60;
-
-    if (diff === 1 && mode1 !== mode2) return 40;
-
-    if ((diff === 7 || diff === 5) && mode1 === mode2) return 30;
-
-    return 0;
+    let base = 0;
+    if (num1 === num2 && mode1 === mode2) base = 100;
+    else if (num1 === num2 && mode1 !== mode2) base = 95;
+    else {
+      const diff = Math.min(Math.abs(num1 - num2), 12 - Math.abs(num1 - num2));
+      if (diff === 1 && mode1 === mode2) base = 80;
+      else if (((num1 + 2 - 1) % 12 + 1) === num2 && mode1 === mode2) base = 60;
+      else if (diff === 1 && mode1 !== mode2) base = 40;
+      else if ((diff === 7 || diff === 5) && mode1 === mode2) base = 30;
+    }
+    return base * tonalityDamping;
   }
 
-  function generateJourneyMap(playlistLength, persona = 'wave') {
-    const patterns = {
-        workout: {
-            core: [
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-                'High-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Positive-Valence',
-            closingOverride: 'Medium-Energy/Positive-Valence'
-        },
-        wave: {
-            core: [
-                'Medium-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-                'High-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Positive-Valence',
-                'Low-Energy/Positive-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Positive-Valence',
-            closingOverride: 'Medium-Energy/Positive-Valence'
-        },
-        chill: {
-            core: [
-                'Medium-Energy/Positive-Valence',
-                'Low-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Low-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Low-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Positive-Valence',
-            closingOverride: 'Low-Energy/Positive-Valence'
-        },
-        focus: {
-            core: [
-                'Medium-Energy/Neutral-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Neutral-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Neutral-Valence',
-            closingOverride: 'Medium-Energy/Neutral-Valence'
-        },
-        party: {
-            core: [
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-                'High-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Positive-Valence',
-            closingOverride: 'High-Energy/Positive-Valence'
-        },
-        discovery: {
-            core: [
-                'Medium-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Positive-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Positive-Valence',
-            closingOverride: 'Medium-Energy/Positive-Valence'
-        },
-        drive: {
-            core: [
-                'Medium-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Neutral-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Neutral-Valence',
-            closingOverride: 'Low-Energy/Neutral-Valence'
-        },
-        morning: {
-            core: [
-                'Low-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'Low-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Positive-Valence',
-            ],
-            openingOverride: 'Low-Energy/Positive-Valence',
-            closingOverride: 'Medium-Energy/Positive-Valence'
-        },
-        gaming: {
-            core: [
-                'High-Energy/Neutral-Valence',
-                'High-Energy/Negative-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'High-Energy/Neutral-Valence',
-                'High-Energy/Negative-Valence',
-                'High-Energy/Neutral-Valence',
-                'Medium-Energy/Negative-Valence',
-                'High-Energy/Neutral-Valence',
-            ],
-            openingOverride: 'High-Energy/Neutral-Valence',
-            closingOverride: 'High-Energy/Neutral-Valence'
-        },
-        rainy: {
-            core: [
-                'Low-Energy/Neutral-Valence',
-                'Low-Energy/Negative-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Medium-Energy/Negative-Valence',
-                'Low-Energy/Negative-Valence',
-                'Low-Energy/Neutral-Valence',
-                'Low-Energy/Negative-Valence',
-                'Medium-Energy/Neutral-Valence',
-            ],
-            openingOverride: 'Low-Energy/Neutral-Valence',
-            closingOverride: 'Low-Energy/Negative-Valence'
-        },
-        pregame: {
-            core: [
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-                'High-Energy/Positive-Valence',
-                'Medium-Energy/Positive-Valence',
-                'High-Energy/Neutral-Valence',
-                'High-Energy/Positive-Valence',
-            ],
-            openingOverride: 'Medium-Energy/Positive-Valence',
-            closingOverride: 'High-Energy/Positive-Valence'
-        }
+  function extractTrackAudioProfile(track) {
+    const f = track.features || track || {};
+    const norm = (val) => (val == null ? null : (val <= 1 ? Number(val) : Number(val) / 100));
+
+    const energy = norm(f.energy) ?? 0.5;
+    let valence = norm(f.valence) ?? 0.5;
+    const danceability = norm(f.danceability) ?? 0.5;
+    const acousticness = norm(f.acousticness) ?? 0.5;
+    const instrumentalness = norm(f.instrumentalness) ?? 0;
+    const speechiness = norm(f.speechiness) ?? 0.1;
+    const loudness = f.loudness != null ? Number(f.loudness) : -10;
+    const tempo = f.tempo ? Number(f.tempo) : 120;
+    const camelotKey = getCamelotKey(f);
+
+    if (loudness > -6.0 && acousticness < 0.05 && energy > 0.75 && (speechiness > 0.12 || tempo > 130)) {
+      valence = Math.min(valence, 0.35 + 0.3 * (1 - energy));
+    }
+
+    const danceDrive = danceability * (1 - 0.7 * acousticness) * (energy >= 0.5 ? 1.0 : Math.max(0.2, energy / 0.5));
+    const normLoudness = Math.max(0, Math.min(1, (loudness + 20) / 16));
+    const intensity = 0.7 * energy + 0.3 * normLoudness;
+    const tonalityWeight = Math.max(0.15, Math.min(1.0, (1 - speechiness * 1.5) * (1 - Math.max(0, instrumentalness - 0.7))));
+
+    let archetype = 'groove';
+    if (acousticness > 0.55 && energy < 0.45) archetype = 'softAcoustic';
+    else if (instrumentalness > 0.45 && energy < 0.60) archetype = 'sadInstrumental';
+    else if (speechiness > 0.20 || (tempo > 130 && speechiness > 0.10)) archetype = 'fastLyrical';
+    else if (energy > 0.70 && valence < 0.40 && loudness > -7.5) archetype = 'sadEnergy';
+    else if (energy > 0.60 && valence >= 0.40) archetype = 'happyEnergy';
+
+    const cleanTitle = getCleanTitle(track.songTitle || track.name || track.track?.name || "");
+    const artistKey = track.artists?.[0]?.id || track.artists?.[0]?.uri || track.artistUris?.[0] || track.track?.artists?.[0]?.id || track.track?.artists?.[0]?.uri || (track.artistName ? track.artistName.toLowerCase().trim() : "unknown");
+    const albumKey = track.album?.id || track.album?.uri || track.albumUri || track.track?.album?.id || track.track?.album?.uri || (track.albumName ? track.albumName.toLowerCase().trim() : "unknown");
+
+    return {
+      energy,
+      valence,
+      danceability,
+      danceDrive,
+      acousticness,
+      instrumentalness,
+      speechiness,
+      loudness,
+      normLoudness,
+      intensity,
+      tempo,
+      camelotKey,
+      tonalityWeight,
+      archetype,
+      cleanTitle,
+      artistKey,
+      albumKey,
+      popularity: track.popularity != null ? Number(track.popularity) : 50
     };
-
-    const selectedPattern = patterns[persona] || patterns.wave;
-    const { core, openingOverride, closingOverride } = selectedPattern;
-    
-    const journeyMap = [];
-
-    for (let i = 0; i < playlistLength; i++) {
-        let step;
-        
-        if (i < core.length) {
-            step = core[i];
-        } else {
-            const phasePosition = i % core.length;
-            step = core[phasePosition];
-            
-            if (i > core.length && Math.random() < 0.15) {
-                const tiers = ['Low', 'Medium', 'High'];
-                const valences = ['Negative-Valence', 'Neutral-Valence', 'Positive-Valence'];
-                
-                const [energyPart] = step.split('/');
-                const currentEnergyIndex = tiers.findIndex(t => energyPart.includes(t));
-                
-                const shift = Math.random() > 0.5 ? 1 : -1;
-                const newEnergyIndex = Math.max(0, Math.min(2, currentEnergyIndex + shift));
-                step = `${tiers[newEnergyIndex]}-Energy/${valences[1 + Math.floor(Math.random() * 2)]}`;
-            }
-        }
-        
-        journeyMap.push(step);
-    }
-    
-    if (playlistLength >= 3) {
-        journeyMap[0] = openingOverride;
-        journeyMap[playlistLength - 1] = closingOverride;
-        
-        if (journeyMap[1]?.includes('High-Energy') && openingOverride.includes('Medium-Energy')) {
-            journeyMap[1] = 'Medium-Energy/Positive-Valence';
-        }
-    }
-    
-    return journeyMap;
   }
-  
+
+  function getTempoScoreWithOctave(lastTempo, candTempo, lastLoudness, candLoudness) {
+    const diffs = [
+      Math.abs(candTempo - lastTempo),
+      Math.abs(candTempo - (lastTempo / 2)),
+      Math.abs(candTempo - (lastTempo * 2)),
+      Math.abs(candTempo - (lastTempo * 2 / 3)),
+      Math.abs(candTempo - (lastTempo * 3 / 2))
+    ];
+    const effectiveDiff = Math.min(...diffs);
+    const pct = (effectiveDiff / Math.max(40, lastTempo)) * 100;
+
+    let score = 0;
+    if (pct < 3.5) score = 65;
+    else if (pct < 7.0) score = 50;
+    else if (pct < 12.0) score = 35;
+    else if (pct < 18.0) score = 15;
+    else if (pct < 25.0) score = -5;
+    else if (pct < 35.0) score = -30;
+    else score = -60;
+
+    if (Math.abs(candLoudness - lastLoudness) > 6.5) {
+      score -= 20;
+    }
+    return score;
+  }
+
+  function buildAdaptiveWaveTrajectory(trackProfiles, persona = 'wave', totalLength, isRandomized = false) {
+    const sortedEnergy = trackProfiles.map(p => p.energy).sort((a, b) => a - b);
+    const sortedValence = trackProfiles.map(p => p.valence).sort((a, b) => a - b);
+    const getQuantile = (arr, q) => arr[Math.floor(Math.max(0, Math.min(arr.length - 1, (arr.length - 1) * q)))];
+
+    let eFloor = getQuantile(sortedEnergy, 0.10);
+    const eMedian = getQuantile(sortedEnergy, 0.50);
+    let eCrest = getQuantile(sortedEnergy, 0.90);
+
+    let vFloor = getQuantile(sortedValence, 0.15);
+    const vMedian = getQuantile(sortedValence, 0.50);
+    let vCrest = getQuantile(sortedValence, 0.85);
+
+    if (persona === 'workout' || persona === 'party') {
+      eFloor = eMedian - 0.25 * (eMedian - eFloor);
+      vFloor = vMedian - 0.20 * (vMedian - vFloor);
+    } else if (persona === 'chill' || persona === 'focus') {
+      eCrest = eMedian + 0.25 * (eCrest - eMedian);
+      vCrest = vMedian + 0.20 * (vCrest - vMedian);
+    }
+
+    const energyVariance = sortedEnergy.reduce((acc, v) => acc + Math.pow(v - eMedian, 2), 0) / sortedEnergy.length;
+    const isFlatline = Math.sqrt(energyVariance) < 0.04;
+
+    let numCycles = 1;
+    if (totalLength >= 37) numCycles = Math.max(3, Math.round(totalLength / 12));
+    else if (totalLength >= 23) numCycles = Math.max(2, Math.round(totalLength / 11));
+    else if (totalLength >= 11) numCycles = 2;
+
+    const baseCycleLen = Math.floor(totalLength / numCycles);
+    let remainder = totalLength % numCycles;
+    const cycleLengths = [];
+    for (let c = 0; c < numCycles; c++) {
+      cycleLengths.push(baseCycleLen + (remainder > 0 ? 1 : 0));
+      if (remainder > 0) remainder--;
+    }
+
+    const chillCount = trackProfiles.filter(p => p.archetype === 'softAcoustic' || p.archetype === 'sadInstrumental').length;
+    const targetChillPerCycle = chillCount === 0 ? 0 : Math.max(1, Math.round(chillCount / numCycles));
+
+    const trajectory = [];
+    const globalPhase = isRandomized ? (Math.random() < 0.5 ? Math.PI : 0) : 0;
+
+    for (let c = 0; c < numCycles; c++) {
+      const len = cycleLengths[c];
+
+      for (let s = 0; s < len; s++) {
+        const t = s / Math.max(1, len - 1);
+        const waveFreq = len <= 6 ? Math.PI : 2 * Math.PI;
+        const waveAngle = waveFreq * t + globalPhase;
+        const sinVal = Math.sin(waveAngle);
+
+        let eTarget, vTarget;
+        if (sinVal >= 0) {
+          eTarget = eMedian + sinVal * (eCrest - eMedian);
+          vTarget = vMedian + sinVal * (vCrest - vMedian);
+        } else {
+          eTarget = eMedian + sinVal * (eMedian - eFloor);
+          vTarget = vMedian + sinVal * (vMedian - vFloor);
+        }
+
+        const locomotionBasin = sinVal > 0.45;
+        const isPalateSlot = sinVal < -0.45;
+
+        trajectory.push({
+          cycleIndex: c,
+          stepIndex: s,
+          targetEnergy: isFlatline ? eMedian : eTarget,
+          targetValence: vTarget,
+          locomotionBasin,
+          isPalateSlot,
+          isCycleEnd: s === len - 1
+        });
+      }
+    }
+
+    return { trajectory, isFlatline, numCycles, targetChillPerCycle, eMedian, vMedian };
+  }
+
   async function energyWaveSort(tracks, persona = 'wave', options = {}) {
-    if (tracks.length < 3) {
-        return tracks;
+    if (!tracks || tracks.length < 3) return tracks || [];
+
+    const profiled = tracks.map(t => ({ track: t, profile: extractTrackAudioProfile(t) }));
+    const validTempos = profiled.map(p => p.profile.tempo).filter(Boolean);
+    const avgTempo = validTempos.length ? validTempos.reduce((a, b) => a + b, 0) / validTempos.length : 120;
+    profiled.forEach(p => { if (!p.profile.tempo) p.profile.tempo = avgTempo; });
+
+    const totalLen = profiled.length;
+    const { trajectory, isFlatline, targetChillPerCycle, eMedian, vMedian } = buildAdaptiveWaveTrajectory(
+      profiled.map(p => p.profile), persona, totalLen
+    );
+
+    let remaining = [...profiled];
+    let opener = null;
+
+    if (options.anchorUris && options.anchorUris.size > 0) {
+      const anchorPool = remaining.filter(p => options.anchorUris.has(p.track.uri));
+      if (anchorPool.length > 0) {
+        anchorPool.sort((a, b) => {
+          const distA = Math.abs(a.profile.energy - eMedian) + Math.abs(a.profile.valence - vMedian);
+          const distB = Math.abs(b.profile.energy - eMedian) + Math.abs(b.profile.valence - vMedian);
+          return distA - distB;
+        });
+        opener = anchorPool[0];
+      }
     }
 
-    const getTier = (val) => {
-        if (val === undefined || val === null) return 'Medium';
-        const normalized = val <= 1 ? val : val / 100;
-        return normalized <= 0.33 ? 'Low' : normalized <= 0.66 ? 'Medium' : 'High';
-    };
-
-    const normalize = (val) => {
-        if (val === undefined || val === null) return null;
-        return val <= 1 ? val : val / 100;
-    };
-
-    const trackProfiles = tracks.map(track => {
-        const f = track.features || {};
-        
-        const energy = normalize(f.energy);
-        const valence = normalize(f.valence);
-        const danceability = normalize(f.danceability);
-        const acousticness = normalize(f.acousticness);
-        const instrumentalness = normalize(f.instrumentalness);
-        const speechiness = normalize(f.speechiness);
-        const liveness = normalize(f.liveness);
-        
-        const moodBucket = `${getTier(energy)}-Energy/${getTier(valence)}-Valence`;
-
-        return {
-            ...track,
-            profile: { 
-                moodBucket, 
-                camelotKey: getCamelotKey(f), 
-                tempo: f.tempo || null,
-                energy: energy ?? 0.5,
-                valence: valence ?? 0.5,
-                danceability: danceability ?? 0.5,
-                acousticness: acousticness ?? 0.5,
-                instrumentalness: instrumentalness ?? 0,
-                speechiness: speechiness ?? 0.1,
-                liveness: liveness ?? 0.2,
-                popularity: track.popularity ?? 50,
-                durationMs: track.duration_ms || f.duration_ms || 200000,
-                cleanTitle: getCleanTitle(track.songTitle || track.name)
-            }
-        };
-    });
-
-    const validTempos = trackProfiles.filter(t => t.profile.tempo !== null).map(t => t.profile.tempo);
-    const avgTempo = validTempos.length > 0 
-        ? validTempos.reduce((a, b) => a + b, 0) / validTempos.length 
-        : 120;
-    
-    trackProfiles.forEach(t => {
-        if (t.profile.tempo === null) t.profile.tempo = avgTempo;
-    });
-
-    const fullJourneyMap = generateJourneyMap(tracks.length, persona);
-
-    const getTempoScore = (lastTempo, candidateTempo) => {
-        const directDiff = Math.abs(candidateTempo - lastTempo);
-        const halfTimeDiff = Math.abs(candidateTempo - (lastTempo / 2));
-        const doubleTimeDiff = Math.abs(candidateTempo - (lastTempo * 2));
-        const thirdTimeDiff = Math.abs(candidateTempo - (lastTempo * 2 / 3));
-        
-        const effectiveDiff = Math.min(directDiff, halfTimeDiff, doubleTimeDiff, thirdTimeDiff);
-        const percentDiff = (effectiveDiff / lastTempo) * 100;
-        
-        if (percentDiff < 3) return 70;
-        if (percentDiff < 6) return 55;
-        if (percentDiff < 10) return 40;
-        if (percentDiff < 15) return 25;
-        if (percentDiff < 22) return 5;
-        if (percentDiff < 32) return -25;
-        if (percentDiff < 45) return -50;
-        return -75;
-    };
-
-    const getMoodMatchScore = (candidateBucket, targetBucket) => {
-        if (candidateBucket === targetBucket) return 100;
-        
-        const [candEnergy, candValence] = candidateBucket.split('/');
-        const [targetEnergy, targetValence] = targetBucket.split('/');
-        
-        let score = 0;
-        
-        if (candEnergy === targetEnergy) {
-            score += 45;
-        } else {
-            const energyTiers = ['Low-Energy', 'Medium-Energy', 'High-Energy'];
-            const candIndex = energyTiers.indexOf(candEnergy);
-            const targetIndex = energyTiers.indexOf(targetEnergy);
-            if (Math.abs(candIndex - targetIndex) === 1) score += 20;
-        }
-        
-        if (candValence === targetValence) {
-            score += 35;
-        } else {
-            const valenceTiers = ['Negative-Valence', 'Neutral-Valence', 'Positive-Valence'];
-            const candIndex = valenceTiers.indexOf(candValence);
-            const targetIndex = valenceTiers.indexOf(targetValence);
-            if (candIndex !== -1 && targetIndex !== -1 && Math.abs(candIndex - targetIndex) === 1) {
-                score += 15;
-            }
-        }
-        
-        return score;
-    };
-
-    const getFlowScore = (lastProfile, candProfile) => {
-        let score = 0;
-        
-        const energyDiff = Math.abs(candProfile.energy - lastProfile.energy);
-        if (energyDiff < 0.12) score += 30;
-        else if (energyDiff < 0.22) score += 15;
-        else if (energyDiff < 0.35) score += 0;
-        else if (energyDiff < 0.50) score -= 15;
-        else score -= 35;
-        
-        const danceDiff = Math.abs(candProfile.danceability - lastProfile.danceability);
-        if (danceDiff < 0.15) score += 20;
-        else if (danceDiff < 0.30) score += 8;
-        else if (danceDiff > 0.50) score -= 15;
-        
-        const acousticDiff = Math.abs(candProfile.acousticness - lastProfile.acousticness);
-        if (acousticDiff < 0.20) score += 18;
-        else if (acousticDiff < 0.40) score += 5;
-        else if (acousticDiff > 0.65) score -= 25;
-        
-        const instrDiff = Math.abs(candProfile.instrumentalness - lastProfile.instrumentalness);
-        if (instrDiff < 0.25) score += 12;
-        else if (instrDiff > 0.70) score -= 18;
-        
-        const valenceDiff = Math.abs(candProfile.valence - lastProfile.valence);
-        if (valenceDiff < 0.15) score += 15;
-        else if (valenceDiff < 0.30) score += 5;
-        else if (valenceDiff > 0.55) score -= 12;
-        
-        return score;
-    };
-
-    const selectOpeningTrack = () => {
-        const targetStart = fullJourneyMap[0];
-        const [targetEnergyTier, targetValenceTier] = targetStart.split('/');
-        
-        let idealEnergyMin, idealEnergyMax, idealValenceMin, idealValenceMax;
-        
-        if (targetEnergyTier === 'High-Energy') { idealEnergyMin = 0.66; idealEnergyMax = 1.0; }
-        else if (targetEnergyTier === 'Medium-Energy') { idealEnergyMin = 0.33; idealEnergyMax = 0.66; }
-        else { idealEnergyMin = 0.0; idealEnergyMax = 0.33; }
-
-        if (targetValenceTier === 'Positive-Valence') { idealValenceMin = 0.66; idealValenceMax = 1.0; }
-        else if (targetValenceTier === 'Neutral-Valence') { idealValenceMin = 0.33; idealValenceMax = 0.66; }
-        else { idealValenceMin = 0.0; idealValenceMax = 0.33; }
-
-        let pool = trackProfiles;
-        if (options.anchorUris && options.anchorUris.size > 0) {
-            const anchorMatches = trackProfiles.filter(t => options.anchorUris.has(t.uri));
-            if (anchorMatches.length > 0) pool = anchorMatches;
-        }
-
-        const candidates = pool.map(t => {
-            let score = 0;
-            
-            score += getMoodMatchScore(t.profile.moodBucket, targetStart);
-            
-            if (t.profile.energy >= idealEnergyMin && t.profile.energy <= idealEnergyMax) score += 30;
-            if (t.profile.valence >= idealValenceMin && t.profile.valence <= idealValenceMax) score += 20;
-
-            if (t.profile.popularity >= 40) score += 20;
-            else if (t.profile.popularity >= 20) score += 10;
-            
-            if (t.profile.instrumentalness > 0.8 && persona !== 'focus') score -= 20;
-            if (t.profile.speechiness > 0.66) score -= 20;
-            
-            score += Math.random() * 15;
-            
-            return { track: t, score };
-        });
-        
-        candidates.sort((a, b) => b.score - a.score);
-        return candidates[0].track;
-    };
-
-    let remainingTracks = [...trackProfiles];
-    const sortedPlaylist = [];
-    
-    const firstTrack = selectOpeningTrack();
-    sortedPlaylist.push(firstTrack);
-    remainingTracks = remainingTracks.filter(t => t.uri !== firstTrack.uri);
-    let lastTrack = firstTrack;
-
-    while (remainingTracks.length > 0) {
-        if (sortedPlaylist.length % 75 === 0) {
-            await new Promise(r => setTimeout(r, 0));
-        }
-
-        const currentPosition = sortedPlaylist.length;
-        const currentJourneyStep = fullJourneyMap[currentPosition] || fullJourneyMap[fullJourneyMap.length - 1];
-        const isNearEnd = currentPosition >= tracks.length - 4;
-        const isFinalTrack = remainingTracks.length === 1;
-        const isSecondToLast = remainingTracks.length === 2;
-        
-        const lastTitle = lastTrack.profile.cleanTitle;
-
-        const scoredCandidates = remainingTracks.map(candidateTrack => {
-            let score = 0;
-            const candProfile = candidateTrack.profile;
-            const lastProfile = lastTrack.profile;
-
-            score += getMoodMatchScore(candProfile.moodBucket, currentJourneyStep);
-
-            const harmonicScore = getHarmonicCompatibilityScore(lastProfile.camelotKey, candProfile.camelotKey);
-            score += harmonicScore * 0.85;
-
-            score += getTempoScore(lastProfile.tempo, candProfile.tempo);
-
-            score += getFlowScore(lastProfile, candProfile);
-
-            if (isNearEnd && !isFinalTrack && persona !== 'party' && persona !== 'workout') {
-                if (candProfile.energy < 0.65) score += 18;
-                if (candProfile.valence > 0.40) score += 12;
-            }
-            
-            if (isSecondToLast) {
-                if (candProfile.energy >= 0.45 && candProfile.energy <= 0.75) score += 15;
-            }
-            
-            if (isFinalTrack) {
-                if (candProfile.energy >= 0.35 && candProfile.energy <= 0.70) score += 30;
-                if (candProfile.valence >= 0.45) score += 25;
-                if (candProfile.popularity >= 40) score += 20;
-                if (candProfile.tempo >= 80 && candProfile.tempo <= 130) score += 15;
-            }
-
-            const candTitle = candProfile.cleanTitle;
-            if (candTitle === lastTitle && candTitle.length > 0) {
-                score -= 1000; 
-            }
-
-            score += Math.random() * 4;
-
-            return { track: candidateTrack, score };
-        });
-
-        scoredCandidates.sort((a, b) => b.score - a.score);
-        const selected = scoredCandidates[0].track;
-
-        sortedPlaylist.push(selected);
-        remainingTracks = remainingTracks.filter(t => t.uri !== selected.uri);
-        lastTrack = selected;
+    if (!opener) {
+      const initialTarget = trajectory[0] || { targetEnergy: eMedian, targetValence: vMedian };
+      const scoredOpeners = remaining.map(p => {
+        const dist = Math.abs(p.profile.energy - initialTarget.targetEnergy) + Math.abs(p.profile.valence - initialTarget.targetValence) * 0.7;
+        const popBonus = (p.profile.popularity || 50) * 0.10;
+        return { item: p, score: 100 - dist * 80 + popBonus };
+      });
+      scoredOpeners.sort((a, b) => b.score - a.score);
+      opener = scoredOpeners[0].item;
     }
 
-    return sortedPlaylist.map(profiledTrack => tracks.find(t => t.uri === profiledTrack.uri));
+    const sorted = [opener];
+    remaining = remaining.filter(p => p !== opener);
+    let last = opener;
+    let currentCycle = 0;
+    let chillInCurrentCycle = (opener.profile.archetype === 'softAcoustic' || opener.profile.archetype === 'sadInstrumental') ? 1 : 0;
+
+    const calcStepScore = (cand, prev, step, remLen) => {
+      const cp = cand.profile;
+      const pp = prev.profile;
+
+      let score = 0;
+      if (!isFlatline) {
+        const eDiff = Math.abs(cp.energy - step.targetEnergy);
+        const vDiff = Math.abs(cp.valence - step.targetValence);
+        score += 100 * Math.exp(-2.2 * (eDiff + 0.6 * vDiff));
+      } else {
+        score += 80;
+      }
+
+      const harmonic = getHarmonicCompatibilityScore(pp.camelotKey, cp.camelotKey, Math.min(pp.tonalityWeight, cp.tonalityWeight));
+      score += harmonic * 0.75;
+
+      score += getTempoScoreWithOctave(pp.tempo, cp.tempo, pp.loudness, cp.loudness);
+
+      if (step.locomotionBasin) {
+        const tempoDist = Math.min(Math.abs(cp.tempo - 120), Math.abs(cp.tempo * 2 - 120));
+        score += 25 * Math.exp(-Math.pow(tempoDist, 2) / 1152) * cp.danceDrive;
+      }
+
+      const isChill = cp.archetype === 'softAcoustic' || cp.archetype === 'sadInstrumental';
+      if (step.isPalateSlot && isChill) score += 35;
+      if (isChill && targetChillPerCycle > 0 && chillInCurrentCycle >= targetChillPerCycle) {
+        score -= 35 * (chillInCurrentCycle - targetChillPerCycle + 1);
+      }
+
+      const eDelta = Math.abs(cp.energy - pp.energy);
+      if (eDelta < 0.15) score += 20;
+      else if (eDelta < 0.30) score += 8;
+      else score -= 25;
+
+      const dDelta = Math.abs(cp.danceDrive - pp.danceDrive);
+      if (dDelta < 0.20) score += 12;
+      else score -= 10;
+
+      if (cp.cleanTitle && cp.cleanTitle === pp.cleanTitle) score -= 1000;
+
+      const relaxFactor = remLen <= 5 ? Math.max(0, remLen / 5) : 1.0;
+      if (relaxFactor > 0.05) {
+        if (sorted.length >= 2) {
+          const p2 = sorted[sorted.length - 2].profile;
+          if (pp.energy < 0.35 && p2.energy < 0.35 && cp.energy < 0.35) score -= 90 * relaxFactor;
+          if (pp.acousticness > 0.70 && p2.acousticness > 0.70 && cp.acousticness > 0.70) score -= 80 * relaxFactor;
+        }
+
+        if (cp.artistKey !== "unknown") {
+          if (cp.artistKey === pp.artistKey) score -= 140 * relaxFactor;
+          else if (sorted.length >= 2 && cp.artistKey === sorted[sorted.length - 2].profile.artistKey) score -= 55 * relaxFactor;
+        }
+
+        if (cp.albumKey !== "unknown" && cp.albumKey === pp.albumKey) score -= 80 * relaxFactor;
+      }
+
+      return score;
+    };
+
+    while (remaining.length > 0) {
+      if (sorted.length % 75 === 0) await fastYield();
+
+      const stepIdx = sorted.length;
+      const step = trajectory[stepIdx] || trajectory[trajectory.length - 1];
+
+      if (step.cycleIndex !== currentCycle) {
+        currentCycle = step.cycleIndex;
+        chillInCurrentCycle = 0;
+      }
+
+      const remLen = remaining.length;
+      const scored = remaining.map(cand => ({
+        item: cand,
+        score: calcStepScore(cand, last, step, remLen)
+      }));
+
+      scored.sort((a, b) => b.score - a.score);
+
+      let chosen = scored[0].item;
+
+      if (remLen > 2 && remLen <= 150) {
+        const topPool = scored.slice(0, Math.min(6, scored.length));
+        const nextStep = trajectory[stepIdx + 1] || step;
+        let bestCombined = -Infinity;
+
+        for (const candidate of topPool) {
+          const subCandidates = scored.filter(s => s.item !== candidate.item).slice(0, Math.min(8, scored.length - 1));
+          let bestSub = -Infinity;
+          for (const sub of subCandidates) {
+            const sc = calcStepScore(sub.item, candidate.item, nextStep, remLen - 1);
+            if (sc > bestSub) bestSub = sc;
+          }
+          const combined = candidate.score + 0.45 * (bestSub === -Infinity ? 0 : bestSub);
+          if (combined > bestCombined) {
+            bestCombined = combined;
+            chosen = candidate.item;
+          }
+        }
+      }
+
+      sorted.push(chosen);
+      remaining = remaining.filter(p => p !== chosen);
+      last = chosen;
+      if (chosen.profile.archetype === 'softAcoustic' || chosen.profile.archetype === 'sadInstrumental') {
+        chillInCurrentCycle++;
+      }
+    }
+
+    return sorted.map(p => p.track);
   }
 
   async function randomizedEnergyWaveSort(tracks, options = {}) {
     const { persona = 'wave', chaos = 0.5 } = options;
-    
-    if (tracks.length < 3) {
-        return [...tracks].sort(() => Math.random() - 0.5);
+    if (!tracks || tracks.length < 3) {
+      return [...(tracks || [])].sort(() => Math.random() - 0.5);
     }
 
-    const normalize = (val) => {
-        if (val === undefined || val === null) return null;
-        return val <= 1 ? val : val / 100;
-    };
+    const profiled = tracks.map(t => ({ track: t, profile: extractTrackAudioProfile(t) }));
+    const validTempos = profiled.map(p => p.profile.tempo).filter(Boolean);
+    const avgTempo = validTempos.length ? validTempos.reduce((a, b) => a + b, 0) / validTempos.length : 120;
+    profiled.forEach(p => { if (!p.profile.tempo) p.profile.tempo = avgTempo; });
 
-    const getTier = (val) => {
-        if (val === undefined || val === null) return 'Medium';
-        const normalized = val <= 1 ? val : val / 100;
-        return normalized <= 0.33 ? 'Low' : normalized <= 0.66 ? 'Medium' : 'High';
-    };
+    const totalLen = profiled.length;
+    const { trajectory, isFlatline, targetChillPerCycle, eMedian, vMedian } = buildAdaptiveWaveTrajectory(
+      profiled.map(p => p.profile), persona, totalLen, true
+    );
 
-    const trackProfiles = tracks.map(track => {
-        const f = track.features || {};
-        
-        const energy = normalize(f.energy);
-        const valence = normalize(f.valence);
-        const danceability = normalize(f.danceability);
-        const acousticness = normalize(f.acousticness);
-        const instrumentalness = normalize(f.instrumentalness);
-        
-        const moodBucket = `${getTier(energy)}-Energy/${getTier(valence)}-Valence`;
+    let remaining = [...profiled];
 
-        return {
-            ...track,
-            profile: { 
-                moodBucket, 
-                camelotKey: getCamelotKey(f), 
-                tempo: f.tempo || null,
-                energy: energy ?? 0.5,
-                valence: valence ?? 0.5,
-                danceability: danceability ?? 0.5,
-                acousticness: acousticness ?? 0.5,
-                instrumentalness: instrumentalness ?? 0,
-                popularity: track.popularity ?? 50,
-                cleanTitle: getCleanTitle(track.songTitle || track.name)
-            }
-        };
+    const initialTarget = trajectory[0] || { targetEnergy: eMedian, targetValence: vMedian };
+    const scoredOpeners = remaining.map(p => {
+      const dist = Math.abs(p.profile.energy - initialTarget.targetEnergy) + Math.abs(p.profile.valence - initialTarget.targetValence) * 0.7;
+      const popBonus = (p.profile.popularity || 50) * 0.10;
+      return { item: p, score: 100 - dist * 80 + popBonus };
     });
+    scoredOpeners.sort((a, b) => b.score - a.score);
+    const openerPoolSize = Math.max(3, Math.floor(scoredOpeners.length * 0.15));
+    const openerPool = scoredOpeners.slice(0, openerPoolSize);
+    const opener = openerPool[Math.floor(Math.random() * openerPool.length)].item;
 
-    const validTempos = trackProfiles.filter(t => t.profile.tempo !== null).map(t => t.profile.tempo);
-    const avgTempo = validTempos.length > 0 
-        ? validTempos.reduce((a, b) => a + b, 0) / validTempos.length 
-        : 120;
-    
-    trackProfiles.forEach(t => {
-        if (t.profile.tempo === null) t.profile.tempo = avgTempo;
-    });
+    const sorted = [opener];
+    remaining = remaining.filter(p => p !== opener);
+    let last = opener;
+    let currentCycle = 0;
+    let chillInCurrentCycle = (opener.profile.archetype === 'softAcoustic' || opener.profile.archetype === 'sadInstrumental') ? 1 : 0;
 
-    const getPoolSize = (remainingCount, chaosLevel) => {
-        let baseSize;
-        if (remainingCount <= 10) baseSize = 2;
-        else if (remainingCount <= 25) baseSize = 3;
-        else if (remainingCount <= 50) baseSize = 4;
-        else if (remainingCount <= 100) baseSize = 5;
-        else baseSize = 6;
-        
-        const chaosAdjustment = Math.floor((chaosLevel - 0.5) * 4);
-        const finalSize = Math.max(2, Math.min(remainingCount, baseSize + chaosAdjustment));
-        
-        return finalSize;
-    };
+    const calcStepScore = (cand, prev, step, remLen) => {
+      const cp = cand.profile;
+      const pp = prev.profile;
 
-    const getTempoScore = (lastTempo, candidateTempo) => {
-        const directDiff = Math.abs(candidateTempo - lastTempo);
-        const halfTimeDiff = Math.abs(candidateTempo - (lastTempo / 2));
-        const doubleTimeDiff = Math.abs(candidateTempo - (lastTempo * 2));
-        const thirdTimeDiff = Math.abs(candidateTempo - (lastTempo * 2 / 3));
-        
-        const effectiveDiff = Math.min(directDiff, halfTimeDiff, doubleTimeDiff, thirdTimeDiff);
-        const percentDiff = (effectiveDiff / lastTempo) * 100;
-        
-        if (percentDiff < 3) return 70;
-        if (percentDiff < 6) return 55;
-        if (percentDiff < 10) return 40;
-        if (percentDiff < 15) return 25;
-        if (percentDiff < 22) return 5;
-        if (percentDiff < 32) return -25;
-        if (percentDiff < 45) return -50;
-        return -75;
-    };
+      let score = 0;
+      if (!isFlatline) {
+        const eDiff = Math.abs(cp.energy - step.targetEnergy);
+        const vDiff = Math.abs(cp.valence - step.targetValence);
+        score += 100 * Math.exp(-2.2 * (eDiff + 0.6 * vDiff));
+      } else {
+        score += 80;
+      }
 
-    const getMoodMatchScore = (candidateBucket, targetBucket) => {
-        if (candidateBucket === targetBucket) return 100;
-        
-        const [candEnergy, candValence] = candidateBucket.split('/');
-        const [targetEnergy, targetValence] = targetBucket.split('/');
-        
-        let score = 0;
-        
-        if (candEnergy === targetEnergy) {
-            score += 45;
-        } else {
-            const energyTiers = ['Low-Energy', 'Medium-Energy', 'High-Energy'];
-            const candIndex = energyTiers.indexOf(candEnergy);
-            const targetIndex = energyTiers.indexOf(targetEnergy);
-            if (Math.abs(candIndex - targetIndex) === 1) score += 20;
-        }
-        
-        if (candValence === targetValence) {
-            score += 35;
-        } else {
-            const valenceTiers = ['Negative-Valence', 'Neutral-Valence', 'Positive-Valence'];
-            const candIndex = valenceTiers.indexOf(candValence);
-            const targetIndex = valenceTiers.indexOf(targetValence);
-            if (candIndex !== -1 && targetIndex !== -1 && Math.abs(candIndex - targetIndex) === 1) {
-                score += 15;
-            }
-        }
-        
-        return score;
-    };
+      const harmonic = getHarmonicCompatibilityScore(pp.camelotKey, cp.camelotKey, Math.min(pp.tonalityWeight, cp.tonalityWeight));
+      score += harmonic * 0.75;
 
-    const getFlowScore = (lastProfile, candProfile) => {
-        let score = 0;
-        
-        const energyDiff = Math.abs(candProfile.energy - lastProfile.energy);
-        if (energyDiff < 0.12) score += 25;
-        else if (energyDiff < 0.22) score += 12;
-        else if (energyDiff < 0.35) score += 0;
-        else if (energyDiff < 0.50) score -= 10;
-        else score -= 25;
-        
-        const danceDiff = Math.abs(candProfile.danceability - lastProfile.danceability);
-        if (danceDiff < 0.15) score += 15;
-        else if (danceDiff < 0.30) score += 6;
-        else if (danceDiff > 0.50) score -= 12;
-        
-        const acousticDiff = Math.abs(candProfile.acousticness - lastProfile.acousticness);
-        if (acousticDiff < 0.20) score += 15;
-        else if (acousticDiff < 0.40) score += 4;
-        else if (acousticDiff > 0.65) score -= 20;
-        
-        const instrDiff = Math.abs(candProfile.instrumentalness - lastProfile.instrumentalness);
-        if (instrDiff < 0.25) score += 10;
-        else if (instrDiff > 0.70) score -= 15;
-        
-        return score;
-    };
+      score += getTempoScoreWithOctave(pp.tempo, cp.tempo, pp.loudness, cp.loudness);
 
-    const weightedRandomSelect = (candidates, chaosLevel) => {
-        if (candidates.length === 0) return null;
-        if (candidates.length === 1) return candidates[0];
-        
-        const minScore = Math.min(...candidates.map(c => c.score));
-        const normalizedCandidates = candidates.map(c => ({
-            ...c,
-            normalizedScore: c.score - minScore + 10
-        }));
-        
-        const flatteningPower = 1 - (chaosLevel * 0.8);
-        const weightedCandidates = normalizedCandidates.map(c => ({
-            ...c,
-            weight: Math.pow(c.normalizedScore, flatteningPower)
-        }));
-        
-        const totalWeight = weightedCandidates.reduce((sum, c) => sum + c.weight, 0);
-        
-        let random = Math.random() * totalWeight;
-        for (const candidate of weightedCandidates) {
-            random -= candidate.weight;
-            if (random <= 0) {
-                return candidate;
-            }
-        }
-        
-        return weightedCandidates[weightedCandidates.length - 1];
-    };
+      if (step.locomotionBasin) {
+        const tempoDist = Math.min(Math.abs(cp.tempo - 120), Math.abs(cp.tempo * 2 - 120));
+        score += 25 * Math.exp(-Math.pow(tempoDist, 2) / 1152) * cp.danceDrive;
+      }
 
-    const fullJourneyMap = generateJourneyMap(tracks.length, persona);
+      const isChill = cp.archetype === 'softAcoustic' || cp.archetype === 'sadInstrumental';
+      if (step.isPalateSlot && isChill) score += 35;
+      if (isChill && targetChillPerCycle > 0 && chillInCurrentCycle >= targetChillPerCycle) {
+        score -= 35 * (chillInCurrentCycle - targetChillPerCycle + 1);
+      }
 
-    const selectOpeningTrack = () => {
-        const candidates = trackProfiles.map(t => {
-            let score = 0;
-            
-            score += getMoodMatchScore(t.profile.moodBucket, fullJourneyMap[0]) * 0.7;
-            
-            if (t.profile.energy >= 0.40 && t.profile.energy <= 0.72) score += 35;
-            if (t.profile.valence >= 0.45) score += 25;
-            if (t.profile.tempo >= 85 && t.profile.tempo <= 135) score += 15;
-            
-            score += Math.random() * 30 * chaos;
-            
-            return { track: t, score };
-        });
-        
-        candidates.sort((a, b) => b.score - a.score);
-        
-        const openerPoolSize = Math.max(2, Math.floor(3 + chaos * 4));
-        const topOpeners = candidates.slice(0, Math.min(openerPoolSize, candidates.length));
-        
-        return weightedRandomSelect(topOpeners, chaos).track;
-    };
+      const eDelta = Math.abs(cp.energy - pp.energy);
+      if (eDelta < 0.15) score += 20;
+      else if (eDelta < 0.30) score += 8;
+      else score -= 25;
 
-    let remainingTracks = [...trackProfiles];
-    const sortedPlaylist = [];
+      const dDelta = Math.abs(cp.danceDrive - pp.danceDrive);
+      if (dDelta < 0.20) score += 12;
+      else score -= 10;
 
-    const firstTrack = selectOpeningTrack();
-    sortedPlaylist.push(firstTrack);
-    remainingTracks = remainingTracks.filter(t => t.uri !== firstTrack.uri);
-    let lastTrack = firstTrack;
+      if (cp.cleanTitle && cp.cleanTitle === pp.cleanTitle) score -= 1000;
 
-    while (remainingTracks.length > 0) {
-        if (sortedPlaylist.length % 75 === 0) {
-            await new Promise(r => setTimeout(r, 0));
+      const relaxFactor = remLen <= 5 ? Math.max(0, remLen / 5) : 1.0;
+      if (relaxFactor > 0.05) {
+        if (sorted.length >= 2) {
+          const p2 = sorted[sorted.length - 2].profile;
+          if (pp.energy < 0.35 && p2.energy < 0.35 && cp.energy < 0.35) score -= 90 * relaxFactor;
+          if (pp.acousticness > 0.70 && p2.acousticness > 0.70 && cp.acousticness > 0.70) score -= 80 * relaxFactor;
         }
 
-        const currentPosition = sortedPlaylist.length;
-        const currentJourneyStep = fullJourneyMap[currentPosition] || fullJourneyMap[fullJourneyMap.length - 1];
-        const isNearEnd = currentPosition >= tracks.length - 3;
-        const isFinalTrack = remainingTracks.length === 1;
+        if (cp.artistKey !== "unknown") {
+          if (cp.artistKey === pp.artistKey) score -= 140 * relaxFactor;
+          else if (sorted.length >= 2 && cp.artistKey === sorted[sorted.length - 2].profile.artistKey) score -= 55 * relaxFactor;
+        }
 
-        const lastTitle = lastTrack.profile.cleanTitle;
+        if (cp.albumKey !== "unknown" && cp.albumKey === pp.albumKey) score -= 80 * relaxFactor;
+      }
 
-        const scoredCandidates = remainingTracks.map(candidateTrack => {
-            let score = 0;
-            const candProfile = candidateTrack.profile;
-            const lastProfile = lastTrack.profile;
+      if (remLen <= 3) {
+        const loopHarmonic = getHarmonicCompatibilityScore(cp.camelotKey, opener.profile.camelotKey, Math.min(cp.tonalityWeight, opener.profile.tonalityWeight));
+        const loopTempo = getTempoScoreWithOctave(cp.tempo, opener.profile.tempo, cp.loudness, opener.profile.loudness);
+        score += (loopHarmonic * 0.35 + loopTempo * 0.25) * (4 - remLen) * 0.33;
+      }
 
-            score += getMoodMatchScore(candProfile.moodBucket, currentJourneyStep) * 0.85;
+      score += (Math.random() - 0.5) * 20 * chaos;
+      return score;
+    };
 
-            const harmonicScore = getHarmonicCompatibilityScore(lastProfile.camelotKey, candProfile.camelotKey);
-            score += harmonicScore * 0.75;
+    while (remaining.length > 0) {
+      if (sorted.length % 75 === 0) await fastYield();
 
-            score += getTempoScore(lastProfile.tempo, candProfile.tempo);
+      const stepIdx = sorted.length;
+      const step = trajectory[stepIdx] || trajectory[trajectory.length - 1];
 
-            score += getFlowScore(lastProfile, candProfile) * 0.8;
+      if (step.cycleIndex !== currentCycle) {
+        currentCycle = step.cycleIndex;
+        chillInCurrentCycle = 0;
+      }
 
-            if (isFinalTrack) {
-                if (candProfile.energy >= 0.35 && candProfile.energy <= 0.70) score += 20;
-                if (candProfile.valence >= 0.45) score += 15;
-            }
+      const remLen = remaining.length;
+      const scored = remaining.map(cand => ({
+        item: cand,
+        score: calcStepScore(cand, last, step, remLen)
+      }));
 
-            if (isNearEnd && !isFinalTrack && persona !== 'party') {
-                if (candProfile.energy < 0.65) score += 12;
-            }
+      scored.sort((a, b) => b.score - a.score);
 
-            const candTitle = candProfile.cleanTitle;
-            if (candTitle === lastTitle && candTitle.length > 0) {
-                score -= 500;
-            }
+      const poolSize = Math.max(1, Math.min(remaining.length, Math.floor(3 + chaos * 3)));
+      const topPool = scored.slice(0, poolSize);
+      const minScore = topPool[topPool.length - 1].score;
+      const weighted = topPool.map(c => ({
+        item: c.item,
+        weight: Math.pow(Math.max(1, c.score - minScore + 10), 1.0 - chaos * 0.5)
+      }));
+      const totalWeight = weighted.reduce((sum, w) => sum + w.weight, 0);
 
-            return { track: candidateTrack, score };
-        });
+      let r = Math.random() * totalWeight;
+      let chosen = topPool[0].item;
+      for (const w of weighted) {
+        r -= w.weight;
+        if (r <= 0) {
+          chosen = w.item;
+          break;
+        }
+      }
 
-        scoredCandidates.sort((a, b) => b.score - a.score);
-
-        const poolSize = getPoolSize(remainingTracks.length, chaos);
-        const topCandidates = scoredCandidates.slice(0, Math.min(poolSize, scoredCandidates.length));
-
-        const selected = weightedRandomSelect(topCandidates, chaos);
-
-        sortedPlaylist.push(selected.track);
-        remainingTracks = remainingTracks.filter(t => t.uri !== selected.track.uri);
-        lastTrack = selected.track;
+      sorted.push(chosen);
+      remaining = remaining.filter(p => p !== chosen);
+      last = chosen;
+      if (chosen.profile.archetype === 'softAcoustic' || chosen.profile.archetype === 'sadInstrumental') {
+        chillInCurrentCycle++;
+      }
     }
 
-    return sortedPlaylist.map(profiledTrack => tracks.find(t => t.uri === profiledTrack.uri));
+    return sorted.map(p => p.track);
   }
 
   const BASIC_SORT_TYPES = [
@@ -48572,12 +51469,11 @@ shadowRoot.innerHTML = `
     return breakUpClusters(shuffled);
   }
 
-  function showRemovedTracksModal(removedTracks, totalOriginalCount, sortType = 'deduplicateOnly') {
+  function showFilterReportModal(removedTracks, totalOriginalCount, sortType) {
     const isExclusion = sortType === 'excludeByPlaylist';
-    const isOnePerArtist = sortType === 'filterOnePerArtist';
-    const modalTitle = isExclusion ? "Excluded Tracks Report" : (isOnePerArtist ? "Artist Duplicates Removed" : "Removed Duplicate Tracks");
-    const summaryLabel = isExclusion ? "Tracks Excluded" : (isOnePerArtist ? "Other Artist Tracks" : "Duplicate Tracks Removed");
-    const fileName = isExclusion ? "sort-play_excluded_tracks.json" : (isOnePerArtist ? "sort-play_artist_duplicates.json" : "sort-play_removed_duplicates.json");
+    const modalTitle = isExclusion ? "Excluded Tracks Report" : "Artist Duplicates Removed";
+    const summaryLabel = isExclusion ? "Tracks Excluded" : "Other Artist Tracks";
+    const fileName = isExclusion ? "sort-play_excluded_tracks.json" : "sort-play_artist_duplicates.json";
 
     const overlay = document.createElement("div");
     overlay.id = "sort-play-removed-tracks-overlay";
@@ -48633,34 +51529,10 @@ shadowRoot.innerHTML = `
     });
 
     const renderTrackRow = (track, type, indexText = "", isLast = false, isStandalone = false) => {
-        const title = track.songTitle || track.name || 'Unknown Title';
-        const artist = track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist';
-        const album = track.albumName || (track.album && track.album.name) || 'Unknown Album';
-        const uri = track.uri || 'N/A';
-        
-        const durationMs = track.durationMs || track.durationMilis || track.track?.duration_ms || 0;
-        const duration = formatDuration(durationMs);
-        
-        let playCount = track.playCount || track.playcount;
-        if (playCount === undefined || playCount === null || playCount === "N/A" || playCount === "") {
-            playCount = "N/A";
-        } else {
-            playCount = Number(playCount).toLocaleString();
-        }
-
-        let trackLink = uri;
-        if (uri.startsWith('spotify:track:')) {
-            trackLink = uri.replace('spotify:track:', 'https://open.spotify.com/track/');
-        } else if (uri.startsWith('spotify:local:')) {
-            trackLink = 'Local File';
-        }
-
-        let coverUrl = '/api/placeholder/40/40';
-        const images = track.track?.album?.images || track.album?.images || [];
-        if (images && images.length > 0) {
-            coverUrl = images[images.length - 1].url || images[0].url;
-        }
-        const needsCoverLoad = coverUrl === '/api/placeholder/40/40';
+        const { title, artist, album, uri, duration, trackLink, albumLink, coverUrl, needsCoverLoad, rawPlays } = getAuditTrackInfo(track);
+        const playCount = (rawPlays === undefined || rawPlays === null || rawPlays === "N/A" || rawPlays === "")
+            ? "N/A"
+            : Number(rawPlays).toLocaleString();
 
         let typeClass = '';
         let badgeHtml = '';
@@ -48677,9 +51549,12 @@ shadowRoot.innerHTML = `
 
         return `
             <div class="track-item ${typeClass}">
-                <div class="track-text-wrapper" style="flex-direction: row; align-items: center; gap: 12px; min-width: 0;">
-                    ${indexText ? `<span style="color: #b3b3b3; font-variant-numeric: tabular-nums; width: 24px; text-align: right; font-size: 13px; flex-shrink: 0;">${indexText}</span>` : ''}
-                    <img src="${coverUrl}" data-track-uri="${uri}" class="track-item-cover" style="opacity: ${needsCoverLoad ? '0' : '1'}; flex-shrink: 0;">
+                <div class="track-text-wrapper" style="flex-direction: row; align-items: center; gap: 10px; min-width: 0;">
+                    ${indexText ? `<span style="color: #b3b3b3; font-variant-numeric: tabular-nums; width: 20px; text-align: right; font-size: 13px; flex-shrink: 0;">${indexText}</span>` : ''}
+                    ${type === 'kept' ? `<div class="tree-root-slot"><div class="tree-root-dot"></div></div>` : ''}
+                    <div class="main-image-container">
+                        <img aria-hidden="false" draggable="false" loading="eager" src="${coverUrl}" alt="" class="main-image-image2 main-trackList-rowImage track-item-cover" width="36" height="36" style="border-radius: 4px; opacity: ${needsCoverLoad ? '0' : '1'};" data-track-uri="${uri}">
+                    </div>
                     <div style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; min-width: 0;">
                         <span class="track-item-title" title="${escapeHtml(title)}">${escapeHtml(title)}</span>
                         <div class="track-item-artist-wrapper" title="${escapeHtml(artist)} • ${escapeHtml(album)}">
@@ -48694,13 +51569,8 @@ shadowRoot.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0; padding-left: 16px;">
                     <div title="Plays" style="width: 100px; text-align: center; color: #b3b3b3; font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${playCount}</div>
                     <div title="Duration" style="width: 50px; text-align: center; color: #b3b3b3; font-size: 13px; font-variant-numeric: tabular-nums;">${duration}</div>
-                    <div style="display: flex; gap: 6px; justify-content: flex-end; width: 72px;">
-                        <button class="copy-track-button copy-uri" data-link="${trackLink}" title="Copy Spotify Link">
-                            ${linkIconSVG}
-                        </button>
-                        <button class="copy-track-button copy-text" data-title="${escapeHtml(title)}" data-artist="${escapeHtml(artist)}" title="Copy 'Track - Artist'">
-                            ${copyIconSVG}
-                        </button>
+                    <div style="display: flex; gap: 6px; justify-content: flex-end; width: 32px;">
+                        <button class="row-menu-btn" data-title="${escapeHtml(title)}" data-artist="${escapeHtml(artist)}" data-track-link="${trackLink}" data-album-link="${albumLink}" title="More options">${threeDotsSvg}</button>
                     </div>
                 </div>
             </div>
@@ -48758,20 +51628,24 @@ shadowRoot.innerHTML = `
         .duplicate-group { background-color: rgba(255,255,255,0.02); border: 1px solid #333; border-radius: 8px; margin-bottom: 8px; overflow: hidden; display: flex; flex-direction: column; }
         .removed-items-container { background-color: rgba(0,0,0,0.15); display: flex; flex-direction: column; }
         .track-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; flex: 1; min-width: 0; transition: background-color 0.2s; }
-        .track-item.kept-track { background-color: rgba(30, 215, 96, 0.05); }
+        .track-item.kept-track { position: relative; background-color: rgba(30, 215, 96, 0.05); }
         .track-item.kept-track:hover { background-color: rgba(30, 215, 96, 0.1); }
-        .track-item.removed-track { background-color: transparent; border-bottom: 1px solid rgba(255,255,255,0.03); padding-left: 48px; position: relative; }
+        .track-item.kept-track::after { content: ''; position: absolute; left: 50px; top: 50%; bottom: 0; border-left: 2px solid #555; }
+        .tree-root-slot { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; z-index: 1; }
+        .tree-root-dot { width: 7px; height: 7px; background-color: #1ed760; border-radius: 50%; box-shadow: 0 0 5px rgba(30, 215, 96, 0.5); }
+        .track-item.removed-track { background-color: transparent; border-bottom: 1px solid rgba(255,255,255,0.03); padding-left: 68px; position: relative; }
         .track-item.removed-track:hover { background-color: rgba(241, 94, 108, 0.08); }
         .track-item.removed-track:last-child { border-bottom: none; }
         .track-item.removed-track.standalone { padding-left: 12px; }
         .track-item.removed-track.standalone::before, .track-item.removed-track.standalone::after { display: none !important; }
-        .track-item.removed-track::before { content: ''; position: absolute; left: 24px; top: 0; bottom: 0; border-left: 2px solid #555; }
-        .track-item.removed-track:first-child::before { top: -8px; }
-        .track-item.removed-track::after { content: ''; position: absolute; left: 24px; top: 50%; width: 16px; border-top: 2px solid #555; }
-        .track-item.removed-track.last-removed::before { bottom: 50%; border-bottom-left-radius: 8px; border-left: 2px solid #555; border-bottom: 2px solid #555; width: 16px; }
+        .track-item.removed-track::before { content: ''; position: absolute; left: 50px; top: 0; bottom: 0; border-left: 2px solid #555; }
+        .track-item.removed-track:first-child::before { top: 0; }
+        .track-item.removed-track::after { content: ''; position: absolute; left: 50px; top: 50%; width: 12px; border-top: 2px solid #555; }
+        .track-item.removed-track.last-removed::before { bottom: 50%; border-bottom-left-radius: 6px; border-left: 2px solid #555; border-bottom: 2px solid #555; width: 12px; }
         .track-item.removed-track.last-removed::after { display: none; }
         .track-text-wrapper { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; padding-right: 12px; }
-        .track-item-cover { width: 36px; height: 36px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background-color: #3e3e3e; transition: opacity 0.3s ease; }
+        .main-image-container { width: 36px; height: 36px; min-width: 36px; min-height: 36px; border-radius: 4px; background-color: #282828; position: relative; aspect-ratio: 1 / 1; flex-shrink: 0; }
+        .main-image-image2 { position: absolute; top: 0; left: 0; width: 100%; height: 100%; transition: opacity 0.3s ease; object-fit: cover; border-radius: 4px; }
         .track-item-title { color: #e0e0e0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
         .track-item-artist-wrapper { display: flex; font-size: 12px; color: #b3b3b3; min-width: 0; margin-top: 2px; }
         .track-item-artist-names { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; }
@@ -48779,10 +51653,14 @@ shadowRoot.innerHTML = `
         .track-badge { font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 3px 0; border-radius: 4px; letter-spacing: 0.5px; margin-top: 1px; width: 80px; text-align: center; display: inline-block; }
         .kept-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); }
         .removed-badge { background-color: rgba(241, 94, 108, 0.15); color: #f15e6c; border: 1px solid rgba(241, 94, 108, 0.3); }
-        .copy-track-button { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; color: #b3b3b3; padding: 8px 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 6px; transition: background-color 0.2s, color 0.2s, border-color 0.2s; }
-        .copy-track-button:hover { color: white; background-color: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
-        .copy-track-button svg { width: 14px; height: 14px; }
-        .copy-track-button.copied { color: #1ED760; border-color: #1ED760; background-color: rgba(30, 215, 96, 0.1); }
+        .row-menu-btn { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); cursor: pointer; color: #b3b3b3; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 5px; width: 28px; height: 28px; transition: all 0.15s ease; }
+        .row-menu-btn:hover, .row-menu-btn.is-active { color: white; background-color: rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.25); }
+        .row-menu-btn svg { width: 14px; height: 14px; flex-shrink: 0; fill: currentColor; }
+        .row-menu-btn svg * { fill: currentColor; }
+        .sp-row-menu { position: absolute; z-index: 9999; background: #282828; border: 1px solid #383838; border-radius: 6px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: flex; flex-direction: column; min-width: 165px; backdrop-filter: blur(8px); }
+        .sp-row-menu-item { background: transparent; border: none; color: #e0e0e0; font-size: 12.5px; font-weight: 500; padding: 7px 10px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; transition: background-color 0.15s, color 0.15s; }
+        .sp-row-menu-item:hover { background-color: rgba(255,255,255,0.1); color: #ffffff; }
+        .sp-row-menu-item svg { width: 14px; height: 14px; flex-shrink: 0; }
         .sp-rt-btn { padding: 8px 18px; border-radius: 20px; font-weight: 550; font-size: 13px; text-transform: uppercase; border: none; cursor: pointer; transition: background-color 0.2s; }
         .sp-rt-btn-primary { background-color: #1ED760; color: black; }
         .sp-rt-btn-primary:hover { background-color: #3BE377; }
@@ -48815,7 +51693,7 @@ shadowRoot.innerHTML = `
             <div style="display: flex; align-items: center; gap: 11px; flex-shrink: 0; padding-left: 16px;">
                 <div class="column-title" style="width: 100px; text-align: center; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Plays</div>
                 <div class="column-title" style="width: 50px; text-align: center; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">Duration</div>
-                <div style="width: 72px;"></div>
+                <div style="width: 32px;"></div>
             </div>
         </div>
         <div class="conversion-list-container">
@@ -48844,37 +51722,7 @@ shadowRoot.innerHTML = `
         overlay.style.opacity = "1";
     });
 
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const img = entry.target;
-                if (img.style.opacity === '0') {
-                    const uri = img.dataset.trackUri;
-                    if (uri && uri.startsWith('spotify:track:')) {
-                        Spicetify.GraphQL.Request(
-                            Spicetify.GraphQL.Definitions.decorateContextTracks,
-                            { uris: [uri] }
-                        ).then(trackDetails => {
-                            const sources = trackDetails?.data?.tracks?.[0]?.albumOfTrack?.coverArt?.sources;
-                            if (sources?.length > 0) {
-                                let bestSource = sources[sources.length - 1];
-                                for (const source of sources) {
-                                    if (source.width >= 32 && source.height >= 32) {
-                                        if (!bestSource || source.width < bestSource.width) {
-                                            bestSource = source;
-                                        }
-                                    }
-                                }
-                                img.src = bestSource.url;
-                                img.style.opacity = '1';
-                            }
-                        }).catch(() => {});
-                    }
-                    observer.unobserve(img);
-                }
-            }
-        });
-    }, { root: modalContainer.querySelector('.conversion-list-container'), rootMargin: '200px' });
+    const observer = createTrackImageObserver(modalContainer.querySelector('.conversion-list-container'), 32, '200px');
 
     modalContainer.querySelectorAll('img[data-track-uri]').forEach(img => {
         if (img.style.opacity === '0') {
@@ -48882,50 +51730,43 @@ shadowRoot.innerHTML = `
         }
     });
 
-    modalContainer.querySelectorAll('.copy-text').forEach(button => {
-        button.addEventListener('click', () => {
-            const textToCopy = `${button.dataset.title} - ${button.dataset.artist}`;
-            navigator.clipboard.writeText(textToCopy).then(() => {
-                button.classList.add('copied');
-                setTimeout(() => button.classList.remove('copied'), 1000);
-            });
-        });
-    });
+    const { close: closeRowMenu, open: openRowMenu, isOpen: isRowMenuOpen } = createTrackRowMenu(shadowRoot, modalContainer);
 
-    modalContainer.querySelectorAll('.copy-uri').forEach(button => {
-        button.addEventListener('click', () => {
-            navigator.clipboard.writeText(button.dataset.link).then(() => {
-                button.classList.add('copied');
-                setTimeout(() => button.classList.remove('copied'), 1000);
-            });
+    const conversionContainer = modalContainer.querySelector('.conversion-list-container');
+    if (conversionContainer) {
+        conversionContainer.addEventListener('scroll', closeRowMenu, { passive: true });
+        conversionContainer.addEventListener('click', (e) => {
+            const rowMenuBtn = e.target.closest('.row-menu-btn');
+            if (rowMenuBtn) {
+                openRowMenu(rowMenuBtn);
+                return;
+            }
+            closeRowMenu();
         });
+    }
+
+    shadowRoot.addEventListener('click', (e) => {
+        if (!e.target.closest('.row-menu-btn, .sp-row-menu')) {
+            closeRowMenu();
+        }
     });
 
     modalContainer.querySelector("#copyAllRemoved").addEventListener("click", () => {
         let trackListText = "";
         let groupNum = 1;
         for (const group of groups.values()) {
-            const k = group.keptTrack;
-            const kTitle = k.songTitle || k.name || 'Unknown Title';
-            const kArtist = k.allArtists || k.artistName || (k.artists && k.artists.map(a=>a.name).join(', ')) || 'Unknown Artist';
-            const kAlbum = k.albumName || (k.album && k.album.name) || 'Unknown Album';
-            let kLink = k.uri;
-            if (kLink?.startsWith('spotify:track:')) kLink = kLink.replace('spotify:track:', 'https://open.spotify.com/track/');
-            
+            const kInfo = getAuditTrackInfo(group.keptTrack);
+            const kLink = kInfo?.trackLink || kInfo?.uri || '';
             const label = isExclusion ? 'MATCHED SOURCE' : 'KEPT';
-            trackListText += `${groupNum}. [${label}] ${kTitle} - ${kArtist} - ${kAlbum} - (${kLink})\n`;
+            trackListText += `${groupNum}. [${label}] ${kInfo.title} - ${kInfo.artist} - ${kInfo.album} - (${kLink})\n`;
             
             group.removed.forEach((r, idx) => {
                 const isLast = idx === group.removed.length - 1;
                 const branch = isLast ? '└──' : '├──';
-                const rTitle = r.songTitle || r.name || 'Unknown Title';
-                const rArtist = r.allArtists || r.artistName || (r.artists && r.artists.map(a=>a.name).join(', ')) || 'Unknown Artist';
-                const rAlbum = r.albumName || (r.album && r.album.name) || 'Unknown Album';
-                let rLink = r.uri;
-                if (rLink?.startsWith('spotify:track:')) rLink = rLink.replace('spotify:track:', 'https://open.spotify.com/track/');
-                
+                const rInfo = getAuditTrackInfo(r);
+                const rLink = rInfo?.trackLink || rInfo?.uri || '';
                 const rLabel = isExclusion ? 'EXCLUDED' : 'REMOVED';
-                trackListText += `    ${branch} [${rLabel}] ${rTitle} - ${rArtist} - ${rAlbum} - (${rLink})\n`;
+                trackListText += `    ${branch} [${rLabel}] ${rInfo.title} - ${rInfo.artist} - ${rInfo.album} - (${rLink})\n`;
             });
             trackListText += '\n';
             groupNum++;
@@ -48933,14 +51774,10 @@ shadowRoot.innerHTML = `
         
         if (unknownGroup.length > 0) {
             unknownGroup.forEach((r, idx) => {
-                const rTitle = r.songTitle || r.name || 'Unknown Title';
-                const rArtist = r.allArtists || r.artistName || (r.artists && r.artists.map(a=>a.name).join(', ')) || 'Unknown Artist';
-                const rAlbum = r.albumName || (r.album && r.album.name) || 'Unknown Album';
-                let rLink = r.uri;
-                if (rLink?.startsWith('spotify:track:')) rLink = rLink.replace('spotify:track:', 'https://open.spotify.com/track/');
-                
+                const rInfo = getAuditTrackInfo(r);
+                const rLink = rInfo?.trackLink || rInfo?.uri || '';
                 const rLabel = isExclusion ? 'EXCLUDED' : 'REMOVED';
-                trackListText += `${groupNum + idx}. [${rLabel}] ${rTitle} - ${rArtist} - ${rAlbum} - (${rLink})\n\n`;
+                trackListText += `${groupNum + idx}. [${rLabel}] ${rInfo.title} - ${rInfo.artist} - ${rInfo.album} - (${rLink})\n\n`;
             });
         }
         
@@ -48955,20 +51792,15 @@ shadowRoot.innerHTML = `
 
     modalContainer.querySelector("#exportRemovedData").addEventListener("click", async () => {
         const formatTrackData = (track) => {
-            if (!track) return null;
-            let trackLink = track.uri;
-            if (trackLink?.startsWith('spotify:track:')) {
-                trackLink = trackLink.replace('spotify:track:', 'https://open.spotify.com/track/');
-            } else if (trackLink?.startsWith('spotify:local:')) {
-                trackLink = 'Local File';
-            }
+            const info = getAuditTrackInfo(track);
+            if (!info) return null;
             return {
-                title: track.songTitle || track.name || 'Unknown Title',
-                artist: track.allArtists || track.artistName || (track.artists && track.artists.map(a => a.name).join(', ')) || 'Unknown Artist',
-                album: track.albumName || (track.album && track.album.name) || 'Unknown Album',
-                link: trackLink,
-                durationMs: track.durationMs || track.durationMilis || 0,
-                playCount: track.playCount
+                title: info.title,
+                artist: info.artist,
+                album: info.album,
+                link: info.isLocal ? 'Local File' : (info.trackLink || info.uri),
+                durationMs: info.durationMs,
+                playCount: info.rawPlays
             };
         };
 
@@ -48988,47 +51820,37 @@ shadowRoot.innerHTML = `
             });
         }
 
-        const jsonString = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-
-        if (window.showSaveFilePicker) {
-            try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: fileName,
-                    types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
-                });
-                const writable = await handle.createWritable();
-                await writable.write(blob);
-                await writable.close();
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.error('Error saving file:', err);
-                    showNotification("Failed to export data.", true);
-                }
-            }
-        } else {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
+        await exportJsonFile(exportData, fileName);
     });
 
     const closeModal = () => {
+        closeRowMenu();
         observer.disconnect();
+        window.removeEventListener("keydown", handleKeyDown);
         overlay.style.opacity = "0";
         setTimeout(() => overlay.remove(), 200);
     };
+
+    const handleKeyDown = (e) => {
+        if (e.key === "Escape") {
+            if (isRowMenuOpen()) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                closeRowMenu();
+                return;
+            }
+            e.preventDefault();
+            closeModal();
+        }
+    };
+    window.addEventListener("keydown", handleKeyDown);
     
     modalContainer.querySelector("#closeRemovedModal").addEventListener("click", closeModal);
     modalContainer.querySelector("#closeRemovedModalX").addEventListener("click", closeModal);
 
     overlay.addEventListener("click", (e) => { 
         if (e.target === overlay) {
+            closeRowMenu();
             e.preventDefault();
             e.stopPropagation();
         }
@@ -49099,7 +51921,7 @@ shadowRoot.innerHTML = `
             const cTitle = (candidate.songTitle || candidate.name || "").toLowerCase();
             const eTitle = (existing.songTitle || existing.name || "").toLowerCase();
             
-            const perfKeywords = ['instrumental', 'acoustic', 'live', 'karaoke', 'demo', 'a cappella', 'acapella', 'sped up', 'slowed', 'remix', 'mashup', 'vocal'];
+            const perfKeywords = ['instrumental', 'acoustic', 'live', 'karaoke', 'demo', 'a cappella', 'acapella', 'sped up', 'slowed', 'remix', 'mashup', 'vocal', 'sing-along', 'sing along', 'orchestral', 'stripped'];
             for (const kw of perfKeywords) {
                 const regex = new RegExp(`\\b${kw}\\b`, 'i');
                 if (regex.test(cTitle) !== regex.test(eTitle)) {
@@ -49351,25 +52173,7 @@ shadowRoot.innerHTML = `
             }
         }
 
-        if (popB !== popA) {
-            return popB - popA;
-        }
-        
-        const isExplicitA = a.explicit || (a.track && a.track.explicit) ? 1 : 0;
-        const isExplicitB = b.explicit || (b.track && b.track.explicit) ? 1 : 0;
-        if (isExplicitB !== isExplicitA) {
-            return isExplicitB - isExplicitA;
-        }
-        
-        if (msA !== msB) {
-            return msA - msB; 
-        }
-
-        if (albumA.length !== albumB.length) {
-            return albumA.length - albumB.length;
-        }
-        
-        return (a.uri || "").localeCompare(b.uri || "");
+        return compareDuplicateKeepers(a, b, sortType);
     });
 
     const BATCH_PROCESS_SIZE = 200;
@@ -50920,38 +53724,7 @@ shadowRoot.innerHTML = `
       modal.querySelector("#lfm-ov-export").onclick = async () => {
           const data = getLfmOverrides();
           if (Object.keys(data).length === 0) return showNotification("No overrides to export.", true);
-          
-          const jsonString = JSON.stringify(data, null, 2);
-          const blob = new Blob([jsonString], { type: 'application/json' });
-
-          if (window.showSaveFilePicker) {
-              try {
-                  const handle = await window.showSaveFilePicker({
-                      suggestedName: 'sort-play_lfm_overrides.json',
-                      types: [{
-                          description: 'JSON Files',
-                          accept: { 'application/json': ['.json'] },
-                      }],
-                  });
-                  const writable = await handle.createWritable();
-                  await writable.write(blob);
-                  await writable.close();
-                  showNotification("Overrides exported successfully!");
-              } catch (err) {
-                  if (err.name !== 'AbortError') {
-                      console.error('Error saving file:', err);
-                      showNotification("Failed to export data.", true);
-                  }
-              }
-          } else {
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'sort-play_lfm_overrides.json';
-              a.click();
-              URL.revokeObjectURL(url);
-              showNotification("Overrides exported successfully!");
-          }
+          await exportJsonFile(data, 'sort-play_lfm_overrides.json', "Overrides exported successfully!");
       };
 
       const close = () => {
@@ -51466,27 +54239,17 @@ shadowRoot.innerHTML = `
       
       let spotifyImagePromise = Promise.resolve(null);
       if (trackUri) {
-          if (spotifyImageCache.has(trackUri) && Date.now() - spotifyImageCache.get(trackUri).ts < CACHE_EXPIRE_MODAL_ASSETS) {
-              spotifyImagePromise = Promise.resolve(spotifyImageCache.get(trackUri).data);
-          } else {
-              if (isArtistContext && trackUri.startsWith("spotify:artist:")) {
-                  const artistId = trackUri.split(":")[2];
-                  spotifyImagePromise = getArtistImageUrl(artistId).then(url => {
-                      if (url) spotifyImageCache.set(trackUri, { ts: Date.now(), data: url });
-                      return url;
-                  }).catch(() => null);
-              } else if (!isArtistContext && trackUri.startsWith("spotify:track:")) {
-                  spotifyImagePromise = fetchInternalTrackMetadata(trackId).then(meta => {
-                     if (meta && meta.album && meta.album.images && meta.album.images.length > 0) {
-                         const url = meta.album.images[0].url;
-                         spotifyImageCache.set(trackUri, { ts: Date.now(), data: url });
-                         return url;
-                     }
-                     return null;
-                  }).catch(err => {
-                      return null;
-                  });
-              }
+          const cachedCover = getCachedSpotifyImage(trackUri, 300);
+          if (cachedCover) {
+              spotifyImagePromise = Promise.resolve(cachedCover);
+          } else if (isArtistContext && trackUri.startsWith("spotify:artist:")) {
+              const artistId = trackUri.split(":")[2];
+              spotifyImagePromise = getArtistImageUrl(artistId).then(url => {
+                  if (url) spotifyImageCache.set(trackUri, { ts: Date.now(), data: url });
+                  return url;
+              }).catch(() => null);
+          } else if (!isArtistContext && trackUri.startsWith("spotify:track:")) {
+              spotifyImagePromise = fetchTrackCoverUrl(trackUri, 300);
           }
       }
 
@@ -51556,14 +54319,15 @@ shadowRoot.innerHTML = `
           const lfmExtractedImage = lfmImages?.find(i => i.size === 'extralarge')?.['#text'] 
                                  || lfmImages?.find(i => i.size === 'large')?.['#text'];
           
+          const hasValidSpotifyCover = spotifyCover && spotifyCover !== FALLBACK_COVER_URI;
           if (isArtistContext) {
               if (lfmExtractedImage && !lfmExtractedImage.includes(defaultLfmStar)) {
                   albumImage = lfmExtractedImage;
-              } else if (spotifyCover) {
+              } else if (hasValidSpotifyCover) {
                   albumImage = spotifyCover;
               }
           } else {
-              if (spotifyCover) {
+              if (hasValidSpotifyCover) {
                   albumImage = spotifyCover;
               } else if (lfmExtractedImage) {
                   albumImage = lfmExtractedImage;
@@ -54316,19 +57080,20 @@ shadowRoot.innerHTML = `
 
 
   function getNativeMenuStyles() {
+    if (cachedNativeMenuStyles) return cachedNativeMenuStyles;
+
     const liveMenu = document.querySelector('.main-contextMenu-menu:not(.sort-play-font-scope), ul[role="menu"]:not(.sort-play-font-scope)');
     if (liveMenu) {
       const comp = window.getComputedStyle(liveMenu);
       if (comp.backgroundColor && comp.backgroundColor !== 'transparent' && comp.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-        return extractMenuStyles(comp);
+        cachedNativeMenuStyles = extractMenuStyles(comp);
+        return cachedNativeMenuStyles;
       }
     }
 
     let wrapper = null;
     try {
       wrapper = document.createElement('div');
-      wrapper.id = 'context-menu';
-      wrapper.setAttribute('data-tippy-root', '');
       wrapper.style.cssText = 'position: fixed; top: -9999px; left: -9999px; visibility: hidden; pointer-events: none; z-index: -9999;';
 
       const tippy = document.createElement('div');
@@ -54354,7 +57119,8 @@ shadowRoot.innerHTML = `
           comp = ulComp;
         }
       }
-      return extractMenuStyles(comp);
+      cachedNativeMenuStyles = extractMenuStyles(comp);
+      return cachedNativeMenuStyles;
     } catch (e) {
       return null;
     } finally {
@@ -54441,25 +57207,11 @@ shadowRoot.innerHTML = `
         const style = document.createElement('style');
         style.id = styleId;
         style.innerHTML = `
-            .like-button-tooltip {
-                background-color: #282828;
-                color: #ffffff;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-size: 14px;
-                font-family: 'SpotifyMixUI', 'CircularSp', 'Circular', 'Helvetica', 'Arial', sans-serif;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-                z-index: 1001;
-                max-width: 300px;
-                text-align: center;
-                pointer-events: none;
-                opacity: 0;
-                transition: opacity 200ms ease-in-out;
-            }
-
-            .like-button-tooltip.visible {
-                opacity: 1;
-            }
+            .like-button-tooltip { background-color: #282828; color: #ffffff; border-radius: 4px; padding: 4px 8px; font-size: 14px; font-family: 'SpotifyMixUI', 'CircularSp', 'Circular', 'Helvetica', 'Arial', sans-serif; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); z-index: 1001; max-width: 300px; text-align: center; pointer-events: none; opacity: 0; transition: opacity 200ms ease-in-out; }
+            .like-button-tooltip.visible { opacity: 1 !important; }
+            .sort-play-like-menu-root { scrollbar-width: none; }
+            .sort-play-like-menu-root::-webkit-scrollbar { display: none; }
+            .sort-play-like-menu-sub { font-size: 11px; color: #b3b3b3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; margin-top: 1px; }
         `;
         document.head.appendChild(style);
     }
@@ -54477,169 +57229,819 @@ shadowRoot.innerHTML = `
         document.head.appendChild(style);
     }
 
-    let likeButton_likedTracksIdsISRCs = new Map(); 
-    let likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
-    var proxy_likeButton_likedTracksIdsISRCs;
+    let likeButton_likedTracksById = new Map();
+    let likeButton_likedTracksByIsrc = new Map();
+    let likeButton_activeMenu = null;
+    let likeButton_activeMenuAbort = null;
     var likeButton_likedTracksChangeEvent = new CustomEvent('likeButton_likedTracksChange');
+    const isrcCountCache = new Map();
+
+    function likeButton_getMatchingSavedTracks(isrc, candidateArtistIds = []) {
+        if (!isrc || !likeButton_likedTracksByIsrc.has(isrc)) return [];
+        const tracks = Array.from(likeButton_likedTracksByIsrc.get(isrc).values());
+        if (!candidateArtistIds?.length) return tracks;
+        return tracks.filter(t => {
+            if (!t.artistIds?.length) return true;
+            return t.artistIds.some(id => candidateArtistIds.includes(id));
+        });
+    }
+
+    async function fetchIsrcTrackCount(isrc, candidateArtistIds = [], artistName = null, trackName = null) {
+        if (!isrc) return null;
+        const cacheKey = `${isrc}:${(candidateArtistIds[0] || artistName || "").toLowerCase().trim()}`;
+        if (isrcCountCache.has(cacheKey)) return isrcCountCache.get(cacheKey);
+
+        try {
+            const res = await searchTracks(`isrc:${isrc}`, 20);
+            const rawItems = res?.tracks?.items || [];
+            if (rawItems.length === 0) return { count: 0, tag: null };
+
+            let matchingItems = rawItems;
+            if (candidateArtistIds?.length > 0) {
+                const idFiltered = rawItems.filter(t => 
+                    t.artists?.some(a => a.id && candidateArtistIds.includes(a.id))
+                );
+                if (idFiltered.length > 0) matchingItems = idFiltered;
+            } else if (artistName) {
+                const targetArtistLower = artistName.toLowerCase().trim();
+                const strFiltered = rawItems.filter(t => 
+                    t.artists?.some(a => {
+                        const aName = a.name?.toLowerCase().trim();
+                        return aName && (aName.includes(targetArtistLower) || targetArtistLower.includes(aName));
+                    })
+                );
+                if (strFiltered.length > 0) matchingItems = strFiltered;
+            }
+
+            const count = matchingItems.length;
+            const isCapped = rawItems.length >= 20;
+            const tag = (count >= 20 && isCapped) ? "(20+)" : `(${count})`;
+            const result = { count, tag };
+            isrcCountCache.set(cacheKey, result);
+            return result;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function likeButton_addLikedTrack(trackData) {
+        if (!trackData || !trackData.trackId) return;
+        likeButton_likedTracksById.set(trackData.trackId, trackData);
+        if (trackData.isrc) {
+            if (!likeButton_likedTracksByIsrc.has(trackData.isrc)) {
+                likeButton_likedTracksByIsrc.set(trackData.isrc, new Map());
+            }
+            likeButton_likedTracksByIsrc.get(trackData.isrc).set(trackData.trackId, trackData);
+        }
+    }
+
+    function likeButton_removeLikedTrack(trackId) {
+        const item = likeButton_likedTracksById.get(trackId);
+        likeButton_likedTracksById.delete(trackId);
+        if (item?.isrc && likeButton_likedTracksByIsrc.has(item.isrc)) {
+            const isrcMap = likeButton_likedTracksByIsrc.get(item.isrc);
+            isrcMap.delete(trackId);
+            if (isrcMap.size === 0) {
+                likeButton_likedTracksByIsrc.delete(item.isrc);
+            }
+        }
+    }
 
     async function likeButton_initiateLikedSongs() {
-        if (!Spicetify.Platform?.LibraryAPI?.getTracks) {
-            setTimeout(likeButton_initiateLikedSongs, 100);
-            return;
-        }
-
-        let likedTracksData;
+        let likedTracks;
         try {
-            likedTracksData = await Spicetify.Platform.LibraryAPI.getTracks({
-                limit: Number.MAX_SAFE_INTEGER,
-            });
+            likedTracks = await getLikedSongs();
         } catch (error) {
-            console.error("[Sort-Play Like Button] Error fetching liked songs via LibraryAPI:", error);
             setTimeout(likeButton_initiateLikedSongs, 30000);
             return;
         }
 
-        if (!likedTracksData || !likedTracksData.items || likedTracksData.items.length === 0) {
+        if (!likedTracks || !Array.isArray(likedTracks)) {
             setTimeout(likeButton_initiateLikedSongs, 5000);
             return;
         }
 
-        let likedTracksIds = likedTracksData.items.map(item => item.uri.replace("spotify:track:", ""));
+        const newById = new Map();
+        const newByIsrc = new Map();
+        const missingIsrcIds = [];
+        const rawItemsMap = new Map();
 
-        let newLikedTracksIdsISRCs = new Map();
-        let likedTracksIdsWithUnknownISRCs = [];
+        likedTracks.forEach(item => {
+            const trackId = item.uri?.replace("spotify:track:", "");
+            if (!trackId || trackId.startsWith("spotify:local:")) return;
+            const albumUri = item.albumUri || item.album?.uri || "";
+            const albumId = albumUri.split(":")[2] || item.track?.album?.id || null;
+            const albumName = item.albumName || item.album?.name || item.track?.album?.name || "Album";
+            const name = item.name || "Track";
+            const artistIds = (item.artists || []).map(a => a.uri?.split(":")[2] || a.id).filter(Boolean);
+            const entry = { trackId, uri: item.uri, name, albumId, albumName, isrc: null, artistIds };
+            newById.set(trackId, entry);
+            rawItemsMap.set(trackId, entry);
+            missingIsrcIds.push(trackId);
+        });
 
-        const cachedLikedMetadata = await idb.getMany('trackMetadata', likedTracksIds, CACHE_EXPIRE_METADATA);
+        const cachedMeta = await idb.getMany('trackMetadata', missingIsrcIds, CACHE_EXPIRE_METADATA);
+        const stillMissing = [];
 
-        likedTracksIds.forEach(trackId => {
-            const meta = cachedLikedMetadata.get(trackId);
-            if (meta && meta.external_ids && meta.external_ids.isrc) {
-                newLikedTracksIdsISRCs.set(trackId, meta.external_ids.isrc);
-            } else if (!trackId.startsWith("spotify:local:")) {
-                likedTracksIdsWithUnknownISRCs.push(trackId);
+        missingIsrcIds.forEach(id => {
+            const meta = cachedMeta.get(id);
+            const entry = rawItemsMap.get(id);
+            if (meta?.external_ids?.isrc && entry) {
+                entry.isrc = meta.external_ids.isrc;
+                if (!newByIsrc.has(entry.isrc)) newByIsrc.set(entry.isrc, new Map());
+                newByIsrc.get(entry.isrc).set(id, entry);
+            } else if (!id.startsWith("spotify:local:")) {
+                stillMissing.push(id);
             }
         });
 
-        if (likedTracksIdsWithUnknownISRCs.length > 0) {
-            for (let i = 0; i < likedTracksIdsWithUnknownISRCs.length; i += 500) {
-                let batchIds = likedTracksIdsWithUnknownISRCs.slice(i, i + 500);
-                let batchUris = batchIds.map(id => `spotify:track:${id}`);
-                
+        if (stillMissing.length > 0) {
+            for (let i = 0; i < stillMissing.length; i += 500) {
+                const batchIds = stillMissing.slice(i, i + 500);
+                const batchUris = batchIds.map(id => `spotify:track:${id}`);
                 try {
                     const fetchedMetaMap = await fetchCoreMetadataBatch(batchUris);
                     for (const id of batchIds) {
                         const meta = fetchedMetaMap.get(`spotify:track:${id}`);
-                        if (meta && meta.isrc) {
-                            newLikedTracksIdsISRCs.set(id, meta.isrc);
-                            const existing = cachedLikedMetadata.get(id) || { id, external_ids: {} };
-                            if (!existing.external_ids) existing.external_ids = {};
-                            existing.external_ids.isrc = meta.isrc;
-                            idb.set('trackMetadata', id, existing);
+                        const entry = rawItemsMap.get(id);
+                        if (meta?.isrc && entry) {
+                            entry.isrc = meta.isrc;
+                            if (!newByIsrc.has(entry.isrc)) newByIsrc.set(entry.isrc, new Map());
+                            newByIsrc.get(entry.isrc).set(id, entry);
                         }
                     }
-                } catch(e) {
-                    await Promise.all(batchIds.slice(0, 50).map(async id => {
-                        try {
-                            const track = await fetchInternalTrackMetadata(id);
-                            if (track && track.external_ids?.isrc) {
-                                newLikedTracksIdsISRCs.set(track.id, track.external_ids.isrc);
-                            }
-                        } catch (err) {}
-                    }));
-                }
-                
-                if (i + 500 < likedTracksIdsWithUnknownISRCs.length) {
-                    await new Promise(resolve => setTimeout(resolve, 150));
-                }
+                } catch(e) {}
             }
         }
 
-        likeButton_likedTracksIdsISRCs = newLikedTracksIdsISRCs;
-        likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
-
-        proxy_likeButton_likedTracksIdsISRCs = new Proxy(likeButton_likedTracksIdsISRCs, {
-            get: function (target, property, receiver) {
-                if (['set', 'delete'].includes(property) && typeof target[property] === 'function') {
-                    return function (...args) {
-                        const result = target[property].apply(target, args);
-                        likeButton_likedTracksISRCs = new Set(likeButton_likedTracksIdsISRCs.values());
-                        document.dispatchEvent(likeButton_likedTracksChangeEvent);
-                        return result;
-                    };
-                }
-                return Reflect.get(target, property, receiver);
-            }
-        });
+        likeButton_likedTracksById = newById;
+        likeButton_likedTracksByIsrc = newByIsrc;
 
         document.dispatchEvent(likeButton_likedTracksChangeEvent);
-        setTimeout(likeButton_initiateLikedSongs, 30000);
+        setTimeout(likeButton_initiateLikedSongs, 600000);
     }
 
-    const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16.3, dynamicSizeSelector = null, buttonStyle = { marginRight: "12px" } }) {
+    let likeButton_tooltipEl = null;
+    let likeButton_tooltipTimer = null;
+    let likeButton_tooltipAbort = null;
+    let likeButton_tooltipAnchor = null;
+
+    likeButton_hideTooltip = () => {
+        likeButton_tooltipAnchor = null;
+        if (likeButton_tooltipTimer) {
+            clearTimeout(likeButton_tooltipTimer);
+            likeButton_tooltipTimer = null;
+        }
+        if (likeButton_tooltipAbort) {
+            likeButton_tooltipAbort.abort();
+            likeButton_tooltipAbort = null;
+        }
+        if (likeButton_tooltipEl) {
+            likeButton_tooltipEl.remove();
+            likeButton_tooltipEl = null;
+        }
+        document.querySelectorAll('.like-button-tooltip').forEach(el => el.remove());
+    };
+
+    function likeButton_showTooltip(anchorEl, text) {
+        likeButton_hideTooltip();
+        if (!anchorEl || !text) return;
+
+        likeButton_tooltipAnchor = anchorEl;
+        likeButton_tooltipTimer = setTimeout(() => {
+            if (!anchorEl || !document.body.contains(anchorEl)) return;
+
+            const tooltip = document.createElement('div');
+            tooltip.className = 'like-button-tooltip sort-play-font-scope';
+            tooltip.textContent = text;
+            tooltip.style.cssText = 'position: fixed; z-index: 100000; pointer-events: none;';
+            document.body.appendChild(tooltip);
+            likeButton_tooltipEl = tooltip;
+
+            const rect = anchorEl.getBoundingClientRect();
+            const tipRect = tooltip.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const margin = 8;
+
+            let top = rect.top - tipRect.height - 8;
+            if (top < margin) {
+                top = rect.bottom + 8;
+            }
+
+            let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+            if (left < margin) left = margin;
+            else if (left + tipRect.width > viewportWidth - margin) left = viewportWidth - tipRect.width - margin;
+
+            tooltip.style.top = `${top}px`;
+            tooltip.style.left = `${left}px`;
+
+            requestAnimationFrame(() => {
+                if (likeButton_tooltipEl === tooltip) tooltip.classList.add('visible');
+            });
+
+            likeButton_tooltipAbort = new AbortController();
+            const signal = likeButton_tooltipAbort.signal;
+
+            window.addEventListener('wheel', likeButton_hideTooltip, { capture: true, passive: true, signal });
+            window.addEventListener('scroll', likeButton_hideTooltip, { capture: true, passive: true, signal });
+            window.addEventListener('pointerdown', likeButton_hideTooltip, { capture: true, signal });
+            window.addEventListener('keydown', likeButton_hideTooltip, { signal });
+            window.addEventListener('blur', likeButton_hideTooltip, { signal });
+            window.addEventListener('resize', likeButton_hideTooltip, { signal });
+        }, 150);
+    }
+
+    closeLikeButtonMenu = () => {
+        likeButton_hideTooltip();
+        document.querySelectorAll('.sort-play-custom-tooltip').forEach(el => el.remove());
+        if (likeButton_activeMenuAbort) {
+            likeButton_activeMenuAbort.abort();
+            likeButton_activeMenuAbort = null;
+        }
+        if (likeButton_activeMenu) {
+            likeButton_activeMenu.remove();
+            likeButton_activeMenu = null;
+        }
+    };
+
+    function openLikeButtonMenu({ anchorEl, uri, isrc, currentAlbumInfo, artistIds = [] }) {
+        let candidateArtistIds = [...artistIds];
+        const trackIdForArtists = uri.replace("spotify:track:", "");
+        if (!candidateArtistIds.length && trackIdForArtists === Spicetify.Player.data?.item?.uri?.split(':')[2]) {
+            candidateArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
+        }
+        if (!candidateArtistIds.length && anchorEl) {
+            const row = anchorEl.closest?.('.main-trackList-trackListRow, div[role="row"]');
+            if (row) {
+                const domArtistLinks = row.querySelectorAll('a[href*="/artist/"], a[href*=":artist:"]');
+                domArtistLinks.forEach(a => {
+                    const href = a.getAttribute('href') || '';
+                    const match = href.match(/artist[/:]([a-zA-Z0-9]+)/);
+                    if (match && !candidateArtistIds.includes(match[1])) candidateArtistIds.push(match[1]);
+                });
+            }
+        }
+        closeAllMenus();
+        closeLikeButtonMenu();
+        const trackId = uri.replace("spotify:track:", "");
+
+        const resolvedCurrentAlbum = { ...currentAlbumInfo };
+        const likedInfo = likeButton_likedTracksById.get(trackId);
+        if (likedInfo) {
+            resolvedCurrentAlbum.id = resolvedCurrentAlbum.id || likedInfo.albumId;
+            resolvedCurrentAlbum.name = resolvedCurrentAlbum.name || likedInfo.albumName;
+        }
+
+        const playerItem = Spicetify.Player.data?.item;
+        const playerTrackId = playerItem?.uri?.split(':')[2];
+        if (trackId === playerTrackId) {
+            resolvedCurrentAlbum.id = resolvedCurrentAlbum.id 
+                || playerItem?.album?.uri?.split(':')[2] 
+                || playerItem?.metadata?.album_uri?.split(':')[2]
+                || playerItem?.album?.id;
+            resolvedCurrentAlbum.name = resolvedCurrentAlbum.name 
+                || playerItem?.album?.name 
+                || playerItem?.metadata?.album_title;
+        }
+
+        const curUri = getCurrentUri();
+        if (curUri && Spicetify.URI.isAlbum(curUri)) {
+            resolvedCurrentAlbum.id = resolvedCurrentAlbum.id || curUri.split(':')[2];
+            resolvedCurrentAlbum.name = resolvedCurrentAlbum.name || document.querySelector(".encore-text.encore-text-headline-large, h1")?.textContent?.trim() || "Album";
+        }
+
+        let resolvedIsrc = isrc || likeButton_likedTracksById.get(trackId)?.isrc;
+
+        const menu = document.createElement("div");
+        menu.className = "main-contextMenu-menu encore-dark-theme encore-layout-themes sort-play-font-scope sort-play-like-menu-root";
+        menu.setAttribute("role", "menu");
+        menu.style.position = "fixed";
+        menu.style.display = "flex";
+        menu.style.flexDirection = "column";
+        menu.style.zIndex = "2005";
+        menu.style.padding = "4px";
+        menu.style.borderRadius = "4px";
+        menu.style.boxShadow = "0 16px 24px rgba(var(--spice-rgb-shadow), .3), 0 6px 8px rgba(var(--spice-rgb-shadow), .2)";
+        menu.style.backdropFilter = "blur(8px)";
+        menu.style.userSelect = "none";
+        menu.style.width = "270px";
+        menu.style.maxWidth = "270px";
+        menu.style.boxSizing = "border-box";
+        menu.style.maxHeight = "calc(100vh - 24px)";
+        menu.style.overflowY = "auto";
+        menu.style.overflowX = "hidden";
+        applyNativeMenuStyles(menu, menuContainer);
+
+        const nativeMenuColor = getNativeMenuTextColor();
+
+        const updatePosition = () => {
+            const rect = anchorEl.getBoundingClientRect();
+            const menuHeight = menu.offsetHeight || 200;
+            const menuWidth = 260;
+            const viewportHeight = window.innerHeight;
+            const viewportWidth = window.innerWidth;
+            const margin = 8;
+
+            let top = rect.bottom + 8;
+            if (top + menuHeight > viewportHeight - margin || rect.top > viewportHeight - 150) {
+                top = Math.max(margin, rect.top - menuHeight - 8);
+            }
+
+            let left = rect.left + (rect.width / 2) - (menuWidth / 2);
+            if (left + menuWidth > viewportWidth - margin) left = viewportWidth - menuWidth - margin;
+            if (left < margin) left = margin;
+
+            menu.style.top = `${top}px`;
+            menu.style.left = `${left}px`;
+        };
+
+        const createButton = ({ text, textTag = null, subtext = null, subtextTag = null, iconSvg, onClick, disabled = false, innerButton = null }) => {
+            const btn = document.createElement("button");
+            btn.style.cssText = `
+                background-color: transparent;
+                color: ${nativeMenuColor};
+                border: none;
+                border-radius: 2px;
+                margin: 0;
+                padding: ${subtext ? "5px 10px 5px 8px" : "4px 10px 4px 8px"};
+                font-weight: 400;
+                font-size: 0.875rem;
+                height: ${subtext ? "auto" : "37px"};
+                min-height: ${subtext ? "42px" : "37px"};
+                width: 100%;
+                min-width: 0;
+                max-width: 100%;
+                box-sizing: border-box;
+                text-align: left;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                cursor: ${disabled ? "default" : "pointer"};
+                opacity: ${disabled ? "0.4" : "1"};
+                pointer-events: ${disabled ? "none" : "auto"};
+                overflow: hidden;
+            `;
+
+            const leftContent = document.createElement("div");
+            leftContent.style.cssText = "display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; overflow: hidden;";
+
+            if (iconSvg) {
+                const icon = parseAndResizeIcon(iconSvg);
+                if (icon) {
+                    icon.style.fill = 'currentColor';
+                    icon.style.flexShrink = '0';
+                    leftContent.appendChild(icon);
+                }
+            }
+
+            const textGroup = document.createElement("div");
+            textGroup.style.cssText = "display: flex; flex-direction: column; min-width: 0; flex: 1; text-align: left; overflow: hidden;";
+
+            const titleContainer = document.createElement("div");
+            titleContainer.style.cssText = "display: flex; align-items: center; min-width: 0; width: 100%; overflow: hidden;";
+
+            const titleSpan = document.createElement("span");
+            titleSpan.textContent = text;
+            titleSpan.style.cssText = "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex-shrink: 1;";
+            titleContainer.appendChild(titleSpan);
+
+            let currentTextTag = textTag;
+            const tagSpan = document.createElement("span");
+            tagSpan.textContent = textTag || "";
+            tagSpan.style.cssText = `flex-shrink: 0; white-space: nowrap; margin-left: 4px; color: #a7a7a7; font-size: 11px; opacity: ${textTag ? '1' : '0'}; transition: opacity 0.15s ease-in;`;
+            titleContainer.appendChild(tagSpan);
+
+            textGroup.appendChild(titleContainer);
+
+            btn._updateTag = (newTag, isDisabled = false) => {
+                currentTextTag = newTag;
+                tagSpan.textContent = newTag || "";
+                tagSpan.style.opacity = newTag ? "1" : "0";
+                titleContainer.removeAttribute("title");
+                if (isDisabled) {
+                    btn.style.opacity = "0.4";
+                    btn.style.pointerEvents = "none";
+                    btn.style.cursor = "default";
+                } else {
+                    btn.style.opacity = "1";
+                    btn.style.pointerEvents = "auto";
+                    btn.style.cursor = "pointer";
+                }
+            };
+
+            let subContainer = null;
+            let subTextSpan = null;
+            if (subtext) {
+                subContainer = document.createElement("div");
+                subContainer.className = "sort-play-like-menu-sub";
+                subContainer.style.cssText = "display: flex; align-items: center; min-width: 0; width: 100%; overflow: hidden; margin-top: 1px;";
+
+                subTextSpan = document.createElement("span");
+                subTextSpan.textContent = subtext;
+                subTextSpan.style.cssText = "overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex-shrink: 1;";
+                subContainer.appendChild(subTextSpan);
+
+                if (subtextTag) {
+                    const subTagSpan = document.createElement("span");
+                    subTagSpan.textContent = subtextTag;
+                    subTagSpan.style.cssText = "flex-shrink: 0; white-space: nowrap; margin-left: 4px; color: #1ed760; font-weight: 500;";
+                    subContainer.appendChild(subTagSpan);
+                }
+                textGroup.appendChild(subContainer);
+            }
+
+            leftContent.appendChild(textGroup);
+            btn.appendChild(leftContent);
+
+            if (innerButton) {
+                btn.appendChild(innerButton);
+            }
+
+            btn.addEventListener("mouseenter", () => {
+                if (!disabled) {
+                    btn.style.backgroundColor = "rgba(var(--spice-rgb-selected-row), 0.1)";
+                }
+                if (titleSpan.scrollWidth > titleSpan.clientWidth) {
+                    titleContainer.title = currentTextTag ? `${text} ${currentTextTag}` : text;
+                } else {
+                    titleContainer.removeAttribute("title");
+                }
+                if (subContainer && subTextSpan) {
+                    if (subTextSpan.scrollWidth > subTextSpan.clientWidth) {
+                        subContainer.title = subtextTag ? `${subtext} ${subtextTag}` : subtext;
+                    } else {
+                        subContainer.removeAttribute("title");
+                    }
+                }
+            });
+
+            if (!disabled) {
+                btn.addEventListener("mouseleave", () => {
+                    btn.style.backgroundColor = "transparent";
+                });
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    onClick(e);
+                });
+            }
+
+            return btn;
+        };
+
+        const createDivider = () => {
+            const hr = document.createElement("hr");
+            hr.style.cssText = "width: 100%; border: none; height: 1px; background-color: rgba(255, 255, 255, 0.1); margin: 0 auto;";
+            return hr;
+        };
+
+        const renderMenuContent = () => {
+            menu.innerHTML = "";
+
+            const currentSavedList = likeButton_getMatchingSavedTracks(resolvedIsrc, candidateArtistIds);
+            const currentCount = currentSavedList.length;
+            const isDirectlyLiked = likeButton_likedTracksById.has(trackId);
+
+            let headerText = "NOT IN LIKED SONGS";
+            let statusIcon = likeMenuStatusUnlikedIconSvg;
+
+            if (currentCount > 1) {
+                headerText = `${currentCount} VERSIONS IN LIKED SONGS`;
+                statusIcon = likeMenuStatusWarningIconSvg;
+            } else if (isDirectlyLiked) {
+                headerText = "IN LIKED SONGS";
+                statusIcon = likeMenuStatusLikedIconSvg;
+            } else if (currentCount === 1) {
+                headerText = "DIFFERENT VERSION IN LIKED SONGS";
+                statusIcon = likeMenuStatusAlternateIconSvg;
+            }
+
+            const header = document.createElement("div");
+            const headerColor = isDirectlyLiked ? "#1ed760" : (currentCount > 1 ? "#ffc107" : "#a7a7a7");
+            header.style.cssText = `
+                color: ${headerColor};
+                font-size: 0.625rem;
+                font-weight: 700;
+                letter-spacing: .08em;
+                line-height: 16px;
+                text-transform: uppercase;
+                padding: 6px 10px 8px 12px;
+                pointer-events: none;
+                user-select: none;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+            `;
+            const headerSpan = document.createElement("span");
+            headerSpan.textContent = headerText;
+            header.appendChild(headerSpan);
+
+            const headerIcon = parseAndResizeIcon(statusIcon);
+            if (headerIcon) {
+                headerIcon.style.fill = headerColor;
+                headerIcon.style.flexShrink = "0";
+                headerIcon.style.opacity = isDirectlyLiked || currentCount > 0 ? "1" : "0.6";
+                header.appendChild(headerIcon);
+            }
+
+            menu.appendChild(header);
+            menu.appendChild(createDivider());
+
+            if (currentCount > 1) {
+                currentSavedList.forEach((sTrack) => {
+                    const isThisExact = sTrack.trackId === trackId;
+                    const innerUnlikeBtn = document.createElement("button");
+                    innerUnlikeBtn.style.cssText = `
+                        background-color: transparent;
+                        border: none;
+                        border-radius: 2px;
+                        padding: 0;
+                        cursor: pointer;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 28px;
+                        height: 28px;
+                        margin-left: 8px;
+                        flex-shrink: 0;
+                        color: #b3b3b3;
+                        transition: color 0.1s ease;
+                    `;
+                    const unlikeIcon = parseAndResizeIcon(likeMenuUnlikeIconSvg);
+                    if (unlikeIcon) {
+                        unlikeIcon.style.fill = "currentColor";
+                        innerUnlikeBtn.appendChild(unlikeIcon);
+                    }
+
+                    innerUnlikeBtn.addEventListener("mouseenter", () => {
+                        innerUnlikeBtn.style.color = "#f15e6c";
+                        const tip = document.createElement("div");
+                        tip.className = "sort-play-custom-tooltip";
+                        tip.textContent = "Unlike this version";
+                        tip.style.cssText = "position: fixed; background-color: #282828; color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 12px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); z-index: 10000; pointer-events: none; white-space: nowrap;";
+                        document.body.appendChild(tip);
+                        const bRect = innerUnlikeBtn.getBoundingClientRect();
+                        const tRect = tip.getBoundingClientRect();
+                        tip.style.left = `${bRect.left + (bRect.width / 2) - (tRect.width / 2)}px`;
+                        tip.style.top = `${bRect.top - tRect.height - 6}px`;
+                        innerUnlikeBtn._tip = tip;
+                    });
+                    innerUnlikeBtn.addEventListener("mouseleave", () => {
+                        innerUnlikeBtn.style.color = "#b3b3b3";
+                        if (innerUnlikeBtn._tip) {
+                            innerUnlikeBtn._tip.remove();
+                            innerUnlikeBtn._tip = null;
+                        }
+                    });
+
+                    innerUnlikeBtn.addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        if (innerUnlikeBtn._tip) {
+                            innerUnlikeBtn._tip.remove();
+                            innerUnlikeBtn._tip = null;
+                        }
+                        if (sTrack.uri && Spicetify.Platform?.LibraryAPI?.remove) {
+                            try {
+                                await Spicetify.Platform.LibraryAPI.remove({ uris: [sTrack.uri] });
+                                invalidateLikedSongsCache();
+                                try {
+                                    if (typeof Spicetify.Platform?.PlaylistAPI?.resync === 'function') {
+                                        Spicetify.Platform.PlaylistAPI.resync("spotify:user:@me:collection");
+                                    }
+                                } catch (_) {}
+                                likeButton_removeLikedTrack(sTrack.trackId);
+                                document.dispatchEvent(likeButton_likedTracksChangeEvent);
+                                renderMenuContent();
+                            } catch (err) {
+                                showNotification("Failed to unlike song.", true);
+                            }
+                        }
+                    });
+
+                    const rowBtn = createButton({
+                        text: sTrack.name || "Track",
+                        subtext: sTrack.albumName || "Album",
+                        subtextTag: isThisExact ? "(This Track)" : null,
+                        iconSvg: likeMenuGoToAlbumIconSvg,
+                        innerButton: innerUnlikeBtn,
+                        onClick: () => {
+                            if (sTrack.albumId) Spicetify.Platform.History.push(`/album/${sTrack.albumId.replace('spotify:album:', '')}`);
+                            closeLikeButtonMenu();
+                        }
+                    });
+                    menu.appendChild(rowBtn);
+                });
+            } else if (currentCount === 1 && !isDirectlyLiked) {
+                const sTrack = currentSavedList[0];
+                const likedAlbumBtn = createButton({
+                    text: "Go to Album",
+                    textTag: "(Liked Version)",
+                    subtext: sTrack.albumName || "Album",
+                    iconSvg: likeMenuGoToAlbumIconSvg,
+                    onClick: () => {
+                        if (sTrack.albumId) Spicetify.Platform.History.push(`/album/${sTrack.albumId.replace('spotify:album:', '')}`);
+                        closeLikeButtonMenu();
+                    }
+                });
+                menu.appendChild(likedAlbumBtn);
+            }
+
+            let isAlreadyShowingCurrent = false;
+            if (currentCount > 1) {
+                isAlreadyShowingCurrent = currentSavedList.some(s => s.albumId && s.albumId === resolvedCurrentAlbum.id);
+            } else if (currentCount === 1 && !isDirectlyLiked) {
+                isAlreadyShowingCurrent = (currentSavedList[0]?.albumId === resolvedCurrentAlbum.id);
+            }
+
+            const isCurrentAlbumKnown = !!(resolvedCurrentAlbum.id || resolvedCurrentAlbum.name);
+            if (isCurrentAlbumKnown && !isAlreadyShowingCurrent) {
+                if (currentCount > 1) {
+                    menu.appendChild(createDivider());
+                }
+                const isAltCase = currentCount > 0 && !isDirectlyLiked;
+                const currentAlbumBtn = createButton({
+                    text: "Go to Album",
+                    textTag: isAltCase ? "(Current)" : null,
+                    subtext: resolvedCurrentAlbum.name || "Album",
+                    iconSvg: likeMenuGoToAlbumIconSvg,
+                    onClick: () => {
+                        if (resolvedCurrentAlbum.id) Spicetify.Platform.History.push(`/album/${resolvedCurrentAlbum.id.replace('spotify:album:', '')}`);
+                        closeLikeButtonMenu();
+                    }
+                });
+                menu.appendChild(currentAlbumBtn);
+            }
+
+            menu.appendChild(createDivider());
+
+            let resolvedArtist = currentAlbumInfo?.artistName || null;
+            let resolvedTitle = null;
+
+            if (!resolvedArtist || !resolvedTitle) {
+                if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2]) {
+                    resolvedArtist = resolvedArtist || Spicetify.Player.data?.item?.artists?.[0]?.name || Spicetify.Player.data?.item?.metadata?.artist_name;
+                    resolvedTitle = resolvedTitle || Spicetify.Player.data?.item?.name || Spicetify.Player.data?.item?.metadata?.title;
+                }
+                const row = anchorEl.closest?.('.main-trackList-trackListRow, div[role="row"]');
+                if (row) {
+                    resolvedArtist = resolvedArtist || row.querySelector('a[href^="/artist/"]')?.textContent?.trim();
+                    resolvedTitle = resolvedTitle || row.querySelector('.main-trackList-rowTitle, [data-testid="tracklist-row-title"]')?.textContent?.trim();
+                }
+            }
+
+            const cacheKey = resolvedIsrc ? `${resolvedIsrc}:${(candidateArtistIds[0] || resolvedArtist || "").toLowerCase().trim()}` : null;
+            const cachedResult = cacheKey ? isrcCountCache.get(cacheKey) : undefined;
+            const hasValidCached = typeof cachedResult?.count === "number" && cachedResult.count > 0;
+
+            const viewAllBtn = createButton({
+                text: "View All Versions on Spotify",
+                textTag: hasValidCached ? cachedResult.tag : null,
+                iconSvg: likeMenuViewVersionsIconSvg,
+                disabled: !resolvedIsrc,
+                onClick: () => {
+                    if (resolvedIsrc) Spicetify.Platform.History.push(`/search/${encodeURIComponent('isrc:' + resolvedIsrc)}/tracks`);
+                    closeLikeButtonMenu();
+                }
+            });
+            menu.appendChild(viewAllBtn);
+
+            if (resolvedIsrc && !hasValidCached) {
+                fetchIsrcTrackCount(resolvedIsrc, candidateArtistIds, resolvedArtist, resolvedTitle).then(res => {
+                    if (likeButton_activeMenu !== menu) return;
+                    if (typeof res?.count === "number" && res.count > 0) {
+                        viewAllBtn._updateTag(res.tag, false);
+                    }
+                });
+            }
+
+            const copyIsrcBtn = createButton({
+                text: resolvedIsrc ? "Copy Track ISRC" : "ISRC Unavailable",
+                iconSvg: likeMenuCopyIsrcIconSvg,
+                disabled: !resolvedIsrc,
+                onClick: () => {
+                    if (resolvedIsrc) {
+                        navigator.clipboard.writeText(resolvedIsrc);
+                        showNotification(`ISRC copied to clipboard: ${resolvedIsrc}`);
+                    }
+                    closeLikeButtonMenu();
+                }
+            });
+            menu.appendChild(copyIsrcBtn);
+
+            applyNativeMenuStyles(menu, menuContainer);
+            if (menu.isConnected) {
+                updatePosition();
+            }
+        };
+
+        renderMenuContent();
+        document.body.appendChild(menu);
+        updatePosition();
+
+        if (!resolvedIsrc || !resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name) {
+            (async () => {
+                let updated = false;
+                if (!resolvedIsrc) {
+                    const cachedMeta = await idb.get('trackMetadata', trackId);
+                    if (cachedMeta?.external_ids?.isrc) {
+                        resolvedIsrc = cachedMeta.external_ids.isrc;
+                        updated = true;
+                    } else if (!trackId.startsWith("spotify:local:")) {
+                        try {
+                            const meta = await fetchCoreMetadataBatch([uri]);
+                            const core = meta.get(uri);
+                            if (core?.isrc) {
+                                resolvedIsrc = core.isrc;
+                                updated = true;
+                            }
+                        } catch (e) {}
+                    }
+                }
+                if (!resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name) {
+                    const cached = await idb.get('trackMetadata', trackId);
+                    if (cached?.album?.id) {
+                        resolvedCurrentAlbum.id = resolvedCurrentAlbum.id || cached.album.id;
+                        resolvedCurrentAlbum.name = resolvedCurrentAlbum.name || cached.album.name;
+                        updated = true;
+                    } else if (!trackId.startsWith("spotify:local:")) {
+                        try {
+                            const meta = await fetchInternalTrackMetadata(trackId);
+                            if (meta?.album?.id) {
+                                resolvedCurrentAlbum.id = resolvedCurrentAlbum.id || meta.album.id;
+                                resolvedCurrentAlbum.name = resolvedCurrentAlbum.name || meta.album.name;
+                                updated = true;
+                            }
+                        } catch (e) {}
+                    }
+                }
+                if (updated && likeButton_activeMenu === menu) {
+                    renderMenuContent();
+                }
+            })();
+        }
+
+        likeButton_activeMenu = menu;
+        likeButton_activeMenuAbort = new AbortController();
+        const signal = likeButton_activeMenuAbort.signal;
+
+        window.addEventListener('pointerdown', (e) => {
+            if (!menu.contains(e.target) && !anchorEl.contains(e.target)) closeLikeButtonMenu();
+        }, { capture: true, signal });
+
+        window.addEventListener('click', (e) => {
+            if (!menu.contains(e.target) && !anchorEl.contains(e.target)) closeLikeButtonMenu();
+        }, { capture: true, signal });
+
+        window.addEventListener('contextmenu', (e) => {
+            if (!menu.contains(e.target) && !anchorEl.contains(e.target)) closeLikeButtonMenu();
+        }, { capture: true, signal });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLikeButtonMenu();
+        }, { signal });
+
+        window.addEventListener('wheel', (e) => {
+            if (!menu.contains(e.target)) closeLikeButtonMenu();
+        }, { passive: true, signal });
+
+        window.addEventListener('scroll', (e) => {
+            if (!menu.contains(e.target)) closeLikeButtonMenu();
+        }, { capture: true, passive: true, signal });
+
+        window.addEventListener('resize', closeLikeButtonMenu, { signal });
+    }
+
+    const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16.3, dynamicSizeSelector = null, buttonStyle = { marginRight: "12px" }, currentAlbum = null, artistIds = [] }) {
         const trackId = uri.replace("spotify:track:", "");
         const [currentSize, setCurrentSize] = Spicetify.React.useState(size);
         const [isrc, setISRC] = Spicetify.React.useState(null);
-        const [isLiked, setIsLiked] = Spicetify.React.useState(likeButton_likedTracksIdsISRCs.has(trackId));
-        const [hasISRCLiked, setHasISRCLiked] = Spicetify.React.useState(false);
+        const [effectiveArtistIds, setEffectiveArtistIds] = Spicetify.React.useState(artistIds);
+        const [isLiked, setIsLiked] = Spicetify.React.useState(likeButton_likedTracksById.has(trackId));
+        const [savedCount, setSavedCount] = Spicetify.React.useState(0);
         const [isHovered, setIsHovered] = Spicetify.React.useState(false);
         const buttonRef = Spicetify.React.useRef(null);
-    
-        const [isTooltipVisible, setIsTooltipVisible] = Spicetify.React.useState(false);
-        const tooltipTimeoutRef = Spicetify.React.useRef(null);
-        const tooltipRef = Spicetify.React.useRef(null);
-        const tooltipCheckIntervalRef = Spicetify.React.useRef(null);
-    
-        const tooltipContent = isLiked ? "Remove from Liked Songs" : hasISRCLiked ? "You've already liked another version." : "Add to Liked Songs";
+
+        const hasISRCLiked = savedCount > 0 && !isLiked;
+
+        let tooltipContent = "Add to Liked Songs (Right-click for options)";
+        if (savedCount > 1) {
+            tooltipContent = `\u26A0\uFE0F ${savedCount} versions saved in Liked Songs (Right-click for options)`;
+        } else if (isLiked) {
+            tooltipContent = "Saved in Liked Songs (Right-click for options)";
+        } else if (hasISRCLiked) {
+            tooltipContent = "Another version is in your Liked Songs (Right-click for options)";
+        }
 
         Spicetify.React.useEffect(() => {
             return () => {
-                clearTimeout(tooltipTimeoutRef.current);
-                clearInterval(tooltipCheckIntervalRef.current);
-                const tooltipNode = tooltipRef.current;
-                if (tooltipNode && tooltipNode.parentNode) {
-                    tooltipNode.parentNode.removeChild(tooltipNode);
+                if (likeButton_tooltipAnchor === buttonRef.current) {
+                    likeButton_hideTooltip();
                 }
             };
         }, []);
 
         Spicetify.React.useEffect(() => {
-            if (isTooltipVisible) {
-                if (buttonRef.current && tooltipRef.current) {
-                    const buttonRect = buttonRef.current.getBoundingClientRect();
-                    const tooltip = tooltipRef.current;
-                    const tooltipRect = tooltip.getBoundingClientRect();
-                    const viewportWidth = window.innerWidth;
-                    const margin = 8;
-
-                    tooltip.style.top = `${buttonRect.top - tooltipRect.height - 8}px`;
-                    let idealLeft = buttonRect.left + (buttonRect.width / 2) - (tooltipRect.width / 2);
-                    
-                    if (idealLeft < margin) idealLeft = margin;
-                    else if (idealLeft + tooltipRect.width > viewportWidth - margin) idealLeft = viewportWidth - tooltipRect.width - margin;
-
-                    tooltip.style.left = `${idealLeft}px`;
-                    
-                    const timeoutId = setTimeout(() => tooltip.classList.add('visible'), 10);
-                    
-                    tooltipCheckIntervalRef.current = setInterval(() => {
-                        if (!buttonRef.current || !document.body.contains(buttonRef.current)) {
-                            setIsTooltipVisible(false);
-                        }
-                    }, 150);
-
-                    return () => clearTimeout(timeoutId);
-                }
-            } else {
-                clearInterval(tooltipCheckIntervalRef.current);
-                if (tooltipRef.current) {
-                    tooltipRef.current.classList.remove('visible');
-                }
-            }
-        }, [isTooltipVisible]);
-    
-        Spicetify.React.useEffect(() => {
             if (!dynamicSizeSelector) return;
-
             const buttonSelector = dynamicSizeSelector.split(',').map(s => s.replace(' svg', '')).join(',');
             const referenceElement = document.querySelector(buttonSelector) || document.querySelector(dynamicSizeSelector);
             if (!referenceElement) return;
@@ -54649,161 +58051,209 @@ shadowRoot.innerHTML = `
                 if (targetSvg) {
                     const rect = targetSvg.getBoundingClientRect();
                     const newSize = rect.height || rect.width;
-                    if (newSize > 0) {
-                        setCurrentSize(newSize);
-                    }
+                    if (newSize > 0) setCurrentSize(newSize);
                 }
             };
 
-            const resizeObserver = new ResizeObserver(() => {
-                updateSize();
-            });
-
+            const resizeObserver = new ResizeObserver(() => updateSize());
             resizeObserver.observe(referenceElement);
             updateSize();
-
             return () => resizeObserver.disconnect();
         }, [dynamicSizeSelector]);
 
         Spicetify.React.useEffect(() => {
-            async function initISRC() {
-                try {
-                    let currentIsrc = null;
-                    const meta = await idb.get('trackMetadata', trackId);
-                    if (meta && meta.external_ids && meta.external_ids.isrc) {
-                        currentIsrc = meta.external_ids.isrc;
-                    } else if (trackId) {
-                        let track = await fetchInternalTrackMetadata(trackId);
-
-                        if (track && track.external_ids && track.external_ids.isrc) {
-                            currentIsrc = track.external_ids.isrc;
-                            idb.set('trackMetadata', trackId, {
-                                name: track.name,
-                                album: track.album,
-                                artists: track.artists,
-                                duration_ms: track.duration_ms,
-                                popularity: track.popularity,
-                                external_ids: track.external_ids,
-                                id: track.id,
-                                uri: track.uri
-                            });
-                        }
-                    }
-                    
-                    if (currentIsrc) {
-                        setISRC(currentIsrc);
-                        setHasISRCLiked(likeButton_likedTracksISRCs.has(currentIsrc));
-                    }
-                } catch (error) {
-                    console.error('[Sort-Play Like Button] Error fetching ISRC:', error);
-                }
-            };
-            initISRC();
-        }, [trackId]);
+            setEffectiveArtistIds(artistIds);
+        }, [artistIds]);
 
         Spicetify.React.useEffect(() => {
-            if (isrc) {
-                setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
+            async function initISRC() {
+                try {
+                    let currentIsrc = likeButton_likedTracksById.get(trackId)?.isrc || null;
+                    let resolvedIds = [...effectiveArtistIds];
+
+                    if (!currentIsrc || resolvedIds.length === 0) {
+                        const meta = await idb.get('trackMetadata', trackId);
+                        if (meta) {
+                            if (!currentIsrc && meta.external_ids?.isrc) currentIsrc = meta.external_ids.isrc;
+                            if (resolvedIds.length === 0 && meta.artists) {
+                                resolvedIds = meta.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
+                            }
+                        } else if (trackId && !trackId.startsWith("spotify:local:")) {
+                            const track = await fetchInternalTrackMetadata(trackId);
+                            if (track) {
+                                if (!currentIsrc && track.external_ids?.isrc) currentIsrc = track.external_ids.isrc;
+                                if (resolvedIds.length === 0 && track.artists) {
+                                    resolvedIds = track.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
+                                }
+                                idb.set('trackMetadata', trackId, formatTrackCacheData(track));
+                            }
+                        }
+                    }
+
+                    if (resolvedIds.length > 0 && resolvedIds.length !== effectiveArtistIds.length) {
+                        setEffectiveArtistIds(resolvedIds);
+                    }
+
+                    if (currentIsrc) {
+                        setISRC(currentIsrc);
+                        if (likeButton_likedTracksById.has(trackId)) {
+                            const entry = likeButton_likedTracksById.get(trackId);
+                            if (!entry.isrc) {
+                                entry.isrc = currentIsrc;
+                                likeButton_addLikedTrack(entry);
+                            }
+                        }
+                        const count = likeButton_getMatchingSavedTracks(currentIsrc, resolvedIds).length;
+                        setSavedCount(count);
+                    }
+                } catch (error) {}
             }
-        }, [isrc]);
+            initISRC();
+        }, [trackId, effectiveArtistIds]);
 
         Spicetify.React.useEffect(() => {
             const handleLikedTracksChange = () => {
-                setIsLiked(likeButton_likedTracksIdsISRCs.has(trackId));
+                setIsLiked(likeButton_likedTracksById.has(trackId));
                 if (isrc) {
-                    setHasISRCLiked(likeButton_likedTracksISRCs.has(isrc));
+                    setSavedCount(likeButton_getMatchingSavedTracks(isrc, effectiveArtistIds).length);
                 }
             };
-            
+
             document.addEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
             return () => {
                 document.removeEventListener('likeButton_likedTracksChange', handleLikedTracksChange);
             };
-        }, [trackId, isrc]);
-    
+        }, [trackId, isrc, effectiveArtistIds]);
+
         const handleClick = async function () {
-            if (!Spicetify.Platform?.LibraryAPI?.add || !Spicetify.Platform?.LibraryAPI?.remove) {
-                showNotification("Library API not available.", true);
-                console.error("[Sort-Play Like Button] Spicetify.Platform.LibraryAPI.add/remove is not available.");
-                return;
-            }
+            likeButton_hideTooltip();
+            if (!Spicetify.Platform?.LibraryAPI?.add || !Spicetify.Platform?.LibraryAPI?.remove) return;
             if (isLiked) {
                 try {
                     await Spicetify.Platform.LibraryAPI.remove({ uris: [uri] });
-                    proxy_likeButton_likedTracksIdsISRCs.delete(trackId);
+                    invalidateLikedSongsCache();
+                    try {
+                        if (typeof Spicetify.Platform?.PlaylistAPI?.resync === 'function') {
+                            Spicetify.Platform.PlaylistAPI.resync("spotify:user:@me:collection");
+                        }
+                    } catch (_) {}
+                    likeButton_removeLikedTrack(trackId);
+                    document.dispatchEvent(likeButton_likedTracksChangeEvent);
                 } catch (error) {
-                    console.error('[Sort-Play Like Button] Error unliking track with LibraryAPI:', error);
                     showNotification("Failed to unlike song.", true);
                 }
             } else {
                 try {
                     await Spicetify.Platform.LibraryAPI.add({ uris: [uri] });
-                    if (isrc) {
-                        proxy_likeButton_likedTracksIdsISRCs.set(trackId, isrc);
+                    invalidateLikedSongsCache();
+                    try {
+                        if (typeof Spicetify.Platform?.PlaylistAPI?.resync === 'function') {
+                            Spicetify.Platform.PlaylistAPI.resync("spotify:user:@me:collection");
+                        }
+                    } catch (_) {}
+                    let currentAlbumId = currentAlbum?.id;
+                    let currentAlbumName = currentAlbum?.name;
+                    let trackTitle = null;
+                    let currentArtistIds = effectiveArtistIds?.length ? [...effectiveArtistIds] : [...artistIds];
+                    if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2]) {
+                        currentAlbumId = currentAlbumId || Spicetify.Player.data?.item?.album?.uri?.split(':')[2];
+                        currentAlbumName = currentAlbumName || Spicetify.Player.data?.item?.album?.name;
+                        trackTitle = Spicetify.Player.data?.item?.name;
+                        if (!currentArtistIds.length) {
+                            currentArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
+                        }
                     }
+                    if (!trackTitle) {
+                        const cached = await idb.get('trackMetadata', trackId);
+                        trackTitle = cached?.name;
+                        currentAlbumId = currentAlbumId || cached?.album?.id;
+                        currentAlbumName = currentAlbumName || cached?.album?.name;
+                        if (!currentArtistIds.length && cached?.artists) {
+                            currentArtistIds = cached.artists.map(a => a.id || a.uri?.split(':')[2]).filter(Boolean);
+                        }
+                    }
+                    likeButton_addLikedTrack({ trackId, uri, name: trackTitle || "Track", albumId: currentAlbumId, albumName: currentAlbumName || "Album", isrc, artistIds: currentArtistIds });
+                    document.dispatchEvent(likeButton_likedTracksChangeEvent);
                 } catch (error) {
-                    console.error('[Sort-Play Like Button] Error liking track with LibraryAPI:', error);
                     showNotification("Failed to like song.", true);
                 }
             }
         };
-    
+
+        const handleContextMenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            likeButton_hideTooltip();
+            openLikeButtonMenu({
+                anchorEl: buttonRef.current,
+                uri,
+                isrc,
+                currentAlbumInfo: currentAlbum || {},
+                artistIds: effectiveArtistIds
+            });
+        };
+
         const finalClassName = `${classList} sort-play-like-button`;
 
-        return Spicetify.React.createElement(Spicetify.React.Fragment, null,
-            Spicetify.React.createElement("button", {
-                ref: buttonRef,
-                className: finalClassName,
-                title: "",
-                "aria-label": tooltipContent,
-                "aria-checked": isLiked || hasISRCLiked,
-                onClick: handleClick,
-                onMouseEnter: () => {
-                    setIsHovered(true);
-                    clearTimeout(tooltipTimeoutRef.current);
-                    tooltipTimeoutRef.current = setTimeout(() => {
-                        setIsTooltipVisible(true);
-                    }, 250);
-                },
-                onMouseLeave: () => {
-                    setIsHovered(false);
-                    clearTimeout(tooltipTimeoutRef.current);
-                    setIsTooltipVisible(false);
-                },
-                style: buttonStyle
-            }, Spicetify.React.createElement("span", {
-                className: "Wrapper-sm-only Wrapper-small-only",
-                style: {
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
+        return Spicetify.React.createElement("button", {
+            ref: buttonRef,
+            className: finalClassName,
+            title: "",
+            "aria-label": tooltipContent,
+            "aria-checked": isLiked || hasISRCLiked,
+            onClick: handleClick,
+            onContextMenu: handleContextMenu,
+            onPointerDown: (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopPropagation();
                 }
-            }, Spicetify.React.createElement("svg", {
-                role: "img", height: currentSize, width: currentSize, viewBox: "0 0 16 16",
-                className: (isLiked || hasISRCLiked) ? "Svg-sc-ytk21e-0 Svg-img-icon-small-textBrightAccent" : "Svg-sc-ytk21e-0 Svg-img-icon-small",
-                style: {
-                    fill: (isLiked || hasISRCLiked) ? "var(--text-bright-accent)" : "var(--text-subdued)",
-                    filter: isHovered ? 'brightness(1.1)' : 'none',
-                    transform: (hasISRCLiked && !isLiked) ? 'translateY(1px)' : 'none',
-                    transition: 'filter 0.1s ease-in-out'
-                },
-                dangerouslySetInnerHTML: {
-                    __html: isLiked
-                        ? LIKE_BUTTON_ICON_LIKED
-                        : (hasISRCLiked
-                            ? LIKE_BUTTON_ICON_ISRC_LIKED
-                            : LIKE_BUTTON_ICON_NOT_LIKED)
+            },
+            onPointerUp: (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopPropagation();
                 }
-            }))),
-            isTooltipVisible && Spicetify.ReactDOM.createPortal(
-                Spicetify.React.createElement("div", {
-                    ref: tooltipRef,
-                    className: "like-button-tooltip",
-                    style: { position: 'fixed' }
-                }, tooltipContent),
-                document.body
-            )
-        );
+            },
+            onMouseDown: (e) => { 
+                likeButton_hideTooltip();
+                if (e.button === 2) { e.preventDefault(); e.stopPropagation(); } 
+            },
+            onMouseUp: (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            },
+            onMouseEnter: () => {
+                setIsHovered(true);
+                likeButton_showTooltip(buttonRef.current, tooltipContent);
+            },
+            onMouseLeave: () => {
+                setIsHovered(false);
+                likeButton_hideTooltip();
+            },
+            style: buttonStyle
+        }, Spicetify.React.createElement("span", {
+            className: "Wrapper-sm-only Wrapper-small-only",
+            style: { display: 'flex', alignItems: 'center', justifyContent: 'center' }
+        }, Spicetify.React.createElement("svg", {
+            role: "img", height: currentSize, width: currentSize, viewBox: "0 0 16 16",
+            className: (isLiked || hasISRCLiked) ? "Svg-sc-ytk21e-0 Svg-img-icon-small-textBrightAccent" : "Svg-sc-ytk21e-0 Svg-img-icon-small",
+            style: {
+                fill: (isLiked || hasISRCLiked) ? "var(--text-bright-accent)" : "var(--text-subdued)",
+                filter: isHovered ? 'brightness(1.1)' : 'none',
+                transform: (hasISRCLiked && !isLiked) ? 'translateY(1px)' : 'none',
+                transition: 'filter 0.1s ease-in-out'
+            },
+            dangerouslySetInnerHTML: {
+                __html: isLiked
+                    ? LIKE_BUTTON_ICON_LIKED
+                    : (hasISRCLiked
+                        ? LIKE_BUTTON_ICON_ISRC_LIKED
+                        : LIKE_BUTTON_ICON_NOT_LIKED)
+            }
+        })));
     });
     
     async function mountLikeButton(isDebounced = false) {
@@ -54901,12 +58351,17 @@ shadowRoot.innerHTML = `
                         continue;
                     }
                     
+                    const curAlbumId = Spicetify.Player.data?.item?.album?.uri?.split(':')[2] || Spicetify.Player.data?.item?.metadata?.album_uri?.split(':')[2] || null;
+                    const curAlbumName = Spicetify.Player.data?.item?.album?.name || Spicetify.Player.data?.item?.metadata?.album_title || null;
+                    const curArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
                     Spicetify.ReactDOM.render(
                         Spicetify.React.createElement(LikeButton, { 
                             uri: uri, 
                             key: uri, 
                             classList: currentNativeLikeButton.className,
-                            buttonStyle: { marginRight: "0px" }
+                            buttonStyle: { marginRight: "0px" },
+                            currentAlbum: { id: curAlbumId, name: curAlbumName },
+                            artistIds: curArtistIds
                         }), 
                         container
                     );
@@ -55016,6 +58471,9 @@ shadowRoot.innerHTML = `
             const dynamicSizeSelector = '.CAVVGuPYPRDhrbGiFOc1 button svg, .main-nowPlayingWidget-plusButtonWrapper button svg';
     
             try {
+                const curAlbumId = Spicetify.Player.data?.item?.album?.uri?.split(':')[2] || Spicetify.Player.data?.item?.metadata?.album_uri?.split(':')[2] || null;
+                const curAlbumName = Spicetify.Player.data?.item?.album?.name || Spicetify.Player.data?.item?.metadata?.album_title || null;
+                const curArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
                 Spicetify.ReactDOM.render(
                     Spicetify.React.createElement(LikeButton, {
                         uri: uri,
@@ -55023,7 +58481,9 @@ shadowRoot.innerHTML = `
                         classList: templateButton.className,
                         size: 21,
                         dynamicSizeSelector: dynamicSizeSelector,
-                        buttonStyle: { marginRight: "0px", marginLeft: "12px" }
+                        buttonStyle: { marginRight: "0px", marginLeft: "12px" },
+                        currentAlbum: { id: curAlbumId, name: curAlbumName },
+                        artistIds: curArtistIds
                     }),
                     container
                 );
@@ -55162,6 +58622,9 @@ shadowRoot.innerHTML = `
                     .replace(/boFkCF4QGEeMQzn5/g, '')
                     .trim();
 
+                const curAlbumId = Spicetify.Player.data?.item?.album?.uri?.split(':')[2] || Spicetify.Player.data?.item?.metadata?.album_uri?.split(':')[2] || null;
+                const curAlbumName = Spicetify.Player.data?.item?.album?.name || Spicetify.Player.data?.item?.metadata?.album_title || null;
+                const curArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
                 Spicetify.ReactDOM.render(
                     Spicetify.React.createElement(LikeButton, {
                         uri: uri,
@@ -55169,7 +58632,9 @@ shadowRoot.innerHTML = `
                         classList: cleanClassList,
                         size: 30,
                         dynamicSizeSelector: null,
-                        buttonStyle: { marginRight: "0px", marginTop: "1px", display: "flex", alignItems: "center", justifyContent: "center" }
+                        buttonStyle: { marginRight: "0px", marginTop: "1px", display: "flex", alignItems: "center", justifyContent: "center" },
+                        currentAlbum: { id: curAlbumId, name: curAlbumName },
+                        artistIds: curArtistIds
                     }),
                     wrapper
                 );
@@ -55186,7 +58651,14 @@ shadowRoot.innerHTML = `
     }
 
     (async function initialize() {
-        await likeButton_initiateLikedSongs();
+        likeButton_initiateLikedSongs();
+
+        try {
+            Spicetify.Platform?.LibraryAPI?.getEvents?.().addListener("update", () => {
+                invalidateLikedSongsCache();
+                likeButton_initiateLikedSongs();
+            });
+        } catch (e) {}
     
         while (!Spicetify?.Player?.data?.item || !document.querySelector(".main-nowPlayingWidget-nowPlaying")) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -55251,6 +58723,15 @@ shadowRoot.innerHTML = `
         if (!entryPoint) return;
         
         let uri = null;
+        let artistIds = [];
+
+        const domArtistLinks = targetRow.querySelectorAll('a[href*="/artist/"], a[href*=":artist:"]');
+        domArtistLinks.forEach(a => {
+            const href = a.getAttribute('href') || '';
+            const match = href.match(/artist[/:]([a-zA-Z0-9]+)/);
+            if (match && !artistIds.includes(match[1])) artistIds.push(match[1]);
+        });
+
         const reactPropsKey = Object.keys(targetRow).find(key => key.startsWith("__reactProps$"));
         if (reactPropsKey) {
             const props = targetRow[reactPropsKey];
@@ -55258,6 +58739,16 @@ shadowRoot.innerHTML = `
             
             if (!uri || !uri.startsWith("spotify:track:")) {
                 uri = likeButton_findVal(props, "uri");
+            }
+
+            if (artistIds.length === 0) {
+                const trackData = typeof getTrackDataObject === 'function' ? getTrackDataObject(targetRow) : null;
+                const rawArtists = trackData?.artists || props?.children?.props?.value?.item?.artists || likeButton_findVal(props, "artists");
+                if (Array.isArray(rawArtists)) {
+                    artistIds = rawArtists.map(a => a.uri?.split(":")[2] || a.id).filter(Boolean);
+                } else if (Array.isArray(rawArtists?.items)) {
+                    artistIds = rawArtists.items.map(a => a.uri?.split(":")[2] || a.id).filter(Boolean);
+                }
             }
         }
         
@@ -55270,10 +58761,30 @@ shadowRoot.innerHTML = `
         likeButtonWrapper.style.display = "contents";
         
         try {
+            let currentAlbum = null;
+            const albumLink = targetRow.querySelector('a[href^="/album/"]');
+            if (albumLink) {
+                const albHref = albumLink.getAttribute('href') || "";
+                currentAlbum = {
+                    id: albHref.split('?')[0].split('/album/')[1] || null,
+                    name: albumLink.textContent?.trim() || null
+                };
+            }
+            const stopSecondary = (e) => {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            };
+            likeButtonWrapper.addEventListener('contextmenu', (e) => { e.preventDefault(); e.stopPropagation(); });
+            likeButtonWrapper.addEventListener('mousedown', stopSecondary);
+            likeButtonWrapper.addEventListener('pointerdown', stopSecondary);
+            likeButtonWrapper.addEventListener('mouseup', stopSecondary);
+            likeButtonWrapper.addEventListener('pointerup', stopSecondary);
+
             entryPoint.parentElement.insertBefore(likeButtonWrapper, entryPoint);
-            Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.className }), likeButtonWrapper);
+            Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.className, currentAlbum, artistIds }), likeButtonWrapper);
         } catch (e) {
-            console.error("[Sort-Play] Failed to render like button", e);
             targetRow.classList.remove("sort-play-like-button-injected");
         }
     };
@@ -55365,6 +58876,7 @@ shadowRoot.innerHTML = `
   let lastObservedMainView = null;
 
   function onPageChange() {
+    likeButton_hideTooltip();
     insertButton();
     updateArtistPageGenres(); 
     const currentUri = getCurrentUri();
@@ -55462,6 +58974,7 @@ shadowRoot.innerHTML = `
 
   const themeObserver = new MutationObserver(() => {
     requestAnimationFrame(() => {
+      cachedNativeMenuStyles = null;
       applyCurrentThemeColors();
     });
   });
