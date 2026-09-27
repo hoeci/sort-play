@@ -20,7 +20,7 @@
 Sort playlists, albums, and artists by Global Play Count, Popularity, Release Date, True Release Date, Artist & Release Date, Last.fm Scrobbles, My Scrobbles, Scrobble Range, Last Scrobbled, Taste Match, Energy Wave, Liked Status, Album Color, and audio features (Tempo, Key, Energy, etc.).
 
 ### ➕ Quick Filters
-Instantly apply filters. Deduplicate tracks, keep one track per artist, filter by followed artists, filter by release type (albums, EPs, singles, compilations), exclude or keep liked songs, remove trashed songs (Trashbin), or exclude tracks found in another playlist or folder.
+Clean, filter, and audit your playlists with one-click actions and interactive review modals. Audit exact and possible duplicates in the Duplicate Tracks Manager, inspect and remove regionally unavailable tracks, keep one track per artist, filter by followed artists, isolate release types, filter by liked status, remove trashed songs (Trashbin), or exclude tracks from other playlists and folders.
 
 ### ➕ Extra Data Columns
 Add up to two extra data columns to playlists or search views, and one to albums/artists. Display Play Count, Release Date, True Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info with custom formatting.
