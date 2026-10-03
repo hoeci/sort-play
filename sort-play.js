@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.7.1";
+  const SORT_PLAY_VERSION = "6.7.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -56090,59 +56090,66 @@ shadowRoot.innerHTML = `
   }
 
   function getTracklistTrackUri(tracklistElement) {
-    const reactPropsKey = Object.keys(tracklistElement).find(key => key.startsWith("__reactProps$"));
-    if (reactPropsKey) {
-        const props = tracklistElement[reactPropsKey];
-        const findUri = (obj, maxDepth = 10, visited = new Set()) => {
-            if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
-            visited.add(obj);
-            if (obj.hasOwnProperty('uri') && typeof obj.uri === 'string' && (obj.uri.startsWith('spotify:track:') || obj.uri.startsWith('spotify:local:'))) return obj.uri;
-            for (const k in obj) {
-                if (['children', 'props', 'value', 'item', 'track'].includes(k) || !isNaN(k)) {
-                    const res = findUri(obj[k], maxDepth - 1, visited);
-                    if (res) return res;
-                }
-            }
-            return null;
-        };
-        const uri = findUri(props);
-        if (uri) return uri;
-    }
+    try {
+      const reactPropsKey = Object.keys(tracklistElement).find(key => key.startsWith("__reactProps$"));
+      if (reactPropsKey) {
+          const props = tracklistElement[reactPropsKey];
+          const findUri = (obj, maxDepth = 10, visited = new Set()) => {
+              if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
+              visited.add(obj);
+              if (obj.hasOwnProperty('uri') && typeof obj.uri === 'string' && (obj.uri.startsWith('spotify:track:') || obj.uri.startsWith('spotify:local:'))) return obj.uri;
+              for (const k in obj) {
+                  if (['children', 'props', 'value', 'item', 'track'].includes(k) || !isNaN(k)) {
+                      const res = findUri(obj[k], maxDepth - 1, visited);
+                      if (res) return res;
+                  }
+              }
+              return null;
+          };
+          const uri = findUri(props);
+          if (uri) return uri;
+      }
 
-    let values = Object.values(tracklistElement);
-    if (values?.[0]?.pendingProps) {
-        const legacyUri = (
-            values[0]?.pendingProps?.children?.props?.value?.spec?._path?.[0]?.uri ||
-            values[0]?.pendingProps?.children[0]?.props?.children?.props?.uri ||
-            values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.uri ||
-            values[0]?.pendingProps?.children[0]?.props?.children?.props?.children?.props?.children?.props?.uri ||
-            values[0]?.pendingProps?.children[0]?.props?.children[0]?.props?.uri
-        );
-        if (legacyUri) return legacyUri;
-    }
+      const elementsToScan = [tracklistElement, tracklistElement.firstElementChild, tracklistElement.querySelector?.('button[aria-label^="Play "]')].filter(Boolean);
+      for (const el of elementsToScan) {
+          const fiberKey = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
+          if (fiberKey) {
+              let curr = el[fiberKey];
+              let depth = 0;
+              while (curr && depth < 8) {
+                  const u = curr.pendingProps?.uri || curr.memoizedProps?.uri || curr.pendingProps?.item?.uri || curr.memoizedProps?.item?.uri || curr.pendingProps?.track?.uri || curr.memoizedProps?.track?.uri;
+                  if (typeof u === 'string' && (u.startsWith('spotify:track:') || u.startsWith('spotify:local:'))) return u;
+                  
+                  const pChildren = curr.pendingProps?.children || curr.memoizedProps?.children;
+                  const firstChild = Array.isArray(pChildren) ? pChildren[0] : pChildren;
+                  const nestedUri = (
+                      firstChild?.props?.value?.spec?._path?.[0]?.uri ||
+                      firstChild?.props?.uri ||
+                      firstChild?.props?.item?.uri ||
+                      firstChild?.props?.track?.uri ||
+                      firstChild?.props?.children?.props?.uri ||
+                      firstChild?.props?.children?.[0]?.props?.uri ||
+                      firstChild?.props?.children?.props?.children?.props?.uri ||
+                      firstChild?.props?.children?.props?.children?.props?.children?.props?.uri
+                  );
+                  if (typeof nestedUri === 'string' && (nestedUri.startsWith('spotify:track:') || nestedUri.startsWith('spotify:local:'))) return nestedUri;
 
-    const elementsToScan = [tracklistElement, tracklistElement.firstElementChild, tracklistElement.querySelector?.('button[aria-label^="Play "]')].filter(Boolean);
-    for (const el of elementsToScan) {
-        const fiberKey = Object.keys(el).find(k => k.startsWith('__reactFiber$'));
-        if (fiberKey) {
-            let curr = el[fiberKey];
-            let depth = 0;
-            while (curr && depth < 8) {
-                const u = curr.pendingProps?.uri || curr.memoizedProps?.uri;
-                if (typeof u === 'string' && (u.startsWith('spotify:track:') || u.startsWith('spotify:local:'))) return u;
-                curr = curr.return;
-                depth++;
-            }
-        }
-    }
+                  curr = curr.return;
+                  depth++;
+              }
+          }
+      }
 
-    const trackLink = tracklistElement.querySelector?.('a[href*="/track/"]');
-    if (trackLink) {
-        const id = trackLink.getAttribute('href').split('/track/')[1]?.split('?')[0];
-        if (id) return `spotify:track:${id}`;
-    }
+      const trackLink = tracklistElement.querySelector?.('a[href*="/track/"]');
+      if (trackLink) {
+          const id = trackLink.getAttribute('href')?.split('/track/')[1]?.split('?')[0];
+          if (id) return `spotify:track:${id}`;
+      }
 
-    return null;
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   function updateTracklistStructure(tracklist_) {
