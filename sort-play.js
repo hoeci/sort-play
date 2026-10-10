@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.7.2";
+  const SORT_PLAY_VERSION = "6.7.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -5154,7 +5154,15 @@
             document.querySelectorAll('.sort-play-modified-parent').forEach(el => {
                 el.style.display = '';
                 el.style.alignItems = '';
+                el.style.minWidth = '';
+                el.style.width = '';
                 el.classList.remove('sort-play-modified-parent');
+            });
+            document.querySelectorAll('.sort-play-modified-marquee').forEach(el => {
+                el.style.minWidth = '';
+                el.style.maxWidth = '';
+                el.style.flex = '';
+                el.classList.remove('sort-play-modified-marquee');
             });
         }
         
@@ -15198,7 +15206,7 @@
 
                       const executionPromise = (async () => {
                           try {
-                              const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(9000) });
+                              const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(11000) });
                               if (!res.ok) throw new Error(`HTTP ${res.status}`);
                               const data = await res.json();
 
@@ -16027,7 +16035,7 @@
 
                           const executionPromise = (async () => {
                               try {
-                                  const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${artistId}`, { signal: AbortSignal.timeout(9000) });
+                                  const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${artistId}`, { signal: AbortSignal.timeout(11000) });
                                   if (!res.ok) throw new Error(`HTTP ${res.status}`);
                                   const data = await res.json();
                                   
@@ -16185,7 +16193,15 @@
         document.querySelectorAll('.sort-play-modified-parent').forEach(el => {
             el.style.display = '';
             el.style.alignItems = '';
+            el.style.minWidth = '';
+            el.style.width = '';
             el.classList.remove('sort-play-modified-parent');
+        });
+        document.querySelectorAll('.sort-play-modified-marquee').forEach(el => {
+            el.style.minWidth = '';
+            el.style.maxWidth = '';
+            el.style.flex = '';
+            el.classList.remove('sort-play-modified-marquee');
         });
     };
 
@@ -16214,11 +16230,19 @@
                 const h = a.getAttribute('href') || '';
                 return h.startsWith('/album/') || h.startsWith('/track/');
             });
-            currentTitleParent = titleLink?.closest('[data-encore-id="text"]') || titleLink?.parentElement || null;
+            if (titleLink) {
+                const trackInfoContainer = Array.from(npWidget.children).find(c => c.contains(titleLink));
+                const titleRow = trackInfoContainer ? Array.from(trackInfoContainer.children).find(c => c.contains(titleLink)) : null;
+                currentTitleParent = titleRow || titleLink.closest('[data-encore-id="text"]') || titleLink.parentElement;
+            }
         }
         if (!currentArtistParent && npWidget) {
             const artistLink = Array.from(npWidget.querySelectorAll('a')).find(a => (a.getAttribute('href') || '').startsWith('/artist/'));
-            currentArtistParent = artistLink?.closest('[data-encore-id="text"]') || artistLink?.parentElement || null;
+            if (artistLink) {
+                const trackInfoContainer = Array.from(npWidget.children).find(c => c.contains(artistLink));
+                const artistRow = trackInfoContainer ? Array.from(trackInfoContainer.children).find(c => c.contains(artistLink)) : null;
+                currentArtistParent = artistRow || artistLink.closest('[data-encore-id="text"]') || artistLink.parentElement;
+            }
         }
 
         if (!currentTitleParent && !currentArtistParent) {
@@ -16229,6 +16253,39 @@
 
         const titleNeeded = nowPlayingConfig.title.enabled;
         const artistNeeded = nowPlayingConfig.artist.enabled;
+
+        if (!titleNeeded && currentTitleParent) {
+            currentTitleParent.querySelectorAll('.sort-play-np-container').forEach(el => el.remove());
+            if (currentTitleParent.classList.contains('sort-play-modified-parent')) {
+                currentTitleParent.style.display = '';
+                currentTitleParent.style.alignItems = '';
+                currentTitleParent.style.minWidth = '';
+                currentTitleParent.style.width = '';
+                currentTitleParent.classList.remove('sort-play-modified-parent');
+            }
+            currentTitleParent.querySelectorAll('.sort-play-modified-marquee').forEach(el => {
+                el.style.minWidth = '';
+                el.style.maxWidth = '';
+                el.style.flex = '';
+                el.classList.remove('sort-play-modified-marquee');
+            });
+        }
+        if (!artistNeeded && currentArtistParent) {
+            currentArtistParent.querySelectorAll('.sort-play-np-container').forEach(el => el.remove());
+            if (currentArtistParent.classList.contains('sort-play-modified-parent')) {
+                currentArtistParent.style.display = '';
+                currentArtistParent.style.alignItems = '';
+                currentArtistParent.style.minWidth = '';
+                currentArtistParent.style.width = '';
+                currentArtistParent.classList.remove('sort-play-modified-parent');
+            }
+            currentArtistParent.querySelectorAll('.sort-play-modified-marquee').forEach(el => {
+                el.style.minWidth = '';
+                el.style.maxWidth = '';
+                el.style.flex = '';
+                el.classList.remove('sort-play-modified-marquee');
+            });
+        }
 
         const titleRendered = currentTitleParent?.querySelector('.sort-play-np-container')?.dataset.renderedForUri === track.uri;
         const artistRendered = currentArtistParent?.querySelector('.sort-play-np-container')?.dataset.renderedForUri === track.uri;
@@ -16245,6 +16302,8 @@
 
         try {
             const trackId = track.uri.split(":")[2];
+            const albumUri = track.album?.uri || track.metadata?.album_uri || "";
+            const albumId = albumUri ? albumUri.split(":")[2] : "";
             
             const allItems = [
                 ...(titleNeeded ? nowPlayingConfig.title.items : []),
@@ -16258,7 +16317,7 @@
             if (typesNeeded.has('releaseDate')) {
                 promises.push(getTrackDetailsWithReleaseDate({
                     uri: track.uri,
-                    albumUri: track.album.uri,
+                    albumUri: albumUri,
                     name: track.name
                 }).then(d => dataContext.releaseDate = d));
             }
@@ -16266,16 +16325,16 @@
             if (typesNeeded.has('trueReleaseDate')) {
                 promises.push(getTrackDetailsWithTrueReleaseDate({
                     uri: track.uri,
-                    albumUri: track.album.uri,
+                    albumUri: albumUri,
                     name: track.name,
-                    artists: track.artists,
+                    artists: track.artists || [],
                     track: { external_ids: {} } 
                 }).then(d => dataContext.trueReleaseDate = d));
             }
             
             if (typesNeeded.has('playCount')) {
                 promises.push(getTrackDetailsWithPlayCount({
-                    track: { id: trackId, album: { id: track.album.uri.split(":")[2] } },
+                    track: { id: trackId, album: { id: albumId } },
                     name: track.name
                 }).then(d => dataContext.playCount = d));
             }
@@ -16339,11 +16398,17 @@
 
             await Promise.all(promises);
 
+            if (track.uri !== Spicetify.Player.data?.item?.uri) return;
+
             const renderSection = async (container, items, isTitleSection) => {
                 if (!container || items.length === 0) return;
+                if (track.uri !== Spicetify.Player.data?.item?.uri) return;
             
                 if (!isTitleSection && !nowPlayingConfig.title.enabled) {
-                    const titleContainer = document.querySelector('.main-trackInfo-name');
+                    const titleContainer = document.querySelector('.main-trackInfo-name') || (npWidget ? Array.from(npWidget.querySelectorAll('a')).find(a => {
+                        const h = a.getAttribute('href') || '';
+                        return h.startsWith('/album/') || h.startsWith('/track/');
+                    })?.closest('[data-encore-id="text"]') : null);
                     if (titleContainer) {
                         let titleCheckAttempts = 0;
                         while (titleCheckAttempts < 50) {
@@ -16389,13 +16454,25 @@
                     checkAttempts++;
                 }
             
-                const existingNpContainer = container.querySelector('.sort-play-np-container');
-                if (existingNpContainer) {
-                    existingNpContainer.remove();
+                container.querySelectorAll('.sort-play-np-container').forEach(el => el.remove());
+
+                const textWrapper = container.querySelector('.main-trackInfo-overlay') || 
+                    (isTitleSection 
+                        ? Array.from(container.children).find(c => c.querySelector && c.querySelector('a[href^="/album/"], a[href^="/track/"]'))
+                        : Array.from(container.children).find(c => c.querySelector && c.querySelector('a[href^="/artist/"]'))) || 
+                    container.firstElementChild;
+
+                if (textWrapper && textWrapper !== container) {
+                    textWrapper.style.minWidth = '0';
+                    textWrapper.style.maxWidth = '100%';
+                    textWrapper.style.flex = '0 1 auto';
+                    textWrapper.classList.add('sort-play-modified-marquee');
                 }
-            
+
                 container.style.display = 'flex';
                 container.style.alignItems = 'center';
+                container.style.minWidth = '0';
+                container.style.width = '100%';
                 container.classList.add('sort-play-modified-parent');
             
                 const wrapper = document.createElement("div");
@@ -16535,9 +16612,8 @@
                 });
             
                 if (wrapper.children.length > 0) {
-                    const overlayElement = container.querySelector('.main-trackInfo-overlay');
-                    if (overlayElement) {
-                        overlayElement.insertAdjacentElement('afterend', wrapper);
+                    if (textWrapper && textWrapper !== container && textWrapper.parentElement === container) {
+                        textWrapper.insertAdjacentElement('afterend', wrapper);
                     } else {
                         container.appendChild(wrapper);
                     }
@@ -33869,13 +33945,13 @@ shadowRoot.innerHTML = `
           const artistsToSaveTurso = [];
           const idbEntriesFromGw = [];
           const chunks = [];
-          for (let i = 0; i < missingEverywhere.length; i += 25) {
-            chunks.push(missingEverywhere.slice(i, i + 25));
+          for (let i = 0; i < missingEverywhere.length; i += 50) {
+            chunks.push(missingEverywhere.slice(i, i + 50));
           }
 
           let processedCount = 0;
           let chunkIndex = 0;
-          const CONCURRENCY = Math.min(2, chunks.length);
+          const CONCURRENCY = Math.min(6, chunks.length);
 
           const processChunk = async (batch) => {
             const sortedBatch = [...batch].sort();
@@ -33884,7 +33960,7 @@ shadowRoot.innerHTML = `
 
             for (let attempt = 0; attempt < 2; attempt++) {
               try {
-                const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(9000) });
+                const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(16000) });
                 if (res.ok) {
                   data = await res.json();
                   break;
@@ -57044,20 +57120,14 @@ shadowRoot.innerHTML = `
         const searchBox = actionBar.querySelector('[role="search"]') || document.querySelector('[role="search"]');
         const sortBtn = actionBar.querySelector('[role="combobox"]') || document.querySelector('[role="combobox"]');
         
-        if (searchBox) {
-          let cluster = searchBox.parentElement;
-          while (cluster && cluster.parentElement && cluster.parentElement !== actionBar) {
-            cluster = cluster.parentElement;
+        if (searchBox && searchBox.parentElement) {
+          const targetParent = searchBox.parentElement;
+          if (!targetParent.contains(mainButton)) {
+            mainButton.style.marginLeft = targetParent === actionBar ? "auto" : "";
+            mainButton.style.marginRight = "8px";
+            targetParent.insertBefore(mainButton, searchBox);
           }
-
-          if (cluster && cluster.parentElement === actionBar) {
-            if (!cluster.contains(mainButton)) {
-              mainButton.style.marginLeft = "";
-              mainButton.style.marginRight = "8px";
-              cluster.insertBefore(mainButton, cluster.firstChild);
-            }
-            return;
-          }
+          return;
         }
 
         if (sortBtn && sortBtn.parentElement) {
