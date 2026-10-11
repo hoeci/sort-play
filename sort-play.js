@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.7.3";
+  const SORT_PLAY_VERSION = "6.7.4";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -15774,7 +15774,7 @@
     }
   }
 
-  async function updateArtistPageGenres() {
+  async function updateArtistPageGenres(retryCount = 0) {
       if (!showGenreTags || !showGenreTagsArtistPage) {
           const existing = document.querySelector('.sort-play-artist-genres');
           if (existing) existing.remove();
@@ -15791,21 +15791,43 @@
 
       const artistId = currentUri.split(':')[2];
       
-      const header = document.querySelector("div.main-entityHeader-headerText");
-      if (!header) return;
+      const header = document.querySelector("div.main-entityHeader-headerText")
+          || document.querySelector('[data-testid="entity-header"] [data-testid="adaptiveEntityTitle"]')?.parentElement
+          || document.querySelector('[data-testid="adaptiveEntityTitle"]')?.parentElement
+          || document.querySelector('[data-testid="entity-header"] h1')?.parentElement;
+
+      if (!header) {
+          if (retryCount < 8) {
+              setTimeout(() => {
+                  if (getCurrentUri() === currentUri) {
+                      updateArtistPageGenres(retryCount + 1);
+                  }
+              }, 150);
+          }
+          return;
+      }
 
       let container = header.querySelector('.sort-play-artist-genres');
       
       if (!container) {
+          const orphaned = document.querySelector('.sort-play-artist-genres');
+          if (orphaned) orphaned.remove();
+
           container = document.createElement("div");
           container.className = "main-entityHeader-detailsText sort-play-artist-genres";
           container.style.display = "block";
+          container.style.fontSize = "1rem";
+          container.style.color = "var(--spice-subtext)";
+          container.style.marginTop = "4px";
+          container.style.marginBottom = "4px";
           
           container.dataset.artistId = artistId;
           container.dataset.status = 'loading';
           container.innerHTML = `<span>Genres : </span><span style="opacity: 0.6;">Loading...</span>`;
           
-          const details = header.querySelector("span.main-entityHeader-detailsText");
+          const titleEl = header.querySelector('[data-testid="adaptiveEntityTitle"], h1');
+          const details = header.querySelector("span.main-entityHeader-detailsText")
+              || (titleEl && titleEl.nextElementSibling !== container ? titleEl.nextElementSibling : null);
           if (details) {
               header.insertBefore(container, details);
           } else {
@@ -15944,7 +15966,8 @@
               if (!domArtistName) {
                   let attempts = 0;
                   while (!domArtistName && attempts < 10) {
-                      const artistNameElement = header.querySelector("h1");
+                      const artistNameElement = header.querySelector("h1, [data-testid='adaptiveEntityTitle'], [data-encore-id='adaptiveTitle']")
+                          || document.querySelector('[data-testid="entity-header"] [data-testid="adaptiveEntityTitle"], [data-testid="adaptiveEntityTitle"], h1');
                       if (artistNameElement) domArtistName = artistNameElement.innerText.trim();
                       if (!domArtistName) await new Promise(r => setTimeout(r, 100));
                       attempts++;
@@ -38226,6 +38249,8 @@ shadowRoot.innerHTML = `
   mainButton.style.display = "flex";
   mainButton.style.justifyContent = "center";
   mainButton.style.alignItems = "center";
+  mainButton.style.alignSelf = "center";
+  mainButton.style.verticalAlign = "middle";
   mainButton.style.transition = "min-width 0.2s ease, background-color 0.1s ease, color 0.1s ease";
 
   const tempDiv = document.createElement("div");
@@ -55350,7 +55375,8 @@ shadowRoot.innerHTML = `
 
     if (columnConfigs.length === 0) return;
 
-    const allTrackRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])')).filter(r => !r.querySelector('[role="columnheader"]'));
+    const isRecGrid = !!tracklist_.closest?.('[data-testid="recommended-track"]');
+    const allTrackRows = Array.from(tracklist_.querySelectorAll(isRecGrid ? '.main-trackList-trackListRow, [role="row"]' : '.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])')).filter(r => !r.querySelector('[role="columnheader"]'));
     const spotifyTracksToProcess = [];
     const expectedCols = columnConfigs.map(c => c.type).join('|');
 
@@ -56142,7 +56168,7 @@ shadowRoot.innerHTML = `
     isUpdatingTracklist = true;
 
     try {
-      const tracklists = Array.from(document.querySelectorAll('.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])'));
+      const tracklists = Array.from(document.querySelectorAll('.main-trackList-indexable, main [role="grid"]:not([aria-colcount="1"])')).filter(t => !t.closest('[data-testid="recommended-track"]'));
       if (tracklists.length) {
         for (const tracklist_ of tracklists) {
           if (!tracklist_ || tracklist_.querySelectorAll('[role="row"]').length <= 1) continue;
@@ -56154,8 +56180,8 @@ shadowRoot.innerHTML = `
 
       const recommendationContainer = document.querySelector('[data-testid="recommended-track"]');
       if (recommendationContainer) {
-        const recTracklist = recommendationContainer.querySelector('.main-trackList-trackList');
-        if (recTracklist && !recTracklist.classList.contains('main-trackList-indexable')) {
+        const recTracklist = recommendationContainer.querySelector('.main-trackList-trackList, [role="grid"]');
+        if (recTracklist) {
           updateRecommendationTracklistStructure(recTracklist);
           loadAdditionalColumnData(recTracklist);
         }
@@ -56544,58 +56570,103 @@ shadowRoot.innerHTML = `
     
     if (!showAdditionalColumn && !showSecondAdditionalColumn) {
         tracklist_.removeAttribute('data-sp-grid-rec');
-        let gridStyleEl = document.getElementById("sort-play-rec-grid-style");
+        tracklist_.removeAttribute('data-sp-max-cols-rec');
+        const gridStyleEl = document.getElementById("sort-play-rec-grid-style");
         if (gridStyleEl) gridStyleEl.innerHTML = "";
+        tracklist_.querySelectorAll('.sort-play-data-column, .sort-play-second-data-column, .sort-play-rec-index-spacer, .sort-play-skeleton-col, .sort-play-second-skeleton-col').forEach(el => el.remove());
+        tracklist_.querySelectorAll('[role="gridcell"]').forEach(c => { if (c.style.display === 'none') c.style.display = ''; });
         return;
     }
 
-    const allRows = tracklist_.getElementsByClassName("main-trackList-trackListRow");
-    let globalMaxCols = 0;
+    const currentPlaylistName = getCurrentPlaylistName();
+    const isExcludedPlaylist = excludedPlaylistNames.includes(currentPlaylistName);
+    const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
+    const shouldRemoveDateAdded = !isSearch && removeDateAdded && !isExcludedPlaylist;
+
+    const allRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]')).filter(r => !r.querySelector('[role="columnheader"]'));
+    let maxVisibleCells = 0;
+
+    const createDataColumn = (className, dataClassName) => {
+        const col = document.createElement("div");
+        col.className = `main-trackList-rowSectionVariable ${className}`;
+        col.setAttribute("role", "gridcell");
+        col.style.cssText = "display: flex; justify-content: center; align-items: center;";
+        col.innerHTML = `<span class="${dataClassName}" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
+        return col;
+    };
     
     for (const track of allRows) {
-        let existingDataColumn = track.querySelector(".sort-play-data-column");
-        let existingSecondDataColumn = track.querySelector(".sort-play-second-data-column");
-        const endCell = track.querySelector(".main-trackList-rowSectionEnd");
+        track.querySelectorAll('.sort-play-skeleton-col, .sort-play-second-skeleton-col, .sort-play-rec-index-spacer').forEach(el => el.remove());
+
+        const cellContainer = (track.children.length === 1 && track.firstElementChild?.querySelector('[role="gridcell"]')) ? track.firstElementChild : track;
+        let existingDataColumn = cellContainer.querySelector(".sort-play-data-column");
+        let existingSecondDataColumn = cellContainer.querySelector(".sort-play-second-data-column");
+
+        const endCell = cellContainer.querySelector(".main-trackList-rowSectionEnd") || cellContainer.querySelector(':has([data-testid="add-to-playlist-button"])') || cellContainer.lastElementChild;
         if (!endCell) continue;
 
-        if (showAdditionalColumn && !existingDataColumn) {
-            existingDataColumn = document.createElement("div");
-            existingDataColumn.className = "main-trackList-rowSectionVariable sort-play-data-column sort-play-column";
-            existingDataColumn.setAttribute("role", "gridcell");
-            existingDataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-            existingDataColumn.innerHTML = `<span class="sort-play-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-            track.insertBefore(existingDataColumn, endCell);
+        const allGridCells = Array.from(cellContainer.children);
+        const spacerCell = allGridCells.find(c => c !== endCell && c !== existingDataColumn && c !== existingSecondDataColumn && c.textContent.trim() === '' && !c.querySelector('button, input, a, img, svg'));
+        if (spacerCell) {
+            spacerCell.style.display = shouldRemoveDateAdded ? 'none' : '';
+        }
+
+        if (showAdditionalColumn) {
+            if (!existingDataColumn) {
+                existingDataColumn = createDataColumn('sort-play-data-column sort-play-column', 'sort-play-data');
+                cellContainer.insertBefore(existingDataColumn, endCell);
+            }
+        } else if (existingDataColumn) {
+            existingDataColumn.remove();
+            existingDataColumn = null;
         }
         
-        if (showSecondAdditionalColumn && !existingSecondDataColumn) {
-            existingSecondDataColumn = document.createElement("div");
-            existingSecondDataColumn.className = "main-trackList-rowSectionVariable sort-play-second-data-column sort-play-second-column";
-            existingSecondDataColumn.setAttribute("role", "gridcell");
-            existingSecondDataColumn.style.cssText = "display: flex; justify-content: center; align-items: center;";
-            existingSecondDataColumn.innerHTML = `<span class="sort-play-second-data" style="font-size: 14px; font-weight: 400; color: var(--spice-subtext);"></span>`;
-            const targetNext = existingDataColumn || endCell;
-            track.insertBefore(existingSecondDataColumn, targetNext);
+        if (showSecondAdditionalColumn) {
+            if (!existingSecondDataColumn) {
+                existingSecondDataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
+                const targetNext = existingDataColumn || endCell;
+                cellContainer.insertBefore(existingSecondDataColumn, targetNext);
+            }
+        } else if (existingSecondDataColumn) {
+            existingSecondDataColumn.remove();
+            existingSecondDataColumn = null;
         }
         
-        const rowCols = Array.from(track.children).filter(el => el.style.display !== 'none').length;
-        if (rowCols > globalMaxCols) globalMaxCols = rowCols;
+        const visibleCols = Array.from(cellContainer.children).filter(el => el.style.display !== 'none').length;
+        if (visibleCols > maxVisibleCells) maxVisibleCells = visibleCols;
+
+        let colIdx = 1;
+        Array.from(cellContainer.children).filter(el => el.style.display !== 'none').forEach((c, idx) => {
+            c.setAttribute('aria-colindex', colIdx.toString());
+            colIdx += (idx === 0 ? 2 : 1);
+        });
     }
+
+    const maxPossibleGridCols = 4 + (shouldRemoveDateAdded ? 0 : 1) + (showAdditionalColumn ? 1 : 0) + (showSecondAdditionalColumn ? 1 : 0);
+    let totalGridCols = maxVisibleCells > 0 ? maxVisibleCells + 1 : 0;
     
     let storedMax = parseInt(tracklist_.getAttribute('data-sp-max-cols-rec') || "0");
-    if (globalMaxCols > storedMax) {
-        storedMax = globalMaxCols;
-        tracklist_.setAttribute('data-sp-max-cols-rec', storedMax.toString());
-    }
-    globalMaxCols = Math.max(globalMaxCols, storedMax);
+    if (storedMax > maxPossibleGridCols) storedMax = maxPossibleGridCols;
+    if (totalGridCols > storedMax) storedMax = totalGridCols;
+    totalGridCols = Math.min(Math.max(totalGridCols, storedMax), maxPossibleGridCols);
+    tracklist_.setAttribute('data-sp-max-cols-rec', totalGridCols.toString());
 
-    if (globalMaxCols > 0) {
-        let template = "[first] 5fr ";
-        for (let i = 1; i < globalMaxCols - 1; i++) {
-            template += `[var${i}] 2fr `;
+    if (totalGridCols > 0) {
+        let template;
+        if (totalGridCols <= 4) template = "[index] 16px [first] 4fr [var1] 2fr [last] minmax(120px,1fr)";
+        else if (totalGridCols === 5) template = "[index] 16px [first] 4fr [var1] 2fr [var2] 2fr [last] minmax(120px,1fr)";
+        else if (totalGridCols === 6) template = "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [last] minmax(120px,1fr)";
+        else if (totalGridCols === 7) template = "[index] 16px [first] 5fr [var1] 3fr [var2] 2fr [var3] 2fr [var4] 2fr [last] minmax(120px,1fr)";
+        else {
+            template = "[index] 16px [first] 5fr [var1] 3fr ";
+            for (let i = 2; i < totalGridCols - 2; i++) {
+                template += `[var${i}] 2fr `;
+            }
+            template += "[last] minmax(120px,1fr)";
         }
-        template += "[last] minmax(120px, 1fr)";
         
         tracklist_.setAttribute('data-sp-grid-rec', 'true');
+        tracklist_.setAttribute('aria-colcount', totalGridCols.toString());
         let gridStyleEl = document.getElementById("sort-play-rec-grid-style");
         if (!gridStyleEl) {
             gridStyleEl = document.createElement("style");
@@ -56603,12 +56674,7 @@ shadowRoot.innerHTML = `
             document.head.appendChild(gridStyleEl);
         }
         
-        const cssString = `
-            html body div.main-trackList-trackList[data-sp-grid-rec="true"] .main-trackList-trackListRow,
-            html body div.main-trackList-trackList[data-sp-grid-rec="true"] .main-trackList-trackListRowGrid:not(.main-trackList-trackListRow) {
-                grid-template-columns: ${template} !important;
-            }
-        `;
+        const cssString = `html body div[data-sp-grid-rec="true"] .main-trackList-trackListRow, html body div[data-sp-grid-rec="true"] [role="row"] > div:has([role="gridcell"]), html body div[data-sp-grid-rec="true"] [role="row"] { grid-template-columns: ${template} !important; }\nhtml body div[data-sp-grid-rec="true"] [role="row"] > div:has([role="gridcell"]) > :first-child, html body div[data-sp-grid-rec="true"] [role="row"] > :first-child, html body div.main-trackList-trackList[data-sp-grid-rec="true"] .main-trackList-trackListRow > :first-child { grid-column: 1 / 3 !important; }`;
         if (gridStyleEl.innerHTML !== cssString) {
             gridStyleEl.innerHTML = cssString;
         }
@@ -56617,28 +56683,31 @@ shadowRoot.innerHTML = `
             if (track.style.gridTemplateColumns) track.style.gridTemplateColumns = '';
         }
 
-        const skeletonRows = tracklist_.querySelectorAll(".main-trackList-trackListRowGrid:not(.main-trackList-trackListRow)");
-        for (const skeleton of skeletonRows) {
+        const legacySkeletonRows = Array.from(tracklist_.querySelectorAll('.main-trackList-trackListRowGrid:not(.main-trackList-trackListRow):not([role="row"])'));
+        for (const skeleton of legacySkeletonRows) {
             if (skeleton.style.gridTemplateColumns) skeleton.style.gridTemplateColumns = '';
             
-            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd");
+            const endCell = skeleton.querySelector(".main-trackList-rowSectionEnd") || skeleton.lastElementChild;
             if (!endCell) continue;
-            
+
             let existingDataColumn = skeleton.querySelector(".sort-play-skeleton-col");
             let existingSecondDataColumn = skeleton.querySelector(".sort-play-second-skeleton-col");
 
             if (showAdditionalColumn && !existingDataColumn) {
                 existingDataColumn = document.createElement("div");
-                const baseClass = "main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-                existingDataColumn.className = `${baseClass} sort-play-skeleton-col`;
+                existingDataColumn.className = "main-trackList-rowSectionVariable sort-play-skeleton-col";
                 skeleton.insertBefore(existingDataColumn, endCell);
+            } else if (!showAdditionalColumn && existingDataColumn) {
+                existingDataColumn.remove();
             }
+
             if (showSecondAdditionalColumn && !existingSecondDataColumn) {
                 existingSecondDataColumn = document.createElement("div");
-                const baseClass = "main-trackList-rowSectionVariable r5OS0NnS9c7LAEJKIri1";
-                existingSecondDataColumn.className = `${baseClass} sort-play-second-skeleton-col`;
+                existingSecondDataColumn.className = "main-trackList-rowSectionVariable sort-play-second-skeleton-col";
                 const targetNext = existingDataColumn || endCell;
                 skeleton.insertBefore(existingSecondDataColumn, targetNext);
+            } else if (!showSecondAdditionalColumn && existingSecondDataColumn) {
+                existingSecondDataColumn.remove();
             }
         }
     }
@@ -57089,10 +57158,25 @@ shadowRoot.innerHTML = `
     
   function insertButton() {
     const currentUri = getCurrentUri(); 
-    if (!currentUri) return;
+    if (!currentUri) {
+      if (mainButton.parentElement) mainButton.remove();
+      return;
+    }
   
+    const mainView = document.querySelector("main") || document.querySelector(".main-view-container");
+    if (!mainView) {
+      if (mainButton.parentElement) mainButton.remove();
+      return;
+    }
+
+    if (mainButton.parentElement && !mainView.contains(mainButton.parentElement)) {
+      mainButton.remove();
+    }
+
+    let inserted = false;
+
     if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)) {
-      const legacyContainer = document.querySelector(".playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter");
+      const legacyContainer = mainView.querySelector(".playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter");
       if (legacyContainer) {
         if (!legacyContainer.contains(mainButton)) {
           mainButton.style.marginLeft = ""; 
@@ -57103,7 +57187,7 @@ shadowRoot.innerHTML = `
       }
 
       if (isLocalFilesPage(currentUri)) {
-        const legacyBar = document.querySelector(".main-actionBar-ActionBarRow");
+        const legacyBar = mainView.querySelector(".main-actionBar-ActionBarRow");
         if (legacyBar) {
           const controlsContainer = legacyBar.querySelector("div:last-child");
           if (controlsContainer && !controlsContainer.contains(mainButton)) {
@@ -57115,27 +57199,22 @@ shadowRoot.innerHTML = `
         }
       }
 
-      const actionBar = document.querySelector('[data-testid="action-bar-row"]') || document.querySelector('[data-testid="action-bar"]');
+      const actionBar = mainView.querySelector('[data-testid="action-bar-row"]') || mainView.querySelector('[data-testid="action-bar"]');
       if (actionBar) {
-        const searchBox = actionBar.querySelector('[role="search"]') || document.querySelector('[role="search"]');
-        const sortBtn = actionBar.querySelector('[role="combobox"]') || document.querySelector('[role="combobox"]');
-        
-        if (searchBox && searchBox.parentElement) {
-          const targetParent = searchBox.parentElement;
-          if (!targetParent.contains(mainButton)) {
-            mainButton.style.marginLeft = targetParent === actionBar ? "auto" : "";
-            mainButton.style.marginRight = "8px";
-            targetParent.insertBefore(mainButton, searchBox);
-          }
-          return;
-        }
+        const searchBox = actionBar.querySelector('[role="search"], button[aria-label*="Search in playlist" i], [data-testid="search-input"], .x-filterBox-expandButton');
+        const sortBtn = actionBar.querySelector('[role="combobox"], .x-sortBox-sortDropdown, [data-sortbox-label="true"]');
 
-        if (sortBtn && sortBtn.parentElement) {
-          if (!sortBtn.parentElement.contains(mainButton)) {
+        const searchTarget = searchBox ? (searchBox.closest('[role="search"]') || searchBox) : null;
+        const target = searchTarget || sortBtn;
+
+        if (target && target.parentElement) {
+          if (!target.parentElement.contains(mainButton) || mainButton.nextElementSibling !== target) {
             mainButton.style.marginLeft = "";
-            mainButton.style.marginRight = "4px";
-            sortBtn.parentElement.insertBefore(mainButton, sortBtn);
+            mainButton.style.marginRight = "";
+            mainButton.style.alignSelf = "center";
+            target.parentElement.insertBefore(mainButton, target);
           }
+          inserted = true;
           return;
         }
 
@@ -57144,14 +57223,11 @@ shadowRoot.innerHTML = `
           mainButton.style.marginRight = "16px";
           actionBar.appendChild(mainButton);
         }
-
-        setTimeout(() => {
-          const currentUriNow = getCurrentUri();
-          if (currentUriNow === currentUri) insertButton();
-        }, 150);
+        inserted = true;
+        return;
       }
     } else if (URI.isArtist(currentUri)) {
-      const legacyBar = document.querySelector(".main-actionBar-ActionBarRow");
+      const legacyBar = mainView.querySelector(".main-actionBar-ActionBarRow");
       if (legacyBar) {
         if (!legacyBar.contains(mainButton)) {
           mainButton.style.marginLeft = "auto"; 
@@ -57161,25 +57237,30 @@ shadowRoot.innerHTML = `
         return;
       }
 
-      const actionBar = document.querySelector('[data-testid="action-bar-row"]') || document.querySelector('[data-testid="action-bar"]');
-      if (actionBar && !actionBar.contains(mainButton)) {
-        mainButton.style.marginLeft = "auto";
-        mainButton.style.marginRight = "16px";
-        actionBar.appendChild(mainButton);
+      const actionBar = mainView.querySelector('[data-testid="action-bar-row"]') || mainView.querySelector('[data-testid="action-bar"]');
+      if (actionBar) {
+        if (!actionBar.contains(mainButton)) {
+          mainButton.style.marginLeft = "auto";
+          mainButton.style.marginRight = "16px";
+          actionBar.appendChild(mainButton);
+        }
+        inserted = true;
+        return;
       }
     } else if (URI.isAlbum(currentUri)) {
-      const listButton = document.querySelector(".x-sortBox-sortDropdown");
+      const listButton = mainView.querySelector(".x-sortBox-sortDropdown");
       if (listButton && listButton.parentElement) {
         const container = listButton.parentElement;
         if (!container.contains(mainButton)) {
           mainButton.style.marginLeft = "";
-          mainButton.style.marginRight = "1px";
+          mainButton.style.marginRight = "";
+          mainButton.style.alignSelf = "center";
           container.insertBefore(mainButton, listButton);
         }
         return;
       }
 
-      const legacyBar = document.querySelector(".main-actionBar-ActionBarRow");
+      const legacyBar = mainView.querySelector(".main-actionBar-ActionBarRow");
       if (legacyBar) {
         if (!legacyBar.contains(mainButton)) {
           mainButton.style.marginLeft = "auto"; 
@@ -57189,21 +57270,38 @@ shadowRoot.innerHTML = `
         return;
       }
 
-      const actionBar = document.querySelector('[data-testid="action-bar-row"]') || document.querySelector('[data-testid="action-bar"]');
+      const actionBar = mainView.querySelector('[data-testid="action-bar-row"]') || mainView.querySelector('[data-testid="action-bar"]');
       if (actionBar) {
-        const sortCombobox = actionBar.querySelector('[role="combobox"]');
+        const sortCombobox = actionBar.querySelector('[role="combobox"], .x-sortBox-sortDropdown, [data-sortbox-label="true"]');
         if (sortCombobox && sortCombobox.parentElement) {
-          if (!sortCombobox.parentElement.contains(mainButton)) {
+          if (!sortCombobox.parentElement.contains(mainButton) || mainButton.nextElementSibling !== sortCombobox) {
             mainButton.style.marginLeft = "";
-            mainButton.style.marginRight = "4px";
+            mainButton.style.marginRight = "";
+            mainButton.style.alignSelf = "center";
             sortCombobox.parentElement.insertBefore(mainButton, sortCombobox);
           }
-        } else if (!actionBar.contains(mainButton)) {
+          inserted = true;
+          return;
+        }
+
+        if (!actionBar.contains(mainButton)) {
           mainButton.style.marginLeft = "auto";
           mainButton.style.marginRight = "16px";
           actionBar.appendChild(mainButton);
         }
+        inserted = true;
+        return;
       }
+    } else {
+      if (mainButton.parentElement) mainButton.remove();
+      return;
+    }
+
+    if (!inserted) {
+      setTimeout(() => {
+        const currentUriNow = getCurrentUri();
+        if (currentUriNow === currentUri) insertButton();
+      }, 100);
     }
   }
 
@@ -58331,6 +58429,12 @@ shadowRoot.innerHTML = `
         const [isHovered, setIsHovered] = Spicetify.React.useState(false);
         const buttonRef = Spicetify.React.useRef(null);
 
+        Spicetify.React.useEffect(() => {
+            setIsLiked(likeButton_likedTracksById.has(trackId));
+            setSavedCount(0);
+            setISRC(null);
+        }, [trackId]);
+
         const hasISRCLiked = savedCount > 0 && !isLiked;
 
         let tooltipContent = "Add to Liked Songs (Right-click for options)";
@@ -58566,25 +58670,35 @@ shadowRoot.innerHTML = `
         })));
     });
     
-    async function mountLikeButton(isDebounced = false) {
+    async function mountLikeButton(isDebouncedOrUri = false, targetUri = null) {
+        let isDebounced = false;
+        let uriParam = targetUri;
+
+        if (typeof isDebouncedOrUri === 'boolean') {
+            isDebounced = isDebouncedOrUri;
+        } else if (typeof isDebouncedOrUri === 'string') {
+            uriParam = isDebouncedOrUri;
+            isDebounced = false;
+        }
+
         if (!isDebounced) {
             clearTimeout(mountLikeButton_debounceTimer);
             mountLikeButton_debounceTimer = setTimeout(() => {
-                mountLikeButton(true);
-            }, 300);
+                mountLikeButton(true, uriParam);
+            }, 150);
             return;
         }
-    
+
         if (mountLikeButton_isRunning) {
             return;
         }
         mountLikeButton_isRunning = true;
-    
+
         const MAX_RETRIES = 10;
         let retryDelay = 250;
-    
+
         try {
-            const uri = Spicetify.Player.data?.item?.uri || "";
+            const uri = uriParam || Spicetify.Player.data?.item?.uri || "";
             const getNowPlayingWidget = () => document.querySelector(".main-nowPlayingWidget-nowPlaying, [data-testid=\"now-playing-widget\"]");
             let nowPlayingWidget = getNowPlayingWidget();
             let container = nowPlayingWidget ? nowPlayingWidget.querySelector(".likeControl-wrapper") : null;
@@ -58605,12 +58719,11 @@ shadowRoot.innerHTML = `
                     retryDelay = Math.min(retryDelay * 1.5, 2000);
                     continue;
                 }
-    
+
                 const nativeLikeButton = nowPlayingWidget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button') || 
                                          nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
                                          nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
                 if (!nativeLikeButton || !nativeLikeButton.parentNode) {
-                    console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native like button not found or has no parent`);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                     retryDelay = Math.min(retryDelay * 2, 3000);
                     continue;
@@ -58624,9 +58737,6 @@ shadowRoot.innerHTML = `
                     return;
                 }
                 
-                if (container && container.dataset.renderedUri !== uri) {
-                }
-                
                 if (!container) {
                     container = document.createElement("div");
                     container.className = "likeControl-wrapper";
@@ -58635,7 +58745,6 @@ shadowRoot.innerHTML = `
                                                     nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
                                                     nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
                     if (!currentNativeLikeButton || !currentNativeLikeButton.parentNode) {
-                        console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native button parent disappeared before insertion`);
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
                         retryDelay = Math.min(retryDelay * 2, 3000);
                         continue;
@@ -58644,7 +58753,6 @@ shadowRoot.innerHTML = `
                     try {
                         currentNativeLikeButton.parentNode.insertBefore(container, currentNativeLikeButton.nextSibling);
                     } catch (error) {
-                        console.error(`[Sort-Play Like Button] Retry ${i + 1}: Failed to insert like button wrapper`, error);
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
                         retryDelay = Math.min(retryDelay * 2, 3000);
                         continue;
@@ -58656,7 +58764,6 @@ shadowRoot.innerHTML = `
                                                     nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
                                                     nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
                     if (!currentNativeLikeButton) {
-                        console.warn(`[Sort-Play Like Button] Retry ${i + 1}: Native button disappeared before render`);
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
                         retryDelay = Math.min(retryDelay * 2, 3000);
                         continue;
@@ -58680,7 +58787,6 @@ shadowRoot.innerHTML = `
                     await new Promise(resolve => setTimeout(resolve, 50));
                     
                     if (!container.firstChild) {
-                        console.error(`[Sort-Play Like Button] Retry ${i + 1}: React render completed but no child element found`);
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
                         retryDelay = Math.min(retryDelay * 2, 3000);
                         continue;
@@ -58693,42 +58799,23 @@ shadowRoot.innerHTML = `
                     return;
                     
                 } catch (error) {
-                    console.error(`[Sort-Play Like Button] Retry ${i + 1}: React render error`, error);
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                     retryDelay = Math.min(retryDelay * 2, 3000);
                     continue;
                 }
             }
-    
+
             mountLikeButton_failedAttempts++;
-            console.error(`[Sort-Play Like Button] Failed to mount like button after ${MAX_RETRIES} retries. Failed attempts: ${mountLikeButton_failedAttempts}`);
-            
             if (mountLikeButton_failedAttempts < 3) {
-                console.log(`[Sort-Play Like Button] Scheduling retry in 2 seconds...`);
-                setTimeout(() => mountLikeButton(true), 2000);
+                setTimeout(() => mountLikeButton(true, uriParam), 2000);
             }
         } finally {
             mountLikeButton_isRunning = false;
         }
     }
 
-    async function mountLikeButtonNowPlayingView() {
-        const MAX_RETRIES = 15;
-        let retryDelay = 250;
-    
-        const uri = Spicetify.Player.data?.item?.uri || "";
-        const getRightPanel = () => {
-            return document.querySelector('.main-nowPlayingView-contextItemInfo')
-                || document.querySelector('.Root__right-sidebar')
-                || document.querySelector('[data-testid="now-playing-view"]')
-                || Array.from(document.querySelectorAll('aside, section, div')).find(el => {
-                    const rect = el.getBoundingClientRect();
-                    return rect.right >= window.innerWidth - 30 && rect.top > 40 && rect.width > 180 && rect.height > 250 && !el.classList.contains('main-nowPlayingBar-container');
-                }) || null;
-        };
-
-        const rightSidebar = getRightPanel();
-        let container = rightSidebar ? rightSidebar.querySelector(".likeControl-wrapper-npv") : null;
+    async function mountLikeButtonNowPlayingView(targetUri = null) {
+        const uri = targetUri || Spicetify.Player.data?.item?.uri || "";
 
         if (!likeButtonConfig.nowPlayingView || !uri || !uri.startsWith("spotify:track:")) {
             document.querySelectorAll(".likeControl-wrapper-npv").forEach(el => {
@@ -58737,81 +58824,131 @@ shadowRoot.innerHTML = `
             });
             return;
         }
-    
-        for (let i = 0; i < MAX_RETRIES; i++) {
-            const panel = getRightPanel();
-            if (!panel) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 1.5, 2000);
-                continue;
-            }
 
-            const targetBtn = panel.querySelector('button[aria-label="Add to playlist"], button[aria-label*="playlist"], button[aria-label*="Liked Songs"]') 
-                || panel.querySelector('.CAVVGuPYPRDhrbGiFOc1 button, .main-nowPlayingWidget-plusButtonWrapper button') 
-                || panel.querySelector('button[aria-label="Copy link to Song"]')
-                || panel.querySelector('button[data-encore-id="buttonTertiary"]');
+        const getRightPanel = () => {
+            return document.querySelector('.main-nowPlayingView-contextItemInfo')
+                || document.querySelector('[data-testid="NPV_Panel_OpenDiv"]')
+                || document.querySelector('.Root__right-sidebar')
+                || document.querySelector('[data-testid="now-playing-view"]')
+                || Array.from(document.querySelectorAll('aside, section, div')).find(el => {
+                    const rect = el.getBoundingClientRect();
+                    return rect.right >= window.innerWidth - 30 && rect.top > 40 && rect.width > 180 && rect.height > 250 && !el.classList.contains('main-nowPlayingBar-container');
+                }) || null;
+        };
 
-            if (!targetBtn || !targetBtn.parentElement) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 1.5, 2000);
-                continue;
-            }
+        const panel = getRightPanel();
+        if (!panel) return;
 
-            const btnWrapper = (targetBtn.parentElement.children.length === 1 && targetBtn.parentElement !== panel) 
-                ? targetBtn.parentElement 
-                : targetBtn;
+        const isHeaderButton = (btn) => {
+            if (!btn) return true;
+            if (btn.classList.contains('sort-play-like-button') || btn.closest('.likeControl-wrapper-npv')) return true;
+            const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+            if (label.includes('hide') || label.includes('close') || label.includes('expand') || label.includes('collapse') || label.includes('more options') || label.includes('queue') || label.includes('show all')) return true;
+            if (btn.closest('.main-nowPlayingView-headerWrapper, .WU7dTdoNA51czqGivj8T, .cciGXIL4H2kwy1SlhFHO, header, [data-testid="now-playing-view-header"]')) return true;
+            return false;
+        };
 
-            container = panel.querySelector(".likeControl-wrapper-npv");
-            if (!container) {
-                container = document.createElement("div");
-                container.className = "likeControl-wrapper-npv";
-                container.style.display = "contents";
-                try {
-                    btnWrapper.parentElement.insertBefore(container, btnWrapper);
-                } catch (error) {
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                    retryDelay = Math.min(retryDelay * 1.5, 2000);
-                    continue;
+        const trackScope = (panel.getAttribute?.('data-testid') === 'NPV_Panel_OpenDiv' || panel.classList?.contains('main-nowPlayingView-contextItemInfo'))
+            ? panel
+            : (panel.querySelector('[data-testid="NPV_Panel_OpenDiv"], .main-nowPlayingView-contextItemInfo') || panel);
+
+        let targetBtn = Array.from(trackScope.querySelectorAll('button')).find(btn => {
+            if (btn.classList.contains('sort-play-like-button') || btn.closest('.likeControl-wrapper-npv')) return false;
+            if (isHeaderButton(btn)) return false;
+            const label = (btn.getAttribute('aria-label') || '').toLowerCase();
+            const hasChecked = btn.hasAttribute('aria-checked');
+            const hasTestId = btn.getAttribute('data-testid') === 'add-button';
+            const isPlusWrapper = btn.closest('.CAVVGuPYPRDhrbGiFOc1, .main-nowPlayingWidget-plusButtonWrapper, .wlaBAYQk3K1M_lNqOKNw');
+            return label.includes('playlist') || label.includes('library') || label.includes('liked songs') || hasChecked || hasTestId || !!isPlusWrapper;
+        }) || null;
+
+        if (!targetBtn && trackScope !== panel) {
+            const shareBtn = trackScope.querySelector('button[aria-label="Copy link to Song"], button[aria-label*="link" i], button[aria-label*="share" i]');
+            if (shareBtn && !isHeaderButton(shareBtn)) {
+                const siblingBtn = shareBtn.nextElementSibling?.querySelector('button') || shareBtn.nextElementSibling;
+                if (siblingBtn?.tagName === 'BUTTON' && !isHeaderButton(siblingBtn) && !siblingBtn.classList.contains('sort-play-like-button')) {
+                    targetBtn = siblingBtn;
+                } else {
+                    targetBtn = shareBtn;
                 }
-            }
-    
-            if (container.dataset.renderedUri === uri && container.firstChild) {
-                return;
-            }
-    
-            try {
-                const curAlbumId = Spicetify.Player.data?.item?.album?.uri?.split(':')[2] || Spicetify.Player.data?.item?.metadata?.album_uri?.split(':')[2] || null;
-                const curAlbumName = Spicetify.Player.data?.item?.album?.name || Spicetify.Player.data?.item?.metadata?.album_title || null;
-                const curArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
-                const measuredSize = targetBtn.querySelector('svg')?.getBoundingClientRect().width || 18;
-
-                Spicetify.ReactDOM.render(
-                    Spicetify.React.createElement(LikeButton, {
-                        uri: uri,
-                        key: uri,
-                        classList: targetBtn.className,
-                        size: measuredSize,
-                        dynamicSizeSelector: null,
-                        buttonStyle: { marginRight: "0px", marginLeft: "10px" },
-                        currentAlbum: { id: curAlbumId, name: curAlbumName },
-                        artistIds: curArtistIds
-                    }),
-                    container
-                );
-                
-                await new Promise(resolve => setTimeout(resolve, 50));
-                if (container.firstChild) {
-                    container.dataset.renderedUri = uri;
-                    return;
-                }
-            } catch (error) {
-                await new Promise(resolve => setTimeout(resolve, retryDelay));
-                retryDelay = Math.min(retryDelay * 1.5, 2000);
             }
         }
+
+        if (!targetBtn || isHeaderButton(targetBtn) || !targetBtn?.parentElement) return;
+
+        const btnWrapper = (targetBtn.parentElement.children.length === 1 && targetBtn.parentElement !== trackScope && targetBtn.parentElement !== panel) 
+            ? targetBtn.parentElement 
+            : targetBtn;
+
+        const allNpvContainers = document.querySelectorAll(".likeControl-wrapper-npv");
+        if (allNpvContainers.length > 1) {
+            allNpvContainers.forEach((el, idx) => {
+                if (idx > 0) {
+                    Spicetify.ReactDOM.unmountComponentAtNode(el);
+                    el.remove();
+                }
+            });
+        }
+
+        let container = document.querySelector(".likeControl-wrapper-npv");
+
+        if (container && (container.parentElement !== btnWrapper.parentElement || container.nextSibling !== btnWrapper)) {
+            Spicetify.ReactDOM.unmountComponentAtNode(container);
+            container.remove();
+            container = null;
+        }
+
+        if (!container) {
+            container = document.createElement("div");
+            container.className = "likeControl-wrapper-npv";
+            container.style.display = "contents";
+            try {
+                btnWrapper.parentElement.insertBefore(container, btnWrapper);
+            } catch (error) {
+                return;
+            }
+        }
+
+        if (container.dataset.renderedUri === uri && container.firstChild) {
+            return;
+        }
+
+        try {
+            const playerItem = (Spicetify.Player.data?.item?.uri === uri) ? Spicetify.Player.data.item : null;
+            const curAlbumId = playerItem?.album?.uri?.split(':')[2] || playerItem?.metadata?.album_uri?.split(':')[2] || null;
+            const curAlbumName = playerItem?.album?.name || playerItem?.metadata?.album_title || null;
+            const curArtistIds = (playerItem?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
+            const rawSvgWidth = targetBtn.querySelector('svg')?.getBoundingClientRect().width || 16;
+            const measuredSize = (rawSvgWidth > 10 && rawSvgWidth < 40) ? rawSvgWidth : 16;
+
+            const shareBtn = trackScope.querySelector('button[aria-label="Copy link to Song"], button[aria-label*="link" i], button[aria-label*="share" i]');
+            const templateBtn = shareBtn || targetBtn;
+
+            const cleanClassList = templateBtn.className
+                .replace(/\bsort-play-like-button\b/g, '')
+                .replace(/\bencore-internal-color-text-bright-accent\b/g, '')
+                .replace(/\bencore-internal-color-text-subdued\b/g, '')
+                .trim();
+
+            Spicetify.ReactDOM.render(
+                Spicetify.React.createElement(LikeButton, {
+                    uri: uri,
+                    key: uri,
+                    classList: cleanClassList,
+                    size: measuredSize,
+                    dynamicSizeSelector: null,
+                    buttonStyle: { marginRight: "0px", marginLeft: "10px" },
+                    currentAlbum: { id: curAlbumId, name: curAlbumName },
+                    artistIds: curArtistIds
+                }),
+                container
+            );
+            
+            container.dataset.renderedUri = uri;
+        } catch (error) {}
     }
     
-    async function mountLikeButtonWatchFeed() {
+    async function mountLikeButtonWatchFeed(targetUri = null) {
         const MAX_RETRIES = 15;
         let retryDelay = 200;
     
@@ -58974,10 +59111,11 @@ shadowRoot.innerHTML = `
         await mountLikeButtonNowPlayingView();
         await mountLikeButtonWatchFeed();
     
-        Spicetify.Player.addEventListener("songchange", () => {
-            mountLikeButton();
-            mountLikeButtonNowPlayingView();
-            mountLikeButtonWatchFeed();
+        Spicetify.Player.addEventListener("songchange", (event) => {
+            const newUri = event?.data?.item?.uri || Spicetify.Player.data?.item?.uri || "";
+            mountLikeButton(newUri);
+            mountLikeButtonNowPlayingView(newUri);
+            mountLikeButtonWatchFeed(newUri);
         });
     })();
 
@@ -59113,13 +59251,21 @@ shadowRoot.innerHTML = `
         mountLikeButtonWatchFeed();
     
         likeButton_tracklistObserver = new MutationObserver((mutations) => {
-            if (document.querySelector(".main-nowPlayingWidget-nowPlaying") && !document.querySelector(".likeControl-wrapper")) {
-                mountLikeButton();
-            }
-            
-            const rightSidebar = document.querySelector('.main-nowPlayingView-contextItemInfo, .Root__right-sidebar, aside:not(.main-nowPlayingBar-container), .main-nowPlayingView-headerWrapper');
-            if (rightSidebar && !rightSidebar.querySelector('.likeControl-wrapper-npv')) {
-                mountLikeButtonNowPlayingView();
+            const currentUri = Spicetify.Player.data?.item?.uri;
+            if (currentUri && currentUri.startsWith("spotify:track:")) {
+                const npBar = document.querySelector(".main-nowPlayingWidget-nowPlaying .likeControl-wrapper, [data-testid=\"now-playing-widget\"] .likeControl-wrapper");
+                if (likeButtonConfig.nowPlayingBar && (!npBar || npBar.dataset.renderedUri !== currentUri)) {
+                    mountLikeButton(currentUri);
+                }
+                
+                const rightSidebar = document.querySelector('.main-nowPlayingView-contextItemInfo, [data-testid="NPV_Panel_OpenDiv"], .Root__right-sidebar, aside:not(.main-nowPlayingBar-container)');
+                if (likeButtonConfig.nowPlayingView && rightSidebar) {
+                    const trackScope = document.querySelector('.main-nowPlayingView-contextItemInfo, [data-testid="NPV_Panel_OpenDiv"]');
+                    const npvContainer = document.querySelector('.likeControl-wrapper-npv');
+                    if (!npvContainer || (trackScope && !trackScope.contains(npvContainer)) || npvContainer.dataset.renderedUri !== currentUri) {
+                        mountLikeButtonNowPlayingView(currentUri);
+                    }
+                }
             }
 
             const watchFeedView = document.querySelector('[data-testid="watch-feed-view"]');
@@ -59252,6 +59398,8 @@ shadowRoot.innerHTML = `
                   
                   if (
                       node.getAttribute?.('data-testid') === 'action-bar-row' || 
+                      node.getAttribute?.('data-testid') === 'entity-header' ||
+                      node.getAttribute?.('data-testid') === 'adaptiveEntityTitle' ||
                       node.getAttribute?.('role') === 'grid' || 
                       node.getAttribute?.('data-testid') === 'now-playing-widget' ||
                       node.getAttribute?.('role') === 'combobox' ||
@@ -59262,7 +59410,7 @@ shadowRoot.innerHTML = `
                   }
 
                   if (node.querySelector) {
-                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter, .x-sortBox-sortDropdown, [data-testid="action-bar-row"], [role="grid"], [data-testid="now-playing-widget"], [role="combobox"], [role="search"]')) {
+                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter, .x-sortBox-sortDropdown, [data-testid="action-bar-row"], [data-testid="entity-header"], [data-testid="adaptiveEntityTitle"], .main-entityHeader-container, .main-entityHeader-headerText, [role="grid"], [data-testid="now-playing-widget"], [role="combobox"], [role="search"]')) {
                           shouldTrigger = true;
                           break;
                       }
