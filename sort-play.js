@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.7.4";
+  const SORT_PLAY_VERSION = "6.7.5";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -3778,7 +3778,7 @@
   }
 
   
-  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", dropdownOptions = null, secondaryDropdownOptions = null, secondaryInputLabel = "", secondaryInputValue = "", toggleOptions = null, onSave, onCancel = null, onPrimaryChange = null }) {
+  function showSimpleInputModal({ title, descriptionHtml = "", inputLabel = "", inputType = "text", inputValue = "", inputPlaceholder = "", subtextHtml = "", saveButtonText = "Save", dropdownOptions = null, secondaryDropdownOptions = null, secondaryInputLabel = "", secondaryInputValue = "", secondaryInputPlaceholder = "", secondaryInputType = "text", toggleOptions = null, onSave, onCancel = null, onPrimaryChange = null }) {
     const overlay = document.createElement("div");
     overlay.className = "sort-play-font-scope";
     overlay.style.cssText = `
@@ -3867,6 +3867,15 @@
             <input type="${inputType}" id="sp-simple-input" value="${escapeHtml(inputValue, "")}" placeholder="${escapeHtml(inputPlaceholder, "")}"
                    style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; font-family: inherit; outline: none;">
         `;
+        if (secondaryInputLabel) {
+            inputHtml += `
+                <div id="sp-simple-secondary-wrapper" style="margin-top: 10px; display: flex; flex-direction: column; gap: 5px;">
+                    <label style="color: #c1c1c1; font-size: 14px;">${escapeHtml(secondaryInputLabel, "")}</label>
+                    <input type="${secondaryInputType}" id="sp-simple-secondary-input" value="${escapeHtml(secondaryInputValue, "")}" placeholder="${escapeHtml(secondaryInputPlaceholder, "")}"
+                           style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #282828; background: #282828; color: white; font-family: inherit; outline: none;">
+                </div>
+            `;
+        }
     }
 
     shadowRoot.innerHTML = `
@@ -3917,6 +3926,15 @@
     addHoverEffect(saveButton, "#1ED760", "#3BE377");
     addHoverEffect(cancelButton, "#333333", "#444444");
 
+    [inputField, secondaryInputField].filter(Boolean).forEach(inp => {
+        inp.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                saveButton.click();
+            }
+        });
+    });
+
     saveButton.addEventListener("click", () => {
         if (toggleOptions) {
             const results = {};
@@ -3924,7 +3942,7 @@
                 results[opt.id] = modalContainer.querySelector(`#sp-toggle-${opt.id}`).checked;
             });
             onSave(results, saveButton, closeModal);
-        } else if (dropdownOptions && secondaryDropdownOptions) {
+        } else if (modalContainer.querySelector("#sp-simple-secondary-input")) {
             const results = {
                 primary: inputField.value.trim(),
                 secondary: modalContainer.querySelector("#sp-simple-secondary-input").value.trim()
@@ -3938,7 +3956,9 @@
     cancelButton.addEventListener("click", () => { closeModal(); if (onCancel) onCancel(); });
     overlay.addEventListener("click", (e) => { 
         if (e.target === overlay) { 
-            if (!toggleOptions && !dropdownOptions && inputField && inputField.value !== String(inputValue || "")) {
+            const isPrimaryChanged = inputField && inputField.value !== String(inputValue || "");
+            const isSecondaryChanged = secondaryInputField && secondaryInputField.value !== String(secondaryInputValue || "");
+            if (!toggleOptions && !dropdownOptions && (isPrimaryChanged || isSecondaryChanged)) {
                 return;
             }
             closeModal(); 
@@ -37231,7 +37251,7 @@ shadowRoot.innerHTML = `
     }
   }
   
-  async function _fetchLastFmTrackInfoCore(artistName, trackName, username = null, useFallback = false) {
+  async function _fetchLastFmTrackInfoCore(artistName, trackName, username = null, useFallback = false, noRedirect = false) {
     const maxRetries = 5;
     let delay = 1000;
 
@@ -37244,7 +37264,8 @@ shadowRoot.innerHTML = `
           format: 'json'
         });
         if (username) params.set('username', username);
-        if (lastFmAutocorrect) params.set('autocorrect', '1');
+        if (lastFmAutocorrect && !noRedirect) params.set('autocorrect', '1');
+        else if (noRedirect) params.set('autocorrect', '0');
 
         let response = await fetchLfmWithGateway(params);
         let text = await response.text();
@@ -37260,7 +37281,7 @@ shadowRoot.innerHTML = `
             throw new Error(`Last.fm API request failed with status ${response.status}`);
         }
 
-        if (data.error === 6 && useFallback) {
+        if (data.error === 6 && useFallback && !noRedirect) {
           params.set('autocorrect', lastFmAutocorrect ? '0' : '1');
           const responseRetry = await fetchLfmWithGateway(params);
           const textRetry = await responseRetry.text();
@@ -37301,7 +37322,8 @@ shadowRoot.innerHTML = `
       return {
           artistName,
           trackName,
-          key: `${artistName.toLowerCase()}|-|${trackName.toLowerCase()}`
+          key: `${artistName.toLowerCase()}|-|${trackName.toLowerCase()}`,
+          noRedirect: !!override?.noRedirect
       };
   }
 
@@ -37321,10 +37343,10 @@ shadowRoot.innerHTML = `
 
     try {
       const username = loadLastFmUsername();
-      let data = await _fetchLastFmTrackInfoCore(lfmInfo.artistName, lfmInfo.trackName, username, useFallback);
+      let data = await _fetchLastFmTrackInfoCore(lfmInfo.artistName, lfmInfo.trackName, username, useFallback, lfmInfo.noRedirect);
 
       if (data && data.error === 17 && username) {
-          data = await _fetchLastFmTrackInfoCore(lfmInfo.artistName, lfmInfo.trackName, null, useFallback);
+          data = await _fetchLastFmTrackInfoCore(lfmInfo.artistName, lfmInfo.trackName, null, useFallback, lfmInfo.noRedirect);
       }
 
       if (data.error) {
@@ -37396,7 +37418,7 @@ shadowRoot.innerHTML = `
     }
 
     try {
-      const data = await _fetchLastFmTrackInfoCore(lfmInfo.artistName, lfmInfo.trackName, username, useFallback);
+      const data = await _fetchLastFmTrackInfoCore(lfmInfo.artistName, lfmInfo.trackName, username, useFallback, lfmInfo.noRedirect);
 
       if (data.error) {
         if (data.error === 17) {
@@ -37485,7 +37507,8 @@ shadowRoot.innerHTML = `
                   limit: '1',
                   format: 'json'
               });
-              if (lastFmAutocorrect) params.set('autocorrect', '1');
+              if (lastFmAutocorrect && !lfmInfo.noRedirect) params.set('autocorrect', '1');
+              else if (lfmInfo.noRedirect) params.set('autocorrect', '0');
 
               let response = await fetchLfmWithGateway(params);
               let text = await response.text();
@@ -37501,7 +37524,7 @@ shadowRoot.innerHTML = `
                   throw new Error(`Last.fm API request failed with status ${response.status}`);
               }
 
-              if (data.error === 6 && useFallback) {
+              if (data.error === 6 && useFallback && !lfmInfo.noRedirect) {
                   params.set('autocorrect', lastFmAutocorrect ? '0' : '1');
                   const responseRetry = await fetchLfmWithGateway(params);
                   const textRetry = await responseRetry.text();
@@ -53582,9 +53605,9 @@ shadowRoot.innerHTML = `
       }
   }
 
-  function setLfmOverride(trackId, artist, track, originalTitle) {
+  function setLfmOverride(trackId, artist, track, originalTitle, noRedirect = false) {
       const overrides = getLfmOverrides();
-      overrides[trackId] = { artist, track, ts: Date.now(), originalTitle };
+      overrides[trackId] = { artist, track, ts: Date.now(), originalTitle, noRedirect: !!noRedirect };
       localStorage.setItem(STORAGE_KEY_LFM_OVERRIDES, JSON.stringify(overrides));
       lfmOverridesCache = overrides;
       lfmDetailsCache.clear();
@@ -53598,30 +53621,98 @@ shadowRoot.innerHTML = `
       lfmDetailsCache.clear();
   }
 
+  function parseSpotifyTrackId(input) {
+      if (!input) return null;
+      const trimmed = input.trim();
+      const uriMatch = trimmed.match(/spotify:track:([a-zA-Z0-9]{22})/);
+      if (uriMatch) return uriMatch[1];
+      const urlMatch = trimmed.match(/track\/([a-zA-Z0-9]{22})/);
+      if (urlMatch) return urlMatch[1];
+      const rawMatch = trimmed.match(/^[a-zA-Z0-9]{22}/);
+      return rawMatch ? rawMatch[0] : null;
+  }
+  
     function parseLastFmUrl(url) {
       try {
-          const urlObj = new URL(url);
+          let raw = (url || '').trim();
+          if (!raw) return null;
+          if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw;
+          const urlObj = new URL(raw);
           if (!urlObj.hostname.includes("last.fm")) return null;
           const pathParts = urlObj.pathname.split('/').filter(Boolean);
-          if (pathParts.length >= 2 && pathParts[0] === 'music') {
-              const artist = decodeURIComponent(pathParts[1].replace(/\+/g, ' '));
-              let track = null;
-              
-              if (pathParts.length >= 4) {
-                  track = decodeURIComponent(pathParts[3].replace(/\+/g, ' '));
-              } else if (pathParts.length === 3 && pathParts[2] !== '_') {
-                  track = decodeURIComponent(pathParts[2].replace(/\+/g, ' '));
-              }
-              
-              if (artist && track) return { artist, track };
+          const musicIdx = pathParts.findIndex(p => p.toLowerCase() === 'music');
+          if (musicIdx === -1) return null;
+          let subParts = pathParts.slice(musicIdx + 1);
+          let noRedirect = false;
+          if (subParts.length > 0 && decodeURIComponent(subParts[0]).trim().toLowerCase() === '+noredirect') {
+              noRedirect = true;
+              subParts = subParts.slice(1);
+          }
+          if (subParts.length < 2) return null;
+          const artist = decodeURIComponent(subParts[0].replace(/\+/g, ' ')).trim();
+          let track = null;
+          if (subParts[1] === '_' && subParts.length >= 3) {
+              track = decodeURIComponent(subParts[2].replace(/\+/g, ' ')).trim();
+          } else if (subParts[1] !== '_') {
+              track = decodeURIComponent(subParts[1].replace(/\+/g, ' ')).trim();
+          }
+          const LFM_SYSTEM_SLUGS = new Set(['+shoutbox', '+wiki', '+images', '+tags', '+albums', '+tracks', '+listeners', '+similar', '+noredirect', '+charts']);
+          if (artist && track && !LFM_SYSTEM_SLUGS.has(artist.toLowerCase()) && !LFM_SYSTEM_SLUGS.has(track.toLowerCase())) {
+              return { artist, track, noRedirect };
           }
       } catch(e) { return null; }
       return null;
   }
 
+  function refreshLfmDisplay(targetTrackId = null) {
+      lfmDetailsCache.clear();
+      shoutboxCache.clear();
+
+      document.querySelectorAll('.sort-play-np-container').forEach(el => el.remove());
+      if (typeof displayNowPlayingData === 'function') {
+          displayNowPlayingData();
+      }
+
+      const resetCell = (cell) => {
+          cell.textContent = "";
+          delete cell.dataset.spProcessed;
+          cell.onclick = null;
+          cell.onmouseover = null;
+          cell.onmouseout = null;
+          cell.style.cursor = "default";
+          cell.style.textDecoration = "none";
+          cell.removeAttribute('title');
+      };
+
+      if (targetTrackId) {
+          document.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
+              const uri = row.dataset.spTrackUri || getTracklistTrackUri(row);
+              if (uri && (uri === targetTrackId || uri.includes(targetTrackId))) {
+                  row.classList.remove('sort-play-processing');
+                  row.removeAttribute('data-sp-fetch-failed');
+                  row.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(resetCell);
+              }
+          });
+      } else {
+          document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(resetCell);
+          document.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
+              row.classList.remove('sort-play-processing');
+              row.removeAttribute('data-sp-fetch-failed');
+          });
+      }
+
+      if (typeof onPageChange === 'function') {
+          onPageChange();
+      } else {
+          if (typeof updateTracklist === 'function') updateTracklist();
+          if (typeof updateAlbumTracklist === 'function') updateAlbumTracklist();
+          if (typeof updateArtistTracklist === 'function') updateArtistTracklist();
+      }
+  }
+
   function showLastFmOverrideModal(trackId, originalTitle, refreshModalCallback) {
       const existing = getLfmOverrides()[trackId];
-      const defaultVal = existing ? `https://www.last.fm/music/${encodeURIComponent(existing.artist)}/_/${encodeURIComponent(existing.track)}` : "";
+      const defaultVal = existing ? `https://www.last.fm/music/${existing.noRedirect ? '+noredirect/' : ''}${encodeURIComponent(existing.artist).replace(/%20/g, '+')}/_/${encodeURIComponent(existing.track).replace(/%20/g, '+')}` : "";
 
       showSimpleInputModal({
           title: "Fix Last.fm Match",
@@ -53636,19 +53727,30 @@ shadowRoot.innerHTML = `
                       await idb.del('scrobbles', lfmKey);
                       await idb.del('personalScrobbles', lfmKey);
                       await idb.del('lastScrobbledDates', lfmKey);
+                      await idb.del('lfmTrends', `${existingOverride.artist}|${existingOverride.track}|1`);
+                      await idb.del('lfmTrends', `${existingOverride.artist}|${existingOverride.track}|0`);
+                  }
+                  const meta = await idb.get('trackMetadata', trackId);
+                  let nativeArtist = meta?.artists?.[0]?.name || meta?.artistName;
+                  let nativeTrack = meta?.name || originalTitle;
+                  if (!nativeArtist) {
+                      const row = document.querySelector(`.main-trackList-trackListRow[data-sp-track-uri*="${trackId}"], [role="row"][data-sp-track-uri*="${trackId}"]`);
+                      if (row) {
+                          const props = getTrackDataObject(row);
+                          if (props) {
+                              nativeArtist = props.artists?.[0]?.name || props.artistName;
+                              if (!nativeTrack || nativeTrack === "Unknown Track") nativeTrack = props.name;
+                          }
+                      }
+                  }
+                  if (nativeArtist && nativeTrack) {
+                      const nativeKey = `${nativeArtist.toLowerCase()}|-|${nativeTrack.toLowerCase()}`;
+                      await idb.del('scrobbles', nativeKey);
+                      await idb.del('personalScrobbles', nativeKey);
+                      await idb.del('lastScrobbledDates', nativeKey);
                   }
                   removeLfmOverride(trackId);
-                  
-                  document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => {
-                      delete el.dataset.spProcessed;
-                      el.onclick = null;
-                      el.onmouseover = null;
-                      el.onmouseout = null;
-                      el.style.cursor = "default";
-                      el.style.textDecoration = "none";
-                      el.removeAttribute('title');
-                  });
-                  if (typeof updateTracklist === 'function') updateTracklist();
+                  refreshLfmDisplay(trackId);
                   showNotification("Last.fm override cleared.");
                   closeModal();
                   if (refreshModalCallback) refreshModalCallback();
@@ -53657,14 +53759,24 @@ shadowRoot.innerHTML = `
               
               const parsed = parseLastFmUrl(val);
               if (parsed) {
-                  setLfmOverride(trackId, parsed.artist, parsed.track, originalTitle);
+                  const existingOverride = getLfmOverrides()[trackId];
+                  if (existingOverride) {
+                      const oldKey = `${existingOverride.artist.toLowerCase()}|-|${existingOverride.track.toLowerCase()}`;
+                      await idb.del('scrobbles', oldKey);
+                      await idb.del('personalScrobbles', oldKey);
+                      await idb.del('lastScrobbledDates', oldKey);
+                      await idb.del('lfmTrends', `${existingOverride.artist}|${existingOverride.track}|1`);
+                      await idb.del('lfmTrends', `${existingOverride.artist}|${existingOverride.track}|0`);
+                  }
+                  setLfmOverride(trackId, parsed.artist, parsed.track, originalTitle, parsed.noRedirect);
                   const lfmKey = `${parsed.artist.toLowerCase()}|-|${parsed.track.toLowerCase()}`;
                   await idb.del('scrobbles', lfmKey);
                   await idb.del('personalScrobbles', lfmKey);
                   await idb.del('lastScrobbledDates', lfmKey);
+                  await idb.del('lfmTrends', `${parsed.artist}|${parsed.track}|1`);
+                  await idb.del('lfmTrends', `${parsed.artist}|${parsed.track}|0`);
                   
-                  document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
-                  if (typeof updateTracklist === 'function') updateTracklist();
+                  refreshLfmDisplay(trackId);
                   showNotification("Last.fm link saved! Scrobble counts will update.");
                   closeModal();
                   if (refreshModalCallback) refreshModalCallback();
@@ -53702,19 +53814,22 @@ shadowRoot.innerHTML = `
               .lfm-ov-target { color: #1ed760; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
               .lfm-ov-del-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 6px; border-radius: 4px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
               .lfm-ov-del-btn:hover { background: rgba(241, 94, 108, 0.1); color: #f15e6c; }
-              .lfm-ov-btn { padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; transition: background 0.2s; }
+              .lfm-ov-btn { padding: 8px 18px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; border: none; transition: background 0.2s; white-space: nowrap; flex-shrink: 0; }
           </style>
-          <div style="padding: 24px 24px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
-              <h2 style="margin:0; color:white; font-size:22px; font-weight:700;">Track Overrides Manager</h2>
-              <div style="display: flex; gap: 8px;">
+          <div style="padding: 24px 24px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+              <h2 style="margin:0; color:white; font-size:20px; font-weight:700; white-space: nowrap;">Track Overrides Manager</h2>
+              <div style="display: flex; gap: 8px; flex-shrink: 0;">
                   <button id="lfm-ov-import" class="lfm-ov-btn" style="background: transparent; border: 1px solid #666; color: white;">Import JSON</button>
                   <button id="lfm-ov-export" class="lfm-ov-btn" style="background: transparent; border: 1px solid #666; color: white;">Export JSON</button>
               </div>
           </div>
           <div class="lfm-ov-list" id="lfm-ov-container"></div>
-          <div style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center;">
+          <div style="padding: 16px 24px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
               <button id="lfm-ov-clear" class="lfm-ov-btn" style="background: rgba(241,94,108,0.15); color: #f15e6c;">Clear All</button>
-              <button id="lfm-ov-close" class="lfm-ov-btn" style="background: #1db954; color: black;">Done</button>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                  <button id="lfm-ov-add" class="lfm-ov-btn" style="background: #1ed760; color: black; font-weight: 700;">+ Add Override</button>
+                  <button id="lfm-ov-close" class="lfm-ov-btn" style="background: #333; color: white;">Done</button>
+              </div>
           </div>
       `;
       document.body.appendChild(overlay);
@@ -53730,7 +53845,7 @@ shadowRoot.innerHTML = `
           const keys = Object.keys(overrides);
           
           if (keys.length === 0) {
-              container.innerHTML = '<div style="text-align: center; padding: 40px; color: #888; font-style: italic;">No manual track overrides saved.<br><br><span style="font-size: 13px; font-style: normal; opacity: 0.8;">To add an override, open a track\'s <b>Last.fm Details</b> by right-clicking it (if enabled in settings) or clicking its scrobble stats in the extra column. Then, click the pen icon next to the title.</span></div>';
+              container.innerHTML = '<div style="text-align: center; padding: 40px; color: #888; font-style: italic;">No manual track overrides saved.<br><br><span style="font-size: 13px; font-style: normal; opacity: 0.8;">To add an override, click <b>+ Add Override</b> below or open a track\'s <b>Last.fm Details</b>.</span></div>';
               return;
           }
 
@@ -53739,11 +53854,12 @@ shadowRoot.innerHTML = `
               const safeTitle = escapeHtml(data.originalTitle || id);
               const safeArtist = escapeHtml(data.artist);
               const safeTrack = escapeHtml(data.track);
+              const noRedirectBadge = data.noRedirect ? ' <span style="font-size: 11px; opacity: 0.7; font-weight: normal;">(+noredirect)</span>' : '';
               return `
                   <div class="lfm-ov-item">
                       <div class="lfm-ov-info">
                           <span class="lfm-ov-title" title="${safeTitle}">${safeTitle}</span>
-                          <span class="lfm-ov-target" title="${safeArtist} - ${safeTrack}">&#x21B3; ${safeArtist} - ${safeTrack}</span>
+                          <span class="lfm-ov-target" title="${safeArtist} - ${safeTrack}">&#x21B3; ${safeArtist} - ${safeTrack}${noRedirectBadge}</span>
                       </div>
                       <div style="display: flex; gap: 4px; flex-shrink: 0;">
                           <button class="lfm-ov-del-btn lfm-ov-edit-btn" data-id="${id}" title="Edit Override">${penIconSvg}</button>
@@ -53772,17 +53888,99 @@ shadowRoot.innerHTML = `
                       await idb.del('scrobbles', lfmKey);
                       await idb.del('personalScrobbles', lfmKey);
                       await idb.del('lastScrobbledDates', lfmKey);
+                      await idb.del('lfmTrends', `${data.artist}|${data.track}|1`);
+                      await idb.del('lfmTrends', `${data.artist}|${data.track}|0`);
+                  }
+                  const meta = await idb.get('trackMetadata', id);
+                  const nativeArtist = meta?.artists?.[0]?.name || meta?.artistName;
+                  const nativeTrack = meta?.name || data?.originalTitle;
+                  if (nativeArtist && nativeTrack) {
+                      const nativeKey = `${nativeArtist.toLowerCase()}|-|${nativeTrack.toLowerCase()}`;
+                      await idb.del('scrobbles', nativeKey);
+                      await idb.del('personalScrobbles', nativeKey);
+                      await idb.del('lastScrobbledDates', nativeKey);
                   }
                   removeLfmOverride(id);
                   renderList();
-                  document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
-                  if (typeof updateTracklist === 'function') updateTracklist();
+                  refreshLfmDisplay(id);
               };
           });
       };
 
       renderList();
 
+      modal.querySelector("#lfm-ov-add").onclick = () => {
+          showSimpleInputModal({
+              title: "Add Track Override",
+              descriptionHtml: "Link a Spotify track to a specific Last.fm track page URL.",
+              inputLabel: "Spotify Track (URL, URI, or ID)",
+              inputPlaceholder: "URL, URI, or ID",
+              secondaryInputLabel: "Target Last.fm Track URL",
+              secondaryInputPlaceholder: "Last.fm URL",
+              saveButtonText: "Add Override",
+              onSave: async (results, saveBtn, closeModal) => {
+                  const trackId = parseSpotifyTrackId(results.primary);
+                  if (!trackId) {
+                      showNotification("Invalid Spotify track (URL, URI, or ID).", true);
+                      return;
+                  }
+
+                  const parsed = parseLastFmUrl(results.secondary);
+                  if (!parsed) {
+                      showNotification("Invalid Last.fm track URL.", true);
+                      return;
+                  }
+
+                  saveBtn.disabled = true;
+                  saveBtn.textContent = "Saving...";
+
+                  let originalTitle = null;
+                  try {
+                      const cached = await idb.get('trackMetadata', trackId);
+                      if (cached?.name) {
+                          originalTitle = cached.name;
+                      } else {
+                          const meta = await fetchInternalTrackMetadata(trackId);
+                          if (meta?.name) {
+                              originalTitle = meta.name;
+                              await idb.set('trackMetadata', trackId, formatTrackCacheData(meta));
+                          }
+                      }
+                  } catch (e) {}
+
+                  if (!originalTitle) {
+                      saveBtn.disabled = false;
+                      saveBtn.textContent = "Add Override";
+                      showNotification("Spotify track not found.", true);
+                      return;
+                  }
+
+                  const existingOverride = getLfmOverrides()[trackId];
+                  if (existingOverride) {
+                      const oldKey = `${existingOverride.artist.toLowerCase()}|-|${existingOverride.track.toLowerCase()}`;
+                      await idb.del('scrobbles', oldKey);
+                      await idb.del('personalScrobbles', oldKey);
+                      await idb.del('lastScrobbledDates', oldKey);
+                      await idb.del('lfmTrends', `${existingOverride.artist}|${existingOverride.track}|1`);
+                      await idb.del('lfmTrends', `${existingOverride.artist}|${existingOverride.track}|0`);
+                  }
+
+                  setLfmOverride(trackId, parsed.artist, parsed.track, originalTitle, parsed.noRedirect);
+                  const lfmKey = `${parsed.artist.toLowerCase()}|-|${parsed.track.toLowerCase()}`;
+                  await idb.del('scrobbles', lfmKey);
+                  await idb.del('personalScrobbles', lfmKey);
+                  await idb.del('lastScrobbledDates', lfmKey);
+                  await idb.del('lfmTrends', `${parsed.artist}|${parsed.track}|1`);
+                  await idb.del('lfmTrends', `${parsed.artist}|${parsed.track}|0`);
+
+                  refreshLfmDisplay(trackId);
+                  showNotification(`Added override for "${originalTitle}"`);
+                  closeModal();
+                  renderList();
+              }
+          });
+      };
+      
       modal.querySelector("#lfm-ov-clear").onclick = async () => {
           const confirmed = await showConfirmationModal({
               title: "Clear All Overrides?",
@@ -53796,6 +53994,7 @@ shadowRoot.innerHTML = `
               localStorage.removeItem(STORAGE_KEY_LFM_OVERRIDES);
               lfmOverridesCache = null;
               lfmDetailsCache.clear();
+              shoutboxCache.clear();
               for (const id of keys) {
                   const data = currentOverrides[id];
                   if (data) {
@@ -53803,11 +54002,12 @@ shadowRoot.innerHTML = `
                       await idb.del('scrobbles', lfmKey);
                       await idb.del('personalScrobbles', lfmKey);
                       await idb.del('lastScrobbledDates', lfmKey);
+                      await idb.del('lfmTrends', `${data.artist}|${data.track}|1`);
+                      await idb.del('lfmTrends', `${data.artist}|${data.track}|0`);
                   }
               }
               renderList();
-              document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
-              if (typeof updateTracklist === 'function') updateTracklist();
+              refreshLfmDisplay();
               showNotification("All overrides cleared.");
           }
       };
@@ -53828,6 +54028,7 @@ shadowRoot.innerHTML = `
                       localStorage.setItem(STORAGE_KEY_LFM_OVERRIDES, JSON.stringify(current));
                       lfmOverridesCache = current;
                       lfmDetailsCache.clear();
+                      shoutboxCache.clear();
                       for (const id of Object.keys(data)) {
                           const ov = data[id];
                           if (ov) {
@@ -53835,11 +54036,12 @@ shadowRoot.innerHTML = `
                               await idb.del('scrobbles', lfmKey);
                               await idb.del('personalScrobbles', lfmKey);
                               await idb.del('lastScrobbledDates', lfmKey);
+                              await idb.del('lfmTrends', `${ov.artist}|${ov.track}|1`);
+                              await idb.del('lfmTrends', `${ov.artist}|${ov.track}|0`);
                           }
                       }
                       renderList();
-                      document.querySelectorAll('.sort-play-data, .sort-play-second-data').forEach(el => delete el.dataset.spProcessed);
-                      if (typeof updateTracklist === 'function') updateTracklist();
+                      refreshLfmDisplay();
                       showNotification("Overrides imported successfully.");
                   } catch (err) {
                       showNotification("Invalid JSON file.", true);
@@ -53864,8 +54066,8 @@ shadowRoot.innerHTML = `
       overlay.onclick = (e) => { if (e.target === overlay) close(); };
   }
 
-  async function fetchLastFmShoutbox(artistRaw, trackRaw, targetPage = 1, sortMode = 'popular') {
-      const cacheKey = `${artistRaw}|${trackRaw}|${targetPage}|${sortMode}`;
+  async function fetchLastFmShoutbox(artistRaw, trackRaw, targetPage = 1, sortMode = 'popular', noRedirect = false) {
+      const cacheKey = `${artistRaw}|${trackRaw}|${targetPage}|${sortMode}|${noRedirect ? '1' : '0'}`;
       if (shoutboxCache.has(cacheKey)) {
           const cached = shoutboxCache.get(cacheKey);
           if (Date.now() - cached.ts < CACHE_EXPIRE_SHOUTBOX) {
@@ -53881,6 +54083,7 @@ shadowRoot.innerHTML = `
           page: targetPage,
           sort: sortMode
       });
+      if (noRedirect) params.set('noredirect', '1');
 
       try {
           const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
@@ -54007,12 +54210,14 @@ shadowRoot.innerHTML = `
 
       let lfmArtist = artist;
       let lfmTrack = track;
+      let isNoRedirect = false;
       
       if (trackId && track) {
           const overrides = getLfmOverrides();
           if (overrides[trackId]) {
               lfmArtist = overrides[trackId].artist;
               lfmTrack = overrides[trackId].track;
+              isNoRedirect = !!overrides[trackId].noRedirect;
           }
       }
 
@@ -54024,7 +54229,7 @@ shadowRoot.innerHTML = `
               artist: lfmArtist,
               track: lfmTrack,
               format: 'json',
-              autocorrect: lastFmAutocorrect ? '1' : '0'
+              autocorrect: (lastFmAutocorrect && !isNoRedirect) ? '1' : '0'
           });
           if (username) trackParams.append('username', username);
           
@@ -54040,7 +54245,7 @@ shadowRoot.innerHTML = `
           method: 'artist.getInfo',
           artist: lfmArtist,
           format: 'json',
-          autocorrect: lastFmAutocorrect ? '1' : '0'
+          autocorrect: (lastFmAutocorrect && !isNoRedirect) ? '1' : '0'
       });
       if (username) artistParams.append('username', username);
 
@@ -54056,8 +54261,8 @@ shadowRoot.innerHTML = `
       return results;
   }
 
-  async function fetchLastFmTrend(artist, track) {
-      const cacheKey = `${artist}|${track}`;
+  async function fetchLastFmTrend(artist, track, noRedirect = false) {
+      const cacheKey = `${artist}|${track}|${noRedirect ? '1' : '0'}`;
       const cached = await idb.get('lfmTrends', cacheKey, 12 * 60 * 60 * 1000);
       if (cached) return cached;
       
@@ -54066,6 +54271,7 @@ shadowRoot.innerHTML = `
           track: track,
           type: 'trend'
       });
+      if (noRedirect) params.set('noredirect', '1');
 
       try {
           const queryString = params.toString().replace(/\+/g, '%20').replace(/%2B/ig, '%252B');
@@ -54349,11 +54555,13 @@ shadowRoot.innerHTML = `
 
       let lfmArtist = artistName;
       let lfmTrack = trackName;
+      let isNoRedirect = false;
       if (trackId && !isArtistContext) {
           const overrides = getLfmOverrides();
           if (overrides[trackId]) {
               lfmArtist = overrides[trackId].artist;
               lfmTrack = overrides[trackId].track;
+              isNoRedirect = !!overrides[trackId].noRedirect;
           }
       }
 
@@ -54363,7 +54571,7 @@ shadowRoot.innerHTML = `
       
       let initialCommentsPromise = null;
       if (!isCommentsCollapsedInitial) {
-          initialCommentsPromise = fetchLastFmShoutbox(lfmArtist, lfmTrack, 1, currentSortMode);
+          initialCommentsPromise = fetchLastFmShoutbox(lfmArtist, lfmTrack, 1, currentSortMode, isNoRedirect);
       }
       
       let spotifyImagePromise = Promise.resolve(null);
@@ -54495,7 +54703,7 @@ shadowRoot.innerHTML = `
           modalContainer.style.setProperty('border-color', 'rgba(255,255,255,0.1)', 'important');
           modalContainer.style.setProperty('box-shadow', '0 10px 60px rgba(0,0,0,0.8)', 'important');
 
-          const trackUrl = isArtistContext ? aData.url : tData.url;
+          const trackUrl = isArtistContext ? aData.url : (isNoRedirect ? `https://www.last.fm/music/+noredirect/${encodeURIComponent(lfmArtist).replace(/%20/g, '+')}/_/${encodeURIComponent(lfmTrack).replace(/%20/g, '+')}` : tData.url);
           
           let statsHtml = '';
           if (isArtistContext) {
@@ -54628,6 +54836,7 @@ shadowRoot.innerHTML = `
           const titleStr = isArtistContext ? aData.name : tData.name;
           const artistStr = isArtistContext ? "Artist" : tData.artist.name;
           const coverStyle = isArtistContext ? 'border-radius: 50%;' : '';
+          const activeOverride = (trackId && !isArtistContext) ? getLfmOverrides()[trackId] : null;
 
           let currentPage = 1;
           let hasNextPage = true;
@@ -54720,7 +54929,7 @@ shadowRoot.innerHTML = `
                         <div class="lfm-info">
                             <div class="lfm-title" title="${escapeHtml(titleStr, "")}">
                                 <span class="lfm-title-text">${escapeHtml(titleStr, "")}</span>
-                                ${(trackId && !isArtistContext) ? `<button id="lfm-fix-match-btn-header" title="Fix Match (Override Link)" style="background:none; border:none; cursor:pointer; color:rgba(255,255,255,0.6); padding:0; margin-left:8px; flex-shrink:0; display:flex; align-items:center; transition: color 0.2s;">${penIconSvg}</button>` : ''}
+                                ${(trackId && !isArtistContext) ? `<div style="display:inline-flex; align-items:center; gap:6px; margin-left:8px; flex-shrink:0; transform:translateY(2px);"><button id="lfm-fix-match-btn-header" title="${activeOverride ? `Custom match active: ${escapeHtml(activeOverride.artist)} - ${escapeHtml(activeOverride.track)}` : 'Fix Match (Override Link)'}" style="background:none; border:none; cursor:pointer; color:${activeOverride ? '#1ed760' : 'rgba(255,255,255,0.6)'}; padding:0; display:flex; align-items:center; justify-content:center; transition: color 0.2s;">${penIconSvg}</button>${activeOverride ? `<span id="lfm-override-badge" title="Custom match active: ${escapeHtml(activeOverride.artist)} - ${escapeHtml(activeOverride.track)}" style="font-size: 9px; font-weight: 700; text-transform: uppercase; background: rgba(30, 215, 96, 0.2); color: #1ed760; padding: 2px 6px; border-radius: 4px; letter-spacing: 0.5px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; line-height: 1;">OVERRIDE</span>` : ''}</div>` : ''}
                             </div>
                             <div class="lfm-artist">${escapeHtml(artistStr, "")}</div>
                         </div>
@@ -54774,7 +54983,7 @@ shadowRoot.innerHTML = `
           if (trendContainer) {
               renderTrendChart(trendContainer, null, `rgb(${cR}, ${cG}, ${cB})`);
 
-              fetchLastFmTrend(lfmArtist, isArtistContext ? "" : lfmTrack).then(data => {
+              fetchLastFmTrend(lfmArtist, isArtistContext ? "" : lfmTrack, isNoRedirect).then(data => {
                   if (trendContainer.isConnected) {
                       if (data && data.length >= 2) {
                           renderTrendChart(trendContainer, data, `rgb(${cR}, ${cG}, ${cB})`);
@@ -54794,7 +55003,12 @@ shadowRoot.innerHTML = `
           if (fixBtnHeader) {
               fixBtnHeader.onclick = triggerFixMatch;
               fixBtnHeader.onmouseover = () => fixBtnHeader.style.color = '#fff';
-              fixBtnHeader.onmouseout = () => fixBtnHeader.style.color = 'rgba(255,255,255,0.6)';
+              fixBtnHeader.onmouseout = () => fixBtnHeader.style.color = activeOverride ? '#1ed760' : 'rgba(255,255,255,0.6)';
+          }
+
+          const overrideBadge = modalContainer.querySelector('#lfm-override-badge');
+          if (overrideBadge) {
+              overrideBadge.onclick = triggerFixMatch;
           }
 
           const setUserBtn = modalContainer.querySelector('#set-user-btn');
@@ -54835,8 +55049,9 @@ shadowRoot.innerHTML = `
                   let replyHtml = '';
                   if (c.replyUrl) {
                       const fullReplyUrl = c.replyUrl.startsWith('http') ? c.replyUrl : `https://www.last.fm${c.replyUrl}`;
+                      const safeReplyUrl = isNoRedirect && !fullReplyUrl.includes('/+noredirect/') ? fullReplyUrl.replace('/music/', '/music/+noredirect/') : fullReplyUrl;
                       replyHtml = `
-                          <a href="${fullReplyUrl}" target="_blank" style="color: rgba(255,255,255,0.4); display: flex; align-items: center; transition: color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.4)'" title="Reply on Last.fm">
+                          <a href="${safeReplyUrl}" target="_blank" style="color: rgba(255,255,255,0.4); display: flex; align-items: center; transition: color 0.2s;" onmouseover="this.style.color='white'" onmouseout="this.style.color='rgba(255,255,255,0.4)'" title="Reply on Last.fm">
                               ${replyIconSvg}
                           </a>
                       `;
@@ -54885,7 +55100,7 @@ shadowRoot.innerHTML = `
                   result = await initialCommentsPromise;
                   initialCommentsPromise = null;
               } else {
-                  result = await fetchLastFmShoutbox(lfmArtist, isArtistContext ? "" : lfmTrack, currentPage, currentSortMode);
+                  result = await fetchLastFmShoutbox(lfmArtist, isArtistContext ? "" : lfmTrack, currentPage, currentSortMode, isNoRedirect);
               }
               
               if (result.error === "session_expired") {
@@ -57507,6 +57722,23 @@ shadowRoot.innerHTML = `
     let likeButton_needsResync = false;
     let likeButton_resyncDebounceTimer = null;
     let likeButton_periodicSyncTimer = null;
+    let likeButton_cachedReservedMargin = 44;
+
+    function likeButton_getReservedMargin(btn = null) {
+        if (!btn) {
+            btn = document.querySelector('.main-trackList-trackListRow button[data-testid="add-button"], div[role="row"] button[data-testid="add-button"], .main-trackList-trackListRow button[aria-checked]:not(.sort-play-like-button), div[role="row"] button[aria-checked]:not(.sort-play-like-button)');
+        }
+        if (btn && btn.isConnected) {
+            const rect = btn.getBoundingClientRect();
+            if (rect.width > 0) {
+                const comp = window.getComputedStyle(btn);
+                const mr = parseFloat(comp.marginRight) || 0;
+                const ml = parseFloat(comp.marginLeft) || 0;
+                likeButton_cachedReservedMargin = Math.round(rect.width + mr + ml + 12);
+            }
+        }
+        return likeButton_cachedReservedMargin;
+    }
 
     function likeButton_scheduleSync(delayMs) {
         clearTimeout(likeButton_periodicSyncTimer);
@@ -57638,8 +57870,8 @@ shadowRoot.innerHTML = `
                 if (fastItems.length > 0) {
                     const newById = new Map();
                     fastItems.forEach(item => {
-                        const trackId = item.uri?.replace("spotify:track:", "");
-                        if (!trackId || trackId.startsWith("spotify:local:")) return;
+                        const trackId = item.uri?.startsWith("spotify:local:") ? item.uri : item.uri?.replace("spotify:track:", "");
+                        if (!trackId) return;
                         const albumUri = item.album?.uri || (item.album?.id ? `spotify:album:${item.album.id}` : "");
                         const albumId = albumUri.split(":")[2] || item.album?.id || null;
                         const albumName = item.album?.name || "Album";
@@ -57692,8 +57924,9 @@ shadowRoot.innerHTML = `
             const missingIsrcIds = [];
 
             likedTracks.forEach(item => {
-                const trackId = item.uri?.replace("spotify:track:", "");
-                if (!trackId || trackId.startsWith("spotify:local:")) return;
+                const trackId = item.uri?.startsWith("spotify:local:") ? item.uri : item.uri?.replace("spotify:track:", "");
+                if (!trackId) return;
+                const isLocal = trackId.startsWith("spotify:local:");
                 const albumUri = item.albumUri || item.album?.uri || "";
                 const albumId = albumUri.split(":")[2] || item.track?.album?.id || null;
                 const albumName = item.albumName || item.album?.name || item.track?.album?.name || "Album";
@@ -57701,11 +57934,11 @@ shadowRoot.innerHTML = `
                 const artistIds = (item.artists || []).map(a => a.uri?.split(":")[2] || a.id).filter(Boolean);
 
                 const existing = likeButton_likedTracksById.get(trackId);
-                const isrc = existing?.isrc || null;
+                const isrc = isLocal ? null : (existing?.isrc || null);
                 const entry = { trackId, uri: item.uri, name, albumId, albumName, isrc, artistIds };
                 freshTrackMap.set(trackId, entry);
 
-                if (!isrc) {
+                if (!isrc && !isLocal) {
                     missingIsrcIds.push(trackId);
                 }
             });
@@ -57874,8 +58107,8 @@ shadowRoot.innerHTML = `
 
     function openLikeButtonMenu({ anchorEl, uri, isrc, currentAlbumInfo, artistIds = [] }) {
         let candidateArtistIds = [...artistIds];
-        const trackIdForArtists = uri.replace("spotify:track:", "");
-        if (!candidateArtistIds.length && trackIdForArtists === Spicetify.Player.data?.item?.uri?.split(':')[2]) {
+        const trackIdForArtists = uri.startsWith("spotify:local:") ? uri : uri.replace("spotify:track:", "");
+        if (!candidateArtistIds.length && (trackIdForArtists === Spicetify.Player.data?.item?.uri?.split(':')[2] || uri === Spicetify.Player.data?.item?.uri)) {
             candidateArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
         }
         if (!candidateArtistIds.length && anchorEl) {
@@ -57891,7 +58124,8 @@ shadowRoot.innerHTML = `
         }
         closeAllMenus();
         closeLikeButtonMenu();
-        const trackId = uri.replace("spotify:track:", "");
+        const trackId = uri.startsWith("spotify:local:") ? uri : uri.replace("spotify:track:", "");
+        const isLocal = uri.startsWith("spotify:local:");
 
         const resolvedCurrentAlbum = { ...currentAlbumInfo };
         const likedInfo = likeButton_likedTracksById.get(trackId);
@@ -58267,13 +58501,19 @@ shadowRoot.innerHTML = `
                     menu.appendChild(createDivider());
                 }
                 const isAltCase = currentCount > 0 && !isDirectlyLiked;
+                const isNavigableAlbum = !isLocal && Boolean(resolvedCurrentAlbum.id && !resolvedCurrentAlbum.id.startsWith("spotify:local:"));
                 const currentAlbumBtn = createButton({
-                    text: "Go to Album",
+                    text: isLocal ? "Search Album on Spotify" : "Go to Album",
                     textTag: isAltCase ? "(Current)" : null,
                     subtext: resolvedCurrentAlbum.name || "Album",
                     iconSvg: likeMenuGoToAlbumIconSvg,
+                    disabled: isLocal ? !resolvedCurrentAlbum.name : !isNavigableAlbum,
                     onClick: () => {
-                        if (resolvedCurrentAlbum.id) Spicetify.Platform.History.push(`/album/${resolvedCurrentAlbum.id.replace('spotify:album:', '')}`);
+                        if (isLocal && resolvedCurrentAlbum.name) {
+                            Spicetify.Platform.History.push(`/search/${encodeURIComponent(resolvedCurrentAlbum.name)}/albums`);
+                        } else if (isNavigableAlbum) {
+                            Spicetify.Platform.History.push(`/album/${resolvedCurrentAlbum.id.replace('spotify:album:', '')}`);
+                        }
                         closeLikeButtonMenu();
                     }
                 });
@@ -58286,7 +58526,7 @@ shadowRoot.innerHTML = `
             let resolvedTitle = null;
 
             if (!resolvedArtist || !resolvedTitle) {
-                if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2]) {
+                if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2] || uri === Spicetify.Player.data?.item?.uri) {
                     resolvedArtist = resolvedArtist || Spicetify.Player.data?.item?.artists?.[0]?.name || Spicetify.Player.data?.item?.metadata?.artist_name;
                     resolvedTitle = resolvedTitle || Spicetify.Player.data?.item?.name || Spicetify.Player.data?.item?.metadata?.title;
                 }
@@ -58295,6 +58535,10 @@ shadowRoot.innerHTML = `
                     resolvedArtist = resolvedArtist || row.querySelector('a[href^="/artist/"]')?.textContent?.trim();
                     resolvedTitle = resolvedTitle || row.querySelector('.main-trackList-rowTitle, [data-testid="tracklist-row-title"]')?.textContent?.trim();
                 }
+                if (isLocal && !resolvedTitle) {
+                    const parts = uri.split(':');
+                    if (parts.length >= 5) resolvedTitle = decodeURIComponent(parts[4].replace(/\+/g, ' '));
+                }
             }
 
             const cacheKey = resolvedIsrc ? `${resolvedIsrc}:${(candidateArtistIds[0] || resolvedArtist || "").toLowerCase().trim()}` : null;
@@ -58302,18 +58546,23 @@ shadowRoot.innerHTML = `
             const hasValidCached = typeof cachedResult?.count === "number" && cachedResult.count > 0;
 
             const viewAllBtn = createButton({
-                text: "View All Versions on Spotify",
-                textTag: hasValidCached ? cachedResult.tag : null,
+                text: isLocal ? "Search Track on Spotify" : "View All Versions on Spotify",
+                textTag: (!isLocal && hasValidCached) ? cachedResult.tag : null,
                 iconSvg: likeMenuViewVersionsIconSvg,
-                disabled: !resolvedIsrc,
+                disabled: isLocal ? !resolvedTitle : !resolvedIsrc,
                 onClick: () => {
-                    if (resolvedIsrc) Spicetify.Platform.History.push(`/search/${encodeURIComponent('isrc:' + resolvedIsrc)}/tracks`);
+                    if (isLocal && resolvedTitle) {
+                        const q = resolvedArtist ? `${resolvedTitle} ${resolvedArtist}` : resolvedTitle;
+                        Spicetify.Platform.History.push(`/search/${encodeURIComponent(q)}/tracks`);
+                    } else if (resolvedIsrc) {
+                        Spicetify.Platform.History.push(`/search/${encodeURIComponent('isrc:' + resolvedIsrc)}/tracks`);
+                    }
                     closeLikeButtonMenu();
                 }
             });
             menu.appendChild(viewAllBtn);
 
-            if (resolvedIsrc && !hasValidCached) {
+            if (!isLocal && resolvedIsrc && !hasValidCached) {
                 fetchIsrcTrackCount(resolvedIsrc, candidateArtistIds, resolvedArtist, resolvedTitle).then(res => {
                     if (likeButton_activeMenu !== menu) return;
                     if (typeof res?.count === "number" && res.count > 0) {
@@ -58323,11 +58572,14 @@ shadowRoot.innerHTML = `
             }
 
             const copyIsrcBtn = createButton({
-                text: resolvedIsrc ? "Copy Track ISRC" : "ISRC Unavailable",
+                text: isLocal ? "Copy Track URI" : (resolvedIsrc ? "Copy Track ISRC" : "ISRC Unavailable"),
                 iconSvg: likeMenuCopyIsrcIconSvg,
-                disabled: !resolvedIsrc,
+                disabled: !isLocal && !resolvedIsrc,
                 onClick: () => {
-                    if (resolvedIsrc) {
+                    if (isLocal) {
+                        navigator.clipboard.writeText(uri);
+                        showNotification(`URI copied to clipboard: ${uri}`);
+                    } else if (resolvedIsrc) {
                         navigator.clipboard.writeText(resolvedIsrc);
                         showNotification(`ISRC copied to clipboard: ${resolvedIsrc}`);
                     }
@@ -58346,7 +58598,7 @@ shadowRoot.innerHTML = `
         document.body.appendChild(menu);
         updatePosition();
 
-        if (!resolvedIsrc || !resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name) {
+        if (!isLocal && (!resolvedIsrc || !resolvedCurrentAlbum.id || !resolvedCurrentAlbum.name)) {
             (async () => {
                 let updated = false;
                 if (!resolvedIsrc) {
@@ -58420,7 +58672,7 @@ shadowRoot.innerHTML = `
     }
 
     const LikeButton = Spicetify.React.memo(function LikeButton({ uri, classList, size = 16.3, dynamicSizeSelector = null, buttonStyle = { marginRight: "12px" }, currentAlbum = null, artistIds = [] }) {
-        const trackId = uri.replace("spotify:track:", "");
+        const trackId = uri.startsWith("spotify:local:") ? uri : uri.replace("spotify:track:", "");
         const [currentSize, setCurrentSize] = Spicetify.React.useState(size);
         const [isrc, setISRC] = Spicetify.React.useState(null);
         const [effectiveArtistIds, setEffectiveArtistIds] = Spicetify.React.useState(artistIds);
@@ -58482,6 +58734,7 @@ shadowRoot.innerHTML = `
         Spicetify.React.useEffect(() => {
             async function initISRC() {
                 try {
+                    if (trackId.startsWith("spotify:local:")) return;
                     let currentIsrc = likeButton_likedTracksById.get(trackId)?.isrc || null;
                     let resolvedIds = [...effectiveArtistIds];
 
@@ -58569,7 +58822,7 @@ shadowRoot.innerHTML = `
                     let currentAlbumName = currentAlbum?.name;
                     let trackTitle = null;
                     let currentArtistIds = effectiveArtistIds?.length ? [...effectiveArtistIds] : [...artistIds];
-                    if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2]) {
+                    if (trackId === Spicetify.Player.data?.item?.uri?.split(':')[2] || uri === Spicetify.Player.data?.item?.uri) {
                         currentAlbumId = currentAlbumId || Spicetify.Player.data?.item?.album?.uri?.split(':')[2];
                         currentAlbumName = currentAlbumName || Spicetify.Player.data?.item?.album?.name;
                         trackTitle = Spicetify.Player.data?.item?.name;
@@ -58577,7 +58830,12 @@ shadowRoot.innerHTML = `
                             currentArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
                         }
                     }
-                    if (!trackTitle) {
+                    if (!trackTitle && trackId.startsWith("spotify:local:")) {
+                        const parts = uri.split(':');
+                        if (parts.length >= 5) trackTitle = decodeURIComponent(parts[4].replace(/\+/g, ' '));
+                        if (!currentAlbumName && parts.length >= 4) currentAlbumName = decodeURIComponent(parts[3].replace(/\+/g, ' '));
+                    }
+                    if (!trackTitle && !trackId.startsWith("spotify:local:")) {
                         const cached = await idb.get('trackMetadata', trackId);
                         trackTitle = cached?.name;
                         currentAlbumId = currentAlbumId || cached?.album?.id;
@@ -58647,7 +58905,7 @@ shadowRoot.innerHTML = `
                 setIsHovered(false);
                 likeButton_hideTooltip();
             },
-            style: buttonStyle
+            style: buttonRef.current?.style?.marginRight ? { ...buttonStyle, marginRight: buttonRef.current.style.marginRight } : buttonStyle
         }, Spicetify.React.createElement("span", {
             className: "Wrapper-sm-only Wrapper-small-only",
             style: { display: 'flex', alignItems: 'center', justifyContent: 'center' }
@@ -58703,7 +58961,8 @@ shadowRoot.innerHTML = `
             let nowPlayingWidget = getNowPlayingWidget();
             let container = nowPlayingWidget ? nowPlayingWidget.querySelector(".likeControl-wrapper") : null;
 
-            if (!likeButtonConfig.nowPlayingBar || !uri || !uri.startsWith("spotify:track:")) {
+            const isSupportedTrackUri = typeof uri === "string" && (uri.startsWith("spotify:track:") || uri.startsWith("spotify:local:"));
+            if (!likeButtonConfig.nowPlayingBar || !isSupportedTrackUri) {
                 if (container) {
                     Spicetify.ReactDOM.unmountComponentAtNode(container);
                     container.remove();
@@ -58772,11 +59031,16 @@ shadowRoot.innerHTML = `
                     const curAlbumId = Spicetify.Player.data?.item?.album?.uri?.split(':')[2] || Spicetify.Player.data?.item?.metadata?.album_uri?.split(':')[2] || null;
                     const curAlbumName = Spicetify.Player.data?.item?.album?.name || Spicetify.Player.data?.item?.metadata?.album_title || null;
                     const curArtistIds = (Spicetify.Player.data?.item?.artists || []).map(a => a.uri?.split(':')[2] || a.id).filter(Boolean);
+                    const cleanClassList = (currentNativeLikeButton.className || '')
+                        .replace(/\bsort-play-like-button\b/g, '')
+                        .replace(/\bencore-internal-color-text-bright-accent\b/g, '')
+                        .replace(/\bencore-internal-color-text-subdued\b/g, '')
+                        .trim();
                     Spicetify.ReactDOM.render(
                         Spicetify.React.createElement(LikeButton, { 
                             uri: uri, 
                             key: uri, 
-                            classList: currentNativeLikeButton.className,
+                            classList: cleanClassList,
                             buttonStyle: { marginRight: "0px" },
                             currentAlbum: { id: curAlbumId, name: curAlbumName },
                             artistIds: curArtistIds
@@ -58816,8 +59080,9 @@ shadowRoot.innerHTML = `
 
     async function mountLikeButtonNowPlayingView(targetUri = null) {
         const uri = targetUri || Spicetify.Player.data?.item?.uri || "";
+        const isSupportedTrackUri = typeof uri === "string" && (uri.startsWith("spotify:track:") || uri.startsWith("spotify:local:"));
 
-        if (!likeButtonConfig.nowPlayingView || !uri || !uri.startsWith("spotify:track:")) {
+        if (!likeButtonConfig.nowPlayingView || !isSupportedTrackUri) {
             document.querySelectorAll(".likeControl-wrapper-npv").forEach(el => {
                 Spicetify.ReactDOM.unmountComponentAtNode(el);
                 el.remove();
@@ -59091,14 +59356,64 @@ shadowRoot.innerHTML = `
     (async function initialize() {
         likeButton_initiateLikedSongs();
 
+        const handleNativeLikeChange = () => {
+            invalidateLikedSongsCache();
+            clearTimeout(likeButton_resyncDebounceTimer);
+            likeButton_resyncDebounceTimer = setTimeout(() => {
+                likeButton_syncWithServer();
+            }, 800);
+        };
+
+        const handlePlaylistOperation = (evt) => {
+            const data = evt?.data || evt;
+            const op = data?.operation;
+            if (op !== "add" && op !== "remove") return;
+            const rawItems = data?.items || [];
+            const trackUris = rawItems.map(item => typeof item === "string" ? item : item?.uri).filter(u => u?.startsWith("spotify:track:") || u?.startsWith("spotify:local:"));
+            if (trackUris.length === 0) return;
+
+            invalidateLikedSongsCache();
+            const targetUri = data?.uri || "";
+            const isCollection = targetUri.includes("collection") || targetUri.includes("37i9dQZF1F5p3rmiWPIYgZ") || targetUri.includes("tracks");
+
+            if (isCollection) {
+                trackUris.forEach(u => {
+                    const id = u.startsWith("spotify:local:") ? u : u.replace("spotify:track:", "");
+                    if (op === "add") {
+                        likeButton_addLikedTrack({ trackId: id, uri: u, name: "Track", albumId: null, albumName: "Album", isrc: null, artistIds: [] }, false);
+                    } else if (op === "remove") {
+                        likeButton_removeLikedTrack(id, false);
+                    }
+                });
+                document.dispatchEvent(likeButton_likedTracksChangeEvent);
+            }
+
+            clearTimeout(likeButton_resyncDebounceTimer);
+            likeButton_resyncDebounceTimer = setTimeout(() => {
+                likeButton_syncWithServer();
+            }, 800);
+        };
+
         try {
-            Spicetify.Platform?.LibraryAPI?.getEvents?.().addListener("update", () => {
-                invalidateLikedSongsCache();
-                clearTimeout(likeButton_resyncDebounceTimer);
-                likeButton_resyncDebounceTimer = setTimeout(() => {
-                    likeButton_syncWithServer();
-                }, 1500);
-            });
+            const plEvents = Spicetify.Platform?.PlaylistAPI?.getEvents?.();
+            if (plEvents?.addListener) {
+                plEvents.addListener("operation", handlePlaylistOperation);
+                plEvents.addListener("update", handleNativeLikeChange);
+            }
+        } catch (e) {}
+
+        try {
+            const rlEvents = Spicetify.Platform?.RootlistAPI?.getEvents?.();
+            if (rlEvents?.addListener) {
+                rlEvents.addListener("update", handleNativeLikeChange);
+            }
+        } catch (e) {}
+
+        try {
+            const libEvents = Spicetify.Platform?.LibraryAPI?.getEvents?.();
+            if (libEvents?.addListener) {
+                libEvents.addListener("update", handleNativeLikeChange);
+            }
         } catch (e) {}
     
         while (!Spicetify?.Player?.data?.item || !document.querySelector(".main-nowPlayingWidget-nowPlaying, [data-testid=\"now-playing-widget\"]")) {
@@ -59140,31 +59455,90 @@ shadowRoot.innerHTML = `
             if (inner) targetRow = inner;
         }
         
-        if (!targetRow.closest('.main-trackList-indexable, div[data-testid="track-list"], div[aria-label*="search results"], div[role="grid"]:not([aria-colcount="1"])')) return;
+        if (!targetRow.closest('.main-trackList-indexable, .main-trackList-trackList, div[data-testid="track-list"], div[aria-label*="search results" i], div[role="grid"]:not([aria-colcount="1"])')) return;
         
         const gridCells = Array.from(targetRow.querySelectorAll('[role="gridcell"]'));
         let actionButtonsContainer = gridCells.length > 0 ? gridCells[gridCells.length - 1] : null;
         if (!actionButtonsContainer) return;
+
+        if (targetRow.closest('[data-testid*="recommend" i], [aria-label*="recommend" i], .playlist-playlist-playlistRecommendations') ||
+            targetRow.querySelector('[data-testid="add-to-playlist-button"]')) {
+            const existing = actionButtonsContainer.querySelector(".likeControl-wrapper") || targetRow.querySelector(".likeControl-wrapper");
+            if (existing) {
+                Spicetify.ReactDOM.unmountComponentAtNode(existing);
+                existing.remove();
+            }
+            targetRow.classList.remove("sort-play-like-button-injected");
+            return;
+        }
         
-        let uri = null;
-        const reactPropsKey = Object.keys(targetRow).find(key => key.startsWith("__reactProps$"));
-        if (reactPropsKey) {
-            const props = targetRow[reactPropsKey];
-            uri = props?.children?.props?.value?.item?.uri;
-            if (!uri || !uri.startsWith("spotify:track:")) {
-                uri = likeButton_findVal(props, "uri");
+        const isTrackOrLocal = (u) => typeof u === "string" && (u.startsWith("spotify:track:") || u.startsWith("spotify:local:"));
+        let uri = targetRow.getAttribute("data-sp-track-uri");
+        if (!isTrackOrLocal(uri)) {
+            const reactPropsKey = Object.keys(targetRow).find(key => key.startsWith("__reactProps$"));
+            if (reactPropsKey) {
+                const props = targetRow[reactPropsKey];
+                uri = props?.children?.props?.value?.item?.uri;
+                if (!isTrackOrLocal(uri)) {
+                    uri = likeButton_findVal(props, "uri");
+                }
             }
         }
 
-        if (!uri || !uri.startsWith("spotify:track:")) {
+        if (!isTrackOrLocal(uri)) {
             uri = getTracklistTrackUri(targetRow);
         }
+
+        if (!isTrackOrLocal(uri)) {
+            const trackLink = targetRow.querySelector('a[href*="/track/"]');
+            if (trackLink) {
+                const match = (trackLink.getAttribute("href") || "").match(/\/track\/([a-zA-Z0-9]+)/);
+                if (match) uri = `spotify:track:${match[1]}`;
+            }
+        }
         
-        if (!uri || !uri.startsWith("spotify:track:")) return;
+        if (!isTrackOrLocal(uri)) return;
+
+        let durationEl = null;
+        let nativeAddBtn = null;
+        const children = Array.from(actionButtonsContainer.children);
+
+        for (const child of children) {
+            if (child.classList?.contains('likeControl-wrapper')) continue;
+            if (!durationEl && (/^\s*\d{1,2}:\d{2}\s*$/.test(child.textContent || '') || child.getAttribute?.('data-encore-id') === 'text')) {
+                durationEl = child;
+                continue;
+            }
+            const btn = child.tagName === 'BUTTON' ? child : child.querySelector?.('button');
+            if (btn && !btn.classList.contains('sort-play-like-button')) {
+                const isMore = btn.hasAttribute('aria-haspopup') || 
+                               btn.getAttribute('data-testid') === 'more-button' || 
+                               (btn.getAttribute('aria-label') || '').toLowerCase().includes('more');
+                const isAdd = !isMore && (
+                    btn.hasAttribute('aria-checked') || 
+                    btn.getAttribute('data-testid') === 'add-button' || 
+                    /add|save|playlist|library|liked/i.test(btn.getAttribute('aria-label') || '')
+                );
+                if (isAdd) {
+                    nativeAddBtn = btn;
+                    break;
+                }
+            }
+        }
+
+        const reservedMargin = nativeAddBtn ? 12 : likeButton_getReservedMargin();
+        if (nativeAddBtn) likeButton_getReservedMargin(nativeAddBtn);
+
+        const insertionTarget = nativeAddBtn || durationEl || actionButtonsContainer.firstChild;
 
         const existingWrapper = actionButtonsContainer.querySelector(".likeControl-wrapper");
         if (existingWrapper) {
-            if (existingWrapper.dataset.renderedUri === uri) {
+            if (existingWrapper.dataset.renderedUri === uri && existingWrapper.firstChild) {
+                if (insertionTarget && existingWrapper.nextElementSibling !== insertionTarget && existingWrapper !== insertionTarget) {
+                    actionButtonsContainer.insertBefore(existingWrapper, insertionTarget);
+                }
+                const existingBtn = existingWrapper.querySelector('.sort-play-like-button');
+                if (existingBtn) existingBtn.style.marginRight = `${reservedMargin}px`;
                 targetRow.classList.add("sort-play-like-button-injected");
                 return;
             }
@@ -59172,13 +59546,6 @@ shadowRoot.innerHTML = `
             existingWrapper.remove();
             targetRow.classList.remove("sort-play-like-button-injected");
         }
-        
-        let entryPoint = actionButtonsContainer.querySelector('button[aria-label*="Add to playlist"], button[aria-label*="Liked Songs"]') ||
-                         actionButtonsContainer.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
-        if (!entryPoint) {
-            entryPoint = actionButtonsContainer.querySelector("button:not(:last-of-type)");
-        }
-        if (!entryPoint) return;
         
         let artistIds = [];
         const domArtistLinks = targetRow.querySelectorAll('a[href*="/artist/"], a[href*=":artist:"]');
@@ -59204,6 +59571,10 @@ shadowRoot.innerHTML = `
                     id: albHref.split('?')[0].split('/album/')[1] || null,
                     name: albumLink.textContent?.trim() || null
                 };
+            } else if (uri.startsWith("spotify:local:")) {
+                const albumCell = targetRow.querySelector('[aria-colindex="3"], .Ls6nEJWHqujNmm7FHebW');
+                const albumText = albumCell?.textContent?.trim();
+                if (albumText) currentAlbum = { id: null, name: albumText };
             }
             const stopSecondary = (e) => {
                 if (e.button === 2) {
@@ -59217,18 +59588,40 @@ shadowRoot.innerHTML = `
             likeButtonWrapper.addEventListener('mouseup', stopSecondary);
             likeButtonWrapper.addEventListener('pointerup', stopSecondary);
 
-            entryPoint.parentElement.insertBefore(likeButtonWrapper, entryPoint);
-            Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { uri, classList: entryPoint.className, currentAlbum, artistIds }), likeButtonWrapper);
+            if (insertionTarget) {
+                actionButtonsContainer.insertBefore(likeButtonWrapper, insertionTarget);
+            } else {
+                actionButtonsContainer.appendChild(likeButtonWrapper);
+            }
+
+            const templateBtn = nativeAddBtn || actionButtonsContainer.querySelector('button:not(.sort-play-like-button)');
+            const classList = (templateBtn?.className || '')
+                .replace(/\bsort-play-like-button\b/g, '')
+                .replace(/\bencore-internal-color-text-bright-accent\b/g, '')
+                .replace(/\bencore-internal-color-text-subdued\b/g, '')
+                .trim();
+            Spicetify.ReactDOM.render(Spicetify.React.createElement(LikeButton, { 
+                uri, 
+                classList, 
+                buttonStyle: { marginRight: `${reservedMargin}px` },
+                currentAlbum, 
+                artistIds 
+            }), likeButtonWrapper);
         } catch (e) {
             targetRow.classList.remove("sort-play-like-button-injected");
         }
     };
 
     likeButton_processTracklist = (mainView) => {
-        const tracklists = Array.from(mainView.querySelectorAll('.main-trackList-indexable, div[data-testid="track-list"], div[aria-label*="search results"], div[role="grid"]:not([aria-colcount="1"])'));
-        tracklists.forEach(tracklist => {
-            tracklist.querySelectorAll('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])').forEach(likeButton_addLikeButtonToRow);
-        });
+        const tracklists = Array.from(mainView.querySelectorAll('.main-trackList-indexable, .main-trackList-trackList, div[data-testid="track-list"], div[aria-label*="search results" i], div[role="grid"]:not([aria-colcount="1"])'));
+        if (tracklists.length > 0) {
+            tracklists.forEach(tracklist => {
+                if (tracklist.closest('[data-testid*="recommend" i], [aria-label*="recommend" i], .playlist-playlist-playlistRecommendations')) return;
+                tracklist.querySelectorAll('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])').forEach(likeButton_addLikeButtonToRow);
+            });
+        } else {
+            mainView.querySelectorAll('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])').forEach(likeButton_addLikeButtonToRow);
+        }
     };
 
     likeButton_connectObserver = () => {
@@ -59252,7 +59645,7 @@ shadowRoot.innerHTML = `
     
         likeButton_tracklistObserver = new MutationObserver((mutations) => {
             const currentUri = Spicetify.Player.data?.item?.uri;
-            if (currentUri && currentUri.startsWith("spotify:track:")) {
+            if (currentUri && (currentUri.startsWith("spotify:track:") || currentUri.startsWith("spotify:local:"))) {
                 const npBar = document.querySelector(".main-nowPlayingWidget-nowPlaying .likeControl-wrapper, [data-testid=\"now-playing-widget\"] .likeControl-wrapper");
                 if (likeButtonConfig.nowPlayingBar && (!npBar || npBar.dataset.renderedUri !== currentUri)) {
                     mountLikeButton(currentUri);
@@ -59273,10 +59666,15 @@ shadowRoot.innerHTML = `
                 mountLikeButtonWatchFeed();
             }
     
+            const rowsToProcess = new Set();
+
             for (const mutation of mutations) {
                 if (mutation.target.closest && (mutation.target.closest('.likeControl-wrapper-npv') || mutation.target.closest('.likeControl-wrapper-wf') || mutation.target.closest('.likeControl-wrapper'))) {
                     continue;
                 }
+
+                const parentRow = mutation.target.closest?.('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])');
+                if (parentRow) rowsToProcess.add(parentRow);
                 
                 for (const node of mutation.addedNodes) {
                     if (node.nodeType === Node.ELEMENT_NODE) {
@@ -59284,16 +59682,18 @@ shadowRoot.innerHTML = `
                             continue;
                         }
                         if (node.getAttribute?.('role') === 'row' || node.classList?.contains('main-trackList-trackListRow')) {
-                            likeButton_addLikeButtonToRow(node);
+                            rowsToProcess.add(node);
                         } else if (node.querySelectorAll) {
-                            node.querySelectorAll('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])').forEach(likeButton_addLikeButtonToRow);
+                            node.querySelectorAll('.main-trackList-trackListRow, div[role="row"]:not([aria-rowindex="1"])').forEach(r => rowsToProcess.add(r));
                         }
                     }
                 }
             }
+
+            rowsToProcess.forEach(likeButton_addLikeButtonToRow);
         });
     
-        likeButton_tracklistObserver.observe(document.body, { childList: true, subtree: true });
+        likeButton_tracklistObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['aria-rowindex'] });
         likeButton_observerInitialized = true;
     };
 
@@ -59344,7 +59744,7 @@ shadowRoot.innerHTML = `
         if (artistTracklistObserver) artistTracklistObserver.disconnect();
         
         if (currentUri) {
-            if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri)) {
+            if (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)) {
                 initializeTracklistObserver();
             } else if (URI.isAlbum(currentUri)) {
                 initializeAlbumTracklistObserver();
@@ -59357,7 +59757,7 @@ shadowRoot.innerHTML = `
             initializeTracklistObserver();
         }
     } else {
-        if (currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isSearchPage)) {
+        if (isSearchPage || (currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri)))) {
              updateTracklist();
         } else if (currentUri && URI.isAlbum(currentUri)) {
              updateAlbumTracklist();
