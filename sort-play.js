@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.7.5";
+  const SORT_PLAY_VERSION = "6.8.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -146,6 +146,11 @@
   const STORAGE_KEY_DEDICATED_OVERRIDES = "sort-play-dedicated-overrides";
   const STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE = "sort-play-backup-unavailable-on-remove";
   const STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE = "sort-play-backup-duplicates-on-remove";
+  const STORAGE_KEY_GENRE_BLACKLIST = "sort-play-genre-blacklist";
+  const STORAGE_KEY_GENRE_BLACKLIST_ENABLED = "sort-play-genre-blacklist-enabled";
+  const STORAGE_KEY_GENRE_BLACKLIST_NOTIFY = "sort-play-genre-blacklist-notify";
+  const STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED = "sort-play-genre-blacklist-protect-liked";
+  const STORAGE_KEY_GENRE_BLACKLIST_CONFIG = "sort-play-genre-blacklist-config";
 
   const SYNCABLE_SETTINGS_KEYS = [
     STORAGE_KEY_SHOW_GENRE_TAGS, STORAGE_KEY_SHOW_GENRE_TAGS_NP, STORAGE_KEY_SHOW_GENRE_TAGS_AP,
@@ -205,7 +210,8 @@
     STORAGE_KEY_CF_FETCH_POPULARITY, STORAGE_KEY_CF_FETCH_LASTFM,
     STORAGE_KEY_CF_RELEASE_DATE_FORMAT, STORAGE_KEY_CF_MY_SCROBBLES_MODE, STORAGE_KEY_CF_KEY_MODE,
     STORAGE_KEY_PRESERVE_DATE_ADDED, STORAGE_KEY_DEDICATED_OVERRIDES, STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE,
-    STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE
+    STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE, STORAGE_KEY_GENRE_BLACKLIST, STORAGE_KEY_GENRE_BLACKLIST_ENABLED,
+    STORAGE_KEY_GENRE_BLACKLIST_NOTIFY, STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED, STORAGE_KEY_GENRE_BLACKLIST_CONFIG
   ];
   const AI_MODELS = [
     { id: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", requiresCustomKey: true },
@@ -310,6 +316,26 @@
   let cfMyScrobblesDisplayMode = 'number';
   let cfKeyDisplayMode = 'standard';
   let preserveDateBehavior = 'ask';
+  let genreBlacklistEnabled = true;
+  let genreBlacklistNotify = true;
+  let genreBlacklistProtectLiked = true;
+  let genreBlacklistRules = [];
+  let genreBlacklistConfig = {
+    sources: {
+      spotify_track: true,
+      everynoise_artist: true,
+      lastfm_track: true,
+      lastfm_artist: true,
+      deezer: false
+    },
+    minSpotifyConfidence: 25
+  };
+  let cachedAllGenresPool = null;
+  const prefetchBlacklistMap = new Map();
+  let consecutiveBlacklistSkips = 0;
+  let lastBlacklistSkipTime = 0;
+  let blacklistPlayTimer = null;
+  let blacklistDebounceTimer = null;
   let rangeExcludeUnlistened = false;
   let localFilesHandling = 'convert_keep';
   let isProcessing = false;
@@ -341,6 +367,10 @@
   let likeButton_processTracklist = () => {};
   let likeButton_hideTooltip = () => {};
   let closeLikeButtonMenu = () => {};
+  let likeButton_likedTracksById = new Map();
+  let likeButton_likedTracksByIsrc = new Map();
+  let likeButton_addLikedTrack = () => {};
+  let likeButton_removeLikedTrack = () => {};
   let updateDebounceTimeout;
   let mountLikeButton_debounceTimer = null;
   let mountLikeButton_isRunning = false;
@@ -388,13 +418,9 @@
   let cachedLikedSongs = null;
   let cachedLikedSongsTimestamp = 0;
   let activeLikedSongsPromise = null;
+  let activeLikedUriSet = null;
+  let activeLikedIsrcSet = null;
   const CACHE_EXPIRE_LIKED_SONGS = 2 * 60 * 1000;
-
-  function invalidateLikedSongsCache() {
-    cachedLikedSongs = null;
-    cachedLikedSongsTimestamp = 0;
-    activeLikedSongsPromise = null;
-  }
 
   let cachedTasteProfile = null;
   let cachedTasteProfileTimestamp = 0;
@@ -703,6 +729,9 @@
   const removeSvgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
   const checkSvgIcon = `<svg viewBox="0 0 24 24" width="14px" height="14px" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
   const lockIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="4"/><path d="M7 10V8a5 5 0 0 1 10 0v2"/></svg>`;
+  const banIconSvg = `<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M6 18 18 6"/></svg>`;
+  const tagAddIconSvg = `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"/></svg>`;
+  const tagRemoveIconSvg = `<svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><path d="M2.47 2.47a.75.75 0 0 1 1.06 0L8 6.94l4.47-4.47a.75.75 0 1 1 1.06 1.06L9.06 8l4.47 4.47a.75.75 0 1 1-1.06 1.06L8 9.06l-4.47 4.47a.75.75 0 0 1-1.06-1.06L6.94 8 2.47 3.53a.75.75 0 0 1 0-1.06z"/></svg>`;
   
   const VIBE_DEFS = [
     { id: 'workout', label: 'Hype / Adrenaline', icon: flameSvg, color: '#D16666', desc: 'High energy, fast tempo, and a heavy beat to get your adrenaline pumping and keep you energized.', long_desc: 'Focuses on high energy, fast tempos, and strong rhythmic elements. Tracks with heavy beats and intense drops perfect for feeling unstoppable, powering through tasks, or intense exercise.' },
@@ -3121,7 +3150,7 @@
         cards: [
             { id: 'infiniteVibe', name: DEDICATED_PLAYLIST_DEFAULTS.infiniteVibe.uiName, description: 'An endless mix of fresh tracks based on your recent obsessions and favorites.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.infiniteVibe, broken: false },
             { id: 'tastemakerProfile', name: DEDICATED_PLAYLIST_DEFAULTS.tastemakerProfile.uiName, description: 'Explore music through the top tracks of a specific Last.fm user.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.tastemakerProfile, broken: false },
-            { id: 'neighborsMix', name: DEDICATED_PLAYLIST_DEFAULTS.neighborsMix.uiName, description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, broken: false },
+            { id: 'neighborsMix', name: DEDICATED_PLAYLIST_DEFAULTS.neighborsMix.uiName, description: 'Discover obsessions, trends, and favorites from your Last.fm neighbors.', thumbnailUrl: DEDICATED_PLAYLIST_COVERS.neighborsMix, version: 'v2', broken: false },
         ]
     },
     {
@@ -3333,6 +3362,20 @@
     cfMyScrobblesDisplayMode = localStorage.getItem(STORAGE_KEY_CF_MY_SCROBBLES_MODE) || 'number';
     cfKeyDisplayMode = localStorage.getItem(STORAGE_KEY_CF_KEY_MODE) || 'standard';
     preserveDateBehavior = localStorage.getItem(STORAGE_KEY_PRESERVE_DATE_ADDED) || 'ask';
+    const storedGblEnabled = localStorage.getItem(STORAGE_KEY_GENRE_BLACKLIST_ENABLED);
+    genreBlacklistEnabled = storedGblEnabled === null ? true : storedGblEnabled === "true";
+    const storedGblNotify = localStorage.getItem(STORAGE_KEY_GENRE_BLACKLIST_NOTIFY);
+    genreBlacklistNotify = storedGblNotify === null ? true : storedGblNotify === "true";
+    const storedGblProtectLiked = localStorage.getItem(STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED);
+    genreBlacklistProtectLiked = storedGblProtectLiked === null ? true : storedGblProtectLiked === "true";
+    const storedGblRules = localStorage.getItem(STORAGE_KEY_GENRE_BLACKLIST);
+    if (storedGblRules) {
+      try { genreBlacklistRules = JSON.parse(storedGblRules); } catch (e) { genreBlacklistRules = []; }
+    }
+    const storedGblConfig = localStorage.getItem(STORAGE_KEY_GENRE_BLACKLIST_CONFIG);
+    if (storedGblConfig) {
+      try { genreBlacklistConfig = { ...genreBlacklistConfig, ...JSON.parse(storedGblConfig) }; } catch (e) {}
+    }
 
     for (const sortType in sortOrderState) {
         const storedValue = localStorage.getItem(`sort-play-${sortType}-reverse`);
@@ -3436,6 +3479,11 @@
     localStorage.setItem(STORAGE_KEY_CF_MY_SCROBBLES_MODE, cfMyScrobblesDisplayMode);
     localStorage.setItem(STORAGE_KEY_CF_KEY_MODE, cfKeyDisplayMode);
     localStorage.setItem(STORAGE_KEY_PRESERVE_DATE_ADDED, preserveDateBehavior);
+    localStorage.setItem(STORAGE_KEY_GENRE_BLACKLIST_ENABLED, genreBlacklistEnabled);
+    localStorage.setItem(STORAGE_KEY_GENRE_BLACKLIST_NOTIFY, genreBlacklistNotify);
+    localStorage.setItem(STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED, genreBlacklistProtectLiked);
+    localStorage.setItem(STORAGE_KEY_GENRE_BLACKLIST, JSON.stringify(genreBlacklistRules));
+    localStorage.setItem(STORAGE_KEY_GENRE_BLACKLIST_CONFIG, JSON.stringify(genreBlacklistConfig));
 
     for (const sortType in sortOrderState) {
       localStorage.setItem(`sort-play-${sortType}-reverse`, sortOrderState[sortType]);
@@ -3577,7 +3625,12 @@
           [STORAGE_KEY_PRESERVE_DATE_ADDED]: "ask",
           [STORAGE_KEY_DEDICATED_OVERRIDES]: "{}",
           [STORAGE_KEY_BACKUP_UNAVAILABLE_ON_REMOVE]: "false",
-          [STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE]: "false"
+          [STORAGE_KEY_BACKUP_DUPLICATES_ON_REMOVE]: "false",
+          [STORAGE_KEY_GENRE_BLACKLIST_ENABLED]: "true",
+          [STORAGE_KEY_GENRE_BLACKLIST_NOTIFY]: "true",
+          [STORAGE_KEY_GENRE_BLACKLIST_PROTECT_LIKED]: "true",
+          [STORAGE_KEY_GENRE_BLACKLIST]: "[]",
+          [STORAGE_KEY_GENRE_BLACKLIST_CONFIG]: JSON.stringify({ sources: { spotify_track: true, everynoise_artist: true, lastfm_track: true, lastfm_artist: true, deezer: false }, minSpotifyConfidence: 25 })
         };
     
         if (key === STORAGE_KEY_NP_CONFIG) {
@@ -3927,12 +3980,14 @@
     addHoverEffect(cancelButton, "#333333", "#444444");
 
     [inputField, secondaryInputField].filter(Boolean).forEach(inp => {
-        inp.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                e.preventDefault();
-                saveButton.click();
-            }
-        });
+        if (inp.tagName === "INPUT") {
+            inp.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    saveButton.click();
+                }
+            });
+        }
     });
 
     saveButton.addEventListener("click", () => {
@@ -4082,6 +4137,1223 @@
     chatPanel.style.left = `${left}px`;
   }
 
+  function getAllUniqueGenresPool() {
+    if (cachedAllGenresPool && (!genrePlaylistsCache || cachedAllGenresPool._hasEveryNoise)) {
+      return cachedAllGenresPool;
+    }
+    const set = new Set();
+    if (typeof MUSIC_MODEL_MAP !== "undefined") {
+      Object.keys(MUSIC_MODEL_MAP).forEach(g => set.add(g.toLowerCase().trim()));
+    }
+    if (typeof GENRE_MAPPINGS !== "undefined") {
+      Object.keys(GENRE_MAPPINGS).forEach(g => set.add(g.toLowerCase().trim()));
+      Object.values(GENRE_MAPPINGS).forEach(arr => arr.forEach(g => set.add(g.toLowerCase().trim())));
+    }
+    let hasEveryNoise = false;
+    if (genrePlaylistsCache && Array.isArray(genrePlaylistsCache) && genrePlaylistsCache.length > 0) {
+      genrePlaylistsCache.forEach(p => { if (p.genre) set.add(p.genre.toLowerCase().trim()); });
+      hasEveryNoise = true;
+    }
+    if (typeof MOOD_DESCRIPTORS_SET !== "undefined") {
+      MOOD_DESCRIPTORS_SET.forEach(m => set.delete(m.toLowerCase().trim()));
+    }
+    cachedAllGenresPool = Array.from(set).filter(Boolean).sort();
+    cachedAllGenresPool._hasEveryNoise = hasEveryNoise;
+    return cachedAllGenresPool;
+  }
+
+  function getRuleExpandedTargets(rule) {
+    if (!rule?.name) return new Set();
+    const target = normalizeGenre(rule.name.toLowerCase().trim());
+    const mode = rule.mode || 'contains';
+    const expand = !!rule.expandSubgenres;
+    const expanded = new Set([target]);
+
+    if (expand && typeof GENRE_MAPPINGS !== "undefined") {
+      for (const [main, variants] of Object.entries(GENRE_MAPPINGS)) {
+        const normMain = normalizeGenre(main.toLowerCase().trim());
+        const isMainMatch = (mode === 'exact') ? (normMain === target) : (normMain === target || normMain.includes(target));
+        if (isMainMatch) {
+          expanded.add(normMain);
+          for (let i = 0; i < variants.length; i++) {
+            expanded.add(normalizeGenre(variants[i].toLowerCase().trim()));
+          }
+        }
+      }
+    }
+    return expanded;
+  }
+
+  function getRuleMatchedGenresSet(rule) {
+    if (!rule?.name) return new Set();
+    const pool = getAllUniqueGenresPool();
+    const mode = rule.mode || 'contains';
+    const targets = getRuleExpandedTargets(rule);
+    const matched = new Set();
+
+    for (let i = 0; i < pool.length; i++) {
+      const genre = pool[i];
+      const normG = normalizeGenre(genre);
+      if (mode === 'exact') {
+        if (targets.has(normG)) matched.add(genre);
+      } else {
+        for (const exp of targets) {
+          if (normG.includes(exp)) {
+            matched.add(genre);
+            break;
+          }
+        }
+      }
+    }
+    return matched;
+  }
+
+  function isGenreMatchedByRule(genreName, rule) {
+    if (!genreName || !rule?.name || rule.enabled === false) return false;
+    const normG = normalizeGenre(genreName.toLowerCase().trim());
+    if (typeof MOOD_DESCRIPTORS_SET !== "undefined" && MOOD_DESCRIPTORS_SET.has(normG)) return false;
+    const mode = rule.mode || 'contains';
+    const targets = getRuleExpandedTargets(rule);
+
+    if (mode === 'exact') {
+      return targets.has(normG);
+    }
+
+    for (const exp of targets) {
+      if (normG.includes(exp)) return true;
+    }
+    return false;
+  }
+
+  async function isTrackLikedForBlacklist(trackUri) {
+    if (!trackUri || !genreBlacklistProtectLiked) return false;
+    if (cachedLikedSongs && cachedLikedSongs.some(s => s.uri === trackUri)) return true;
+    try {
+      if (Spicetify.Platform?.LibraryAPI?.contains) {
+        const res = await Spicetify.Platform.LibraryAPI.contains(trackUri);
+        if (Array.isArray(res) ? res[0] : res) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function findMatchingBlacklistRule(genresList, sourceName, minConfidence = 25) {
+    if (!genreBlacklistEnabled || !genreBlacklistRules || genreBlacklistRules.length === 0) return null;
+    if (!genresList || !Array.isArray(genresList) || genresList.length === 0) return null;
+    const confSources = genreBlacklistConfig?.sources || {};
+    if (sourceName && confSources[sourceName] === false) return null;
+
+    for (let i = 0; i < genresList.length; i++) {
+      const item = genresList[i];
+      let name = "";
+      let score = 100;
+
+      if (typeof item === 'string') {
+        name = item;
+      } else if (item && typeof item === 'object') {
+        name = item.name || "";
+        if (item.score !== undefined) {
+          score = Math.round(item.score <= 1 ? item.score * 100 : item.score);
+        }
+      }
+
+      if (!name) continue;
+      if (sourceName === 'spotify_track' && score < minConfidence) continue;
+
+      const norm = normalizeGenre(name);
+      if (typeof MOOD_DESCRIPTORS_SET !== "undefined" && MOOD_DESCRIPTORS_SET.has(norm)) continue;
+
+      for (let r = 0; r < genreBlacklistRules.length; r++) {
+        const rule = genreBlacklistRules[r];
+        if (isGenreMatchedByRule(name, rule)) {
+          return { matchedGenre: name, rule };
+        }
+      }
+    }
+    return null;
+  }
+
+  async function triggerBlacklistAutoSkip(track, matchedGenre) {
+    if (!genreBlacklistEnabled) return;
+    const currentItem = Spicetify.Player.data?.item;
+    if (!currentItem || currentItem.uri !== track.uri) return;
+    if (Spicetify.Player.data?.is_paused === true) return;
+
+    if (blacklistDebounceTimer) {
+      clearTimeout(blacklistDebounceTimer);
+      blacklistDebounceTimer = null;
+    }
+
+    const now = Date.now();
+    if (now - lastBlacklistSkipTime < 3500) {
+      consecutiveBlacklistSkips++;
+    } else {
+      consecutiveBlacklistSkips = 1;
+    }
+    lastBlacklistSkipTime = now;
+
+    const genreDisplay = formatGenreTitle(matchedGenre || "");
+
+    if (consecutiveBlacklistSkips >= 4) {
+      consecutiveBlacklistSkips = 0;
+      Spicetify.Player.pause();
+      showNotification(`Auto-skip paused: 4 consecutive tracks matched your blacklist (last matched: '${genreDisplay}'). Playback was stopped to prevent an infinite loop. You may be playing a playlist or radio dedicated to this genre.`, "warning", 8000);
+      return;
+    }
+
+    Spicetify.Player.next();
+
+    const trackTitle = track.name || track.songTitle || currentItem.metadata?.title || "Unknown Track";
+    const artistName = track.artistName || track.artists?.[0]?.name || currentItem.metadata?.artist_name || "Unknown Artist";
+    const skipMessage = `Auto-skipped: ${trackTitle} — ${artistName} (Matched: '${genreDisplay}')`;
+
+    if (genreBlacklistNotify) {
+      showNotification(skipMessage);
+    } else {
+      notificationHistoryCache.unshift({
+        id: Date.now() + Math.random(),
+        text: skipMessage,
+        type: 'info',
+        timestamp: Date.now(),
+        count: 1
+      });
+      if (notificationHistoryCache.length > MAX_NOTIFICATION_HISTORY) {
+        notificationHistoryCache.pop();
+      }
+      idb.set('notificationHistory', 'logs', notificationHistoryCache);
+    }
+  }
+
+  async function evaluateTrackAgainstBlacklist(track, isPrefetch = false) {
+    if (!genreBlacklistEnabled || !genreBlacklistRules || genreBlacklistRules.length === 0) return null;
+    if (!track || !track.uri || Spicetify.URI.isLocal(track.uri)) return null;
+
+    if (genreBlacklistProtectLiked) {
+      const isLiked = await isTrackLikedForBlacklist(track.uri);
+      if (isLiked) return null;
+    }
+
+    const confSources = genreBlacklistConfig?.sources || {};
+    const minConf = genreBlacklistConfig?.minSpotifyConfidence ?? 25;
+
+    const cachedMap = nowPlayingGenreCache.get(track.uri);
+    if (cachedMap instanceof Map) {
+      for (const item of cachedMap.values()) {
+        let isSourceActive = false;
+        for (const s of item.sources) {
+          if (s.startsWith("Spotify Track")) {
+            if (confSources.spotify_track) {
+              const match = s.match(/\((\d+)%\)/);
+              const score = match ? parseInt(match[1], 10) : 100;
+              if (score >= minConf) isSourceActive = true;
+            }
+          } else if (s.startsWith("EveryNoise") && confSources.everynoise_artist) {
+            isSourceActive = true;
+          } else if (s.startsWith("Last.fm Track") && confSources.lastfm_track) {
+            isSourceActive = true;
+          } else if (s.startsWith("Last.fm Artist") && confSources.lastfm_artist) {
+            isSourceActive = true;
+          } else if (s.startsWith("Deezer") && confSources.deezer) {
+            isSourceActive = true;
+          }
+          if (isSourceActive) break;
+        }
+
+        if (isSourceActive) {
+          for (let r = 0; r < genreBlacklistRules.length; r++) {
+            const rule = genreBlacklistRules[r];
+            if (isGenreMatchedByRule(item.name, rule)) {
+              const directMatch = { matchedGenre: item.name, rule };
+              if (!isPrefetch) triggerBlacklistAutoSkip(track, directMatch.matchedGenre);
+              return directMatch;
+            }
+          }
+        }
+      }
+    }
+
+    const cachedRecord = sessionGenreCache.get(track.uri);
+    if (cachedRecord && typeof cachedRecord === 'object' && !(cachedRecord instanceof Map)) {
+      const directMatch = (confSources.spotify_track && findMatchingBlacklistRule(cachedRecord.spotify_track_genres, 'spotify_track', minConf)) ||
+                          (confSources.everynoise_artist && findMatchingBlacklistRule(cachedRecord.everynoise_artist_genres, 'everynoise_artist', minConf)) ||
+                          (confSources.lastfm_track && findMatchingBlacklistRule(cachedRecord.lastfm_track_genres, 'lastfm_track', minConf)) ||
+                          (confSources.lastfm_artist && findMatchingBlacklistRule(cachedRecord.lastfm_artist_genres, 'lastfm_artist', minConf)) ||
+                          (confSources.deezer && findMatchingBlacklistRule(cachedRecord.deezer_genres, 'deezer', minConf));
+      if (directMatch) {
+        if (!isPrefetch) triggerBlacklistAutoSkip(track, directMatch.matchedGenre);
+        return directMatch;
+      }
+    }
+
+    let hasSkipped = false;
+    let matchResult = null;
+
+    const checkSourceResult = (genreList, sourceName) => {
+      if (hasSkipped) return;
+      const match = findMatchingBlacklistRule(genreList, sourceName, minConf);
+      if (match && !hasSkipped) {
+        hasSkipped = true;
+        matchResult = match;
+        if (!isPrefetch) {
+          triggerBlacklistAutoSkip(track, match.matchedGenre);
+        }
+      }
+    };
+
+    const promises = [];
+
+    if (confSources.spotify_track) {
+      promises.push((async () => {
+        try {
+          const concepts = await fetchNativeSpotifyTrackGenres(track.uri);
+          checkSourceResult(concepts, 'spotify_track');
+        } catch (e) {}
+      })());
+    }
+
+    const artistIds = [...new Set([
+      track.artistId,
+      ...(track.artists || []).map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)),
+      ...(track.artistUris || []).map(u => u ? u.split(':')[2] : null),
+      track.metadata?.artist_uri ? track.metadata.artist_uri.split(':')[2] : null
+    ].filter(Boolean))];
+
+    if (confSources.everynoise_artist && artistIds.length > 0) {
+      promises.push((async () => {
+        try {
+          for (let i = 0; i < artistIds.length; i++) {
+            const aId = artistIds[i];
+            let tags = everyNoiseCache.get(aId);
+            if (!tags) tags = await idb.get('everyNoiseArtistTags', aId, CACHE_EXPIRE_EVERYNOISE);
+            if (tags && Array.isArray(tags)) {
+              checkSourceResult(tags, 'everynoise_artist');
+              if (hasSkipped) break;
+            }
+          }
+        } catch (e) {}
+      })());
+    }
+
+    const artistName = track.artists?.[0]?.name || track.artistName || track.metadata?.artist_name || "";
+    const trackName = track.name || track.songTitle || track.metadata?.title || "";
+
+    if ((confSources.lastfm_track || confSources.lastfm_artist) && artistName) {
+      promises.push((async () => {
+        try {
+          const lfmData = await getLastfmGenres(artistName, trackName, !confSources.lastfm_artist);
+          if (lfmData) {
+            if (confSources.lastfm_track && lfmData.track_genres?.length) {
+              checkSourceResult(lfmData.track_genres, 'lastfm_track');
+            }
+            if (confSources.lastfm_artist && lfmData.artist_genres?.length) {
+              checkSourceResult(lfmData.artist_genres, 'lastfm_artist');
+            }
+          }
+        } catch (e) {}
+      })());
+    }
+
+    if (confSources.deezer && track.uri) {
+      promises.push((async () => {
+        try {
+          let isrc = track.isrc || track.external_ids?.isrc || track.metadata?.isrc || null;
+          if (!isrc) {
+            const metaMap = await fetchCoreMetadataBatch([track.uri]);
+            isrc = metaMap.get(track.uri)?.isrc;
+          }
+          if (isrc) {
+            const deezerGenres = await idb.get('deezerGenres', isrc) || await getDeezerGenres(isrc);
+            if (deezerGenres && Array.isArray(deezerGenres)) {
+              checkSourceResult(deezerGenres, 'deezer');
+            }
+          }
+        } catch (e) {}
+      })());
+    }
+
+    await Promise.allSettled(promises);
+    return matchResult;
+  }
+
+  let cachedCuratedSet = null;
+  function getCuratedGenresSet() {
+    if (cachedCuratedSet) return cachedCuratedSet;
+    const s = new Set();
+    if (typeof GENRE_MAPPINGS !== "undefined") {
+      Object.keys(GENRE_MAPPINGS).forEach(k => s.add(normalizeGenre(k)));
+    }
+    if (typeof MUSIC_MODEL_MAP !== "undefined") {
+      Object.keys(MUSIC_MODEL_MAP).forEach(k => s.add(normalizeGenre(k)));
+    }
+    cachedCuratedSet = s;
+    return s;
+  }
+
+  function showMatchedGenresModal(rule) {
+    if (!rule?.name) return;
+    const rawMatches = Array.from(getRuleMatchedGenresSet(rule));
+    const normTarget = normalizeGenre(rule.name.toLowerCase().trim());
+    const isContainsMode = (rule.mode || 'contains') === 'contains';
+
+    const getMatchDetails = (name) => {
+      const normG = normalizeGenre(name);
+      if (normG === normTarget) {
+        return { priority: 0, badgeClass: "mg-badge-exact", badgeLabel: "Exact Match" };
+      }
+      if (isContainsMode && normG.includes(normTarget)) {
+        return { priority: 1, badgeClass: "mg-badge-contains", badgeLabel: "Contains" };
+      }
+      return { priority: 2, badgeClass: "mg-badge-related", badgeLabel: "Related Style" };
+    };
+
+    const sortedData = rawMatches.map(name => {
+      const details = getMatchDetails(name);
+      return {
+        name,
+        title: formatGenreTitle(name),
+        ...details
+      };
+    }).sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      return a.title.localeCompare(b.title);
+    });
+
+    const overlay = document.createElement("div");
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.75); z-index: 1000005; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); opacity: 0; transition: opacity 0.2s ease;`;
+
+    const modal = document.createElement("div");
+    modal.className = "sort-play-modal-container sort-play-font-scope";
+    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(540px, 94vw) !important; max-width: 540px !important; min-width: 320px !important; max-height: min(600px, 86vh) !important; border-radius: 24px; overflow: hidden; background-color: #181818 !important; color: #fff; border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.65);`;
+
+    const shadowRoot = modal.attachShadow({ mode: "open" });
+    const ITEM_HEIGHT = 38;
+    let currentVisible = [...sortedData];
+    const renderedElements = new Map();
+    let lastStartIndex = -1;
+    let lastEndIndex = -1;
+
+    shadowRoot.innerHTML = `
+      <style>
+        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+        *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+        .mg-header { padding: 22px 24px 12px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #282828; flex-shrink: 0; }
+        .mg-title-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .mg-title { margin: 0; font-size: 20px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mg-subtitle { font-size: 12px; color: #888; display: flex; align-items: center; gap: 8px; }
+        .mg-close-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.15s ease; flex-shrink: 0; }
+        .mg-close-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+        .mg-toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 24px; border-bottom: 1px solid #282828; background: rgba(0,0,0,0.15); flex-shrink: 0; }
+        .mg-search-wrap { position: relative; flex: 1; display: flex; align-items: center; }
+        .mg-search-wrap svg { position: absolute; left: 10px; width: 14px; height: 14px; fill: rgba(255,255,255,0.4); pointer-events: none; }
+        .mg-search-input { width: 100%; background: #222; border: 1px solid #333; border-radius: 8px; padding: 7px 28px 7px 32px; color: #fff; font-size: 13px; outline: none; transition: border-color 0.15s ease; }
+        .mg-search-input:focus { border-color: #555; background: #262626; }
+        .mg-search-clear { position: absolute; right: 8px; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 18px; padding: 0; }
+        .mg-search-clear:hover { color: #fff; }
+        .mg-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; padding: 8px 16px; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+        .mg-content::-webkit-scrollbar { width: 6px; }
+        .mg-content::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        .mg-list-wrap { position: relative; width: 100%; contain: layout; }
+        .mg-row { position: absolute; left: 0; width: 100%; height: 34px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 38px 0 8px; border-radius: 6px; background: transparent; border: 1px solid transparent; transition: background 0.15s ease, border-color 0.15s ease; user-select: none; }
+        .mg-row:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.12); }
+        .mg-rank { width: 32px; text-align: right; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.35); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+        .mg-title-cell { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+        .mg-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.3px; }
+        .mg-badge-exact { background: rgba(30, 215, 96, 0.14); color: #1ed760; border: 1px solid rgba(30, 215, 96, 0.3); }
+        .mg-badge-contains { background: rgba(50, 190, 240, 0.14); color: #45c8f5; border: 1px solid rgba(50, 190, 240, 0.3); }
+        .mg-badge-related { background: rgba(180, 140, 255, 0.14); color: #c49bff; border: 1px solid rgba(180, 140, 255, 0.3); }
+        .mg-copy-btn { position: absolute; right: 0; top: 0; bottom: 0; width: 36px; height: 100%; background: transparent; border: none; color: rgba(255,255,255,0.4); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 0 6px 6px 0; transition: all 0.15s ease; flex-shrink: 0; }
+        .mg-row:hover .mg-copy-btn { color: rgba(255,255,255,0.8); }
+        .mg-copy-btn:hover { background: rgba(255,255,255,0.15) !important; color: #fff !important; }
+        .mg-empty { text-align: center; color: #777; font-size: 13px; padding: 32px 20px; }
+      </style>
+      <div class="mg-header">
+        <div class="mg-title-wrap">
+          <h2 class="mg-title">Matched Genres: "${escapeHtml(formatGenreTitle(rule.name))}"</h2>
+          <div class="mg-subtitle">
+            <span>${rule.mode === 'exact' ? 'Exact Tag' : 'Contains Word'}</span>
+            <span>•</span>
+            <span>${rule.expandSubgenres ? 'Related Styles Included' : 'No Related Styles'}</span>
+            <span>•</span>
+            <span id="mgTotalCountBadge">${sortedData.length} matched</span>
+          </div>
+        </div>
+        <button id="mgCloseBtn" class="mg-close-btn" title="Close">${closeModalIcon20Svg}</button>
+      </div>
+      <div class="mg-toolbar">
+        <div class="mg-search-wrap">
+          ${searchIconSvg}
+          <input type="text" id="mgSearchInput" class="mg-search-input" placeholder="Search within matched genres...">
+          <button id="mgSearchClear" class="mg-search-clear" style="display: none;">&times;</button>
+        </div>
+      </div>
+      <div style="padding: 6px 24px; font-size: 11px; color: #888; background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid #282828; flex-shrink: 0;">
+        * This list is based on known catalog samples. Dynamic sources (Last.fm, Deezer) may trigger skips on unlisted tags.
+      </div>
+      <div class="mg-content" id="mgContent">
+        <div class="mg-list-wrap" id="mgListWrap"></div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modal);
+    requestAnimationFrame(() => { overlay.style.opacity = "1"; });
+
+    const contentArea = shadowRoot.querySelector("#mgContent");
+    const listWrap = shadowRoot.querySelector("#mgListWrap");
+    const searchInput = shadowRoot.querySelector("#mgSearchInput");
+    const searchClear = shadowRoot.querySelector("#mgSearchClear");
+    const closeBtn = shadowRoot.querySelector("#mgCloseBtn");
+    const countBadge = shadowRoot.querySelector("#mgTotalCountBadge");
+    const smallCopy = copyIconSVG.replace('width="16px"', 'width="12px"').replace('height="16px"', 'height="12px"');
+
+    const getRowHtml = (item, idx) => {
+      const topPx = idx * ITEM_HEIGHT;
+      return `
+        <div class="mg-row" data-idx="${idx}" data-genre="${escapeHtml(item.title)}" style="top: ${topPx}px;">
+          <span class="mg-rank">${idx + 1}.</span>
+          <span class="mg-title-cell" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
+          <span class="mg-badge ${item.badgeClass}">${item.badgeLabel}</span>
+          <button class="mg-copy-btn" title="Copy genre">${smallCopy}</button>
+        </div>
+      `;
+    };
+
+    const renderVisibleGenres = () => {
+      if (!modal.isConnected || !currentVisible.length) return;
+      const scrollTop = contentArea.scrollTop;
+      const clientHeight = contentArea.clientHeight || 450;
+      const buffer = 25;
+      const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - buffer);
+      const endIndex = Math.min(currentVisible.length - 1, Math.ceil((scrollTop + clientHeight) / ITEM_HEIGHT) + buffer);
+
+      if (startIndex === lastStartIndex && endIndex === lastEndIndex) return;
+      lastStartIndex = startIndex;
+      lastEndIndex = endIndex;
+
+      const newIndices = new Set();
+      for (let i = startIndex; i <= endIndex; i++) newIndices.add(i);
+
+      for (const [idx, el] of renderedElements.entries()) {
+        if (!newIndices.has(idx)) {
+          el.remove();
+          renderedElements.delete(idx);
+        }
+      }
+
+      let htmlToAppend = "";
+      const addedIndices = [];
+      for (let i = startIndex; i <= endIndex; i++) {
+        if (!renderedElements.has(i)) {
+          const item = currentVisible[i];
+          if (item) {
+            htmlToAppend += getRowHtml(item, i);
+            addedIndices.push(i);
+          }
+        }
+      }
+
+      if (htmlToAppend) {
+        listWrap.insertAdjacentHTML("beforeend", htmlToAppend);
+        const children = listWrap.children;
+        for (let i = children.length - addedIndices.length; i < children.length; i++) {
+          const child = children[i];
+          if (child && child.dataset.idx !== undefined) {
+            renderedElements.set(Number(child.dataset.idx), child);
+          }
+        }
+      }
+    };
+
+    const updateFilter = () => {
+      renderedElements.clear();
+      lastStartIndex = -1;
+      lastEndIndex = -1;
+      listWrap.innerHTML = "";
+      const q = searchInput.value.trim().toLowerCase();
+      searchClear.style.display = q ? "block" : "none";
+      currentVisible = q ? sortedData.filter(g => g.name.includes(q) || g.title.toLowerCase().includes(q)) : sortedData;
+      countBadge.textContent = `${currentVisible.length} matched`;
+
+      if (currentVisible.length === 0) {
+        listWrap.innerHTML = `<div class="mg-empty">No matched genres found for "${escapeHtml(q)}"</div>`;
+        listWrap.style.height = "auto";
+        return;
+      }
+
+      listWrap.style.height = `${currentVisible.length * ITEM_HEIGHT}px`;
+      contentArea.scrollTop = 0;
+      renderVisibleGenres();
+    };
+
+    let scrollTicking = false;
+    contentArea.addEventListener("scroll", () => {
+      if (!scrollTicking) {
+        window.requestAnimationFrame(() => {
+          renderVisibleGenres();
+          scrollTicking = false;
+        });
+        scrollTicking = true;
+      }
+    }, { passive: true });
+
+    searchInput.addEventListener("input", updateFilter);
+    searchClear.addEventListener("click", () => {
+      searchInput.value = "";
+      updateFilter();
+      searchInput.focus();
+    });
+
+    contentArea.addEventListener("click", (e) => {
+      const copyBtn = e.target.closest(".mg-copy-btn");
+      if (!copyBtn) return;
+      const row = copyBtn.closest(".mg-row");
+      const genre = row?.dataset?.genre;
+      if (!genre) return;
+      navigator.clipboard.writeText(genre).then(() => {
+        copyBtn.style.color = "#1ed760";
+        copyBtn.innerHTML = checkSvgIcon;
+        setTimeout(() => { copyBtn.style.color = ""; copyBtn.innerHTML = smallCopy; }, 1000);
+      }).catch(() => {});
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        closeModal();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+
+    const closeModal = () => {
+      document.removeEventListener("keydown", onKeyDown);
+      overlay.style.opacity = "0";
+      setTimeout(() => overlay.remove(), 200);
+    };
+
+    closeBtn.addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+    if (sortedData.length === 0) {
+      listWrap.innerHTML = '<div class="mg-empty">No genres in the catalog matched this rule.</div>';
+      listWrap.style.height = "auto";
+    } else {
+      listWrap.style.height = `${sortedData.length * ITEM_HEIGHT}px`;
+      renderVisibleGenres();
+    }
+  }
+  
+  function showGenreRuleConfigModal(existingRule, onSave, onDelete = null) {
+    const isEditing = Boolean(existingRule?.id);
+    const overlay = document.createElement("div");
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 999999; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);`;
+
+    const modal = document.createElement("div");
+    modal.className = "sort-play-modal-container sort-play-font-scope";
+    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(440px, 92vw) !important; max-width: 440px !important; min-width: 320px !important; border-radius: 24px; overflow: hidden; background-color: #181818 !important; color: #fff; border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.6);`;
+
+    const shadowRoot = modal.attachShadow({ mode: 'open' });
+    const currentRule = {
+      id: existingRule?.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+      name: existingRule?.name || '',
+      mode: existingRule?.mode || 'exact',
+      expandSubgenres: existingRule?.expandSubgenres !== undefined ? existingRule.expandSubgenres : false,
+      enabled: existingRule?.enabled !== undefined ? existingRule.enabled : true
+    };
+
+    const initialMatchedCount = currentRule.name ? getRuleMatchedGenresSet(currentRule).size : 0;
+
+    shadowRoot.innerHTML = `
+      <style>
+        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+        *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+        .cfg-header { padding: 24px 28px 12px; }
+        .cfg-title { margin: 0; font-size: 20px; font-weight: 700; color: #fff; }
+        .cfg-body { padding: 8px 28px 24px; display: flex; flex-direction: column; gap: 16px; }
+        .cfg-label { font-size: 13px; color: #b3b3b3; margin-bottom: 6px; font-weight: 500; }
+        .cfg-input { width: 100%; background: #242424; border: 1px solid #333; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; outline: none; }
+        .cfg-input:focus { border-color: #1ed760; }
+        .cfg-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+        .cfg-select { background: #242424; border: 1px solid #333; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; outline: none; }
+        .cfg-switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+        .cfg-switch input { opacity: 0; width: 0; height: 0; }
+        .cfg-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 22px; transition: .2s; }
+        .cfg-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+        .cfg-switch input:checked + .cfg-slider { background-color: #1DB954; }
+        .cfg-switch input:checked + .cfg-slider:before { transform: translateX(16px); }
+        .cfg-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(30, 215, 96, 0.12); color: #1ed760; border: 1px solid rgba(30, 215, 96, 0.3); border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; width: fit-content; }
+        .cfg-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 28px; border-top: 1px solid #282828; }
+        .cfg-btn { padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; text-transform: uppercase; transition: all 0.15s ease; }
+        .cfg-btn-sec { background: #333; color: #fff; }
+        .cfg-btn-sec:hover { background: #444; }
+        .cfg-btn-pri { background: #1ed760; color: #000; }
+        .cfg-btn-pri:hover { background: #3be377; }
+        .cfg-btn-del { background: transparent; border: 1px solid #e91429; color: #ff6b6b; margin-right: auto; }
+        .cfg-btn-del:hover { background: rgba(233, 20, 41, 0.15); color: #fff; }
+      </style>
+      <div class="cfg-header">
+        <h2 class="cfg-title">${isEditing ? 'Edit Blacklisted Genre' : 'Blacklist Genre'}</h2>
+      </div>
+      <div class="cfg-body">
+        <div>
+          <div class="cfg-label">Genre Name / Pattern</div>
+          <input type="text" id="ruleNameInput" class="cfg-input" value="${escapeHtml(currentRule.name)}" placeholder="e.g. k-pop, metal, nightcore">
+        </div>
+        <div class="cfg-row">
+          <div>
+            <div style="font-size: 14px; color: #fff; font-weight: 500;">Match Mode</div>
+            <div style="font-size: 12px; color: #888;">Partial substring match or strict exact tag</div>
+          </div>
+          <select id="ruleModeSelect" class="cfg-select">
+            <option value="exact" ${currentRule.mode === 'exact' ? 'selected' : ''}>Exact Tag</option>
+            <option value="contains" ${currentRule.mode === 'contains' ? 'selected' : ''}>Contains Word</option>
+          </select>
+        </div>
+        <div class="cfg-row">
+          <div>
+            <div style="font-size: 14px; color: #fff; font-weight: 500;">Include Related Styles</div>
+            <div style="font-size: 12px; color: #888;">Expands to known taxonomy aliases, related styles, and regional variants</div>
+          </div>
+          <label class="cfg-switch">
+            <input type="checkbox" id="ruleExpandToggle" ${currentRule.expandSubgenres ? 'checked' : ''}>
+            <span class="cfg-slider"></span>
+          </label>
+        </div>
+        <div id="ruleAliasNotice" style="display: none; font-size: 12px; color: #8cb4ff; line-height: 1.4; padding: 6px 10px; background: rgba(140, 180, 255, 0.08); border: 1px solid rgba(140, 180, 255, 0.2); border-radius: 6px;"></div>
+        <div id="ruleMatchBadge" class="cfg-badge" style="cursor: pointer;" title="Click to view all matched genres">
+          Matches ${initialMatchedCount} library genres ↗
+        </div>
+      </div>
+      <div class="cfg-footer">
+        ${isEditing && onDelete ? `<button id="ruleDeleteBtn" class="cfg-btn cfg-btn-del">Delete</button>` : ''}
+        <button id="ruleCancelBtn" class="cfg-btn cfg-btn-sec">Cancel</button>
+        <button id="ruleSaveBtn" class="cfg-btn cfg-btn-pri">${isEditing ? 'Save' : 'Blacklist'}</button>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modal);
+
+    const nameInput = shadowRoot.querySelector("#ruleNameInput");
+    const modeSelect = shadowRoot.querySelector("#ruleModeSelect");
+    const expandToggle = shadowRoot.querySelector("#ruleExpandToggle");
+    const matchBadge = shadowRoot.querySelector("#ruleMatchBadge");
+    const saveBtn = shadowRoot.querySelector("#ruleSaveBtn");
+    const cancelBtn = shadowRoot.querySelector("#ruleCancelBtn");
+    const deleteBtn = shadowRoot.querySelector("#ruleDeleteBtn");
+
+    const aliasNotice = shadowRoot.querySelector("#ruleAliasNotice");
+    const getAliasesText = (rawName) => {
+      const lower = (rawName || "").toLowerCase().trim();
+      if (!lower) return null;
+      for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+        if (canonical === lower || aliases.includes(lower)) {
+          const variants = aliases.filter(a => a !== lower);
+          if (variants.length > 0) return variants.join(", ");
+        }
+      }
+      return null;
+    };
+
+    const updatePreview = () => {
+      currentRule.name = nameInput.value.trim();
+      currentRule.mode = modeSelect.value;
+      currentRule.expandSubgenres = expandToggle.checked;
+      const count = currentRule.name ? getRuleMatchedGenresSet(currentRule).size : 0;
+      matchBadge.textContent = `Matches ${count} library genres ↗`;
+      const aliases = getAliasesText(currentRule.name);
+      if (aliases) {
+        aliasNotice.textContent = `Spelling variants auto-matched: ${aliases}`;
+        aliasNotice.style.display = "block";
+      } else {
+        aliasNotice.style.display = "none";
+      }
+    };
+
+    matchBadge.addEventListener("click", () => {
+      if (!currentRule.name) return;
+      showMatchedGenresModal(currentRule);
+    });
+
+    nameInput.addEventListener("input", updatePreview);
+    modeSelect.addEventListener("change", updatePreview);
+    expandToggle.addEventListener("change", updatePreview);
+    updatePreview();
+
+    const closeSelf = () => overlay.remove();
+
+    cancelBtn.addEventListener("click", closeSelf);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSelf(); });
+
+    saveBtn.addEventListener("click", () => {
+      const trimmed = nameInput.value.trim().toLowerCase();
+      if (!trimmed) {
+        showNotification("Please enter a genre name.", true);
+        return;
+      }
+      currentRule.name = trimmed;
+      currentRule.mode = modeSelect.value;
+      currentRule.expandSubgenres = expandToggle.checked;
+      if (currentRule.enabled === undefined) currentRule.enabled = true;
+      onSave(currentRule);
+      closeSelf();
+    });
+
+    if (deleteBtn) {
+      deleteBtn.addEventListener("click", () => {
+        if (onDelete) onDelete(currentRule);
+        closeSelf();
+      });
+    }
+
+    setTimeout(() => { nameInput.focus(); }, 50);
+  }
+
+  function showGenreBlacklistManagerModal() {
+    const overlay = document.createElement("div");
+    overlay.id = "sort-play-blacklist-manager-overlay";
+    overlay.className = "sort-play-font-scope";
+    overlay.style.cssText = `position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 2008; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); opacity: 0; transition: opacity 0.2s ease;`;
+
+    const modal = document.createElement("div");
+    modal.className = "sort-play-modal-container sort-play-font-scope";
+    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(815px, 92vw) !important; max-width: 815px !important; min-width: 320px !important; min-height: 0 !important; max-height: 85vh !important; flex-shrink: 0 !important; border-radius: 30px; overflow: hidden; background-color: #181818 !important; color: var(--spice-text, #ffffff); border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.5);`;
+
+    const shadowRoot = modal.attachShadow({ mode: 'open' });
+
+    shadowRoot.innerHTML = `
+      <style>
+        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+        *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
+        .mgr-header { padding: 27px 32px 12px !important; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #282828; flex-shrink: 0; }
+        .mgr-title-wrap { display: flex; align-items: center; gap: 12px; }
+        .mgr-title { margin: 0; font-size: 25px; font-weight: 700; color: #fff; }
+        .mgr-badge { background: rgba(30, 215, 96, 0.12); border: 1px solid rgba(30, 215, 96, 0.3); color: #1ed760; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .mgr-close-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: color 0.15s ease, background-color 0.15s ease; }
+        .mgr-close-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+        .mgr-body { padding: 20px 32px 25px !important; display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
+        .mgr-layout { display: grid; grid-template-columns: 1.18fr 1fr; gap: 32px; min-height: 0; }
+        .mgr-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+        .section-header { font-weight: bold; font-size: 16px; color: white; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 10px; flex-shrink: 0; }
+        .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; gap: 12px; }
+        .setting-label { color: #c1c1c1; font-size: 15px; font-weight: 500; user-select: none; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
+        .sliderx:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
+        input:checked + .sliderx { background-color: #1DB954; }
+        input:checked + .sliderx:before { transform: translateX(16px); }
+        .mgr-conf-select { background: #242424; border: 1px solid #3e3e3e; color: #e5e5e5; border-radius: 6px; height: 24px; padding: 0 6px; font-size: 12px; font-weight: 500; cursor: pointer; outline: none; transition: border-color 0.15s ease, opacity 0.2s ease; }
+        .mgr-conf-select:hover:not(:disabled) { border-color: #666; color: #fff; }
+        .mgr-conf-select:focus { border-color: #888; }
+        .mgr-conf-select:disabled { opacity: 0.4; cursor: not-allowed; }
+        .mgr-search-box { position: relative; width: 100%; display: flex; gap: 8px; margin-bottom: 12px; flex-shrink: 0; }
+        .mgr-search-input-wrap { position: relative; flex: 1; min-width: 0; }
+        .mgr-search-input { width: 100%; height: 36px; background: #222; border: 1px solid #333; color: #fff; padding: 0 12px; border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.15s ease, background-color 0.15s ease; }
+        .mgr-search-input:focus { border-color: #555; background: #262626; }
+        .mgr-search-input::placeholder { color: #777; }
+        .mgr-add-btn { height: 36px; background: #282828; color: #e5e5e5; border: 1px solid #3a3a3a; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: all 0.15s ease; display: flex; align-items: center; gap: 4px; }
+        .mgr-add-btn:hover { background: #333; border-color: #555; color: #fff; }
+        .mgr-add-btn:active { transform: scale(0.97); }
+        .mgr-typeahead { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #242424; border: 1px solid #383838; border-radius: 8px; max-height: 320px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: none; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+        .mgr-typeahead::-webkit-scrollbar { width: 6px; }
+        .mgr-typeahead::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        .mgr-typeahead-item { padding: 8px 12px; font-size: 13px; color: #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .mgr-typeahead-item:hover { background: #333; color: #fff; }
+        .mgr-typeahead-added { font-size: 11px; color: #1ed760; background: rgba(30, 215, 96, 0.12); padding: 1px 6px; border-radius: 4px; }
+        .mgr-rules-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overflow-x: hidden; max-height: min(385px, 48vh); margin-right: -10px; padding-right: 10px; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+        .mgr-rules-list::-webkit-scrollbar { width: 4px; }
+        .mgr-rules-list::-webkit-scrollbar-track { background: transparent; }
+        .mgr-rules-list::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
+        .mgr-rules-list::-webkit-scrollbar-thumb:hover { background-color: #777; }
+        .mgr-rule-card { background: #212121; border: 1px solid #2e2e2e; border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; transition: border-color 0.15s ease, background-color 0.15s ease; flex-shrink: 0; }
+        .mgr-rule-card:hover { border-color: #3e3e3e; background: #242424; }
+        .mgr-rule-card.is-disabled { opacity: 0.55; }
+        .mgr-rule-info { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+        .mgr-rule-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .mgr-rule-name { font-size: 14px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mgr-rule-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .mgr-rule-tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.08); color: #bbb; cursor: pointer; user-select: none; transition: all 0.15s ease; }
+        .mgr-rule-tag:hover { background: rgba(255,255,255,0.14); border-color: rgba(255,255,255,0.2); color: #fff; }
+        .mgr-rule-badge { font-size: 11px; color: #1ed760; background: rgba(30,215,96,0.1); padding: 1px 7px; border-radius: 6px; white-space: nowrap; font-weight: 500; flex-shrink: 0; cursor: pointer; transition: all 0.15s ease; }
+        .mgr-rule-badge:hover { background: rgba(30,215,96,0.22); color: #3be377; }
+        .mgr-rule-actions { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
+        .mgr-rule-btns { display: flex; align-items: center; gap: 2px; }
+        .mgr-card-switch { position: relative; display: inline-block; width: 32px; height: 18px; flex-shrink: 0; cursor: pointer; }
+        .mgr-card-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .mgr-card-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3e3e3e; border-radius: 18px; transition: background-color .2s; }
+        .mgr-card-slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; border-radius: 50%; transition: transform .2s; }
+        .mgr-card-switch input:checked + .mgr-card-slider { background-color: #1DB954; }
+        .mgr-card-switch input:checked + .mgr-card-slider:before { transform: translateX(14px); }
+        .mgr-icon-btn { background: transparent; border: none; color: #777; cursor: pointer; padding: 6px; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+        .mgr-icon-btn svg { width: 14px; height: 14px; fill: currentColor; pointer-events: none; }
+        .mgr-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .mgr-del-btn:hover { background: rgba(233, 20, 41, 0.15); color: #ff6b6b; }
+        .mgr-empty { text-align: center; color: #777; font-size: 13px; padding: 70px 16px; background: rgba(255,255,255,0.02); border: 1px dashed #2e2e2e; border-radius: 10px; margin-top: 4px; }
+        .mgr-sources-note { font-size: 12px; color: #888; line-height: 1.45; margin-bottom: 12px; }
+        .custom-tooltip { visibility: hidden; position: absolute; z-index: 1000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
+        .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
+        .custom-tooltip.tooltip-bottom { bottom: auto; top: 100%; margin-bottom: 0; margin-top: 5px; }
+        .custom-tooltip.tooltip-bottom::after { top: auto; bottom: 100%; border-color: transparent transparent #373737 transparent; }
+        .tooltip-container { position: relative; display: inline-block; vertical-align: middle; margin-left: 6px; }
+        .tooltip-container:hover .custom-tooltip { visibility: visible; }
+        .mgr-footer { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 15px; border-top: 1px solid #282828; flex-shrink: 0; }
+        .mgr-done-btn { padding: 8px 24px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease; }
+      </style>
+      <div class="mgr-header">
+        <div class="mgr-title-wrap">
+          <h1 class="mgr-title">Genre Blacklist Manager</h1>
+          <span id="mgrRulesCount" class="mgr-badge">${genreBlacklistRules.length} ${genreBlacklistRules.length === 1 ? 'rule' : 'rules'}</span>
+        </div>
+        <button id="mgrCloseBtn" class="mgr-close-btn" title="Close">${closeModalIcon20Svg}</button>
+      </div>
+      <div class="mgr-body">
+        <div class="mgr-layout">
+          <div class="mgr-col">
+            <div class="section-header">Blacklisted Genres</div>
+            <div class="mgr-search-box">
+              <div class="mgr-search-input-wrap">
+                <input type="text" id="mgrSearchInput" class="mgr-search-input" placeholder="Search or type genre to block...">
+                <div id="mgrTypeahead" class="mgr-typeahead"></div>
+              </div>
+              <button id="mgrAddBtn" class="mgr-add-btn" title="Add genre to blacklist">+ Add</button>
+            </div>
+            <div id="mgrRulesList" class="mgr-rules-list"></div>
+          </div>
+
+          <div class="mgr-col">
+            <div class="section-header" style="margin-bottom: 4px;">Track Genre Sources</div>
+            <div class="mgr-sources-note">
+              Select which genre databases are checked when evaluating tracks against your blacklist rules.
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div class="setting-row">
+                <div style="display: flex; align-items: center;">
+                  <label class="setting-label" for="srcSpotifyTrack">Spotify (Track Tags)</label>
+                  <span class="tooltip-container">
+                    ${infoIconSvg}
+                    <span class="custom-tooltip tooltip-bottom">Spotify assigns tags with a confidence score. This threshold filters out low-confidence tags. Set to 0% (Any) to match all detected track tags regardless of confidence.</span>
+                  </span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <select id="mgrConfidenceSelect" class="mgr-conf-select" title="Minimum Spotify Track Tag confidence threshold" ${genreBlacklistConfig.sources.spotify_track ? '' : 'disabled'}>
+                    <option value="0" ${genreBlacklistConfig.minSpotifyConfidence === 0 ? 'selected' : ''}>0% (Any)</option>
+                    <option value="10" ${genreBlacklistConfig.minSpotifyConfidence === 10 ? 'selected' : ''}>10%</option>
+                    <option value="20" ${genreBlacklistConfig.minSpotifyConfidence === 20 ? 'selected' : ''}>20%</option>
+                    <option value="25" ${genreBlacklistConfig.minSpotifyConfidence === 25 ? 'selected' : ''}>25%</option>
+                    <option value="35" ${genreBlacklistConfig.minSpotifyConfidence === 35 ? 'selected' : ''}>35%</option>
+                    <option value="50" ${genreBlacklistConfig.minSpotifyConfidence === 50 ? 'selected' : ''}>50%</option>
+                  </select>
+                  <label class="switch">
+                    <input type="checkbox" id="srcSpotifyTrack" ${genreBlacklistConfig.sources.spotify_track ? 'checked' : ''}>
+                    <span class="sliderx"></span>
+                  </label>
+                </div>
+              </div>
+              <div class="setting-row">
+                <label class="setting-label" for="srcLastfmTrack">Last.fm (Track Tags)</label>
+                <label class="switch">
+                  <input type="checkbox" id="srcLastfmTrack" ${genreBlacklistConfig.sources.lastfm_track ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <label class="setting-label" for="srcLastfmArtist">Last.fm (Artist Tags)</label>
+                <label class="switch">
+                  <input type="checkbox" id="srcLastfmArtist" ${genreBlacklistConfig.sources.lastfm_artist ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <label class="setting-label" for="srcEverynoise">Every Noise (Artist Tags)</label>
+                <label class="switch">
+                  <input type="checkbox" id="srcEverynoise" ${genreBlacklistConfig.sources.everynoise_artist ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <label class="setting-label" for="srcDeezer">Deezer (Album Tags)</label>
+                <label class="switch">
+                  <input type="checkbox" id="srcDeezer" ${genreBlacklistConfig.sources.deezer ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mgr-footer">
+          <button id="mgrDoneBtn" class="mgr-done-btn">Done</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.appendChild(modal);
+
+    requestAnimationFrame(() => { overlay.style.opacity = "1"; });
+
+    const searchInput = shadowRoot.querySelector("#mgrSearchInput");
+    const addBtn = shadowRoot.querySelector("#mgrAddBtn");
+    const typeahead = shadowRoot.querySelector("#mgrTypeahead");
+    const rulesList = shadowRoot.querySelector("#mgrRulesList");
+    const rulesCount = shadowRoot.querySelector("#mgrRulesCount");
+    const closeBtn = shadowRoot.querySelector("#mgrCloseBtn");
+    const doneBtn = shadowRoot.querySelector("#mgrDoneBtn");
+    const confSelect = shadowRoot.querySelector("#mgrConfidenceSelect");
+
+    addHoverEffect(doneBtn, "#1ED760", "#3BE377");
+
+    const srcSpotifyTrack = shadowRoot.querySelector("#srcSpotifyTrack");
+    const srcEverynoise = shadowRoot.querySelector("#srcEverynoise");
+    const srcLastfmTrack = shadowRoot.querySelector("#srcLastfmTrack");
+    const srcLastfmArtist = shadowRoot.querySelector("#srcLastfmArtist");
+    const srcDeezer = shadowRoot.querySelector("#srcDeezer");
+
+    const recheckLiveTrack = () => {
+      prefetchBlacklistMap.clear();
+      const liveTrack = Spicetify.Player.data?.item;
+      if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+    };
+
+    const saveSourcesConfig = () => {
+      genreBlacklistConfig.sources.spotify_track = srcSpotifyTrack.checked;
+      genreBlacklistConfig.sources.everynoise_artist = srcEverynoise.checked;
+      genreBlacklistConfig.sources.lastfm_track = srcLastfmTrack.checked;
+      genreBlacklistConfig.sources.lastfm_artist = srcLastfmArtist.checked;
+      genreBlacklistConfig.sources.deezer = srcDeezer.checked;
+      const parsedConf = parseInt(confSelect.value, 10);
+      genreBlacklistConfig.minSpotifyConfidence = Number.isNaN(parsedConf) ? 25 : parsedConf;
+      confSelect.disabled = !srcSpotifyTrack.checked;
+      saveSettings();
+      recheckLiveTrack();
+    };
+
+    [srcSpotifyTrack, srcEverynoise, srcLastfmTrack, srcLastfmArtist, srcDeezer, confSelect].forEach(el => {
+      el.addEventListener("change", saveSourcesConfig);
+    });
+
+    const renderRules = () => {
+      rulesCount.textContent = `${genreBlacklistRules.length} ${genreBlacklistRules.length === 1 ? 'rule' : 'rules'}`;
+      if (genreBlacklistRules.length === 0) {
+        rulesList.innerHTML = `<div class="mgr-empty">No blacklisted genres yet.<br>Search or type a genre above to block it.</div>`;
+        return;
+      }
+
+      rulesList.innerHTML = genreBlacklistRules.map((rule, idx) => {
+        const count = getRuleMatchedGenresSet(rule).size;
+        const isEnabled = rule.enabled !== false;
+        return `
+          <div class="mgr-rule-card ${isEnabled ? '' : 'is-disabled'}" data-idx="${idx}">
+            <div class="mgr-rule-info">
+              <div class="mgr-rule-top">
+                <span class="mgr-rule-name" title="${escapeHtml(rule.name)}">${escapeHtml(formatGenreTitle(rule.name))}</span>
+                <span class="mgr-rule-badge" data-action="inspect-matches" title="Click to view all matched genres">${count} ${count === 1 ? 'match' : 'matches'} ↗</span>
+              </div>
+              <div class="mgr-rule-meta">
+                <span class="mgr-rule-tag" data-action="toggle-mode" title="Click to toggle match mode">${rule.mode === 'exact' ? 'Exact' : 'Contains'}</span>
+                <span class="mgr-rule-tag" data-action="toggle-expand" title="Click to toggle subgenre expansion">${rule.expandSubgenres ? '+ Related Styles' : 'No Related'}</span>
+              </div>
+            </div>
+            <div class="mgr-rule-actions">
+              <label class="mgr-card-switch" title="${isEnabled ? 'Pause rule' : 'Enable rule'}">
+                <input type="checkbox" data-action="toggle-enabled" ${isEnabled ? 'checked' : ''}>
+                <span class="mgr-card-slider"></span>
+              </label>
+              <div class="mgr-rule-btns">
+                <button class="mgr-icon-btn" data-action="edit" title="Edit rule">${penIconSvg}</button>
+                <button class="mgr-icon-btn mgr-del-btn" data-action="delete" title="Remove rule">${closeIcon16Svg}</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    };
+
+    renderRules();
+
+    rulesList.addEventListener("change", (e) => {
+      const input = e.target.closest('input[data-action="toggle-enabled"]');
+      if (!input) return;
+      const card = input.closest(".mgr-rule-card");
+      if (!card) return;
+      const idx = parseInt(card.dataset.idx, 10);
+      const rule = genreBlacklistRules[idx];
+      if (!rule) return;
+      rule.enabled = input.checked;
+      saveSettings();
+      renderRules();
+      recheckLiveTrack();
+    });
+
+    rulesList.addEventListener("click", (e) => {
+      const actionEl = e.target.closest("[data-action]");
+      if (!actionEl) return;
+      const card = actionEl.closest(".mgr-rule-card");
+      if (!card) return;
+      const idx = parseInt(card.dataset.idx, 10);
+      const rule = genreBlacklistRules[idx];
+      if (!rule) return;
+
+      const action = actionEl.dataset.action;
+      if (action === "inspect-matches") {
+        showMatchedGenresModal(rule);
+        return;
+      }
+      if (action === "delete") {
+        genreBlacklistRules.splice(idx, 1);
+        prefetchBlacklistMap.clear();
+        saveSettings();
+        renderRules();
+        recheckLiveTrack();
+      } else if (action === "toggle-mode") {
+        rule.mode = rule.mode === 'exact' ? 'contains' : 'exact';
+        saveSettings();
+        renderRules();
+        recheckLiveTrack();
+      } else if (action === "toggle-expand") {
+        rule.expandSubgenres = !rule.expandSubgenres;
+        saveSettings();
+        renderRules();
+        recheckLiveTrack();
+      } else if (action === "edit") {
+        showGenreRuleConfigModal(rule, (updated) => {
+          genreBlacklistRules[idx] = updated;
+          saveSettings();
+          renderRules();
+          recheckLiveTrack();
+        }, () => {
+          genreBlacklistRules.splice(idx, 1);
+          prefetchBlacklistMap.clear();
+          saveSettings();
+          renderRules();
+        });
+      }
+    });
+
+    if (!genrePlaylistsCache) {
+      getGenreMapping().then(() => {
+        cachedAllGenresPool = null;
+        renderRules();
+      }).catch(() => {});
+    }
+
+    const openRuleModalForName = (name) => {
+      const cleanName = name.trim().toLowerCase();
+      if (!cleanName) return;
+      typeahead.style.display = "none";
+      searchInput.value = "";
+      const existingIdx = genreBlacklistRules.findIndex(r => r.name.toLowerCase() === cleanName);
+      if (existingIdx !== -1) {
+        showGenreRuleConfigModal(genreBlacklistRules[existingIdx], (updated) => {
+          genreBlacklistRules[existingIdx] = updated;
+          saveSettings();
+          renderRules();
+          recheckLiveTrack();
+        }, () => {
+          genreBlacklistRules.splice(existingIdx, 1);
+          prefetchBlacklistMap.clear();
+          saveSettings();
+          renderRules();
+        });
+      } else {
+        showGenreRuleConfigModal({ name: cleanName, mode: 'exact', expandSubgenres: false, enabled: true }, (newRule) => {
+          genreBlacklistRules.push(newRule);
+          saveSettings();
+          renderRules();
+          recheckLiveTrack();
+        });
+      }
+    };
+
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) {
+        typeahead.style.display = "none";
+        return;
+      }
+      const pool = getAllUniqueGenresPool();
+      const existingSet = new Set(genreBlacklistRules.map(r => r.name.toLowerCase()));
+      const wordBoundaryRegex = new RegExp(`(^|[\\s\\-_/])${escapeRegExp(q)}([\\s\\-_/]|$)`, 'i');
+
+      const getTier = (g) => {
+        if (g === q) return 0;
+        if (g.startsWith(q) || wordBoundaryRegex.test(g)) return 1;
+        return 2;
+      };
+
+      const rawFiltered = pool.filter(g => g.includes(q));
+      const seenNormalized = new Set();
+      const deduplicated = [];
+
+      for (let i = 0; i < rawFiltered.length; i++) {
+        const item = rawFiltered[i];
+        const norm = normalizeGenre(item);
+        if (!seenNormalized.has(norm)) {
+          seenNormalized.add(norm);
+          deduplicated.push(item);
+        }
+      }
+
+      const matches = deduplicated
+        .sort((a, b) => {
+          const tierA = getTier(a);
+          const tierB = getTier(b);
+          if (tierA !== tierB) return tierA - tierB;
+          if (a.length !== b.length) return a.length - b.length;
+          return a.localeCompare(b);
+        })
+        .slice(0, 30);
+
+      if (matches.length === 0) {
+        typeahead.style.display = "none";
+        return;
+      }
+      typeahead.innerHTML = matches.map(m => {
+        const isAdded = existingSet.has(m);
+        return `<div class="mgr-typeahead-item" data-val="${escapeHtml(m)}"><span>${escapeHtml(formatGenreTitle(m))}</span>${isAdded ? '<span class="mgr-typeahead-added">Added</span>' : ''}</div>`;
+      }).join('');
+      typeahead.style.display = "block";
+    });
+
+    typeahead.addEventListener("click", (e) => {
+      const item = e.target.closest(".mgr-typeahead-item");
+      if (!item) return;
+      openRuleModalForName(item.dataset.val);
+    });
+
+    shadowRoot.addEventListener("click", (e) => {
+      if (!e.target.closest(".mgr-search-input-wrap")) {
+        typeahead.style.display = "none";
+      }
+    });
+
+    addBtn.addEventListener("click", () => openRuleModalForName(searchInput.value));
+    searchInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        openRuleModalForName(searchInput.value);
+      } else if (e.key === "Escape") {
+        typeahead.style.display = "none";
+      }
+    });
+
+    const closeModal = () => {
+      overlay.style.opacity = "0";
+      setTimeout(() => {
+        overlay.remove();
+        const openGenreWindow = document.getElementById("sort-play-genre-details-window");
+        if (openGenreWindow && typeof openGenreWindow._refreshWindowDisplay === 'function') {
+          openGenreWindow._refreshWindowDisplay();
+        }
+      }, 200);
+    };
+
+    closeBtn.addEventListener("click", closeModal);
+    doneBtn.addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+  }
+  
   function showSettingsModal() {
     const abortController = new AbortController();
     let notifHoverTimeout = null;
@@ -4892,6 +6164,59 @@
         </div>
     </div>
 
+    <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
+        Genre Blocking
+    </div>
+    <div style="border-bottom: 1px solid #555; margin-top: -3px;"></div>
+
+    <div class="setting-row" id="genreBlacklistEnabledSetting">
+        <label class="col description">
+            Genre Auto-Skip
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Automatically skips tracks that match your blacklisted genres.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <button id="manageGenreBlacklistBtn" class="main-buttons-button main-button-secondary" style="padding: 3px 12px; border-radius: 16px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; background-color: transparent; transition: background-color 0.2s;">Manage</button>
+            <label class="switch">
+                <input type="checkbox" id="genreBlacklistEnabledToggle" ${genreBlacklistEnabled ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="genreBlacklistNotifySetting">
+        <label class="col description">
+            Show Skip Notifications
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Displays a toast notification whenever a track is automatically skipped by genre.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="genreBlacklistNotifyToggle" ${genreBlacklistNotify ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
+
+    <div class="setting-row" id="genreBlacklistProtectLikedSetting">
+        <label class="col description">
+            Never Auto-Skip Liked Songs
+            <span class="tooltip-container">
+                ${infoIconSvg}
+                <span class="custom-tooltip">Prevents your Liked Songs from ever being auto-skipped, even if their genres match the blacklist.</span>
+            </span>
+        </label>
+        <div class="col action">
+            <label class="switch">
+                <input type="checkbox" id="genreBlacklistProtectLikedToggle" ${genreBlacklistProtectLiked ? 'checked' : ''}>
+                <span class="sliderx"></span>
+            </label>
+        </div>
+    </div>
     
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Notifications
@@ -5049,6 +6374,31 @@
     const showGenresContextMenuToggle = modalContainer.querySelector("#showGenresContextMenuToggle");
     const genreSourcesSettingsBtn = modalContainer.querySelector("#genreSourcesSettingsBtn");
     const autoHideDiscographyNotificationToggle = modalContainer.querySelector("#autoHideDiscographyNotificationToggle");
+    const genreBlacklistEnabledToggle = modalContainer.querySelector("#genreBlacklistEnabledToggle");
+    const genreBlacklistNotifyToggle = modalContainer.querySelector("#genreBlacklistNotifyToggle");
+    const genreBlacklistProtectLikedToggle = modalContainer.querySelector("#genreBlacklistProtectLikedToggle");
+    const manageGenreBlacklistBtn = modalContainer.querySelector("#manageGenreBlacklistBtn");
+
+    genreBlacklistEnabledToggle.addEventListener("change", () => {
+      genreBlacklistEnabled = genreBlacklistEnabledToggle.checked;
+      saveSettings();
+    });
+
+    genreBlacklistNotifyToggle.addEventListener("change", () => {
+      genreBlacklistNotify = genreBlacklistNotifyToggle.checked;
+      saveSettings();
+    });
+
+    genreBlacklistProtectLikedToggle.addEventListener("change", () => {
+      genreBlacklistProtectLiked = genreBlacklistProtectLikedToggle.checked;
+      saveSettings();
+    });
+
+    manageGenreBlacklistBtn.addEventListener("click", () => {
+      showGenreBlacklistManagerModal();
+    });
+    manageGenreBlacklistBtn.addEventListener("mouseenter", () => manageGenreBlacklistBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)");
+    manageGenreBlacklistBtn.addEventListener("mouseleave", () => manageGenreBlacklistBtn.style.backgroundColor = "transparent");
     const useEnergyWaveShuffleToggle = modalContainer.querySelector("#useEnergyWaveShuffleToggle");
     const energyWaveSettingsBtn = modalContainer.querySelector("#energyWaveSettingsBtn");
     const showNowPlayingDataToggle = modalContainer.querySelector("#showNowPlayingDataToggle");
@@ -9342,6 +10692,12 @@
                               <span class="sliderx"></span>
                           </label>
                       </div>
+                      <div class="setting-row">
+                          <div style="display: flex; align-items: center;">
+                              <label class="setting-label">Genre Blacklist</label>
+                          </div>
+                          <button id="openBlacklistFromGenreSettingsBtn" class="main-buttons-button main-button-secondary" style="padding: 4px 12px; border-radius: 16px; border: 1px solid #666; cursor: pointer; color: white; font-weight: 500; font-size: 12px; background-color: transparent; transition: background-color 0.2s;">Manage</button>
+                      </div>
                   </div>
               </div>
               
@@ -9452,6 +10808,14 @@
     const apEveryNoiseToggle = modalContainer.querySelector("#apEveryNoiseToggle");
     const useGenreDbToggle = modalContainer.querySelector("#useGenreDbToggle");
     const autoUpdateModalToggle = modalContainer.querySelector("#autoUpdateModalToggle");
+    const openBlacklistFromGenreSettingsBtn = modalContainer.querySelector("#openBlacklistFromGenreSettingsBtn");
+    if (openBlacklistFromGenreSettingsBtn) {
+      openBlacklistFromGenreSettingsBtn.addEventListener("click", () => {
+        showGenreBlacklistManagerModal();
+      });
+      openBlacklistFromGenreSettingsBtn.addEventListener("mouseenter", () => openBlacklistFromGenreSettingsBtn.style.backgroundColor = "rgba(255, 255, 255, 0.1)");
+      openBlacklistFromGenreSettingsBtn.addEventListener("mouseleave", () => openBlacklistFromGenreSettingsBtn.style.backgroundColor = "transparent");
+    }
     const doneButton = modalContainer.querySelector("#doneGenreSources");
     const genreSeparatorInput = modalContainer.querySelector("#genreSeparatorInput");
     const genreSeparatorBtn = modalContainer.querySelector("#genreSeparatorBtn");
@@ -13450,8 +14814,11 @@
           const delayStyle = animate && idx < 25 ? `animation-delay: ${idx * 15}ms;` : '';
           const animClass = animate && idx < 25 ? 'animated' : '';
           const topPx = idx * ITEM_HEIGHT;
+          const matchedRule = genreBlacklistRules.find(r => isGenreMatchedByRule(g?.name, r));
+          const isBanned = Boolean(matchedRule);
+          const bannedClass = isBanned ? 'is-blacklisted' : '';
 
-          return `<div class="sp-pg-genre-row ${animClass}" data-idx="${idx}" data-genre="${escapeHtml(titleCase, "")}" style="position: absolute; top: ${topPx}px; left: 0; width: 100%; ${delayStyle}">${inner}</div>`;
+          return `<div class="sp-pg-genre-row ${animClass} ${bannedClass}" data-idx="${idx}" data-genre="${escapeHtml(titleCase, "")}" data-raw-genre="${escapeHtml(g?.name || "")}" data-blacklisted="${isBanned ? 'true' : 'false'}" style="position: absolute; top: ${topPx}px; left: 0; width: 100%; ${delayStyle}">${inner}</div>`;
       };
 
       const renderVisibleGenres = (animate = false) => {
@@ -13764,10 +15131,14 @@
               const titleEl = target.closest('.sp-pg-genre-title, .sp-pg-genre-info');
               if (titleEl) {
                   const rowEl = titleEl.closest('.sp-pg-genre-row');
-                  const genreName = rowEl?.dataset?.genre;
-                  if (genreName) {
+                  const targetGenre = rowEl?.dataset?.rawGenre || rowEl?.dataset?.genre;
+                  if (targetGenre) {
                       removeFloatingTooltip();
-                      navigateToGenre(genreName);
+                      if (modal.classList.contains('in-block-mode') && typeof modal._handleGenreClickForBlocking === 'function') {
+                          modal._handleGenreClickForBlocking(targetGenre);
+                          return;
+                      }
+                      navigateToGenre(targetGenre);
                   }
               }
           });
@@ -13979,9 +15350,6 @@
       
       if (existing) {
           if (existing.dataset.trackId === trackIdKey && !forceUpdate) {
-              if (existing.classList.contains('minimized')) {
-                  existing.querySelector('.minimize-btn').click();
-              }
               return;
           }
           
@@ -14012,7 +15380,13 @@
           const oldCovers = existing.querySelectorAll('.sp-genre-cover');
 
           const closeBtn = existing.querySelector('.close-btn');
-          if (closeBtn) closeBtn.onclick = () => existing.remove();
+          if (closeBtn) {
+              closeBtn.onclick = () => {
+                  existing.remove();
+                  const liveTrack = Spicetify.Player.data?.item;
+                  if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+              };
+          }
 
           const syncColor = getSyncDominantColor(coverUrl, entityUriForColor);
           if (syncColor) {
@@ -14152,6 +15526,7 @@
               showLoaderKeepingHeight();
               genreMapOrPromise.then(genreMap => {
                   if (existing.dataset.trackId !== trackIdKey) return;
+                  existing._genreMap = genreMap;
                   transitionToContent(existing._renderContentHtml(genreMap, true), () => existing._bindEvents());
               }).catch(err => {
                   if (existing.dataset.trackId !== trackIdKey) return;
@@ -14159,12 +15534,10 @@
                   transitionToContent('<div style="color: rgba(241,94,108,0.9); text-align: center; padding: 40px 20px;">Failed to load genres.</div>');
               });
           } else {
+              existing._genreMap = genreMapOrPromise;
               transitionToContent(existing._renderContentHtml(genreMapOrPromise, true), () => existing._bindEvents());
           }
           
-          if (existing.classList.contains('minimized')) {
-              existing.querySelector('.minimize-btn').click();
-          }
           return;
       }
 
@@ -14292,12 +15665,21 @@
                       const animClass = animate ? 'animated' : '';
                       globalTagIndex++;
 
+                      const matchedRule = genreBlacklistRules.find(r => isGenreMatchedByRule(g.name, r));
+                      const isBanned = Boolean(matchedRule);
+                      const bannedClass = isBanned ? 'is-blacklisted' : '';
+                      const bannedTitle = matchedRule ? ` • Blacklisted: "${matchedRule.name}"` : '';
+
+                      const toggleIconSvg = isBanned ? tagRemoveIconSvg : tagAddIconSvg;
+
                       return `
-                        <div class="genre-detail-tag ${animClass}" data-genre="${escapeHtml(titleCase, "")}" title="Source: ${escapeHtml(tooltip, "")}" style="${delayStyle}">
+                        <div class="genre-detail-tag ${animClass} ${bannedClass}" data-genre="${escapeHtml(titleCase, "")}" data-raw-genre="${escapeHtml(g.name)}" data-blacklisted="${isBanned ? 'true' : 'false'}" title="Source: ${escapeHtml(tooltip, "")}${escapeHtml(bannedTitle)}" style="${delayStyle}">
+                            ${isBanned ? `<span class="genre-banned-badge" title="Blacklisted: ${escapeHtml(matchedRule.name)}">${banIconSvg}</span>` : ''}
                             <span class="genre-text">${escapeHtml(titleCase, "")}</span>${scoreHtml}
                             <button class="genre-copy-btn" title="Copy">
                                 ${smallCopyIcon}
                             </button>
+                            <span class="genre-toggle-icon" aria-hidden="true">${toggleIconSvg}</span>
                         </div>`;
                   }).join('');
 
@@ -14324,6 +15706,21 @@
             @keyframes sp-tag-pop { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
             .genre-detail-tag { height: 28px; box-sizing: border-box; padding: 0 0 0 12px; border-radius: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.05); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; user-select: none; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; position: relative; }
             .genre-detail-tag:hover { background-color: rgba(255,255,255,0.14) !important; border-color: rgba(255,255,255,0.18) !important; }
+            .genre-detail-tag.is-blacklisted { background: rgba(233, 20, 41, 0.14) !important; border-color: rgba(233, 20, 41, 0.45) !important; color: #ff9b9b !important; }
+            .genre-detail-tag.is-blacklisted:hover { background: rgba(233, 20, 41, 0.25) !important; border-color: rgba(233, 20, 41, 0.7) !important; color: #fff !important; }
+            .genre-banned-badge { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; color: #ff6b6b; margin-right: 2px; flex-shrink: 0; }
+            .genre-banned-badge svg { width: 12px; height: 12px; }
+            .sp-control-btn.block-mode-btn.is-active { color: #ff6b6b !important; background-color: rgba(233, 20, 41, 0.2) !important; }
+            .sp-genre-block-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 20px; background: rgba(233, 20, 41, 0.14); border-bottom: 1px solid rgba(233, 20, 41, 0.3); font-size: 12px; color: #eee; position: relative; z-index: 2; flex-shrink: 0; }
+            .sp-genre-block-banner-text { flex: 1; line-height: 1.35; }
+            .sp-genre-block-mgr-link { background: transparent; border: 1px solid rgba(255, 255, 255, 0.25); color: #fff; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s ease; }
+            .sp-genre-block-mgr-link:hover { background: rgba(255, 255, 255, 0.15); border-color: #fff; }
+            .in-block-mode .genre-detail-tag:not(.is-blacklisted):hover { background-color: rgba(233, 20, 41, 0.16) !important; border-color: rgba(255, 107, 107, 0.6) !important; color: #fff !important; box-shadow: 0 0 8px rgba(233, 20, 41, 0.3); }
+            .in-block-mode .genre-detail-tag .genre-copy-btn { display: none !important; }
+            .genre-toggle-icon { display: none; width: 22px; height: 100%; align-items: center; justify-content: center; padding: 0 5px 0 2px; flex-shrink: 0; pointer-events: none; color: inherit; }
+            .in-block-mode .genre-toggle-icon { display: flex !important; }
+            .sp-pg-genre-row.is-blacklisted { background: rgba(233, 20, 41, 0.1) !important; border-color: rgba(233, 20, 41, 0.35) !important; }
+            .sp-pg-genre-row.is-blacklisted .sp-pg-genre-title { color: #ff9b9b !important; }
             .genre-detail-tag.animated { animation: sp-tag-pop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; opacity: 0; }
             .genre-detail-score { background: rgba(var(--sp-pg-accent, 255, 255, 255), 0.14); border: 1px solid rgba(255, 255, 255, 0.07); color: rgb(var(--sp-pg-accent-light, 255, 255, 255)); padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500; line-height: 1; display: inline-flex; align-items: center; letter-spacing: 0.2px; font-family: var(--font-family, 'SpotifyMixUI', 'CircularSp', sans-serif); flex-shrink: 0; -webkit-font-smoothing: antialiased; transition: background 0.3s ease, color 0.3s ease; }
             .genre-detail-tag:hover .genre-detail-score { background: rgba(var(--sp-pg-accent, 255, 255, 255), 0.28); color: #fff; }
@@ -14346,19 +15743,15 @@
             .sp-genre-track { font-size: 18px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
             .sp-genre-artist { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,0.2); }
             .sp-window-controls { display: flex; gap: 8px; align-items: center; padding-left: 12px; position: relative; z-index: 2; }
-            .sp-control-btn { background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background-color 0.2s; }
+            .sp-control-btn { background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; width: 28px; height: 28px; padding: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background-color 0.2s; box-sizing: border-box; }
             .sp-control-btn:hover { color: white; background-color: rgba(255,255,255,0.1); }
             .sp-window-content { padding: 24px 20px 24px 24px; overflow-y: auto; scrollbar-gutter: stable; background-color: transparent; flex-grow: 1; position: relative; z-index: 2; scrollbar-width: auto !important; scrollbar-color: auto !important; will-change: scroll-position; }
             .sp-window-content > div:last-child { margin-bottom: 0 !important; }
-            .minimized .sp-window-content { display: none; }
-            .minimized .sp-genre-header { border-bottom: none !important; border-top: none !important; background-color: transparent !important; }
-            .minimized { height: auto !important; max-height: none !important; }
             .sp-window-content::-webkit-scrollbar { width: 4px !important; }
             .sp-window-content::-webkit-scrollbar-track { background: transparent !important; margin-bottom: 12px !important; }
             .sp-window-content::-webkit-scrollbar-button:vertical:start:decrement { display: none !important; }
             .sp-window-content::-webkit-scrollbar-button:vertical:end:increment { display: block !important; height: 12px !important; background: transparent !important; border: none !important; }
             .sp-window-content::-webkit-scrollbar-thumb { background-color: rgba(255,255,255,0.15) !important; border-radius: 4px !important; }
-            .minimized .sp-playlist-genre-toolbar { display: none !important; }
             .sp-playlist-genre-toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.1); backdrop-filter: blur(6px); position: relative; z-index: 2; flex-shrink: 0; }
             .sp-pg-search-wrap { position: relative; flex: 1; display: flex; align-items: center; }
             .sp-pg-search-wrap svg { position: absolute; left: 8px; width: 14px; height: 14px; fill: rgba(255,255,255,0.5); pointer-events: none; }
@@ -14403,8 +15796,8 @@
                   <div class="sp-genre-artist" title="${escapeHtml(artistName)}">${escapeHtml(artistName)}</div>
               </div>
               <div class="sp-window-controls">
-                  <button class="sp-control-btn minimize-btn" title="Minimize">
-                      ${minimizeIconSvg}
+                  <button class="sp-control-btn block-mode-btn" title="Genre Blocker">
+                      ${banIconSvg}
                   </button>
                   <button class="sp-control-btn settings-btn" title="Genre Settings">
                       ${settingsSvg.replace('<svg', '<svg width="19" height="19" fill="currentColor"')}
@@ -14413,6 +15806,12 @@
                       ${closeIcon16Svg}
                   </button>
               </div>
+          </div>
+          <div class="sp-genre-block-banner" id="sp-genre-block-banner" style="display: none;">
+              <div class="sp-genre-block-banner-text">
+                  <span style="font-weight: 700; color: #ff6b6b;">Genre Blocker:</span> Select genres to auto-skip when playing music. Click blocked tags to remove them.
+              </div>
+              <button class="sp-genre-block-mgr-link" id="sp-genre-block-mgr-btn">Manage ↗</button>
           </div>
           <div class="sp-window-content" id="sp-genre-content-area">
           </div>
@@ -14431,10 +15830,72 @@
 
       const contentArea = modalContainer.querySelector('#sp-genre-content-area');
 
+      let isBlockModeActive = false;
+
+      const refreshWindowDisplay = () => {
+          if (modalContainer.dataset.mode === 'playlist') {
+              if (typeof modalContainer._refreshPlaylistGenres === 'function') {
+                  modalContainer._refreshPlaylistGenres();
+              }
+              return;
+          }
+          if (modalContainer._genreMap) {
+              contentArea.innerHTML = renderContentHtml(modalContainer._genreMap, false);
+              bindEvents();
+          }
+      };
+
+      modalContainer._refreshWindowDisplay = refreshWindowDisplay;
+
+      const handleGenreClickForBlocking = (targetGenreName) => {
+          const cleanName = (targetGenreName || "").toLowerCase().trim();
+          if (!cleanName) return;
+
+          const directRule = genreBlacklistRules.find(r => normalizeGenre(r.name) === normalizeGenre(cleanName));
+          const matchedRule = directRule || genreBlacklistRules.find(r => isGenreMatchedByRule(cleanName, r));
+
+          if (matchedRule) {
+              const ruleIndex = genreBlacklistRules.indexOf(matchedRule);
+              showGenreRuleConfigModal(matchedRule, (updated) => {
+                  if (ruleIndex !== -1) genreBlacklistRules[ruleIndex] = updated;
+                  else genreBlacklistRules.push(updated);
+                  saveSettings();
+                  refreshWindowDisplay();
+                  showNotification(`Updated blacklist: ${formatGenreTitle(updated.name)}`);
+                  prefetchBlacklistMap.clear();
+              }, () => {
+                  if (ruleIndex !== -1) genreBlacklistRules.splice(ruleIndex, 1);
+                  prefetchBlacklistMap.clear();
+                  saveSettings();
+                  refreshWindowDisplay();
+                  showNotification(`Removed from blacklist: ${formatGenreTitle(matchedRule.name)}`);
+              });
+          } else {
+              showGenreRuleConfigModal({ name: cleanName, mode: 'exact', expandSubgenres: false }, (newRule) => {
+                  genreBlacklistRules.push(newRule);
+                  saveSettings();
+                  refreshWindowDisplay();
+                  const isLive = modalContainer.dataset.trackId === Spicetify.Player.data?.item?.uri;
+                  showNotification(`Blacklisted: ${formatGenreTitle(newRule.name)}${isLive ? ' (skips on exit)' : ''}`);
+                  prefetchBlacklistMap.clear();
+              });
+          }
+      };
+
+      modalContainer._handleGenreClickForBlocking = handleGenreClickForBlocking;
+
       const bindEvents = () => {
           modalContainer.querySelectorAll('.genre-detail-tag').forEach(tag => {
               tag.addEventListener('click', (e) => {
                   if (e.target.closest('.genre-copy-btn')) return;
+
+                  const targetGenre = tag.dataset.rawGenre || tag.dataset.genre;
+                  if (isBlockModeActive) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleGenreClickForBlocking(targetGenre);
+                      return;
+                  }
 
                   const genreName = tag.dataset.genre;
                   let path;
@@ -14460,6 +15921,7 @@
 
           modalContainer.querySelectorAll('.genre-copy-btn').forEach(btn => {
               btn.addEventListener('click', (e) => {
+                  if (isBlockModeActive) return;
                   e.stopPropagation();
                   const tag = btn.closest('.genre-detail-tag');
                   const genreName = tag?.dataset?.genre;
@@ -14502,6 +15964,7 @@
           `;
           genreMapOrPromise.then(genreMap => {
               if (modalContainer.dataset.trackId !== trackIdKey) return;
+              modalContainer._genreMap = genreMap;
               contentArea.innerHTML = renderContentHtml(genreMap, true);
               bindEvents();
               requestAnimationFrame(() => {
@@ -14516,6 +15979,7 @@
               enforceBoundaries(modalContainer);
           });
       } else if (genreMapOrPromise) {
+          modalContainer._genreMap = genreMapOrPromise;
           contentArea.innerHTML = renderContentHtml(genreMapOrPromise, false);
           bindEvents();
           requestAnimationFrame(() => {
@@ -14546,7 +16010,11 @@
           modalContainer.classList.remove('docked-bottom');
       });
 
-      const closeModal = () => modalContainer.remove();
+      const closeModal = () => {
+          modalContainer.remove();
+          const liveTrack = Spicetify.Player.data?.item;
+          if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+      };
       
       const closeBtn = modalContainer.querySelector('.close-btn');
       closeBtn.addEventListener('click', closeModal);
@@ -14555,70 +16023,31 @@
       settingsBtn.addEventListener('click', () => {
           showGenreTagsSettingsModal();
       });
-      
-      const minimizeBtn = modalContainer.querySelector('.minimize-btn');
-      let isMinimized = false;
-      
-      minimizeBtn.addEventListener('click', () => {
-          isMinimized = !isMinimized;
-          
-          if (isMinimized) {
-              modalContainer.classList.add('minimized');
-          } else {
-              modalContainer.classList.remove('minimized');
-              
-              requestAnimationFrame(() => {
-                  const rect = modalContainer.getBoundingClientRect(); 
-                  const vH = window.innerHeight;
-                  const vW = window.innerWidth;
-                  
-                  if (!modalContainer.classList.contains('docked-bottom') && rect.bottom > vH - 10) {
-                      modalContainer.classList.add('docked-bottom');
-                      const headerHeight = modalContainer.querySelector('.sp-genre-header').offsetHeight;
-                      const targetBottom = vH - (rect.top + headerHeight);
-                      modalContainer.style.bottom = `${Math.max(10, targetBottom)}px`;
-                      modalContainer.style.top = 'auto';
-                  } 
-                  else if (modalContainer.classList.contains('docked-bottom') && rect.top < 70) {
-                      modalContainer.classList.remove('docked-bottom');
-                      const headerHeight = modalContainer.querySelector('.sp-genre-header').offsetHeight;
-                      const targetTop = vH - rect.bottom - headerHeight;
-                      modalContainer.style.top = `${Math.max(70, targetTop)}px`;
-                      modalContainer.style.bottom = 'auto';
-                  }
-                  
-                  requestAnimationFrame(() => {
-                      const finalRect = modalContainer.getBoundingClientRect();
-                      let nL = finalRect.left;
-                      let nT = finalRect.top;
-                      
-                      if (nL < 10) nL = 10;
-                      if (nL + finalRect.width > vW - 10) nL = vW - finalRect.width - 10;
-                      
-                      if (modalContainer.classList.contains('docked-bottom')) {
-                          let nB = vH - finalRect.bottom;
-                          if (nB < 10) nB = 10;
-                          if (nB + finalRect.height > vH - 70) nB = vH - finalRect.height - 70;
-                          modalContainer.style.bottom = `${nB}px`;
-                          modalContainer.style.left = `${nL}px`;
-                          modalContainer.style.top = 'auto';
-                      } else {
-                          if (nT < 70) nT = 70;
-                          if (nT + finalRect.height > vH - 10) nT = vH - finalRect.height - 10;
-                          modalContainer.style.top = `${nT}px`;
-                          modalContainer.style.left = `${nL}px`;
-                          modalContainer.style.bottom = 'auto';
-                      }
-                  });
-              });
-          }
 
-          minimizeBtn.innerHTML = isMinimized 
-              ? `${restoreWindowIconSvg}`
-              : `${minimizeIconSvg}`; 
-          minimizeBtn.title = isMinimized ? "Restore" : "Minimize";
-      });
+      const blockModeBtn = modalContainer.querySelector('.block-mode-btn');
+      const blockBanner = modalContainer.querySelector('#sp-genre-block-banner');
+      const blockMgrBtn = modalContainer.querySelector('#sp-genre-block-mgr-btn');
 
+      if (blockModeBtn) {
+          blockModeBtn.addEventListener('click', () => {
+              isBlockModeActive = !isBlockModeActive;
+              blockModeBtn.classList.toggle('is-active', isBlockModeActive);
+              if (blockBanner) blockBanner.style.display = isBlockModeActive ? 'flex' : 'none';
+              modalContainer.classList.toggle('in-block-mode', isBlockModeActive);
+              enforceBoundaries(modalContainer);
+              if (!isBlockModeActive) {
+                  const liveTrack = Spicetify.Player.data?.item;
+                  if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+              }
+          });
+      }
+
+      if (blockMgrBtn) {
+          blockMgrBtn.addEventListener('click', () => {
+              showGenreBlacklistManagerModal();
+          });
+      }
+      
       const header = modalContainer.querySelector('.sp-genre-header');
       let isDragging = false;
       let startX, startY, startLeft, startTop, startBottom;
@@ -14802,81 +16231,96 @@
   }
 
   const GENRE_ALIASES_RAW = {
-    "r&b": ["r&b", "rnb", "r and b", "r n b", "rhythm and blues", "rhythm & blues", "r&b's", "rnb's"],
-    "neo soul": ["neo soul", "neosoul", "neo-soul"],
-    "hip hop": ["hip hop", "hip-hop", "hiphop", "hip-hop music", "hip hop's", "hip-hops"],
-    "lo-fi": ["lo-fi", "lofi", "lo fi"],
-    "trap": ["trap", "trap music"],
-    "pop": ["pop", "pop music", "pop's", "popmusic", "pops"],
-    "indie pop": ["indie pop", "indiepop", "indie-pop"],
-    "synth pop": ["synth pop", "synthpop", "synth-pop"],
-    "electropop": ["electropop", "electro-pop", "electro pop"],
-    "dream pop": ["dream pop", "dreampop"],
-    "art pop": ["art pop", "art-pop"],
-    "k-pop": ["k-pop", "kpop", "k pop"],
-    "j-pop": ["j-pop", "jpop", "j pop"],
-    "c-pop": ["c-pop", "cpop", "c pop"],
-    "rock and roll": ["rock & roll", "rock n roll", "rock and roll", "rock'n'roll"],
-    "alternative rock": ["alternative rock", "alt rock", "alt-rock"],
-    "indie rock": ["indie rock", "indierock", "indie-rock"],
-    "hard rock": ["hard rock", "hardrock", "hard rock music", "hard rock's", "hard-rock", "hardrockmusic"],
-    "soft rock": ["soft rock", "softrock"],
-    "psychedelic rock": ["psychedelic rock", "psych rock"],
-    "pop punk": ["pop punk", "poppunk", "pop-punk"],
-    "post-punk": ["post-punk", "postpunk", "post punk"],
-    "new wave": ["new wave", "newwave"],
-    "post-rock": ["post-rock", "postrock", "post rock"],
-    "shoegaze": ["shoegaze", "shoe gaze", "nu gaze", "nu-gaze", "nugaze"],
-    "idm": ["idm", "intelligent dance music"],
-    "metal": ["metal", "heavy metal", "heavymetal", "metal rock", "metal's", "metalhead", "metallic", "metalmusic", "metals"],
-    "death metal": ["death metal", "deathmetal"],
-    "black metal": ["black metal", "blackmetal"],
-    "metalcore": ["metalcore", "metal core"],
-    "nu metal": ["nu metal", "numetal", "nu-metal"],
-    "power metal": ["power metal", "powermetal"],
-    "thrash metal": ["thrash metal", "thrashmetal"],
-    "doom metal": ["doom metal", "doommetal"],
-    "electronic": ["electro", "electro's", "electronic", "electronic music", "electronic's", "electronica", "electronicas", "electronico", "electronics", "electronik", "eletronic"],
-    "edm": ["edm", "electronic dance", "electronic dance music"],
-    "house": ["house", "house music", "house's", "housemusic"],
-    "deep house": ["deep house", "deephouse"],
-    "tech house": ["tech house", "techhouse"],
-    "drum and bass": ["drum and bass", "dnb", "d&b", "drum n bass", "drum & bass", "drumandbass", "drum'n'bass"],
-    "psytrance": ["psytrance", "psy trance", "psy-trance"],
-    "synthwave": ["synthwave", "synth wave", "synth-wave", "synthwave's"],
-    "vaporwave": ["vaporwave", "vapor wave"],
-    "chillwave": ["chillwave", "chill wave"],
-    "latin": ["latin", "latin music", "latin's", "latina", "latinas", "latinmusic", "latino", "latinos"],
-    "reggaeton": ["reggaeton", "reggaetón", "regueton"],
-    "bossa nova": ["bossa nova", "bossanova"],
-    "salsa": ["salsa", "salsa music"],
-    "singer-songwriter": ["singer-songwriter", "singer songwriter", "singer/songwriter"],
-    "nu disco": ["nu disco", "nu-disco", "nudisco"],
-    "soundtrack": ["soundtrack", "ost", "original soundtrack"],
-    "country": ["country", "country music", "country's", "countrymusic"],
-    "classical": ["classic", "classical", "classical music", "classical's", "classics", "orchestra", "orchestral", "orchestral music", "orchestras"],
-    "world": ["world", "world music"],
-    "christian": ["christian", "christian music"],
-    "christian pop": ["christian pop", "ccm", "deep ccm"],
-    "rock": ["rock", "rock music", "rock's", "rockmusic", "rocks", "rockin", "rockin'"],
-    "indie": ["indie", "indie's", "indiemusic", "indies"],
-    "dance": ["dance", "dance music", "dance's", "dances", "dancey"],
-    "jazz": ["jazz", "jazz's", "jazzier", "jazziest", "jazzmusic", "jazzy"],
-    "folk": ["folk", "folk music", "folk's", "folkie", "folkier", "folklore", "folkmusic", "folksy"],
-    "rap": ["rap", "rap music", "raps", "rapper", "rappers"],
-    "punk": ["punk", "punk music", "punk's", "punkmusic", "punks", "punky"],
-    "soul": ["soul", "soul music", "soul's", "soulful", "soulmusic", "souly"],
-    "blues": ["blues", "blues music", "blues'", "bluesier", "bluesiest", "bluesmusic", "bluesy"],
-    "alternative": ["alt", "alternative", "alternative music", "alternative's", "alternativemusic", "alternatives"],
-    "instrumental": ["instrumental", "instrumental's", "instrumentalmusic", "instrumentals", "no vocals"],
-    "experimental": ["experiment", "experimental", "experimental's", "experimentalmusic", "experiments"],
-    "ambient": ["ambient", "ambient's", "ambients", "atmospheric"],
-    "acoustic": ["acoustic", "acoustic's", "acousticmusic", "acoustics"],
-    "reggae": ["reggae", "reggae music", "reggae's", "reggaemusic"],
-    "techno": ["tech", "techno", "techno music", "techno's", "technomusic"],
-    "trance": ["trance", "trance music", "trance's", "trancemusic", "trancing"],
-    "funk": ["funk", "funk's", "funkier", "funkiest", "funkmusic", "funky"],
-    "disco": ["disco", "disco music", "disco's", "discomusic", "discos"]
+    "r&b": ["r&b","rnb","r and b","r n b","rhythm and blues","rhythm & blues","r&b's","rnb's","r & b"],
+    "neo soul": ["neo soul","neosoul","neo-soul"],
+    "hip hop": ["hip hop","hip-hop","hiphop","hip-hop music","hip hop's","hip-hops"],
+    "lo-fi": ["lo-fi","lofi","lo fi"],
+    "trap": ["trap","trap music"],
+    "pop": ["pop","pop music","pop's","popmusic","pops"],
+    "indie pop": ["indie pop","indiepop","indie-pop"],
+    "synth pop": ["synth pop","synthpop","synth-pop"],
+    "electropop": ["electropop","electro-pop","electro pop"],
+    "dream pop": ["dream pop","dreampop"],
+    "art pop": ["art pop","art-pop"],
+    "k-pop": ["k-pop","kpop","k pop"],
+    "j-pop": ["j-pop","jpop","j pop"],
+    "c-pop": ["c-pop","cpop","c pop"],
+    "rock and roll": ["rock & roll","rock n roll","rock and roll","rock'n'roll"],
+    "alternative rock": ["alternative rock","alt rock","alt-rock"],
+    "indie rock": ["indie rock","indierock","indie-rock"],
+    "hard rock": ["hard rock","hardrock","hard rock music","hard rock's","hard-rock","hardrockmusic"],
+    "soft rock": ["soft rock","softrock"],
+    "psychedelic rock": ["psychedelic rock","psych rock"],
+    "pop punk": ["pop punk","poppunk","pop-punk"],
+    "post-punk": ["post-punk","postpunk","post punk"],
+    "new wave": ["new wave","newwave"],
+    "post-rock": ["post-rock","postrock","post rock"],
+    "shoegaze": ["shoegaze","shoe gaze","nu gaze","nu-gaze","nugaze"],
+    "idm": ["idm","intelligent dance music"],
+    "metal": ["metal","heavy metal","heavymetal","metal rock","metal's","metalhead","metallic","metalmusic","metals"],
+    "death metal": ["death metal","deathmetal"],
+    "black metal": ["black metal","blackmetal"],
+    "metalcore": ["metalcore","metal core"],
+    "nu metal": ["nu metal","numetal","nu-metal"],
+    "power metal": ["power metal","powermetal"],
+    "thrash metal": ["thrash metal","thrashmetal"],
+    "doom metal": ["doom metal","doommetal"],
+    "electronic": ["electro","electro's","electronic","electronic music","electronic's","electronica","electronicas","electronico","electronics","electronik","eletronic"],
+    "edm": ["edm","electronic dance","electronic dance music","edm music","edm's","edmmusic"],
+    "house": ["house","house music","house's","housemusic"],
+    "deep house": ["deep house","deephouse"],
+    "tech house": ["tech house","techhouse"],
+    "drum and bass": ["drum and bass","dnb","d&b","drum n bass","drum & bass","drumandbass","drum'n'bass"],
+    "psytrance": ["psytrance","psy trance","psy-trance"],
+    "synthwave": ["synthwave","synth wave","synth-wave","synthwave's"],
+    "vaporwave": ["vaporwave","vapor wave"],
+    "chillwave": ["chillwave","chill wave"],
+    "latin": ["latin","latin music","latin's","latina","latinas","latinmusic","latino","latinos"],
+    "reggaeton": ["reggaeton","reggaetón","regueton"],
+    "bossa nova": ["bossa nova","bossanova"],
+    "salsa": ["salsa","salsa music"],
+    "singer-songwriter": ["singer-songwriter","singer songwriter","singer/songwriter"],
+    "nu disco": ["nu disco","nu-disco","nudisco"],
+    "soundtrack": ["soundtrack","ost","original soundtrack"],
+    "country": ["country","country music","country's","countrymusic"],
+    "classical": ["classic","classical","classical music","classical's","classics","orchestra","orchestral","orchestral music","orchestras"],
+    "world": ["world","world music"],
+    "christian": ["christian","christian music"],
+    "christian pop": ["christian pop","ccm","deep ccm"],
+    "rock": ["rock","rock music","rock's","rockmusic","rocks","rockin","rockin'"],
+    "indie": ["indie","indie's","indiemusic","indies"],
+    "dance": ["dance","dance music","dance's","dances","dancey"],
+    "jazz": ["jazz","jazz's","jazzier","jazziest","jazzmusic","jazzy"],
+    "folk": ["folk","folk music","folk's","folkie","folkier","folklore","folkmusic","folksy"],
+    "rap": ["rap","rap music","raps","rapper","rappers"],
+    "punk": ["punk","punk music","punk's","punkmusic","punks","punky"],
+    "soul": ["soul","soul music","soul's","soulful","soulmusic","souly"],
+    "blues": ["blues","blues music","blues'","bluesier","bluesiest","bluesmusic","bluesy"],
+    "alternative": ["alt","alternative","alternative music","alternative's","alternativemusic","alternatives"],
+    "instrumental": ["instrumental","instrumental's","instrumentalmusic","instrumentals","no vocals"],
+    "experimental": ["experiment","experimental","experimental's","experimentalmusic","experiments"],
+    "ambient": ["ambient","ambient's","ambients","atmospheric"],
+    "acoustic": ["acoustic","acoustic's","acousticmusic","acoustics"],
+    "reggae": ["reggae","reggae music","reggae's","reggaemusic"],
+    "techno": ["tech","techno","techno music","techno's","technomusic"],
+    "trance": ["trance","trance music","trance's","trancemusic","trancing"],
+    "funk": ["funk","funk's","funkier","funkiest","funkmusic","funky"],
+    "disco": ["disco","disco music","disco's","discomusic","discos"],
+    "afrobeats": ["afrobeats","afro beats"],
+    "baroque": ["baroque","baroque's"],
+    "drone": ["drone","drone's","dronemusic","drones"],
+    "dubstep": ["dubstep","dub step","dub-step","dubstep's","dubstepmusic"],
+    "epic": ["epic","epic music","epic's","epicmusic"],
+    "epiccore": ["epiccore","epic core","epic-core"],
+    "future bass": ["future bass","future bass's","futurebass","futurebassmusic"],
+    "jungle": ["jungle","jungle's","junglemusic","jungles"],
+    "new age": ["new age","new age music","new-age","new-age music","newage","newagemusic"],
+    "piano": ["piano","piano music"],
+    "pop rock": ["pop rock","pop rock music","pop rock's","pop-rock","poprock","poprockmusic"],
+    "swing": ["swing","swing music"],
+    "trip hop": ["trip hop","trip hop's","trip hops","triphop","triphopmusic"],
+    "a cappella": ["a cappella","acappella"],
+    "folk rock": ["folk rock","folk-rock"]
   };
 
   const GENRE_ALIAS_MAP = new Map();
@@ -14902,7 +16346,7 @@
   const MOOD_DESCRIPTORS_SET = new Set([
       "chill", "relaxing", "calm", "love", "fast", "slow", "soothing", "peaceful", "tranquil",
       "mellow", "soft", "smooth", "quiet", "energetic", "sad", "upbeat", "pump up", "romantic",
-      "moody", "melancholy", "nostalgia", "emotional", "cozy", "gentle", "happy", "rain",
+      "moody", "melancholy", "nostalgia", "emotional", "cozy", "gentle", "happy", "rain", "Children's Music",
       "motivation", "angst", "aggressive", "atmospheric", "nature", "angry", "dark", "classy",
       "funny", "spooky", "epic", "sensual", "ethereal", "beats", "ibiza", "club", "gaming", "spiritual", "soulful"
   ]);
@@ -14934,6 +16378,9 @@
           Object.values(GENRE_MAPPINGS).forEach(variants => {
               variants.forEach(v => isWhitelistedGenre_MappedSet.add(normalizeGenre(v)));
           });
+          if (typeof GENRE_ALIASES_RAW !== "undefined") {
+              Object.keys(GENRE_ALIASES_RAW).forEach(g => isWhitelistedGenre_MappedSet.add(normalizeGenre(g)));
+          }
       }
       
       const isMapped = isWhitelistedGenre_MappedSet.has(normalizedTag);
@@ -15488,6 +16935,18 @@
 
           if (showGenreTags && showGenreTagsNowPlaying) {
               fetchDisplayGenres(mockTrackObj).catch(() => {});
+          }
+
+          if (genreBlacklistEnabled && genreBlacklistRules.length > 0) {
+              evaluateTrackAgainstBlacklist(mockTrackObj, true).then(match => {
+                  if (match) {
+                      prefetchBlacklistMap.set(nextTrack.uri, match);
+                      if (prefetchBlacklistMap.size > 50) {
+                          const firstKey = prefetchBlacklistMap.keys().next().value;
+                          prefetchBlacklistMap.delete(firstKey);
+                      }
+                  }
+              }).catch(() => {});
           }
 
           const titleNeeded = nowPlayingConfig.title?.enabled;
@@ -19697,6 +21156,8 @@ shadowRoot.innerHTML = `
     const isrc = track.isrc || track.track?.external_ids?.isrc || track.external_ids?.isrc || null;
     const isExplicit = Boolean(track.explicit || track.track?.explicit);
     const rawPlays = track.playCount ?? track.playcount ?? null;
+    const isPlayable = track.isPlayable !== false && track.is_playable !== false && track.playability?.playable !== false && track.track?.isPlayable !== false && track.track?.is_playable !== false && track.track?.playability?.playable !== false;
+    const isUnavailable = !isLocal && !isPlayable;
 
     return {
       title,
@@ -19712,7 +21173,8 @@ shadowRoot.innerHTML = `
       needsCoverLoad,
       isrc,
       isExplicit,
-      rawPlays
+      rawPlays,
+      isUnavailable
     };
   }
 
@@ -20454,6 +21916,10 @@ shadowRoot.innerHTML = `
       const isAltA = altVersionRegex.test(rawTitleA) ? 1 : 0;
       const isAltB = altVersionRegex.test(rawTitleB) ? 1 : 0;
       if (isAltA !== isAltB) return isAltA - isAltB;
+
+      const likedRankA = getTrackLikedRank(a);
+      const likedRankB = getTrackLikedRank(b);
+      if (likedRankA !== likedRankB) return likedRankB - likedRankA;
 
       const isExpA = a.explicit || (a.track && a.track.explicit) ? 1 : 0;
       const isExpB = b.explicit || (b.track && b.track.explicit) ? 1 : 0;
@@ -21324,6 +22790,12 @@ shadowRoot.innerHTML = `
                 .kept-badge { background-color: rgba(30, 215, 96, 0.15); color: #1ED760; border: 1px solid rgba(30, 215, 96, 0.3); }
                 .dup-badge { background-color: rgba(241, 94, 108, 0.15); color: #f15e6c; border: 1px solid rgba(241, 94, 108, 0.3); }
                 .reason-badge { background-color: rgba(232, 160, 57, 0.15); color: #e8a039; border: 1px solid rgba(232, 160, 57, 0.3); }
+                .unavailable-badge { background-color: rgba(255, 255, 255, 0.06); color: #888888; border: 1px solid rgba(255, 255, 255, 0.15); }
+                .sp-da-like-btn { background: transparent; border: none; padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                .sp-da-like-btn.is-unliked { opacity: 0; }
+                .track-row:hover .sp-da-like-btn.is-unliked, .sp-da-like-btn.is-unliked:focus-visible { opacity: 1; }
+                .sp-da-like-btn:hover svg { filter: brightness(1.1); }
+                .sp-da-like-btn.is-unliked:hover svg { fill: #ffffff !important; }
                 .isrc-tag { font-size: 10px; color: #888888; background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px; cursor: pointer; transition: all 0.15s ease; }
                 .isrc-tag:hover { color: #ffffff; background: rgba(255,255,255,0.12); }
                 .isrc-tag.isrc-match { background-color: rgba(30, 215, 96, 0.15); color: #1ed760; border: 1px solid rgba(30, 215, 96, 0.3); font-weight: 600; }
@@ -21357,7 +22829,7 @@ shadowRoot.innerHTML = `
                 .sp-checkbox-hitbox { display: flex; align-items: center; justify-content: center; width: 62px; height: 48px; margin: -7px -10px -7px -36px; padding: 0 10px 0 36px; box-sizing: border-box; cursor: pointer; flex-shrink: 0; z-index: 1; }
                 .sp-checkbox { accent-color: #1db954; width: 16px; height: 16px; cursor: pointer; margin: 0; flex-shrink: 0; }
                 .date-col { width: 55px; text-align: center; color: #b3b3b3; font-size: 12.5px; font-variant-numeric: tabular-nums; cursor: help; }
-                .plays-col { width: 85px; text-align: center; color: #b3b3b3; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .plays-col { width: 55px; text-align: center; color: #b3b3b3; font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
                 .plays-col.plays-match { color: #1ed760; font-weight: 600; }
                 .plays-col.plays-diff { color: #e8a039; }
                 .dur-col { width: 50px; text-align: center; position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -21400,8 +22872,8 @@ shadowRoot.innerHTML = `
                             <input type="checkbox" id="selectAllCheckbox" class="sp-checkbox">
                             <span id="selectAllLabel" style="color: #ffffff; font-size: 13px; font-weight: 500;">Select All</span>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0;">
-                            <span style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 85px; text-align: center;">Plays</span>
+                        <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0; padding-left: 6px;">
+                            <span style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 55px; text-align: center;">Plays</span>
                             <span style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 55px; text-align: center;">Year</span>
                             <span style="font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; width: 50px; text-align: center;">Duration</span>
                             <div style="width: 95px;"></div>
@@ -21595,7 +23067,7 @@ shadowRoot.innerHTML = `
         };
 
         const renderTrackRowHtml = (track, isKept, familyId, candidateType, keeperTrack = null) => {
-            const { title, artist, album, uri, isrc, isExplicit, durationMs, duration, rawPlays, isLocal, coverUrl, needsCoverLoad, trackLink, albumLink } = getAuditTrackInfo(track);
+            const { title, artist, album, uri, isrc, isExplicit, durationMs, duration, rawPlays, isLocal, coverUrl, needsCoverLoad, trackLink, albumLink, isUnavailable } = getAuditTrackInfo(track);
             const keeperIsrc = keeperTrack ? (keeperTrack.isrc || keeperTrack.track?.external_ids?.isrc || keeperTrack.external_ids?.isrc || null) : null;
             const plays = formatPlayCount(rawPlays, "rounded_abbreviated");
             
@@ -21618,6 +23090,9 @@ shadowRoot.innerHTML = `
                 badgeHtml = `<span class="track-badge dup-badge" style="opacity: 0.85;" title="Managed in Exact Duplicates tab">Exact Duplicate</span>`;
             } else if (track._possibleReason) {
                 badgeHtml = `<span class="track-badge reason-badge">${escapeHtml(track._possibleReason)}</span>`;
+            }
+            if (isUnavailable) {
+                badgeHtml += `<span class="track-badge unavailable-badge" title="This track is unavailable in your region">Unavailable</span>`;
             }
 
             const targetFamily = familiesState.find(f => f.familyId === familyId);
@@ -21688,6 +23163,22 @@ shadowRoot.innerHTML = `
 
             const isGhost = candidateType === 'ghost';
             const showSwapBtn = !isKept && !isGhost && (candidateType === 'confident' || (targetFamily && targetFamily.confidentDuplicates.length === 0));
+
+            const isDirectlyLiked = isTrackDirectlyLiked(track);
+            const isIsrcLiked = !isDirectlyLiked && Boolean(isrc && activeLikedIsrcSet?.has(isrc));
+            const likeTitle = isDirectlyLiked 
+                ? "In your Liked Songs (Click to unlike)" 
+                : (isIsrcLiked 
+                    ? "Another version in Liked Songs (Same ISRC) • Click to like" 
+                    : "Add to Liked Songs");
+            const likeSvg = isDirectlyLiked 
+                ? LIKE_BUTTON_ICON_LIKED 
+                : (isIsrcLiked ? LIKE_BUTTON_ICON_ISRC_LIKED : LIKE_BUTTON_ICON_NOT_LIKED);
+            const likeColor = isDirectlyLiked || isIsrcLiked ? "#1ed760" : "#b3b3b3";
+            const likeTransform = (isIsrcLiked && !isDirectlyLiked) ? "transform: translateY(1px);" : "";
+            const likeBtnClass = isDirectlyLiked ? "is-liked" : (isIsrcLiked ? "is-isrc-liked" : "is-unliked");
+            const likeBtnHtml = `<button class="sp-da-like-btn ${likeBtnClass}" data-track-uri="${uri}" data-isrc="${isrc || ''}" title="${likeTitle}"><svg role="img" height="16" width="16" viewBox="0 0 16 16" style="fill: ${likeColor}; ${likeTransform}">${likeSvg}</svg></button>`;
+
             return `
                 <div class="track-row ${isKept ? 'kept-row' : (isGhost ? 'candidate-row ghost-row' : 'candidate-row')} ${isCurrent ? 'is-active' : ''} ${showPause ? 'is-playing' : ''}" data-instance-id="${track._instanceId}" data-family-id="${familyId}" data-track-uri="${uri}">
                     <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex-grow: 1;">
@@ -21712,8 +23203,11 @@ shadowRoot.innerHTML = `
                             ${badgeHtml}
                             ${isrcBadgeHtml}
                         </div>
+                        <div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: 2px; margin-right: 6px;">
+                            ${likeBtnHtml}
+                        </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0; padding-left: 12px;">
+                    <div style="display: flex; align-items: center; gap: 16px; flex-shrink: 0; padding-left: 6px;">
                         <span class="plays-col ${playsClass}" title="${playsTitle}">${plays}</span>
                         <span class="date-col" title="${hoverDateTitle}">${year}</span>
                         <div class="dur-col" title="${durTitle}">
@@ -21721,7 +23215,7 @@ shadowRoot.innerHTML = `
                             ${durDiffHtml}
                         </div>
                         <div style="display: flex; gap: 6px; justify-content: flex-end; width: 95px; align-items: center;">
-                            ${!isKept ? (isGhost ? `<button class="jump-exact-btn" data-family-id="${familyId}" title="View in Exact Duplicates tab to manage or keep this version">Manage</button>` : (showSwapBtn ? `<button class="swap-btn" data-instance-id="${track._instanceId}" data-family-id="${familyId}">Keep ⇄</button>` : '')) : ''}
+                            ${!isKept ? (isGhost ? `<button class="jump-exact-btn" data-family-id="${familyId}" title="View in Exact Duplicates tab to manage or keep this version">Manage</button>` : (showSwapBtn ? `<button class="swap-btn" data-instance-id="${track._instanceId}" data-family-id="${familyId}" title="Make this track the kept version">Keep ⇄</button>` : '')) : ''}
                             <button class="row-menu-btn" data-title="${escapeHtml(title)}" data-artist="${escapeHtml(artist)}" data-track-link="${trackLink}" data-album-link="${albumLink}" title="More options">${threeDotsSvg}</button>
                         </div>
                     </div>
@@ -21992,6 +23486,7 @@ shadowRoot.innerHTML = `
 
         listContainer.addEventListener("mousedown", (e) => {
             if (e.button !== 0) return;
+            if (e.target.closest(".sp-da-like-btn")) return;
             const hitbox = e.target.closest(".sp-checkbox-hitbox");
             if (!hitbox) return;
             const cb = hitbox.querySelector(".row-checkbox");
@@ -22045,6 +23540,78 @@ shadowRoot.innerHTML = `
             }
             if (!e.target.closest(".row-menu-btn")) closeRowMenu();
             auditBackupController.close();
+
+            const likeBtn = e.target.closest(".sp-da-like-btn");
+            if (likeBtn) {
+                e.stopPropagation();
+                closeRowMenu();
+                const uri = likeBtn.dataset.trackUri;
+                if (!uri) return;
+                const row = likeBtn.closest(".track-row");
+                const familyId = row?.dataset.familyId;
+                const isCurrentlyLiked = isTrackDirectlyLiked({ uri });
+
+                (async () => {
+                    try {
+                        if (isCurrentlyLiked) {
+                            await Spicetify.Platform.LibraryAPI.remove({ uris: [uri] });
+                            if (activeLikedUriSet) {
+                                activeLikedUriSet.delete(uri);
+                                const id = uri.startsWith("spotify:track:") ? uri.split(":")[2] : uri;
+                                activeLikedUriSet.delete(id);
+                            }
+                            if (typeof likeButton_removeLikedTrack === 'function') {
+                                const id = uri.startsWith("spotify:local:") ? uri : uri.replace("spotify:track:", "");
+                                likeButton_removeLikedTrack(id);
+                            }
+                            const trackIsrc = likeBtn.dataset.isrc;
+                            if (trackIsrc && activeLikedIsrcSet) {
+                                const hasOther = typeof likeButton_likedTracksByIsrc !== 'undefined' && likeButton_likedTracksByIsrc?.has(trackIsrc) && (likeButton_likedTracksByIsrc.get(trackIsrc)?.size || 0) > 0;
+                                if (!hasOther) {
+                                    activeLikedIsrcSet.delete(trackIsrc);
+                                }
+                            }
+                        } else {
+                            await Spicetify.Platform.LibraryAPI.add({ uris: [uri] });
+                            if (activeLikedUriSet) {
+                                activeLikedUriSet.add(uri);
+                                const id = uri.startsWith("spotify:track:") ? uri.split(":")[2] : uri;
+                                activeLikedUriSet.add(id);
+                            }
+                            const trackIsrc = likeBtn.dataset.isrc;
+                            if (trackIsrc && activeLikedIsrcSet) {
+                                activeLikedIsrcSet.add(trackIsrc);
+                            }
+                            if (typeof likeButton_addLikedTrack === 'function') {
+                                const id = uri.startsWith("spotify:local:") ? uri : uri.replace("spotify:track:", "");
+                                likeButton_addLikedTrack({ trackId: id, uri, name: row?.querySelector(".track-title")?.textContent?.trim() || "Track", albumId: null, albumName: "Album", isrc: trackIsrc || null, artistIds: [] }, true);
+                            }
+                        }
+                        invalidateLikedSongsCache();
+                        try {
+                            if (typeof Spicetify.Platform?.PlaylistAPI?.resync === 'function') {
+                                Spicetify.Platform.PlaylistAPI.resync("spotify:user:@me:collection");
+                            }
+                        } catch (_) {}
+                        document.dispatchEvent(new CustomEvent('likeButton_likedTracksChange'));
+
+                        if (familyId && renderedCardsMap.has(familyId)) {
+                            const oldCardEl = renderedCardsMap.get(familyId);
+                            if (oldCardEl) {
+                                oldCardEl.querySelectorAll("img.track-cover[data-track-uri]").forEach(img => imgObserver.unobserve(img));
+                                oldCardEl.remove();
+                                renderedCardsMap.delete(familyId);
+                            }
+                            renderVisibleWindow();
+                        }
+                        showNotification(isCurrentlyLiked ? "Removed from Liked Songs." : "Added to Liked Songs.");
+                    } catch (err) {
+                        showNotification(isCurrentlyLiked ? "Failed to unlike track." : "Failed to like track.", true);
+                    }
+                })();
+                return;
+            }
+
             const coverBtn = e.target.closest(".track-cover-btn");
             if (coverBtn) {
                 const uri = coverBtn.dataset.trackUri;
@@ -22173,7 +23740,7 @@ shadowRoot.innerHTML = `
         });
 
         listContainer.addEventListener("dblclick", (e) => {
-            if (e.target.closest(".sp-checkbox-hitbox, .row-checkbox, .swap-btn, .jump-exact-btn, .row-menu-btn, .isrc-tag")) return;
+            if (e.target.closest(".sp-checkbox-hitbox, .row-checkbox, .swap-btn, .jump-exact-btn, .row-menu-btn, .isrc-tag, .sp-da-like-btn")) return;
             const row = e.target.closest(".track-row");
             if (!row) return;
             e.preventDefault();
@@ -32011,252 +33578,252 @@ shadowRoot.innerHTML = `
   }
 
   const GENRE_MAPPINGS = {
-    "acoustic": ["acoustic", "acoustic's", "acousticmusic", "acoustics"],
-    "adult standards": ["adult standards", "crooner", "easy listening", "lounge", "standards", "traditional pop"],
-    "afro r&b": ["afro r&b", "afro soul", "afrofuturism", "bongo flava"],
-    "afro-funk": ["afro-funk", "highlife", "nigerian hip hop"],
-    "afrobeats": ["afro beats", "afrobeats", "afropop", "afroswing", "azonto", "azontobeats", "coupé-décalé", "ghanaian pop", "makossa", "nigerian pop"],
-    "alternative": ["alt", "alternative", "alternative's", "alternativemusic", "alternatives"],
-    "alternative metal": ["alternative metal", "funk metal", "industrial metal", "nu metal", "rap metal"],
-    "alternative rock": ["alternative rock", "britpop", "modern alternative rock", "modern rock", "permanent wave"],
-    "amapiano": ["afro piano", "amapiano", "sgija"],
-    "ambient": ["ambient", "ambient's", "ambients", "atmospheric"],
-    "art pop": ["art pop", "baroque pop", "chamber pop", "experimental pop"],
-    "art rock": ["art rock", "experimental rock", "rock in opposition", "zeuhl"],
-    "bachata": ["bachata", "bachata dominicana"],
-    "bebop": ["bebop", "bop", "post-bop"],
-    "black metal": ["atmospheric black metal", "black metal", "blackgaze", "cascadian black metal", "melodic black metal", "metal noir quebecois", "pagan black metal", "raw black metal", "symphonic black metal", "viking metal"],
-    "blues": ["blues", "blues'", "bluesier", "bluesiest", "bluesmusic", "bluesy", "jazz blues", "punk blues"],
-    "blues rock": ["blues rock", "british blues", "electric blues"],
-    "bollywood pop": ["bollywood pop", "classic bollywood", "desi pop", "filmi", "kollywood", "modern bollywood", "mollywood", "sandalwood", "tollywood", "bollywood"],
-    "bossa nova": ["bossa nova", "bossa nova cover", "bossa nova jazz", "samba-jazz"],
-    "breakbeat": ["big beat", "breakbeat", "breaks", "funky breaks", "nu skool breaks"],
-    "c-pop": ["c-pop", "cantopop", "chinese pop", "mandopop"],
-    "chillwave": ["chillwave", "hypnagogic pop"],
-    "christian hip hop": ["christian hip hop", "christian trap", "gospel rap"],
-    "christian metal": ["christian death metal", "christian metal", "christian metalcore", "unblack metal"],
-    "christian rock": ["christian alternative rock", "christian rock", "christian indie"],
-    "city pop": ["city pop", "japanese funk", "japanese soul", "shibuya-kei"],
-    "classic rock": ["album rock", "aor", "classic rock", "soft rock", "southern rock"],
-    "classical": ["baroque", "baroque's", "classic", "classical", "classical music", "classical's", "classics", "minimalism", "orchestra", "orchestral", "orchestral music", "orchestras", "symphonic", "symphonies", "symphony"],
-    "conscious hip hop": ["conscious hip hop", "political hip hop", "rap conscient", "underground hip hop"],
-    "contemporary r&b": ["contemporary r and b", "contemporary r&b", "contemporary rhythm and blues", "contemporary rnb", "modern r&b", "modern rnb"],
-    "corridos tumbados": ["corridos alternativos", "corridos belicos", "corridos tumbados", "sad sierreno", "sierre", "sierreno"],
-    "country": ["country", "country & western music", "country blues", "country music", "country's", "countrymusic"],
-    "cumbia": ["cumbia", "cumbia 420", "cumbia andina mexicana", "cumbia boliviana", "cumbia chilena", "cumbia del sureste", "cumbia lagunera", "cumbia peruana", "cumbia pop", "cumbia ranchera", "cumbia salvadorena", "cumbia santafesina", "cumbia sonidera", "cumbia uruguaya", "cumbia villera", "nu-cumbia", "tecnocumbia"],
-    "dance": ["dance", "dance's", "dances", "dancey"],
-    "dark wave": ["coldwave", "dark wave", "gothic", "gothic americana", "neoclassical darkwave"],
-    "death metal": ["brutal death metal", "cavernous death metal", "death 'n' roll", "death metal", "deathgrind", "florida death metal", "gothenburg metal", "melodic death metal", "swedish melodeath", "technical death metal"],
-    "dembow": ["dembow", "dembow dominicano"],
-    "disco": ["disco", "disco music", "disco's", "discomusic", "discos", "future funk"],
-    "doom metal": ["doom metal", "drone metal", "epic doom", "funeral doom", "psychedelic doom", "sludge metal"],
-    "dream pop": ["dream pop", "ethereal", "ethereal wave"],
-    "drill": ["aussie drill", "bronx drill", "brooklyn drill", "chicago drill", "classical drill", "drill", "drill chileno", "drill espanol", "drill francais", "drill tuga", "florida drill", "german drill", "melodic drill", "ny drill", "uk drill"],
-    "drone": ["drone", "drone's", "dronemusic", "drones"],
-    "drum and bass": ["d&b", "dnb", "drum & bass", "drum and bass", "drum n bass", "drumandbass", "Drum'n'bass"],
-    "dubstep": ["brostep", "chillstep", "drumstep", "dub step", "dub-step", "dubstep", "dubstep's", "dubstepmusic"],
-    "east coast hip hop": ["boom bap", "east coast hip hop", "hardcore hip hop"],
-    "edm": ["edm", "edm music", "edm's", "edmmusic", "electronic dance", "electronic dance music"],
-    "electro swing": ["electro swing", "swing house"],
-    "electronic": ["electro", "electro's", "electronic", "electronic music", "electronic's", "electronica", "electronicas", "electronico", "electronics", "electronik", "eletronic"],
-    "electropop": ["electro pop", "electro-pop", "electronic pop", "electropop"],
-    "emo": ["emo", "emo rap", "emo trap", "emocore", "midwest emo", "pop emo"],
-    "epic": ["epic", "epic music", "epic's", "epicmusic"],
-    "epiccore": ["epic core", "epic-core", "epiccore"],
-    "eurodance": ["bubblegum dance", "eurodance", "hands up", "hi-nrg", "italo dance"],
-    "experimental": ["experiment", "experimental", "experimental electronic", "experimental's", "experimentalmusic", "experiments"],
-    "folk": ["folk", "folk's", "folk-pop", "folkie", "folkier", "folklore", "folkmusic", "folksy", "contemporary folk"],
-    "forro": ["baiao", "forro", "forro de favela", "forro tradicional", "piseiro", "xote"],
-    "french hip hop": ["french hip hop", "pop urbaine", "r&b francais", "rap francais", "rap marseille"],
-    "french pop": ["chanson", "french indie pop", "french pop", "french synthpop", "nouvelle chanson francaise", "variete francaise", "yeye"],
-    "funk": ["funk", "funk's", "funkier", "funkiest", "funkmusic", "funky"],
-    "funk carioca": ["brega funk", "funk 150 bpm", "funk carioca", "funk mandelao", "funk mtg", "funk ostentacao", "funk paulista", "funk viral", "mega funk", "rave funk"],
-    "future bass": ["future bass", "future bass's", "futurebass", "futurebassmusic"],
-    "gangster rap": ["chicano rap", "crunk", "dirty south rap", "g funk", "gangster rap", "hardcore hip hop", "houston rap", "memphis hip hop", "southern hip hop", "west coast rap"],
-    "garage rock": ["freakbeat", "garage psych", "garage rock", "garage rock revival", "protopunk", "punk blues"],
-    "german hip hop": ["frauenrap", "german alternative rap", "german cloud rap", "german hip hop", "german underground rap", "oldschool deutschrap"],
-    "german pop": ["deutschrock", "german pop", "neue deutsche welle", "ostrock"],
-    "glam rock": ["glam metal", "glam punk", "glam rock", "hard glam", "sleaze rock"],
-    "global christian": ["african gospel", "celtic worship", "global christian", "latin christian", "reggae cristao", "tagalog worship", "world worship"],
-    "gospel": ["black gospel", "brazilian gospel", "choir", "gospel", "gospel r&b", "gospel soul", "naija worship", "southern gospel", "spiritual", "spirituals"],
-    "gothic metal": ["gothic", "gothic metal", "gothic symphonic metal", "metal gotico"],
-    "gothic rock": ["dark post-punk", "deathrock", "gothabilly", "gothic", "gothic rock"],
-    "grime": ["eskibeat", "grime", "sublow", "uk grime"],
-    "grunge": ["grunge", "grungegaze", "post-grunge", "seattle sound"],
-    "hard bop": ["bebop", "bop", "hard bop", "post-bop", "soul jazz"],
-    "hard rock": ["glam metal", "hard rock", "hard rock music", "hard rock's", "hard-rock", "hardrock", "hardrockmusic"],
-    "hardcore punk": ["crust punk", "d-beat", "hardcore punk", "melodic hardcore", "nyhc", "powerviolence", "skate punk", "straight edge", "youth crew"],
-    "hardstyle": ["euphoric hardstyle", "gabber", "hard dance", "hardcore", "hardcore techno", "hardstyle", "jumpstyle", "rawstyle", "uptempo hardcore"],
-    "heavy metal": ["hard rock", "heavy metal", "nwobhm", "traditional heavy metal"],
-    "hip hop": ["hip hop", "hip hop's", "hip-hop", "hip-hop music", "hip-hops", "hiphop"],
-    "house": ["deep house", "electro house", "house", "house music", "house's", "housemusic"],
-    "idm": ["ambient idm", "braindance", "drill and bass", "fluxwork", "glitch", "glitch hop", "idm", "intelligent dance music", "wonky"],
-    "indie": ["indie", "indie's", "indiemusic", "indies"],
-    "indie folk": ["chamber folk", "folk-pop", "freak folk", "indie anthem-folk", "indie folk", "new americana", "stomp and holler"],
-    "indie pop": ["alt pop", "alternative pop", "bedroom pop", "indie pop", "indie poptimism", "shimmer pop", "twee pop"],
-    "indietronica": ["indie psych-pop", "indietronica", "metropopolis"],
-    "industrial": ["aggrotech", "ebm", "electro-industrial", "industrial", "industrial rock", "martial industrial", "power noise", "industrial metal"],
-    "instrumental": ["instrumental", "instrumental's", "instrumentalmusic", "instrumentals", "no vocals"],
-    "italian pop": ["classic italian pop", "italian adult pop", "italian indie pop", "italian pop", "italian pop rock", "pop virale italiano"],
-    "j-pop": ["anime", "j-division", "j-idol", "j-pop", "j-pop boy group", "j-pop girl group", "j-rap", "japanese teen pop", "kayokyoku", "vocaloid", "japanese electropop"],
-    "j-rock": ["j-metal", "j-poprock", "j-rock"],
-    "jazz": ["jazz", "jazz's", "jazzier", "jazziest", "jazzmusic", "jazzy"],
-    "jazz rap": ["abstract hip hop", "jazz hop", "jazz rap"],
-    "jungle": ["jungle", "jungle's", "junglemusic", "jungles"],
-    "k-ballad": ["k-ballad", "k-pop ballad"],
-    "k-pop": ["korean pop", "kpop"],
-    "k-rock": ["k-indie", "k-rock", "korean indie rock"],
-    "latin": ["latin", "latin's", "latina", "latinas", "latinmusic", "latino", "latinos"],
-    "latin trap": ["trap argentino", "trap boricua", "trap chileno", "trap colombiano", "trap latino", "trap mexicano", "trap venezolano"],
-    "lofi": ["chill beats", "chillhop", "lo fi", "lo-fi", "lo-fi beats", "lo-fi chill", "lo-fi cover", "lo-fi jazzhop", "lo-fi sleep", "lo-fi study", "lofi", "sad lo-fi"],
-    "medieval": ["early music", "gregorian chant", "medieval", "renaissance"],
-    "metal": ["metal", "metal rock", "metal's", "metalhead", "metallic", "metalmusic", "metals"],
-    "metalcore": ["chaotic hardcore", "deathcore", "electronicore", "mathcore", "melodic metalcore", "metalcore", "nintendocore", "progressive metalcore"],
-    "mpb": ["jovem guarda", "mpb", "nova mpb", "pop folk", "tropicalia", "velha guarda", "violao"],
-    "new age": ["new age", "new age music", "new-age", "new-age music", "newage", "newagemusic"],
-    "new wave": ["new romantic", "new wave", "new wave pop", "sophisti-pop"],
-    "nu jazz": ["broken beat", "future jazz", "jazztronica", "nu jazz"],
-    "old school hip hop": ["golden age hip hop", "old school hip hop"],
-    "opera": ["arias", "libretto", "opera", "operatic"],
-    "pagode": ["pagode", "pagode baiano", "pagode novo", "partido alto", "samba de roda"],
-    "persian pop": ["farsi pop", "iranian pop", "persian pop"],
-    "persian rock": ["iranian metal", "iranian rock", "persian metal", "persian rock"],
-    "persian traditional": ["classical persian", "iranian traditional", "persian traditional", "sonati"],
-    "phonk": ["aggressive phonk", "cowbell", "drift phonk", "gym phonk", "memphis phonk", "phonk"],
-    "piano": ["classical piano", "piano", "piano cover", "piano music", "solo piano"],
-    "pop": ["alt pop", "bubblegum pop", "dance pop", "folk-pop", "pop", "pop music", "pop's", "popmusic", "pops"],
-    "pop punk": ["anthem emo", "easycore", "neon pop punk", "pop punk", "socal pop punk"],
-    "pop rap": ["commercial rap", "mainstream rap", "melodic rap", "pop rap", "radio rap", "rap pop"],
-    "pop rock": ["britpop", "pop rock", "pop rock music", "pop rock's", "pop-rock", "poprock", "poprockmusic", "power pop"],
-    "post-hardcore": ["post-hardcore", "swancore"],
-    "post-punk": ["dance-punk", "minimal synth", "new rave", "no wave", "post-punk", "uk post-punk"],
-    "power metal": ["epic metal", "fantasy metal", "melodic power metal", "power metal"],
-    "progressive rock": ["canterbury scene", "crossover prog", "krautrock", "neo-prog", "progressive rock", "symphonic rock"],
-    "psychedelic rock": ["acid rock", "neo-psychedelic", "psychedelic pop", "psychedelic rock", "raga rock", "space rock"],
-    "punjabi pop": ["bhangra", "desi hip hop", "punjabi pop"],
-    "punk": ["punk", "punk's", "punkmusic", "punks", "punky"],
-    "r&b": ["neo soul", "r & b", "r and b", "r&b", "r&b's", "rhythm & blues", "rhythm and blues", "rnb", "rnb's", "trap soul"],
-    "rap": ["rap", "rapper", "rappers", "raps"],
-    "reggae": ["reggae", "reggae music", "reggae's", "reggaemusic", "roots reggae"],
-    "reggaeton": ["dembow", "neoperreo", "perreo", "pop reggaeton", "reggaeton", "reggaeton chileno", "reggaeton colombiano", "reggaeton flow", "reggaeton mexicano"],
-    "regional mexican": ["banda", "banda sinaloense", "corrido", "grupera", "mariachi", "musica mexicana", "norte", "norteno", "norteno-sax", "ranchera", "regional mexican", "tejano"],
-    "rock": ["power pop", "rock", "rock music", "rock's", "rockin", "rockin'", "rockmusic", "rocks"],
-    "salsa": ["boogaloo", "modern salsa", "salsa", "salsa choke", "salsa colombiana", "salsa cubana", "salsa puertorriquena", "salsa urbana", "salsa venezolana", "timba"],
-    "samba": ["samba", "samba paulista", "samba-enredo", "samba-rock"],
-    "scandinavian pop": ["classic swedish pop", "danish pop", "dansband", "finnish pop", "iskelma", "norwegian pop", "scandipop", "swedish pop"],
-    "sertanejo": ["agronejo", "sertanejo", "sertanejo pop", "sertanejo tradicional", "sertanejo universitario"],
-    "singer-songwriter": ["acoustic pop", "cantautor", "canzone d'autore", "gen z singer-songwriter", "liedermacher", "lilith", "neo mellow", "singer-songwriter"],
-    "soul": ["motown", "neo soul", "soul", "soul funk", "soul music", "soul's", "soulful", "soulmusic", "souly"],
-    "soundtrack": ["film music", "film score", "game music", "game score", "movie music", "original motion picture soundtrack", "original score", "original soundtrack", "ost", "score", "soundtrack", "theme music", "tv music"],
-    "sufi music": ["ghazal", "indian instrumental", "qawwali", "sufi music"],
-    "swing": ["big band", "swing", "swing music"],
-    "symphonic metal": ["gothic symphonic metal", "symphonic metal", "symphonic power metal"],
-    "synthpop": ["electropop", "synth pop", "synth-pop", "synthpop", "neo-synthpop"],
-    "synthwave": ["futuresynth", "outrun", "retrowave", "synth wave", "synth-wave", "synthwave", "synthwave's"],
-    "techno": ["minimal techno", "tech", "techno", "techno music", "techno's", "technomusic"],
-    "trance": ["psytrance", "trance", "trance music", "trance's", "trancemusic", "trancing"],
-    "trap": ["atl trap", "cloud rap", "dark trap", "desi trap", "emo trap", "melodic rap", "plugg", "pluggnb", "rage rap", "sad rap", "trap", "trap brasileiro", "trap carioca", "trap queen", "trap soul", "viral rap"],
-    "trip hop": ["trip hop", "trip hop's", "trip hops", "triphop", "triphopmusic"],
+    "acoustic": ["acoustic"],
+    "adult standards": ["adult standards","crooner","easy listening","lounge","standards","traditional pop"],
+    "afro r&b": ["afro r&b","afro soul","afrofuturism","bongo flava"],
+    "afro-funk": ["afro-funk","highlife","nigerian hip hop"],
+    "afrobeats": ["afrobeats","afropop","afroswing","azonto","azontobeats","coupé-décalé","ghanaian pop","makossa","nigerian pop"],
+    "alternative": ["alternative"],
+    "alternative metal": ["alternative metal","funk metal","industrial metal","nu metal","rap metal"],
+    "alternative rock": ["alternative rock","britpop","modern alternative rock","modern rock","permanent wave"],
+    "amapiano": ["amapiano","afro piano","sgija"],
+    "ambient": ["ambient"],
+    "art pop": ["art pop","baroque pop","chamber pop","experimental pop"],
+    "art rock": ["art rock","experimental rock","rock in opposition","zeuhl"],
+    "bachata": ["bachata","bachata dominicana"],
+    "bebop": ["bebop","bop","post-bop"],
+    "black metal": ["black metal","atmospheric black metal","blackgaze","cascadian black metal","melodic black metal","metal noir quebecois","pagan black metal","raw black metal","symphonic black metal","viking metal"],
+    "blues": ["blues","jazz blues","punk blues"],
+    "blues rock": ["blues rock","british blues","electric blues"],
+    "bollywood pop": ["bollywood pop","classic bollywood","desi pop","filmi","kollywood","modern bollywood","mollywood","sandalwood","tollywood","bollywood"],
+    "bossa nova": ["bossa nova","bossa nova cover","bossa nova jazz","samba-jazz"],
+    "breakbeat": ["breakbeat","big beat","breaks","funky breaks","nu skool breaks"],
+    "c-pop": ["c-pop","cantopop","chinese pop","mandopop"],
+    "chillwave": ["chillwave","hypnagogic pop"],
+    "christian hip hop": ["christian hip hop","christian trap","gospel rap"],
+    "christian metal": ["christian metal","christian death metal","christian metalcore","unblack metal"],
+    "christian rock": ["christian rock","christian alternative rock","christian indie"],
+    "city pop": ["city pop","japanese funk","japanese soul","shibuya-kei"],
+    "classic rock": ["classic rock","album rock","aor","soft rock","southern rock"],
+    "classical": ["classical","baroque","minimalism","symphonic","symphonies","symphony"],
+    "conscious hip hop": ["conscious hip hop","political hip hop","rap conscient","underground hip hop"],
+    "contemporary r&b": ["contemporary r&b","contemporary r and b","contemporary rhythm and blues","contemporary rnb","modern r&b","modern rnb"],
+    "corridos tumbados": ["corridos tumbados","corridos alternativos","corridos belicos","sad sierreno","sierre","sierreno"],
+    "country": ["country","country & western music","country blues","country-pop"],
+    "cumbia": ["cumbia","cumbia 420","cumbia andina mexicana","cumbia boliviana","cumbia chilena","cumbia del sureste","cumbia lagunera","cumbia peruana","cumbia pop","cumbia ranchera","cumbia salvadorena","cumbia santafesina","cumbia sonidera","cumbia uruguaya","cumbia villera","nu-cumbia","tecnocumbia"],
+    "dance": ["dance"],
+    "dark wave": ["dark wave","coldwave","gothic","gothic americana","neoclassical darkwave"],
+    "death metal": ["death metal","brutal death metal","cavernous death metal","death 'n' roll","deathgrind","florida death metal","gothenburg metal","melodic death metal","swedish melodeath","technical death metal"],
+    "dembow": ["dembow","dembow dominicano"],
+    "disco": ["disco","future funk"],
+    "doom metal": ["doom metal","drone metal","epic doom","funeral doom","psychedelic doom","sludge metal"],
+    "dream pop": ["dream pop","ethereal","ethereal wave"],
+    "drill": ["drill","aussie drill","bronx drill","brooklyn drill","chicago drill","classical drill","drill chileno","drill espanol","drill francais","drill tuga","florida drill","german drill","melodic drill","ny drill","uk drill"],
+    "drone": ["drone"],
+    "drum and bass": ["drum and bass"],
+    "dubstep": ["dubstep","brostep","chillstep","drumstep"],
+    "east coast hip hop": ["east coast hip hop","boom bap","hardcore hip hop"],
+    "edm": ["edm"],
+    "electro swing": ["electro swing","swing house"],
+    "electronic": ["electronic"],
+    "electropop": ["electropop","electronic pop"],
+    "emo": ["emo","emo rap","emo trap","emocore","midwest emo","pop emo"],
+    "epic": ["epic"],
+    "epiccore": ["epiccore"],
+    "eurodance": ["eurodance","bubblegum dance","hands up","hi-nrg","italo dance"],
+    "experimental": ["experimental","experimental electronic"],
+    "folk": ["folk","folk-pop","contemporary folk"],
+    "forro": ["forro","baiao","forro de favela","forro tradicional","piseiro","xote"],
+    "french hip hop": ["french hip hop","pop urbaine","r&b francais","rap francais","rap marseille"],
+    "french pop": ["french pop","chanson","french indie pop","french synthpop","nouvelle chanson francaise","variete francaise","yeye"],
+    "funk": ["funk"],
+    "funk carioca": ["funk carioca","brega funk","funk 150 bpm","funk mandelao","funk mtg","funk ostentacao","funk paulista","funk viral","mega funk","rave funk"],
+    "future bass": ["future bass"],
+    "gangster rap": ["gangster rap","chicano rap","crunk","dirty south rap","g funk","hardcore hip hop","houston rap","memphis hip hop","southern hip hop","west coast rap"],
+    "garage rock": ["garage rock","freakbeat","garage psych","garage rock revival","protopunk","punk blues"],
+    "german hip hop": ["german hip hop","frauenrap","german alternative rap","german cloud rap","german underground rap","oldschool deutschrap"],
+    "german pop": ["german pop","deutschrock","neue deutsche welle","ostrock"],
+    "glam rock": ["glam rock","glam metal","glam punk","hard glam","sleaze rock"],
+    "global christian": ["global christian","african gospel","celtic worship","latin christian","reggae cristao","tagalog worship","world worship"],
+    "gospel": ["gospel","black gospel","brazilian gospel","choir","gospel r&b","gospel soul","naija worship","southern gospel","spiritual","spirituals"],
+    "gothic metal": ["gothic metal","gothic","gothic symphonic metal","metal gotico"],
+    "gothic rock": ["gothic rock","dark post-punk","deathrock","gothabilly","gothic"],
+    "grime": ["grime","eskibeat","sublow","uk grime"],
+    "grunge": ["grunge","grungegaze","post-grunge","seattle sound"],
+    "hard bop": ["hard bop","bebop","bop","post-bop","soul jazz"],
+    "hard rock": ["hard rock","glam metal"],
+    "hardcore punk": ["hardcore punk","crust punk","d-beat","melodic hardcore","nyhc","powerviolence","skate punk","straight edge","youth crew"],
+    "hardstyle": ["hardstyle","euphoric hardstyle","gabber","hard dance","hardcore","hardcore techno","jumpstyle","rawstyle","uptempo hardcore"],
+    "heavy metal": ["heavy metal","hard rock","nwobhm","traditional heavy metal"],
+    "hip hop": ["hip hop"],
+    "house": ["house","deep house","electro house"],
+    "idm": ["idm","ambient idm","braindance","drill and bass","fluxwork","glitch","glitch hop","wonky"],
+    "indie": ["indie"],
+    "indie folk": ["indie folk","chamber folk","folk-pop","freak folk","indie anthem-folk","new americana","stomp and holler"],
+    "indie pop": ["indie pop","alt pop","alternative pop","bedroom pop","indie poptimism","shimmer pop","twee pop"],
+    "indietronica": ["indietronica","indie psych-pop","metropopolis"],
+    "industrial": ["industrial","aggrotech","ebm","electro-industrial","industrial rock","martial industrial","power noise","industrial metal"],
+    "instrumental": ["instrumental"],
+    "italian pop": ["italian pop","classic italian pop","italian adult pop","italian indie pop","italian pop rock","pop virale italiano"],
+    "j-pop": ["j-pop","anime","j-division","j-idol","j-pop boy group","j-pop girl group","j-rap","japanese teen pop","kayokyoku","vocaloid","japanese electropop"],
+    "j-rock": ["j-rock","j-metal","j-poprock"],
+    "jazz": ["jazz"],
+    "jazz rap": ["jazz rap","abstract hip hop","jazz hop"],
+    "jungle": ["jungle"],
+    "k-ballad": ["k-ballad","k-pop ballad"],
+    "k-pop": ["k-pop","korean pop"],
+    "k-rock": ["k-rock","k-indie","korean indie rock"],
+    "latin": ["latin"],
+    "latin trap": ["latin trap","trap argentino","trap boricua","trap chileno","trap colombiano","trap latino","trap mexicano","trap venezolano"],
+    "lofi": ["lofi","chill beats","chillhop","lo-fi beats","lo-fi chill","lo-fi cover","lo-fi jazzhop","lo-fi sleep","lo-fi study","sad lo-fi"],
+    "medieval": ["medieval","early music","gregorian chant","renaissance"],
+    "metal": ["metal"],
+    "metalcore": ["metalcore","chaotic hardcore","deathcore","electronicore","mathcore","melodic metalcore","nintendocore","progressive metalcore"],
+    "mpb": ["mpb","jovem guarda","nova mpb","pop folk","tropicalia","velha guarda","violao"],
+    "new age": ["new age"],
+    "new wave": ["new wave","new romantic","new wave pop","sophisti-pop"],
+    "nu jazz": ["nu jazz","broken beat","future jazz","jazztronica"],
+    "old school hip hop": ["old school hip hop","golden age hip hop"],
+    "opera": ["opera","arias","libretto","operatic"],
+    "pagode": ["pagode","pagode baiano","pagode novo","partido alto","samba de roda"],
+    "persian pop": ["persian pop","farsi pop","iranian pop"],
+    "persian rock": ["persian rock","iranian metal","iranian rock","persian metal"],
+    "persian traditional": ["persian traditional","classical persian","iranian traditional","sonati"],
+    "phonk": ["phonk","aggressive phonk","cowbell","drift phonk","gym phonk","memphis phonk"],
+    "piano": ["piano","classical piano","piano cover","solo piano"],
+    "pop": ["pop","alt pop","bubblegum pop","dance pop"],
+    "pop punk": ["pop punk","anthem emo","easycore","neon pop punk","socal pop punk"],
+    "pop rap": ["pop rap","commercial rap","mainstream rap","melodic rap","radio rap","rap pop"],
+    "pop rock": ["pop rock","britpop","power pop"],
+    "post-hardcore": ["post-hardcore","swancore"],
+    "post-punk": ["post-punk","dance-punk","minimal synth","new rave","no wave","uk post-punk"],
+    "power metal": ["power metal","epic metal","fantasy metal","melodic power metal"],
+    "progressive rock": ["progressive rock","canterbury scene","crossover prog","krautrock","neo-prog","symphonic rock"],
+    "psychedelic rock": ["psychedelic rock","acid rock","neo-psychedelic","psychedelic pop","raga rock","space rock"],
+    "punjabi pop": ["punjabi pop","bhangra","desi hip hop"],
+    "punk": ["punk"],
+    "r&b": ["r&b","neo soul","trap soul"],
+    "rap": ["rap"],
+    "reggae": ["reggae","roots reggae"],
+    "reggaeton": ["reggaeton","dembow","neoperreo","perreo","pop reggaeton","reggaeton chileno","reggaeton colombiano","reggaeton flow","reggaeton mexicano"],
+    "regional mexican": ["regional mexican","banda","banda sinaloense","corrido","grupera","mariachi","musica mexicana","norte","norteno","norteno-sax","ranchera","tejano"],
+    "rock": ["rock","power pop"],
+    "salsa": ["salsa","boogaloo","modern salsa","salsa choke","salsa colombiana","salsa cubana","salsa puertorriquena","salsa urbana","salsa venezolana","timba"],
+    "samba": ["samba","samba paulista","samba-enredo","samba-rock"],
+    "scandinavian pop": ["scandinavian pop","classic swedish pop","danish pop","dansband","finnish pop","iskelma","norwegian pop","scandipop","swedish pop"],
+    "sertanejo": ["sertanejo","agronejo","sertanejo pop","sertanejo tradicional","sertanejo universitario"],
+    "singer-songwriter": ["singer-songwriter","acoustic pop","cantautor","canzone d'autore","gen z singer-songwriter","liedermacher","lilith","neo mellow"],
+    "soul": ["soul","motown","neo soul","soul funk"],
+    "soundtrack": ["soundtrack","film music","film score","game music","game score","movie music","original motion picture soundtrack","original score","score","theme music","tv music"],
+    "sufi music": ["sufi music","ghazal","indian instrumental","qawwali"],
+    "swing": ["swing","big band"],
+    "symphonic metal": ["symphonic metal","gothic symphonic metal","symphonic power metal"],
+    "synthpop": ["synthpop","electropop","neo-synthpop"],
+    "synthwave": ["synthwave","futuresynth","outrun","retrowave"],
+    "techno": ["techno","minimal techno"],
+    "trance": ["trance","psytrance"],
+    "trap": ["trap","atl trap","cloud rap","dark trap","desi trap","emo trap","melodic rap","plugg","pluggnb","rage rap","sad rap","trap brasileiro","trap carioca","trap queen","trap soul","viral rap"],
+    "trip hop": ["trip hop"],
     "turkish folk": ["turkish folk"],
-    "turkish pop": ["arabesk", "turkish pop"],
-    "turkish rock": ["anadolu rock", "turkish alternative", "turkish psych", "turkish rock"],
-    "uk garage": ["2-step", "bassline", "future garage", "garage", "speed garage", "uk garage"],
-    "vaporwave": ["broken transmission", "future funk", "mallsoft", "slushwave", "utopian virtual", "vapor trap", "vaporwave"],
-    "vgm": ["anime game", "anime score", "gamecore", "indie game soundtrack", "japanese vgm", "nintendocore", "otacore", "rhythm game", "scorecore", "vgm", "vgm remix", "video game music"],
-    "vocal jazz": ["crooner", "jazz singing", "lounge music", "vocal jazz"],
-    "west coast hip hop": ["g funk", "g-funk", "west coast hip hop", "west coast rap"],
-    "christian pop": ["christian pop", "ccm", "deep ccm", "christian music"],
-    "worship": ["worship", "worship pop", "pop worship", "anthem worship", "praise", "adoracao", "louvor", "devotional"],
-    "arabic pop": ["arabic pop", "dabke", "egyptian pop", "iraqi pop", "khaliji", "lebanese pop", "maghreb pop", "raï", "shaabi", "arabic hip hop"],
-    "balkan": ["balkan brass", "chalga", "manele", "tallava", "turbo-folk", "yugoslav rock"],
-    "bluegrass": ["bluegrass", "jamgrass", "old-time", "progressive bluegrass"],
-    "bolero": ["bolero", "bolero cubano", "bolero mexicano"],
-    "celtic": ["celtic", "celtic punk", "celtic rock", "irish folk", "scottish folk", "traditional irish"],
-    "dangdut": ["campursari", "dangdut", "dangdut koplo"],
-    "flamenco": ["flamenco", "flamenco pop", "nuevo flamenco", "rumba", "rumba catalana"],
-    "indonesian pop": ["indo pop", "indonesian indie", "indonesian pop", "pop minang"],
-    "kizomba": ["ghetto zouk", "kizomba", "semba", "tarraxinha", "zouk"],
-    "merengue": ["mambo", "merengue", "merengue tipico", "tecno-merengue"],
-    "rockabilly": ["neo-rockabilly", "psychobilly", "rockabilly"],
-    "schlager": ["discofox", "german schlager", "partyschlager", "schlager", "volksmusik"],
-    "ska": ["rocksteady", "ska", "ska punk", "traditional ska", "two-tone"],
-    "soukous": ["congolese rumba", "ndombolo", "soukous"],
-    "tango": ["neotango", "tango", "tango cancion"],
-    "thai pop": ["luk thung", "mor lam", "t-pop", "thai indie", "thai pop", "thai rock"],
-    "vietnamese pop": ["v-pop", "vietnamese hip hop", "vietnamese pop", "vinahouse"],
-    "dancehall": ["dancehall", "dancehall queen", "ragga"],
-    "dub": ["dub", "dub poetry", "reggae dub"],
-    "folk metal": ["celtic metal", "folk metal", "medieval metal", "pagan metal"],
-    "highlife": ["burger highlife", "highlife", "igbo highlife"],
-    "math rock": ["math pop", "math rock", "midwest math rock"],
-    "opm": ["opm", "pinoy indie", "pinoy pop", "pinoy rock", "vispop"],
-    "post-rock": ["instrumental post-rock", "post-rock", "post-metal"],
-    "russian pop": ["russian dance", "russian hip hop", "russian pop", "russian rock"],
-    "soca": ["calypso", "chutney", "soca"],
-    "vallenato": ["vallenato", "vallenato moderno"],
-    "americana": ["americana", "alternative country", "country rock", "roots rock", "southern gothic", "stomp and holler"],
-    "chiptune": ["8-bit", "bitpop", "chiptune"],
-    "enka": ["enka", "japanese traditional"],
-    "fado": ["fado", "fado de coimbra", "fado de lisboa", "portuguese folk"],
-    "grindcore": ["cybergrind", "goregrind", "grindcore", "pornogrind"],
-    "klezmer": ["klezmer", "yiddish folk"],
-    "latin jazz": ["afro-cuban jazz", "latin jazz"],
-    "polka": ["polka", "slovenian folk"],
-    "trot": ["trot", "korean traditional"],
-    "zydeco": ["cajun", "louisiana blues", "swamp pop", "zydeco"],
-    "afro house": ["afro house", "gqom", "kuduro", "south african house", "3-step", "afro house angolano"],
-    "doo-wop": ["doo-wop", "rhythm and blues", "street corner harmony"],
-    "french house": ["filter house", "french house", "french touch"],
-    "noise": ["harsh noise", "japanoise", "noise", "noise rock", "power electronics"],
-    "progressive metal": ["djent", "math metal", "progressive metal", "progressive metalcore"],
-    "show tunes": ["broadway", "hollywood", "musical", "musicals", "show tunes", "theatre", "west end"],
-    "thrash metal": ["crossover thrash", "speed metal", "teutonic thrash metal", "thrash metal", "trash metal"],
-    "tropical house": ["tropical house", "sax house", "deep tropical house"],
-    "children's music": ["children's music", "disney", "kids", "kindermusik", "nursery rhymes"],
-    "lullaby": ["lullaby", "baby sleep", "music box"],
-    "club": ["baltimore club", "jersey club", "philly club"],
-    "comedy": ["comedy", "comedy rock", "parody", "stand-up", "stand-up comedy"],
-    "dungeon synth": ["dungeon synth", "fantasy synth"],
+    "turkish pop": ["turkish pop","arabesk"],
+    "turkish rock": ["turkish rock","anadolu rock","turkish alternative","turkish psych"],
+    "uk garage": ["uk garage","2-step","bassline","future garage","garage","speed garage"],
+    "vaporwave": ["vaporwave","broken transmission","future funk","mallsoft","slushwave","utopian virtual","vapor trap"],
+    "vgm": ["vgm","anime game","anime score","gamecore","indie game soundtrack","japanese vgm","nintendocore","otacore","rhythm game","scorecore","vgm remix","video game music"],
+    "vocal jazz": ["vocal jazz","crooner","jazz singing","lounge music"],
+    "west coast hip hop": ["west coast hip hop","g funk","g-funk","west coast rap"],
+    "christian pop": ["christian pop","christian music"],
+    "worship": ["worship","worship pop","pop worship","anthem worship","praise","adoracao","louvor","devotional"],
+    "arabic pop": ["arabic pop","dabke","egyptian pop","iraqi pop","khaliji","lebanese pop","maghreb pop","raï","shaabi","arabic hip hop"],
+    "balkan": ["balkan","balkan brass","chalga","manele","tallava","turbo-folk","yugoslav rock"],
+    "bluegrass": ["bluegrass","jamgrass","old-time","progressive bluegrass"],
+    "bolero": ["bolero","bolero cubano","bolero mexicano"],
+    "celtic": ["celtic","celtic punk","celtic rock","irish folk","scottish folk","traditional irish"],
+    "dangdut": ["dangdut","campursari","dangdut koplo"],
+    "flamenco": ["flamenco","flamenco pop","nuevo flamenco","rumba","rumba catalana"],
+    "indonesian pop": ["indonesian pop","indo pop","indonesian indie","pop minang"],
+    "kizomba": ["kizomba","ghetto zouk","semba","tarraxinha","zouk"],
+    "merengue": ["merengue","mambo","merengue tipico","tecno-merengue"],
+    "rockabilly": ["rockabilly","neo-rockabilly","psychobilly"],
+    "schlager": ["schlager","discofox","german schlager","partyschlager","volksmusik"],
+    "ska": ["ska","rocksteady","ska punk","traditional ska","two-tone"],
+    "soukous": ["soukous","congolese rumba","ndombolo"],
+    "tango": ["tango","neotango","tango cancion"],
+    "thai pop": ["thai pop","luk thung","mor lam","t-pop","thai indie","thai rock"],
+    "vietnamese pop": ["vietnamese pop","v-pop","vietnamese hip hop","vinahouse"],
+    "dancehall": ["dancehall","dancehall queen","ragga"],
+    "dub": ["dub","dub poetry","reggae dub"],
+    "folk metal": ["folk metal","celtic metal","medieval metal","pagan metal"],
+    "highlife": ["highlife","burger highlife","igbo highlife"],
+    "math rock": ["math rock","math pop","midwest math rock"],
+    "opm": ["opm","pinoy indie","pinoy pop","pinoy rock","vispop"],
+    "post-rock": ["post-rock","instrumental post-rock","post-metal"],
+    "russian pop": ["russian pop","russian dance","russian hip hop","russian rock"],
+    "soca": ["soca","calypso","chutney"],
+    "vallenato": ["vallenato","vallenato moderno"],
+    "americana": ["americana","alternative country","country rock","roots rock","southern gothic","stomp and holler"],
+    "chiptune": ["chiptune","8-bit","bitpop"],
+    "enka": ["enka","japanese traditional"],
+    "fado": ["fado","fado de coimbra","fado de lisboa","portuguese folk"],
+    "grindcore": ["grindcore","cybergrind","goregrind","pornogrind"],
+    "klezmer": ["klezmer","yiddish folk"],
+    "latin jazz": ["latin jazz","afro-cuban jazz"],
+    "polka": ["polka","slovenian folk"],
+    "trot": ["trot","korean traditional"],
+    "zydeco": ["zydeco","cajun","louisiana blues","swamp pop"],
+    "afro house": ["afro house","gqom","kuduro","south african house","3-step","afro house angolano"],
+    "doo-wop": ["doo-wop","rhythm and blues","street corner harmony"],
+    "french house": ["french house","filter house","french touch"],
+    "noise": ["noise","harsh noise","japanoise","noise rock","power electronics"],
+    "progressive metal": ["progressive metal","djent","math metal","progressive metalcore"],
+    "show tunes": ["show tunes","broadway","hollywood","musical","musicals","theatre","west end"],
+    "thrash metal": ["thrash metal","crossover thrash","speed metal","teutonic thrash metal","trash metal"],
+    "tropical house": ["tropical house","sax house","deep tropical house"],
+    "children's music": ["children's music","disney","kids","kindermusik","nursery rhymes"],
+    "lullaby": ["lullaby","baby sleep","music box"],
+    "club": ["club","baltimore club","jersey club","philly club"],
+    "comedy": ["comedy","comedy rock","parody","stand-up","stand-up comedy"],
+    "dungeon synth": ["dungeon synth","fantasy synth"],
     "eurovision": ["eurovision"],
-    "kawaii metal": ["kawaii metal", "idol metal", "cute metal"],
-    "moombahton": ["moombahton", "moombahcore"],
-    "nightcore": ["nightcore", "sped up"],
-    "christmas": ["christmas", "christmas pop", "holiday", "carols"],
-    "jazz fusion": ["jazz fusion", "fusion", "jazz funk", "jazz rock", "electric jazz"],
-    "psytrance": ["psytrance", "psychedelic trance", "goa trance", "dark psytrance", "forest psy"],
-    "sea shanties": ["sea shanty", "shanty", "maritime"],
-    "surf rock": ["surf rock", "surf music", "instrumental surf"],
-    "a cappella": ["a cappella", "acappella", "barbershop", "vocal group"],
-    "bass house": ["bass house", "g-house", "wobble house"],
-    "boogie": ["boogie", "post-disco"],
-    "choral": ["choral", "choir", "chamber choir", "gregorian chant"],
-    "dark ambient": ["dark ambient", "ritual ambient", "isolationism"],
-    "neofolk": ["neofolk", "dark folk", "apocalyptic folk"],
-    "new jack swing": ["new jack swing", "90s r&b"],
-    "smooth jazz": ["smooth jazz", "contemporary jazz"],
-    "breakcore": ["breakcore", "lolicore", "mashcore"],
-    "dark cabaret": ["dark cabaret", "cabaret", "circus rock"],
-    "eurobeat": ["eurobeat", "para para"],
-    "shoegaze": ["shoegaze", "nu gaze", "chillgaze", "blackgaze"],
-    "stoner rock": ["stoner rock", "stoner metal", "desert rock", "heavy psych"],
-    "visual kei": ["visual kei", "angura kei", "eroguro"],
+    "kawaii metal": ["kawaii metal","idol metal","cute metal"],
+    "moombahton": ["moombahton","moombahcore"],
+    "nightcore": ["nightcore","sped up"],
+    "christmas": ["christmas","christmas pop","holiday","carols"],
+    "jazz fusion": ["jazz fusion","fusion","jazz funk","jazz rock","electric jazz"],
+    "psytrance": ["psytrance","psychedelic trance","goa trance","dark psytrance","forest psy"],
+    "sea shanties": ["sea shanties","sea shanty","shanty","maritime"],
+    "surf rock": ["surf rock","surf music","instrumental surf"],
+    "a cappella": ["a cappella","barbershop","vocal group"],
+    "bass house": ["bass house","g-house","wobble house"],
+    "boogie": ["boogie","post-disco"],
+    "choral": ["choral","choir","chamber choir","gregorian chant"],
+    "dark ambient": ["dark ambient","ritual ambient","isolationism"],
+    "neofolk": ["neofolk","dark folk","apocalyptic folk"],
+    "new jack swing": ["new jack swing","90s r&b"],
+    "smooth jazz": ["smooth jazz","contemporary jazz"],
+    "breakcore": ["breakcore","lolicore","mashcore"],
+    "dark cabaret": ["dark cabaret","cabaret","circus rock"],
+    "eurobeat": ["eurobeat","para para"],
+    "shoegaze": ["shoegaze","chillgaze","blackgaze"],
+    "stoner rock": ["stoner rock","stoner metal","desert rock","heavy psych"],
+    "visual kei": ["visual kei","angura kei","eroguro"],
     "yacht rock": ["yacht rock"],
     "acid jazz": ["acid jazz"],
-    "downtempo": ["downtempo", "chillout"],
-    "happy hardcore": ["happy hardcore", "uk hardcore", "makina"],
+    "downtempo": ["downtempo","chillout"],
+    "happy hardcore": ["happy hardcore","uk hardcore","makina"],
     "riot grrrl": ["riot grrrl"],
-    "rock and roll": ["rock & roll", "rock and roll", "rock n roll", "rock n' roll"],
-    "oldies": ["oldies", "golden oldies", "classic oldies"],
-    "screamo": ["screamo", "skramz", "emoviolence"],
-    "slowcore": ["slowcore", "sadcore"],
-    "axé": ["axé", "samba-reggae"],
-    "hyperpop": ["hyperpop", "digicore", "glitchcore", "dariacore"],
-    "ballad": ["ballad", "power ballad", "piano ballad", "pop ballad", "sentimental"],
-    "alternative hip hop": ["alternative hip hop", "alt hip hop"],
-    "folk rock": ["folk rock", "folk-rock"],
+    "rock and roll": ["rock and roll","rock n' roll"],
+    "oldies": ["oldies","golden oldies","classic oldies"],
+    "screamo": ["screamo","skramz","emoviolence"],
+    "slowcore": ["slowcore","sadcore"],
+    "axé": ["axé","samba-reggae"],
+    "hyperpop": ["hyperpop","digicore","glitchcore","dariacore"],
+    "ballad": ["ballad","power ballad","piano ballad","pop ballad","sentimental"],
+    "alternative hip hop": ["alternative hip hop","alt hip hop"],
+    "folk rock": ["folk rock"],
     "funk rock": ["funk rock"],
-    "indie rock": ["indie rock", "indierock", "indie-rock"],
-    "rock en espanol": ["rock en espa", "rock en espanol", "latin rock", "rock latino"],
+    "indie rock": ["indie rock"],
+    "rock en espanol": ["rock en espanol","rock en espa","latin rock","rock latino"]
   };
 
   const COUNTRY_MAPPINGS = {
@@ -34735,6 +36302,26 @@ shadowRoot.innerHTML = `
         VARIANT_TO_MAIN_GENRE_MAP[normalizedMainKey] = [canonicalMainGenre];
     }
   });
+
+  if (typeof GENRE_ALIASES_RAW !== "undefined") {
+    for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+      const canonicalKey = getNormalizedGenreKey(canonical);
+      const targetMains = VARIANT_TO_MAIN_GENRE_MAP[canonicalKey] || (GENRE_MAPPINGS[canonical] ? [canonical] : null);
+      if (targetMains && targetMains.length > 0) {
+        aliases.forEach(alias => {
+          const aliasKey = getNormalizedGenreKey(alias);
+          if (!VARIANT_TO_MAIN_GENRE_MAP[aliasKey]) {
+            VARIANT_TO_MAIN_GENRE_MAP[aliasKey] = [];
+          }
+          targetMains.forEach(mainGenre => {
+            if (!VARIANT_TO_MAIN_GENRE_MAP[aliasKey].includes(mainGenre)) {
+              VARIANT_TO_MAIN_GENRE_MAP[aliasKey].push(mainGenre);
+            }
+          });
+        });
+      }
+    }
+  }
   
   Object.entries(COUNTRY_MAPPINGS).forEach(([mainCountry, variants]) => {
     variants.forEach(variant => {
@@ -34773,7 +36360,8 @@ shadowRoot.innerHTML = `
             return;
         }
 
-        const normalizedKey = getNormalizedGenreKey(rawGenreName);
+        const normalizedGenre = normalizeGenre(rawGenreName);
+        const normalizedKey = getNormalizedGenreKey(normalizedGenre);
         
         if (VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey]) {
             const mainCountry = VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey];
@@ -34786,7 +36374,7 @@ shadowRoot.innerHTML = `
             });
         } 
         else {
-            mappedGenres.add(JSON.stringify({ name: lowerName, source: source }));
+            mappedGenres.add(JSON.stringify({ name: normalizedGenre || lowerName, source: source }));
         }
     });
 
@@ -35138,6 +36726,56 @@ shadowRoot.innerHTML = `
     })();
 
     return await activeLikedSongsPromise;
+  }
+
+  function invalidateLikedSongsCache() {
+    cachedLikedSongs = null;
+    cachedLikedSongsTimestamp = 0;
+    activeLikedSongsPromise = null;
+  }
+
+  async function ensureLikedSongsIndex() {
+    if (!activeLikedUriSet || (Date.now() - cachedLikedSongsTimestamp >= CACHE_EXPIRE_LIKED_SONGS)) {
+      const liked = await getLikedSongs();
+      activeLikedUriSet = new Set(liked.map(s => s.uri));
+      liked.forEach(s => {
+        if (s.uri?.startsWith("spotify:track:")) {
+          activeLikedUriSet.add(s.uri.split(":")[2]);
+        }
+      });
+      try {
+        activeLikedIsrcSet = await getLikedIsrcsSet(liked);
+      } catch (_) {
+        activeLikedIsrcSet = new Set();
+      }
+    }
+    if (typeof likeButton_likedTracksById !== 'undefined' && likeButton_likedTracksById?.size > 0) {
+      likeButton_likedTracksById.forEach((entry, id) => {
+        activeLikedUriSet.add(id);
+        if (entry.uri) activeLikedUriSet.add(entry.uri);
+        if (entry.isrc && activeLikedIsrcSet) activeLikedIsrcSet.add(entry.isrc);
+      });
+    }
+    return { likedUriSet: activeLikedUriSet, likedIsrcSet: activeLikedIsrcSet || new Set() };
+  }
+
+  function isTrackDirectlyLiked(track) {
+    if (!track) return false;
+    const uri = track.uri || (track.trackId ? `spotify:track:${track.trackId}` : null);
+    if (!uri) return false;
+    if (activeLikedUriSet?.has(uri)) return true;
+    const id = uri.startsWith("spotify:track:") ? uri.split(":")[2] : uri;
+    if (activeLikedUriSet?.has(id)) return true;
+    if (typeof likeButton_likedTracksById !== 'undefined' && likeButton_likedTracksById?.has(id)) return true;
+    return false;
+  }
+
+  function getTrackLikedRank(track) {
+    if (!track) return 0;
+    if (isTrackDirectlyLiked(track)) return 2;
+    const isrc = track.isrc || track.track?.external_ids?.isrc || track.external_ids?.isrc;
+    if (isrc && activeLikedIsrcSet?.has(isrc)) return 1;
+    return 0;
   }
     
   async function getLocalFilesTracks() {
@@ -45794,7 +47432,7 @@ shadowRoot.innerHTML = `
             const validForWave = tracksToSort.filter(t => t.features && t.features.energy != null);
             const others = tracksToSort.filter(t => !t.features || t.features.energy == null);
 
-            const sortedTracks = await energyWaveSort(validForWave, 'discovery', { anchorUris: anchorClusterSelectedUris });
+            const sortedTracks = await energyWaveSort(validForWave);
             const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
 
             const trackUris = finalTracks.map(track => track.uri);
@@ -46557,7 +48195,7 @@ shadowRoot.innerHTML = `
             const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
             const others = finalSelected.filter(t => !t.features || t.features.energy == null);
 
-            const sortedTracks = await energyWaveSort(validForWave, 'discovery', { anchorUris: anchorClusterSelectedUris });
+            const sortedTracks = await energyWaveSort(validForWave);
             const finalTracks = [...sortedTracks, ...others].slice(0, targetPlaylistCount);
             const trackUris = finalTracks.map(track => track.uri);
 
@@ -47244,7 +48882,7 @@ shadowRoot.innerHTML = `
             const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
             const others = finalSelected.filter(t => !t.features || t.features.energy == null);
 
-            const sortedTracks = await energyWaveSort(validForWave, 'discovery', { anchorUris: dominantPillarSelectedUris });
+            const sortedTracks = await energyWaveSort(validForWave);
             const finalTracks = [...sortedTracks, ...others].slice(0, targetPlaylistCount);
             const trackUris = finalTracks.map(track => track.uri);
 
@@ -48047,7 +49685,7 @@ shadowRoot.innerHTML = `
         const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
         const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
 
-        const sorted = await energyWaveSort(validForWave, 'discovery');
+        const sorted = await energyWaveSort(validForWave);
         finalTracks = [...sorted, ...others];
         
         const trackUris = finalTracks.map(t => t.uri);
@@ -48080,12 +49718,11 @@ shadowRoot.innerHTML = `
 
   async function scrapeLastFmObsessions(username) {
       try {
-          const gatewayUrlBase = GATEWAY_URL;
-          const baseUrl = `https://www.last.fm/user/${username}/obsessions`;
+          const getUrl = (p) => `${LFM_SHOUTBOX_GATEWAY_URL}?type=obsessions&user=${encodeURIComponent(username)}${p ? `&page=${p}` : ''}`;
           
           let response = null;
           for (let attempt = 1; attempt <= 3; attempt++) {
-              response = await fetch(`${gatewayUrlBase}${encodeURIComponent(baseUrl)}`);
+              response = await fetch(getUrl());
               if (response.ok) break;
               if (attempt < 3) await new Promise(r => setTimeout(r, 1000));
           }
@@ -48099,8 +49736,9 @@ shadowRoot.innerHTML = `
               const items = d.querySelectorAll('.obsession-history-item');
               return Array.from(items).map(item => {
                   const trackName = item.querySelector('.obsession-history-item-heading')?.textContent?.trim();
-                  const artistName = item.querySelector('.obsession-history-item-artist span a')?.textContent?.trim() || 
-                                     item.querySelector('.obsession-history-item-artist')?.textContent?.trim();
+                  let artistName = item.querySelector('.obsession-history-item-artist span a')?.textContent?.trim() || 
+                                   item.querySelector('.obsession-history-item-artist')?.textContent?.trim();
+                  if (artistName) artistName = artistName.replace(/^by\s+/i, '').trim();
                   
                   if (trackName && artistName) {
                       return { name: trackName, artist: { name: artistName } }; 
@@ -48128,9 +49766,8 @@ shadowRoot.innerHTML = `
               }
 
               const pagePromises = Array.from(pagesToFetch).map(async (pageNum) => {
-                  const pageUrl = `${baseUrl}?page=${pageNum}`;
                   try {
-                      const pRes = await fetch(`${gatewayUrlBase}${encodeURIComponent(pageUrl)}`);
+                      const pRes = await fetch(getUrl(pageNum));
                       if (pRes.ok) {
                           const pHtml = await pRes.text();
                           const pDoc = new DOMParser().parseFromString(pHtml, "text/html");
@@ -48430,137 +50067,193 @@ shadowRoot.innerHTML = `
     try {
         updateProgress("Neighbors...");
 
-        const targetUrl = `https://www.last.fm/user/${username}/neighbours`;
-        const gatewayUrl = `${GATEWAY_URL}${encodeURIComponent(targetUrl)}`;
-        
-        let candidates = [];
+        const gatewayUrl = `${LFM_SHOUTBOX_GATEWAY_URL}?type=neighbours&user=${encodeURIComponent(username)}`;
+        let parsedNeighbors = [];
         let scrapeErrorMsg = "";
-        
+
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
                 const response = await fetch(gatewayUrl);
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 
                 const htmlText = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlText, "text/html");
-                const neighborNodes = doc.querySelectorAll('.user-list-item .user-list-name a');
-                
-                candidates = Array.from(neighborNodes).map(node => ({
-                    name: node.textContent.trim()
-                }));
+                const doc = new DOMParser().parseFromString(htmlText, "text/html");
+                const itemNodes = doc.querySelectorAll('.user-list-item');
+
+                parsedNeighbors = Array.from(itemNodes).map(item => {
+                    const nameNode = item.querySelector('.user-list-name a');
+                    if (!nameNode) return null;
+                    const name = nameNode.textContent.trim();
+                    const sharedNodes = item.querySelectorAll('.user-list-shared-artists a');
+                    const sharedArtists = Array.from(sharedNodes).map(a => a.textContent.trim()).filter(Boolean);
+                    return { name, sharedArtists };
+                }).filter(Boolean);
+
                 scrapeErrorMsg = "";
                 break;
-            } catch (scrapeError) {
-                scrapeErrorMsg = scrapeError.message;
+            } catch (err) {
+                scrapeErrorMsg = err.message;
                 if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
             }
         }
 
-        if (scrapeErrorMsg) {
+        if (scrapeErrorMsg && parsedNeighbors.length === 0) {
             throw new Error(`Failed to scrape neighbors: ${scrapeErrorMsg}`);
         }
 
-        if (candidates.length === 0) {
-             throw new Error("No neighbors found. Last.fm might not have calculated them yet.");
+        if (parsedNeighbors.length === 0) {
+            throw new Error("No neighbors found. Last.fm might not have calculated them yet.");
         }
-            
-        candidates = shuffleArray(candidates);
-        const activeNeighbors = candidates.slice(0, 20);
 
-        if (activeNeighbors.length === 0) {
-            throw new Error("Could not find any neighbors.");
+        const TARGET_NEIGHBORS = 20;
+        let activeNeighbors = [];
+
+        if (parsedNeighbors.length <= TARGET_NEIGHBORS) {
+            activeNeighbors = parsedNeighbors;
+        } else {
+            const pool = shuffleArray([...parsedNeighbors]);
+            const coveredArtists = new Set();
+            const remainingPool = [];
+
+            for (const neighbor of pool) {
+                if (activeNeighbors.length >= TARGET_NEIGHBORS) break;
+                const newCount = neighbor.sharedArtists.filter(a => !coveredArtists.has(a.toLowerCase())).length;
+                if (newCount > 0) {
+                    activeNeighbors.push(neighbor);
+                    neighbor.sharedArtists.forEach(a => coveredArtists.add(a.toLowerCase()));
+                } else {
+                    remainingPool.push(neighbor);
+                }
+            }
+
+            while (activeNeighbors.length < TARGET_NEIGHBORS && remainingPool.length > 0) {
+                activeNeighbors.push(remainingPool.shift());
+            }
         }
 
         updateProgress("Scanning...");
-        const trackScoreMap = new Map();
-
-        const processTrack = (track, points, neighborName) => {
-            if (!track || !track.name || !track.artist) return;
-            const artistName = track.artist.name || track.artist['#text']; 
-            const trackName = track.name;
-            if (!artistName || !trackName) return;
-
-            const key = `${artistName.toLowerCase().trim()}|${trackName.toLowerCase().trim()}`;
-            
-            if (!trackScoreMap.has(key)) {
-                trackScoreMap.set(key, {
-                    artist: artistName,
-                    track: trackName,
-                    score: 0,
-                    neighbors: new Set()
-                });
-            }
-            
-            const entry = trackScoreMap.get(key);
-            entry.score += points;
-            entry.neighbors.add(neighborName);
-        };
-
+        const rawCandidateMap = new Map();
         let neighborIndex = 0;
+
         const neighborPromises = activeNeighbors.map(async (neighbor) => {
             const name = neighbor.name;
-            
-            const p1 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: name, period: '7day', limit: '20', format: 'json' }));
-            const p2 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: name, period: 'overall', limit: '20', format: 'json' }));
-            const p3 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.getlovedtracks', user: name, limit: '20', format: 'json' }));
-            
-            const p4 = scrapeLastFmObsessions(name).then(res => shuffleArray(res).slice(0, 20));
+            try {
+                const p1 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: name, period: '7day', limit: '30', format: 'json' }));
+                const p2 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.gettoptracks', user: name, period: '1month', limit: '25', format: 'json' }));
+                const p3 = fetchLfmWithGateway(new URLSearchParams({ method: 'user.getlovedtracks', user: name, limit: '20', format: 'json' }));
 
-            const [r1, r2, r3, obsessions] = await Promise.all([p1, p2, p3, p4]);
-            
-            const d1 = r1.ok ? await r1.json() : {};
-            const d2 = r2.ok ? await r2.json() : {};
-            const d3 = r3.ok ? await r3.json() : {};
+                const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+                const d1 = r1.ok ? await r1.json().catch(() => ({})) : {};
+                const d2 = r2.ok ? await r2.json().catch(() => ({})) : {};
+                const d3 = r3.ok ? await r3.json().catch(() => ({})) : {};
 
-            const tracks7day = d1.toptracks?.track || [];
-            const tracksOverall = d2.toptracks?.track || [];
-            const tracksLoved = d3.lovedtracks?.track || [];
+                const tracks7day = Array.isArray(d1.toptracks?.track) ? d1.toptracks.track : (d1.toptracks?.track ? [d1.toptracks.track] : []);
+                const tracks1month = Array.isArray(d2.toptracks?.track) ? d2.toptracks.track : (d2.toptracks?.track ? [d2.toptracks.track] : []);
+                const tracksLoved = Array.isArray(d3.lovedtracks?.track) ? d3.lovedtracks.track : (d3.lovedtracks?.track ? [d3.lovedtracks.track] : []);
 
-            (Array.isArray(tracks7day) ? tracks7day : []).forEach(t => processTrack(t, 15, name));
-            (Array.isArray(tracksOverall) ? tracksOverall : []).forEach(t => processTrack(t, 15, name));
-            (Array.isArray(tracksLoved) ? tracksLoved : []).forEach(t => processTrack(t, 20, name));
-            obsessions.forEach(t => processTrack(t, 25, name));
+                const neighborArtistCounts = new Map();
+                const neighborSeenTracks = new Set();
 
-            neighborIndex++;
-            updateProgress(`Scan ${Math.round((neighborIndex / activeNeighbors.length) * 100)}%`);
+                const addNeighborTrack = (t, periodType) => {
+                    if (!t || !t.name) return;
+                    const artistName = (t.artist?.name || t.artist?.['#text'] || '').trim();
+                    const trackName = t.name.trim();
+                    if (!artistName || !trackName) return;
+
+                    const artistKey = artistName.toLowerCase();
+                    const key = `${artistKey}|${trackName.toLowerCase()}`;
+
+                    if (!neighborSeenTracks.has(key)) {
+                        const currentArtCount = neighborArtistCounts.get(artistKey) || 0;
+                        if (currentArtCount >= 2) return;
+                        neighborArtistCounts.set(artistKey, currentArtCount + 1);
+                        neighborSeenTracks.add(key);
+                    }
+
+                    const playCount = parseInt(t.playcount, 10) || 1;
+
+                    let velocityPoints = 10;
+                    if (periodType === '7day') {
+                        if (playCount >= 2) {
+                            const cappedPlays = Math.min(playCount, 8);
+                            velocityPoints = 25 + (cappedPlays * 4);
+                        } else {
+                            velocityPoints = 12;
+                        }
+                    } else if (periodType === '1month') {
+                        velocityPoints = playCount >= 4 ? 18 : 10;
+                    } else if (periodType === 'loved') {
+                        velocityPoints = 15;
+                    }
+
+                    if (!rawCandidateMap.has(key)) {
+                        rawCandidateMap.set(key, {
+                            artist: artistName,
+                            track: trackName,
+                            rawScore: 0,
+                            neighbors: new Set(),
+                            hasRepeat: false
+                        });
+                    }
+
+                    const entry = rawCandidateMap.get(key);
+                    entry.rawScore += velocityPoints;
+                    entry.neighbors.add(name);
+                    if (periodType === '7day' && playCount >= 2) entry.hasRepeat = true;
+                };
+
+                tracks7day.forEach(t => addNeighborTrack(t, '7day'));
+                tracks1month.forEach(t => addNeighborTrack(t, '1month'));
+                tracksLoved.forEach(t => addNeighborTrack(t, 'loved'));
+            } catch (err) {
+                console.warn(`[Sort-Play] Skipped neighbor ${name} due to fetch error:`, err);
+            } finally {
+                neighborIndex++;
+                updateProgress(`Scan ${Math.round((neighborIndex / activeNeighbors.length) * 100)}%`);
+            }
         });
 
         await Promise.all(neighborPromises);
 
-        trackScoreMap.forEach(entry => {
+        rawCandidateMap.forEach(entry => {
             if (entry.neighbors.size > 1) {
-                entry.score = entry.score * 1.5;
+                entry.rawScore *= 1.35;
+            }
+            if (entry.hasRepeat) {
+                entry.rawScore *= 1.25;
             }
         });
 
-        const sortedRawCandidates = Array.from(trackScoreMap.values())
-            .sort((a, b) => b.score - a.score);
+        const sortedRawCandidates = Array.from(rawCandidateMap.values())
+            .sort((a, b) => b.rawScore - a.rawScore);
 
-        const finalCandidates = [];
-        const artistCounts = new Map();
-        const MAX_TRACKS_PER_ARTIST = 2;
-        const TARGET_CANDIDATE_COUNT = 150;
+        const TARGET_CANDIDATE_COUNT = 300;
+        const stage1Candidates = [];
+        const globalHarvestArtistCounts = new Map();
 
-        for (const candidate of sortedRawCandidates) {
-            if (finalCandidates.length >= TARGET_CANDIDATE_COUNT) break;
-
-            const artistKey = candidate.artist.toLowerCase().trim();
-            const currentCount = artistCounts.get(artistKey) || 0;
-
-            if (currentCount < MAX_TRACKS_PER_ARTIST) {
-                finalCandidates.push(candidate);
-                artistCounts.set(artistKey, currentCount + 1);
+        for (const c of sortedRawCandidates) {
+            if (stage1Candidates.length >= TARGET_CANDIDATE_COUNT) break;
+            const aKey = c.artist.toLowerCase();
+            const count = globalHarvestArtistCounts.get(aKey) || 0;
+            if (count < 3) {
+                stage1Candidates.push(c);
+                globalHarvestArtistCounts.set(aKey, count + 1);
             }
         }
 
         updateProgress("Resolving...");
-        
-        const mockLocalTracks = finalCandidates.map(c => ({
-            uri: "spotify:local:::::",
-            name: c.track,
-            artistName: c.artist
-        }));
+        const candidateMetaMap = new Map();
+        const mockLocalTracks = stage1Candidates.map((c, idx) => {
+            const uid = `nm_cand_${idx}`;
+            candidateMetaMap.set(uid, c);
+            candidateMetaMap.set(`${c.artist.toLowerCase()}|${c.track.toLowerCase()}`, c);
+            return {
+                uri: "spotify:local:::::",
+                uid: uid,
+                name: c.track,
+                artistName: c.artist
+            };
+        });
 
         const { convertedTracks: resolvedSpotifyTracks } = await convertLocalTracksToSpotify(
             mockLocalTracks,
@@ -48569,87 +50262,191 @@ shadowRoot.innerHTML = `
         );
 
         updateProgress("Verifying...");
-        const availableTracks = [];
-        for (const t of resolvedSpotifyTracks) {
-            if (await isTrackAvailable(t)) availableTracks.push(t);
+        const availabilityChecks = await Promise.all(resolvedSpotifyTracks.map(t => isTrackAvailable(t)));
+        const availableTracks = resolvedSpotifyTracks.filter((_, i) => availabilityChecks[i]);
+
+        const dedupedSpotifyTracks = [];
+        const seenSpotifyUris = new Map();
+
+        for (const track of availableTracks) {
+            const rawCand = candidateMetaMap.get(track.uid) || candidateMetaMap.get(`${(track.artists?.[0]?.name || track.artistName || "").toLowerCase()}|${(track.name || "").toLowerCase()}`);
+            track._rawCandidate = rawCand;
+
+            const cleanTitle = getCleanTitle(track.name || track.songTitle || "");
+            const primaryArt = (track.artists?.[0]?.name || track.artistName || "").toLowerCase().trim();
+            const titleArtKey = `${cleanTitle}|${primaryArt}`;
+
+            const existingTrack = seenSpotifyUris.get(track.uri) || seenSpotifyUris.get(titleArtKey);
+            if (existingTrack) {
+                if (existingTrack._rawCandidate && rawCand) {
+                    rawCand.neighbors.forEach(n => existingTrack._rawCandidate.neighbors.add(n));
+                    if (rawCand.hasRepeat) existingTrack._rawCandidate.hasRepeat = true;
+                }
+                continue;
+            }
+
+            seenSpotifyUris.set(track.uri, track);
+            seenSpotifyUris.set(titleArtKey, track);
+            dedupedSpotifyTracks.push(track);
         }
 
-        updateProgress("Filtering...");
-        const likedSongs = await getLikedSongs();
-        const likedUris = new Set(likedSongs.map(s => s.uri));
-        
-        const likedIsrcs = await getLikedIsrcsSet(likedSongs);
+        if (dedupedSpotifyTracks.length === 0) {
+            throw new Error("No available tracks found on Spotify from neighbor listening.");
+        }
 
-        const candidatesForMeta = availableTracks.map(t => ({
+        updateProgress("Enriching...");
+        const candidatesForMeta = dedupedSpotifyTracks.map(t => ({
             uri: t.uri,
             id: t.id || t.uri.split(':')[2],
-            track: t.track || t, 
+            track: t.track || t,
             name: t.name,
             is_playable: t.is_playable,
             explicit: t.explicit,
             artistName: t.artistName || (t.artists && t.artists[0]?.name) || "",
             allArtists: t.allArtists || (t.artists && t.artists.map(a => a.name).join(", ")),
-            artists: t.artists
+            artists: t.artists,
+            _rawCandidate: t._rawCandidate
         }));
 
         const candidatesWithMeta = await refreshTrackAlbumInfo(candidatesForMeta, () => {});
-        
-        const likedFilteredPool = candidatesWithMeta.filter(c => {
-            if (likedUris.has(c.uri)) return false;
-            const isrc = c.track?.external_ids?.isrc;
+        const trackIds = candidatesWithMeta.map(t => t.id).filter(Boolean);
+        const trackUris = candidatesWithMeta.map(t => t.uri).filter(Boolean);
+
+        updateProgress("Features...");
+        const [allAudioStats, nativeGenresMap] = await Promise.all([
+            getBatchTrackStats(trackIds, (p) => updateProgress(`Audio ${Math.floor(p)}%`)),
+            fetchNativeSpotifyTrackGenresBatch(trackUris)
+        ]);
+
+        candidatesWithMeta.forEach(t => {
+            t.features = allAudioStats[t.id] || null;
+            const rawGenres = nativeGenresMap.get(t.uri) || [];
+            const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
+            t.genres = mappedGenres.map(m => {
+                const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
+                return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
+            });
+        });
+
+        updateProgress("Taste Match...");
+        const tracksWithAllData = candidatesWithMeta.filter(t => t.features && t.features.energy != null);
+        const tracksMissingAudio = candidatesWithMeta.filter(t => !t.features || t.features.energy == null);
+
+        const scoredTracks = await evaluateTasteMatch(tracksWithAllData, updateProgress);
+        const allScoredTracks = [...scoredTracks, ...tracksMissingAudio.map(t => ({ ...t, calibratedTasteMatch: 50.0 }))];
+
+        allScoredTracks.forEach(t => {
+            const rawCand = t._rawCandidate || {};
+            const tasteMatch = t.calibratedTasteMatch ?? 50.0;
+            const neighborCount = rawCand.neighbors?.size || 1;
+            const hasRepeat = rawCand.hasRepeat || false;
+
+            let velocityMultiplier = 1.0;
+            if (hasRepeat) velocityMultiplier += 0.25;
+
+            const pop = t.popularity ?? 50;
+            if (neighborCount > 1) {
+                if (pop < 45) {
+                    velocityMultiplier += 0.35;
+                } else if (pop <= 60) {
+                    velocityMultiplier += 0.15;
+                }
+            }
+
+            t.compositeScore = tasteMatch * velocityMultiplier;
+        });
+
+        updateProgress("Filtering...");
+        const likedSongs = await getLikedSongs();
+        const likedUris = new Set(likedSongs.map(s => s.uri));
+        const likedIsrcs = await getLikedIsrcsSet(likedSongs);
+
+        const HISTORY_KEY = 'dedicated_neighborsMix_history';
+        let recentHistoryUris = await idb.get('jobHistory', HISTORY_KEY) || [];
+        if (!Array.isArray(recentHistoryUris)) recentHistoryUris = [];
+        const historySet = new Set(recentHistoryUris);
+
+        const unlikedPool = allScoredTracks.filter(t => {
+            if (likedUris.has(t.uri)) return false;
+            const isrc = t.track?.external_ids?.isrc || t.isrc;
             if (isrc && likedIsrcs.has(isrc)) return false;
             return true;
         });
 
         updateProgress("History...");
         const poolWithScrobbles = await handleScrobblesSorting(
-            likedFilteredPool, 
-            'personalScrobbles', 
-            (p) => { if(!isHeadless) mainButton.innerText = `History ${p}%`; }
+            unlikedPool,
+            'personalScrobbles',
+            (p) => { if (!isHeadless) mainButton.innerText = `History ${p}%`; }
         );
 
-        const unlistenedTracks = poolWithScrobbles.filter(t => !t.personalScrobbles || t.personalScrobbles === 0);
-        let finalPoolTracks = unlistenedTracks;
+        const tier1Clean = [];
+        const tier2History = [];
+        const tier3Listened = [];
 
-        if (unlistenedTracks.length < 50) {
-            const listenedTracks = poolWithScrobbles.filter(t => t.personalScrobbles > 0);
-            const needed = 50 - unlistenedTracks.length;
-            
-            const backfill = listenedTracks.slice(0, needed);
-            finalPoolTracks = [...unlistenedTracks, ...backfill];
-            
-            if (backfill.length > 0 && !isHeadless) {
-                console.log(`[Sort-Play] Backfilled Neighbors Mix with ${backfill.length} listened tracks to prevent empty playlist.`);
+        for (const track of poolWithScrobbles) {
+            const scrobbles = (typeof track.personalScrobbles === 'number' && track.personalScrobbles > 0) ? track.personalScrobbles : 0;
+            const inRecentRun = historySet.has(track.uri);
+
+            if (scrobbles === 0 && !inRecentRun) {
+                tier1Clean.push(track);
+            } else if (scrobbles === 0 && inRecentRun) {
+                tier2History.push(track);
+            } else {
+                tier3Listened.push(track);
             }
         }
 
-        const top50 = finalPoolTracks.slice(0, 50);
-        
-        if (top50.length === 0) {
+        tier1Clean.sort((a, b) => b.compositeScore - a.compositeScore);
+        tier2History.sort((a, b) => b.compositeScore - a.compositeScore);
+        tier3Listened.sort((a, b) => b.compositeScore - a.compositeScore);
+
+        const finalSelected = [];
+        const finalArtistCounts = new Map();
+        const TARGET_PLAYLIST_SIZE = 50;
+
+        const tryAddTrack = (track) => {
+            if (finalSelected.length >= TARGET_PLAYLIST_SIZE) return false;
+            const artKey = (track.artists?.[0]?.name || track.artistName || "").toLowerCase().trim();
+            const count = finalArtistCounts.get(artKey) || 0;
+            if (count >= 2) return false;
+
+            finalSelected.push(track);
+            finalArtistCounts.set(artKey, count + 1);
+            return true;
+        };
+
+        for (const t of tier1Clean) tryAddTrack(t);
+        if (finalSelected.length < TARGET_PLAYLIST_SIZE) {
+            for (const t of tier2History) tryAddTrack(t);
+        }
+        if (finalSelected.length < TARGET_PLAYLIST_SIZE) {
+            for (const t of tier3Listened) tryAddTrack(t);
+        }
+        if (finalSelected.length < TARGET_PLAYLIST_SIZE) {
+            const remainingAll = [...tier1Clean, ...tier2History, ...tier3Listened].filter(t => !finalSelected.some(s => s.uri === t.uri));
+            for (const t of remainingAll) {
+                if (finalSelected.length >= TARGET_PLAYLIST_SIZE) break;
+                finalSelected.push(t);
+            }
+        }
+
+        if (finalSelected.length === 0) {
             throw new Error("No available tracks found after filtering.");
         }
 
-        const trackIds = top50.map(t => t.uri.split(':')[2]);
-        const stats = await getBatchTrackStats(trackIds);
-        
-        const tracksWithFeatures = top50.map(t => {
-            const id = t.uri.split(':')[2];
-            return {
-                ...t,
-                features: stats[id]
-            };
-        });
-
-        let finalTracks;
-
-        const validForWave = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
-        const others = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
+        updateProgress("Sorting...");
+        const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
+        const others = finalSelected.filter(t => !t.features || t.features.energy == null);
 
         const sorted = await energyWaveSort(validForWave);
-        finalTracks = [...sorted, ...others];
-        
-        const trackUris = finalTracks.map(t => t.uri);
+        const finalTracks = [...sorted, ...others].slice(0, TARGET_PLAYLIST_SIZE);
 
+        const newlyAddedUris = finalTracks.map(t => t.uri);
+        const updatedHistory = Array.from(new Set([...newlyAddedUris, ...recentHistoryUris])).slice(0, 200);
+        await idb.set('jobHistory', HISTORY_KEY, updatedHistory);
+
+        const finalUris = finalTracks.map(t => t.uri);
         const playlistName = "Neighbors Mix";
         const playlistDescription = "A balanced mix of current obsessions, trends, and favorites from your Last.fm neighbors. Filtered for discovery. Created by Sort-Play.";
 
@@ -48658,12 +50455,12 @@ shadowRoot.innerHTML = `
 
         updateProgress("Saving...");
         if (wasUpdated) {
-            await replacePlaylistTracks(newPlaylist.id, trackUris);
+            await replacePlaylistTracks(newPlaylist.id, finalUris);
         } else {
-            await addTracksToPlaylist(newPlaylist.id, trackUris);
+            await addTracksToPlaylist(newPlaylist.id, finalUris);
         }
 
-        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${trackUris.length} tracks!`);
+        showNotification(`Playlist "${playlistName}" ${wasUpdated ? 'updated' : 'created'} with ${finalUris.length} tracks!`);
         if (!isHeadless) await navigateToPlaylist(newPlaylist);
 
     } catch (error) {
@@ -52014,6 +53811,8 @@ shadowRoot.innerHTML = `
         return { unique: tracks, removed: [] };
     }
 
+    await ensureLikedSongsIndex();
+
     const tracksWithIds = tracks.filter(t => t.uri.startsWith("spotify:track:"));
     const trackIds = tracksWithIds.map(t => t.uri.split(":")[2]);
     const uniqueTrackIds = [...new Set(trackIds)];
@@ -52063,6 +53862,14 @@ shadowRoot.innerHTML = `
             }
         }
     }
+
+    tracksWithIds.forEach(t => {
+        if (!t.isrc) {
+            const id = t.uri.split(":")[2];
+            const meta = cachedMetadata.get(id);
+            if (meta?.external_ids?.isrc) t.isrc = meta.external_ids.isrc;
+        }
+    });
 
     const DURATION_THRESHOLD = 2500; 
     const finalUniqueTracks = [];
@@ -52215,6 +54022,10 @@ shadowRoot.innerHTML = `
     }
 
     const sortedInputTracks = [...tracks].sort((a, b) => {
+        const isPlayableA = a.isPlayable !== false && a.is_playable !== false && a.track?.isPlayable !== false && a.track?.is_playable !== false;
+        const isPlayableB = b.isPlayable !== false && b.is_playable !== false && b.track?.isPlayable !== false && b.track?.is_playable !== false;
+        if (isPlayableA !== isPlayableB) return isPlayableA ? -1 : 1;
+
         const popA = a.popularity || 0;
         const popB = b.popularity || 0;
 
@@ -52230,6 +54041,10 @@ shadowRoot.innerHTML = `
             const isPopularity = sortType === 'popularity';
 
             if (isChronological || isPopularity) {
+                const likedRankA = getTrackLikedRank(a);
+                const likedRankB = getTrackLikedRank(b);
+                if (likedRankA !== likedRankB) return likedRankB - likedRankA;
+
                 const typeA = (a.album_type || a.albumType || 'album').toLowerCase();
                 const typeB = (b.album_type || b.albumType || 'album').toLowerCase();
 
@@ -52300,6 +54115,10 @@ shadowRoot.innerHTML = `
                     if (msA !== msB) return msA - msB;
                 }
             } else {
+                const likedRankA = getTrackLikedRank(a);
+                const likedRankB = getTrackLikedRank(b);
+                if (likedRankA !== likedRankB) return likedRankB - likedRankA;
+
                 const effPopA = trackEffectivePop.get(a.uri) || 0;
                 const effPopB = trackEffectivePop.get(b.uri) || 0;
 
@@ -57710,8 +59529,6 @@ shadowRoot.innerHTML = `
         document.head.appendChild(style);
     }
 
-    let likeButton_likedTracksById = new Map();
-    let likeButton_likedTracksByIsrc = new Map();
     let likeButton_activeMenu = null;
     let likeButton_activeMenuAbort = null;
     var likeButton_likedTracksChangeEvent = new CustomEvent('likeButton_likedTracksChange');
@@ -57808,7 +59625,7 @@ shadowRoot.innerHTML = `
         }
     }
 
-    function likeButton_addLikedTrack(trackData, isUserAction = false) {
+    likeButton_addLikedTrack = (trackData, isUserAction = false) => {
         if (!trackData || !trackData.trackId) return;
         likeButton_likedTracksById.set(trackData.trackId, trackData);
         if (trackData.isrc) {
@@ -57821,9 +59638,9 @@ shadowRoot.innerHTML = `
             likeButton_localActionTimestamps.set(trackData.trackId, Date.now());
         }
         likeButton_scheduleSaveCache();
-    }
+    };
 
-    function likeButton_removeLikedTrack(trackId, isUserAction = true) {
+    likeButton_removeLikedTrack = (trackId, isUserAction = true) => {
         const item = likeButton_likedTracksById.get(trackId);
         likeButton_likedTracksById.delete(trackId);
         if (item?.isrc && likeButton_likedTracksByIsrc.has(item.isrc)) {
@@ -57837,7 +59654,7 @@ shadowRoot.innerHTML = `
             likeButton_localActionTimestamps.set(trackId, Date.now());
         }
         likeButton_scheduleSaveCache();
-    }
+    };
 
     async function likeButton_initiateLikedSongs() {
         const cacheKey = likeButton_getCacheKey();
@@ -59868,6 +61685,7 @@ shadowRoot.innerHTML = `
   }
   
   loadSettings();
+  getGenreMapping().catch(() => {});
   fetchLastFmKeys();
   fetchGeminiKeys();
 
@@ -59879,6 +61697,31 @@ shadowRoot.innerHTML = `
   initializeSongChangeWatcher();
   
   Spicetify.Player.addEventListener("songchange", async () => {
+      const currentTrack = Spicetify.Player.data?.item;
+      if (currentTrack && currentTrack.uri && !Spicetify.URI.isLocal(currentTrack.uri)) {
+          if (blacklistPlayTimer) clearTimeout(blacklistPlayTimer);
+          blacklistPlayTimer = setTimeout(() => {
+              consecutiveBlacklistSkips = 0;
+          }, 4000);
+
+          if (genreBlacklistEnabled && genreBlacklistRules.length > 0) {
+              const prefetched = prefetchBlacklistMap.get(currentTrack.uri);
+              if (prefetched) {
+                  prefetchBlacklistMap.delete(currentTrack.uri);
+                  const isLiked = await isTrackLikedForBlacklist(currentTrack.uri);
+                  if (!isLiked) {
+                      triggerBlacklistAutoSkip(currentTrack, prefetched.matchedGenre);
+                      return;
+                  }
+              }
+
+              if (blacklistDebounceTimer) clearTimeout(blacklistDebounceTimer);
+              blacklistDebounceTimer = setTimeout(() => {
+                  evaluateTrackAgainstBlacklist(currentTrack, false);
+              }, 300);
+          }
+      }
+
       const p1 = displayNowPlayingData();
       const p2 = displayGenreTags();
       
@@ -59888,9 +61731,9 @@ shadowRoot.innerHTML = `
 
       if (autoUpdateGenreModal) {
           const existingModal = document.getElementById("sort-play-genre-details-window");
-          if (existingModal && existingModal.dataset.mode !== 'playlist') {
+          if (existingModal && existingModal.dataset.mode !== 'playlist' && !existingModal.classList.contains('in-block-mode')) {
               const track = Spicetify.Player.data?.item;
-              if (track && track.uri && !Spicetify.URI.isLocalTrack(track.uri)) {
+              if (track && track.uri && !Spicetify.URI.isLocal(track.uri)) {
                   const fetchPromise = fetchDisplayGenres(track);
                   const artistName = track.metadata?.artist_name || (track.artists && track.artists.map(a => a.name).join(", ")) || "Unknown Artist";
                   const trackName = track.metadata?.title || track.name || "Unknown Track";
