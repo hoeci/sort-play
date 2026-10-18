@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.8.0";
+  const SORT_PLAY_VERSION = "6.9.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -424,7 +424,7 @@
 
   let cachedTasteProfile = null;
   let cachedTasteProfileTimestamp = 0;
-  const TASTE_PROFILE_VERSION = "5";
+  const TASTE_PROFILE_VERSION = "6";
   const TASTE_PROFILE_UPDATE_INTERVAL = 24 * 60 * 60 * 1000;
   const TASTE_PROFILE_FULL_REBUILD_INTERVAL = 30 * 24 * 60 * 60 * 1000;
   let isBuildingTasteProfile = false;
@@ -1582,24 +1582,31 @@
       const n = spMath.norm(vec);
       return n === 0 ? vec.map(() => 0) : vec.map(v => v / n);
     },
-    mean: (data) => {
+    mean: (data, weights = null) => {
       if (data.length === 0) return [];
       const d = data[0].length;
       const n = data.length;
       const mu = new Array(d).fill(0);
+      let wSum = 0;
       for(let i=0; i<n; i++){
-          for(let j=0; j<d; j++) mu[j] += data[i][j];
+          const w = weights ? weights[i] : 1;
+          wSum += w;
+          for(let j=0; j<d; j++) mu[j] += data[i][j] * w;
       }
-      return mu.map(x => x / n);
+      return wSum > 0 ? mu.map(x => x / wSum) : mu;
     },
-    covariance: (centeredData) => {
+    covariance: (centeredData, weights = null) => {
       const n = centeredData.length;
       const d = centeredData[0].length;
       const cov = Array.from({length: d}, () => new Array(d).fill(0));
+      let wSum = 0;
+      for (let i = 0; i < n; i++) wSum += weights ? weights[i] : 1;
+      const denom = Math.max(1e-9, wSum > 1 ? wSum - 1 : wSum);
       for (let i = 0; i < n; i++) {
+          const w = (weights ? weights[i] : 1) / denom;
           for (let r = 0; r < d; r++) {
               for (let c = 0; c < d; c++) {
-                  cov[r][c] += (centeredData[i][r] * centeredData[i][c]) / (n - 1);
+                  cov[r][c] += (centeredData[i][r] * centeredData[i][c]) * w;
               }
           }
       }
@@ -1619,16 +1626,16 @@
       }
       return vec;
     },
-    pca: (data, targetVariance = 0.85, maxDims = 10) => {
+    pca: (data, targetVariance = 0.85, maxDims = 10, weights = null) => {
       if (!data || data.length === 0) return { projected: [], components: [], mu: [] };
       const d = data[0].length;
       const n = data.length;
       const maxComponents = Math.min(n - 1, d, maxDims);
       if (maxComponents <= 0) return { projected: data.map(() => []), components: [], mu: new Array(d).fill(0) };
 
-      const mu = spMath.mean(data);
+      const mu = spMath.mean(data, weights);
       const centered = data.map(v => v.map((x, i) => x - mu[i]));
-      let matrix = spMath.covariance(centered);
+      let matrix = spMath.covariance(centered, weights);
       
       const totalVar = matrix.reduce((sum, row, i) => sum + row[i], 0);
       if (totalVar <= 1e-10) return { projected: data.map(() => new Array(1).fill(0)), components: [new Array(d).fill(1/Math.sqrt(d))], mu };
@@ -1745,11 +1752,22 @@
       this.tol = tol;
       this.bic = Infinity;
     }
-    fit(data) {
+    fit(data, weights = null) {
       const n = data.length;
       if (n === 0) return false;
       const d = data[0].length;
       if (n < this.k) this.k = 1;
+
+      let normW = null;
+      if (weights && weights.length === n) {
+          let wSum = 0;
+          for (let i = 0; i < n; i++) wSum += weights[i];
+          if (wSum > 0) {
+              const scale = n / wSum;
+              normW = new Float64Array(n);
+              for (let i = 0; i < n; i++) normW[i] = weights[i] * scale;
+          }
+      }
       
       this.means = [];
       this.vars = [];
@@ -1757,8 +1775,22 @@
       
       const sortedIndices = Array.from({ length: n }, (_, i) => i).sort((a, b) => data[a][0] - data[b][0]);
       for (let i = 0; i < this.k; i++) {
-          const qIdx = sortedIndices[Math.floor((i + 0.5) * n / this.k)];
-          const mean = [...data[qIdx]];
+          const sliceStart = Math.floor((i * n) / this.k);
+          const sliceEnd = Math.max(sliceStart + 1, Math.floor(((i + 1) * n) / this.k));
+          const mean = new Array(d).fill(0);
+          let sliceWSum = 0;
+          for (let s = sliceStart; s < sliceEnd; s++) {
+              const idx = sortedIndices[s];
+              const w = normW ? normW[idx] : 1;
+              sliceWSum += w;
+              for (let dim = 0; dim < d; dim++) mean[dim] += data[idx][dim] * w;
+          }
+          if (sliceWSum > 0) {
+              for (let dim = 0; dim < d; dim++) mean[dim] /= sliceWSum;
+          } else {
+              const qIdx = sortedIndices[Math.floor((i + 0.5) * n / this.k)];
+              for (let dim = 0; dim < d; dim++) mean[dim] = data[qIdx][dim];
+          }
           if (i > 0 && this.means.some(m => m.every((v, idx) => Math.abs(v - mean[idx]) < 1e-4))) {
               mean[0] += (i * 0.01);
           }
@@ -1804,7 +1836,8 @@
                   row[j] = Math.exp(row[j] - maxLogP);
                   sumP += row[j];
               }
-              iterLL += maxLogP + Math.log(sumP + 1e-10);
+              const wI = normW ? normW[i] : 1;
+              iterLL += wI * (maxLogP + Math.log(sumP + 1e-10));
               
               if (sumP === 0) {
                   for (let j = 0; j < this.k; j++) row[j] = 1 / this.k;
@@ -1820,7 +1853,8 @@
           const Nk = new Array(this.k).fill(1e-10);
           for (let i = 0; i < n; i++) {
               const row = resps[i];
-              for (let j = 0; j < this.k; j++) Nk[j] += row[j];
+              const wI = normW ? normW[i] : 1;
+              for (let j = 0; j < this.k; j++) Nk[j] += row[j] * wI;
           }
           
           for (let j = 0; j < this.k; j++) {
@@ -1828,13 +1862,17 @@
               const invNk = 1 / Nk[j];
               for (let dim = 0; dim < d; dim++) {
                   let sumMu = 0;
-                  for (let i = 0; i < n; i++) sumMu += resps[i][j] * data[i][dim];
+                  for (let i = 0; i < n; i++) {
+                      const wI = normW ? normW[i] : 1;
+                      sumMu += resps[i][j] * wI * data[i][dim];
+                  }
                   this.means[j][dim] = sumMu * invNk;
                   
                   let sumVar = 0;
                   for (let i = 0; i < n; i++) {
+                      const wI = normW ? normW[i] : 1;
                       const diff = data[i][dim] - this.means[j][dim];
-                      sumVar += resps[i][j] * diff * diff;
+                      sumVar += resps[i][j] * wI * diff * diff;
                   }
                   this.vars[j][dim] = Math.max(1e-6, sumVar * invNk);
               }
@@ -1845,6 +1883,7 @@
       this.bic = -2 * logLikelihood + numParams * Math.log(n);
       return true;
     }
+    
     predict(vector) {
       const d = vector.length;
       const resps = [];
@@ -2636,7 +2675,10 @@
   }
     
   async function setCachedScrobbles(key, scrobbleCount) {
-    await idb.set('scrobbles', key, scrobbleCount);
+    const existing = await idb.get('scrobbles', key);
+    const bestCount = (typeof existing === 'number' && existing > scrobbleCount) ? existing : scrobbleCount;
+    await idb.set('scrobbles', key, bestCount);
+    return bestCount;
   }
   
   async function setCachedReleaseDate(trackId, rawReleaseDate, trackNumber = 0, discNumber = 1) { 
@@ -7139,8 +7181,8 @@
       modalContainer.style.cssText = `
           box-sizing: border-box !important;
           position: relative !important;
-          width: min(600px, 92vw) !important;
-          max-width: 600px !important;
+          width: min(670px, 92vw) !important;
+          max-width: 670px !important;
           min-width: 320px !important;
           min-height: 0 !important;
           height: 75vh;
@@ -15602,7 +15644,10 @@
               categoryMap.set(c, []);
           });
 
-          genreMap.forEach(item => {
+          const allItems = Array.from(genreMap.values());
+          const nonMoodItems = allItems.filter(item => !MOOD_DESCRIPTORS_SET.has(normalizeGenre(item.name)));
+
+          (nonMoodItems.length > 0 ? nonMoodItems : allItems).forEach(item => {
               item.sources.forEach(source => {
                   let category = 'Other';
                   let score = '';
@@ -15673,7 +15718,7 @@
                       const toggleIconSvg = isBanned ? tagRemoveIconSvg : tagAddIconSvg;
 
                       return `
-                        <div class="genre-detail-tag ${animClass} ${bannedClass}" data-genre="${escapeHtml(titleCase, "")}" data-raw-genre="${escapeHtml(g.name)}" data-blacklisted="${isBanned ? 'true' : 'false'}" title="Source: ${escapeHtml(tooltip, "")}${escapeHtml(bannedTitle)}" style="${delayStyle}">
+                        <div class="genre-detail-tag ${animClass} ${bannedClass}" data-genre="${escapeHtml(titleCase, "")}" data-raw-genre="${escapeHtml(g.name, "")}" data-blacklisted="${isBanned ? 'true' : 'false'}" title="Source: ${escapeHtml(tooltip, "")}${escapeHtml(bannedTitle, "")}" style="${delayStyle}">
                             ${isBanned ? `<span class="genre-banned-badge" title="Blacklisted: ${escapeHtml(matchedRule.name)}">${banIconSvg}</span>` : ''}
                             <span class="genre-text">${escapeHtml(titleCase, "")}</span>${scoreHtml}
                             <button class="genre-copy-btn" title="Copy">
@@ -16121,8 +16166,53 @@
       header.addEventListener('mousedown', onMouseDown);
   }
 
+  function ensureContextMenuCompat() {
+    const orig = Spicetify.ReactComponent?.MenuItem;
+    if (!orig || orig._spPatched || typeof orig !== 'function') return;
+    if (!orig.toString().includes('shouldCloseOnSelect')) return;
+
+    try {
+      const chunk = window.rspackChunk ?? window.webpackChunkclient_web ?? window.rspackChunkclient_web;
+      if (!chunk) return;
+      let req = null;
+      chunk.push([[Symbol()], {}, r => { req = r; return r; }]);
+      if (!req?.m) return;
+
+      let WrapperMenuItem = null;
+      for (const [id, mod] of Object.entries(req.m)) {
+        const s = mod.toString();
+        if (s.includes('dividerBefore') && s.includes('forceV2LeadingIcon')) {
+          const exp = req(id);
+          WrapperMenuItem = exp && Object.values(exp).find(v => typeof v === 'function');
+          if (WrapperMenuItem) break;
+        }
+      }
+      if (!WrapperMenuItem) return;
+
+      const origUseContext = Spicetify.React.useContext;
+      let NativeLegacyMenuItem = null;
+      try {
+        Spicetify.React.useContext = () => false;
+        NativeLegacyMenuItem = WrapperMenuItem({})?.type;
+      } finally {
+        Spicetify.React.useContext = origUseContext;
+      }
+
+      if (typeof NativeLegacyMenuItem === 'function') {
+        const PatchedMenuItem = (props) =>
+          Spicetify.React.createElement(NativeLegacyMenuItem, { ...props, forceV2LeadingIcon: true });
+        Object.assign(PatchedMenuItem, orig);
+        PatchedMenuItem._spPatched = true;
+        Spicetify.ReactComponent.MenuItem = PatchedMenuItem;
+      }
+    } catch (e) {
+      console.warn('[Sort-Play] ContextMenu compatibility shim failed:', e);
+    }
+  }
+
   function toggleContextMenuItem(condition, currentItem, title, onClick, shouldAdd, iconName, iconSvg = null) {
       if (condition && !currentItem) {
+          ensureContextMenuCompat();
           if (iconName && iconSvg && !Spicetify.SVGIcons[iconName]) {
               Spicetify.SVGIcons[iconName] = iconSvg;
           }
@@ -16346,7 +16436,7 @@
   const MOOD_DESCRIPTORS_SET = new Set([
       "chill", "relaxing", "calm", "love", "fast", "slow", "soothing", "peaceful", "tranquil",
       "mellow", "soft", "smooth", "quiet", "energetic", "sad", "upbeat", "pump up", "romantic",
-      "moody", "melancholy", "nostalgia", "emotional", "cozy", "gentle", "happy", "rain", "Children's Music",
+      "moody", "melancholy", "nostalgia", "emotional", "cozy", "gentle", "happy", "rain", "children's music",
       "motivation", "angst", "aggressive", "atmospheric", "nature", "angry", "dark", "classy",
       "funny", "spooky", "epic", "sensual", "ethereal", "beats", "ibiza", "club", "gaming", "spiritual", "soulful"
   ]);
@@ -20629,18 +20719,16 @@ shadowRoot.innerHTML = `
                   
                   showNotification(isSingleVibe ? `Applying Vibe Flow...` : "Performing Randomized Energy Wave Shuffle...");
                   
-                  const tracksWithData = tracksToPlay.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-                  const tracksWithoutData = tracksToPlay.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+                  const tracksWithData = tracksToPlay.filter(track => track.features && track.features.energy != null);
+                  const tracksWithoutData = tracksToPlay.filter(track => !track.features || track.features.energy == null);
 
                   if (tracksWithData.length < 3) {
                       tracksToPlay = shuffleArray(tracksToPlay);
                   } else {
-                      let waveSorted;
-                      if (isSingleVibe) {
-                          waveSorted = await energyWaveSort(tracksWithData, activeKeys[0]);
-                      } else {
-                          waveSorted = await randomizedEnergyWaveSort(tracksWithData);
-                      }
+                      const dominantVibe = activeKeys.reduce((best, k) => (activeVibesMap[k] || 0) > (activeVibesMap[best] || 0) ? k : best, activeKeys[0] || 'wave');
+                      const waveSorted = isSingleVibe
+                          ? await energyWaveSort(tracksWithData, activeKeys[0])
+                          : await randomizedEnergyWaveSort(tracksWithData, { persona: dominantVibe });
                       tracksToPlay = [...waveSorted, ...shuffleArray(tracksWithoutData)];
                   }
               } else {
@@ -20683,16 +20771,17 @@ shadowRoot.innerHTML = `
               let tracksToSave = finalTracks;
               const activeKeys = Object.keys(activeVibesMap);
               
-              const tracksWithData = finalTracks.filter(track => track.features && track.features.energy !== null && track.features.valence !== null);
-              const tracksWithoutData = finalTracks.filter(track => !track.features || track.features.energy === null || track.features.valence === null);
+              const tracksWithData = finalTracks.filter(track => track.features && track.features.energy != null);
+              const tracksWithoutData = finalTracks.filter(track => !track.features || track.features.energy == null);
               
               if (tracksWithData.length >= 3) {
                   mainButton.innerText = "Sorting...";
+                  const dominantVibe = activeKeys.reduce((best, k) => (activeVibesMap[k] || 0) > (activeVibesMap[best] || 0) ? k : best, activeKeys[0] || 'wave');
                   if (activeKeys.length === 1) {
                       const sorted = await energyWaveSort(tracksWithData, activeKeys[0]);
                       tracksToSave = [...sorted, ...tracksWithoutData];
                   } else {
-                      const sorted = await randomizedEnergyWaveSort(tracksWithData);
+                      const sorted = await randomizedEnergyWaveSort(tracksWithData, { persona: dominantVibe });
                       tracksToSave = [...sorted, ...shuffleArray(tracksWithoutData)];
                   }
                   mainButton.innerText = "Creating...";
@@ -28382,8 +28471,8 @@ shadowRoot.innerHTML = `
                         const id = Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || (t.uri ? t.uri.split(':')[2] : null));
                         return { ...t, features: id ? allStats[id] : null };
                     });
-                    const withData = tracksWithFeatures.filter(t => t.features && t.features.energy !== null && t.features.valence !== null);
-                    const withoutData = tracksWithFeatures.filter(t => !t.features || t.features.energy === null || t.features.valence === null);
+                    const withData = tracksWithFeatures.filter(t => t.features && t.features.energy != null);
+                    const withoutData = tracksWithFeatures.filter(t => !t.features || t.features.energy == null);
                     if (withData.length >= 3) {
                         mainButton.innerText = "Vibe...";
                         const waveSorted = await randomizedEnergyWaveSort(withData);
@@ -29172,16 +29261,34 @@ shadowRoot.innerHTML = `
                 const f = id ? (eWaveStats[id] || {}) : {};
                 return { ...t, features: f, ...f };
             });
-            const eWaveValid = eWaveWithData.filter(t => t.features && t.features.energy != null && t.features.valence != null);
-            const eWaveInvalid = eWaveWithData.filter(t => !t.features || t.features.energy == null || t.features.valence == null);
-            let eWaveSorted = await energyWaveSort(eWaveValid);
-            if (isAscending) eWaveSorted.reverse();
+            const eWaveValid = eWaveWithData.filter(t => t.features && t.features.energy != null);
+            const eWaveInvalid = eWaveWithData.filter(t => !t.features || t.features.energy == null);
+            const eWaveSorted = await energyWaveSort(eWaveValid, 'wave', { reverse: isAscending });
             sortedTracks = [...eWaveSorted, ...eWaveInvalid];
             break;
         }
-        case "shuffle":
-            sortedTracks = shuffleArray(uniqueTracks);
+        case "shuffle": {
+            if (useEnergyWaveShuffle) {
+                const shufTrackIds = uniqueTracks.map(t => Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || t.uri.split(":")[2])).filter(Boolean);
+                const shufStats = await getBatchTrackStats(shufTrackIds);
+                const shufWithData = uniqueTracks.map(t => {
+                    const id = Spicetify.URI.isLocal(t.uri) ? null : (t.trackId || t.uri.split(":")[2]);
+                    const f = id ? (shufStats[id] || {}) : {};
+                    return { ...t, features: f, ...f };
+                });
+                const shufValid = shufWithData.filter(t => t.features && t.features.energy != null);
+                const shufInvalid = shufWithData.filter(t => !t.features || t.features.energy == null);
+                if (shufValid.length >= 3) {
+                    const waveShuffled = await randomizedEnergyWaveSort(shufValid);
+                    sortedTracks = [...waveShuffled, ...shuffleArray(shufInvalid)];
+                } else {
+                    sortedTracks = shuffleArray(uniqueTracks);
+                }
+            } else {
+                sortedTracks = shuffleArray(uniqueTracks);
+            }
             break;
+        }
         case "tasteMatch": {
             const updateProgressText = (msg) => {
                 if (!isHeadless) mainButton.innerText = msg;
@@ -35635,13 +35742,16 @@ shadowRoot.innerHTML = `
 
       try {
         const resultMap = new Map();
+        const scoresMap = new Map();
+        resultMap._scoresMap = scoresMap;
         const urisToFetch = [];
 
         tracks.forEach(t => {
           if (Spicetify.URI.isLocal(t.uri) || !t.uri.startsWith('spotify:track:')) return;
           const cachedSession = sessionGenreCache.get(t.uri);
-          if (cachedSession && Array.isArray(cachedSession.spotify_track_genres)) {
+          if (cachedSession && Array.isArray(cachedSession.spotify_track_genres) && cachedSession._spotify_track_genre_scores) {
             resultMap.set(t.uri, cachedSession.spotify_track_genres);
+            scoresMap.set(t.uri, cachedSession._spotify_track_genre_scores);
           } else {
             urisToFetch.push(t.uri);
           }
@@ -35668,11 +35778,16 @@ shadowRoot.innerHTML = `
             });
 
             const finalNative = [];
+            const trackScores = {};
             validNative.forEach(g => {
-              if ((g.score * 100) > 5) finalNative.push(g.name);
+              if ((g.score * 100) > 5) {
+                finalNative.push(g.name);
+                trackScores[g.name] = g.score;
+              }
             });
 
             resultMap.set(uri, finalNative);
+            scoresMap.set(uri, trackScores);
           });
 
           processed += batch.length;
@@ -36208,8 +36323,10 @@ shadowRoot.innerHTML = `
       const extData = externalResult.externalMap.get(uri) || sessionGenreCache.get(uri) || {};
 
       let nativeGenres = isLocal ? [] : extData.spotify_track_genres;
+      let nativeScores = isLocal ? null : (extData._spotify_track_genre_scores || null);
       if (reqSources.spotify_track && !isLocal) {
         nativeGenres = nativeTrackMap.get(uri) || extData.spotify_track_genres || [];
+        nativeScores = nativeTrackMap._scoresMap?.get(uri) || extData._spotify_track_genre_scores || null;
       }
 
       let enGenres = extData.everynoise_artist_genres || [];
@@ -36239,6 +36356,7 @@ shadowRoot.innerHTML = `
         apple_music_genres: extData.apple_music_genres || [],
         everynoise_artist_genres: enGenres,
         spotify_track_genres: nativeGenres,
+        _spotify_track_genre_scores: nativeScores,
         release_date: parsedReleaseDate,
         _lfm_track_checked: extData._lfm_track_checked || reqSources.lastfm_track || false,
         _lfm_artist_checked: extData._lfm_artist_checked || reqSources.lastfm_artist || false,
@@ -36262,6 +36380,14 @@ shadowRoot.innerHTML = `
 
       const mappedAndNormalized = mapAndNormalizeGenres(combined);
       const finalUnique = Array.from(new Set(mappedAndNormalized.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
+      if (nativeScores) {
+        const rawEntries = Object.entries(nativeScores).map(([name, score]) => ({ name, score }));
+        finalUnique.forEach(g => {
+          if (g.source === 'spotify_track') {
+            g.score = resolveMappedGenreScore(g.name, rawEntries);
+          }
+        });
+      }
       trackGenreMap.set(uri, finalUnique);
     });
 
@@ -38979,6 +39105,8 @@ shadowRoot.innerHTML = `
         }
     }
 
+    const previousHighWater = !isLocal ? await idb.get('scrobbles', lfmInfo.key) : null;
+
     try {
       const username = loadLastFmUsername();
       let data = await _fetchLastFmTrackInfoCore(lfmInfo.artistName, lfmInfo.trackName, username, useFallback, lfmInfo.noRedirect);
@@ -38989,6 +39117,10 @@ shadowRoot.innerHTML = `
 
       if (data.error) {
         if (data.error === 6) { 
+          if (typeof previousHighWater === 'number' && previousHighWater >= 0) {
+              if (!isLocal && !skipCacheWrite) await setCachedScrobbles(lfmInfo.key, previousHighWater);
+              return { ...track, scrobbles: previousHighWater };
+          }
           if (!isLocal && !skipCacheWrite) {
               await setCachedScrobbles(lfmInfo.key, -1);
               if (username) await setCachedPersonalScrobbles(lfmInfo.key, -1, false);
@@ -39004,6 +39136,9 @@ shadowRoot.innerHTML = `
            const parsed = parseInt(rawCount, 10);
            if (!isNaN(parsed)) scrobbles = parsed;
       }
+      if (typeof previousHighWater === 'number' && previousHighWater > scrobbles) {
+          scrobbles = previousHighWater;
+      }
 
       const resTrack = { ...track, scrobbles };
       if (username && data.track?.userplaycount !== undefined) {
@@ -39012,7 +39147,7 @@ shadowRoot.innerHTML = `
       }
 
       if (!isLocal && !skipCacheWrite) {
-          await setCachedScrobbles(lfmInfo.key, scrobbles);
+          resTrack.scrobbles = await setCachedScrobbles(lfmInfo.key, scrobbles);
           if (resTrack.personalScrobbles !== undefined) {
               await setCachedPersonalScrobbles(lfmInfo.key, resTrack.personalScrobbles, false);
           }
@@ -39021,6 +39156,9 @@ shadowRoot.innerHTML = `
       return resTrack;
     } catch (error) {
       console.error(`Error fetching scrobbles for track ${track.name}:`, error);
+      if (typeof previousHighWater === 'number' && previousHighWater >= 0) {
+          return { ...track, scrobbles: previousHighWater };
+      }
       return { ...track, scrobbles: null, error: "Failed to fetch from Last.fm after multiple attempts.", errorLabel: "Failed" };
     }
   }
@@ -41351,8 +41489,8 @@ shadowRoot.innerHTML = `
         });
 
         mainButton.innerText = "Vibe...";
-        const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy != null && track.features.valence != null);
-        const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy == null || track.features.valence == null);
+        const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy != null);
+        const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy == null);
         
         if (tracksWithData.length < 3) {
             finalSortedTracks = shuffleArray(tracksToProcess);
@@ -45039,20 +45177,67 @@ shadowRoot.innerHTML = `
     return knownArtistIds;
   }
   
+  function resolveMappedGenreScore(genreName, rawGenres, fallbackScore = 0.5) {
+      if (!genreName || !rawGenres || rawGenres.length === 0) return fallbackScore;
+      const targetKey = getNormalizedGenreKey(genreName);
+      const targetNorm = normalizeGenre(genreName);
+      let directMax = 0;
+      let parentMax = 0;
+
+      for (let i = 0; i < rawGenres.length; i++) {
+          const g = rawGenres[i];
+          if (!g || !g.name) continue;
+          const gScore = typeof g.score === 'number' ? g.score : fallbackScore;
+          const rawKey = getNormalizedGenreKey(g.name);
+          if (rawKey === targetKey || normalizeGenre(g.name) === targetNorm) {
+              if (gScore > directMax) directMax = gScore;
+          } else {
+              const mappedMains = VARIANT_TO_MAIN_GENRE_MAP[rawKey];
+              if (mappedMains) {
+                  for (let j = 0; j < mappedMains.length; j++) {
+                      const main = mappedMains[j];
+                      if (getNormalizedGenreKey(main) === targetKey || normalizeGenre(main) === targetNorm) {
+                          const inherited = gScore * 0.9;
+                          if (inherited > parentMax) parentMax = inherited;
+                      }
+                  }
+              }
+          }
+      }
+      if (directMax > 0) return directMax;
+      if (parentMax > 0) return parentMax;
+      return fallbackScore;
+  }
+
+  const VALID_HIERARCHICAL_GENRE_TOKENS = new Set([
+      "pop", "rock", "rap", "hip hop", "metal", "jazz", "blues", "folk", "country",
+      "soul", "funk", "house", "techno", "trance", "electro", "electronic", "electronica",
+      "dance", "indie", "punk", "reggae", "reggaeton", "latin", "trap", "dub", "dubstep",
+      "classical", "ambient", "gospel", "disco", "ska", "grunge", "emo", "opera", "industrial",
+      "americana", "bluegrass", "cumbia", "salsa", "samba", "flamenco", "tango", "bolero",
+      "bachata", "merengue", "afrobeats", "dancehall", "grime", "synthwave", "vaporwave", "shoegaze",
+      "acoustic", "lounge", "downtempo", "soundtrack", "synthpop", "synth pop", "electropop", "britpop",
+      "garage", "metalcore", "hardstyle"
+  ]);
+
   function getHierarchicalTokens(genreStr) {
       const tokens = [];
       if (!genreStr) return tokens;
-      const full = genreStr.trim();
+      const full = genreStr.trim().toLowerCase();
       tokens.push({ name: full, weight: 1.0 });
       
       const words = full.split(/\s+/);
       if (words.length > 1) {
           words.forEach(w => {
-              if (w.length > 2) tokens.push({ name: w, weight: 0.2 });
+              if (w.length > 2 && VALID_HIERARCHICAL_GENRE_TOKENS.has(w)) {
+                  tokens.push({ name: w, weight: 0.2 });
+              }
           });
           if (words.length > 2) {
-              tokens.push({ name: words.slice(1).join(' '), weight: 0.4 });
-              tokens.push({ name: words.slice(0, -1).join(' '), weight: 0.4 });
+              const tail = words.slice(1).join(' ');
+              const head = words.slice(0, -1).join(' ');
+              if (VALID_HIERARCHICAL_GENRE_TOKENS.has(tail)) tokens.push({ name: tail, weight: 0.4 });
+              if (VALID_HIERARCHICAL_GENRE_TOKENS.has(head)) tokens.push({ name: head, weight: 0.4 });
           }
       }
       return tokens;
@@ -45086,7 +45271,7 @@ shadowRoot.innerHTML = `
     "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "alternative metal": { I: 0.9, C: 0.1 }, "rock en espa": { I: 0.9, C: 0.1 },
     "grunge": { I: 1.0 }, "death metal": { I: 1.0 }, "metalcore": { I: 1.0 }, "screamo": { I: 1.0 }, "post-hardcore": { I: 0.9, C: 0.1 },
     "rockabilly": { I: 0.8, U: 0.2 }, "industrial": { I: 0.8, C: 0.2 }, "hardcore punk": { I: 1.0 },
-    "black metal": { I: 1.0 }, "doom metal": { I: 1.0 },
+    "black metal": { I: 1.0 }, "doom metal": { I: 1.0 }, "southern rock": { I: 0.7, U: 0.3 },
     "pop": { U: 0.4, C: 0.4, M: 0.2 }, "electronic": { M: 0.6, C: 0.4 }, "electronica": { M: 0.6, C: 0.4 }, "dance pop": { C: 0.6, U: 0.4 },
     "dance": { C: 0.6, M: 0.4 }, "electropop": { C: 0.8, M: 0.2 }, "upbeat": { C: 1.0 }, "energetic": { C: 0.7, I: 0.3 }, "electro": { C: 0.8, M: 0.2 },
     "edm": { C: 1.0 }, "fast": { C: 1.0 }, "happy": { C: 0.7, M: 0.3 }, "pump up": { C: 0.8, I: 0.2 }, "anime": { C: 0.7, I: 0.3 },
@@ -45099,6 +45284,7 @@ shadowRoot.innerHTML = `
     "dubstep": { C: 0.8, I: 0.2 }, "trap latino": { C: 1.0 }, "gangster rap": { C: 1.0 }, "crunk": { C: 1.0 },
     "hardstyle": { C: 0.8, I: 0.2 }, "hardcore techno": { C: 0.8, I: 0.2 }, "afrobeats": { C: 1.0 }, "dancehall": { C: 1.0 },
     "funk carioca": { C: 1.0 }, "merengue": { C: 1.0 }, "bachata": { C: 1.0 }, "roots reggae": { S: 0.5, C: 0.3, U: 0.2 },
+    "grime": { C: 0.8, I: 0.2 }, "happy hardcore": { C: 0.8, I: 0.2 }, "chillwave": { M: 0.6, C: 0.4 },
     "pop rock": { C: 0.6, I: 0.4 },
     "alternative rock": { I: 0.7, C: 0.3 },
     "modern rock": { I: 0.7, C: 0.3 },
@@ -45109,6 +45295,7 @@ shadowRoot.innerHTML = `
     "pop rap": { C: 1.0 },
     "indie pop": { C: 0.6, M: 0.4 },
     "synthpop": { C: 0.8, M: 0.2 },
+    "synth pop": { C: 0.8, M: 0.2 },
     "alternative pop": { C: 0.7, M: 0.3 },
     "garage rock": { I: 0.8, U: 0.2 },
     "r&b": { M: 0.6, C: 0.4 },
@@ -45143,21 +45330,39 @@ shadowRoot.innerHTML = `
     "shoegaze": { I: 0.6, M: 0.4 }
   };
 
+  const NORMALIZED_MUSIC_MODEL_MAP = {};
+  for (const [k, v] of Object.entries(MUSIC_MODEL_MAP)) {
+      NORMALIZED_MUSIC_MODEL_MAP[k] = v;
+      NORMALIZED_MUSIC_MODEL_MAP[normalizeGenre(k)] = v;
+      NORMALIZED_MUSIC_MODEL_MAP[getNormalizedGenreKey(k)] = v;
+  }
+
   function getTrackMusicProfile(genres, features) {
       let m = 0, u = 0, s = 0, i = 0, c = 0;
       let weightSum = 0;
 
-      const resolveModel = (name) => {
+      const resolveModel = (name, allowMoodFallback = false) => {
           if (!name) return null;
           const lower = name.toLowerCase().trim();
-          if (MOOD_DESCRIPTORS_SET.has(lower)) return null;
-          if (MUSIC_MODEL_MAP[lower]) return MUSIC_MODEL_MAP[lower];
+          const norm = normalizeGenre(lower);
+          const compactKey = getNormalizedGenreKey(lower);
+          const isMood = MOOD_DESCRIPTORS_SET.has(lower) || MOOD_DESCRIPTORS_SET.has(norm);
+          if (isMood && (!allowMoodFallback || lower === "children's music" || norm === "children's music")) return null;
+
+          if (NORMALIZED_MUSIC_MODEL_MAP[lower]) return NORMALIZED_MUSIC_MODEL_MAP[lower];
+          if (NORMALIZED_MUSIC_MODEL_MAP[norm]) return NORMALIZED_MUSIC_MODEL_MAP[norm];
+          if (NORMALIZED_MUSIC_MODEL_MAP[compactKey]) return NORMALIZED_MUSIC_MODEL_MAP[compactKey];
+
           for (const key in MUSIC_MODEL_MAP) {
-              if (!MOOD_DESCRIPTORS_SET.has(key) && (lower.includes(key) || key.includes(lower))) return MUSIC_MODEL_MAP[key];
+              if (!MOOD_DESCRIPTORS_SET.has(key) && (lower.includes(key) || key.includes(lower) || norm.includes(key))) {
+                  return MUSIC_MODEL_MAP[key];
+              }
           }
-          const tokens = lower.split(/\s+/);
+          const tokens = norm.split(/\s+/);
           for (const tok of tokens) {
-              if (tok.length > 2 && !MOOD_DESCRIPTORS_SET.has(tok) && MUSIC_MODEL_MAP[tok]) return MUSIC_MODEL_MAP[tok];
+              if (tok.length > 2 && !MOOD_DESCRIPTORS_SET.has(tok) && NORMALIZED_MUSIC_MODEL_MAP[tok]) {
+                  return NORMALIZED_MUSIC_MODEL_MAP[tok];
+              }
           }
           return null;
       };
@@ -45165,8 +45370,9 @@ shadowRoot.innerHTML = `
       if (genres && genres.length > 0) {
           genres.forEach(g => {
               const gName = typeof g === 'string' ? g : g.name;
-              if (MOOD_DESCRIPTORS_SET.has((gName || "").toLowerCase().trim())) return;
-              const model = resolveModel(gName);
+              const lower = (gName || "").toLowerCase().trim();
+              if (MOOD_DESCRIPTORS_SET.has(lower) || MOOD_DESCRIPTORS_SET.has(normalizeGenre(lower))) return;
+              const model = resolveModel(gName, false);
               if (model) {
                   const w = g.score ?? 1;
                   if (model.M) m += model.M * w;
@@ -45177,6 +45383,37 @@ shadowRoot.innerHTML = `
                   weightSum += w;
               }
           });
+
+          if (weightSum === 0) {
+              genres.forEach(g => {
+                  const gName = typeof g === 'string' ? g : g.name;
+                  const model = resolveModel(gName, true);
+                  if (model) {
+                      const w = g.score ?? 0.5;
+                      if (model.M) m += model.M * w;
+                      if (model.U) u += model.U * w;
+                      if (model.S) s += model.S * w;
+                      if (model.I) i += model.I * w;
+                      if (model.C) c += model.C * w;
+                      weightSum += w;
+                  }
+              });
+              if (weightSum > 0 && features && features.energy != null) {
+                  const moodVec = spMath.normalize([m, u, s, i, c]);
+                  const nE = Number(features.energy) / 100;
+                  const nA = Number(features.acousticness || 0) / 100;
+                  const nI = Number(features.instrumentalness || 0) / 100;
+                  const nD = Number(features.danceability || 0) / 100;
+                  const featVec = spMath.normalize([
+                      (1 - nE) * nA,
+                      nA * 0.5 + 0.2,
+                      nI * nA + 0.1,
+                      nE * (1 - nA),
+                      nD * nE
+                  ]);
+                  return spMath.normalize(moodVec.map((val, idx) => 0.5 * val + 0.5 * featVec[idx]));
+              }
+          }
       }
 
       if (weightSum > 0) {
@@ -45347,29 +45584,33 @@ shadowRoot.innerHTML = `
               newCachedEnrichedData.set(uri, cachedData);
           } else {
               const id = item.track.id || uri.split(':')[2];
-              const f = stats[id];
-              if (!f || f.energy === null) continue; 
+              const prevCached = cachedEnrichedData.get(uri);
+              const f = stats[id] || prevCached?.features;
+              if (!f || f.energy == null) continue; 
               
               item.features = f;
-              item.playCount = playCounts.get(uri) || 0;
-              const ng = nativeGenres.get(uri) || [];
-              
-              const toMap = ng.map(g => ({name: g.name, source: 'spotify_track'}));
-              const mapped = mapAndNormalizeGenres(toMap);
-              
-              const expandedGenres = new Map();
-              mapped.forEach(m => {
-                  const orig = ng.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
-                  const baseScore = orig ? orig.score : 0.85;
-                  const hierTokens = getHierarchicalTokens(m.name);
+              item.playCount = playCounts.get(uri) ?? prevCached?.playCount ?? 0;
+              const rawNg = nativeGenres.get(uri);
+              if (rawNg && rawNg.length > 0) {
+                  const ng = rawNg.filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                  const toMap = ng.map(g => ({name: g.name, source: 'spotify_track'}));
+                  const mapped = mapAndNormalizeGenres(toMap);
                   
-                  hierTokens.forEach(ht => {
-                      const currentScore = expandedGenres.get(ht.name) || 0;
-                      expandedGenres.set(ht.name, Math.max(currentScore, baseScore * ht.weight));
+                  const expandedGenres = new Map();
+                  mapped.forEach(m => {
+                      const baseScore = resolveMappedGenreScore(m.name, ng, 0.5);
+                      const hierTokens = getHierarchicalTokens(m.name);
+                      
+                      hierTokens.forEach(ht => {
+                          const currentScore = expandedGenres.get(ht.name) || 0;
+                          expandedGenres.set(ht.name, Math.max(currentScore, baseScore * ht.weight));
+                      });
                   });
-              });
 
-              item.genres = Array.from(expandedGenres.entries()).map(([name, score]) => ({ name, score }));
+                  item.genres = Array.from(expandedGenres.entries()).map(([name, score]) => ({ name, score }));
+              } else {
+                  item.genres = prevCached?.genres || [];
+              }
               enrichedCorpus.push(item);
               totalWeight += item.weight;
               
@@ -45422,7 +45663,7 @@ shadowRoot.innerHTML = `
       
       trackWeights.forEach(tw => {
           const f = tw.item.features;
-          if (!f || f.energy === null || f.valence === null) return;
+          if (!f || f.energy == null || f.valence == null) return;
           
           const energyTier = f.energy < 33 ? 'L' : f.energy < 66 ? 'M' : 'H';
           const valenceTier = f.valence < 33 ? 'L' : f.valence < 66 ? 'M' : 'H';
@@ -45431,8 +45672,8 @@ shadowRoot.innerHTML = `
           let archId = 'none';
           let maxAff = 0;
           const normF = { 
-              energy: f.energy !== null ? f.energy/100 : 0.5, 
-              valence: f.valence !== null ? f.valence/100 : 0.5, 
+              energy: f.energy != null ? f.energy/100 : 0.5, 
+              valence: f.valence != null ? f.valence/100 : 0.5, 
               danceability: (f.danceability||50)/100, 
               acousticness: (f.acousticness||50)/100,
               speechiness: (f.speechiness||10)/100, 
@@ -45474,12 +45715,12 @@ shadowRoot.innerHTML = `
           weights.archetype *= (1.0 - 0.3 * redundancy);
       }
 
-      if (entropies.key > 0.90) {
-          weights.key = 0;
-      }
-
       for (const k in weights) {
           weights[k] = Math.max(0.01, weights[k]);
+      }
+
+      if (entropies.key > 0.90) {
+          weights.key = 0;
       }
 
       let sum = Object.values(weights).reduce((a,b) => a + b, 0);
@@ -45493,17 +45734,27 @@ shadowRoot.innerHTML = `
   }
 
   async function buildSingleClusterProfile(trackWeights, pmiMatrix) {
-      const cTfIdf = new Map();
-      trackWeights.forEach(tw => {
-          tw.item.tfidf.forEach((val, token) => {
-              cTfIdf.set(token, (cTfIdf.get(token) || 0) + val * tw.weight);
-          });
-      });
-      const topGenres = Array.from(cTfIdf.entries()).sort((a,b) => b[1] - a[1]).slice(0, 150);
-      const maxVal = topGenres.length > 0 ? topGenres[0][1] : 1;
-      const genreProfile = Object.fromEntries(topGenres.map(e => [e[0], e[1]/maxVal]));
+    const cTfIdf = new Map();
+    const cMoodWeights = new Map();
+    trackWeights.forEach(tw => {
+        tw.item.tfidf.forEach((val, token) => {
+            cTfIdf.set(token, (cTfIdf.get(token) || 0) + val * tw.weight);
+        });
+        (tw.item.genres || []).forEach(g => {
+            if (MOOD_DESCRIPTORS_SET.has(g.name) && g.name !== "children's music") {
+                cMoodWeights.set(g.name, (cMoodWeights.get(g.name) || 0) + (g.score ?? 0.5) * tw.weight);
+            }
+        });
+    });
+    const topGenres = Array.from(cTfIdf.entries()).sort((a,b) => b[1] - a[1]).slice(0, 150);
+    const maxVal = topGenres.length > 0 ? topGenres[0][1] : 1;
+    const genreProfile = Object.fromEntries(topGenres.map(e => [e[0], e[1]/maxVal]));
 
-      const extract = (key, defaultVal) => trackWeights.map(tw => ({ val: (tw.item.features[key] !== null ? tw.item.features[key] / 100 : defaultVal), weight: tw.weight }));
+    const topMoods = Array.from(cMoodWeights.entries()).sort((a,b) => b[1] - a[1]).slice(0, 30);
+    const maxMoodVal = topMoods.length > 0 ? topMoods[0][1] : 1;
+    const moodProfile = Object.fromEntries(topMoods.map(e => [e[0], e[1]/maxMoodVal]));
+
+      const extract = (key, defaultVal) => trackWeights.map(tw => ({ val: (tw.item.features[key] != null ? tw.item.features[key] / 100 : defaultVal), weight: tw.weight }));
       const eData = extract('energy', 0.5);
       const vData = extract('valence', 0.5);
       const dData = extract('danceability', 0.5);
@@ -45521,8 +45772,8 @@ shadowRoot.innerHTML = `
       };
 
       const extract2D = (k1, def1, k2, def2) => trackWeights.map(tw => ({ 
-          x: (tw.item.features[k1] !== null ? tw.item.features[k1] / 100 : def1), 
-          y: (tw.item.features[k2] !== null ? tw.item.features[k2] / 100 : def2), 
+          x: (tw.item.features[k1] != null ? tw.item.features[k1] / 100 : def1), 
+          y: (tw.item.features[k2] != null ? tw.item.features[k2] / 100 : def2), 
           weight: tw.weight 
       }));
       
@@ -45544,7 +45795,7 @@ shadowRoot.innerHTML = `
       const teData = [];
       trackWeights.forEach(tw => {
           const t = tw.item.features.tempo;
-          const e = tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5;
+          const e = tw.item.features.energy != null ? tw.item.features.energy / 100 : 0.5;
           if (t) {
               teData.push({ x: spMath.clamp((t - 40) / 180, 0, 1), y: e, weight: tw.weight });
               if (t / 2 >= 40) teData.push({ x: spMath.clamp((t / 2 - 40) / 180, 0, 1), y: e, weight: tw.weight * 0.3 });
@@ -45559,12 +45810,12 @@ shadowRoot.innerHTML = `
           let affinitySum = 0;
           trackWeights.forEach(tw => {
               const normF = {
-                  energy: tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5,
-                  valence: tw.item.features.valence !== null ? tw.item.features.valence / 100 : 0.5,
-                  danceability: tw.item.features.danceability !== null ? tw.item.features.danceability / 100 : 0.5,
-                  acousticness: tw.item.features.acousticness !== null ? tw.item.features.acousticness / 100 : 0.5,
-                  speechiness: tw.item.features.speechiness !== null ? tw.item.features.speechiness / 100 : 0.1,
-                  instrumentalness: tw.item.features.instrumentalness !== null ? tw.item.features.instrumentalness / 100 : 0.0
+                  energy: tw.item.features.energy != null ? tw.item.features.energy / 100 : 0.5,
+                  valence: tw.item.features.valence != null ? tw.item.features.valence / 100 : 0.5,
+                  danceability: tw.item.features.danceability != null ? tw.item.features.danceability / 100 : 0.5,
+                  acousticness: tw.item.features.acousticness != null ? tw.item.features.acousticness / 100 : 0.5,
+                  speechiness: tw.item.features.speechiness != null ? tw.item.features.speechiness / 100 : 0.1,
+                  instrumentalness: tw.item.features.instrumentalness != null ? tw.item.features.instrumentalness / 100 : 0.0
               };
               affinitySum += tw.weight * arch.affinity(normF);
           });
@@ -45633,21 +45884,21 @@ shadowRoot.innerHTML = `
       const featureVars = { e: 0, v: 0, d: 0, a: 0, s: 0, i: 0 };
       
       trackWeights.forEach(tw => {
-          featureMeans.e += (tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5) * tw.weight;
-          featureMeans.v += (tw.item.features.valence !== null ? tw.item.features.valence / 100 : 0.5) * tw.weight;
-          featureMeans.d += (tw.item.features.danceability !== null ? tw.item.features.danceability / 100 : 0.5) * tw.weight;
-          featureMeans.a += (tw.item.features.acousticness !== null ? tw.item.features.acousticness / 100 : 0.5) * tw.weight;
-          featureMeans.s += (tw.item.features.speechiness !== null ? tw.item.features.speechiness / 100 : 0.1) * tw.weight;
-          featureMeans.i += (tw.item.features.instrumentalness !== null ? tw.item.features.instrumentalness / 100 : 0.0) * tw.weight;
+          featureMeans.e += (tw.item.features.energy != null ? tw.item.features.energy / 100 : 0.5) * tw.weight;
+          featureMeans.v += (tw.item.features.valence != null ? tw.item.features.valence / 100 : 0.5) * tw.weight;
+          featureMeans.d += (tw.item.features.danceability != null ? tw.item.features.danceability / 100 : 0.5) * tw.weight;
+          featureMeans.a += (tw.item.features.acousticness != null ? tw.item.features.acousticness / 100 : 0.5) * tw.weight;
+          featureMeans.s += (tw.item.features.speechiness != null ? tw.item.features.speechiness / 100 : 0.1) * tw.weight;
+          featureMeans.i += (tw.item.features.instrumentalness != null ? tw.item.features.instrumentalness / 100 : 0.0) * tw.weight;
       });
 
       trackWeights.forEach(tw => {
-          const diffE = (tw.item.features.energy !== null ? tw.item.features.energy / 100 : 0.5) - featureMeans.e;
-          const diffV = (tw.item.features.valence !== null ? tw.item.features.valence / 100 : 0.5) - featureMeans.v;
-          const diffD = (tw.item.features.danceability !== null ? tw.item.features.danceability / 100 : 0.5) - featureMeans.d;
-          const diffA = (tw.item.features.acousticness !== null ? tw.item.features.acousticness / 100 : 0.5) - featureMeans.a;
-          const diffS = (tw.item.features.speechiness !== null ? tw.item.features.speechiness / 100 : 0.1) - featureMeans.s;
-          const diffI = (tw.item.features.instrumentalness !== null ? tw.item.features.instrumentalness / 100 : 0.0) - featureMeans.i;
+          const diffE = (tw.item.features.energy != null ? tw.item.features.energy / 100 : 0.5) - featureMeans.e;
+          const diffV = (tw.item.features.valence != null ? tw.item.features.valence / 100 : 0.5) - featureMeans.v;
+          const diffD = (tw.item.features.danceability != null ? tw.item.features.danceability / 100 : 0.5) - featureMeans.d;
+          const diffA = (tw.item.features.acousticness != null ? tw.item.features.acousticness / 100 : 0.5) - featureMeans.a;
+          const diffS = (tw.item.features.speechiness != null ? tw.item.features.speechiness / 100 : 0.1) - featureMeans.s;
+          const diffI = (tw.item.features.instrumentalness != null ? tw.item.features.instrumentalness / 100 : 0.0) - featureMeans.i;
           
           featureVars.e += (diffE * diffE) * tw.weight;
           featureVars.v += (diffV * diffV) * tw.weight;
@@ -45677,6 +45928,7 @@ shadowRoot.innerHTML = `
       const profile = {
           label: clusterLabel,
           genreProfile,
+          moodProfile,
           vibe1D,
           vibe2D,
           archetypes,
@@ -45777,11 +46029,19 @@ shadowRoot.innerHTML = `
       await fastYield();
 
       const dataVectors = corpus.map(item => {
-          const vec = topTokens.map(t => item.tfidf.has(t) ? 1.0 : 0.0);
-          vec.push(item.features.energy !== null ? item.features.energy / 100 : 0.5);
-          vec.push(item.features.valence !== null ? item.features.valence / 100 : 0.5);
-          vec.push(item.features.danceability !== null ? item.features.danceability / 100 : 0.5);
-          vec.push(item.features.acousticness !== null ? item.features.acousticness / 100 : 0.5);
+          let maxItemTfIdf = 0;
+          topTokens.forEach(t => {
+              const v = item.tfidf.get(t) || 0;
+              if (v > maxItemTfIdf) maxItemTfIdf = v;
+          });
+          const vec = topTokens.map(t => {
+              if (!item.tfidf.has(t)) return 0.0;
+              return maxItemTfIdf > 0 ? (0.35 + 0.65 * (item.tfidf.get(t) / maxItemTfIdf)) : 1.0;
+          });
+          vec.push(item.features.energy != null ? item.features.energy / 100 : 0.5);
+          vec.push(item.features.valence != null ? item.features.valence / 100 : 0.5);
+          vec.push(item.features.danceability != null ? item.features.danceability / 100 : 0.5);
+          vec.push(item.features.acousticness != null ? item.features.acousticness / 100 : 0.5);
           
           const safePlayCount = Number(item.playCount) || 0;
           vec.push(Math.log10(safePlayCount + 1) / 10.0); 
@@ -45789,7 +46049,10 @@ shadowRoot.innerHTML = `
           return vec;
       });
 
-      const pcaResult = spMath.pca(dataVectors, 0.85, 10);
+      const nCorpus = Math.max(1, corpus.length);
+      const clusterSampleWeights = corpus.map(item => spMath.clamp(Math.sqrt((item.weight || (1 / nCorpus)) * nCorpus), 0.5, 2.5));
+
+      const pcaResult = spMath.pca(dataVectors, 0.85, 10, clusterSampleWeights);
       const projected = pcaResult.projected;
 
       let bestGMM = null;
@@ -45802,7 +46065,7 @@ shadowRoot.innerHTML = `
           const maxK = Math.min(7, Math.max(minK, Math.floor(corpus.length / 25)));
           for (let k = minK; k <= maxK; k++) {
               const gmm = new spDiagonalGMM(k);
-              if (gmm.fit(projected)) {
+              if (gmm.fit(projected, clusterSampleWeights)) {
                   if (gmm.bic < bestBIC) {
                       bestBIC = gmm.bic;
                       bestGMM = gmm;
@@ -45812,7 +46075,7 @@ shadowRoot.innerHTML = `
           }
           if (!bestGMM) {
               const fallbackGmm = new spDiagonalGMM(minK);
-              if (fallbackGmm.fit(projected)) bestGMM = fallbackGmm;
+              if (fallbackGmm.fit(projected, clusterSampleWeights)) bestGMM = fallbackGmm;
               else bestGMM = { k: 1, predict: () => [1.0] };
           }
       }
@@ -45975,17 +46238,17 @@ shadowRoot.innerHTML = `
             
             const weight = (hasAnyLiked && isLiked) ? 1.7 : 1.0;
 
-            if (t.popularity !== null && t.popularity !== undefined && !isNaN(t.popularity)) {
+            if (t.popularity !== null && t.popularity !== undefined && !isNaN(t.popularity) && Number(t.popularity) > 0) {
                 popValues.push(Number(t.popularity));
             }
 
-            if (f && f.energy !== null) {
+            if (f && f.energy != null) {
                 const e = f.energy / 100;
-                const v = f.valence !== null ? f.valence / 100 : 0.5;
-                const d = f.danceability !== null ? f.danceability / 100 : 0.5;
-                const a = f.acousticness !== null ? f.acousticness / 100 : 0.5;
-                const s = f.speechiness !== null ? f.speechiness / 100 : 0.1;
-                const i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+                const v = f.valence != null ? f.valence / 100 : 0.5;
+                const d = f.danceability != null ? f.danceability / 100 : 0.5;
+                const a = f.acousticness != null ? f.acousticness / 100 : 0.5;
+                const s = f.speechiness != null ? f.speechiness / 100 : 0.1;
+                const i = f.instrumentalness != null ? f.instrumentalness / 100 : 0.0;
                 const t = (f.tempo || 120) / 220;
 
                 featureSums.e += e * weight;
@@ -46009,8 +46272,13 @@ shadowRoot.innerHTML = `
 
             if (t.genres && Array.isArray(t.genres)) {
                 t.genres.forEach(g => {
-                    if (!MOOD_DESCRIPTORS_SET.has(g.name)) {
-                        genreCounts.set(g.name, (genreCounts.get(g.name) || 0) + ((g.score || 1) * weight));
+                    const gName = (typeof g === 'string' ? g : g.name) || "";
+                    if (gName && !MOOD_DESCRIPTORS_SET.has(gName.toLowerCase().trim())) {
+                        const baseW = (g.score ?? 1) * weight;
+                        const hierTokens = getHierarchicalTokens(gName);
+                        hierTokens.forEach(ht => {
+                            genreCounts.set(ht.name, (genreCounts.get(ht.name) || 0) + (baseW * ht.weight));
+                        });
                     }
                 });
             }
@@ -46069,7 +46337,8 @@ shadowRoot.innerHTML = `
         });
 
         const popProfile = new Array(10).fill(0);
-        if (popValues.length > 0) {
+        const hasValidPopProfile = popValues.length >= Math.max(5, Math.floor(totalCount * 0.3));
+        if (hasValidPopProfile) {
             popValues.forEach(pop => {
                 const bucketIdx = Math.min(9, Math.floor(pop / 10));
                 popProfile[bucketIdx]++;
@@ -46082,7 +46351,7 @@ shadowRoot.innerHTML = `
 
         const musicProfile = spMath.normalize(musicProfileSum);
 
-        return { isValid: true, featureMeans, genreProfile, coherence, popProfile, musicProfile };
+        return { isValid: true, featureMeans, genreProfile, coherence, rawCoherence, popProfile, hasValidPopProfile, musicProfile };
     }
 
     function scoreTrackAgainstContext(track, context) {
@@ -46091,13 +46360,13 @@ shadowRoot.innerHTML = `
         let vibeScore = 50;
         let hardGateMultiplier = 1.0;
         const f = track.features;
-        if (f && f.energy !== null) {
+        if (f && f.energy != null) {
             const e = f.energy / 100;
-            const v = f.valence !== null ? f.valence / 100 : 0.5;
-            const d = f.danceability !== null ? f.danceability / 100 : 0.5;
-            const a = f.acousticness !== null ? f.acousticness / 100 : 0.5;
-            const s = f.speechiness !== null ? f.speechiness / 100 : 0.1;
-            const i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+            const v = f.valence != null ? f.valence / 100 : 0.5;
+            const d = f.danceability != null ? f.danceability / 100 : 0.5;
+            const a = f.acousticness != null ? f.acousticness / 100 : 0.5;
+            const s = f.speechiness != null ? f.speechiness / 100 : 0.1;
+            const i = f.instrumentalness != null ? f.instrumentalness / 100 : 0.0;
 
             if (context.featureMeans.i > 0.80) {
                 if (s > 0.15) hardGateMultiplier *= Math.exp(-(s - 0.15) * 8);
@@ -46150,7 +46419,7 @@ shadowRoot.innerHTML = `
             genreScore = vibeScore;
         }
 
-        const coh = (context.coherence !== undefined && context.coherence !== null) ? context.coherence : 0.6;
+        const coh = context.rawCoherence ?? context.coherence ?? 0.6;
         const vibeWeight = 0.30 + (0.40 * coh);
         const musicModelWeight = 0.20;
         const genreWeight = 1.0 - vibeWeight - musicModelWeight;
@@ -46158,27 +46427,59 @@ shadowRoot.innerHTML = `
         const mVec = track.musicVector || getTrackMusicProfile(track.genres, track.features);
         const musicModelScore = spMath.cosineSimilarity(mVec, context.musicProfile) * 100;
 
-        let baseScore = ((vibeScore * vibeWeight) + (genreScore * genreWeight) + (musicModelScore * musicModelWeight)) * hardGateMultiplier;
-        return Math.min(100, baseScore);
+        let baseScore = (vibeScore * vibeWeight) + (genreScore * genreWeight) + (musicModelScore * musicModelWeight);
+        if (context.hasValidPopProfile && track.popularity != null && !isNaN(track.popularity) && Number(track.popularity) > 0 && context.popProfile) {
+            const bucketIdx = spMath.clamp(Math.floor(Number(track.popularity) / 10), 0, 9);
+            const popFit = (context.popProfile[bucketIdx] || 0) * 100;
+            baseScore = (baseScore * 0.92) + (popFit * 0.08);
+        }
+        return Math.min(100, baseScore * hardGateMultiplier);
     }
 
     function scoreTrackAgainstCluster(track, cluster, pmiMatrix) {
-        let genreScore = 40, genreConf = 0.5, noveltyContrib = 0;
-        const candidateMusicalGenres = (track.genres || []).filter(g => {
-            const name = (typeof g === 'string' ? g : g.name) || "";
-            return !MOOD_DESCRIPTORS_SET.has(name.toLowerCase().trim());
+        let genreScore = 40, genreConf = 0.45, noveltyContrib = 0;
+        const candidateMusicalGenres = [];
+        const candidateMoodGenres = [];
+        (track.genres || []).forEach(g => {
+            const name = ((typeof g === 'string' ? g : g.name) || "").toLowerCase().trim();
+            if (!name || name === "children's music") return;
+            if (MOOD_DESCRIPTORS_SET.has(name) || MOOD_DESCRIPTORS_SET.has(normalizeGenre(name))) {
+                candidateMoodGenres.push(g);
+            } else {
+                candidateMusicalGenres.push(g);
+            }
         });
+
+        let moodMatchScore = null;
+        if (candidateMoodGenres.length > 0 && cluster.moodProfile && Object.keys(cluster.moodProfile).length > 0) {
+            const moodMatches = candidateMoodGenres.map(g => {
+                const mName = normalizeGenre((typeof g === 'string' ? g : g.name) || "");
+                const mWeight = cluster.moodProfile[mName] || 0;
+                const mConf = g.score ?? 0.6;
+                return mWeight * (mConf >= 0.35 ? 1.0 : spMath.clamp(mConf / 0.35, 0.4, 1.0));
+            });
+            moodMatches.sort((a, b) => b - a);
+            const mTop1 = moodMatches[0];
+            const mTop2 = moodMatches.length > 1 ? moodMatches[1] : mTop1;
+            moodMatchScore = (0.75 * mTop1 + 0.25 * mTop2) * 100;
+        }
 
         if (candidateMusicalGenres.length > 0) {
             const sortedByScore = [...candidateMusicalGenres].sort((a, b) => (b.score ?? 0.5) - (a.score ?? 0.5));
             const primaryScore = sortedByScore[0].score ?? 1.0;
             const threshold = Math.min(primaryScore, Math.max(0.08, primaryScore * 0.20));
             const gatedGenres = sortedByScore.filter(g => (g.score ?? 0.5) >= threshold);
+            const plateauFloor = Math.min(0.38, primaryScore * 0.45);
 
             const rootMatches = [];
             gatedGenres.forEach(g => {
                 const rawName = (typeof g === 'string' ? g : g.name) || "";
                 const gName = normalizeGenre(rawName);
+                const gScore = g.score ?? 0.5;
+                const confMultiplier = (gScore >= 0.38 || (gScore / primaryScore) >= 0.45)
+                    ? 1.0
+                    : spMath.clamp(gScore / Math.max(0.08, plateauFloor), 0.35, 1.0);
+
                 const directWeight = cluster.genreProfile[gName] || cluster.genreProfile[rawName] || 0;
                 const isKnown = directWeight > 0;
                 
@@ -46204,26 +46505,33 @@ shadowRoot.innerHTML = `
                     });
                 }
 
-                if (!isKnown && maxPmiForGenre > 0) noveltyContrib += Math.min(2.0, maxPmiForGenre * 0.3);
-                rootMatches.push(Math.max(directWeight, subMatch, pmiMatch));
+                if (!isKnown && maxPmiForGenre > 0) noveltyContrib += Math.min(2.0, maxPmiForGenre * 0.3) * confMultiplier;
+                rootMatches.push(Math.max(directWeight, subMatch, pmiMatch) * confMultiplier);
             });
 
             if (rootMatches.length > 0) {
                 rootMatches.sort((a, b) => b - a);
                 const top1 = rootMatches[0];
                 const top2 = rootMatches.length > 1 ? rootMatches[1] : top1;
-                genreScore = (0.75 * top1 + 0.25 * top2) * 100;
+                let musicalScore = (0.75 * top1 + 0.25 * top2) * 100;
+                if (moodMatchScore !== null) {
+                    musicalScore = spMath.clamp(musicalScore * 0.92 + moodMatchScore * 0.14, Math.max(0, musicalScore - 4), 100);
+                }
+                genreScore = musicalScore;
                 genreConf = 1.0;
             }
+        } else if (moodMatchScore !== null) {
+            genreScore = spMath.clamp(35 + 0.45 * moodMatchScore, 35, 80);
+            genreConf = 0.65;
         }
 
         let vibeScore = 50, vibeConf = 0.0;
         let hardGateMultiplier = 1.0;
         const f = track.features;
-        if (f && f.energy !== null && f.valence !== null && f.danceability !== null && f.acousticness !== null) {
+        if (f && f.energy != null && f.valence != null && f.danceability != null && f.acousticness != null) {
             const e = f.energy / 100, v = f.valence / 100, d = f.danceability / 100, 
-                  a = f.acousticness / 100, s = f.speechiness !== null ? f.speechiness / 100 : 0.1, 
-                  i = f.instrumentalness !== null ? f.instrumentalness / 100 : 0.0;
+                  a = f.acousticness / 100, s = f.speechiness != null ? f.speechiness / 100 : 0.1, 
+                  i = f.instrumentalness != null ? f.instrumentalness / 100 : 0.0;
 
             if (cluster.featureMeans.i > 0.80 && s > 0.15) hardGateMultiplier *= Math.exp(-(s - 0.15) * 8);
             else if (cluster.featureMeans.s > 0.40 && i > 0.50) hardGateMultiplier *= Math.exp(-(i - 0.50) * 6);
@@ -46237,12 +46545,12 @@ shadowRoot.innerHTML = `
             const distS = getGaussianDistance(s, cluster.featureMeans.s, cluster.featureVars.s);
             const distI = getGaussianDistance(i, cluster.featureMeans.i, cluster.featureVars.i);
 
-            const mE = Math.max(getDensityScore1D(cluster.vibe1D.energy, e, 0, 1), distE);
-            const mV = Math.max(getDensityScore1D(cluster.vibe1D.valence, v, 0, 1), distV);
-            const mD = Math.max(getDensityScore1D(cluster.vibe1D.danceability, d, 0, 1), distD);
-            const mA = Math.max(getDensityScore1D(cluster.vibe1D.acousticness, a, 0, 1), distA);
-            const mS = Math.max(getDensityScore1D(cluster.vibe1D.speechiness, s, 0, 1), distS);
-            const mI = Math.max(getDensityScore1D(cluster.vibe1D.instrumentalness, i, 0, 1), distI);
+            const mE = 0.75 * getDensityScore1D(cluster.vibe1D.energy, e, 0, 1) + 0.25 * distE;
+            const mV = 0.75 * getDensityScore1D(cluster.vibe1D.valence, v, 0, 1) + 0.25 * distV;
+            const mD = 0.75 * getDensityScore1D(cluster.vibe1D.danceability, d, 0, 1) + 0.25 * distD;
+            const mA = 0.75 * getDensityScore1D(cluster.vibe1D.acousticness, a, 0, 1) + 0.25 * distA;
+            const mS = 0.75 * getDensityScore1D(cluster.vibe1D.speechiness, s, 0, 1) + 0.25 * distS;
+            const mI = 0.75 * getDensityScore1D(cluster.vibe1D.instrumentalness, i, 0, 1) + 0.25 * distI;
             const marginalScore = (1.2 * mE + 1.0 * mV + 1.2 * mD + 1.1 * mA + 1.0 * mS + 0.8 * mI) / 6.3;
 
             const jEV = getDensityScore2D(cluster.vibe2D.ev, e, v, 0, 1);
@@ -46257,21 +46565,27 @@ shadowRoot.innerHTML = `
             const jointScore = ((jEV * 1.2) + (jEA * 1.1) + (jVA * 1.0) + (jEI * 0.8) + (jES * 0.9) + (jED * 1.2) + (jVD * 1.1) + (jDA * 1.0)) / 8.3;
             vibeScore = 0.60 * marginalScore + 0.40 * jointScore;
             vibeConf = 1.0;
-        } else if (f && (f.energy !== null || f.valence !== null)) {
+        } else if (f && (f.energy != null || f.valence != null)) {
             vibeConf = 0.6;
             let sum = 0, count = 0;
-            if (f.energy !== null) { sum += getDensityScore1D(cluster.vibe1D.energy, f.energy/100, 0, 1); count++; }
-            if (f.valence !== null) { sum += getDensityScore1D(cluster.vibe1D.valence, f.valence/100, 0, 1); count++; }
-            if (f.danceability !== null) { sum += getDensityScore1D(cluster.vibe1D.danceability, f.danceability/100, 0, 1); count++; }
-            if (f.acousticness !== null) { sum += getDensityScore1D(cluster.vibe1D.acousticness, f.acousticness/100, 0, 1); count++; }
-            vibeScore = count > 0 ? sum / count : 0;
+            if (f.energy != null) { sum += getDensityScore1D(cluster.vibe1D.energy, f.energy/100, 0, 1); count++; }
+            if (f.valence != null) { sum += getDensityScore1D(cluster.vibe1D.valence, f.valence/100, 0, 1); count++; }
+            if (f.danceability != null) { sum += getDensityScore1D(cluster.vibe1D.danceability, f.danceability/100, 0, 1); count++; }
+            if (f.acousticness != null) { sum += getDensityScore1D(cluster.vibe1D.acousticness, f.acousticness/100, 0, 1); count++; }
+            const margPartial = count > 0 ? sum / count : 0;
+            if (f.energy != null && f.danceability != null && cluster.vibe2D?.ed) {
+                const jED = getDensityScore2D(cluster.vibe2D.ed, f.energy/100, f.danceability/100, 0, 1);
+                vibeScore = 0.65 * margPartial + 0.35 * jED;
+            } else {
+                vibeScore = margPartial;
+            }
         }
 
         let archScore = 50, archConf = 0.0;
-        if (vibeConf >= 0.6) {
+        if (vibeConf >= 1.0) {
             const normF = { 
-                energy: f.energy !== null ? f.energy/100 : 0.5, 
-                valence: f.valence !== null ? f.valence/100 : 0.5, 
+                energy: f.energy != null ? f.energy/100 : 0.5, 
+                valence: f.valence != null ? f.valence/100 : 0.5, 
                 danceability: (f.danceability||50)/100, 
                 acousticness: (f.acousticness||50)/100,
                 speechiness: (f.speechiness||10)/100, 
@@ -46329,7 +46643,7 @@ shadowRoot.innerHTML = `
             const normT = spMath.clamp((t - 40) / 180, 0, 1);
             const normTh = spMath.clamp((t/2 - 40) / 180, 0, 1);
             const normTd = spMath.clamp((t*2 - 40) / 180, 0, 1);
-            const e = f.energy !== null ? f.energy / 100 : 0.5;
+            const e = f.energy != null ? f.energy / 100 : 0.5;
             
             const s1 = getDensityScore1D(cluster.tempoHist, t, 40, 220);
             const s2 = t/2 >= 40 ? getDensityScore1D(cluster.tempoHist, t/2, 40, 220) : 0;
@@ -46350,21 +46664,27 @@ shadowRoot.innerHTML = `
             const tKey = f.key_raw, tMode = f.mode;
             const compatMatrix = [1.0, 0.6, 0.6, 0.2, 0.2, 0.85, 0.2, 0.85, 0.2, 0.2, 0.6, 0.6]; 
             let harmonicSum = 0;
-            let peakDist = Math.max(...cluster.keyDist, 1e-9);
+            let totalKeyWeight = cluster.keyDist.reduce((a, b) => a + b, 0) || 1e-9;
             for(let k=0; k<12; k++) {
                 const diff = Math.min(Math.abs(tKey - k), 12 - Math.abs(tKey - k));
-                harmonicSum += (cluster.keyDist[k] / peakDist) * (compatMatrix[diff] || 0.2);
+                harmonicSum += (cluster.keyDist[k] / totalKeyWeight) * (compatMatrix[diff] || 0.2);
             }
             let modePeak = Math.max(...cluster.modeDist, 1e-9);
             const modeFactor = cluster.modeDist[tMode] / modePeak;
-            keyScore = Math.min(100, harmonicSum * 100 * (0.7 + 0.3 * modeFactor));
+            keyScore = spMath.clamp(harmonicSum * 100 * (0.7 + 0.3 * modeFactor), 0, 100);
             keyConf = 1.0;
         }
 
-        const hasMusicData = (candidateMusicalGenres.length > 0) || (f && f.energy != null);
-        const mVec = track.musicVector || getTrackMusicProfile(candidateMusicalGenres, track.features);
+        const hasMusicData = (track.genres && track.genres.length > 0) || (f && f.energy != null);
+        const mVec = track.musicVector || getTrackMusicProfile(track.genres, track.features);
         const musicModelScore = spMath.cosineSimilarity(mVec, cluster.musicProfile) * 100;
         const musicModelConf = hasMusicData ? 1.0 : 0.0;
+
+        if (candidateMusicalGenres.length === 0 && moodMatchScore === null) {
+            const sonicAnchor = vibeConf > 0 ? (0.6 * vibeScore + 0.4 * musicModelScore) : musicModelScore;
+            genreScore = spMath.clamp(0.55 * sonicAnchor, 35, 65);
+            genreConf = 0.45;
+        }
 
         const scores = { 
             genre: spMath.clamp(genreScore, 0, 100), 
@@ -46432,19 +46752,27 @@ shadowRoot.innerHTML = `
                 const res = scoreTrackAgainstCluster(track, cluster, profile.pmiMatrix);
                 const clusterMass = cluster.mass || 0.01;
                 const massRatio = Math.min(1.0, clusterMass / Math.max(0.24, maxClusterMass * 0.75));
-                const dietMultiplier = 0.82 + 0.18 * Math.sqrt(massRatio);
+                const dietMultiplier = 0.92 + 0.08 * Math.sqrt(massRatio);
                 const effectiveScore = res.rawScore * res.penalty * dietMultiplier;
                 return { ...res, effectiveScore, dietMultiplier };
             });
 
             let bestResult = clusterResults[0];
+            let secondBestScore = -1;
             for (let c = 1; c < clusterResults.length; c++) {
                 if (clusterResults[c].effectiveScore > bestResult.effectiveScore) {
+                    secondBestScore = bestResult.effectiveScore;
                     bestResult = clusterResults[c];
+                } else if (clusterResults[c].effectiveScore > secondBestScore) {
+                    secondBestScore = clusterResults[c].effectiveScore;
                 }
             }
 
             let aggregatedScore = bestResult.effectiveScore;
+            if (secondBestScore >= 70 && bestResult.effectiveScore > 0) {
+                const synergyRatio = secondBestScore / bestResult.effectiveScore;
+                aggregatedScore += Math.min(3.0, (secondBestScore - 68) * 0.12 * synergyRatio);
+            }
 
             const noveltyBonus = Math.min(4, (bestResult.noveltyContrib || 0) * 1.5);
             if (aggregatedScore >= 65) aggregatedScore += noveltyBonus;
@@ -46473,17 +46801,19 @@ shadowRoot.innerHTML = `
         const total = sortedByScore.length;
         
         if (total > 0) {
-            const minScore = sortedByScore[0].tasteMatchScore;
-            const maxScore = sortedByScore[total - 1].tasteMatchScore;
+            const lowIdx = total >= 20 ? Math.floor(total * 0.05) : 0;
+            const highIdx = total >= 20 ? Math.min(total - 1, Math.floor(total * 0.95)) : total - 1;
+            const minScore = sortedByScore[lowIdx].tasteMatchScore;
+            const maxScore = sortedByScore[highIdx].tasteMatchScore;
             const range = maxScore - minScore;
             
             sortedByScore.forEach(t => {
                 if (range >= 8.0) {
-                    const normalized = (t.tasteMatchScore - minScore) / range;
+                    const normalized = spMath.clamp((t.tasteMatchScore - minScore) / range, 0, 1);
                     const stretchMin = Math.min(minScore, 20);
                     const stretchMax = Math.max(maxScore, 85);
                     const stretched = stretchMin + normalized * (stretchMax - stretchMin);
-                    t.calibratedTasteMatch = 0.7 * t.tasteMatchScore + 0.3 * stretched;
+                    t.calibratedTasteMatch = spMath.clamp(0.7 * t.tasteMatchScore + 0.3 * stretched, 0, 100);
                 } else {
                     t.calibratedTasteMatch = t.tasteMatchScore;
                 }
@@ -46495,7 +46825,7 @@ shadowRoot.innerHTML = `
 
     function calculateTrackVibeScores(trackOrFeatures) {
       const f = trackOrFeatures.features || trackOrFeatures;
-      if (!f || f.energy === null || f.valence === null) return {};
+      if (!f || f.energy == null || f.valence == null) return {};
   
       const getMatch = (val, ideal, weight) => Math.max(0, 1 - Math.abs(val - ideal)) * weight;
   
@@ -46982,7 +47312,7 @@ shadowRoot.innerHTML = `
             const seedsL2 = getValidSeeds(level2, level1, level3);
             const seedsL1 = getValidSeeds(level1, level2, level3);
 
-            const allRadioSeeds = [...new Set([...seedsL4, ...seedsL3, ...seedsL2, ...seedsL1].map(a => `spotify:artist:${a.id}`))];
+            const allRadioSeeds = [...new Set([...seedsL1, ...seedsL2, ...seedsL3, ...seedsL4].map(a => `spotify:artist:${a.id}`))];
             const rawApiTracks = await fetchRadioTracks(allRadioSeeds, 300);
 
             let apiRecommendedTracks = [];
@@ -47001,7 +47331,6 @@ shadowRoot.innerHTML = `
                     const hasKnownArtist = track.artists.some(a => knownArtistIds.has(a.id));
                     if (hasKnownArtist) return false;
 
-                    track.artists.forEach(a => knownArtistIds.add(a.id));
                     return true;
                 });
             }
@@ -47064,8 +47393,12 @@ shadowRoot.innerHTML = `
             ]);
 
             const assignGenres = (t) => {
-                const raw = nativeGenresMap.get(t.uri) || [];
-                t.genres = raw.map(g => ({ name: normalizeGenre(g.name), score: g.score || 0.85 }));
+                const raw = (nativeGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
+                const mapped = mapAndNormalizeGenres(raw.map(g => ({ name: g.name, source: 'spotify_track' })));
+                t.genres = mapped.map(m => ({
+                    name: normalizeGenre(m.name),
+                    score: resolveMappedGenreScore(m.name, raw, 0.5)
+                }));
             };
 
             tracksToProfile.forEach(t => {
@@ -47073,7 +47406,7 @@ shadowRoot.innerHTML = `
                 assignGenres(t);
             });
 
-            const validProfiling = tracksToProfile.filter(t => t.features && t.features.energy !== null);
+            const validProfiling = tracksToProfile.filter(t => t.features && t.features.energy != null);
 
             const genreDocFreq = new Map();
             validProfiling.forEach(t => {
@@ -47265,7 +47598,7 @@ shadowRoot.innerHTML = `
             const scoreAgainstExemplar = (track, exemplar) => {
                 const f = track.features;
                 let vibeScore = 50;
-                if (f && f.energy !== null) {
+                if (f && f.energy != null) {
                     const e = f.energy / 100;
                     const v = (f.valence ?? 50) / 100;
                     const d = (f.danceability ?? 50) / 100;
@@ -47273,10 +47606,10 @@ shadowRoot.innerHTML = `
                     const t = (f.tempo || 120) / 220;
 
                     const diffE = Math.pow(e - exemplar.featureMeans.e, 2) * 1.8;
-                    const diffV = Math.pow(Math.abs(v - exemplar.featureMeans.v), 1.8);
-                    const diffT = Math.pow(Math.abs(t - exemplar.featureMeans.t), 1.4);
-                    const diffA = Math.pow(Math.abs(a - exemplar.featureMeans.a), 1.2);
-                    const diffD = Math.pow(Math.abs(d - exemplar.featureMeans.d), 0.6);
+                    const diffV = Math.pow(v - exemplar.featureMeans.v, 2) * 1.8;
+                    const diffT = Math.pow(t - exemplar.featureMeans.t, 2) * 1.4;
+                    const diffA = Math.pow(a - exemplar.featureMeans.a, 2) * 1.2;
+                    const diffD = Math.pow(d - exemplar.featureMeans.d, 2) * 0.6;
 
                     vibeScore = Math.max(0, 100 * Math.exp(-(diffE + diffV + diffT + diffA + diffD) * 1.4));
                 }
@@ -47432,7 +47765,7 @@ shadowRoot.innerHTML = `
             const validForWave = tracksToSort.filter(t => t.features && t.features.energy != null);
             const others = tracksToSort.filter(t => !t.features || t.features.energy == null);
 
-            const sortedTracks = await energyWaveSort(validForWave);
+            const sortedTracks = await energyWaveSort(validForWave, 'wave', { anchorUris: anchorClusterSelectedUris });
             const finalTracks = [...sortedTracks, ...others].slice(0, discoveryPlaylistSize);
 
             const trackUris = finalTracks.map(track => track.uri);
@@ -47548,17 +47881,17 @@ shadowRoot.innerHTML = `
             corpus.forEach(item => {
                 const id = item.track.id || item.track.uri.split(':')[2];
                 const stats = corpusAudioStats[id];
-                if (!stats || stats.energy === null) return;
+                if (!stats || stats.energy == null) return;
                 
                 item.features = stats;
                 item.track.popularity = corpusPopMap.get(item.track.uri) ?? item.track.popularity ?? 50;
 
-                const rawGenres = corpusNativeGenres.get(item.track.uri) || [];
+                const rawGenres = (corpusNativeGenres.get(item.track.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
-                item.genres = mappedGenres.map(m => {
-                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
-                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
-                });
+                item.genres = mappedGenres.map(m => ({
+                    name: normalizeGenre(m.name),
+                    score: resolveMappedGenreScore(m.name, rawGenres, 0.5)
+                }));
 
                 validCorpus.push(item);
                 totalCorpusWeight += item.weight;
@@ -47828,9 +48161,15 @@ shadowRoot.innerHTML = `
             }));
 
             const allSeededUrisWithCluster = [];
-            clusterSeedMap.forEach((seedUris, clusterId) => {
-                seedUris.forEach(uri => allSeededUrisWithCluster.push({ uri, clusterId }));
-            });
+            const clusterEntries = Array.from(clusterSeedMap.entries());
+            const maxClusterSeeds = Math.max(0, ...clusterEntries.map(([, list]) => list.length));
+            for (let sIdx = 0; sIdx < maxClusterSeeds; sIdx++) {
+                for (const [clusterId, seedUris] of clusterEntries) {
+                    if (sIdx < seedUris.length) {
+                        allSeededUrisWithCluster.push({ uri: seedUris[sIdx], clusterId });
+                    }
+                }
+            }
 
             const uniqueSeedsToFetch = [...new Set(allSeededUrisWithCluster.map(s => s.uri))];
             const rawApiTracks = await fetchRadioTracks(uniqueSeedsToFetch, 400);
@@ -47857,7 +48196,9 @@ shadowRoot.innerHTML = `
             const availabilityChecks = await Promise.all(rawApiTracks.map(track => isTrackAvailable(track)));
 
             const seedToClusterMap = new Map();
-            allSeededUrisWithCluster.forEach(s => seedToClusterMap.set(s.uri, s.clusterId));
+            allSeededUrisWithCluster.forEach(s => {
+                if (!seedToClusterMap.has(s.uri)) seedToClusterMap.set(s.uri, s.clusterId);
+            });
 
             const seenCandidateUris = new Set();
             const preFilteredTracks = rawApiTracks.filter((track, index) => {
@@ -47990,12 +48331,12 @@ shadowRoot.innerHTML = `
 
             const evaluatedCandidates = cleanCandidatePool.map(t => {
                 const stats = candidateStats[t.id];
-                const rawGenres = candidateGenresMap.get(t.uri) || [];
+                const rawGenres = (candidateGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
-                const genres = mappedGenres.map(m => {
-                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
-                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
-                });
+                const genres = mappedGenres.map(m => ({
+                    name: normalizeGenre(m.name),
+                    score: resolveMappedGenreScore(m.name, rawGenres, 0.5)
+                }));
 
                 const nativeClusterId = seedToClusterMap.get(t._seedUri) ?? primaryAnchorCluster.id;
                 return { ...t, features: stats, genres, assignedClusterId: nativeClusterId };
@@ -48006,7 +48347,7 @@ shadowRoot.innerHTML = `
             const scoreTrackAgainstClusterProfile = (track, cluster) => {
                 const f = track.features;
                 let vibeScore = 50;
-                if (f && f.energy !== null) {
+                if (f && f.energy != null) {
                     const e = f.energy / 100;
                     const v = (f.valence ?? 50) / 100;
                     const d = (f.danceability ?? 50) / 100;
@@ -48014,10 +48355,10 @@ shadowRoot.innerHTML = `
                     const t = (f.tempo || 120) / 220;
 
                     const diffE = Math.pow(e - cluster.featureMeans.e, 2) * 1.8;
-                    const diffV = Math.pow(Math.abs(v - cluster.featureMeans.v), 1.8);
-                    const diffT = Math.pow(Math.abs(t - cluster.featureMeans.t), 1.4);
-                    const diffA = Math.pow(Math.abs(a - cluster.featureMeans.a), 1.2);
-                    const diffD = Math.pow(Math.abs(d - cluster.featureMeans.d), 0.6);
+                    const diffV = Math.pow(v - cluster.featureMeans.v, 2) * 1.8;
+                    const diffT = Math.pow(t - cluster.featureMeans.t, 2) * 1.4;
+                    const diffA = Math.pow(a - cluster.featureMeans.a, 2) * 1.2;
+                    const diffD = Math.pow(d - cluster.featureMeans.d, 2) * 0.6;
 
                     vibeScore = Math.max(0, 100 * Math.exp(-(diffE + diffV + diffT + diffA + diffD) * 1.4));
                 }
@@ -48195,7 +48536,7 @@ shadowRoot.innerHTML = `
             const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
             const others = finalSelected.filter(t => !t.features || t.features.energy == null);
 
-            const sortedTracks = await energyWaveSort(validForWave);
+            const sortedTracks = await energyWaveSort(validForWave, 'wave', { anchorUris: anchorClusterSelectedUris });
             const finalTracks = [...sortedTracks, ...others].slice(0, targetPlaylistCount);
             const trackUris = finalTracks.map(track => track.uri);
 
@@ -48274,17 +48615,17 @@ shadowRoot.innerHTML = `
             corpus.forEach(item => {
                 const id = item.track.id || item.track.uri.split(':')[2];
                 const stats = corpusAudioStats[id];
-                if (!stats || stats.energy === null) return;
+                if (!stats || stats.energy == null) return;
 
                 item.features = stats;
                 item.track.popularity = corpusPopMap.get(item.track.uri) ?? item.track.popularity ?? 50;
 
-                const rawGenres = corpusNativeGenres.get(item.track.uri) || [];
+                const rawGenres = (corpusNativeGenres.get(item.track.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
-                item.genres = mappedGenres.map(m => {
-                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
-                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
-                });
+                item.genres = mappedGenres.map(m => ({
+                    name: normalizeGenre(m.name),
+                    score: resolveMappedGenreScore(m.name, rawGenres, 0.5)
+                }));
 
                 validCorpus.push(item);
                 totalCorpusWeight += item.weight;
@@ -48530,9 +48871,15 @@ shadowRoot.innerHTML = `
             }));
 
             const allSeededUrisWithPillar = [];
-            pillarSeedMap.forEach((seedUris, pillarId) => {
-                seedUris.forEach(uri => allSeededUrisWithPillar.push({ uri, pillarId }));
-            });
+            const pillarEntries = Array.from(pillarSeedMap.entries());
+            const maxPillarSeeds = Math.max(0, ...pillarEntries.map(([, list]) => list.length));
+            for (let sIdx = 0; sIdx < maxPillarSeeds; sIdx++) {
+                for (const [pillarId, seedUris] of pillarEntries) {
+                    if (sIdx < seedUris.length) {
+                        allSeededUrisWithPillar.push({ uri: seedUris[sIdx], pillarId });
+                    }
+                }
+            }
 
             const uniqueSeedsToFetch = [...new Set(allSeededUrisWithPillar.map(s => s.uri))];
             const rawApiTracks = await fetchRadioTracks(uniqueSeedsToFetch, 350);
@@ -48559,7 +48906,9 @@ shadowRoot.innerHTML = `
             const availabilityChecks = await Promise.all(rawApiTracks.map(track => isTrackAvailable(track)));
 
             const seedToPillarMap = new Map();
-            allSeededUrisWithPillar.forEach(s => seedToPillarMap.set(s.uri, s.pillarId));
+            allSeededUrisWithPillar.forEach(s => {
+                if (!seedToPillarMap.has(s.uri)) seedToPillarMap.set(s.uri, s.pillarId);
+            });
 
             const seenCandidateUris = new Set();
             const preFilteredTracks = rawApiTracks.filter((track, index) => {
@@ -48692,12 +49041,12 @@ shadowRoot.innerHTML = `
 
             const evaluatedCandidates = cleanCandidatePool.map(t => {
                 const stats = candidateStats[t.id];
-                const rawGenres = candidateGenresMap.get(t.uri) || [];
+                const rawGenres = (candidateGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
                 const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
-                const genres = mappedGenres.map(m => {
-                    const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
-                    return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
-                });
+                const genres = mappedGenres.map(m => ({
+                    name: normalizeGenre(m.name),
+                    score: resolveMappedGenreScore(m.name, rawGenres, 0.5)
+                }));
 
                 const nativePillarId = seedToPillarMap.get(t._seedUri) ?? dominantPillar.id;
                 return { ...t, features: stats, genres, assignedPillarId: nativePillarId };
@@ -48708,7 +49057,7 @@ shadowRoot.innerHTML = `
             const scoreTrackAgainstPillarProfile = (track, pillar) => {
                 const f = track.features;
                 let vibeScore = 50;
-                if (f && f.energy !== null) {
+                if (f && f.energy != null) {
                     const e = f.energy / 100;
                     const v = (f.valence ?? 50) / 100;
                     const d = (f.danceability ?? 50) / 100;
@@ -48716,10 +49065,10 @@ shadowRoot.innerHTML = `
                     const t = (f.tempo || 120) / 220;
 
                     const diffE = Math.pow(e - pillar.featureMeans.e, 2) * 1.8;
-                    const diffV = Math.pow(Math.abs(v - pillar.featureMeans.v), 1.8);
-                    const diffT = Math.pow(Math.abs(t - pillar.featureMeans.t), 1.4);
-                    const diffA = Math.pow(Math.abs(a - pillar.featureMeans.a), 1.2);
-                    const diffD = Math.pow(Math.abs(d - pillar.featureMeans.d), 0.6);
+                    const diffV = Math.pow(v - pillar.featureMeans.v, 2) * 1.8;
+                    const diffT = Math.pow(t - pillar.featureMeans.t, 2) * 1.4;
+                    const diffA = Math.pow(a - pillar.featureMeans.a, 2) * 1.2;
+                    const diffD = Math.pow(d - pillar.featureMeans.d, 2) * 0.6;
 
                     vibeScore = Math.max(0, 100 * Math.exp(-(diffE + diffV + diffT + diffA + diffD) * 1.4));
                 }
@@ -48882,7 +49231,7 @@ shadowRoot.innerHTML = `
             const validForWave = finalSelected.filter(t => t.features && t.features.energy != null);
             const others = finalSelected.filter(t => !t.features || t.features.energy == null);
 
-            const sortedTracks = await energyWaveSort(validForWave);
+            const sortedTracks = await energyWaveSort(validForWave, 'wave', { anchorUris: dominantPillarSelectedUris });
             const finalTracks = [...sortedTracks, ...others].slice(0, targetPlaylistCount);
             const trackUris = finalTracks.map(track => track.uri);
 
@@ -50013,7 +50362,8 @@ shadowRoot.innerHTML = `
               if (chunk.length < 3) {
                   sortedTracks.push(...chunk);
               } else {
-                  const sortedChunk = await energyWaveSort(chunk);
+                  const previousTrack = sortedTracks.length > 0 ? sortedTracks[sortedTracks.length - 1] : null;
+                  const sortedChunk = await energyWaveSort(chunk, 'wave', { previousTrack });
                   sortedTracks.push(...sortedChunk);
               }
           }
@@ -50320,12 +50670,12 @@ shadowRoot.innerHTML = `
 
         candidatesWithMeta.forEach(t => {
             t.features = allAudioStats[t.id] || null;
-            const rawGenres = nativeGenresMap.get(t.uri) || [];
+            const rawGenres = (nativeGenresMap.get(t.uri) || []).filter(g => (g.score * 100) > 5 && !isCountryOnly(g.name));
             const mappedGenres = mapAndNormalizeGenres(rawGenres.map(g => ({ name: g.name, source: 'spotify_track' })));
-            t.genres = mappedGenres.map(m => {
-                const orig = rawGenres.find(g => getNormalizedGenreKey(g.name) === getNormalizedGenreKey(m.name));
-                return { name: normalizeGenre(m.name), score: orig ? orig.score : 0.85 };
-            });
+            t.genres = mappedGenres.map(m => ({
+                name: normalizeGenre(m.name),
+                score: resolveMappedGenreScore(m.name, rawGenres, 0.5)
+            }));
         });
 
         updateProgress("Taste Match...");
@@ -51428,8 +51778,8 @@ shadowRoot.innerHTML = `
                     return { ...track, ...stats, features: stats };
                 });
                 
-                const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy != null && track.features.valence != null);
-                const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy == null || track.features.valence == null);
+                const tracksWithData = tracksWithAudioFeatures.filter(track => track.features && track.features.energy != null);
+                const tracksWithoutData = tracksWithAudioFeatures.filter(track => !track.features || track.features.energy == null);
                 missingDataCount = tracksWithoutData.length;
 
                 updateProgressText("Vibe...");
@@ -51845,20 +52195,16 @@ shadowRoot.innerHTML = `
             let journeySortedTracks;
             let tracksWithData, tracksWithoutData;
 
-            tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy != null && track.features.valence != null);
-            tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy == null || track.features.valence == null);
+            tracksWithData = uniqueTracks.filter(track => track.features && track.features.energy != null);
+            tracksWithoutData = uniqueTracks.filter(track => !track.features || track.features.energy == null);
             
             if (tracksWithData.length < 3) {
-                 journeySortedTracks = [...tracksWithData];
+                 journeySortedTracks = isAscending ? [...tracksWithData].reverse() : [...tracksWithData];
             } else {
-                 journeySortedTracks = await energyWaveSort(tracksWithData);
+                 journeySortedTracks = await energyWaveSort(tracksWithData, 'wave', { reverse: isAscending });
             }
 
             missingDataCount = tracksWithoutData.length;
-
-            if (isAscending) {
-                journeySortedTracks.reverse();
-            }
 
             sortedTracks = [...journeySortedTracks, ...tracksWithoutData];
             updateProgressText("100%");
@@ -52680,39 +53026,57 @@ shadowRoot.innerHTML = `
   function getHarmonicCompatibilityScore(camelotKey1, camelotKey2, tonalityDamping = 1.0) {
     if (!camelotKey1 || !camelotKey2) return 0;
     const num1 = parseInt(camelotKey1.slice(0, -1), 10);
-    const mode1 = camelotKey1.slice(-1);
+    const mode1 = camelotKey1.slice(-1).toUpperCase();
     const num2 = parseInt(camelotKey2.slice(0, -1), 10);
-    const mode2 = camelotKey2.slice(-1);
+    const mode2 = camelotKey2.slice(-1).toUpperCase();
     if (isNaN(num1) || isNaN(num2)) return 0;
 
+    const clockDiff = (num2 - num1 + 12) % 12;
+    const dist = Math.min(clockDiff, 12 - clockDiff);
+
     let base = 0;
-    if (num1 === num2 && mode1 === mode2) base = 100;
-    else if (num1 === num2 && mode1 !== mode2) base = 95;
-    else {
-      const diff = Math.min(Math.abs(num1 - num2), 12 - Math.abs(num1 - num2));
-      if (diff === 1 && mode1 === mode2) base = 80;
-      else if (((num1 + 2 - 1) % 12 + 1) === num2 && mode1 === mode2) base = 60;
-      else if (diff === 1 && mode1 !== mode2) base = 40;
-      else if ((diff === 7 || diff === 5) && mode1 === mode2) base = 30;
+    if (dist === 0 && mode1 === mode2) base = 100;
+    else if (dist === 0 && mode1 !== mode2) base = 95;
+    else if (dist === 1 && mode1 === mode2) base = 85;
+    else if (dist === 1 && mode1 !== mode2) {
+      const isCompatibleDiag = (mode1 === 'A' && clockDiff === 11) || (mode1 === 'B' && clockDiff === 1);
+      base = isCompatibleDiag ? 65 : 30;
+    } else if (dist === 2 && mode1 === mode2) {
+      base = clockDiff === 2 ? 60 : 45;
+    } else if (mode1 !== mode2 && ((mode1 === 'A' && clockDiff === 3) || (mode1 === 'B' && clockDiff === 9))) {
+      base = 55;
+    } else if (dist === 5 && mode1 === mode2) {
+      base = clockDiff === 7 ? 40 : 20;
+    } else if (dist === 6) {
+      base = -15;
     }
+
     return base * tonalityDamping;
   }
 
   function extractTrackAudioProfile(track) {
-    const f = track.features || track || {};
-    const norm = (val) => (val == null ? null : (val <= 1 ? Number(val) : Number(val) / 100));
+    const f = (track.features && track.features.energy != null) ? track.features : (track || {});
+    const norm = (val) => {
+      if (val === null || val === undefined || val === "" || typeof val === "boolean") return null;
+      const num = Number(val);
+      if (!Number.isFinite(num)) return null;
+      if (num > 0 && num < 1) return num;
+      return Math.max(0, Math.min(1, num / 100));
+    };
 
     const energy = norm(f.energy) ?? 0.5;
-    let valence = norm(f.valence) ?? 0.5;
     const danceability = norm(f.danceability) ?? 0.5;
     const acousticness = norm(f.acousticness) ?? 0.5;
     const instrumentalness = norm(f.instrumentalness) ?? 0;
     const speechiness = norm(f.speechiness) ?? 0.1;
-    const loudness = f.loudness != null ? Number(f.loudness) : -10;
-    const tempo = f.tempo ? Number(f.tempo) : 120;
+    const loudness = (f.loudness != null && !isNaN(f.loudness)) ? Number(f.loudness) : -10;
+    const tempo = (f.tempo != null && !isNaN(f.tempo) && Number(f.tempo) > 0) ? Number(f.tempo) : null;
+    const effectiveTempo = tempo ?? 120;
     const camelotKey = getCamelotKey(f);
 
-    if (loudness > -6.0 && acousticness < 0.05 && energy > 0.75 && (speechiness > 0.12 || tempo > 130)) {
+    let valence = norm(f.valence) ?? Math.max(0.15, Math.min(0.85, 0.35 * energy + 0.35 * danceability + (f.mode === 1 ? 0.12 : 0.04) + 0.10 * (1 - acousticness)));
+
+    if (loudness > -6.0 && acousticness < 0.05 && energy > 0.75 && (speechiness > 0.12 || effectiveTempo > 130)) {
       valence = Math.min(valence, 0.35 + 0.3 * (1 - energy));
     }
 
@@ -52724,13 +53088,49 @@ shadowRoot.innerHTML = `
     let archetype = 'groove';
     if (acousticness > 0.55 && energy < 0.45) archetype = 'softAcoustic';
     else if (instrumentalness > 0.45 && energy < 0.60) archetype = 'sadInstrumental';
-    else if (speechiness > 0.20 || (tempo > 130 && speechiness > 0.10)) archetype = 'fastLyrical';
+    else if (speechiness > 0.20 || (effectiveTempo > 130 && speechiness > 0.10)) archetype = 'fastLyrical';
     else if (energy > 0.70 && valence < 0.40 && loudness > -7.5) archetype = 'sadEnergy';
     else if (energy > 0.60 && valence >= 0.40) archetype = 'happyEnergy';
 
     const cleanTitle = getCleanTitle(track.songTitle || track.name || track.track?.name || "");
-    const artistKey = track.artists?.[0]?.id || track.artists?.[0]?.uri || track.artistUris?.[0] || track.track?.artists?.[0]?.id || track.track?.artists?.[0]?.uri || (track.artistName ? track.artistName.toLowerCase().trim() : "unknown");
-    const albumKey = track.album?.id || track.album?.uri || track.albumUri || track.track?.album?.id || track.track?.album?.uri || (track.albumName ? track.albumName.toLowerCase().trim() : "unknown");
+
+    const stripPrefix = (val, prefix) => {
+      if (!val) return null;
+      const str = String(val).trim();
+      return str.startsWith(prefix) ? str.slice(prefix.length) : str;
+    };
+
+    const artistKeys = [];
+    const addArtistId = (raw) => {
+      const cleaned = stripPrefix(raw, "spotify:artist:");
+      if (cleaned && !artistKeys.includes(cleaned)) artistKeys.push(cleaned);
+    };
+
+    if (Array.isArray(track.artists)) {
+      track.artists.forEach(a => addArtistId(a?.id || a?.uri));
+    }
+    if (Array.isArray(track.artistUris)) {
+      track.artistUris.forEach(u => addArtistId(u));
+    }
+    if (Array.isArray(track.track?.artists)) {
+      track.track.artists.forEach(a => addArtistId(a?.id || a?.uri));
+    }
+    if (artistKeys.length === 0) {
+      if (Array.isArray(track.artists)) {
+        track.artists.forEach(a => addArtistId(a?.name ? a.name.toLowerCase().trim() : null));
+      }
+      if (Array.isArray(track.track?.artists)) {
+        track.track.artists.forEach(a => addArtistId(a?.name ? a.name.toLowerCase().trim() : null));
+      }
+      if (artistKeys.length === 0 && track.artistName) {
+        addArtistId(track.artistName.toLowerCase().trim());
+      }
+    }
+
+    const artistKey = artistKeys[0] || "unknown";
+    const rawAlbumId = track.albumId || track.album?.id || track.track?.album?.id || track.albumUri || track.album?.uri || track.track?.album?.uri;
+    const albumKey = stripPrefix(rawAlbumId, "spotify:album:") || ((track.albumName || track.album?.name || track.track?.album?.name) ? (track.albumName || track.album?.name || track.track?.album?.name).toLowerCase().trim() : "unknown");
+    const rawPop = track.popularity != null ? Number(track.popularity) : 0;
 
     return {
       energy,
@@ -52749,8 +53149,9 @@ shadowRoot.innerHTML = `
       archetype,
       cleanTitle,
       artistKey,
+      artistKeys,
       albumKey,
-      popularity: track.popularity != null ? Number(track.popularity) : 50
+      popularity: rawPop > 0 ? rawPop : 50
     };
   }
 
@@ -52780,7 +53181,7 @@ shadowRoot.innerHTML = `
     return score;
   }
 
-  function buildAdaptiveWaveTrajectory(trackProfiles, persona = 'wave', totalLength, isRandomized = false) {
+  function buildAdaptiveWaveTrajectory(trackProfiles, persona = 'wave', totalLength, isRandomized = false, reverse = false) {
     const sortedEnergy = trackProfiles.map(p => p.energy).sort((a, b) => a - b);
     const sortedValence = trackProfiles.map(p => p.valence).sort((a, b) => a - b);
     const getQuantile = (arr, q) => arr[Math.floor(Math.max(0, Math.min(arr.length - 1, (arr.length - 1) * q)))];
@@ -52796,12 +53197,46 @@ shadowRoot.innerHTML = `
     if (persona === 'workout' || persona === 'party') {
       eFloor = eMedian - 0.25 * (eMedian - eFloor);
       vFloor = vMedian - 0.20 * (vMedian - vFloor);
+    } else if (persona === 'gaming') {
+      eFloor = eMedian - 0.30 * (eMedian - eFloor);
+    } else if (persona === 'pregame') {
+      eFloor = eMedian - 0.35 * (eMedian - eFloor);
+      vFloor = vMedian - 0.25 * (vMedian - vFloor);
     } else if (persona === 'chill' || persona === 'focus') {
       eCrest = eMedian + 0.25 * (eCrest - eMedian);
       vCrest = vMedian + 0.20 * (vCrest - vMedian);
+    } else if (persona === 'rainy') {
+      eCrest = eMedian + 0.20 * (eCrest - eMedian);
+      vCrest = vMedian + 0.15 * (vCrest - vMedian);
+    } else if (persona === 'drive') {
+      eFloor = eMedian - 0.60 * (eMedian - eFloor);
+      eCrest = eMedian + 0.75 * (eCrest - eMedian);
+    } else if (persona === 'morning') {
+      eFloor = eMedian - 0.55 * (eMedian - eFloor);
+      eCrest = eMedian + 0.65 * (eCrest - eMedian);
+      vFloor = vMedian - 0.40 * (vMedian - vFloor);
     }
 
-    const energyVariance = sortedEnergy.reduce((acc, v) => acc + Math.pow(v - eMedian, 2), 0) / sortedEnergy.length;
+    const n = trackProfiles.length || 1;
+    let sumE = 0, sumV = 0;
+    for (let i = 0; i < n; i++) {
+      sumE += trackProfiles[i].energy;
+      sumV += trackProfiles[i].valence;
+    }
+    const meanE = sumE / n;
+    const meanV = sumV / n;
+    let covEV = 0, varE = 0, varV = 0;
+    for (let i = 0; i < n; i++) {
+      const de = trackProfiles[i].energy - meanE;
+      const dv = trackProfiles[i].valence - meanV;
+      covEV += de * dv;
+      varE += de * de;
+      varV += dv * dv;
+    }
+    const evCorr = (varE > 1e-6 && varV > 1e-6) ? (covEV / Math.sqrt(varE * varV)) : 0.5;
+    const valencePhaseCoupling = evCorr >= 0.10 ? 1.0 : Math.max(-0.5, evCorr + 0.35);
+
+    const energyVariance = varE / n;
     const isFlatline = Math.sqrt(energyVariance) < 0.04;
 
     let numCycles = 1;
@@ -52821,25 +53256,24 @@ shadowRoot.innerHTML = `
     const targetChillPerCycle = chillCount === 0 ? 0 : Math.max(1, Math.round(chillCount / numCycles));
 
     const trajectory = [];
-    const globalPhase = isRandomized ? (Math.random() < 0.5 ? Math.PI : 0) : 0;
+    const globalPhase = isRandomized ? (Math.random() < 0.5 ? Math.PI : 0) : (reverse ? Math.PI : 0);
 
     for (let c = 0; c < numCycles; c++) {
       const len = cycleLengths[c];
 
       for (let s = 0; s < len; s++) {
-        const t = s / Math.max(1, len - 1);
-        const waveFreq = len <= 6 ? Math.PI : 2 * Math.PI;
-        const waveAngle = waveFreq * t + globalPhase;
+        const t = s / Math.max(1, len);
+        const waveAngle = 2 * Math.PI * t + globalPhase;
         const sinVal = Math.sin(waveAngle);
+        const vSinVal = sinVal * valencePhaseCoupling;
 
-        let eTarget, vTarget;
-        if (sinVal >= 0) {
-          eTarget = eMedian + sinVal * (eCrest - eMedian);
-          vTarget = vMedian + sinVal * (vCrest - vMedian);
-        } else {
-          eTarget = eMedian + sinVal * (eMedian - eFloor);
-          vTarget = vMedian + sinVal * (vMedian - vFloor);
-        }
+        const eTarget = sinVal >= 0
+          ? eMedian + sinVal * (eCrest - eMedian)
+          : eMedian + sinVal * (eMedian - eFloor);
+
+        const vTarget = vSinVal >= 0
+          ? vMedian + vSinVal * (vCrest - vMedian)
+          : vMedian + vSinVal * (vMedian - vFloor);
 
         const locomotionBasin = sinVal > 0.45;
         const isPalateSlot = sinVal < -0.45;
@@ -52860,51 +53294,130 @@ shadowRoot.innerHTML = `
   }
 
   async function energyWaveSort(tracks, persona = 'wave', options = {}) {
-    if (!tracks || tracks.length < 3) return tracks || [];
+    if (!tracks || tracks.length < 3) {
+      return options.reverse ? [...(tracks || [])].reverse() : (tracks || []);
+    }
 
-    const profiled = tracks.map(t => ({ track: t, profile: extractTrackAudioProfile(t) }));
+    const missingPopIds = [];
+    for (let i = 0; i < tracks.length; i++) {
+      const t = tracks[i];
+      if (!(t.popularity > 0) && t.uri && t.uri.startsWith("spotify:track:")) {
+        missingPopIds.push(t.trackId || t.id || t.uri.split(":")[2]);
+      }
+    }
+    const cachedMetaMap = missingPopIds.length > 0 ? await idb.getMany('trackMetadata', missingPopIds) : null;
+
+    const profiled = tracks.map(t => {
+      if (cachedMetaMap && !(t.popularity > 0) && t.uri && t.uri.startsWith("spotify:track:")) {
+        const meta = cachedMetaMap.get(t.trackId || t.id || t.uri.split(":")[2]);
+        if (meta && meta.popularity > 0) t = { ...t, popularity: meta.popularity };
+      }
+      return { track: t, profile: extractTrackAudioProfile(t) };
+    });
     const validTempos = profiled.map(p => p.profile.tempo).filter(Boolean);
     const avgTempo = validTempos.length ? validTempos.reduce((a, b) => a + b, 0) / validTempos.length : 120;
     profiled.forEach(p => { if (!p.profile.tempo) p.profile.tempo = avgTempo; });
 
     const totalLen = profiled.length;
+    const artistCounts = new Map();
+    const albumCounts = new Map();
+    for (let i = 0; i < totalLen; i++) {
+      const p = profiled[i].profile;
+      if (p.artistKeys && p.artistKeys.length > 0) {
+        for (let a = 0; a < p.artistKeys.length; a++) {
+          const ak = p.artistKeys[a];
+          if (ak && ak !== "unknown") artistCounts.set(ak, (artistCounts.get(ak) || 0) + 1);
+        }
+      }
+      if (p.albumKey !== "unknown") albumCounts.set(p.albumKey, (albumCounts.get(p.albumKey) || 0) + 1);
+    }
+
+    const getArtistPenaltyWeight = (ak) => {
+      if (!ak || ak === "unknown") return 0;
+      const share = (artistCounts.get(ak) || 0) / totalLen;
+      return share > 0.60 ? Math.max(0, (1 - share) / 0.40) : 1.0;
+    };
+
+    const maxAlbumShare = albumCounts.size > 0 ? Math.max(...albumCounts.values()) / totalLen : 0;
+    const albumPenaltyScale = maxAlbumShare > 0.70 ? Math.max(0, (1 - maxAlbumShare) / 0.30) : 1.0;
+
     const { trajectory, isFlatline, targetChillPerCycle, eMedian, vMedian } = buildAdaptiveWaveTrajectory(
-      profiled.map(p => p.profile), persona, totalLen
+      profiled.map(p => p.profile), persona, totalLen, false, !!options.reverse
     );
 
-    let remaining = [...profiled];
-    let opener = null;
+    const remaining = [...profiled];
+    const prevBoundaryProfile = options.previousTrack ? extractTrackAudioProfile(options.previousTrack) : null;
+    if (prevBoundaryProfile && !prevBoundaryProfile.tempo) prevBoundaryProfile.tempo = avgTempo;
+    const initialTarget = trajectory[0] || { targetEnergy: eMedian, targetValence: vMedian };
 
+    const getSharedArtistPenalty = (cp, pp, primaryPen, secondaryPen) => {
+      let maxPen = 0;
+      if (cp.artistKey !== "unknown" && cp.artistKey === pp.artistKey) {
+        maxPen = primaryPen * getArtistPenaltyWeight(cp.artistKey);
+      }
+      if (cp.artistKeys && pp.artistKeys && (cp.artistKeys.length > 1 || pp.artistKeys.length > 1)) {
+        for (let i = 0; i < cp.artistKeys.length; i++) {
+          const ak = cp.artistKeys[i];
+          if (pp.artistKeys.includes(ak)) {
+            const pen = (ak === cp.artistKey && ak === pp.artistKey ? primaryPen : secondaryPen) * getArtistPenaltyWeight(ak);
+            if (pen > maxPen) maxPen = pen;
+          }
+        }
+      }
+      return maxPen;
+    };
+
+    const scoreOpenerCandidate = (p) => {
+      const dist = Math.abs(p.profile.energy - initialTarget.targetEnergy) + Math.abs(p.profile.valence - initialTarget.targetValence) * 0.7;
+      const popBonus = (p.profile.popularity || 50) * 0.10;
+      let sc = 100 - dist * 80 + popBonus;
+      if (prevBoundaryProfile) {
+        const harm = getHarmonicCompatibilityScore(prevBoundaryProfile.camelotKey, p.profile.camelotKey, Math.min(prevBoundaryProfile.tonalityWeight, p.profile.tonalityWeight));
+        const tempoSc = getTempoScoreWithOctave(prevBoundaryProfile.tempo, p.profile.tempo, prevBoundaryProfile.loudness, p.profile.loudness);
+        sc += harm * 0.6 + tempoSc * 0.7;
+        sc -= getSharedArtistPenalty(p.profile, prevBoundaryProfile, 140, 95);
+        if (p.profile.albumKey !== "unknown" && p.profile.albumKey === prevBoundaryProfile.albumKey) sc -= 80 * albumPenaltyScale;
+      }
+      return sc;
+    };
+
+    let openerIdx = -1;
     if (options.anchorUris && options.anchorUris.size > 0) {
-      const anchorPool = remaining.filter(p => options.anchorUris.has(p.track.uri));
-      if (anchorPool.length > 0) {
-        anchorPool.sort((a, b) => {
-          const distA = Math.abs(a.profile.energy - eMedian) + Math.abs(a.profile.valence - vMedian);
-          const distB = Math.abs(b.profile.energy - eMedian) + Math.abs(b.profile.valence - vMedian);
-          return distA - distB;
-        });
-        opener = anchorPool[0];
+      let bestAnchorScore = -Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        if (options.anchorUris.has(remaining[i].track.uri)) {
+          const sc = scoreOpenerCandidate(remaining[i]);
+          if (sc > bestAnchorScore) {
+            bestAnchorScore = sc;
+            openerIdx = i;
+          }
+        }
       }
     }
 
-    if (!opener) {
-      const initialTarget = trajectory[0] || { targetEnergy: eMedian, targetValence: vMedian };
-      const scoredOpeners = remaining.map(p => {
-        const dist = Math.abs(p.profile.energy - initialTarget.targetEnergy) + Math.abs(p.profile.valence - initialTarget.targetValence) * 0.7;
-        const popBonus = (p.profile.popularity || 50) * 0.10;
-        return { item: p, score: 100 - dist * 80 + popBonus };
-      });
-      scoredOpeners.sort((a, b) => b.score - a.score);
-      opener = scoredOpeners[0].item;
+    if (openerIdx === -1) {
+      let bestOpenerScore = -Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const sc = scoreOpenerCandidate(remaining[i]);
+        if (sc > bestOpenerScore) {
+          bestOpenerScore = sc;
+          openerIdx = i;
+        }
+      }
     }
+    if (openerIdx === -1) openerIdx = 0;
+
+    const opener = remaining[openerIdx];
+    remaining[openerIdx] = remaining[remaining.length - 1];
+    remaining.pop();
 
     const sorted = [opener];
-    remaining = remaining.filter(p => p !== opener);
     let last = opener;
     let currentCycle = 0;
-    let chillInCurrentCycle = (opener.profile.archetype === 'softAcoustic' || opener.profile.archetype === 'sadInstrumental') ? 1 : 0;
+    const isChillProfile = (prof) => prof.archetype === 'softAcoustic' || prof.archetype === 'sadInstrumental';
+    let chillInCurrentCycle = isChillProfile(opener.profile) ? 1 : 0;
 
-    const calcStepScore = (cand, prev, step, remLen) => {
+    const calcStepScore = (cand, prev, prev2, step, remLen, chillCountInCycle) => {
       const cp = cand.profile;
       const pp = prev.profile;
 
@@ -52927,10 +53440,10 @@ shadowRoot.innerHTML = `
         score += 25 * Math.exp(-Math.pow(tempoDist, 2) / 1152) * cp.danceDrive;
       }
 
-      const isChill = cp.archetype === 'softAcoustic' || cp.archetype === 'sadInstrumental';
+      const isChill = isChillProfile(cp);
       if (step.isPalateSlot && isChill) score += 35;
-      if (isChill && targetChillPerCycle > 0 && chillInCurrentCycle >= targetChillPerCycle) {
-        score -= 35 * (chillInCurrentCycle - targetChillPerCycle + 1);
+      if (isChill && targetChillPerCycle > 0 && chillCountInCycle >= targetChillPerCycle) {
+        score -= 35 * (chillCountInCycle - targetChillPerCycle + 1);
       }
 
       const eDelta = Math.abs(cp.energy - pp.energy);
@@ -52946,22 +53459,38 @@ shadowRoot.innerHTML = `
 
       const relaxFactor = remLen <= 5 ? Math.max(0, remLen / 5) : 1.0;
       if (relaxFactor > 0.05) {
-        if (sorted.length >= 2) {
-          const p2 = sorted[sorted.length - 2].profile;
+        if (prev2) {
+          const p2 = prev2.profile;
           if (pp.energy < 0.35 && p2.energy < 0.35 && cp.energy < 0.35) score -= 90 * relaxFactor;
           if (pp.acousticness > 0.70 && p2.acousticness > 0.70 && cp.acousticness > 0.70) score -= 80 * relaxFactor;
         }
 
-        if (cp.artistKey !== "unknown") {
-          if (cp.artistKey === pp.artistKey) score -= 140 * relaxFactor;
-          else if (sorted.length >= 2 && cp.artistKey === sorted[sorted.length - 2].profile.artistKey) score -= 55 * relaxFactor;
+        const step1Pen = getSharedArtistPenalty(cp, pp, 140, 95);
+        if (step1Pen > 0) {
+          score -= step1Pen * relaxFactor;
+        } else if (prev2) {
+          const step2Pen = getSharedArtistPenalty(cp, prev2.profile, 55, 45);
+          if (step2Pen > 0) score -= step2Pen * relaxFactor;
         }
 
-        if (cp.albumKey !== "unknown" && cp.albumKey === pp.albumKey) score -= 80 * relaxFactor;
+        if (albumPenaltyScale > 0 && cp.albumKey !== "unknown" && cp.albumKey === pp.albumKey) {
+          score -= 80 * relaxFactor * albumPenaltyScale;
+        }
+      }
+
+      if (!prevBoundaryProfile && remLen <= 3) {
+        const loopHarmonic = getHarmonicCompatibilityScore(cp.camelotKey, opener.profile.camelotKey, Math.min(cp.tonalityWeight, opener.profile.tonalityWeight));
+        const loopTempo = getTempoScoreWithOctave(cp.tempo, opener.profile.tempo, cp.loudness, opener.profile.loudness);
+        score += (loopHarmonic * 0.35 + loopTempo * 0.25) * (4 - remLen) * 0.33;
       }
 
       return score;
     };
+
+    const TOP_K = 6;
+    const topItems = new Array(TOP_K);
+    const topScores = new Array(TOP_K);
+    const topIndices = new Array(TOP_K);
 
     while (remaining.length > 0) {
       if (sorted.length % 75 === 0) await fastYield();
@@ -52975,39 +53504,77 @@ shadowRoot.innerHTML = `
       }
 
       const remLen = remaining.length;
-      const scored = remaining.map(cand => ({
-        item: cand,
-        score: calcStepScore(cand, last, step, remLen)
-      }));
+      const secondLast = sorted.length >= 2 ? sorted[sorted.length - 2] : prevBoundaryProfile ? { profile: prevBoundaryProfile } : null;
+      const kLimit = Math.min(TOP_K, remLen);
 
-      scored.sort((a, b) => b.score - a.score);
+      for (let k = 0; k < kLimit; k++) {
+        topScores[k] = -Infinity;
+        topItems[k] = null;
+        topIndices[k] = -1;
+      }
 
-      let chosen = scored[0].item;
+      for (let i = 0; i < remLen; i++) {
+        const cand = remaining[i];
+        const sc = calcStepScore(cand, last, secondLast, step, remLen, chillInCurrentCycle);
+        if (sc > topScores[kLimit - 1]) {
+          let insertPos = kLimit - 1;
+          while (insertPos > 0 && sc > topScores[insertPos - 1]) {
+            topScores[insertPos] = topScores[insertPos - 1];
+            topItems[insertPos] = topItems[insertPos - 1];
+            topIndices[insertPos] = topIndices[insertPos - 1];
+            insertPos--;
+          }
+          topScores[insertPos] = sc;
+          topItems[insertPos] = cand;
+          topIndices[insertPos] = i;
+        }
+      }
 
-      if (remLen > 2 && remLen <= 150) {
-        const topPool = scored.slice(0, Math.min(6, scored.length));
+      let chosenIdx = topIndices[0] !== -1 ? topIndices[0] : 0;
+      let chosen = topItems[0] || remaining[0];
+
+      if (remLen > 1) {
         const nextStep = trajectory[stepIdx + 1] || step;
         let bestCombined = -Infinity;
+        const sampleStride = remLen > 48 ? Math.max(1, Math.floor(remLen / 24)) : 1;
 
-        for (const candidate of topPool) {
-          const subCandidates = scored.filter(s => s.item !== candidate.item).slice(0, Math.min(8, scored.length - 1));
+        for (let k = 0; k < kLimit; k++) {
+          const candItem = topItems[k];
+          if (!candItem) continue;
+          const candScore = topScores[k];
+          const candRemIdx = topIndices[k];
+          const nextChillBase = (nextStep.cycleIndex !== step.cycleIndex ? 0 : chillInCurrentCycle) + (isChillProfile(candItem.profile) ? 1 : 0);
+
           let bestSub = -Infinity;
-          for (const sub of subCandidates) {
-            const sc = calcStepScore(sub.item, candidate.item, nextStep, remLen - 1);
+          if (sampleStride > 1) {
+            for (let m = 0; m < kLimit; m++) {
+              if (m === k || !topItems[m]) continue;
+              const sc = calcStepScore(topItems[m], candItem, last, nextStep, remLen - 1, nextChillBase);
+              if (sc > bestSub) bestSub = sc;
+            }
+          }
+
+          for (let j = 0; j < remLen; j += sampleStride) {
+            if (j === candRemIdx) continue;
+            const subCand = remaining[j];
+            const sc = calcStepScore(subCand, candItem, last, nextStep, remLen - 1, nextChillBase);
             if (sc > bestSub) bestSub = sc;
           }
-          const combined = candidate.score + 0.45 * (bestSub === -Infinity ? 0 : bestSub);
+
+          const combined = candScore + 0.45 * (bestSub === -Infinity ? 0 : bestSub);
           if (combined > bestCombined) {
             bestCombined = combined;
-            chosen = candidate.item;
+            chosen = candItem;
+            chosenIdx = candRemIdx;
           }
         }
       }
 
       sorted.push(chosen);
-      remaining = remaining.filter(p => p !== chosen);
+      remaining[chosenIdx] = remaining[remLen - 1];
+      remaining.pop();
       last = chosen;
-      if (chosen.profile.archetype === 'softAcoustic' || chosen.profile.archetype === 'sadInstrumental') {
+      if (isChillProfile(chosen.profile)) {
         chillInCurrentCycle++;
       }
     }
@@ -53018,7 +53585,7 @@ shadowRoot.innerHTML = `
   async function randomizedEnergyWaveSort(tracks, options = {}) {
     const { persona = 'wave', chaos = 0.5 } = options;
     if (!tracks || tracks.length < 3) {
-      return [...(tracks || [])].sort(() => Math.random() - 0.5);
+      return shuffleArray(tracks || []);
     }
 
     const profiled = tracks.map(t => ({ track: t, profile: extractTrackAudioProfile(t) }));
@@ -53027,30 +53594,71 @@ shadowRoot.innerHTML = `
     profiled.forEach(p => { if (!p.profile.tempo) p.profile.tempo = avgTempo; });
 
     const totalLen = profiled.length;
+    const artistCounts = new Map();
+    const albumCounts = new Map();
+    for (let i = 0; i < totalLen; i++) {
+      const p = profiled[i].profile;
+      if (p.artistKeys && p.artistKeys.length > 0) {
+        for (let a = 0; a < p.artistKeys.length; a++) {
+          const ak = p.artistKeys[a];
+          if (ak && ak !== "unknown") artistCounts.set(ak, (artistCounts.get(ak) || 0) + 1);
+        }
+      }
+      if (p.albumKey !== "unknown") albumCounts.set(p.albumKey, (albumCounts.get(p.albumKey) || 0) + 1);
+    }
+
+    const getArtistPenaltyWeight = (ak) => {
+      if (!ak || ak === "unknown") return 0;
+      const share = (artistCounts.get(ak) || 0) / totalLen;
+      return share > 0.60 ? Math.max(0, (1 - share) / 0.40) : 1.0;
+    };
+
+    const maxAlbumShare = albumCounts.size > 0 ? Math.max(...albumCounts.values()) / totalLen : 0;
+    const albumPenaltyScale = maxAlbumShare > 0.70 ? Math.max(0, (1 - maxAlbumShare) / 0.30) : 1.0;
+
     const { trajectory, isFlatline, targetChillPerCycle, eMedian, vMedian } = buildAdaptiveWaveTrajectory(
       profiled.map(p => p.profile), persona, totalLen, true
     );
 
-    let remaining = [...profiled];
+    const remaining = [...profiled];
 
     const initialTarget = trajectory[0] || { targetEnergy: eMedian, targetValence: vMedian };
-    const scoredOpeners = remaining.map(p => {
+    const scoredOpeners = remaining.map((p, idx) => {
       const dist = Math.abs(p.profile.energy - initialTarget.targetEnergy) + Math.abs(p.profile.valence - initialTarget.targetValence) * 0.7;
       const popBonus = (p.profile.popularity || 50) * 0.10;
-      return { item: p, score: 100 - dist * 80 + popBonus };
+      return { idx, score: 100 - dist * 80 + popBonus };
     });
     scoredOpeners.sort((a, b) => b.score - a.score);
-    const openerPoolSize = Math.max(3, Math.floor(scoredOpeners.length * 0.15));
-    const openerPool = scoredOpeners.slice(0, openerPoolSize);
-    const opener = openerPool[Math.floor(Math.random() * openerPool.length)].item;
+    const openerPoolSize = Math.max(3, Math.min(scoredOpeners.length, Math.floor(scoredOpeners.length * 0.15)));
+    const pickedOpenerIdx = scoredOpeners[Math.floor(Math.random() * openerPoolSize)].idx;
+    const opener = remaining[pickedOpenerIdx];
+    remaining[pickedOpenerIdx] = remaining[remaining.length - 1];
+    remaining.pop();
 
     const sorted = [opener];
-    remaining = remaining.filter(p => p !== opener);
     let last = opener;
     let currentCycle = 0;
-    let chillInCurrentCycle = (opener.profile.archetype === 'softAcoustic' || opener.profile.archetype === 'sadInstrumental') ? 1 : 0;
+    const isChillProfile = (prof) => prof.archetype === 'softAcoustic' || prof.archetype === 'sadInstrumental';
+    let chillInCurrentCycle = isChillProfile(opener.profile) ? 1 : 0;
 
-    const calcStepScore = (cand, prev, step, remLen) => {
+    const getSharedArtistPenalty = (cp, pp, primaryPen, secondaryPen) => {
+      let maxPen = 0;
+      if (cp.artistKey !== "unknown" && cp.artistKey === pp.artistKey) {
+        maxPen = primaryPen * getArtistPenaltyWeight(cp.artistKey);
+      }
+      if (cp.artistKeys && pp.artistKeys && (cp.artistKeys.length > 1 || pp.artistKeys.length > 1)) {
+        for (let i = 0; i < cp.artistKeys.length; i++) {
+          const ak = cp.artistKeys[i];
+          if (pp.artistKeys.includes(ak)) {
+            const pen = (ak === cp.artistKey && ak === pp.artistKey ? primaryPen : secondaryPen) * getArtistPenaltyWeight(ak);
+            if (pen > maxPen) maxPen = pen;
+          }
+        }
+      }
+      return maxPen;
+    };
+
+    const calcStepScore = (cand, prev, prev2, step, remLen, chillCountInCycle) => {
       const cp = cand.profile;
       const pp = prev.profile;
 
@@ -53073,10 +53681,10 @@ shadowRoot.innerHTML = `
         score += 25 * Math.exp(-Math.pow(tempoDist, 2) / 1152) * cp.danceDrive;
       }
 
-      const isChill = cp.archetype === 'softAcoustic' || cp.archetype === 'sadInstrumental';
+      const isChill = isChillProfile(cp);
       if (step.isPalateSlot && isChill) score += 35;
-      if (isChill && targetChillPerCycle > 0 && chillInCurrentCycle >= targetChillPerCycle) {
-        score -= 35 * (chillInCurrentCycle - targetChillPerCycle + 1);
+      if (isChill && targetChillPerCycle > 0 && chillCountInCycle >= targetChillPerCycle) {
+        score -= 35 * (chillCountInCycle - targetChillPerCycle + 1);
       }
 
       const eDelta = Math.abs(cp.energy - pp.energy);
@@ -53092,18 +53700,23 @@ shadowRoot.innerHTML = `
 
       const relaxFactor = remLen <= 5 ? Math.max(0, remLen / 5) : 1.0;
       if (relaxFactor > 0.05) {
-        if (sorted.length >= 2) {
-          const p2 = sorted[sorted.length - 2].profile;
+        if (prev2) {
+          const p2 = prev2.profile;
           if (pp.energy < 0.35 && p2.energy < 0.35 && cp.energy < 0.35) score -= 90 * relaxFactor;
           if (pp.acousticness > 0.70 && p2.acousticness > 0.70 && cp.acousticness > 0.70) score -= 80 * relaxFactor;
         }
 
-        if (cp.artistKey !== "unknown") {
-          if (cp.artistKey === pp.artistKey) score -= 140 * relaxFactor;
-          else if (sorted.length >= 2 && cp.artistKey === sorted[sorted.length - 2].profile.artistKey) score -= 55 * relaxFactor;
+        const step1Pen = getSharedArtistPenalty(cp, pp, 140, 95);
+        if (step1Pen > 0) {
+          score -= step1Pen * relaxFactor;
+        } else if (prev2) {
+          const step2Pen = getSharedArtistPenalty(cp, prev2.profile, 55, 45);
+          if (step2Pen > 0) score -= step2Pen * relaxFactor;
         }
 
-        if (cp.albumKey !== "unknown" && cp.albumKey === pp.albumKey) score -= 80 * relaxFactor;
+        if (albumPenaltyScale > 0 && cp.albumKey !== "unknown" && cp.albumKey === pp.albumKey) {
+          score -= 80 * relaxFactor * albumPenaltyScale;
+        }
       }
 
       if (remLen <= 3) {
@@ -53112,9 +53725,14 @@ shadowRoot.innerHTML = `
         score += (loopHarmonic * 0.35 + loopTempo * 0.25) * (4 - remLen) * 0.33;
       }
 
-      score += (Math.random() - 0.5) * 20 * chaos;
       return score;
     };
+
+    const maxPoolCap = Math.max(1, Math.floor(3 + chaos * 3));
+    const topItems = new Array(maxPoolCap);
+    const topScores = new Array(maxPoolCap);
+    const topIndices = new Array(maxPoolCap);
+    const temperature = Math.max(6, 10 + chaos * 20);
 
     while (remaining.length > 0) {
       if (sorted.length % 75 === 0) await fastYield();
@@ -53128,36 +53746,59 @@ shadowRoot.innerHTML = `
       }
 
       const remLen = remaining.length;
-      const scored = remaining.map(cand => ({
-        item: cand,
-        score: calcStepScore(cand, last, step, remLen)
-      }));
+      const secondLast = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
+      const poolSize = Math.min(remLen, maxPoolCap);
 
-      scored.sort((a, b) => b.score - a.score);
+      for (let k = 0; k < poolSize; k++) {
+        topScores[k] = -Infinity;
+        topItems[k] = null;
+        topIndices[k] = -1;
+      }
 
-      const poolSize = Math.max(1, Math.min(remaining.length, Math.floor(3 + chaos * 3)));
-      const topPool = scored.slice(0, poolSize);
-      const minScore = topPool[topPool.length - 1].score;
-      const weighted = topPool.map(c => ({
-        item: c.item,
-        weight: Math.pow(Math.max(1, c.score - minScore + 10), 1.0 - chaos * 0.5)
-      }));
-      const totalWeight = weighted.reduce((sum, w) => sum + w.weight, 0);
+      for (let i = 0; i < remLen; i++) {
+        const cand = remaining[i];
+        const sc = calcStepScore(cand, last, secondLast, step, remLen, chillInCurrentCycle);
+        if (sc > topScores[poolSize - 1]) {
+          let insertPos = poolSize - 1;
+          while (insertPos > 0 && sc > topScores[insertPos - 1]) {
+            topScores[insertPos] = topScores[insertPos - 1];
+            topItems[insertPos] = topItems[insertPos - 1];
+            topIndices[insertPos] = topIndices[insertPos - 1];
+            insertPos--;
+          }
+          topScores[insertPos] = sc;
+          topItems[insertPos] = cand;
+          topIndices[insertPos] = i;
+        }
+      }
+
+      const maxScore = topScores[0];
+      let totalWeight = 0;
+      const weights = new Array(poolSize);
+      for (let k = 0; k < poolSize; k++) {
+        const w = topItems[k] ? Math.exp((topScores[k] - maxScore) / temperature) : 0;
+        weights[k] = w;
+        totalWeight += w;
+      }
 
       let r = Math.random() * totalWeight;
-      let chosen = topPool[0].item;
-      for (const w of weighted) {
-        r -= w.weight;
+      let chosenSlot = 0;
+      for (let k = 0; k < poolSize; k++) {
+        r -= weights[k];
         if (r <= 0) {
-          chosen = w.item;
+          chosenSlot = k;
           break;
         }
       }
 
+      const chosen = topItems[chosenSlot] || remaining[0];
+      const chosenIdx = topIndices[chosenSlot] !== -1 ? topIndices[chosenSlot] : 0;
+
       sorted.push(chosen);
-      remaining = remaining.filter(p => p !== chosen);
+      remaining[chosenIdx] = remaining[remLen - 1];
+      remaining.pop();
       last = chosen;
-      if (chosen.profile.archetype === 'softAcoustic' || chosen.profile.archetype === 'sadInstrumental') {
+      if (isChillProfile(chosen.profile)) {
         chillInCurrentCycle++;
       }
     }
@@ -54670,6 +55311,7 @@ shadowRoot.innerHTML = `
     });
 
     if (missingTracks.length > 0) {
+        const highWaterGlobalMap = await idb.getMany('scrobbles', allLfmKeys);
         const fetchFunction = isPersonal ? getTrackDetailsWithPersonalScrobbles : getTrackDetailsWithScrobbles;
         
         if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
@@ -54688,7 +55330,13 @@ shadowRoot.innerHTML = `
 
                 try {
                     const result = await fetchFunction(track, false, true, true);
-                    if (result) results.push(result);
+                    if (result) {
+                        const prevHigh = track._lfmKey ? highWaterGlobalMap.get(track._lfmKey) : null;
+                        if (typeof prevHigh === 'number' && prevHigh >= 0 && (result.scrobbles === undefined || result.scrobbles === null || prevHigh > result.scrobbles)) {
+                            result.scrobbles = prevHigh;
+                        }
+                        results.push(result);
+                    }
                 } catch (error) {
                     console.error(`Error fetching scrobbles for track ${track.name}:`, error);
                 } finally {
@@ -54715,11 +55363,14 @@ shadowRoot.innerHTML = `
                  if (missingTrackIds.has(res.id)) {
                      const lfmInfo = getLfmInfo(res);
                      if (lfmInfo) {
+                         const prevHigh = highWaterGlobalMap.get(lfmInfo.key);
+                         const clampGlobal = (v) => (typeof prevHigh === 'number' && prevHigh > v) ? prevHigh : v;
+
                          const mainVal = isPersonal ? res.personalScrobbles : res.scrobbles;
                          if (mainVal !== null && mainVal !== undefined) {
                              entriesToSave.push({
                                  key: lfmInfo.key,
-                                 val: isPersonal ? { count: mainVal, pendingUpdate: false } : mainVal
+                                 val: isPersonal ? { count: mainVal, pendingUpdate: false } : clampGlobal(mainVal)
                              });
                          }
                          
@@ -54727,7 +55378,7 @@ shadowRoot.innerHTML = `
                          if (altVal !== null && altVal !== undefined) {
                              altEntriesToSave.push({
                                  key: lfmInfo.key,
-                                 val: isPersonal ? altVal : { count: altVal, pendingUpdate: false }
+                                 val: isPersonal ? clampGlobal(altVal) : { count: altVal, pendingUpdate: false }
                              });
                          }
                      }
@@ -55144,8 +55795,8 @@ shadowRoot.innerHTML = `
                             mode: mode,
                             key: keyString,
                             camelot: camelotVal,
-                            energy: attr.energy || null,
-                            danceability: attr.danceability || null,
+                            energy: (attr.energy !== null && attr.energy !== undefined) ? Math.round(100 * attr.energy) : null,
+                            danceability: (attr.danceability !== null && attr.danceability !== undefined) ? Math.round(100 * attr.danceability) : null,
                             valence: null, acousticness: null, 
                             instrumentalness: null, speechiness: null, 
                             liveness: null, loudness: null
@@ -56081,9 +56732,15 @@ shadowRoot.innerHTML = `
   }
 
   async function fetchLastFmTrend(artist, track, noRedirect = false) {
+      const isTrack = Boolean(track);
       const cacheKey = `${artist}|${track}|${noRedirect ? '1' : '0'}`;
-      const cached = await idb.get('lfmTrends', cacheKey, 12 * 60 * 60 * 1000);
-      if (cached) return cached;
+      const ttl = isTrack ? 5 * 60 * 1000 : 12 * 60 * 60 * 1000;
+      const cached = await idb.get('lfmTrends', cacheKey, ttl);
+      if (cached) {
+          if (!isTrack || (!Array.isArray(cached) && typeof cached === 'object')) {
+              return cached;
+          }
+      }
       
       const params = new URLSearchParams({
           artist: artist,
@@ -56097,14 +56754,67 @@ shadowRoot.innerHTML = `
           const response = await fetch(`${LFM_SHOUTBOX_GATEWAY_URL}?${queryString}`);
           if (!response.ok) return null;
           const data = await response.json();
-          if (data && Array.isArray(data) && data.length > 0) {
-              await idb.set('lfmTrends', cacheKey, data);
-              return data;
+          if (Array.isArray(data)) {
+              if (data.length > 0) {
+                  await idb.set('lfmTrends', cacheKey, data);
+                  return data;
+              }
+          } else if (data && typeof data === 'object') {
+              const hasTrend = Array.isArray(data.trend) && data.trend.length > 0;
+              const hasStats = typeof data.listeners === 'number' || typeof data.playcount === 'number';
+              if (hasTrend || hasStats) {
+                  await idb.set('lfmTrends', cacheKey, data);
+                  return data;
+              }
           }
       } catch(e) {
           console.warn("Failed to fetch Last.fm trend:", e);
       }
       return null;
+  }
+
+  function syncTrackScrobblesToUi(lfmKey, trackUri, scrobbleCount) {
+      if (scrobbleCount === null || scrobbleCount === undefined || scrobbleCount < 0) return;
+      const currentUri = getCurrentUri();
+      const isSearch = Spicetify.Platform.History.location?.pathname?.startsWith('/search');
+      const isValidPlaylistPage = currentUri && (URI.isPlaylistV1OrV2(currentUri) || isLikedSongsPage(currentUri) || isLocalFilesPage(currentUri));
+
+      const targetSelectors = [];
+      if (isValidPlaylistPage || isSearch) {
+          if (showAdditionalColumn && selectedColumnType === 'scrobbles') targetSelectors.push('.sort-play-data');
+          if (showSecondAdditionalColumn && selectedSecondColumnType === 'scrobbles') targetSelectors.push('.sort-play-second-data');
+      } else if (URI.isAlbum(currentUri)) {
+          if (showAlbumColumn && selectedAlbumColumnType === 'scrobbles') targetSelectors.push('.sort-play-data');
+      } else if (URI.isArtist(currentUri)) {
+          if (showArtistColumn && selectedArtistColumnType === 'scrobbles') targetSelectors.push('.sort-play-data');
+      }
+
+      if (targetSelectors.length > 0) {
+          document.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
+              const rowUri = row.dataset.spTrackUri || getTracklistTrackUri(row);
+              let isMatch = Boolean(trackUri && rowUri === trackUri);
+              if (!isMatch && lfmKey) {
+                  const props = getTrackDataObject(row);
+                  if (props && getLfmInfo(props)?.key === lfmKey) isMatch = true;
+              }
+              if (isMatch) {
+                  targetSelectors.forEach(sel => {
+                      const cell = row.querySelector(sel);
+                      if (cell) updateDisplay(cell, scrobbleCount, 'scrobbles');
+                  });
+              }
+          });
+      }
+
+      const npTrack = Spicetify.Player?.data?.item;
+      if (npTrack) {
+          const isNpMatch = (trackUri && npTrack.uri === trackUri) || (lfmKey && getLfmInfo(npTrack)?.key === lfmKey);
+          if (isNpMatch && typeof displayNowPlayingData === 'function') {
+              const hasNpScrobbles = (nowPlayingConfig.title?.enabled && nowPlayingConfig.title.items?.some(i => i.type === 'scrobbles')) ||
+                                     (nowPlayingConfig.artist?.enabled && nowPlayingConfig.artist.items?.some(i => i.type === 'scrobbles'));
+              if (hasNpScrobbles) displayNowPlayingData();
+          }
+      }
   }
 
   function renderTrendChart(container, data, dominantColor = '#1ed760') {
@@ -56385,6 +57095,8 @@ shadowRoot.innerHTML = `
       }
 
       const lfmPromise = fetchLastFmExtendedInfo(artistName, trackName, username, trackId);
+      const trendPromise = fetchLastFmTrend(lfmArtist, isArtistContext ? "" : lfmTrack, isNoRedirect).catch(() => null);
+      const lfmTrackKey = !isArtistContext && lfmArtist && lfmTrack ? `${lfmArtist.toLowerCase().trim()}|-|${lfmTrack.toLowerCase().trim()}` : null;
 
       let currentSortMode = 'popular';
       
@@ -56525,6 +57237,7 @@ shadowRoot.innerHTML = `
           const trackUrl = isArtistContext ? aData.url : (isNoRedirect ? `https://www.last.fm/music/+noredirect/${encodeURIComponent(lfmArtist).replace(/%20/g, '+')}/_/${encodeURIComponent(lfmTrack).replace(/%20/g, '+')}` : tData.url);
           
           let statsHtml = '';
+          let fastTrendResolved = false;
           if (isArtistContext) {
               const totalListeners = aData?.stats?.listeners || 0;
               const artistTotal = aData?.stats?.playcount || 0;
@@ -56547,19 +57260,28 @@ shadowRoot.innerHTML = `
                   </div>
               `;
           } else {
+              const fastTrendResult = await Promise.race([trendPromise, new Promise(r => setTimeout(() => r(null), 600))]);
+              fastTrendResolved = Boolean(fastTrendResult);
+              const cachedHighScrobbles = lfmTrackKey ? await idb.get('scrobbles', lfmTrackKey) : null;
               const userPlaycount = tData.userplaycount || 0;
-              const totalListeners = tData.listeners || 0;
-              const totalScrobbles = tData.playcount || 0;
+              const totalListeners = Math.max(Number(tData.listeners || 0), Number(fastTrendResult?.listeners || 0));
+              let totalScrobbles = Math.max(Number(tData.playcount || 0), Number(fastTrendResult?.playcount || 0), typeof cachedHighScrobbles === 'number' ? cachedHighScrobbles : 0);
+              if (lfmTrackKey && totalScrobbles >= 0) {
+                  totalScrobbles = await setCachedScrobbles(lfmTrackKey, totalScrobbles);
+                  syncTrackScrobblesToUi(lfmTrackKey, trackUri, totalScrobbles);
+              }
+              tData.listeners = totalListeners;
+              tData.playcount = totalScrobbles;
               const artistTotal = aData?.stats?.playcount || 0;
               const userArtistCount = aData?.stats?.userplaycount;
               statsHtml = `
                   <div class="lfm-stat-box">
                       <div class="lfm-stat-header">${listenersIcon} <span class="lfm-stat-label">Total Listeners</span></div>
-                      <div class="lfm-stat-value">${Number(totalListeners).toLocaleString()}</div>
+                      <div class="lfm-stat-value" id="lfm-stat-listeners">${Number(totalListeners).toLocaleString()}</div>
                   </div>
                   <div class="lfm-stat-box">
                       <div class="lfm-stat-header">${barsIcon} <span class="lfm-stat-label">Total Track Scrobbles</span></div>
-                      <div class="lfm-stat-value">${Number(totalScrobbles).toLocaleString()}</div>
+                      <div class="lfm-stat-value" id="lfm-stat-scrobbles">${Number(totalScrobbles).toLocaleString()}</div>
                   </div>
                   <div class="lfm-stat-box">
                       <div class="lfm-stat-header">${myPlaysIcon} <span class="lfm-stat-label">Your Track Scrobbles</span></div>
@@ -56802,10 +57524,30 @@ shadowRoot.innerHTML = `
           if (trendContainer) {
               renderTrendChart(trendContainer, null, `rgb(${cR}, ${cG}, ${cB})`);
 
-              fetchLastFmTrend(lfmArtist, isArtistContext ? "" : lfmTrack, isNoRedirect).then(data => {
+              trendPromise.then(async (trendResult) => {
+                  if (!isArtistContext && !fastTrendResolved && trendResult && !Array.isArray(trendResult)) {
+                      const mergedListeners = Math.max(Number(tData.listeners || 0), Number(trendResult.listeners || 0));
+                      let mergedScrobbles = Math.max(Number(tData.playcount || 0), Number(trendResult.playcount || 0));
+                      if (lfmTrackKey && mergedScrobbles >= 0) {
+                          mergedScrobbles = await setCachedScrobbles(lfmTrackKey, mergedScrobbles);
+                          syncTrackScrobblesToUi(lfmTrackKey, trackUri, mergedScrobbles);
+                      }
+                      if (mergedListeners > Number(tData.listeners || 0)) {
+                          tData.listeners = mergedListeners;
+                          const listenersEl = modalContainer.querySelector('#lfm-stat-listeners');
+                          if (listenersEl) listenersEl.textContent = mergedListeners.toLocaleString();
+                      }
+                      if (mergedScrobbles > Number(tData.playcount || 0)) {
+                          tData.playcount = mergedScrobbles;
+                          const scrobblesEl = modalContainer.querySelector('#lfm-stat-scrobbles');
+                          if (scrobblesEl) scrobblesEl.textContent = mergedScrobbles.toLocaleString();
+                      }
+                  }
+
+                  const trendPoints = Array.isArray(trendResult) ? trendResult : trendResult?.trend;
                   if (trendContainer.isConnected) {
-                      if (data && data.length >= 2) {
-                          renderTrendChart(trendContainer, data, `rgb(${cR}, ${cG}, ${cB})`);
+                      if (trendPoints && trendPoints.length >= 2) {
+                          renderTrendChart(trendContainer, trendPoints, `rgb(${cR}, ${cG}, ${cB})`);
                       } else {
                           trendContainer.innerHTML = ''; 
                       }
