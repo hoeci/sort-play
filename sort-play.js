@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.9.0";
+  const SORT_PLAY_VERSION = "6.10.0";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -106,6 +106,8 @@
   const STORAGE_KEY_INCLUDE_LYRICS = "sort-play-include-lyrics";
   const STORAGE_KEY_AI_MODEL = "sort-play-ai-model";
   const STORAGE_KEY_MATCH_ALL_GENRES = "sort-play-match-all-genres";
+  const STORAGE_KEY_GROUP_SIMILAR_GENRES = "sort-play-group-similar-genres";
+  const STORAGE_KEY_FILTER_NOISE_GENRES = "sort-play-filter-noise-genres";
   const STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE = "sort-play-my-scrobbles-display-mode";
   const STORAGE_KEY_KEY_DISPLAY_MODE = "sort-play-key-display-mode";
   const STORAGE_KEY_SHOW_LIKE_BUTTON = "sort-play-show-like-button";
@@ -194,6 +196,7 @@
     STORAGE_KEY_RELEASE_DATE_FORMAT, STORAGE_KEY_REMOVE_DATE_ADDED,
     STORAGE_KEY_INCLUDE_SONG_STATS, STORAGE_KEY_INCLUDE_LYRICS,
     STORAGE_KEY_AI_MODEL, STORAGE_KEY_MATCH_ALL_GENRES,
+    STORAGE_KEY_GROUP_SIMILAR_GENRES, STORAGE_KEY_FILTER_NOISE_GENRES,
     STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE, STORAGE_KEY_KEY_DISPLAY_MODE,
     STORAGE_KEY_SHOW_LIKE_BUTTON, STORAGE_KEY_LIKE_BUTTON_CONFIG, STORAGE_KEY_LASTFM_AUTOCORRECT,
     STORAGE_KEY_ARTIST_DISCOGRAPHY_DEDUP_MODE, STORAGE_KEY_LFM_OVERRIDES,
@@ -296,7 +299,9 @@
   let showGenreTags = false;
   let showGenreTagsNowPlaying = true;
   let showGenreTagsArtistPage = true;
-  let matchAllGenres  = false;
+  let matchAllGenres = false;
+  let groupSimilarGenres = true;
+  let filterNoiseGenres = true;
   let useGenrePlaylistDatabase = true;
   let genreSourcesNpSpotify = true;
   let genreSourcesNpSpotifyTrack = true;
@@ -408,8 +413,2763 @@
   const albumReleaseDateCache = {};
   const albumTracksDataCache = {};
   const inFlightAlbumRequests = {};
+
+  const GENRE_ALIASES_RAW = {
+    "r&b": ["r&b","rnb","r and b","r n b","rhythm and blues","rhythm & blues","r&b's","rnb's","r & b","r'n'b","r-n-b","rythm and blues","rythym and blues","rhythm n blues","randb"],
+    "contemporary r&b": ["contemporary r&b","contemporary rnb","contemporary r and b","contemporary rhythm and blues","modern r&b","modern rnb","rnb contemporain"],
+    "alternative r&b": ["alternative r&b","alternative rnb","alt r&b","alt rnb","alt-rnb","alternate rnb"],
+    "indie r&b": ["indie r&b","indie rnb","indie r and b"],
+    "bedroom r&b": ["bedroom r&b","bedroom rnb"],
+    "dark r&b": ["dark r&b","dark rnb","dark-rnb","dark r and b","dark rb"],
+    "chill r&b": ["chill r&b","chill rnb","chill-rnb"],
+    "pop r&b": ["pop r&b","pop rnb","pop-rnb","rnb pop"],
+    "uk r&b": ["uk r&b","uk rnb","uk contemporary r&b","uk contemporary rnb","british r&b","british rnb"],
+    "french r&b": ["french r&b","french rnb","r&b francais","rnb francais","french r and b"],
+    "canadian contemporary r&b": ["canadian contemporary r&b","canadian contemporary rnb","canadian contemporary r and b","canadian r&b","canadian rnb"],
+    "afro r&b": ["afro r&b","afro rnb","afro r and b"],
+    "kenyan r&b": ["kenyan r&b","kenyan rnb","kenyan r and b"],
+    "chinese r&b": ["chinese r&b","chinese rnb","chinese r and b","c-r&b","c-rnb"],
+    "neo r&b": ["neo r&b","neo rnb","neo-r&b","neo-rnb","neo r and b"],
+    "experimental r&b": ["experimental r&b","experimental rnb","experimental r and b","post-r&b","post-rnb","post r&b","post rnb","prog r&b","prog rnb","prog-rnb","progressive r&b","progressive rnb","future r&b","future rnb"],
+    "deep r&b": ["deep r&b","deep rnb","deep r and b"],
+    "deep smooth r&b": ["deep smooth r&b","deep smooth rnb","deep smooth r and b"],
+    "australian r&b": ["australian r&b","australian rnb","australian r and b","aussie r&b","aussie rnb"],
+    "dutch r&b": ["dutch r&b","dutch rnb","dutch r and b"],
+    "german r&b": ["german r&b","german rnb","german r and b"],
+    "scandinavian r&b": ["scandinavian r&b","scandinavian rnb","scandinavian r and b"],
+    "south african r&b": ["south african r&b","south african rnb","south african r and b"],
+    "r&b en espanol": ["r&b en espanol","rnb en espanol","r&b en español","rnb en español","latin r&b","latin rnb"],
+    "r&b argentino": ["r&b argentino","rnb argentino","argentine r&b","argentine rnb"],
+    "gospel r&b": ["gospel r&b","gospel rnb","gospel r and b","christian r&b","christian rnb"],
+    "indonesian r&b": ["indonesian r&b","indonesian rnb","indonesian r and b"],
+    "r&b italiano": ["r&b italiano","rnb italiano","italian r&b","italian rnb"],
+    "90s r&b": ["90s r&b","90s rnb","90s r and b"],
+    "pinoy r&b": ["pinoy r&b","pinoy rnb","filipino r&b","filipino rnb"],
+    "r&b brasileiro": ["r&b brasileiro","rnb brasileiro","brazilian r&b","brazilian rnb"],
+    "bulgarian r&b": ["bulgarian r&b","bulgarian rnb","bulgarian r and b"],
+    "cloud r&b": ["cloud r&b","cloud rnb","cloud r and b"],
+    "russian r&b": ["russian r&b","russian rnb","russian r and b"],
+    "spanish r&b": ["spanish r&b","spanish rnb","spanish r and b"],
+    "romanian r&b": ["romanian r&b","romanian rnb","romanian r and b"],
+    "vietnamese r&b": ["vietnamese r&b","vietnamese rnb","vietnamese r and b"],
+    "hindi r&b": ["hindi r&b","hindi rnb","hindi r and b"],
+    "neo soul": ["neo soul","neosoul","neo-soul","nu soul","nu-soul","nusoul"],
+    "quiet storm": ["quiet storm","slow jams","slow jam"],
+    "hip hop": ["hip hop","hip-hop","hiphop","hip-hop music","hip hop's","hip-hops","hip-hip","hip hop/rap","hip-hop/rap","genre: hip-hop"],
+    "lo-fi": ["lo-fi","lofi","lo fi","low-fi","low fi"],
+    "lo-fi hip hop": ["lo-fi hip hop","lo-fi hip-hop","lofi hip hop","lofi hip-hop","lo-fi hiphop","lofi hiphop","lofi-hiphop"],
+    "chillhop": ["chillhop","chill-hop","chill hop"],
+    "lo-fi beats": ["lo-fi beats","lofi beats","lo-fi beat","low-fi beats","laid-back lofi beats","laid-back lo-fi beats"],
+    "lo-fi house": ["lo-fi house","lofi house","lo fi house"],
+    "lo-fi indie": ["lo-fi indie","lofi indie","lo fi indie","lo-fi indie rock","lofi indie rock"],
+    "lo-fi emo": ["lo-fi emo","lofi emo","lo fi emo"],
+    "lo-fi rap": ["lo-fi rap","lofi rap","lo fi rap"],
+    "lo-fi chill": ["lo-fi chill","lofi chill","lo fi chill"],
+    "lo-fi study": ["lo-fi study","lofi study","lo fi study"],
+    "lo-fi sleep": ["lo-fi sleep","lofi sleep","lo fi sleep"],
+    "lo-fi cover": ["lo-fi cover","lofi cover","lo fi cover"],
+    "lo-fi jazzhop": ["lo-fi jazzhop","lofi jazzhop","lo fi jazzhop"],
+    "lo-fi vgm": ["lo-fi vgm","lofi vgm","lo fi vgm"],
+    "sad lo-fi": ["sad lo-fi","sad lofi","sad lo fi"],
+    "ambient lo-fi": ["ambient lo-fi","ambient lofi","ambient lo fi"],
+    "christian lo-fi": ["christian lo-fi","christian lofi","christian lo fi"],
+    "late night lo-fi": ["late night lo-fi","late night lofi","late night lo fi"],
+    "indonesian lo-fi pop": ["indonesian lo-fi pop","indonesian lofi pop","indonesian lo fi pop"],
+    "brazilian lo-fi rock": ["brazilian lo-fi rock","brazilian lofi rock","brazilian lo fi rock"],
+    "alternative hip hop": ["alternative hip hop","alt hip hop","alternative hip-hop","alt hip-hop","alternative hiphop","alternative rap","alt rap","alt-rap"],
+    "underground hip hop": ["underground hip hop","underground hip-hop","underground hiphop"],
+    "old school hip hop": ["old school hip hop","old school hip-hop","old school hiphop","oldschool hip hop","oldschool hip-hop","oldschool hiphop","old school rap","oldschool rap","old skool hip hop","old skool rap"],
+    "golden age hip hop": ["golden age hip hop","golden age hip-hop","golden age rap"],
+    "boom bap": ["boom bap","boombap","boom-bap"],
+    "cloud rap": ["cloud rap","cloudrap","cloud-rap"],
+    "emo rap": ["emo rap","emorap","emo-rap","emo hip hop","emo hip-hop","emo hiphop"],
+    "pop rap": ["pop rap","pop-rap"],
+    "hardcore hip hop": ["hardcore hip hop","hardcore rap","hardcore hip-hop"],
+    "conscious hip hop": ["conscious hip hop","conscious rap","conscious hip-hop"],
+    "political hip hop": ["political hip hop","political rap","political hip-hop"],
+    "instrumental hip hop": ["instrumental hip hop","instrumental hip-hop","instrumental hiphop"],
+    "jazz rap": ["jazz rap","jazz hop","jazz-hop","jazzhop","jazzy hip-hop","jazzy hip hop","jazz hip-hop","jazz hip hop"],
+    "nerdcore": ["nerdcore","nerdcore hip hop","nerdcore hip-hop","nerdcore hiphop","nerd rap"],
+    "horrorcore": ["horrorcore","horrorcore rap","horrocore","horrorkore"],
+    "crunkcore": ["crunkcore","crunk core","scrunk"],
+    "chopped and screwed": ["chopped and screwed","chopped n screwed","screwed and chopped"],
+    "turntablism": ["turntablism","turntablist"],
+    "trap": ["trap","trap music","trap rap","trap-rap"],
+    "pop": ["pop","pop music","pop's","popmusic","pops"],
+    "dance pop": ["dance pop","dance-pop","dancepop"],
+    "indie pop": ["indie pop","indiepop","indie-pop"],
+    "synthpop": ["synthpop","synth pop","synth-pop","synthiepop","tecnopop","technopop"],
+    "electropop": ["electropop","electro-pop","electro pop","electronic pop","eletropop","elettropop"],
+    "hyperpop": ["hyperpop","hyper pop","hyper-pop"],
+    "dream pop": ["dream pop","dreampop","dream-pop"],
+    "art pop": ["art pop","art-pop","artpop"],
+    "noise pop": ["noise pop","noisepop","noise-pop"],
+    "power pop": ["power pop","powerpop","power-pop"],
+    "k-pop": ["k-pop","kpop","k pop","korean pop","korean kpop"],
+    "k-rap": ["k-rap","krap","k rap","korean hip hop","korean rap","k-hip hop","khiphop","k-hiphop","k-hip-hop","khip-hop","khh","k-hh","korean hiphop"],
+    "k-rock": ["k-rock","krock","k rock","korean rock"],
+    "k-indie": ["k-indie","korean indie"],
+    "k-ballad": ["k-ballad","k-ballads","kballad","k-pop ballad","kpop ballad","korean ballad"],
+    "korean r&b": ["korean r&b","k-r&b","krnb","k-rnb","korean rnb","k rnb"],
+    "trot": ["trot","k-trot","ktrot","k-pop trot","kpop trot","트로트"],
+    "korean folk": ["korean folk","korean traditional","korean traditional music","gugak","fusion gugak","creative gugak"],
+    "j-pop": ["j-pop","jpop","j pop","japanese pop","japan pop"],
+    "j-rock": ["j-rock","jrock","j rock","japanese rock","japan rock"],
+    "j-rap": ["j-rap","jrap","j rap","japanese hip hop","japanese rap","j-hiphop","j-hip hop","j-hip-hop","japanese hiphop"],
+    "j-metal": ["j-metal","jmetal","japanese metal"],
+    "j-indie": ["j-indie","japanese indie"],
+    "j-r&b": ["j-r&b","j-rnb","jrnb","japanese r&b","japanese rnb"],
+    "city pop": ["city pop","citypop","japanese city pop"],
+    "kayokyoku": ["kayokyoku","kayoukyoku","kayōkyoku"],
+    "visual kei": ["visual kei","vkei","v-kei","visual-kei","visual key","v-rock"],
+    "j-poprock": ["j-poprock","j-pop rock","jpop rock"],
+    "vocarock": ["vocarock","vocaloid rock","vocalorock"],
+    "vocaloid": ["vocaloid","vocaloidp","vocaloid-p"],
+    "anison": ["anison","anisong","anime song","anime music"],
+    "c-pop": ["c-pop","cpop","c pop","chinese pop","mainland chinese pop"],
+    "mandopop": ["mandopop","mando pop","mandarin pop"],
+    "cantopop": ["cantopop","canto pop"],
+    "p-pop": ["p-pop","ppop","p pop","pinoy pop","filipino pop"],
+    "opm": ["opm","original pilipino music","original pinoy music","filipino music"],
+    "pinoy hip hop": ["pinoy hip hop","pinoy rap","filipino rap","tagalog rap"],
+    "pinoy rock": ["pinoy rock","filipino rock","opm rock"],
+    "v-pop": ["v-pop","vpop","v pop"],
+    "vietnamese hip hop": ["vietnamese hip hop","vietnamese rap","rap viet","vietrap"],
+    "vinahouse": ["vinahouse","vina house"],
+    "t-pop": ["t-pop","tpop","t pop"],
+    "indonesian pop": ["indonesian pop","indo pop","pop indonesia"],
+    "rock and roll": ["rock & roll","rock n roll","rock and roll","rock'n'roll","rock-and-roll","rock 'n' roll","rock'n roll","rock 'n roll","rocknroll","rock&roll","rockandroll","rocanrol"],
+    "alternative rock": ["alternative rock","alt rock","alt-rock","alt. rock","alt.rock","altrock","alternate rock","alternativerock"],
+    "indie rock": ["indie rock","indierock","indie-rock"],
+    "indie folk": ["indie folk","indiefolk","indie-folk"],
+    "indietronica": ["indietronica","indietronic","indie electronic","indie electronica","indie-electro"],
+    "hard rock": ["hard rock","hardrock","hard rock music","hard rock's","hard-rock","hardrockmusic","rock duro"],
+    "soft rock": ["soft rock","softrock"],
+    "aor": ["aor","album oriented rock"],
+    "psychedelic rock": ["psychedelic rock","psych rock","psychodelic rock","psychadelic rock"],
+    "psychedelic pop": ["psychedelic pop","psych pop","psych-pop","psychedelica"],
+    "psychedelic folk": ["psychedelic folk","psych folk","psych-folk"],
+    "garage rock": ["garage rock","garage-rock"],
+    "proto-punk": ["proto-punk","protopunk","proto punk"],
+    "pop punk": ["pop punk","poppunk","pop-punk","punk pop","punk-pop"],
+    "post-punk": ["post-punk","postpunk","post punk"],
+    "post-hardcore": ["post-hardcore","post hardcore","posthardcore"],
+    "new wave": ["new wave","newwave"],
+    "post-rock": ["post-rock","postrock","post rock"],
+    "post-metal": ["post-metal","post metal"],
+    "math rock": ["math rock","mathrock","math-rock"],
+    "noise rock": ["noise rock","noiserock","noise-rock"],
+    "shoegaze": ["shoegaze","shoe gaze","shoegazer","shoegazing","shogaze"],
+    "nu gaze": ["nu gaze","nu-gaze","nugaze"],
+    "blackgaze": ["blackgaze","black gaze"],
+    "folk pop": ["folk pop","folk-pop","folkpop"],
+    "anti-folk": ["anti-folk","anti folk"],
+    "neo-psychedelia": ["neo-psychedelia","neo psychedelia","neopsychedelia","neo-psychedelic","neo psychedelic"],
+    "post-grunge": ["post-grunge","post grunge","postgrunge"],
+    "dance-punk": ["dance-punk","dance punk","dancepunk","disco punk","discopunk"],
+    "midwest emo": ["midwest emo","midwestern emo"],
+    "screamo": ["screamo","skramz","real screamo","scramz"],
+    "emoviolence": ["emoviolence","emo violence","emo-violence"],
+    "idm": ["idm","intelligent dance music"],
+    "metal": ["metal","metal's","metalhead","metallic","metalmusic","metals"],
+    "heavy metal": ["heavy metal","heavymetal","traditional heavy metal","trad metal"],
+    "nwobhm": ["nwobhm","new wave of british heavy metal"],
+    "death metal": ["death metal","deathmetal"],
+    "melodic death metal": ["melodic death metal","melodeath","melo-death"],
+    "technical death metal": ["technical death metal","tech death","tech-death"],
+    "slam death metal": ["slam death metal","slamming brutal death metal","slamming death metal","slam brutal death metal","slamming brutal death","slam metal"],
+    "death-doom": ["death-doom","death doom","death doom metal","death-doom metal","death/doom metal","doom death metal","doom-death metal","doom/death"],
+    "death 'n' roll": ["death 'n' roll","death n roll","death'n'roll","death and roll"],
+    "black metal": ["black metal","blackmetal"],
+    "depressive suicidal black metal": ["depressive suicidal black metal","dsbm","suicidal black metal","depressive black metal"],
+    "nsbm": ["nsbm","national socialist black metal"],
+    "black 'n' roll": ["black 'n' roll","black n roll","black'n'roll"],
+    "norwegian black metal": ["norwegian black metal","true norwegian black metal","tnbm"],
+    "black thrash": ["black thrash","black-thrash","black/thrash","black thrash metal","black-thrash metal","black/thrash metal"],
+    "deathrash": ["deathrash","death thrash","death-thrash","death/thrash","death thrash metal","death-thrash metal","death/thrash metal","thrash death metal"],
+    "black death": ["black death","black death metal","black/death metal","black-death metal","death black metal"],
+    "old school death metal": ["old school death metal","oldschool death metal","old-school death metal"],
+    "old school thrash": ["old school thrash","old school thrash metal","oldschool thrash","oldschool thrash metal"],
+    "metalcore": ["metalcore","metal core"],
+    "deathcore": ["deathcore","death core"],
+    "mathcore": ["mathcore","math core"],
+    "grindcore": ["grindcore","grind core","grind"],
+    "goregrind": ["goregrind","gore grind"],
+    "pornogrind": ["pornogrind","porngrind","porno grind"],
+    "mincecore": ["mincecore","mince","mincegore"],
+    "nu metal": ["nu metal","numetal","nu-metal"],
+    "alternative metal": ["alternative metal","alt metal","alt. metal","alt-metal","altmetal"],
+    "power metal": ["power metal","powermetal"],
+    "thrash metal": ["thrash metal","thrash","thrashmetal"],
+    "crossover thrash": ["crossover thrash","crossover thrash metal","thrash crossover"],
+    "doom metal": ["doom metal","doommetal"],
+    "funeral doom": ["funeral doom","funeral doom metal"],
+    "epic doom": ["epic doom","epic doom metal"],
+    "drone metal": ["drone metal","drone doom","drone doom metal"],
+    "stoner metal": ["stoner metal","stoner doom","stoner doom metal","stoner-doom"],
+    "stoner rock": ["stoner rock","stoner"],
+    "sludge metal": ["sludge metal","sludge"],
+    "progressive metal": ["progressive metal","prog metal","prog-metal","progmetal","metal prog"],
+    "progressive rock": ["progressive rock","prog rock","prog-rock","progrock","prog"],
+    "symphonic prog": ["symphonic prog","symphonic progressive rock"],
+    "rock progressivo italiano": ["rock progressivo italiano","italian prog","italian symphonic prog","italian progressive rock","rpi"],
+    "krautrock": ["krautrock","kosmische","kosmische musik"],
+    "electronic": ["electronic","electronic music","electronic's","electronico","electronics","electronik","eletronic","electronique","elektronik","eletronica","elettronica","electrónica","electonic"],
+    "electronica": ["electronica","electronicas"],
+    "edm": ["edm","electronic dance","electronic dance music","edm music","edm's","edmmusic"],
+    "house": ["house","house music","house's","housemusic"],
+    "deep house": ["deep house","deephouse"],
+    "tech house": ["tech house","techhouse"],
+    "progressive house": ["progressive house","prog house","progessive house"],
+    "electro house": ["electro house","electrohouse"],
+    "bass house": ["bass house","basshouse"],
+    "slap house": ["slap house","slaphouse"],
+    "big room": ["big room","big room house","bigroom","bigroom house"],
+    "melbourne bounce": ["melbourne bounce","melbourne bounce international"],
+    "french house": ["french house","french touch"],
+    "electro swing": ["electro swing","electroswing","electro-swing"],
+    "eurodance": ["eurodance","euro dance","euro-dance"],
+    "italo disco": ["italo disco","italo-disco","italodisco"],
+    "italo dance": ["italo dance","italo-dance","italodance"],
+    "hi-nrg": ["hi-nrg","hi nrg","high energy"],
+    "drum and bass": ["drum and bass","dnb","d&b","drum n bass","drum & bass","drumandbass","drum'n'bass","drumnbass","drum 'n' bass","drum n' bass","drum 'n bass","d'n'b","drum and base","drumnbase"],
+    "liquid funk": ["liquid funk","liquid dnb","liquid drum and bass","liquid drum & bass","liquidfunk"],
+    "atmospheric dnb": ["atmospheric dnb","atmospheric drum and bass","atmospheric drum & bass","atmospheric drum n bass","intelligent drum and bass","intelligent drum n bass","athmospheric dnb","athmospheric drum and bass","atmosphere drum and bass"],
+    "soulful dnb": ["soulful dnb","soulful drum and bass","soulful drum & bass","soulful drum n bass"],
+    "jungle dnb": ["jungle dnb","jungle drum and bass","jungle drum & bass"],
+    "ragga jungle": ["ragga jungle","raggajungle"],
+    "dancefloor dnb": ["dancefloor dnb","dancefloor drum and bass","dancefloor drum & bass","dancefloor drum n bass"],
+    "deep dnb": ["deep dnb","deep drum and bass","deep drum & bass","deep drum n bass"],
+    "minimal dnb": ["minimal dnb","minimal drum and bass","minimal drum & bass","minimal drum n bass"],
+    "jazzy dnb": ["jazzy dnb","jazzy drum and bass","jazzy drum & bass","jazzy drum n bass","jazz dnb","jazz drum and bass"],
+    "halftime dnb": ["halftime dnb","halftime drum and bass","halftime drum & bass"],
+    "uk dnb": ["uk dnb","uk drum and bass","uk drum & bass","british drum and bass","british dnb"],
+    "belgian dnb": ["belgian dnb","belgian drum and bass"],
+    "dutch dnb": ["dutch dnb","dutch drum and bass"],
+    "french dnb": ["french dnb","french drum and bass"],
+    "german dnb": ["german dnb","german drum and bass"],
+    "austrian dnb": ["austrian dnb","austrian drum and bass"],
+    "russian dnb": ["russian dnb","russian drum and bass"],
+    "nz dnb": ["nz dnb","nz drum and bass","new zealand dnb","new zealand drum and bass"],
+    "south african dnb": ["south african dnb","south african drum and bass"],
+    "brazilian dnb": ["brazilian dnb","brazilian drum and bass"],
+    "stateside dnb": ["stateside dnb","stateside drum and bass","american dnb","american drum and bass","us dnb"],
+    "ambient dnb": ["ambient dnb","ambient drum and bass","ambient drum & bass","ambient drum n bass"],
+    "melodic dnb": ["melodic dnb","melodic drum and bass","melodic drum & bass"],
+    "vocal drum and bass": ["vocal drum and bass","vocal dnb","vocal drum & bass"],
+    "dark drum and bass": ["dark drum and bass","dark dnb","dark drum & bass"],
+    "lo-fi dnb": ["lo-fi dnb","lofi dnb","lo-fi drum and bass","lofi drum and bass"],
+    "futurepop": ["futurepop","future pop","future-pop"],
+    "jackin' house": ["jackin' house","jackin house","jacking house"],
+    "two-tone": ["two-tone","two tone","2-tone","2 tone","2tone"],
+    "uk garage": ["uk garage","ukg","uk-garage","2-step garage"],
+    "2-step": ["2-step","2step","two-step"],
+    "uk drill": ["uk drill","british drill","drill uk"],
+    "uk hip hop": ["uk hip hop","uk rap","british hip hop","british rap","ukhh"],
+    "australian hip hop": ["australian hip hop","aussie hip hop","aussie hip-hop","australian rap","aussie rap","aus rap","oz hip hop","oz hip-hop"],
+    "australian rock": ["australian rock","aussie rock","oz rock"],
+    "canadian hip hop": ["canadian hip hop","canadian rap"],
+    "psytrance": ["psytrance","psy trance","psy-trance","psychedelic trance"],
+    "dark psytrance": ["dark psytrance","darkpsy","dark psy","darkpsytrance","dark psychedelic trance"],
+    "goa trance": ["goa trance","goa","goatrance","goa psytrance"],
+    "psybient": ["psybient","psy-ambient","psyambient","psychill","psy-chill"],
+    "uplifting trance": ["uplifting trance","epic trance","euphoric trance"],
+    "progressive trance": ["progressive trance","prog trance","progessive trance"],
+    "hard trance": ["hard trance","hardtrance","hard-trance"],
+    "hardstyle": ["hardstyle","harstyle","hardsytle"],
+    "hard techno": ["hard techno","hardtechno","hard-techno"],
+    "hardtek": ["hardtek","hard tek","hardtekno","hard tekno","tekno","tekkno","tekk"],
+    "minimal techno": ["minimal techno","minimaltechno","mnml"],
+    "dub techno": ["dub techno","dubtechno","dub-techno"],
+    "acid techno": ["acid techno","acidtechno"],
+    "ebm": ["ebm","electronic body music"],
+    "neue deutsche harte": ["neue deutsche harte","neue deutsche härte","neue deutsche haerte","ndh"],
+    "psychedelic": ["psychedelic","psych","psychedelia"],
+    "synthwave": ["synthwave","synth wave","synth-wave","synthwave's","retrowave","new retro wave","new retrowave","outrun","futuresynth"],
+    "darksynth": ["darksynth","dark synth","dark synthwave"],
+    "vaporwave": ["vaporwave","vapor wave"],
+    "chillwave": ["chillwave","chill wave","glo-fi"],
+    "witch house": ["witch house","witchhouse","witch-house"],
+    "chiptune": ["chiptune","chiptunes","chipmusic","8-bit","8bit","8 bit"],
+    "vgm": ["vgm","video game music","videogame music","video game soundtrack","videogame soundtrack","video game ost","videogame ost","game music","game soundtrack","game ost","game score","video game","video games","videogame","videogames"],
+    "latin": ["latin","latin music","latin's","latina","latinas","latinmusic","latino","latinos"],
+    "urbano latino": ["urbano latino","latin urban","urbano","urban latin","musica urbana"],
+    "latin trap": ["latin trap","trap latino"],
+    "reggaeton": ["reggaeton","reggaetón","regueton","reggeaton","reggeton","raggaeton"],
+    "regional mexican": ["regional mexican","regional mexicano","musica mexicana","música mexicana","regional mexicana"],
+    "norteno": ["norteno","norteño","nortena","norteña","musica nortena"],
+    "sierreno": ["sierreno","sierreño","sierrena","sierreña","sierre"],
+    "corridos tumbados": ["corridos tumbados","corrido tumbado"],
+    "corridos belicos": ["corridos belicos","corridos bélicos","corridos belico","corridos bélico"],
+    "sierreno urbano": ["sierreno urbano","sierreño urbano","urban sierreno","urban sierreño"],
+    "mariachi": ["mariachi","mariachis"],
+    "ranchera": ["ranchera","rancheras","ranchero","pura ranchera","puro ranchero"],
+    "bolero": ["bolero","boleros"],
+    "vallenato": ["vallenato","vallenatos"],
+    "cumbia": ["cumbia","cumbias"],
+    "salsa": ["salsa","salsas","salsa music"],
+    "bachata": ["bachata","bachatas"],
+    "bossa nova": ["bossa nova","bossanova","bossa","bossa-nova"],
+    "samba": ["samba","samba raiz","samba de raiz"],
+    "mpb": ["mpb","musica popular brasileira","música popular brasileira","musica brasileira"],
+    "funk carioca": ["funk carioca","baile funk","brazilian funk","funk brasileiro","brazil funk","favela funk","carioca funk","br funk","funk br","funk brasil","brasil funk"],
+    "brega funk": ["brega funk","bregafunk"],
+    "funk mandelao": ["funk mandelao","funk mandelão","mandelao","mandelão"],
+    "funk ostentacao": ["funk ostentacao","funk ostentação"],
+    "funk mtg": ["funk mtg","mtg funk","funk montagem","montagem funk"],
+    "trap brasileiro": ["trap brasileiro","brazilian trap","trap nacional","trap br","brazil trap","trapbrazilian"],
+    "phonk brasileiro": ["phonk brasileiro","brazilian phonk","brazil phonk","brazillian phonk"],
+    "drill brasileiro": ["drill brasileiro","brazilian drill","drill br"],
+    "brazilian hip hop": ["brazilian hip hop","rap nacional","hip hop nacional","rap brasileiro","hip hop brasileiro","brazilian rap","rap br"],
+    "brazilian rock": ["brazilian rock","rock brasileiro","brock","rock brasil","rock nacional brasileiro"],
+    "brazilian metal": ["brazilian metal","metal brasil","heavy metal brasil"],
+    "pop nacional": ["pop nacional","brazilian pop","pop brasileiro"],
+    "sertanejo": ["sertanejo","musica sertaneja","música sertaneja","sertaneja","brazilian country"],
+    "funk paulista": ["funk paulista","funk sp"],
+    "funk das antigas": ["funk das antigas","funk antigo"],
+    "sertanejo universitario": ["sertanejo universitario","sertanejo universitário"],
+    "forro": ["forro","forró"],
+    "piseiro": ["piseiro","pisadinha"],
+    "axé": ["axé","axe","axe music","brazilian axe"],
+    "pagode": ["pagode"],
+    "french hip hop": ["french hip hop","french rap","rap francais","rap français","hip hop francais","rapfr","rap fr","rap cefran","french hiphop"],
+    "drill francais": ["drill francais","french drill","drill fr"],
+    "french rock": ["french rock","rock francais","rock français"],
+    "chanson": ["chanson","chanson francaise","chanson française","chansons"],
+    "german hip hop": ["german hip hop","german rap","deutschrap","deutsch rap","german hiphop","deutscher hip hop","deutscher hiphop","deutscher rap","germanrap"],
+    "german pop": ["german pop","deutschpop","deutsch pop"],
+    "german rock": ["german rock","deutschrock","deutsch rock"],
+    "german punk": ["german punk","deutschpunk","deutsch punk"],
+    "neue deutsche welle": ["neue deutsche welle","ndw"],
+    "schlager": ["schlager","german schlager","deutsche schlager","deutscher schlager"],
+    "dutch hip hop": ["dutch hip hop","nederhop","dutch rap"],
+    "dutch pop": ["dutch pop","nederpop"],
+    "spanish hip hop": ["spanish hip hop","spanish rap","rap espanol","rap español"],
+    "spanish pop": ["spanish pop","pop espanol","pop español"],
+    "spanish rock": ["spanish rock","rock espanol","rock español"],
+    "italian hip hop": ["italian hip hop","italian rap","rap italiano","hip hop italiano","italo rap"],
+    "trap italiana": ["trap italiana","italian trap"],
+    "drill italiana": ["drill italiana","drill italiano","italian drill"],
+    "italian pop": ["italian pop","pop italiano","musica italiana","musica leggera"],
+    "itpop": ["itpop","italian indie pop","indie italiano","italian indie"],
+    "italian rock": ["italian rock","rock italiano"],
+    "polish hip hop": ["polish hip hop","polish rap","polski rap","rap polski","polski hip hop","polski hip-hop"],
+    "polish rock": ["polish rock","polski rock"],
+    "polish punk": ["polish punk","polski punk"],
+    "disco polo": ["disco polo","discopolo"],
+    "sung poetry": ["sung poetry"],
+    "poezja spiewana": ["poezja spiewana","poezja śpiewana"],
+    "russian hip hop": ["russian hip hop","russian rap","russian hiphop","русский рэп"],
+    "russian pop": ["russian pop"],
+    "russian rock": ["russian rock","russkiy rok"],
+    "russian chanson": ["russian chanson","blatnyak","shanson"],
+    "russian bard": ["russian bard","avtorskaya pesnya","russian guitar song"],
+    "hardbass": ["hardbass","hard bass"],
+    "ukrainian pop": ["ukrainian pop"],
+    "ukrainian hip hop": ["ukrainian hip hop","ukrainian rap","ukranian rap"],
+    "romanian hip hop": ["romanian hip hop","romanian hip-hop","romanian hiphop","romanian rap"],
+    "swedish hip hop": ["swedish hip hop","swedish hip-hop","swedish hiphop","swedish rap","svensk hip hop","svensk rap"],
+    "norwegian hip hop": ["norwegian hip hop","norwegian hip-hop","norwegian hiphop","norwegian rap","norsk hip hop","norsk hiphop","norsk rap"],
+    "danish hip hop": ["danish hip hop","danish hip-hop","danish hiphop","danish rap","dansk rap","dansk hip hop"],
+    "finnish hip hop": ["finnish hip hop","finnish hip-hop","finnish hiphop","finnish rap"],
+    "icelandic hip hop": ["icelandic hip hop","icelandic hip-hop","icelandic hiphop","icelandic rap"],
+    "greek hip hop": ["greek hip hop","greek hip-hop","greek hiphop","greek rap"],
+    "serbian hip hop": ["serbian hip hop","serbian hip-hop","serbian hiphop","serbian rap"],
+    "croatian hip hop": ["croatian hip hop","croatian hip-hop","croatian hiphop","croatian rap"],
+    "bulgarian hip hop": ["bulgarian hip hop","bulgarian hip-hop","bulgarian hiphop","bulgarian rap"],
+    "albanian hip hop": ["albanian hip hop","albanian hip-hop","albanian hiphop","albanian rap"],
+    "hungarian hip hop": ["hungarian hip hop","hungarian hip-hop","hungarian hiphop","hungarian rap","magyar rap","magyar hip hop"],
+    "czech hip hop": ["czech hip hop","czech hip-hop","czech hiphop","czech rap","cesky rap"],
+    "slovak hip hop": ["slovak hip hop","slovak hip-hop","slovak hiphop","slovak rap","slovensky rap"],
+    "kazakh hip hop": ["kazakh hip hop","kazakh hip-hop","kazakh hiphop","kazakh rap"],
+    "israeli hip hop": ["israeli hip hop","israeli hip-hop","israeli hiphop","israeli rap"],
+    "pakistani hip hop": ["pakistani hip hop","pakistani hip-hop","pakistani hiphop","pakistani rap","urdu rap"],
+    "tamil hip hop": ["tamil hip hop","tamil hip-hop","tamil hiphop","tamil rap"],
+    "indonesian hip hop": ["indonesian hip hop","indonesian hip-hop","indonesian hiphop","indonesian rap"],
+    "malaysian hip hop": ["malaysian hip hop","malaysian hip-hop","malaysian hiphop","malaysian rap","malay rap"],
+    "thai hip hop": ["thai hip hop","thai hip-hop","thai hiphop","thai rap"],
+    "chinese hip hop": ["chinese hip hop","chinese hip-hop","chinese hiphop","chinese rap","c-rap","mandarin rap"],
+    "taiwan hip hop": ["taiwan hip hop","taiwanese hip hop","taiwanese rap","taiwan rap"],
+    "hong kong hip hop": ["hong kong hip hop","hk hip hop","hk rap","cantonese rap"],
+    "south african hip hop": ["south african hip hop","south african hip-hop","south african hiphop","south african rap"],
+    "nigerian hip hop": ["nigerian hip hop","nigerian hip-hop","nigerian hiphop","nigerian rap","naija rap"],
+    "ghanaian hip hop": ["ghanaian hip hop","ghanaian hip-hop","ghanaian hiphop","ghanaian rap"],
+    "kenyan hip hop": ["kenyan hip hop","kenyan hip-hop","kenyan hiphop","kenyan rap"],
+    "tanzanian hip hop": ["tanzanian hip hop","tanzanian hip-hop","tanzanian hiphop","tanzanian rap"],
+    "egyptian hip hop": ["egyptian hip hop","egyptian hip-hop","egyptian hiphop","egyptian rap"],
+    "romanian pop": ["romanian pop"],
+    "balkan": ["balkan","balkan music","balkans"],
+    "turbo-folk": ["turbo-folk","turbofolk","turbo folk"],
+    "ex-yu rock": ["ex-yu rock","yugoslav rock","ex-yu","ex yu","novi val","yugo wave"],
+    "turkish hip hop": ["turkish hip hop","turkish rap","turkce rap","türkçe rap","turkish hiphop","turkcerap","turkishrap"],
+    "turkish pop": ["turkish pop","turkce pop","türkçe pop","turhish pop"],
+    "turkish rock": ["turkish rock","turkce rock","türkçe rock","turk rock","turkcerock"],
+    "anatolian rock": ["anatolian rock","anadolu rock"],
+    "turkish folk": ["turkish folk","turk halk muzigi","türk halk müziği","halk muzigi","turkish folk music","turkce folk","türkü","turku"],
+    "turkish classical": ["turkish classical","turk sanat muzigi","türk sanat müziği","turk sanat musikisi","turkish classical music","turkish art music","klasik turk muzigi"],
+    "arabesk": ["arabesk","arabesque","turkish arabesque"],
+    "arabic pop": ["arabic pop","arab pop"],
+    "arabic hip hop": ["arabic hip hop","arabic rap","arab rap"],
+    "khaleeji": ["khaleeji","khaliji","khaliji pop","khaleeji iraqi"],
+    "rai": ["rai","raï"],
+    "mahraganat": ["mahraganat","electro shaabi"],
+    "moroccan rap": ["moroccan rap","rap maroc","rap marocain"],
+    "persian pop": ["persian pop","farsi pop","iranian pop"],
+    "persian hip hop": ["persian hip hop","persian rap","rap farsi","iranian hip hop","iranian rap"],
+    "persian traditional": ["persian traditional","classical persian","iranian traditional","sonati","persian classical","persian classical music","iranian traditional music"],
+    "bollywood pop": ["bollywood pop","bollywood","bollywood music","hindi film","indian film"],
+    "desi hip hop": ["desi hip hop","desi rap","desi hiphop","indian hip hop","indian hip-hop","indian rap","hindi hip hop","hindi rap"],
+    "punjabi hip hop": ["punjabi hip hop","punjabi rap"],
+    "indian classical": ["indian classical","indian classical music"],
+    "singer-songwriter": ["singer-songwriter","singer songwriter","singer/songwriter","singer-songwriters","singersongwriter"],
+    "cantautori": ["cantautori","cantautore","italian songwriter","italian songwriters","cantautorato"],
+    "nu disco": ["nu disco","nu-disco","nudisco"],
+    "soundtrack": ["soundtrack","soundtracks","ost","original soundtrack","film score","movie soundtrack","movie score","film soundtrack"],
+    "show tunes": ["show tunes","showtunes","show tune","musical theatre","musical theater","musicals"],
+    "country": ["country","country music","country's","countrymusic"],
+    "contemporary country": ["contemporary country","modern country"],
+    "country pop": ["country pop","country-pop","pop country"],
+    "traditional country": ["traditional country","old country"],
+    "neo-traditional country": ["neo-traditional country","neo-traditionalist country","new traditionalist","new traditionalist country"],
+    "alternative country": ["alternative country","alt-country","alt country","alt.country","altcountry"],
+    "country rock": ["country rock","country-rock","countryrock"],
+    "bluegrass": ["bluegrass","blue grass","blugrass","traditional bluegrass"],
+    "old-time": ["old-time","old time","old-timey","old timey","old time music","old-time music"],
+    "classical": ["classical","classical music","classical's"],
+    "orchestral": ["orchestral","orchestral music","orchestras"],
+    "contemporary classical": ["contemporary classical","modern classical","21st century classical"],
+    "baroque": ["baroque","baroque's","baroque music","baroque era","baroque period"],
+    "opera": ["opera","operatic","opera music"],
+    "choral": ["choral","choir","choral music"],
+    "world": ["world","world music","worldbeat","world beat"],
+    "christian": ["christian","christian music","musica cristiana","musica crista","christelijk"],
+    "christian pop": ["christian pop","ccm","contemporary christian","contemporary christian music"],
+    "christian hip hop": ["christian hip hop","christian rap","gospel rap","holy hip hop","holy hip-hop","chh","rap cristiano","rap cristao"],
+    "christian rock": ["christian rock","rock cristiano"],
+    "worship": ["worship","praise and worship","praise & worship","contemporary worship","worship music","alabanza","adoracion","louvor","adoracao","lobpreis"],
+    "christmas": ["christmas","christmas music","christmas songs","xmas","x-mas","holiday","holiday music"],
+    "children's music": ["children's music","childrens music","children music","childrens","kids music"],
+    "spoken word": ["spoken word","poetry","poesia","poésie","poesie"],
+    "audiobook": ["audiobook","audiobooks","audio book","audio drama","radio drama"],
+    "hoerspiel": ["hoerspiel","hörspiel","hoerbuch"],
+    "stand-up comedy": ["stand-up comedy","stand-up","standup","standup comedy","comedian"],
+    "rock": ["rock","rock music","rock's","rockmusic","rocks","rockin","rockin'"],
+    "glam rock": ["glam rock","glamrock"],
+    "glam metal": ["glam metal","hair metal","sleaze metal"],
+    "blues rock": ["blues rock","blues-rock","bluesrock"],
+    "folk rock": ["folk rock","folk-rock","folkrock"],
+    "pop rock": ["pop rock","pop rock music","pop rock's","pop-rock","poprock","poprockmusic","rock pop","rock-pop","pop/rock"],
+    "surf rock": ["surf rock","surf","instrumental surf rock"],
+    "rockabilly": ["rockabilly","rock-a-billy"],
+    "neo-rockabilly": ["neo-rockabilly","neo rockabilly"],
+    "psychobilly": ["psychobilly","psycho-billy"],
+    "gothabilly": ["gothabilly","hellbilly"],
+    "gothic rock": ["gothic rock","goth rock","goth","gothrock"],
+    "deathrock": ["deathrock","death rock","death-rock"],
+    "dark wave": ["dark wave","darkwave","dark-wave"],
+    "coldwave": ["coldwave","cold wave","french coldwave","french cold wave"],
+    "neofolk": ["neofolk","neo-folk","neo folk"],
+    "synth punk": ["synth punk","synthpunk","synth-punk","electropunk","electro-punk","electro punk","elektropunk"],
+    "electroclash": ["electroclash","electro-clash","electro clash"],
+    "indie": ["indie","indie's","indiemusic","indies","indie music"],
+    "dance": ["dance","dance music","dance's","dances","dancey"],
+    "jazz": ["jazz","jazz's","jazzier","jazziest","jazzmusic","jazzy"],
+    "vocal jazz": ["vocal jazz","jazz vocal","jazzvocal","jazz singing"],
+    "smooth jazz": ["smooth jazz"],
+    "acid jazz": ["acid jazz","acidjazz"],
+    "nu jazz": ["nu jazz","nujazz","nu-jazz","future jazz","jazztronica"],
+    "jazz fusion": ["jazz fusion","jazz-fusion","jazzfusion"],
+    "jazz rock": ["jazz rock","jazz-rock","jazzrock"],
+    "jazz funk": ["jazz funk","jazz-funk","jazzfunk","funk jazz"],
+    "gypsy jazz": ["gypsy jazz","jazz manouche","gipsy jazz"],
+    "big band": ["big band","big band jazz","bigband","jazz orchestra"],
+    "dixieland": ["dixieland","dixieland jazz","trad jazz","hot jazz"],
+    "swing": ["swing","swing music"],
+    "folk": ["folk","folk music","folk's","folkie","folkier","folklore","folkmusic","folksy"],
+    "folk punk": ["folk punk","folkpunk","folk-punk"],
+    "celtic": ["celtic","celtic music","celtic folk"],
+    "irish folk": ["irish folk","traditional irish","irish traditional","irish folk music","irish traditional music"],
+    "sea shanties": ["sea shanties","sea shanty","shanties","shanty"],
+    "klezmer": ["klezmer","yiddish"],
+    "fado": ["fado"],
+    "flamenco": ["flamenco"],
+    "nuevo flamenco": ["nuevo flamenco","new flamenco","flamenco nuevo","flamenco fusion"],
+    "tango": ["tango","tango argentino","argentine tango"],
+    "nuevo tango": ["nuevo tango","tango nuevo","neotango","neo-tango","electrotango","tango electronico"],
+    "rap": ["rap","rap music","raps","rapper","rappers"],
+    "gangster rap": ["gangster rap","gangsta rap","gangsta-rap","gangsta","gangsterrap","gangstarap"],
+    "southern hip hop": ["southern hip hop","southern rap","dirty south","dirty south rap","south rap"],
+    "memphis rap": ["memphis rap","memphis hip hop","memphisrap"],
+    "east coast hip hop": ["east coast hip hop","east coast rap"],
+    "west coast hip hop": ["west coast hip hop","west coast rap","westcoast rap","westcoast hip hop"],
+    "g-funk": ["g-funk","g funk","gfunk","gangsta funk"],
+    "p-funk": ["p-funk","p funk","pfunk"],
+    "miami bass": ["miami bass"],
+    "punk": ["punk","punk music","punk's","punkmusic","punks","punky","punk rock","punkrock","punk-rock"],
+    "hardcore punk": ["hardcore punk","hardcore-punk","hardcorepunk","hc punk"],
+    "crust punk": ["crust punk","crust","crustcore"],
+    "d-beat": ["d-beat","dbeat","d beat"],
+    "powerviolence": ["powerviolence","power violence"],
+    "street punk": ["street punk","streetpunk"],
+    "oi": ["oi","oi!","oi punk","oi-punk","oicore","skinhead oi"],
+    "skate punk": ["skate punk","skatepunk","skate-punk"],
+    "anarcho-punk": ["anarcho-punk","anarcho punk","anarchopunk","anarcopunk"],
+    "riot grrrl": ["riot grrrl","riot grrl","riot girl"],
+    "horror punk": ["horror punk","horrorpunk"],
+    "ska": ["ska"],
+    "ska punk": ["ska punk","skapunk","ska-punk"],
+    "rocksteady": ["rocksteady","rock steady"],
+    "soul": ["soul","soul music","soul's","soulmusic","souly"],
+    "doo-wop": ["doo-wop","doo wop","doowop"],
+    "new jack swing": ["new jack swing"],
+    "blues": ["blues","blues music","blues'","bluesier","bluesiest","bluesmusic","bluesy"],
+    "alternative": ["alt","alternative","alternative music","alternative's","alternativemusic","alternatives"],
+    "instrumental": ["instrumental","instrumental's","instrumentalmusic","instrumentals","no vocals","intrumental","instumental"],
+    "experimental": ["experiment","experimental","experimental's","experimentalmusic","experiments"],
+    "avant-garde": ["avant-garde","avantgarde","avant garde"],
+    "musique concrete": ["musique concrete","musique concrète","electroacoustic"],
+    "acousmatic": ["acousmatic","acousmatique"],
+    "field recording": ["field recording","field recordings"],
+    "ambient": ["ambient","ambient's","ambients"],
+    "dark ambient": ["dark ambient","darkambient"],
+    "acoustic": ["acoustic","acoustic's","acousticmusic","acoustics","accoustic","acustico"],
+    "reggae": ["reggae","reggae music","reggae's","reggaemusic","raggae","reagge","reggea"],
+    "roots reggae": ["roots reggae","reggae roots","roots and culture"],
+    "dancehall": ["dancehall","dance hall","jamaican dancehall","bashment","ragga","raggamuffin"],
+    "dub": ["dub","reggae dub","dub reggae"],
+    "techno": ["techno","techno music","techno's","technomusic"],
+    "trance": ["trance","trance music","trance's","trancemusic","trancing"],
+    "funk": ["funk","funk's","funkier","funkiest","funkmusic","funky"],
+    "disco": ["disco","disco music","disco's","discomusic","discos"],
+    "afrobeats": ["afrobeats","afro beats","afro-beats"],
+    "afropop": ["afropop","afro-pop","afro pop"],
+    "afrobeat": ["afrobeat","afro-beat","afro beat"],
+    "amapiano": ["amapiano","afropiano","afro piano"],
+    "soukous": ["soukous","congolese rumba"],
+    "coupé-décalé": ["coupé-décalé","coupe-decale","coupe decale"],
+    "drone": ["drone","drone's","dronemusic","drones"],
+    "dubstep": ["dubstep","dub step","dub-step","dubstep's","dubstepmusic","dupstep"],
+    "epic": ["epic","epic music","epic's","epicmusic"],
+    "epiccore": ["epiccore","epic core","epic-core","epicore"],
+    "future bass": ["future bass","future bass's","futurebass","futurebassmusic"],
+    "jungle": ["jungle","jungle's","junglemusic","jungles"],
+    "new age": ["new age","new age music","new-age","new-age music","newage","newagemusic"],
+    "piano": ["piano","piano music","klavier","piyano"],
+    "trip hop": ["trip hop","trip hop's","trip hops","triphop","triphopmusic","trip-hop"],
+    "a cappella": ["a cappella","acappella","a capella","acapella"],
+    "argentine rock": ["argentine rock","rock argentino","rock nacional argentino","rock argento","argentinian rock"],
+    "argentine hip hop": ["argentine hip hop","rap argentino","argentine rap"],
+    "chilean rock": ["chilean rock","rock chileno"],
+    "chilean hip hop": ["chilean hip hop","rap chileno","hip hop chileno"],
+    "mexican rock": ["mexican rock","rock mexicano"],
+    "mexican hip hop": ["mexican hip hop","mexican rap","rap mexicano","hip hop mexicano"],
+    "colombian hip hop": ["colombian hip hop","rap colombiano"],
+    "venezuelan hip hop": ["venezuelan hip hop","rap venezolano"],
+    "peruvian rock": ["peruvian rock","rock peruano"],
+    "uruguayan rock": ["uruguayan rock","rock uruguayo"],
+    "latin pop": ["latin pop","pop latino","pop en espanol","poplatino"],
+    "rock en espanol": ["rock en espanol","latin rock","rock en español","rock urbano","rock latino","rock en tu idioma","rock en espa","rock latinoamericano"],
+    "latin hip hop": ["latin hip hop","latin rap","rap latino"],
+    "doujin": ["doujin","doujin ongaku"],
+    "krushclub": ["krushclub","krush club","krushclub!","krush-club"],
+    "jerk rap": ["jerk rap","jerk","new jerk"],
+    "new jazz": ["new jazz","newjazz"],
+    "sexy drill": ["sexy drill","slizzy drill","slizzy","sexy drill rap"],
+    "pluggnb": ["pluggnb","plugg n b","plugg&b","plugg and b","plug&b","plugnb"],
+    "sigilkore": ["sigilkore","sigilcore"],
+    "dariacore": ["dariacore","daria core","hyperflip"],
+    "stutter house": ["stutter house","flutter house","tremolo house","vocal chop house"],
+    "3-step": ["3-step","three-step","3 step","3step"],
+    "color bass": ["color bass","colour bass","melodic riddim","future riddim","colorbass"],
+    "briddim": ["briddim","brostep riddim","briddim dubstep"],
+    "trap metal": ["trap metal","trapmetal","trap-metal"],
+    "rap rock": ["rap rock","rapcore","rap-rock","rock rap"],
+    "rage rap": ["rage rap","rage","rage beat"],
+    "ai music": ["ai music","ai","ai generated","ai-generated","ai slop","artificial intelligence","artificial intelligence music","ai artist"],
+    "midtempo bass": ["midtempo bass","midtempo","mid-tempo","mid tempo"],
+    "future beats": ["future beats","futurebeats","future beat"],
+    "breakbeat hardcore": ["breakbeat hardcore","old skool rave","oldskool rave","old skool hardcore","oldskool hardcore","rave hardcore"],
+    "old school hardcore": ["old school hardcore","oldschool hardcore","old-school hardcore"],
+    "old school techno": ["old school techno","oldschool techno","old-school techno","oldskool techno"],
+    "old school goth": ["old school goth","old school gothic rock","oldschool goth"],
+    "power noise": ["power noise","powernoise","power-noise"],
+    "bal-musette": ["bal-musette","bal musette","musette"],
+    "zouklove": ["zouklove","zouk love","zouk-love"],
+    "dream plugg": ["dream plugg","dreamplugg","dream-plugg"],
+    "dark plugg": ["dark plugg","darkplugg","dark-plugg"],
+    "emoplugg": ["emoplugg","emo plugg","emo-plugg"],
+    "slowed and reverb": ["slowed and reverb","slowed & reverb","slowed reverb"],
+    "video game metal": ["video game metal","videogame metal"],
+    "narcocorridos": ["narcocorridos","narcocorrido","narco corridos","narco corrido"],
+    "progressive folk": ["progressive folk","prog folk","prog-folk"],
+    "melodic punk": ["melodic punk","melodic punk rock","melodic-punk"],
+    "blackened sludge": ["blackened sludge","blackened sludge metal"],
+    "blackened doom metal": ["blackened doom metal","black doom metal","black-doom metal","black/doom metal","blackened doom"],
+    "freeform hardcore": ["freeform hardcore","freeform"],
+    "hard house": ["hard house","hardhouse"],
+    "ghetto house": ["ghetto house","ghettohouse"],
+    "ghettotech": ["ghettotech","ghetto tech","ghetto-tech"],
+    "bmore": ["bmore","b-more"],
+    "new rave": ["new rave","nu rave","nu-rave"],
+    "electronic rock": ["electronic rock","electro-rock","electrorock","electro rock"],
+    "synth rock": ["synth rock","synth-rock","synthrock"],
+    "avant-folk": ["avant-folk","avant folk"],
+    "alternative folk": ["alternative folk","alt-folk","alt folk"],
+    "lo-fi pop": ["lo-fi pop","lofi pop","lo fi pop"],
+    "ringtone": ["ringtone","ringtones"],
+    "melodic house and techno": ["melodic house and techno","melodic house & techno"],
+    "future funk": ["future funk","futurefunk","future-funk"],
+    "classical crossover": ["classical crossover","pop opera"],
+    "pagan folk": ["pagan folk","pagan-folk"],
+    "mittelalter": ["mittelalter","mittelalter folk"],
+    "mittelalter rock": ["mittelalter rock","mittelalter-rock","mittelalterpunk"],
+    "soundcloud rap": ["soundcloud rap","soundcloudrap"],
+    "mumble rap": ["mumble rap"],
+    "dungeon synth": ["dungeon synth","dungeonsynth"],
+    "horror synth": ["horror synth","horrorsynth"],
+    "keller synth": ["keller synth","kellersynth"],
+    "trap soul": ["trap soul","trapsoul"],
+    "chill trap": ["chill trap","chilltrap"],
+    "dark trap": ["dark trap","darktrap"],
+    "emo trap": ["emo trap","emotrap"],
+    "vapor trap": ["vapor trap","vaportrap"],
+    "future garage": ["future garage","futuregarage"],
+    "neo-crust": ["neo-crust","neocrust","neo crust"],
+    "neo-prog": ["neo-prog","neoprog","neo prog","neo-progressive","neo-progressive rock","neo progressive rock"],
+    "neo-swing": ["neo-swing","neoswing","neo swing","nu swing"],
+    "neoperreo": ["neoperreo","neo perreo","neo-perreo","neoperro"],
+    "folktronica": ["folktronica","folktronic","electrofolk","electro-folk","electronic folk"],
+    "electro-funk": ["electro-funk","electrofunk"],
+    "euro disco": ["euro disco","eurodisco","euro-disco"],
+    "euro house": ["euro house","eurohouse","euro-house"],
+    "euro trance": ["euro trance","eurotrance","euro-trance"],
+    "pop emo": ["pop emo","emo pop","emopop","emo-pop"],
+    "indie emo": ["indie emo","indiemo","indie-emo"],
+    "epunk": ["epunk","e-punk","incelcore","incel punk","zoomer epunk"],
+    "crank wave": ["crank wave","post-brexit new wave"],
+    "american primitive": ["american primitive","american primitivism","american primitive guitar"],
+    "suomi rock": ["suomi rock","suomirock"],
+    "suomirap": ["suomirap","suomi hip-hop","suomi hip hop","suomihoppi"],
+    "detroit hip hop": ["detroit hip hop","detroit rap"],
+    "atl hip hop": ["atl hip hop","atlanta hip hop","atlanta rap","atl rap"],
+    "nyc rap": ["nyc rap","new york rap","new york hip hop","new york hip-hop","ny rap"],
+    "cali rap": ["cali rap","california rap","la rap"],
+    "midwest hip hop": ["midwest hip hop","midwest hip-hop","midwest rap"],
+    "psychedelic hip hop": ["psychedelic hip hop","psychedelic rap","acid rap"],
+    "country rap": ["country rap","hick hop","hick-hop"],
+    "argentine reggae": ["argentine reggae","reggae argentino"],
+    "brazilian reggae": ["brazilian reggae","reggae brasileiro","reggae brasil"],
+    "italian reggae": ["italian reggae","reggae italiano"],
+    "colombian reggae": ["colombian reggae","reggae colombia","reggae colombiano"],
+    "dancehall reggae": ["dancehall reggae","reggae dancehall","ragga-reggae"],
+    "latin reggae": ["latin reggae","reggae latino"],
+    "french reggae": ["french reggae","reggae francais","reggae français"],
+    "uk reggae": ["uk reggae","british reggae"],
+    "nz reggae": ["nz reggae","new zealand reggae"],
+    "reggae pop": ["reggae pop","reggae-pop","pop reggae"],
+    "colombian rock": ["colombian rock","rock colombiano"],
+    "venezuelan rock": ["venezuelan rock","rock venezolano"],
+    "ecuadorian alternative rock": ["ecuadorian alternative rock","rock ecuatoriano","ecuadorian rock"],
+    "paraguayan rock": ["paraguayan rock","rock paraguayo"],
+    "bolivian rock": ["bolivian rock","rock boliviano"],
+    "rock tico": ["rock tico","rock costarricense","costa rican rock"],
+    "spanish punk": ["spanish punk","spanish punk rock","punk espanol","punk español"],
+    "argentine punk": ["argentine punk","punk argentino","punk rock argentino"],
+    "ska mexicano": ["ska mexicano","mexican ska"],
+    "salsa colombiana": ["salsa colombiana","colombian salsa"],
+    "cumbia peruana": ["cumbia peruana","peruvian cumbia"],
+    "italian hardcore": ["italian hardcore","italian hardcore punk"],
+    "argentine indie": ["argentine indie","indie argentino"],
+    "chilean indie": ["chilean indie","indie chileno"],
+    "mexican indie": ["mexican indie","indie mexicano","indie mexico"],
+    "colombian indie": ["colombian indie","indie colombiano"],
+    "peruvian indie": ["peruvian indie","indie peruano"],
+    "argentine metal": ["argentine metal","metal argentino"],
+    "mexican metal": ["mexican metal","metal mexicano"],
+    "metal colombiano": ["metal colombiano","colombian metal"],
+    "chilean metal": ["chilean metal","metal chileno"],
+    "peruvian metal": ["peruvian metal","metal peruano"],
+    "spanish metal": ["spanish metal","metal espanol","metal español"],
+    "hardgroove": ["hardgroove","hardgroove techno","hard groove"],
+    "pagodao": ["pagodao","pagodão"],
+    "jazz worship": ["jazz worship","jazzworship"],
+    "tecnocumbia": ["tecnocumbia","technocumbia"],
+    "electrocumbia": ["electrocumbia","eletrocumbia","electro cumbia"],
+    "piep kicks": ["piep kicks","piep kick"],
+    "full-on": ["full-on","full on","full-on psytrance","full on psytrance"],
+    "forest psy": ["forest psy","forest psytrance"],
+    "rock demenziale": ["rock demenziale","demenziale","metal demenziale"],
+    "belly dance": ["belly dance","bellydance"]
+  };
+
+  const GENRE_ALIAS_MAP = new Map();
+  for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+      GENRE_ALIAS_MAP.set(canonical, canonical);
+      aliases.forEach(alias => GENRE_ALIAS_MAP.set(alias, canonical));
+  }
+
+  function normalizeGenre(genre) {
+      if (!genre) return "";
+      let lower = genre.toLowerCase().trim();
+      
+      if (GENRE_ALIAS_MAP.has(lower)) {
+          return GENRE_ALIAS_MAP.get(lower);
+      }
+
+      const cleaned = lower
+          .replace(/-/g, ' ')
+          .replace(/&/g, 'and')
+          .replace(/\s+/g, ' ');
+
+      return GENRE_ALIAS_MAP.get(cleaned) || cleaned;
+  }
+
+  const UPPER_ACRONYMS = new Set(["idm", "edm", "ost", "r&b", "rnb", "uk", "us", "bpm", "hi-nrg", "dj", "ep", "lp", "ai", "dnb", "ebm", "mpb", "opm", "vgm", "nyc", "nz", "dc", "uae", "czsk"]);
+  const genreTitleCache = new Map();
+  const formatGenreTitle = (rawName) => {
+      if (!rawName) return "";
+      let cached = genreTitleCache.get(rawName);
+      if (cached) return cached;
+      cached = rawName.split(' ').map(word => {
+          return word.split('-').map(part => {
+              const lower = part.toLowerCase();
+              if (UPPER_ACRONYMS.has(lower)) return lower.toUpperCase();
+              return part.charAt(0).toUpperCase() + part.slice(1);
+          }).join('-');
+      }).join(' ');
+      genreTitleCache.set(rawName, cached);
+      return cached;
+  };
+  const MOOD_DESCRIPTORS_SET = new Set([
+      "chill", "relaxing", "calm", "love", "fast", "slow", "soothing", "peaceful", "tranquil",
+      "mellow", "soft", "smooth", "quiet", "energetic", "sad", "upbeat", "pump up", "romantic",
+      "moody", "melancholy", "nostalgia", "emotional", "cozy", "gentle", "happy", "rain", "children's music",
+      "motivation", "angst", "aggressive", "atmospheric", "nature", "angry", "dark", "classy",
+      "funny", "spooky", "epic", "sensual", "ethereal", "beats", "ibiza", "club", "gaming", "spiritual", "soulful"
+  ]);
+
+  const GENRE_MAPPINGS = {
+    "a cappella": ["a cappella","barbershop","barbershop quartet","vocal group","vocal harmony group","close harmony","college a cappella","collegiate a cappella","christian a cappella","sda a cappella","jewish a capella"],
+    "acid jazz": ["acid jazz"],
+    "acoustic": ["acoustic","acoustic cover","acoustic guitar","acoustic guitar cover","acoustic chill","instrumental acoustic guitar","fingerstyle","fingerstyle guitar","fingerpicking","acoustic rock","cover acustico","ukulele","ukulele cover","chill guitar","japanese guitar","greek guitar","steel guitar","sacred steel","slack-key guitar"],
+    "adult standards": ["adult standards","crooner","easy listening","lounge","standards","traditional pop","torch song","deep adult standards","vintage swoon","brill building pop","space age pop","exotica","light music","british dance band","salon music","tin pan alley","man's orchestra","vintage dutch pop","vintage swedish pop","vintage spanish pop","muzica usoara","audiophile vocal"],
+    "afro house": ["afro house","gqom","kuduro","kuduro antigo","south african house","3-step","afro house angolano","bolobedu house","afro tech","batida","afrikaans gqom","african house","mzansi house"],
+    "afro r&b": ["afro r&b","afro soul","afrofuturism","bongo flava","alte"],
+    "afro-funk": ["afro-funk","afrobeat","classic afrobeat","afrobeat fusion","afrobeat brasileiro","west african jazz","afro-jazz","african jazz","zamrock","ethio-jazz","ethiopiques","desert blues","tuareg guitar","musique touareg","tishoumaren","wassoulou","mbalax","chimurenga","jit","sungura","benga","marrabenta","makossa","bikutsi","latin afrobeat","afro psych","cuban funk","zilizopendwa","mbaqanga","maskandi","taarab","ohangla","kadongo kamu","gumbe","mapouka","afrofunk","west african funk","african funk"],
+    "afrobeats": ["afrobeats","afropop","afroswing","azonto","azontobeats","coupé-décalé","ghanaian pop","ghanaian hip hop","ghanaian alternative","hiplife","asakaa","nigerian pop","nigerian hip hop","naija old school","igbo pop","igbo rap","igbo trap","hausa pop","banku","viral afropop","afro drill","gengetone","kapuka","tanzanian pop","tanzanian hip hop","ugandan pop","ugandan hip hop","kenyan pop","kenyan r&b","kenyan hip hop","kenyan drill","kenyan alternative","rwandan pop","rwandan hip hop","zambian pop","zambian hip hop","zim urban groove","zim hip hop","cameroonian pop","cameroonian hip hop","zouglou","rap ivoire","beninese pop","togolese pop","guinean pop","rap guineen","gambian pop","gambian hip hop","sierra leonean pop","liberian pop","hipco","malagasy pop","rap gasy","musica angolana","rap angolano","musica mocambicana","rap mocambicana","musica cabo-verdiana","rap criolo","south african hip hop","mande pop","ethiopian pop","amharic pop","tigrigna pop","oromo pop","eritrean pop","somali pop","south sudanese pop","sepedi pop","venda pop","xitsonga pop","sesotho pop","swazi pop","botswana pop","namibian pop","malawian pop","burundian pop","gabonese pop","burkinabe pop","kikuyu pop","kamba pop","seychelles pop","reunion pop","musica santomense","musica guineense","musica ecuatoguineana"],
+    "ai music": ["ai music"],
+    "alternative": ["alternative"],
+    "alternative hip hop": ["alternative hip hop","alt hip hop","indie hip hop","indie pop rap","experimental hip hop","experimental rap","hipster rap","industrial hip hop","industrial rap","psychedelic hip hop","abstract beats","chill abstract hip hop","drumless","drumless hip hop","art rap","escape room","nerdcore","lgbtq+ hip hop","hip-hop experimental","rap geek","rap anime","battle rap","spiritual hip hop","outer hip hop","czech alternative rap","nephop","chip hop","flick hop","proto-rap","bboy","indie rap","abstract rap","folk rap","chap hop","chill rap","bedroom rap"],
+    "alternative metal": ["alternative metal","funk metal","nu metal","rap metal","modern metal","heavy alternative","hard alternative","rap metal espanol","aggro chileno","neo metal","comic metal","dub metal","metal alternativo","avant-garde metal","experimental metal","christian nu metal"],
+    "alternative rock": ["alternative rock","britpop","britpop revival","post-britpop","modern alternative rock","modern rock","permanent wave","alternative pop rock","british alternative rock","australian alternative rock","australian rock","australian pub rock","canadian rock","scottish rock","irish rock","welsh rock","kiwi rock","nz alternative rock","finnish alternative rock","swedish alternative rock","danish alternative rock","norwegian alternative rock","dutch rock","belgian rock","swiss alternative rock","french rock","rock alternatif francais","italian alternative","italian rock","polish alternative rock","polish rock","czech rock","slovak rock","hungarian rock","romanian rock","bulgarian rock","croatian rock","serbian alternative rock","slovenian rock","greek rock","ukrainian rock","israeli rock","south african rock","south african alternative","pakistani rock","indian rock","baggy","madchester","grebo","alternative dance","dance rock","dark rock","action rock","detroit rock","boston rock","pittsburgh rock","austin rock","suomi rock","icelandic rock","danish rock","norwegian rock","varmland rock","deep swedish rock","rock quebecois","portuguese rock","swiss rock","belarusian rock","estonian rock","lithuanian rock","latvian rock","faroese rock","macedonian rock","african rock","cambodian rock","rock independant francais","polish alternative","magyar alternative","mongolian alternative","georgian alternative","azeri alternative","cuban alternative","electronic rock","future rock","geek rock","wrock","trash rock","punta rock","rhythm rock","deep active rock","synth rock","occult rock","fuzz rock","heavy rock","depressive rock"],
+    "amapiano": ["amapiano","sgija","deep amapiano","private school amapiano","underground amapiano","gospel amapiano","bacardi"],
+    "ambient": ["ambient","space ambient","warm drone","lowercase","ambient pop","compositional ambient","ambient guitar","ambient piano","ambient synth","ambient folk","ambient house","ambient trance","ambient worship","ambient lo-fi","ambient psychill","ambient fusion","organic ambient","experimental ambient","space music","soundscape","soundscapes","fourth world","kankyo ongaku","j-ambient","nordic ambient","argentine ambient","indian ambient","light ambient","deep ambient","pop ambient","australian ambient","polish ambient","future ambient","ambeat","weightless","noise ambient","fantasy ambient","tribal ambient","progressive ambient","power ambient"],
+    "americana": ["americana","alternative country","country rock","roots rock","southern gothic","stomp and holler","roots americana","southern americana","midwest americana","new england americana","western americana","austin americana","nashville americana","canadian americana","uk americana","australian americana","swedish americana","norwegian americana","dutch americana","memphis americana","new orleans americana","deep new americana","alternative americana","black americana","alternative roots rock","countrygaze","cosmic american","gothic country","dark country","death country","deathgrass","new americana","new weird america","american primitive","scottish americana","kentucky roots","north carolina roots","wyoming roots","ny roots","montana roots","ambient country","murder ballad"],
+    "arabic pop": ["arabic pop","classic arab pop","dabke","egyptian pop","egyptian hip hop","egyptian alternative","egyptian trap","mahraganat","shaabi","iraqi pop","iraqi hip hop","khaleeji","sheilat","lebanese pop","lebanese indie","syrian pop","syrian hip hop","palestinian pop","palestinian hip hop","palestinian alternative","palestinian traditional","jordanian pop","yemeni pop","maghreb pop","rai","rai algerien","deep rai","arabic hip hop","arab electronic","arab alternative","arab folk","arab groove","arab trap","arabic jazz","arabic instrumental","tarab","sudanese pop","sudanese hip hop","classic sudanese pop","libyan pop","libyan hip hop","tunisian pop","tunisian alternative","classic tunisian pop","rap tunisien","moroccan pop","classic moroccan pop","chaabi marocain","chaabi algerien","rap algerien","kabyle","kabyle moderne","tamazight","amazigh","rif","gnawa","mizrahi","jalsat","assyrian pop","sorani pop","kurdish remix","mezwed","maghreb","musique mariage algerien","musique mauritanienne","israeli mediterranean","belly dance"],
+    "art pop": ["art pop","baroque pop","chamber pop","experimental pop","avant-pop","chamber psych","hypnagogic pop","outsider","outsider music","hauntology","zolo","collage pop","bow pop","classify","transpop","new weird finland","song poem"],
+    "art rock": ["art rock","experimental rock","rock in opposition","zeuhl","avant-rock","experimental indie rock","early avant garde"],
+    "australian hip hop": ["australian hip hop","australian underground hip hop","australian indigenous hip hop","west australian hip hop","melbourne hip hop","brisbane hip hop","perth hip hop","nz hip hop","nz gangsta rap","polynesian hip hop","australian trap"],
+    "axé": ["axé","samba-reggae","swingueira","frevo","carnaval","bloco","maracatu","coco"],
+    "bachata": ["bachata","bachata dominicana","bachata sensual"],
+    "balkan": ["balkan","balkan brass","balkan beats","balkan trap","balkan hip hop","balkan drill","balkan post-punk","balkan punk","balkan folk","balkan pop","balkan rock","chalga","manele","neo-manele","muzica etno","muzica populara","muzica lautareasca","tallava","turbo-folk","ex-yu rock","sevdah","narodna muzika","starogradska","krajiska muzika","izvorna muzika","tamburica","kolo","horo","laiko","rebetiko","entehno","nisiotika","cretan folk","pontian folk","albanian pop","albanian hip hop","albanian rock","albanian folk","albanian alternative","kosovan pop","kosovan folk","bosnian pop","bosnian indie","serbian hip hop","serbian folk","serbian pop","serbian indie","croatian pop","croatian hip hop","croatian folk","croatian indie","slovenian pop","slovenian hip hop","slovenian indie","macedonian pop","macedonian hip hop","macedonian folk","macedonian indie","montenegrin pop","bulgarian pop","bulgarian hip hop","bulgarian folk","greek hip hop","romanian hip hop","klapa","popullore jugu","cifteli","kaba gaida","muzica moldoveneasca","greek folk","greek clarinet","neo kyma","greek underground rap","greek fem rap","bouzouki","gypsy"],
+    "ballad": ["ballad","power ballad","piano ballad","pop ballad","sentimental","romantic ballad","romantic ballads","rock ballad","rock ballads","balada romantica","cancion melodica","grupero romantico","gruperas inmortales","pop romantico"],
+    "bass house": ["bass house","brazilian bass","g-house","wobble house","uk bass","uk bassline","fidget","basshall","uk bass house","night bass","italian bass","bassline house"],
+    "bebop": ["bebop","bop","post-bop","contemporary post-bop","straight-ahead jazz"],
+    "big band": ["big band","modern big band"],
+    "black metal": ["black metal","atmospheric black metal","blackgaze","cascadian black metal","melodic black metal","metal noir quebecois","pagan black metal","raw black metal","symphonic black metal","viking metal","viking black metal","norwegian black metal","depressive suicidal black metal","autonomous black metal","avant-garde black metal","black 'n' roll","blackthrash","black thrash","blackened thrash metal","blackened crust","blackened hardcore","blackened screamo","chaotic black metal","cosmic black metal","cryptic black metal","dark black metal","emotional black metal","epic black metal","experimental black metal","folk black metal","forest black metal","gothic black metal","industrial black metal","instrumental black metal","medieval black metal","nsbm","occult black metal","orthodox black metal","post-black metal","progressive black metal","rabm","red and anarchist black metal","technical black metal","true black metal","usbm","american black metal","appalachian black metal","austrian black metal","baltic black metal","belarusian black metal","belgian black metal","british black metal","canadian black metal","chilean black metal","chinese black metal","colombian black metal","czsk black metal","danish black metal","dutch black metal","finnish black metal","french black metal","german black metal","greek black metal","hellenic black metal","hungarian black metal","icelandic black metal","indonesian black metal","irish black metal","italian black metal","mexican black metal","native american black metal","polish black metal","portuguese black metal","romanian black metal","russian black metal","spanish black metal","swedish black metal","swiss black metal","turkish black metal","ukrainian black metal","war metal","bestial black metal","ambient black metal","deep symphonic black metal","australian black metal","black metal argentino","celtic black metal","psychedelic black metal","war black metal","religious black metal","christian black metal","satanic black metal","anarchist black metal","transcendental black metal","space black metal","iberian black metal","lusitanian black metal","old school black metal"],
+    "bluegrass": ["bluegrass","jamgrass","old-time","progressive bluegrass","neo-traditional bluegrass","instrumental bluegrass","bluegrass gospel","bluegrass fiddle","newgrass","banjo","clawhammer banjo","old-time fiddle","mandolin","string band","modern old-time","vintage old-time","jug band","washboard"],
+    "blues": ["blues","classic blues","jazz blues","modern blues","traditional blues","acoustic blues","delta blues","deep delta blues","chicago blues","texas blues","memphis blues","new orleans blues","piedmont blues","hill country blues","swamp blues","jump blues","boogie-woogie","piano blues","barrelhouse piano","harmonica blues","blues harmonica","pre-war blues","classic female blues","soul blues","rebel blues","garage punk blues","australian blues","canadian blues","dutch blues","finnish blues","german blues","italian blues","japanese blues","norwegian blues","polish blues","spanish blues","swedish blues","brazilian blues","blues mexicano","blues latinoamericano","malian blues","belgian blues","blues band","modern electric blues","whiskey blues","dirty blues","doom blues","folk blues","blues harp"],
+    "blues rock": ["blues rock","british blues","electric blues","modern blues rock","power blues-rock","psychedelic blues-rock","blues-rock guitar","slide guitar","heavy blues","heavy blues rock"],
+    "bolero": ["bolero","bolero cubano","bolero mexicano","mexican bolero","mexican boleros","trio cubano","trova","trova mexicana","nueva trova","nueva trova chilena","nueva cancion","nueva cancion chilena","canto popular uruguayo","cancion de autor"],
+    "bollywood pop": ["bollywood pop","filmi","hindi pop","modern bollywood","classic bollywood","desi pop","kollywood","classic kollywood","mollywood","sandalwood","tollywood","classic tollywood","vintage tollywood","hindi indie","indian indie","indian indie pop","indian singer-songwriter","indian edm","indian electronic","bhojpuri pop","bhojpuri folk","haryanvi pop","haryanvi hip hop","gujarati pop","gujarati garba","marathi pop","marathi traditional","marathi remix","rajasthani pop","rajasthani folk","assamese pop","assamese hip hop","odia pop","bengali folk","rabindra sangeet","classic bangla pop","bangla pop","bangla rock","bangladeshi rock","bangladeshi indie","bangladeshi hip hop","tamil pop","tamil hip hop","tamil indie","telugu folk","telugu indie","telugu remix","telugu hip hop","malayalam pop","malayalam hip hop","malayalam indie","kannada pop","kannada hip hop","kannada indie","konkani pop","pahadi pop","garhwali pop","kumaoni pop","himachali pop","dogri pop","kashmiri pop","kashmiri hip hop","sambalpuri pop","nagpuri pop","khortha pop","santali pop","chhattisgarhi pop","maithili","manipuri pop","mizo pop","khasi pop","northeast indian indie","northeast indian hip hop","pakistani pop","classic pakistani pop","pakistani indie","pakistani electronic","pakistani hip hop","urdu hip hop","saraiki pop","pashto pop","balochi pop","sindhi","nepali pop","classic nepali pop","nepali indie","nepali rock","lok dohori","sinhala pop","classic sinhala pop","sinhala indie","sinhala rap","sinhala edm","baila","indian fusion","west bengali pop","malaysian tamil pop","malaysian tamil rap","mappila paattu","indian underground rap","koligeet","mewati pop","marwadi pop","malayalam madh","malayalam cover","rasiya","purulia pop","khandeshi pop","bodo pop","kannada bhava geethe","adivasi pop","kokborok pop","goa hip hop","meenawati","banjara pop","haryanvi ragni","marathi hip hop","karbi pop","bhutanese pop","gaddiyali pop","classic konkani pop","garo pop","bangla gojol","classic assamese pop","kinnauri pop","mising pop","ho munda","rongmei pop","ladakhi pop","chakma pop","zomi pop","maldivian pop","sirmauri pop","south asian metal"],
+    "boogie": ["boogie","post-disco","brazilian boogie","post-disco soul","electro-funk","boogie funk"],
+    "boom bap": ["boom bap","90s boom bap","classic boom bap","jazz boom bap","underground boom bap","boom bap espanol","german boom bap","japanese boom bap"],
+    "bossa nova": ["bossa nova","bossa nova cover","bossa nova jazz","samba-jazz"],
+    "brazilian hip hop": ["brazilian hip hop","boom bap brasileiro","rap nacional antigo","rap feminino nacional","rap baiano","rap mineiro","rap cearense","rap df","rap maromba","rap baixada fluminense","rap capixaba","rap paranaense","rap pernambucano","rap guarulhense","rap gaucho","rap abc paulista","rap alagoano","rap sergipano","rap nortista","rap potiguar","rap paraense","trap brasileiro","trap carioca","trap baiano","trap pesado","plug brasileiro","speed plug brasileiro","detroit trap brasileiro","drill brasileiro","grime brasileiro","nerdcore brasileiro","pop rap brasileiro","afrofuturismo brasileiro","rap catarinense","trap cristao"],
+    "brazilian metal": ["brazilian metal","brazilian thrash metal","brazilian groove metal","brazilian power metal","brazilian progressive metal","brazilian death metal","brazilian black metal","brazilian doom metal","brazilian heavy metal","brazilian metalcore","brazilian grindcore","brazilian deathcore","metal mineiro","metal gaucho","metal paranaense","metal catarinense","metal cearense","metal baiano","metal nortista","metal pernambucano","metal piauiense","metal cristao"],
+    "brazilian rock": ["brazilian rock","pop rock brasileiro","hard rock brasileiro","rock alternativo brasileiro","rock gaucho","rock brasiliense","rock mineiro","rock baiano","rock curitibano","rock piauiense","rock campineiro","rock cearense","rock paraibano","rock goiano","rock alagoano","rock pernambucano","rock catarinense","rock potiguar","rock sergipano","rock abc paulista","rock sul-mato-grossense","rock paraense","rock nacional feminino","novo rock gaucho","post-punk brasileiro","brazilian punk","brazilian punk rock","brazilian hardcore","brazilian emo","brazilian post-hardcore","shoegaze brasileiro","grunge brasileiro","psicodelia brasileira","neo-psicodelia brasileira","gotico brasileiro","brazilian lo-fi rock","brazilian stoner rock","brazilian post-rock","brazilian surf rock","brazilian rockabilly","brazilian indie","brazilian indie rock","indie brasileiro","indie nacional","manguebeat","mangue beat","musica gaucha","musica gaucha tradicionalista","musica juiz-forana","musica feirense","musica campista","musica blumenauense","musica campineira","musica rondoniense","musica londrinense","musica caririense","musica roraimense","musica ponta-grossense","musica mogiana","musica maringaense","indie paraense"],
+    "breakbeat": ["breakbeat","big beat","breaks","funky breaks","nu skool breaks","nuskool breaks","nu-breaks","acid breaks","progressive breaks","psybreaks","hardcore breaks","florida breaks","electro breaks","booty breaks","rave","old school rave","broken beat","nu electro","classic breakbeat"],
+    "breakcore": ["breakcore","lolicore","mashcore","chill breakcore","deep breakcore","raggacore","vocaloid breakcore","maidcore","splittercore","speedcore","extratone","flashcore","digital hardcore","depressive breakcore","atmospheric breakcore","intelligent breakcore"],
+    "c-pop": ["c-pop","cantopop","hk-pop","classic cantopop","mandopop","classic mandopop","taiwan pop","taiwan singer-songwriter","taiwan indie","taiwanese indie","taiwan idol pop","taiwan campus folk","vintage taiwan pop","taiwanese pop","hong kong indie","singaporean mandopop","singaporean pop","singaporean singer-songwriter","malaysian mandopop","chinese viral pop","chinese singer-songwriter","chinese idol pop","chinese drama ost","chinese electropop","chinese r&b","chinese indie","chinese indie pop","chinese indie rock","chinese post-punk","chinese minyao","chinese manyao","zhongguo feng","gufeng","chinese hip hop","chinese melodic rap","taiwan hip hop","hong kong hip hop","sichuanese hip hop","chinese rock","taiwan rock","taiwan punk","hong kong rock","chinese metal","taiwan metal","xinyao","vintage chinese pop","vintage cantonese pop","c-pop girl group","chinese audiophile","taiwan instrumental","taiwan graduation song","macau pop","tibetan pop","tibetan hip hop","uyghur pop","hmong pop","southern china indie","northwest china indie","shanghai indie","wuhan indie"],
+    "canadian hip hop": ["canadian hip hop","toronto rap","canadian trap","canadian underground hip hop","canadian old school hip hop","bc underground hip hop","ottawa rap","winnipeg hip hop","alberta hip hop","atlantic canada hip hop","canadian indigenous hip hop"],
+    "celtic": ["celtic","celtic punk","celtic rock","irish folk","scottish folk","canadian celtic","japanese celtic","celtic harp","scottish gaelic folk","irish gaelic folk","scottish fiddle","irish fiddle","irish flute","irish banjo","irish accordion","uilleann pipes","bagpipe","bagpipes","scottish smallpipe","pibroch","pipe and drum","bagpipe marching band","ceilidh","bothy ballad","irish pub song","irish rebel song","irish ballad","irish neo-traditional","cornish folk","welsh folk","manx","breton folk","galician folk","musica folk asturiana","trikiti","balfolk","jig and reel","sean-nos singing","puirt-a-beul","traditional irish singing","northumbrian folk","cymraeg","metis fiddle"],
+    "children's music": ["children's music","disney","kids","kindermusik","nursery rhymes","nursery","preschool children's music","british children's music","canadian children's music","australian children's music","nz children's music","children's folk","muziek voor kinderen","vlaamse kinderliedje","kinderliedjies","kinderlieder","kleine hoerspiel","chinderlieder","kinderchor","musique pour enfants","musique pour enfant quebecois","comptine","comptine africaine","histoire pour enfants","dessin anime","musica infantil","musica infantil catala","cancion infantil mexicana","cancion infantil latinoamericana","musica para ninos","musica para criancas","cancoes infantis","musica per bambini","cartoni animati","barnmusik","barnemusikk","bornesange","musiikkia lapsille","lastelaulud","barnalog","cocuk sarkilari","detskie pesni","dytyachi pisni","bajki","zespol dzieciecy","detske pisnicky","detske pesnicky","gyerekdalok","muzica copii","detski pesnichki","decije pesme","djecje pjesme","otroske pesmice","paidika tragoudia","muzika l'yeladim","aghani lil-atfal","nhac thieu nhi","musik anak-anak","er ge","kodomo no ongaku","dong-yo","bachchon ke geet","marathi balgeet","kids dance party","kids hip hop","cartoon","kindie rock","cristiana para ninos","eventyr","haur kantak","barnasogur","vaikiskos dainos","waiata mo tamariki","bernu dziesmas"],
+    "chillwave": ["chillwave","vapor soul","chillsynth"],
+    "chiptune": ["chiptune","bitpop","16-bit","c64","demoscene","fakebit","nintendo","gameboy"],
+    "choral": ["choral","chamber choir","british choir","canadian choir","american choir","australian choir","swedish choir","norwegian choir","danish choir","finnish choir","icelandic choir","german choir","austrian choir","italian choir","polish choir","russian choir","ukrainian choir","baltic choir","hungarian choir","welsh choir","oxford choir","cambridge choir","cathedral choir","university choir","school choir","jugendchor","children's choir","women's choir","men's choir","gay chorus","contemporary choir","chamber ensemble","vocal ensemble","polyphony","polyphonies corses","georgian polyphony","albanian iso polyphony","orthodox chant","syro-aramaic chant","byzantine","south african choral","japanese choir","sda choir","duhovne pjesme","muzica bisericeasca","oratory","convent"],
+    "christian hip hop": ["christian hip hop","christian trap","uk christian rap","christian lo-fi","gospel drill","christian afrobeat","rap chretien"],
+    "christian metal": ["christian metal","christian death metal","christian metalcore","unblack metal","christian hard rock","christian post-hardcore","christian power metal","christian symphonic metal","christian thrash metal","christian doom metal","christian deathcore","christcore"],
+    "christian pop": ["christian pop","christian","deep ccm","canadian ccm","german ccm","russian ccm","ukrainian ccm","brazilian ccm","alternative ccm","christian uplift","christian dance","lds","lds youth","classic praise","praise","piano worship","cedm","musica cristiana guatemalteca","musica bautista","afrikaans gospel","norwegian gospel","gospel papiamento","vintage gospel","dicsoites"],
+    "christian rock": ["christian rock","christian alternative rock","christian indie","deep christian rock","christian punk","christian hardcore","jesus movement","rock gospel brasileiro","rock cristao fluminense"],
+    "christmas": ["christmas","christmas pop","carols","christmas instrumental","christmas product","villancicos","koledy","noel quebecois"],
+    "city pop": ["city pop","classic city pop","japanese funk","japanese soul","shibuya-kei","korean city pop","indonesian city pop","pinoy city pop"],
+    "classic rock": ["classic rock","album rock","aor","melodic rock","soft rock","mellow gold","southern rock","modern southern rock","british invasion","merseybeat","bossbeat","classic canadian rock","swamp rock","heartland rock","jam band","yacht rock","beatlesque","bosstown sound","classic greek rock","classic finnish rock","classic hungarian rock","classic danish rock","deep soft rock","trop rock","flute rock","rock drums","rock keyboard"],
+    "classical": ["classical","orchestra","orchestral","baroque","minimalism","symphonic","symphonies","symphony","early modern classical","classical era","galante era","early romantic era","late romantic era","post-romantic era","impressionism","serialism","totalism","neoclassicism","neo-classical","neoclassical","post-classical","cinematic classical","contemporary classical","american contemporary classical","american modern classical","american romanticism","british contemporary classical","british modern classical","canadian contemporary classical","australian classical","new zealand classical","french contemporary classical","french romanticism","french baroque","german contemporary classical","german romanticism","german baroque","austrian contemporary classical","austro-german modernism","swiss contemporary classical","italian contemporary classical","italian romanticism","italian baroque","spanish contemporary classical","spanish baroque","portuguese contemporary classical","portuguese classical","dutch contemporary classical","dutch baroque","belgian contemporary classical","nordic contemporary classical","swedish contemporary classical","swedish classical","norwegian classical","danish contemporary classical","danish classical","finnish contemporary classical","finnish classical","icelandic classical","baltic classical","polish contemporary classical","polish classical","czech contemporary classical","czech classical","hungarian contemporary classical","romanian contemporary classical","greek contemporary classical","russian contemporary classical","russian modern classical","russian romanticism","ukrainian contemporary classical","ukrainian classical","caucasian classical","israeli classical","japanese contemporary classical","japanese classical","korean contemporary classical","chinese classical","latin classical","brazilian contemporary classical","brazilian classical","mexican classical","african-american classical","orchestral performance","historic orchestral performance","british orchestra","american orchestra","german orchestra","french orchestra","italian orchestra","russian orchestra","nordic orchestra","japanese orchestra","chamber orchestra","string orchestra","symfonicky orchestr","orkiestra symfoniczna","pops orchestra","radio symphony","wind symphony","concert band","japanese concert band","brass ensemble","brass quintet","wind quintet","wind ensemble","clarinet ensemble","string quartet","modern string quartet","historic string quartet","quartetto d'archi","quatuor a cordes","streichquartett","classical string trio","string quintet","string duo","modern chamber music","chamber music","baroque ensemble","italian baroque ensemble","historically informed performance","classical performance","historic classical performance","chinese classical performance","taiwan classical performance","korean classical performance","japanese classical performance","hungarian classical performance","violin","baroque violin","italian violin","viola","viola da gamba","cello","classical cello","baroque cello","modern cello","cello ensemble","contrabass","classical bass","classical flute","classical oboe","classical clarinet","classical bassoon","classical horn","classical trumpet","classical trombone","classical tuba","euphonium","classical saxophone","classical saxophone quartet","baroque brass","baroque woodwind","classical harp","classical guitar","classical guitar duo","classical guitar quartet","italian classical guitar","guitarra clasica","violao classico","classical mandolin","italian mandolin","lute","harpsichord","historical keyboard","classical organ","pipe organ","classical accordion","classical percussion","canadian classical","spanish classical","irish classical","irish contemporary classical","american 21st century classical","oriental classical","andalusian classical","synthetic classical","english baroque","bohemian baroque","latin american baroque","barockinterpreten","austrian orchestra","fictitious orchestra","youth orchestra","musica sinfonica","art song","pastoral","ballet class","school ensemble","trombone ensemble","british brass band","brass band","marching band","college marching band","street band","military band","musique militaire","banda militar","musikkorps","staff band","police band","cornetas y tambores","fife and drum","fanfare","harp","sacred harp","handbells","bells","mallet","recorder","theremin","chapman stick","glass","modern performance"],
+    "club": ["club","baltimore club","jersey club","philly club","deconstructed club","dark clubbing","ballroom","vogue","raptor house","guaracha","tribal guarachero","trival","ghettotech","bmore","atlanta bass","bounce","techengue","latincore","italo beats","new orleans bounce","tropical bass"],
+    "comedy": ["comedy","comedy rock","parody","stand-up comedy","comedy rap","comedy metal","comedy punk","clean comedy","new comedy","deep comedy","black comedy","british comedy","canadian comedy","australian comedy","latino comedy","dansk comedy","humour francais","chanson humoristique","chanson paillarde","kabarett","dutch cabaret","vlaamse cabaret","magyar kabare","komedi","comedia","piada","music hall","vaudeville","novelty","meme","meme rap","soundclown","mashup","comedienne","comic","rakugo","geinin song","rock demenziale"],
+    "conscious hip hop": ["conscious hip hop","political hip hop","rap conscient","underground hip hop","underground rap","rap conciencia","rap politico"],
+    "contemporary jazz": ["contemporary jazz","jazz pop","jazz piano","modern jazz piano","jazz trio","modern jazz trio","jazz quartet","jazz saxophone","jazz trumpet","jazz trombone","jazz clarinet","jazz flute","jazz violin","jazz guitar","jazz guitar trio","jazz double bass","jazz organ","hammond organ","jazz vibraphone","jazz harp","jazz accordion","jazz drums","jazz brass","dinner jazz","jazz cover","british jazz","uk contemporary jazz","scottish jazz","irish modern jazz","french jazz","german jazz","austrian jazz","swiss jazz","italian jazz","italian contemporary jazz","spanish jazz","portuguese jazz","dutch jazz","belgian jazz","belgian modern jazz","norwegian jazz","norwegian contemporary jazz","swedish jazz","danish jazz","danish modern jazz","finnish jazz","finnish modern jazz","icelandic jazz","polish jazz","polish modern jazz","czech jazz","russian jazz","russian modern jazz","greek jazz","turkish jazz","turkish modern jazz","israeli jazz","indian jazz","japanese jazz","classic japanese jazz","korean jazz","chinese jazz","australian jazz","nz jazz","canadian modern jazz","south african jazz","south african modern jazz","brazilian jazz","brazilian modern jazz","argentine jazz","jazz mexicano","jazz chileno","jazz colombiano","jazz worship","vintage jazz","vintage finnish jazz","harmonica jazz","neo soul-jazz","jazzcore","jazz tuba","jazz composition","saxophone trio","swedish jazz orkester","jazz catala","trad jazz catala","galician jazz","lithuanian jazz","estonian jazz","faroese jazz","modern jazz","classic jazz","piano jazz","chamber jazz","ambient jazz","world jazz"],
+    "contemporary r&b": ["contemporary r&b","canadian contemporary r&b","uk r&b","french r&b","indie r&b","bedroom r&b","chill r&b","dark r&b","pop r&b","neo r&b","experimental r&b","deep r&b","deep smooth r&b","australian r&b","dutch r&b","german r&b","scandinavian r&b","south african r&b","r&b en espanol","r&b argentino","quiet storm","bulgarian r&b","russian r&b","spanish r&b","romanian r&b","vietnamese r&b","hindi r&b","soul flow","future soul","cloud r&b"],
+    "corridos tumbados": ["corridos tumbados","corridos alternativos","sierreno","classic sierreno","sad sierreno","corridos belicos","corridos adictivos","corridos progresivos","corridos clasicos","corridos cristianos"],
+    "country": ["country","contemporary country","country & western music","country blues","country pop","modern country pop","classic country pop","modern country rock","country road","country dawn","country rap","country gospel","country boogie","truck-driving country","honky tonk","honky-tonk piano","neo honky tonk","outlaw country","traditional country","classic country","neo-traditional country","bakersfield sound","nashville sound","countrypolitan","western swing","western","cowboy","cowpunk","red dirt","texas country","oklahoma country","classic texas country","classic oklahoma country","arkansas country","alberta country","canadian country","canadian contemporary country","country quebecois","manitoba country","australian country","classic australian country","bush ballad","british country","irish country","swedish country","norwegian country","german country","swiss country","czech country","south african country","classic nz country","queer country","deep contemporary country","rez country","redneck","old west","vintage western","new country","country soul","christian country"],
+    "cumbia": ["cumbia","cumbia 420","cumbia andina mexicana","cumbia andina","cumbia boliviana","cumbia chilena","cumbia del sureste","cumbia lagunera","cumbia peruana","cumbia pop","cumbia ranchera","cumbia salvadorena","cumbia santafesina","cumbia sonidera","cumbia uruguaya","cumbia villera","cumbia argentina","cumbia texana","cumbia romantica","cumbia punk","psychedelic cumbia","dark cumbia","digital cumbia","nu-cumbia","tecnocumbia","cumbia colombiana regia","cumbia ecuatoriana","cumbia paraguaya","cumbia surena","cumbia amazonica","cumbia sonorense","cumbia editada","cumbia cristiana","cumbia rebajada","electrocumbia","cumbiaton","chicha","porro","bullerengue","champeta","tropipop","cuarteto"],
+    "dance": ["dance","pop dance","uk dance","australian dance","german dance","belgian dance","irish dance","south african pop dance","gregorian dance","magyar retro dance","haitian dance","electro bailando","klubowe","cantaditas","dakke dak"],
+    "dancehall": ["dancehall","dancehall queen","uk dancehall","old school dancehall","swedish dancehall","dancehall chileno","dancehall colombiano","dancehall guyanaise","dancehall mauricien","zimdancehall","trinibad","shatta","deep ragga","traphall"],
+    "dangdut": ["dangdut","dangdut koplo","koplo","javanese dangdut","dangdut remix","campursari","lagu tarling"],
+    "dark ambient": ["dark ambient","ritual ambient","isolationism","new isolationism","drone ambient","ambient industrial","cryo chamber"],
+    "dark cabaret": ["dark cabaret","cabaret","circus","circus rock","steampunk","punk cabaret"],
+    "dark wave": ["dark wave","coldwave","gothic","gothic americana","neoclassical darkwave","modern darkwave","minimal wave","grave wave","ethereal gothic","neue deutsche todeskunst","sovietwave","solo wave","zimna fala","polish cold wave","italian darkwave","turkish darkwave"],
+    "death metal": ["death metal","brutal death metal","cavernous death metal","death 'n' roll","deathgrind","florida death metal","gothenburg metal","melodic death metal","swedish melodeath","technical death metal","slam death metal","swedish death metal","old school death metal","death-doom","blackened death metal","american melodeath","finnish melodeath","german melodeath","technical melodic death metal","symphonic melodic death metal","symphonic death metal","progressive death metal","progressive technical death metal","dissonant death metal","cosmic death metal","grisly death metal","grim death metal","instrumental death metal","technical brutal death metal","charred death","black death","deathrash","new wave of osdm","osdm","british death metal","canadian death metal","quebec death metal","danish death metal","dutch death metal","finnish death metal","french death metal","german death metal","indonesian death metal","irish death metal","italian death metal","mexican death metal","norwegian death metal","peruvian death metal","polish death metal","portuguese death metal","russian death metal","spanish death metal","texas death metal","turkish death metal","colombian death metal","new york death metal","deep melodic death metal","australian death metal","belgian death metal","atmospheric death metal","guttural brutal death metal","slamming guttural brutal death metal","blasting brutal death metal","brutal technical death metal","brutal slamming death metal","progressive melodic death metal","melodic death-thrash metal","industrial death metal","modern melodic death metal","new wave of old school death metal","melodic black death metal"],
+    "deathcore": ["deathcore","blackened deathcore","slam deathcore","slamming deathcore","technical deathcore","downtempo deathcore","beatdown","uk beatdown","symphonic deathcore","progressive deathcore","melodic deathcore","brutal deathcore","myspace deathcore","nu deathcore","indonesian deathcore","russian deathcore","ukrainian deathcore","beatdown deathcore","slamming beatdown","japanese deathcore","experimental deathcore","atmospheric deathcore"],
+    "deep house": ["deep house","deep euro house","deep groove house","turkish deep house","deep disco house","south african deep house","deep deep house","deep soul house","south african soulful deep house","deep vocal house","lo-fi house","outsider house","float house","soulful house","chill house","melodic house","organic house","organic electronic","jazz house","saxophone house","lounge house","beach house","minimal deep house","deep funk house","vapor house","tulum"],
+    "dembow": ["dembow","dembow dominicano","trap dominicano","drill dominicano"],
+    "disco": ["disco","nu disco","italo disco","new italo disco","deep italo disco","euro disco","space disco","norwegian space disco","cosmic disco","mutant disco","dark disco","deep disco","disco funk","japanese disco"],
+    "dixieland": ["dixieland","new orleans jazz","stride","ragtime"],
+    "djent": ["djent","thall","progressive djent","math metal","instrumental djent","electronic djent"],
+    "doo-wop": ["doo-wop","street corner harmony"],
+    "doom metal": ["doom metal","drone metal","epic doom","funeral doom","psychedelic doom","traditional doom metal","atmospheric doom","atmospheric doom metal","finnish doom metal","italian doom metal","norwegian doom metal","swedish doom metal","uk doom metal","progressive doom","progressive doom metal","melodic doom","melodic doom metal","neo-trad doom metal","gothic doom","gothic doom metal","gaian doom","blackened doom metal","sludge doom","funeral doom ambient","melodic death doom metal"],
+    "downtempo": ["downtempo","chillout","chill out","chill lounge","sunset lounge","deep sunset lounge","balearic","balearic beat","illbient","psydub","ambient dub","ambient dub techno","downtempo bass","downtempo fusion","deep downtempo fusion","organic downtempo","greek downtempo","coverchill","deep chill","deep chill-out","world chill","chill groove","modern downshift"],
+    "dream pop": ["dream pop","ethereal","ethereal wave","modern dream pop","indie dream pop","chill dream pop","korean dream pop","japanese dream pop","dreamgaze","gauze pop","popgaze"],
+    "drift phonk": ["drift phonk","wave phonk","raw phonk","russian phonk","house phonk","phonk house"],
+    "drill": ["drill","aussie drill","australian drill","chicago drill","chicago bop","classical drill","drill chileno","drill espanol","spanish drill","drill tuga","florida drill","jacksonville drill","german drill","melodic drill","ny drill","new york drill","philly drill","st louis drill","rva drill","dmv drill","canadian drill","irish drill","scottish drill","dutch drill","swedish drill","finnish drill","polish drill","czech drill","russian drill","greek drill","turkce drill","persian drill","korean drill","japanese drill","chill drill","anime drill","drill beats"],
+    "drone": ["drone","dronescape","drone folk","drone psych","drone rock"],
+    "drum and bass": ["drum and bass","liquid funk","neurofunk","jump up","belgian jump up","ragga jungle","darkstep","sambass","drumfunk","atmospheric dnb","dancefloor dnb","halftime","halftime dnb","techstep","uk dnb","stateside dnb","belgian dnb","dutch dnb","french dnb","german dnb","austrian dnb","russian dnb","nz dnb","south african dnb","brazilian dnb","deep dnb","deep liquid","deep liquid bass","minimal dnb","jazzy dnb","neurostep","substep","clownstep","artcore","crossbreed","melodic dnb","ambient dnb","vocal drum and bass","dark drum and bass","lo-fi dnb","soulful dnb","jungle dnb","autonomic","microfunk","hardstep","jazzstep","electrostep","dubwise"],
+    "dub": ["dub","dub poetry","uk dub","french dub","japanese dub","dub brasileiro","experimental dub","digital dub","steppa","roots dub","electro dub","minimal dub","dubsteppe","dub product"],
+    "dubstep": ["dubstep","brostep","chillstep","drumstep","riddim","riddim dubstep","melodic dubstep","deathstep","tearout","post-dubstep","classic dubstep","deep dubstep","gaming dubstep","cinematic dubstep","experimental dubstep","minimal dubstep","filthstep","deep filthstep","purple sound","140 dubstep","heavy dubstep","dark dubstep","liquid dubstep","orchestral dubstep","color bass","briddim","experimental bass","ghoststep","dubstep product","melodic bass","lovestep","gorestep","metalstep","trapstep","neurohop","glitchstep","ambient dubstep","freeform bass","kawaii bass","bass trip","vomitstep","future dubstep"],
+    "dungeon synth": ["dungeon synth","fantasy synth","keller synth","winter synth","comfy synth","forest synth","medieval ambient","tanzelcore"],
+    "dutch hip hop": ["dutch hip hop","dutch rap pop","dutch trap","dutch underground hip hop","old school nederhop","antilliaanse rap","vlaamse rap","west-vlaamse hip hop","surinamese hip hop"],
+    "east coast hip hop": ["east coast hip hop","hardcore hip hop","nyc rap","queens hip hop","brooklyn hip hop","bronx hip hop","harlem hip hop","upstate ny rap","buffalo hip hop","new jersey rap","new jersey underground rap","philly rap","pittsburgh rap","boston hip hop","rhode island rap","baltimore hip hop","dmv rap","virginia hip hop","deep east coast hip hop","wu fam","brockton hip hop","maine hip hop"],
+    "edm": ["edm","dutch edm","belgian edm","brazilian edm","finnish edm","mexican edm","hungarian edm","lithuanian edm","ukrainian edm","japanese edm","deep big room"],
+    "electro house": ["electro house","progressive electro house","dutch house","fidget house","bouncy house","speed house","complextro","big room","melbourne bounce","future bounce","future house","future rave","slap house","dirty dutch","bloghouse","gaming edm","midtempo bass","dirty electro","electro trash","tecktonik","jungle terror"],
+    "electro swing": ["electro swing","swing house","swing revival","neo-swing"],
+    "electronic": ["electronic","electro","electronica","detroit electro","canadian electronic","danish electronic","scottish electronic","lithuanian electronic","ukrainian electronic","icelandic electronic","belarusian electronic","slovenian electronic","romanian electronic","korean electronic","japanese electronic","spanish electronic","singaporean electronic","belgian electronic","south african electronic","taiwan electronic","estonian electronic","slovak electronic","czech electronic","bulgarian electronic","chinese electronic","georgian electronic","latvian electronic","bosnian electronic","macedonian electronic","finnish electronic","colombian electronic","cuban electronic","croatian electronic","mexican electronic","indonesian electronic","luxembourgian electronic","african electronic","nz electronic","irish electronic","swedish electronic","serbian electronic","boston electronic","uk experimental electronic","vintage french electronic","hamburg electronic","leipzig electronic","frankfurt electronic","munich electronic","dusseldorf electronic","cologne electronic","tijuana electronic","electronica argentina","electronica chilena","electronica venezuela","electronica peruana","musica eletronica brasileira","eletronica underground brasileira","polish electronica","italian electronica","german electronica","finnish electro","danish electro","berlin school","synthesizer","modular synth","moog","abstractro","ethnotronica","progressive electronic","minimal electronic","minimal electro","retro electro"],
+    "electropop": ["electropop","canadian electropop","australian electropop","swedish electropop","danish electropop","spanish electropop","czsk electropop","indie electropop","electropowerpop","etherpop","shiver pop","vapor pop","dark pop","alt z","covertronica","pop electronico","electrofox","electra","hopebeat"],
+    "emo": ["emo","emo rap","emocore","midwest emo","pop emo","emo rock","emo pop punk","real emo","acoustic emo","bedroom emo","twinkle emo","alternative emo","5th wave emo","fifth wave emo","diy emo","new england emo","north carolina emo","indie emo","indie emo rock","lo-fi emo","dreamo","japanese emo","russian emo","swedish emo","italian emo","french emo","emo mexicano","emo punk","mall emo","emo revival","twinkle daddies","orgcore","deep orgcore","deep pop emo","pixie","aussie emo","epunk","desi emo rap","czsk emo rap","post-emo","ukrainian emo","twinkly emo"],
+    "enka": ["enka","japanese traditional","modern enka","ryukoka","min'yo","okinawan folk","okinawan pop","ryukyu ongaku","tsugaru shamisen","shamisen","koto","shakuhachi","gagaku","taiko","ainu folk"],
+    "epic": ["epic","epic trailer music","trailer music"],
+    "epiccore": ["epiccore"],
+    "eurobeat": ["eurobeat","para para","super eurobeat","techno kayo"],
+    "eurodance": ["eurodance","bubblegum dance","hands up","hi-nrg","euro hi-nrg","italo dance","swedish eurodance","deep eurodance","euro house","dancemania","disco polo","classic disco polo"],
+    "eurovision": ["eurovision","eurovision song contest","melodifestivalen"],
+    "experimental": ["experimental","avant-garde","acousmatic","experimental electronic","experimental vocal","experimental guitar","experimental synth","experimental percussion","experimental classical","experimental big band","experimental club","experimental house","experimental techno","experimental folk","experimental indie","experimental psych","experimental poetry","british experimental","canadian experimental","australian experimental","french experimental","french experimental rock","german experimental","italian experimental","spanish experimental","portuguese experimental","dutch experimental","dutch experimental electronic","belgian experimental","swiss experimental","danish experimental","norwegian experimental","swedish experimental","finnish experimental","icelandic experimental","polish experimental","polish experimental electronic","czech experimental","bulgarian experimental","russian experimental electronic","ukrainian experimental","japanese experimental","korean experimental","chinese experimental","taiwan experimental","indonesian experimental","brazilian experimental","mexican experimental","peruvian experimental","arab experimental","iranian experimental","turkish experimental","african experimental","tennessee experimental","new england experimental","irish experimental","irish experimental electronic","plunderphonics","sound collage","sound art","musique concrete","electroacoustic composition","electroacoustic improvisation","modern electroacoustic","british electroacoustic","free improvisation","microtonal","xenharmonic","tape music","prepared piano","wandelweiser","field recording"],
+    "fado": ["fado","portuguese folk","fado de coimbra","fado de lisboa","fado antigo","novo fado","fado instrumental","guitarra portuguesa","musica portuguesa contemporanea","musica de intervencao","cante alentejano","musica acoriana","musica madeirense","folclore portugues","morna","coladeira"],
+    "flamenco": ["flamenco","cante flamenco","flamenco guitar","flamenco pop","nuevo flamenco","rumba","rumba catalana","rumba flamenca","flamenco urbano","pop flamenco","rock andaluz","sevillanas","copla","pasodobles"],
+    "folk": ["folk","contemporary folk","traditional folk","traditional british folk","traditional english folk","traditional scottish folk","yorkshire folk","orkney and shetland folk","traditional southern folk","early american folk","michigan folk","appalachian folk","kentucky mountain folk","canadian folk","cape breton folk","nz folk","nordic folk","swedish folk","swedish folk pop","swedish fiddle","nyckelharpa","norwegian folk","norwegian folk rock","hardingfele","trekkspill","norske viser","visor","danish folk","finnish folk","kantele","icelandic folk","icelandic traditional","faroese folk","dutch folk","flemish folk","swiss folk","appenzeller folk","italian folk","folk siciliana","tarantella","pizzica","canto a tenore","canti alpini","liscio","spanish folk","jota aragonesa","catalan folk","nova canco","basque folk","chant basque","folclore castilla y leon","folclore navarra","folclore extremeno","folk cantabria","russian folk","balalaika","ukrainian folk","ukrainian folk pop","bandura","rusyn folk","polish folk","goralski","czech folk","slovak folk","hungarian folk","romanian folk","muzica ardeleneasca","muzica banateana","muzica maramureseana","baltic folk","lithuanian folk","latvian folk","estonian folk","karelian folk","armenian folk","georgian folk","caucasian folk","circassian folk","kurdish folk","israeli folk","persian folk","central asian folk","kazakh traditional","dombra","kyrgyz traditional","uzbek traditional","mongolian folk","throat singing","tuvan folk","khoomei","morin khuur","siberian folk","tatar folk","tibetan traditional","tibetan folk pop","himalayan folk","indian folk","pakistani folk","balochi folk","japanese folk","korean folk","korean minyo","pansori","gayageum","chinese traditional","chinese folk","guzheng","erhu","pipa","dizi","guqin","huqin","thai folk","thai folk pop","thai traditional","folklore argentino","nuevo folklore argentino","folklore nuevo argentino","folclore salteno","folclore santiagueno","folclore tucumano","folclore jujeno","folklore cuyano","folklore surero","zamba","chacarera","chamame","chamame brasilero","guitarra argentina","folklore chileno","cueca chilena","musica mapuche","folklore uruguayo","murga","folklore paraguayo","polca paraguaya","arpa paraguaya","folklore boliviano","tinku","salay","folklore peruano","huayno","huayno peruano","huayno popular","tunantada","musica criolla","musica afroperuana","marinera","guitarra andina","folklore ecuatoriano","musica otavalena","folclor colombiano","folclor afrocolombiano","musica andina","musica andina chilena","musica andina colombiana","andean flute","charango","folklore venezolano","musica llanera","joropo","cuatro venezolano","gaita zuliana","gaita","folklore panameno","nuevo folklore mexicano","mexican traditional","mexican son","son jarocho","son huasteco","trio huasteco","protest folk","anti-folk","antifolk","freak folk","free folk","wyrd folk","acid folk","folk brasileiro","folklore quebecois","trad quebecois","musique acadienne","corsican folk","mountain dulcimer","hammered dulcimer","autoharp","concertina","hurdy-gurdy","jaw harp","boston folk","geek folk","nl folk","french folk","string folk","vintage country folk","cape verdean folk","algerian folk","malagasy folk","western saharan folk","bahamian folk","garifuna folk","malawian folk","moravian folk","uyghur folk","afrikaans folk","puerto rican folk","native american traditional","native american contemporary","native american spiritual","powwow","navajo","australian indigenous music","canadian indigenous music","taiwanese indigenous music","indonesian indigenous traditional","waiata maori","kapa haka","inuit traditional","inuit pop","sami","yoik","polynesian traditional","tahitian traditional","musique tahitienne","himene tarava","hula","vintage hawaiian","cook islands pop","chamorro pop","vanuatu music","papuan traditional","musica rapa nui","musica indigena latinoamericana","musica indigena brasileira","musica prehispanica","musica tradicional cubana","musica aragonesa","musica catalana","musica canaria","musica nicaraguense","musica sarda","musica ayacuchana","musique guadeloupe","gwoka","musica popular uruguaya","musica hondurena","musica jibara","cuatro puertorriqueno","musica lombarda","musica pitiusa","musica costarricense","musica occitana","musica calabrese","musica mallorquina","folklore veracruzano","musica pernambucana","musica valenciana","musica sammarinese","musica colombiana instrumental","musica menorquina","musica andorra","musica nublensina","musica piemonteisa","musica puntana","musica amapaense","musica timor-leste","euskal musica","carnaval cadiz","mestissatge","tuna","tuna universitaria","rondalla","orquestas de galicia","galego","folkmusik","skansk musik","gotlandsk musik","alandsk musik","finlandssvenska musik","rogaland musikk","trondersk musikk","nordnorsk musikk","hjemmesnekk","sunnlensk tonlist","streektaal","friese muziek","grunneger muziek","slaskie piosenki","moderne ludovky","cimbalova muzika","musiikkia lapista","zohioliin duu","lai hla","pinoy traditional","malaysian traditional","borneo traditional","cantonese traditional","yunnan traditional","tanci","chinese wind","indonesian bamboo","burmese traditional","cambodian traditional","khmer","lao traditional","azeri traditional","israeli traditional","middle eastern traditional","egyptian traditional","moroccan traditional","moorish traditional","nubian traditional","haitian traditional","twoubadou","musique comorienne","musique traditionnelle comorienne","musique mahoraise","senegalese traditional","malian traditional","musique mandingue","musique peule","musique soninke","griot","musique nigerienne","musique tchadienne","musique centrafricaine","igbo traditional","baoule","frafra","burkinabe traditional","ethiopian traditional","kenyan traditional","tanzanian traditional","ugandan traditional","rwandan traditional","burundian traditional","batswana traditional","lesotho traditional","swazi traditional","yemeni traditional","pygmy music","kora","ngoni","balafon","djembe","mbira","oud","ney","qanun","darbuka","didgeridoo","panpipe","marimba","marimba orquesta","marimba de guatemala","cimbalom","zither","alphorn","gong","akordeon","harmonikka","fisarmonica","organetto","zampogna","schwyzerorgeli","dragspel","bal-musette","skiffle","contra dance","musica etnica","ethnomusicology","christian folk"],
+    "folk metal": ["folk metal","celtic metal","medieval metal","pagan metal","nordic folk metal","german pagan metal","polish folk metal","russian folk metal","slavic folk metal","spanish folk metal","italian folk metal","folk metal latinoamericano","deep folk metal","pirate metal","tolkien metal","balkan folk metal","celtic folk metal","viking folk metal","slavic pagan metal","symphonic folk metal","chinese folk metal"],
+    "folk rock": ["folk rock","modern folk rock","british folk","folk rock italiano","spanish folk rock","czech folk rock","russian folk rock","ukrainian folk rock","thai folk rock","psychedelic folk rock","progressive folk","synth folk"],
+    "forro": ["forro","baiao","forro de favela","forro tradicional","forro gospel","forro manauara","forro instrumental","forro eletrico","forro romantico","forro das antigas","forro de vaquejada","piseiro","xote","vaqueiro","arrocha","arrochadeira","bregadeira","batidao romantico","sanfona","forro eletronico","forro universitario","brega","brega romantico","brega paraense","brega saudade","brega pop","brega eletronico","tecnobrega","tecnomelody","lambada","lambadao","carimbo","guitarrada","musica popular paraense","seresta","vaquejada"],
+    "french hip hop": ["french hip hop","french trap","pop urbaine","cloud rap francais","drill francais","old school rap francais","rap francais nouvelle vague","plugg francais","rap calme","rap marseille","rap lyonnais","rap belge","rap liegeois","rap montrealais","hip hop quebecois","rap inde","rap antillais","trap antillais","hip hop reunionnais"],
+    "french house": ["french house","filter house","new french touch","french indietronica","french electro","ed banger","crydamoure"],
+    "french pop": ["french pop","chanson","nouvelle chanson francaise","nouvelle scene francaise","variete francaise","french indie pop","french synthpop","yeye","ye ye","electro-pop francais","classic french pop","vintage chanson","chanson virale","chanson quebecois","pop quebecois","indie quebecois","auteur-compositeur-interprete quebecois","french folk pop","french movie tunes","comedie musicale","musique alsacienne"],
+    "free jazz": ["free jazz","avant-garde jazz","modern free jazz","deep free jazz","polish free jazz","spiritual jazz","ecm-style jazz","dark jazz","experimental jazz","indie jazz","tzadik","doom jazz"],
+    "funk": ["funk","p-funk","synth funk","modern funk","instrumental funk","deep funk","traditional funk","new orleans funk","rare groove","go-go","minneapolis sound","minneapolis funk","funk pop","funktronica","neapolitan funk","eastern bloc groove","indie funk","chill funk","nu funk"],
+    "funk carioca": ["funk carioca","brega funk","funk 150 bpm","funk mandelao","funk ostentacao","funk paulista","funk viral","mega funk","rave funk","funk rj","funk bh","funk consciente","funk das antigas","funk melody","funk evangelico","funk capixaba","funk floripa","funk sc","funk mineiro","funk putaria","funk ousadia","trap funk","trapnejo","funknejo","cumbia funk","deep funk ostentacao","chill baile","fvnky rimex","funk bruxaria","beat bruxaria","bruxaria funk","funk automotivo","beat automotivo","som automotivo","mega funk automotivo","eletrofunk","eletro funk","electro funk brasil","arrocha funk","arrochafunk","funk arrocha","funk arrochado","funk mtg","deboxe","funk mexicano"],
+    "funk rock": ["funk rock"],
+    "future bass": ["future bass","kawaii future bass","kawaii edm","chill trap","wave","hardwave","vapor twitch","future beats","twerk","trap and bass"],
+    "gangster rap": ["gangster rap","chicano rap","crunk","snap music","houston rap","southern hip hop","memphis rap","memphis horrorcore","atl hip hop","old school atlanta hip hop","chicago rap","detroit hip hop","detroit trap","flint hip hop","miami hip hop","florida rap","baton rouge rap","new orleans rap","dfw rap","texas latin rap","tennessee hip hop","kentucky hip hop","st louis rap","minnesota hip hop","midwest hip hop","ohio hip hop","indiana hip hop","north carolina hip hop","south carolina hip hop","alabama rap","mississippi hip hop","arkansas hip hop","dirty texas rap","scam rap","horrorcore","chopped and screwed","kansas city hip hop","cincinnati rap","austin hip hop","san antonio rap","milwaukee hip hop","iowa hip hop","kansas hip hop","denver rap","alaska hip hop","idaho hip hop","nashville hip hop","hawaiian hip hop"],
+    "garage rock": ["garage rock","classic garage rock","freakbeat","garage psych","garage rock revival","proto-punk","punk blues","deep classic garage rock","canadian garage rock","french garage rock","swedish garage rock","garage rock mexicano","australian garage punk","garage pop","indie garage rock","garage punk","medway sound","mod revival","modern mod","pub rock","rautalanka","indorock","beat italiano"],
+    "german hip hop": ["german hip hop","frauenrap","german alternative rap","german cloud rap","german underground rap","oldschool deutschrap","deep german hip hop","hamburg hip hop","cologne hip hop","bayerischer rap","german trap","german viral rap","german jazz rap","austrian hip hop","swiss hip hop","schweizer rap","christlicher rap"],
+    "german pop": ["german pop","neue deutsche welle","neue neue deutsche welle","german pop rock","german singer-songwriter","german indie","german indie pop","german indie rock","german indie folk","deep german indie","hamburger schule","austropop","austrian pop","austrian indie","swiss pop","swiss indie","mundart","kleinkunst","antideutsche"],
+    "german rock": ["german rock","ostrock","german alternative rock","german hard rock","german punk","german punk rock","deep german punk","german street punk","german oi","german post-punk","german post-hardcore","german post-rock","german prog"],
+    "glam rock": ["glam rock","glam punk","hard glam","glam metal","pop metal","new wave of glam metal","sleaze rock"],
+    "global christian": ["global christian","african gospel","clap and tap","celtic worship","latin christian","latin worship","adoracion pentecostal","musica instrumental cristiana","deep latin christian","electronica cristiana","mariachi cristiano","salsa cristiana","reggaeton cristiano","trap cristiano","pop cristiano","reggae cristao","louvores pentecostais","fogo pentecostal","louvor icm","hinos ccb","coral gospel","quarteto gospel","gospel antigas","mpb gospel","musica eletronica gospel","musica crista reformada","adventista","indie cristao","tagalog worship","pinoy praise","papuri","bisaya worship","world worship","world devotional","south african gospel","ghanaian gospel","yoruba worship","igbo worship","kikuyu gospel","ugandan gospel","rwandan gospel","zambian gospel","zim gospel","congolese gospel","swahili gospel","haitian gospel","kompa chretien","pacific islands gospel","indonesian worship","korean worship","japanese worship","chinese worship","cantonese worship","thai worship","myanmar gospel","mizo gospel","tamil worship","telugu worship","malayalam worship","hindi worship","french worship","louange","chant religieux","german worship","swiss worship","psalmen","kerkkoor","norsk lovsang","svensk lovsang","dansk lovsang","finnish worship","hengelliset laulut","uwielbienie","ceske chvaly","slovenske chvaly","muzica crestina","gospel italiano","uk worship","nz christian","messianic praise","apostolic worship","chasidic pop","jewish pop","chabad niggunim","jewish cantorial","islamic recitation","quran","nasheed","nasyid","naat","latmiya","ilahiler","sholawat","zikir","taraneem","coptic hymn","mezmur","bhajan","modern bhajan","jain bhajan","odia bhajan","kirtan","hare krishna","shabad","tamil devotional","telugu devotional","marathi devotional","tibetan mantra","mantra","nohay","japanese buddhist chant","fo jing","bahai","lldm","zcc","musicas espiritas"],
+    "gospel": ["gospel","black gospel","brazilian gospel","gospel r&b","gospel soul","naija worship","southern gospel","spiritual","spirituals","contemporary gospel","traditional gospel","family gospel","baptist gospel","groove gospel","gospel singers","gospel blues","gospel reggae"],
+    "gothic metal": ["gothic metal","metal gotico","italian gothic metal","love metal","dark metal","vampire metal","melodic gothic metal","progressive gothic metal","symphonic gothic metal","symphonic doom metal"],
+    "gothic rock": ["gothic rock","dark post-punk","deathrock","gothabilly","modern goth","heavy gothic rock","gothic post-punk","deep gothic post-punk","gothic alternative","italian gothic","batcave","rock gotico","old school goth","goth punk"],
+    "grime": ["grime","eskibeat","sublow","uk grime","instrumental grime","birmingham grime","grimewave","neo grime","russian grime","australian grime","brazilian grime"],
+    "grindcore": ["grindcore","cybergrind","goregrind","pornogrind","american grindcore","british grindcore","german grindcore","swedish grindcore","polish grindcore","technical grindcore","mathgrind","mincecore","noisecore","gorenoise","animegrind","voidgrind","necrogrind","crustgrind","noisegrind","techgrind"],
+    "groove metal": ["groove metal","progressive groove metal","melodic groove metal","technical groove metal","thrash-groove metal","southern metal"],
+    "grunge": ["grunge","grungegaze","post-grunge","seattle sound","bubblegrunge","spacegrunge","grunge pop","grunge revival","underground grunge","grunge argentina"],
+    "gypsy jazz": ["gypsy jazz","manouche"],
+    "happy hardcore": ["happy hardcore","uk hardcore","makina","deep happy hardcore","freeform hardcore","j-core","raggatek","breakbeat hardcore","uk uptempo hardcore","donk","scouse house","uk bounce"],
+    "hard bop": ["hard bop","soul jazz","modal jazz","cool jazz","west coast jazz"],
+    "hard rock": ["hard rock","arena rock","australian hard rock","modern hard rock","melodic hard rock","deep melodic hard rock","nwocr","swedish hard rock","swedish melodic rock","finnish hard rock","hard rock mexicano","canadian hard rock"],
+    "hardcore punk": ["hardcore punk","crust punk","neo-crust","crasher crust","melodic crust","blackened punk","grindviolence","d-beat","melodic hardcore","modern melodic hardcore","japanese melodic hardcore","fast melodic punk","nyhc","powerviolence","skate punk","straight edge","vegan straight edge","youth crew","beatdown hardcore","metallic hardcore","modern hardcore","deep hardcore","deep hardcore punk","chain punk","egg punk","boston hardcore","new england hardcore","new jersey hardcore","connecticut hardcore","pennsylvania hardcore","dc hardcore","virginia punk","florida hardcore","texas hardcore","chicago hardcore","minneapolis punk","ohio hardcore","colorado hardcore","slc hardcore","california hardcore","nardcore","canadian hardcore","quebec hardcore","ukhc","uk82","street punk","oi","american oi","russian oi","umea hardcore","swedish hardcore","norwegian hardcore","danish hardcore","finnish hardcore","german hardcore","belgian hardcore","h8000","lowlands hardcore","french hardcore","spanish hardcore","hardcore punk espanol","street punk espanol","italian hardcore","polish hardcore","czech hardcore","russian hardcore","irish hardcore","australian hardcore","nz hardcore","japanese hardcore","burning spirits","korean hardcore","indonesian hardcore","malaysian hardcore","lion city hardcore","mexican hardcore","argentine hardcore","chilean hardcore","colombian hardcore","thrashcore","fastcore","stenchcore","thrash core","alabama hardcore","portuguese hardcore","alternative hardcore","french oi","old school hardcore","straight edge hardcore","youth crew hardcore","poppy hardcore","new school hardcore","heavy hardcore","progressive hardcore"],
+    "hardstyle": ["hardstyle","classic hardstyle","euphoric hardstyle","gabber","nu gabber","hard dance","hardcore","hardcore techno","jumpstyle","rawstyle","xtra raw","uptempo hardcore","mainstream hardcore","industrial hardcore","terrorcore","early hardcore","nederlandse hardstyle","gym hardstyle","frenchcore","hardtek","freetekno","hardtekk","jumptek","lento violento","hardbass","gymcore","hard motivation","dark hardcore","doomcore","ruta destroy","bakalao","raw hardstyle","melodic hardstyle","australian hardstyle","italian hardstyle","french tek","acid tekno","melodic tekno","tribecore","piep kicks","early hardstyle","industrial hardstyle","hypertechno"],
+    "heavy metal": ["heavy metal","nwobhm","nwothm","us power metal","uspm","finnish metal","finnish heavy metal","swedish metal","swedish heavy metal","german metal","german heavy metal","italian heavy metal","russian heavy metal","argentine heavy metal","proto-metal","retro metal","neo-trad metal","canadian metal","birmingham metal","spanish metal","latin metal","danish metal","texas metal","dutch metal","welsh metal","french metal","virginia metal","russian metal","norwegian metal","atlanta metal","boston metal","italian metal","irish metal","scottish metal","polish metal","swiss metal","mexican metal","greek metal","australian metal","vancouver metal","buffalo ny metal","kentucky metal","alabama metal","lapland metal","czech metal","miami metal","louisiana metal","tennessee metal","hungarian metal","oulu metal","austin metal","austrian metal","north carolina metal","sci-fi metal","cleveland metal","belgian metal","portland metal","slavic metal","argentine metal","pittsburgh metal","minneapolis metal","denver metal","portuguese metal","nz metal","metal colombiano","ukrainian metal","new england metal","seattle metal","nyc metal","metal catala","indian metal","chilean metal","icelandic metal","malaysian metal","israeli metal","native american metal","slovenian metal","lovecraftian metal","south carolina metal","metal ecuatoriano","peruvian metal","south african metal","romanian metal","euskal metal","singaporean metal","croatian metal","arkansas metal","wisconsin metal","guatemalan metal","utah metal","metal tico","belarusian metal","mainland se asia metal","bolivian metal","western ny metal","minnesota metal","estonian metal","metal salvadoreno","bulgarian metal","edinburgh metal","quebec metal","african metal","serbian metal","slovak metal","lithuanian metal","saxony metal","luxembourgian metal","metal galego","belfast metal","latvian metal","metal paraguayo","metal uruguayo","metal balear","central american metal","venezuelan metal","maltese metal","montana metal","cypriot metal","puerto rican metal","caribbean metal","macedonian metal","west virginia metal","arab metal","melodic metal","oriental metal","metal cover","metal guitar","shred","epic heavy metal","blackened heavy metal","spanish heavy metal","french heavy metal","us metal","uk metal","horror metal","theatrical metal"],
+    "highlife": ["highlife","burger highlife","igbo highlife","old school highlife","ghanaian traditional","palm wine guitar","juju","fuji","apala","afro-cuban percussion","african percussion","indian percussion","brazilian percussion"],
+    "hip hop": ["hip hop","deep underground hip hop","belgian hip hop","hip hop tuga","rap tuga underground","rap portuense","asian american hip hop","jamaican hip hop","central asian hip hop","kyrgyz hip hop","uzbek hip hop","turkmen hip hop","belarusian hip hop","estonian hip hop","latvian hip hop","lithuanian hip hop","middle east hip hop","gulf hip hop","afghan rap","armenian hip hop","georgian hip hop","azeri rap","meyxana","jewish hip hop","israelite hip hop","cypriot hip hop","rap moldovenesc","maltese hip hop","luxembourgian hip hop","mongolian hip hop","myanmar hip hop","khmer hip hop","lao hip hop","singaporean hip hop","hip hop timur","afrikaans hip hop","kasi rap","venda rap","sesotho hip hop","xhosa hip hop","swazi hip hop","malawian hip hop","botswana hip hop","ethiopian hip hop","rap congolais","hip hop galsen","rap ecuatoguineano","rap malien","rap gabonais","rap burkinabe","hip hop mauritanien","rap kreyol","native american hip hop","lapland hip hop","gothenburg hip hop","irish underground rap","hungarian underground rap","south african underground rap","military rap","maga rap","scratch","beatboxing","chipmunk soul","new school hip hop"],
+    "house": ["house","uk house","classic house","detroit house","german house","australian house","canadian house","swedish house","nordic house","norwegian house","swiss house","greek house","romanian house","brazilian house","latin house","house argentino","japanese house","hard house","uk hard house","ghetto house","pumping house","minimal house","disco house","acid house","chicago house","piano house","vocal house","funky house","italo house","hip house","diva house","microhouse","rally house","circuit"],
+    "hyperpop": ["hyperpop","digicore","glitchcore","dariacore","proto-hyperpop","hyperpop francais","french hyperpop","german hyperpop","hyperpop en espanol","hyperpop italiano","russian hyperpop","japanese hyperpop","korean hyperpop","indonesian hyperpop","czsk hyperpop","glitchbreak","hypertrance","webcore","weirdcore","crunkcore","drain","psychokore","robloxcore"],
+    "idm": ["idm","ambient idm","braindance","drill and bass","fluxwork","glitch","glitch hop","wonky","deep idm","abstract idm","acid idm","japanese idm","glitch pop","glitch beats","microsound","algorave","skweee","folktronica","tape club","solipsynthm"],
+    "indie": ["indie"],
+    "indie folk": ["indie folk","chamber folk","folk pop","indie anthem-folk","modern indie folk","canadian indie folk","australian indie folk","scottish indie folk","swedish indie folk","french indie folk","spanish indie folk","indie folk italiano","japanese indie folk","indie folk argentino","stomp and flutter","stomp and whittle","ectofolk","indiecoustica","swiss indie folk","modern psychedelic folk","avant-folk","alternative folk","dream folk"],
+    "indie pop": ["indie pop","alt pop","alternative pop","modern alternative pop","bedroom pop","indie poptimism","shimmer pop","twee pop","twee indie pop","pov: indie","modern indie pop","uk alternative pop","canadian indie","australian indie","australian alternative pop","nz indie","dunedin sound","scottish indie","glasgow indie","edinburgh indie","irish indie","dublin indie","welsh indie","cardiff indie","brighton indie","oxford indie","bristol indie","manchester indie","liverpool indie","leeds indie","sheffield indie","nottingham indie","birmingham indie","leicester indie","cambridgeshire indie","swedish indie pop","gothenburg indie","stockholm indie","norwegian indie","oslo indie","bergen indie","danish indie pop","danish indie","finnish indie","icelandic indie","dutch indie","belgian indie","polish indie","czech indie","slovak indie","hungarian indie","romanian indie","bulgarian indie","greek indie","russian indie","ukrainian indie","belarusian indie","lithuanian indie","latvian indie","estonian indie","israeli indie","turkish indie","japanese indie pop","j-pixie","thai indie pop","singaporean indie","malaysian indie","argentine indie","indie platense","indie cordoba","rosario indie","chilean indie","concepcion indie","peruvian indie","colombian indie","venezuelan indie","ecuadorian indie","uruguayan indie","mexican indie","cdmx indie","monterrey indie","guadalajara indie","indie triste","la indie","brooklyn indie","bay area indie","oakland indie","seattle indie","portland indie","austindie","chicago indie","boston indie","philly indie","atlanta indie","nashville indie","minneapolis indie","denver indie","phoenix indie","san diego indie","vancouver indie","toronto indie","montreal indie","jangle pop","modern jangle pop","jangle rock","c86","paisley underground","indie surf","surf pop","sophisti-pop","sunshine pop","indie soul","bedroom soul","small room","spanish indie pop","deep indie pop","japanese bedroom pop","tontipop","stomp pop","melodipop","soda pop","elephant 6","el paso indie","edmonton indie","sacramento indie","kentucky indie","new jersey indie","baltimore indie","athens indie","eau claire indie","newcastle nsw indie","morelos indie","veracruz indie","vegas indie","saskatchewan indie","quebec indie","cdo indie","ann arbor indie","northern irish indie","washington indie","auckland indie","chihuahua indie","murcia indie","cologne indie","slc indie","rochester mn indie","victoria bc indie","brisbane indie","north east england indie","albuquerque indie","alabama indie","asbury park indie","san marcos tx indie","reading indie","indie catala","perth indie","indie extremena","jacksonville indie","michigan indie","pittsburgh indie","grand rapids indie","tempe indie","nantes indie","south carolina indie","springfield mo indie","alaska indie","ontario indie","oc indie","kingston on indie","hokkaido indie","fremantle indie","olympia wa indie","new delhi indie","melbourne indie","north carolina indie","channel islands indie","orebro indie","cape town indie","louisville indie","london indie","orlando indie","asheville indie","socal indie","manso indie","gainesville indie","dayton indie","christchurch indie","sydney indie","okc indie","kc indie","munich indie","arunachal indie","omaha indie","kyushu indie","tulsa indie","dalarna indie","miami indie","granada indie","duluth indie","bath indie","eugene indie","rennes indie","manitoba indie","denton tx indie","indy indie","charlotte nc indie","connecticut indie","kolkata indie","tampa indie","rhode island indie","indie valenciana","vermont indie","cincinnati indie","kent indie","new orleans indie","nice indie","vienna indie","fort worth indie","hamburg indie","ohio indie","portuguese indie","charlottesville indie","kazakh indie","utah indie","western mass indie","dunedin indie","lexington ky indie","windsor on indie","hamilton on indie","maine indie","ghent indie","dallas indie","tamaulipas indie","ok indie","newfoundland indie","rochester ny indie","york indie","idaho indie","oaxaca indie","dc indie","sinaloa indie","southampton indie","devon indie","puerto rican indie","dominican indie","mumbai indie","newcastle indie","tassie indie","graz indie","warrington indie","rva indie","buffalo ny indie","lafayette indie","rogaland indie","uppsala indie","mississippi indie","sonora indie","kansai indie","derby indie","worcester ma indie","lancaster pa indie","memphis indie","tucson indie","euskal indie","leipzig indie","kelowna bc indie","halifax indie","lancashire indie","columbus ohio indie","oth indie","aarhus indie","limerick indie","zurich indie","kansas indie","arkansas indie","west virginia indie","stl indie","lund indie","wyoming indie","detroit indie","east anglia indie","norrbotten indie","little rock indie","north dakota indie","chattanooga indie","pei indie","myanmar indie","ottawa indie","montana indie","luxembourgian indie","caracas indie","essex indie","wisconsin indie","adelaide indie","calgary indie","albany ny indie","cleveland indie","tijuana indie","isle of wight indie","cork indie","kalmar indie","canberra indie","faroese indie","indie tico","indie campechano","virginia indie","pune indie","knoxville indie","bangalore indie","cornwall indie","london on indie","dresden indie","stuttgart indie","malmo indie","milwaukee indie","sevilla indie","south dakota indie","baja indie","lawrence ks indie","hull indie","norman ok indie","dundee indie","hampton roads indie","indie salvadoreno","west yorkshire indie","indie michoacano","chennai indie","coventry indie","iowa indie","north alabama indie","uae indie","indie cantabria","guam indie","swansea indie","wellington indie","panamanian indie","pittsburgh indie rock","poznan indie","triangle indie","indie canario","dusseldorf indie","merida indie","hawaiian indie","new hampshire indie","indiana indie","basel indie","rotterdam indie","salzburg indie","frankfurt indie","leon gto indie","derry indie","galician indie","dortmund indie","brno indie","portsmouth indie","fort wayne indie","indie poblano","trondheim indie","isle of man indie","oulu indie","missouri indie","indie boliviano","bern indie","san antonio indie","galway indie","indie sudcaliforniano","houston indie","svensk indie","paraguayan indie","armenian indie","prague indie","baton rouge indie","new brunswick indie","indie hidalguense","nagaland indie","indie trujillano","indie hidrocalido","st petersburg fl indie","indie arequipeno","aberdeen indie","kosovan indie","cape breton indie","umea indie","northamptonshire indie","guatemalan indie","delaware indie","sardinia indie","indie asturiana","indie queretano","indie nica","normal indie","lincoln ne indie","bohol indie","bury st edmunds indie","indie catracho","indie tucumano","belfast indie","indie nordeste argentino","santa fe indie","indie tabasqueno","twin cities indie","bruneian indie"],
+    "indie rock": ["indie rock","british indie rock","english indie rock","scottish indie rock","irish indie rock","australian indie rock","swedish indie rock","dutch indie rock","belgian indie rock","spanish indie rock","portuguese indie rock","polish indie rock","russian indie rock","ukrainian alternative rock","greek indie rock","japanese indie rock","thai indie rock","argentine indie rock","indie rock mexicano","indie rock colombiano","indie rock peruano","indie rockism","indie punk","indie shoegaze","indie fuzzpop","lo-fi indie","slacker rock","gbvfi","american post-punk","uk post-punk revival","dance-punk","crank wave","windmill scene","deep indie rock"],
+    "indietronica": ["indietronica","indie psych-pop","metropopolis","indietronica italiana","aussietronica","latintronica","jamtronica","livetronica","new rave","indie dance","indie sleaze"],
+    "indonesian pop": ["indonesian pop","classic indo pop","indonesian indie","pop minang","indonesian pop rock","indonesian singer-songwriter","indonesian jazz","indonesian folk","indonesian folk pop","indonesian alternative rock","indonesian rock","classic indonesian rock","indonesian idol pop","indonesian lo-fi pop","indonesian viral pop","indonesian r&b","indonesian indie pop","indonesian indie rock","indonesian emo","indonesian emo rap","indonesian punk","indonesian pop punk","indonesian post-hardcore","indonesian ska","indonesian reggae","indonesian hip hop","indonesian underground hip hop","indonesian trap","indonesian edm","indonesian blues","indonesian psychedelia","indonesian neo-psychedelia","indonesian shoegaze","indonesian metal","indonesian thrash metal","malaysian hip hop","keroncong","gamelan","javanese gamelan","balinese traditional","sundanese traditional","lagu jawa","lagu sunda","lagu bali","lagu timur","lagu melayu","lagu aceh","lagu bugis","batak","trio batak","lagu karo","lagu manado","lagu maluku","maluku pop","lagu sasak","lagu sabahan","lagu iban","lagu betawi","bandung indie","yogyakarta indie","semarang indie","surabaya indie","malang indie","bogor indie","bali indie","lampung indie","rock kapak","dikir barat","sulawesi indie","lombok indie","pontianak indie","south borneo indie","balikpapan indie","lagu jambi","lagu lampung","lagu madura"],
+    "industrial": ["industrial","aggrotech","ebm","old school ebm","electro-industrial","dark electro-industrial","dark electro","industrial rock","industrial metal","martial industrial","death industrial","power noise","rhythmic noise","industrial pop","post-industrial","cyber metal","neue deutsche harte","british industrial","industrial noise","new beat","swedish ebm","italian industrial","neo-industrial rock","harsh ebm","terror ebm","anhalt ebm","old school industrial"],
+    "instrumental": ["instrumental","background piano","background music","background jazz","background jazz product","calming instrumental","instrumental worship","musica evangelica instrumental","lds instrumental","korean instrumental","japanese instrumental","chinese instrumental","thai instrumental","viet instrumental","turkish instrumental","latin instrumental","musica de fondo","japanese piano","indian violin","electric bass","double drumming"],
+    "italian hip hop": ["italian hip hop","italian underground hip hop","rap italiano old school","rap genovese","rap napoletano","rap siciliano","rap sardegna","rap toscana","trap italiana","drill italiana","emo rap italiano","emo trap italiana","trap metal italiana"],
+    "italian pop": ["italian pop","classic italian pop","italian adult pop","itpop","italian pop rock","pop virale italiano","indie rock italiano","milan indie","rome indie","turin indie","bergamo indie","puglia indie","firenze indie","indie liguria","indie veneto","indie napoletano","indie siciliano","canzone napoletana","neomelodici","canzone genovese","canzone siciliane","classic italian folk pop","vintage italian pop","r&b italiano","italian lounge","sanremo"],
+    "j-metal": ["j-metal","japanese heavy metal","japanese power metal","japanese metalcore","japanese death metal","japanese black metal","japanese thrash metal","vocaloid metal","touhou metal"],
+    "j-pop": ["j-pop","classic j-pop","anime","j-division","j-idol","j-pop boy group","j-pop girl group","japanese teen pop","kayokyoku","idol kayo","vocaloid","vocarock","cevio","synthv","utau","japanese electropop","japanese singer-songwriter","japanese viral pop","japanese dance pop","japanese alternative pop","j-acoustic","j-reggae","j-r&b","anison","anime rock","anime rap","anime piano","anime cv","denpa-kei","denpa","akiba-pop","seiyu","seiyuu","dansei seiyu","utaite","youtaite","vtuber","japanese vtuber","touhou","bemani","doujin","j-indie","classic anime","48g","alt-idol","idol","men chika","idol game","shonen","shojo","seinen","mecha","yaoi","yuri","neru"],
+    "j-rap": ["j-rap","japanese chill rap","japanese pop rap","japanese old school hip hop","japanese underground rap","japanese trap","josei rap","samurai trap","japanese beats"],
+    "j-rock": ["j-rock","classic j-rock","modern j-rock","j-poprock","japanese alternative rock","japanese post-hardcore","japanese post-punk","japanese punk rock","japanese melodic punk","japanese girl punk","japanese pop punk","japanese screamo","japanese garage rock","japanese rockabilly","japanese psychedelic","japanese psychedelic rock","japanese prog","j-punk"],
+    "jazz": ["jazz"],
+    "jazz fusion": ["jazz fusion","jazz rock","fusion","jazz funk","electric jazz","progressive jazz fusion","psychedelic jazz fusion","classical jazz fusion","deep jazz fusion","japanese jazz fusion","italian jazz fusion","jazz metal","gypsy fusion","world fusion"],
+    "jazz rap": ["jazz rap","abstract hip hop","instrumental hip hop","turntablism"],
+    "jerk rap": ["jerk rap","hoodtrap","kashtrap","mylancore","vampjerk","edm jerk","jerknb"],
+    "jungle": ["jungle","modern jungle","old school jungle","footwork","juke","ambient jungle","atmospheric jungle","lo-fi jungle","footwork jungle","old skool jungle","junglecore","intelligent jungle"],
+    "k-ballad": ["k-ballad","korean ost","k-drama ost"],
+    "k-pop": ["k-pop","classic k-pop","classic korean pop","k-pop boy group","k-pop girl group","k-pop reality show","korean singer-songwriter","korean r&b","korean electropop","korean superband","korean talent show","joseon pop"],
+    "k-rap": ["k-rap","korean old school hip hop","korean underground rap","korean trap"],
+    "k-rock": ["k-rock","k-indie","korean indie rock","korean indie pop","korean indie folk","korean shoegaze","korean punk","korean metal"],
+    "karaoke": ["karaoke","backing track","tribute","cover band","ringtone","8d"],
+    "kawaii metal": ["kawaii metal","idol metal","cute metal","idol rock"],
+    "kizomba": ["kizomba","ghetto zouk","semba","tarraxinha","zouk","kizomba antigas","kizomba cabo-verdiana","urban kiz","kompa","kompa gouyad","zouk riddim","zouklove","funana","ritmo kombina","antilliaanse folklore"],
+    "klezmer": ["klezmer","yiddish folk","sefardi","judaica","kol isha"],
+    "krushclub": ["krushclub","scenecore","krushfunk"],
+    "latin": ["latin"],
+    "latin hip hop": ["latin hip hop","argentine hip hop","rap underground argentino","chilean hip hop","rap sureno chileno","rap norteno chileno","rap feminino chileno","colombian hip hop","rap underground colombiano","venezuelan hip hop","peruvian hip hop","mexican hip hop","rap underground mexicano","rap regio","tamaulipas rap","rap femenino mexicano","hip hop cubano","rap boricua","rap dominicano","hip hop boliviano","rap uruguayo","rap paraguayo","rap ecuatoriano","rap salvadoreno","rap tico","rap nica","latin viral rap","narco rap","bases de freestyle","rap romantico","anime latino"],
+    "latin jazz": ["latin jazz","afro-cuban jazz","jazz cubano","jazz puertorriqueno","jazz venezolano","danzon","descarga","deep latin jazz","jazz dominicano","jazz tico","jazz caraibes","jazz boliviano"],
+    "latin pop": ["latin pop","mexican pop","latin ballad","balada","latin arena pop","latin viral pop","puerto rican pop","colombian pop","classic colombian pop","musica popular colombiana","pop argentino","argentine telepop","pop chileno","pop venezolano","classic venezuelan pop","pop peruano","classic peruvian pop","ecuadorian pop","panamanian pop","dominican pop","pop costarricense","pop boliviano","pop paraguayo","guatemalan pop","pop catracho","romantico","tropical","tropical alternativo","canadian latin","nueva ola chilena","nueva ola peruana","musica costena","musica tropical guatemalteca","tropical tecladista","combos nacionales","banda peruana","banda de viento","pop alternativo"],
+    "latin trap": ["latin trap","trap argentino","trap boricua","trap chileno","trap colombiano","trap mexicano","trap venezolano","trap triste","urbano chileno","urbano mexicano","trap peruano","trap boliviano","rap latina","trap kreyol"],
+    "lofi": ["lofi","chill beats","lo-fi hip hop","chillhop","lo-fi beats","lo-fi chill","lo-fi cover","lo-fi jazzhop","lo-fi sleep","lo-fi study","sad lo-fi","lo-fi product","lo-fi vgm","lo-fi rap","lo-fi pop","lo-fi latino","lo-fi brasileiro","punjabi lo-fi","indian lo-fi","viet lo-fi","anime lo-fi","study beats","focus beats","japanese chillhop"],
+    "lullaby": ["lullaby","baby sleep","music box","instrumental lullaby"],
+    "math rock": ["math rock","math pop","midwest math rock","japanese math rock","british math rock","instrumental math rock","math rock latinoamericano"],
+    "medieval": ["medieval","early music","gregorian chant","renaissance","medieval rock","medieval folk","medieval ensemble","early music ensemble","early music choir","american early music","polish early music","portuguese early music","musique ancienne","musica antigua","franco-flemish school","english renaissance","french renaissance","german renaissance","italian renaissance","spanish renaissance","ars subtilior","trecento","troubadour","trouvere","minnesang","madrigal","bardcore","tavern","rune folk","bard","ancient mediterranean","mittelalter","mittelalter rock","medieval synth"],
+    "merengue": ["merengue","mambo","merengue tipico","dominican merengue","merengue clasico","merengue hip hop","merenhouse","merengueton","tecno-merengue","mambo chileno","bomba","plena","bomba y plena","musica tradicional dominicana","tipico","punta","plena uruguaya","candombe"],
+    "metal": ["metal"],
+    "metalcore": ["metalcore","chaotic hardcore","chaotic metalcore","symphonic metalcore","electronicore","mathcore","melodic metalcore","progressive metalcore","post-metalcore","american metalcore","australian metalcore","canadian metalcore","uk metalcore","german metalcore","finnish metalcore","swedish metalcore","italian metalcore","polish metalcore","russian metalcore","ukrainian metalcore","chinese metalcore","metalcore espanol","nu-metalcore","alternative metalcore","deep metalcore","deep melodic metalcore","rap metalcore","trancecore","technical metalcore","old school metalcore","crabcore"],
+    "moombahton": ["moombahton","moombahcore","dutch moombahton"],
+    "moroccan rap": ["moroccan rap","trap maroc","north moroccan rap"],
+    "mpb": ["mpb","jovem guarda","nova mpb","pop folk","tropicalia","velha guarda","violao","nova musica pernambucana","nova musica carioca","nova musica paulista","nova musica maranhense","nova musica amazonense","musica popular mineira","clube da esquina","musica baiana","musica alagoana","musica maranhense","musica paraibana","musica potiguar","musica cearense","musica sergipana","musica piauiense","musica capixaba","musica paranaense","musica catarinense","musica brasiliense","musica goiana","musica sul-mato-grossense","musica mato-grossense","musica popular amazonense","piano mpb","choro","choro contemporaneo","chorinho","bandolim","brass band brasileiro","trombone brasileiro","bandinhas"],
+    "neofolk": ["neofolk","dark folk","apocalyptic folk","deep neofolk","neo-pagan","viking folk","pagan folk","combat folk","folk noir","murderfolk"],
+    "new age": ["new age","new age piano","meditation","guided meditation","world meditation","healing","healing hz","432hz","528hz","solfeggio product","binaural","brain waves","chakra","reiki","kundalini","singing bowl","handpan","spa","massage","yoga","zen","relaxative","nu age","native american flute","shamanic"],
+    "new jack swing": ["new jack swing","new jack smooth","90s r&b","freestyle","deep freestyle","popping","latin freestyle"],
+    "new jazz": ["new jazz","new jazz rap","new jazz trap"],
+    "new wave": ["new wave","new romantic","new wave pop","scottish new wave","spanish new wave","la movida","movida","italian new wave","belgian new wave","finnish new wave","japanese new wave","yugoslav new wave","deep new wave","minimal synth"],
+    "nightcore": ["nightcore","sped up","speed up","speed up turkce","slowed and reverb","slowed","daycore"],
+    "noise": ["noise","harsh noise","harsh noise wall","hnw","japanoise","noise rock","power electronics","noise pop","spanish noise pop","uk noise rock","polish noise rock","rock noise","noise punk","black noise","no wave"],
+    "nu jazz": ["nu jazz","japanese jazztronica","electro jazz"],
+    "old school hip hop": ["old school hip hop","golden age hip hop","old school uk hip hop","miami bass","booty bass","edo old school","britcore"],
+    "oldies": ["oldies","golden oldies","classic oldies","beach music","harlem renaissance"],
+    "opera": ["opera","arias","libretto","operatic pop","popera","classical crossover","classical tenor","italian tenor","classical soprano","italian soprano","boy soprano","classical mezzo-soprano","italian mezzo-soprano","classical contralto","classical baritone","italian baritone","classical countertenor","castrato","baroque singing","vintage classical singing","wagnerian singing","italian opera","french opera","german opera","opera chorus","operetta","zarzuela","cantonese opera","chinese opera","beijing opera","trallalero","marcha funebre"],
+    "opm": ["opm","classic opm","pinoy indie","pinoy indie rock","p-pop","pinoy rock","pinoy alternative rock","vispop","acoustic opm","pinoy singer-songwriter","pinoy idol pop","pinoy r&b","pinoy hip hop","pinoy trap","pinoy drill","pinoy alternative rap","pinoy pop punk","pinoy shoegaze","pinoy metal","pinoy reggae","pinoy edm","kundiman","manila sound","bisaya rap","bisaya indie","bisrock","ilocano pop"],
+    "pagode": ["pagode","pagode baiano","pagode novo","pagode romantico","pagodao"],
+    "persian pop": ["persian pop","classic persian pop","persian electronic","persian alternative","persian hip hop","persian underground hip hop","persian melodic rap","persian sad rap","persian trap"],
+    "persian rock": ["persian rock","iranian rock","iranian metal","persian metal"],
+    "persian traditional": ["persian traditional","persian neo-traditional","persian poetry","tar","santur","kamancheh","duduk","mazandarani folk","afghan pop","afghan traditional","hazaragi pop","tajik pop","tajik traditional","musiqi-ye zanan","dambora"],
+    "phonk": ["phonk","aggressive phonk","cowbell","gym phonk","memphis phonk","chill phonk","anime phonk","phonk brasileiro","ukrainian phonk","montagem phonk","funk phonk","trillwave","russian pixel","cloud phonk","rage phonk","melodic phonk","trill phonk","dungeon phonk","death phonk","g-phonk","phonkwave","deep phonk","rare phonk","blast phonk","military phonk","turkish phonk","phonk argentino"],
+    "piano": ["piano","classical piano","piano cover","piano covers","solo piano","pianissimo","contemporary classical piano","british classical piano","american classical piano","canadian classical piano","australian classical piano","french classical piano","german classical piano","austrian classical piano","swiss classical piano","italian classical piano","spanish classical piano","dutch classical piano","belgian classical piano","nordic classical piano","polish classical piano","czech classical piano","hungarian classical piano","romanian classical piano","balkan classical piano","baltic classical piano","russian classical piano","ukrainian classical piano","caucasian classical piano","israeli classical piano","japanese classical piano","korean classical piano","chinese classical piano","latin american classical piano","brazilian classical piano","historic piano performance","classical piano trio","classical piano quartet","classical piano duo"],
+    "pluggnb": ["pluggnb","dream plugg","dark plugg","emoplugg","plugg en espanol","russian plugg","ambient plugg","terror plugg","vampplugg","holy plugg","evil plugg"],
+    "polish hip hop": ["polish hip hop","polish trap","polish viral rap","polish alternative rap","polish underground rap","polish old school hip hop","rap uliczny","rap motywacja","smutny rap"],
+    "polka": ["polka","slovenian folk","polka nortena","oberkrainer","blasmusik","blaskapelle","volkstumliche musik","dechovka","narodnozabavna","heligonka","accordion","accordeon","accordion band","schrammelmusik","tanzlmusi","guggenmusik","marsmuziek","dweilorkest","tanzorchester","stubenmusik","karntner volksmusik","landler","boeremusiek","draaiorgel","band organ"],
+    "pop": ["pop","bubblegum pop","dance pop","uk pop","classic uk pop","canadian pop","australian pop","nz pop","classic nz pop","irish pop","dutch pop","classic dutch pop","belgian pop","classic belgian pop","portuguese pop","classic portuguese pop","spanish pop","israeli pop","classic israeli pop","south african pop","polish pop","classic polish pop","czech pop","classic czech pop","slovak pop","hungarian pop","classic hungarian pop","romanian pop","classic romanian pop","classic bulgarian pop","greek pop","classic greek pop","cypriot pop","maltese pop","estonian pop","latvian pop","classic latvian pop","lithuanian pop","belarusian pop","ukrainian pop","classic ukrainian pop","ukrainian viral pop","moldovan pop","georgian pop","armenian pop","azeri pop","classic azeri pop","kazakh pop","uzbek pop","kyrgyz pop","turkmen pop","mongolian pop","malaysian pop","classic malaysian pop","bruneian pop","cambodian pop","lao pop","burmese pop","fijian pop","samoan pop","tongan pop","solomon islands pop","png pop","pacific islands pop","barbadian pop","post-teen pop","viral pop","social media pop","antiviral pop","talent show","deep talent show","boy band","girl group","classic girl group","boy pop","candy pop","channel pop","singer-songwriter pop","pop soul","pop edm","deep pop edm","pop house","deep dance pop","la pop","nyc pop","polish viral pop","czsk viral pop","dutch idol pop","chill pop","pop violin","brass band pop","luxembourgian pop","tatar pop","yakut pop","karen pop","melanesian pop","bahamian pop","guyanese pop","surinamese pop","turkce remix","classic pop","progressive pop","piano pop","retro pop","guitar pop"],
+    "pop nacional": ["pop nacional","pop nacional antigas","pop teen brasileiro","pop lgbtq+ brasileira","viral pop brasileiro","speed up brasileiro","hyperpop brasileiro","r&b brasileiro","indie curitibano","belo horizonte indie","rio grande do sul indie","brasilia indie","musica triste brasileira","talentos brasileiros","novos talentos brasileiros","deep brazilian pop"],
+    "pop punk": ["pop punk","anthem emo","easycore","neon pop punk","socal pop punk","canadian pop punk","uk pop punk","mexican pop punk","italian pop punk","swedish pop punk","finnish pop punk","russian pop punk","texas pop punk","chicago pop punk","diy pop punk","pop punk revival","ramonescore"],
+    "pop rap": ["pop rap","hip pop","commercial rap","mainstream rap","melodic rap","radio rap","rap pop","uk melodic rap","aesthetic rap","viral trap","czech hip hop","slovak hip hop","hungarian hip hop","israeli hip hop","czsk hip hop"],
+    "pop rock": ["pop rock","spanish pop rock","danish pop rock","czech pop rock","indie pop rock","piano rock"],
+    "post-hardcore": ["post-hardcore","swancore","progressive post-hardcore","canadian post-hardcore","uk post-hardcore","australian post-hardcore","swedish post-hardcore","italian post-hardcore","post-post-hardcore","post-screamo","sasscore","modern post-hardcore","atmospheric post-hardcore"],
+    "post-metal": ["post-metal","atmospheric post-metal","uk post-metal","post-doom metal","atmospheric sludge"],
+    "post-punk": ["post-punk","uk post-punk","irish post-punk","danish post-punk","swedish post-punk","finnish post-punk","icelandic post-punk","french post-punk","spanish post-punk","italian post-punk","polish post-punk","baltic post-punk","russian post-punk","ukrainian post-punk","turkish post-punk","australian post-punk","canadian post-punk","post-punk latinoamericano","post-punk mexicano","post-punk argentina","post-punk colombiano","brazilian post-punk"],
+    "post-rock": ["post-rock","instrumental post-rock","american post-rock","louisville underground","british post-rock","canadian post-rock","australian post-rock","nordic post-rock","french post-rock","belgian post-rock","spanish post-rock","portuguese post-rock","italian post-rock","polish post-rock","russian post-rock","japanese post-rock","chinese post-rock","taiwan post-rock","thai post-rock","southeast asian post-rock","mexican post-rock","post-rock latinoamericano","cinematic post-rock","ambient post-rock","atmospheric post-rock","cosmic post-rock","malaysian post-rock","indian instrumental rock"],
+    "power metal": ["power metal","epic metal","fantasy metal","melodic power metal","swedish power metal","finnish power metal","german power metal","british power metal","italian power metal","russian power metal","mexican power metal","progressive power metal","neo classical metal","neoclassical metal","opera metal","extreme power metal","epic power metal","folk power metal"],
+    "power pop": ["power pop","modern power pop","underground power pop","power-pop punk","deep power-pop punk"],
+    "progressive house": ["progressive house","classic progressive house","dark progressive house","deep progressive house","japanese progressive house","minimal melodic techno","melodic techno","anjunadeep","anjunabeats","melodic house and techno","melodic progressive house","festival progressive house"],
+    "progressive metal": ["progressive metal","instrumental metal","swedish progressive metal","finnish progressive metal","italian progressive metal","instrumental progressive metal","melodic progressive metal","progressive alternative","extreme progressive metal","progressive math metal"],
+    "progressive rock": ["progressive rock","canterbury scene","crossover prog","krautrock","neo-prog","neo-trad prog","synth prog","symphonic prog","symphonic rock","rock opera","theatrical rock","avant-prog","modern progressive rock","deep progressive rock","rock progressivo italiano","italian modern prog","french progressive rock","rock progressif francais","rock progressif","dutch prog","spanish prog","spanish progressive rock","polish prog","swedish prog","svensk progg","norwegian prog","finnish progressive rock","prog quebec","rock progresivo mexicano","neo-kraut","eclectic prog","heavy prog","british progressive rock","canadian progressive rock"],
+    "psychedelic": ["psychedelic","psychedelic pop","psychedelic folk","polish psychedelia","thai psychedelic","czech psychedelic","vintage french psychedelic","italian occult psychedelia","psicodelia mexicana","psicodelia chilena","norwegian psychedelic","french psychedelic","turkish psychedelic"],
+    "psychedelic rock": ["psychedelic rock","classic psychedelic rock","acid rock","neo-psychedelia","raga rock","space rock","psychedelic space rock","deep space rock","australian psych","canadian psychedelic","canadian psychedelic rock","swedish psychedelic rock","finnish psychedelic rock","spanish psychedelic rock","greek psychedelic rock","indie psychedelic rock","psychedelic punk","heavy psych","latin american heavy psych","palm desert scene","cascadia psych","shimmer psych","psych gaze"],
+    "psytrance": ["psytrance","goa trance","dark psytrance","deep darkpsy","forest psy","progressive psytrance","full-on","full on groove","deep full on","twilight psy","hi-tech","zenonesque","psytech","suomisaundi","nitzhonot","deep psytrance","south african psytrance","psybient","psybass","psycore","psyprog","progressive goa","vocal psytrance","minimal psytrance"],
+    "punjabi pop": ["punjabi pop","bhangra","classic bhangra","classic punjabi pop","desi hip hop","punjabi hip hop","punjabi folk","uk bhangra","uk desi rap"],
+    "punk": ["punk","early us punk","deep punk rock","punk 'n' roll","canadian punk","vancouver punk","quebec punk","new jersey punk","chicago punk","texas punk","arizona punk","portland punk","uk diy punk","northern irish punk","dutch punk","dutch punk rock","belgian punk","austrian punk","swiss punk","french punk","early french punk","spanish punk","punk urbano","punk catala","punk euskera","punk galego","punk tuga","italian punk","punk rock italiano","polish punk","czech punk","slovak punk","hungarian punk","romanian punk","greek punk","turkish punk","israeli punk","russian punk","russian punk rock","belarusian punk","swedish punk","trallpunk","danspunk","norwegian punk","norwegian punk rock","danish punk","finnish punk","icelandic punk","brisbane punk","melbourne punk","adelaide punk","nz punk","south african punk","chinese punk","singaporean punk","malaysian punk","malang punk","punk mexicano","punk rock mexicano","argentine punk","punk chileno","punk melodico chileno","peruvian punk","punk colombiano","punk ecuatoriano","punk tico","folk punk","surf punk","beach punk","horror punk","horror punk brasileiro","synth punk","art punk","anarcho-punk","boston punk","atlanta punk","kentucky punk","long island punk","irish punk","hawaiian punk","chicano punk","acoustic punk","black punk","dub punk","slash punk","punk ska","nordnorsk ponk","punk cover","peace punk","political punk","melodic punk","british punk","japanese punk","siberian punk","77 punk","pirate punk","old school punk"],
+    "r&b": ["r&b","alternative r&b","trap soul"],
+    "rap": ["rap"],
+    "rap rock": ["rap rock","punk rap","rap punk"],
+    "reggae": ["reggae","roots reggae","roots rock reggae","modern reggae","traditional reggae","early reggae","vintage reggae","lovers rock","lovers reggae","rocksteady","mento","nyahbinghi","uk reggae","french reggae","german reggae","italian reggae","spanish reggae","reggae catala","euskal reggae","reggae tuga","nederreggae","swiss reggae","polish reggae","czsk reggae","swedish reggae","finnish reggae","russian reggae","turkish reggae","chinese reggae","japanese reggae","korean reggae","israeli reggae","bulgarian reggae","serbian reggae","australian reggae fusion","nz reggae","jawaiian","hawaiian","hawaiian reggae","california reggae","west coast reggae","east coast reggae","african reggae","reggae maghreb","seggae","sega","sega mauricien","maloya","kaneka","brazilian reggae","reggae do maranhao","reggae gaucho","argentine reggae","reggae cuyano","reggae uruguayo","reggae peruano","reggae boliviano","reggae mexicano","reggae tico","reggae puerto rico","colombian reggae","reggae en espanol","trinidadian reggae","virgin islands reggae","reggae cover","kaseko","baithak gana","skinhead reggae","dancehall reggae","reggae pop","latin reggae","christian reggae","salegy","tsapiky"],
+    "reggaeton": ["reggaeton","neoperreo","perreo","pop reggaeton","reggaeton chileno","reggaeton colombiano","reggaeton flow","reggaeton mexicano","urbano latino","electro latino","cubaton","reparto","salsaton","rkt","turreo","malianteo","bellakeo","previa"],
+    "regional mexican": ["regional mexican","banda","banda sinaloense","banda jalisciense","banda carnavalera","banda guanajuatense","tamborazo","tecnobanda","duranguense","musica duranguense","tierra caliente","corrido","corridos","grupera","mariachi","norteno","deep norteno","norteno-sax","ranchera","tejano","new tejano","tex-mex","chicano","chicago mexican","regional mexicano femenil","guitarra mexicana","marimba mexicana","arpa grande","huapango","pirekua","musica purepecha","musica wixarika","musica indigena mexicana","musica chihuahuense","musica sonorense","musica bajacaliforniana","musica sudcaliforniana","musica sinaloense","musica tamaulipeca","musica neoleonesa","musica coahuilense","musica potosina","musica jalisciense","musica michoacana","musica guerrerense","musica oaxaquena","musica istmena","musica chiapaneca","musica tabasquena","musica campechana","musica yucateca","musica quintanarroense","musica poblana","musica tlaxcalteca","musica morelense","musica mexiquense","musica queretana","musica aguascalentense","musica nayarita","musica colimense","musica mixteca","musica nortena chilena","new mexico music","chilena","tololoche","musica urbana oaxaquena","narcocorridos"],
+    "riot grrrl": ["riot grrrl","women's music"],
+    "rock": ["rock"],
+    "rock and roll": ["rock and roll","mexican rock-and-roll","swedish rock-and-roll","french rock-and-roll","rhythm and boogie","twist","yu-mex"],
+    "rock en espanol": ["rock en espanol","latin alternative","latinx alternative","deep latin alternative","argentine rock","rock nacional","argentine alternative rock","chilean rock","mexican rock","rock nacional mexicano","mexican classic rock","rock urbano mexicano","colombian rock","peruvian rock","venezuelan rock","uruguayan rock","ecuadorian alternative rock","paraguayan rock","bolivian rock","puerto rican rock","panamanian rock","rock dominicano","rock tico","rock chapin","rock catracho","rock nica","spanish rock","spanish modern rock","rock alternativo espanol","spanish invasion","rock catala","euskal rock","galician rock","rock en asturiano","rock canario","rock of gibraltar","rock alternativo","rock barrial","rock radical vasco","rock transgresivo"],
+    "rockabilly": ["rockabilly","neo-rockabilly","traditional rockabilly","psychobilly","deep psychobilly","uk rockabilly","canadian rockabilly","australian rockabilly","german rockabilly","french rockabilly","spanish rockabilly","italian rockabilly","swedish rockabilly","finnish rockabilly","rockabilly en espanol","vintage rockabilly"],
+    "russian pop": ["russian pop","classic russian pop","russian dance","russian hip hop","ukrainian hip hop","kazakh hip hop","russian alt pop","russian viral pop","russian dance pop","russian synthpop","soviet synthpop","russian edm","russian trance","russian rave","russian electronic","russian witch house","russian drain","zxc","russian trap","russian gangster rap","russian underground rap","russian viral rap","russian old school hip hop","russian emo rap","zhenskiy rep","russian chanson","russian romance","russian bard","estrada","soviet estrada","kavkaz","chechen pop","lezginka"],
+    "russian rock": ["russian rock","classic russian rock","new wave of russian rock","russian alternative rock","russian nu metal"],
+    "salsa": ["salsa","boogaloo","pachanga","modern salsa","salsa choke","salsa colombiana","salsa cubana","salsa puertorriquena","salsa urbana","salsa venezolana","salsa peruana","salsa international","salsa dura","salsa romantica","salsa sensual","salsa guajira","salsa brava","salsa erotica","timba","son cubano","son cubano clasico","son montuno","guajira","charanga","orquesta cubana","orquesta tropical","cha-cha-cha","cuban rumba","guaguanco","afro-cuban traditional","fania","salsa boricua","dominican salsa","new york salsa"],
+    "samba": ["samba","samba paulista","samba-enredo","samba-rock","samba moderno","samba de roda","roda de samba","samba gospel","partido alto","samba-canção","samba cancao","samba de breque","marchinha","marchinha de carnaval","batucada","candomble","umbanda","capoeira"],
+    "scandinavian hip hop": ["scandinavian hip hop","swedish hip hop","swedish gangsta rap","swedish trap","swedish trap pop","swedish pop rap","swedish underground rap","norwegian hip hop","norwegian trap","norwegian pop rap","norrlandsk hip hop","nordnorsk rap","danish hip hop","finnish hip hop","suomirap","finnish trap","icelandic hip hop"],
+    "scandinavian pop": ["scandinavian pop","classic swedish pop","danish pop","classic danish pop","dansband","danseband","dansktop","finnish pop","classic finnish pop","finnish dance pop","finnish idol pop","iskelma","classic iskelma","suomipop","norwegian pop","classic norwegian pop","vintage norwegian pop","scandipop","swedish pop","swedish idol pop","swedish synth","swedish soul","icelandic pop","classic icelandic pop","faroese pop","greenlandic pop","epa dunk","russemusikk","russelater","hakkapop","drikkelek","finnish soul"],
+    "schlager": ["schlager","classic schlager","discofox","deep discofox","partyschlager","volksmusik","neue volksmusik","volkspop","vintage schlager","ostschlager","alpine yodeling","yodeling","naturjodel","zillertal","alpenpanorama","oktoberfest","karneval","kolsche karneval","ballermann","apres ski","levenslied","piratenmuziek","carnaval limburg","oeteldonk","smartlap","finnish tango","humppa","kermis","magyar mulatos","raspe","sotalaulut"],
+    "screamo": ["screamo","emoviolence","screamocore","italian screamo","russian screamo","french screamo","spanish screamo","mexican screamo","midwest screamo","bedroom screamo","bedroom skramz","twinkle skramz","twinkle screamo","lofi skramz","mall screamo","chaotic screamo"],
+    "sea shanties": ["sea shanties","pirate","pirate folk","maritime","seemannslieder","szanty","shantykoren"],
+    "sertanejo": ["sertanejo","agronejo","sertanejo pop","sertanejo tradicional","sertanejo universitario","sertanejo gospel","viola caipira","rock caipira","emo caipira","moda de viola","caipira"],
+    "sexy drill": ["sexy drill","sample drill","bronx drill","brooklyn drill","jersey drill"],
+    "shoegaze": ["shoegaze","nu gaze","chillgaze","american shoegaze","canadian shoegaze","australian shoegaze","nordic shoegaze","german shoegaze","french shoegaze","japanese shoegaze","j-shoegaze","sinogaze","asiagaze","thai shoegaze","russian shoegaze","latin shoegaze","shoegaze chileno","italogaze","bleakgaze","voidgaze","heavy shoegaze","heavygaze","mikgaze","j-gaze","tweegaze","emogaze","breakgaze","zoomergaze","newgaze","stonegaze","dronegaze","shitgaze","deathgaze","grindgaze"],
+    "show tunes": ["show tunes","broadway","hollywood","theatre","west end","movie tunes","vintage broadway","vintage hollywood","german show tunes","magyar musicalek","korean musicals","musical advocacy","glee club","dutch musical"],
+    "sierreno urbano": ["sierreno urbano"],
+    "sigilkore": ["sigilkore","hexd","jewelxxet","yabujincore"],
+    "singer-songwriter": ["singer-songwriter","acoustic pop","cantautor","cantautori","canzone d'autore","gen z singer-songwriter","liedermacher","lilith","neo mellow","british singer-songwriter","irish singer-songwriter","scottish singer-songwriter","canadian singer-songwriter","australian singer-songwriter","nz singer-songwriter","nashville singer-songwriter","austin singer-songwriter","swedish singer-songwriter","norwegian singer-songwriter","danish singer-songwriter","icelandic singer-songwriter","laulaja-lauluntekija","dutch singer-songwriter","belgian singer-songwriter","swiss singer-songwriter","cantautor catala","cantautora mexicana","cantautora argentina","czech singer-songwriter","israeli singer-songwriter","vietnamese singer-songwriter","neo-singer-songwriter","indie singer-songwriter","deep indie singer-songwriter","deep acoustic pop","scottish hush","one-person band"],
+    "ska": ["ska","traditional ska","ska punk","two-tone","3rd wave ska","third wave ska","skacore","ska-core","ska core","jamaican ska","ska revival","modern ska punk","ska jazz","latin ska","ska espanol","ska catala","ska mexicano","ska argentino","ska chileno","brazilian ska","german ska","italian ska","japanese ska","australian ska","euroska","crack rock steady","bluebeat","russian ska","ska rock","j-ska","turkish ska","christian ska","patchanka","mestizaje"],
+    "sleep": ["sleep","white noise","pink noise","color noise","rain","water","ocean","environmental","sound","nature sounds","birdsong","whale song","asmr","pet calming","subliminal product"],
+    "slowcore": ["slowcore","sadcore"],
+    "sludge metal": ["sludge metal","sludgecore","atmospheric sludge metal","progressive sludge","black sludge","blackened sludge"],
+    "smooth jazz": ["smooth jazz","smooth saxophone","deep smooth jazz"],
+    "soca": ["soca","calypso","chutney","power soca","groovy soca","bajan soca","vincy soca","grenada soca","bouyon","dennery segment","raboday","steelpan"],
+    "soukous": ["soukous","rumba congolaise","ndombolo","musique urbaine kinshasa","musique urbaine brazzaville","musique traditionnelle congolaise","sebene"],
+    "soul": ["soul","classic soul","motown","deep motown","soul funk","retro soul","souldies","british soul","brazilian soul","traditional soul","smooth soul","instrumental soul","southern soul","deep southern soul","southern soul blues","northern soul","deep northern soul","philly soul","chicago soul","memphis soul","new orleans soul","psychedelic soul","blue-eyed soul","neo soul","latin soul","uk soul","french soul","scandinavian soul","acoustic soul","chicano soul"],
+    "soundtrack": ["soundtrack","classic soundtrack","film music","movie music","original motion picture soundtrack","original score","score","theme music","tv music","tv themes","theme","bgm","british soundtrack","canadian soundtrack","french soundtrack","german soundtrack","italian soundtrack","vintage italian soundtrack","nordic soundtrack","turkish soundtrack","japanese soundtrack","korean soundtrack","chinese soundtrack","chinese bgm","thai ost","thai bl ost","korean bl ost","latin soundtrack","oceania soundtrack","deep soundtrack","library music","italian library music","spytrack","sound team","middle earth","fantasy","hong kong tv drama"],
+    "spanish hip hop": ["spanish hip hop","rap underground espanol","rap canario","rap catala","trap catala","rap galego","rap euskera","urbano espanol","spanish trap"],
+    "speed metal": ["speed metal","black speed metal","new wave of speed metal","melodic speed metal","technical speed metal","blackened speed metal"],
+    "spoken word": ["spoken word","sung poetry","poezja spiewana","dainuojamoji poezija","slam poetry","beat poetry","audiobook","hoerspiel","children's story","barnsagor","bornehistorier","lasten satuja","cocuk masallari","detskie rasskazy","pohadky","rozpravky","hangoskonyvek","cuento infantile","mluvene slovo","lesen","reading","german literature","vintage radio show"],
+    "stoner metal": ["stoner metal","doomgaze"],
+    "stoner rock": ["stoner rock","desert rock","instrumental stoner rock","uk stoner rock","swedish stoner rock","german stoner rock","dutch stoner rock","belgian stoner rock","french stoner rock","spanish stoner rock","italian stoner rock","austrian stoner rock","canadian stoner rock","hard stoner rock"],
+    "stutter house": ["stutter house"],
+    "sufi music": ["sufi music","ghazal","indian instrumental","qawwali","sufi","sufi chant","mevlevi sufi","indian classical","hindustani classical","hindustani vocal","hindustani instrumental","carnatic","carnatic vocal","carnatic instrumental","khayal","dhrupad","sitar","sarod","tabla","bansuri","santoor","sarangi","shehnai","veena","nadaswaram"],
+    "surf rock": ["surf rock","surf music","instrumental surf","australian surf rock","latin surf rock","deep surf music","horror surf"],
+    "swing": ["swing","modern swing","vintage swing","swing italiano","czech swing","greek swing","jive","lindy hop"],
+    "symphonic metal": ["symphonic metal","female fronted metal","gothic symphonic metal","symphonic power metal","trance metal","flamenco metal","cello metal","cello rock"],
+    "synthpop": ["synthpop","neo-synthpop","early synthpop","dark synthpop","swedish synthpop","spanish synthpop","polish synthpop","futurepop","electroclash","deep neo-synthpop","popwave"],
+    "synthwave": ["synthwave","darksynth","spacewave","synthwave brasileiro","dreamwave","cyberpunk","nightrun","spacesynth","space synth","witch house","horror synth"],
+    "tango": ["tango","vintage tango","nuevo tango","tango cancion","orquesta tipica","bandoneon","milonga"],
+    "tech house": ["tech house","minimal tech house","uk tech house","french tech house","dutch tech house","deep tech house","italian tech house","funky tech house","latin tech house","german tech house","brazilian tech house","mexican tech house","deep deep tech house","tribal house","jackin' house"],
+    "techno": ["techno","minimal techno","acid techno","hard acid techno","detroit techno","dub techno","hard techno","industrial techno","dark industrial techno","berlin minimal techno","berlin techno","schranz","peak time techno","dark techno","german techno","german dark minimal techno","dark minimal techno","deep minimal techno","high-tech minimal","rominimal","belgian techno","french techno","italian techno","spanish techno","portuguese techno","swiss techno","austrian techno","polish techno","hungarian techno","romanian techno","greek techno","swedish techno","norwegian techno","finnish techno","scottish techno","irish techno","russian techno","australian techno","south african techno","indian techno","japanese techno","brazilian techno","mexican techno","chilean techno","techno argentina","raw techno","hypnotic techno","modular techno","techno rave","hard industrial techno","hardgroove","groovy techno","deep hardtechno","destroy techno","somatik techno","bleep techno","proto-techno","acidcore","danish techno","israeli techno","hard minimal techno","re:techno","big room techno","warehouse techno","old school techno","fast techno","rave techno","tribal techno","uk techno","underground techno","future techno"],
+    "thai pop": ["thai pop","t-pop","luk thung","classic luk thung","mor lam","molam","phleng phuea chiwit","thai indie","thai rock","thai teen pop","thai viral pop","thai pop rap","thai hip hop","thai trap","thai metal","classic thai pop","t-pop girl group"],
+    "thrash metal": ["thrash metal","crossover thrash","thrash punk","punk metal","metal punk","teutonic thrash metal","trash metal","bay area thrash","teutonic thrash","old school thrash","german thrash metal","swedish thrash metal","polish thrash metal","russian thrash metal","australian thrash metal","mexican thrash metal","colombian thrash metal","technical thrash","technical thrash metal","progressive thrash","progressive thrash metal","melodic thrash","new wave of thrash metal","power thrash","british thrash metal","speed thrash metal","spanish thrash metal","turkish thrash metal","ukrainian thrash metal","brutal thrash metal","modern thrash metal","italian thrash metal","symphonic thrash metal","melodic thrash metal","canadian thrash metal"],
+    "trance": ["trance","progressive trance","uplifting trance","vocal trance","hard trance","old school hard trance","tech trance","euro trance","dream trance","classic trance","melodic trance","german trance","dutch trance","italian trance","trance brasileiro","trance mexicano","progressive uplifting trance","progressive trance house","deep uplifting trance","deep progressive trance","cosmic uplifting trance","acid trance","balearic trance","bubble trance","chill-out trance","focus trance","glitter trance","covertrance","pure trance","dark trance","deep trance","cybertrance","neotrance","emotional trance","minimal trance"],
+    "trap": ["trap","atl trap","cloud rap","dark trap","desi trap","emo trap","emo trap en espanol","plugg","rage rap","sad rap","trap queen","viral rap","southern trap","deep southern trap","melodic trap","tread","electronic trap","edm trap","festival trap","future trap","liquid trap","wave trap","instrumental trap","bass trap","hybrid trap","ambient trap","traprun","trap beats","south african trap","vietnamese trap","trap tuga","trap angolano","ua trap","israeli trap","greek trap","bulgarian trap","romanian trap","magyar trap","slovak trap","lithuanian trap","detroit trap en espanol","swiss trap","irish trap","indian trap","arabic trap","texas trap","florida trap","dungeon rap","futuristic swag","soundcloud rap","mumble rap","trill","hard trap","supertrap","witch trap"],
+    "trap metal": ["trap metal","scream rap","necrotrap","turkce trap metal","russian trap metal","death rap","ragecore"],
+    "trip hop": ["trip hop","bristol electronic"],
+    "tropical house": ["tropical house","sax house","deep tropical house","swedish tropical house"],
+    "trot": ["trot","korean old pop"],
+    "turkish folk": ["turkish folk","karadeniz turkuleri","rumeli turkuleri","bozlak","oyun havasi","baglama","cerkes muzikleri","kurdish pop","kurdish hip hop","kurdish rock","alevi","ulkucu sarkilar"],
+    "turkish hip hop": ["turkish hip hop","new school turkce rap","turkish trap","turkish trap pop","turkce kadin rap","turkish underground rap"],
+    "turkish pop": ["turkish pop","classic turkish pop","arabesk","taverna muzigi","deep turkish pop","turkish alt pop","turkce slow sarkilar","huzunlu sarkilar","karadeniz pop","turkish singer-songwriter","turkish edm","turkish electronic","turkish classical","turkish classical performance","fantezi","damar","ozgun muzik"],
+    "turkish rock": ["turkish rock","anatolian rock","anadolu pop","turkish alternative","turkish alternative rock","turkish psych","turkish metal","turkish hardcore"],
+    "uk drill": ["uk drill"],
+    "uk garage": ["uk garage","2-step","bassline","old school bassline","future garage","garage","speed garage","ukg revival","uk funky","bassline garage","dark garage"],
+    "uk hip hop": ["uk hip hop","london rap","uk alternative hip hop","scouse rap","manchester hip hop","birmingham hip hop","nottingham hip hop","scottish hip hop","welsh hip hop","irish hip hop","road rap"],
+    "vallenato": ["vallenato","vallenato moderno","vallenato romantico"],
+    "vaporwave": ["vaporwave","broken transmission","future funk","mallsoft","slushwave","utopian virtual","vapor trap","dreampunk","hardvapour","eccojams","signalwave","late night lo-fi","barber beats","seapunk","frutiger aero"],
+    "vgm": ["vgm","anime game","anime score","anime ost","anime soundtrack","gamecore","indie game soundtrack","japanese vgm","nintendocore","otacore","rhythm game","scorecore","vgm remix","vgm instrumental","game mood","pixel","speedrun","video game metal","video game rock","video game remixes"],
+    "vietnamese pop": ["vietnamese pop","v-pop","vietnamese hip hop","vinahouse","vietnamese idol pop","vietnamese bolero","vietnamese traditional","nhac vang","tan co","indie viet","rock viet","viet chill rap","vietnamese melodic rap","viet remix","viet edm","vietnamese electronic"],
+    "visual kei": ["visual kei","angura kei","eroguro","oshare kei","nagoya kei","kote kei","tanbi kei","menhera kei","jirai kei"],
+    "vocal jazz": ["vocal jazz","contemporary vocal jazz","deep vocal jazz","japanese vocal jazz"],
+    "west coast hip hop": ["west coast hip hop","g-funk","deep g funk","cali rap","oakland hip hop","bay area hip hop","sacramento hip hop","san diego rap","oc rap","seattle hip hop","portland hip hop","hyphy","jerkin","westcoast flow","west coast trap"],
+    "worship": ["worship","worship pop","pop worship","anthem worship","devotional","roots worship","modern uplift"],
+    "zydeco": ["zydeco","cajun","louisiana blues","swamp pop","second line"]
+  };
+
+  const COUNTRY_MAPPINGS = {
+    "united states": ["usa", "us", "united states", "united states of america", "america", "american", "u.s.a.", "murica"],
+    "canada": ["canada", "canadian", "canadien", "ca", "canuck", "great white north", "quebec", "quebecois"],
+    "mexico": ["mexico", "mexican", "mexicano", "mexicana", "méxico", "mx", "mex", "aztec"],
+    "united kingdom": ["uk", "united kingdom", "britain", "british", "great britain", "england", "english", "scotland", "scottish", "wales", "welsh", "northern ireland", "northern irish", "gb", "gbr", "brit", "albion", "blighty"],
+    "ireland": ["ireland", "irish", "eire", "ie", "hibernia", "emerald isle"],
+    "france": ["france", "french", "français", "francais", "francaise", "francophone", "fr", "hexagon", "gallia"],
+    "germany": ["germany", "german", "deutschland", "deutsch", "deutsche", "deutscher", "de", "brd", "allemagne", "aleman"],
+    "netherlands": ["netherlands", "the netherlands", "dutch", "holland", "flemish", "nl", "nld", "low countries", "nederland", "nederlands", "nederlandstalig"],
+    "belgium": ["belgium", "belgian", "be", "belgique", "belgie", "vlaams"],
+    "luxembourg": ["luxembourg", "luxembourgish", "luxembourgian"],
+    "switzerland": ["switzerland", "swiss", "ch", "suisse", "schweiz", "svizzera", "helvetia"],
+    "austria": ["austria", "austrian", "at", "osterreich", "österreich"],
+    "sweden": ["sweden", "swedish", "sverige", "svensk", "svenska", "svenskt", "se", "swe"],
+    "norway": ["norway", "norwegian", "norge", "norsk", "no", "nor"],
+    "denmark": ["denmark", "danish", "danmark", "dansk", "dk", "dnk"],
+    "finland": ["finland", "finnish", "suomi", "fi", "fin"],
+    "iceland": ["iceland", "icelandic", "island", "islenskt", "is", "ice"],
+    "faroe islands": ["faroe islands", "faroese"],
+    "greenland": ["greenland", "greenlandic"],
+    "spain": ["spain", "spanish", "españa", "espana", "espanol", "español", "castellano", "es", "iberia", "catalan", "catala", "catalunya", "basque", "euskara", "euskal herria", "galicia", "galician", "galiza", "andalusia", "andalucia"],
+    "andorra": ["andorra", "andorran"],
+    "portugal": ["portugal", "portuguese", "portugues", "luso", "pt", "lusitania"],
+    "italy": ["italy", "italian", "italia", "italiano", "italiana", "italiani", "it", "azzurri"],
+    "malta": ["malta", "maltese"],
+    "greece": ["greece", "greek", "ellada", "hellenic", "ellinika", "gr", "hellas"],
+    "cyprus": ["cyprus", "cypriot"],
+    "russia": ["russia", "russian", "rossiya", "russkij", "rus", "ru", "soviet", "ussr", "soviet union", "rusia"],
+    "ukraine": ["ukraine", "ukrainian", "ukranian", "ucrania", "ukraina", "ua", "ukr", "ukrayina"],
+    "belarus": ["belarus", "belarusian", "belarussian", "belorussian", "bialorus"],
+    "moldova": ["moldova", "moldovan", "moldovian", "moldavia"],
+    "poland": ["poland", "polish", "polska", "polski", "polskie", "pl", "pol"],
+    "czech republic": ["czech republic", "czech", "czechia", "cz", "bohemia"],
+    "slovakia": ["slovakia", "slovak", "slovakian"],
+    "hungary": ["hungary", "hungarian", "magyar", "hu", "hun"],
+    "romania": ["romania", "romanian", "ro", "rom"],
+    "bulgaria": ["bulgaria", "bulgarian", "bg"],
+    "serbia": ["serbia", "serbian", "rs", "srbija", "srpsko"],
+    "croatia": ["croatia", "croatian", "hr", "hrvatska", "hrvatsko"],
+    "bosnia": ["bosnia", "herzegovina", "bosnian", "bosnia and herzegovina", "bosnia-herzegovina", "bosansko", "ba", "bih"],
+    "slovenia": ["slovenia", "slovenian", "slovenija"],
+    "north macedonia": ["north macedonia", "macedonia", "macedonian", "makedonija"],
+    "montenegro": ["montenegro", "montenegrin"],
+    "kosovo": ["kosovo", "kosovan", "kosovar"],
+    "albania": ["albania", "albanian", "al", "shqiperia", "shqip"],
+    "estonia": ["estonia", "estonian", "eesti", "ee"],
+    "latvia": ["latvia", "latvian", "lv", "latvija"],
+    "lithuania": ["lithuania", "lithuanian", "lt", "lietuva"],
+    "turkey": ["turkey", "turkish", "türkiye", "turkiye", "turkce", "turk", "türk", "turkisch", "tr", "anatolian", "ottoman"],
+    "armenia": ["armenia", "armenian", "hayastan"],
+    "georgia": ["georgia", "georgian", "sakartvelo"],
+    "azerbaijan": ["azerbaijan", "azerbaijani", "azeri", "azerbaycan"],
+    "kazakhstan": ["kazakhstan", "kazakh", "qazaq"],
+    "uzbekistan": ["uzbekistan", "uzbek"],
+    "kyrgyzstan": ["kyrgyzstan", "kyrgyz"],
+    "turkmenistan": ["turkmenistan", "turkmen"],
+    "tajikistan": ["tajikistan", "tajik"],
+    "mongolia": ["mongolia", "mongolian", "mongol"],
+    "japan": ["japan", "japanese", "nihon", "nippon", "jp", "jpn", "yamato"],
+    "south korea": ["south korea", "korea", "korean", "south korean", "hanguk", "kr", "kor", "rok", "joseon"],
+    "china": ["china", "chinese", "mandarin", "cantonese", "cn", "chn", "prc", "zhongguo", "mainland china", "hk", "hong kong", "taiwan", "taiwanese", "roc"],
+    "india": ["india", "indian", "in", "ind", "hindi", "bharat", "desi", "tamil", "telugu", "bhojpuri", "bengali", "malayalam", "punjabi", "punjab", "kannada", "marathi", "gujarati", "assamese", "odia", "haryanvi", "kashmiri", "konkani"],
+    "pakistan": ["pakistan", "pakistani", "pk", "pak", "urdu"],
+    "bangladesh": ["bangladesh", "bengali", "bangladeshi", "bd", "bangla"],
+    "nepal": ["nepal", "nepali", "nepalese"],
+    "sri lanka": ["sri lanka", "sri lankan", "sinhala", "sinhalese"],
+    "afghanistan": ["afghanistan", "afghan"],
+    "bhutan": ["bhutan", "bhutanese"],
+    "maldives": ["maldives", "maldivian"],
+    "myanmar": ["myanmar", "burma", "burmese"],
+    "philippines": ["philippines", "filipino", "pinoy", "tagalog", "ph", "phi", "pinas"],
+    "indonesia": ["indonesia", "indonesian", "indo", "id", "idn", "nusantara", "javanese"],
+    "vietnam": ["vietnam", "vietnamese", "vn", "vnm", "kinh"],
+    "thailand": ["thailand", "thai", "th", "tha", "siam"],
+    "malaysia": ["malaysia", "malaysian", "my", "mas", "malay"],
+    "singapore": ["singapore", "singaporean", "sg", "sgp", "lion city"],
+    "cambodia": ["cambodia", "cambodian"],
+    "laos": ["laos", "laotian", "lao"],
+    "brunei": ["brunei", "bruneian"],
+    "brazil": ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "br", "bra"],
+    "argentina": ["argentina", "argentinian", "argentine", "argentino", "ar", "arg", "gaucho"],
+    "colombia": ["colombia", "colombian", "colombiano", "colombiana", "co", "col", "cafetero"],
+    "chile": ["chile", "chilean", "chileno", "cl", "chl"],
+    "peru": ["peru", "peruvian", "peruano", "pe", "per", "inca"],
+    "venezuela": ["venezuela", "venezuelan", "venezolano", "venezolana", "ve", "ven"],
+    "uruguay": ["uruguay", "uruguayan", "uruguayo", "uy", "ury", "charrúa"],
+    "ecuador": ["ecuador", "ecuadorian", "ecuatoriano", "ecuatoriana"],
+    "bolivia": ["bolivia", "bolivian", "boliviano"],
+    "paraguay": ["paraguay", "paraguayan", "paraguayo"],
+    "costa rica": ["costa rica", "costa rican", "costarricense", "tico"],
+    "panama": ["panama", "panamanian", "panameno"],
+    "guatemala": ["guatemala", "guatemalan", "chapin"],
+    "honduras": ["honduras", "honduran", "catracho"],
+    "el salvador": ["el salvador", "salvadoran", "salvadoreno"],
+    "nicaragua": ["nicaragua", "nicaraguan", "nicaraguense"],
+    "puerto rico": ["puerto rico", "puerto rican", "boricua", "pr", "pri", "borinquen"],
+    "cuba": ["cuba", "cuban", "cubano", "cu", "cub"],
+    "dominican republic": ["dominican republic", "dominican", "dominicano", "republica dominicana", "dr", "do", "dom", "quisqueya", "quisqueyano"],
+    "haiti": ["haiti", "haitian", "haitiano"],
+    "jamaica": ["jamaica", "jamaican", "jm", "jam", "yardie", "yard"],
+    "trinidad and tobago": ["trinidad and tobago", "trinidad", "tobago", "trinidadian", "trini"],
+    "barbados": ["barbados", "barbadian", "bajan"],
+    "bahamas": ["bahamas", "bahamian"],
+    "guyana": ["guyana", "guyanese"],
+    "suriname": ["suriname", "surinamese"],
+    "australia": ["australia", "australian", "aussie", "au", "aus", "oz", "straya", "down under"],
+    "new zealand": ["new zealand", "nz", "kiwi", "aotearoa", "zealand", "new zealander"],
+    "israel": ["israel", "israeli", "hebrew", "il", "isr", "zion"],
+    "palestine": ["palestine", "palestinian"],
+    "lebanon": ["lebanon", "lebanese"],
+    "syria": ["syria", "syrian"],
+    "jordan": ["jordan", "jordanian"],
+    "iraq": ["iraq", "iraqi"],
+    "saudi arabia": ["saudi arabia", "saudi", "saudi arabian"],
+    "united arab emirates": ["united arab emirates", "uae", "emirati"],
+    "kuwait": ["kuwait", "kuwaiti"],
+    "qatar": ["qatar", "qatari"],
+    "bahrain": ["bahrain", "bahraini"],
+    "oman": ["oman", "omani"],
+    "yemen": ["yemen", "yemeni"],
+    "kurdistan": ["kurdistan", "kurdish", "kurd", "kurdi", "kurtce"],
+    "egypt": ["egypt", "egyptian", "eg", "egy", "misr"],
+    "iran": ["iran", "iranian", "persian", "farsi", "ir", "irn", "iranis", "irani"],
+    "morocco": ["morocco", "moroccan", "ma", "mar", "maroc"],
+    "algeria": ["algeria", "algerian", "dz", "dza", "algerie"],
+    "tunisia": ["tunisia", "tunisian"],
+    "libya": ["libya", "libyan"],
+    "sudan": ["sudan", "sudanese"],
+    "nigeria": ["nigeria", "nigerian", "ng", "nga", "naija", "9ja"],
+    "south africa": ["south africa", "south african", "za", "zaf", "rsa", "mzansi"],
+    "ghana": ["ghana", "ghanaian", "gh", "gha", "gold coast"],
+    "kenya": ["kenya", "kenyan", "ke", "ken", "254", "swahili"],
+    "senegal": ["senegal", "senegalese", "sn", "sen", "wolof"],
+    "ethiopia": ["ethiopia", "ethiopian"],
+    "eritrea": ["eritrea", "eritrean"],
+    "somalia": ["somalia", "somali", "somalian"],
+    "tanzania": ["tanzania", "tanzanian"],
+    "uganda": ["uganda", "ugandan"],
+    "rwanda": ["rwanda", "rwandan"],
+    "burundi": ["burundi", "burundian"],
+    "zimbabwe": ["zimbabwe", "zimbabwean"],
+    "zambia": ["zambia", "zambian"],
+    "malawi": ["malawi", "malawian"],
+    "mozambique": ["mozambique", "mozambican"],
+    "angola": ["angola", "angolan", "angolano"],
+    "namibia": ["namibia", "namibian"],
+    "botswana": ["botswana", "batswana"],
+    "madagascar": ["madagascar", "malagasy"],
+    "mauritius": ["mauritius", "mauritian"],
+    "congo": ["congo", "dr congo", "congolese", "drc"],
+    "cameroon": ["cameroon", "cameroonian", "cameroun"],
+    "ivory coast": ["ivory coast", "cote d'ivoire", "cote divoire", "ivorian", "ivoirien"],
+    "mali": ["mali", "malian"],
+    "guinea": ["guinea", "guinean"],
+    "benin": ["benin", "beninese"],
+    "togo": ["togo", "togolese"],
+    "burkina faso": ["burkina faso", "burkinabe"],
+    "cape verde": ["cape verde", "cabo verde", "cape verdean"]
+  };
+
+  const mainGenres = Object.keys(GENRE_MAPPINGS);
+
   const VARIANT_TO_MAIN_GENRE_MAP = {};
   const VARIANT_TO_MAIN_COUNTRY_MAP = {};
+  function getNormalizedGenreKey(genre) {
+    return genre
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[\s-]+/g, '');
+  }
+
+  Object.entries(GENRE_MAPPINGS).forEach(([mainGenre, variants]) => {
+    const canonicalMainGenre = mainGenre;
+    variants.forEach(variant => {
+      const normalizedKey = getNormalizedGenreKey(variant);
+      if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey]) {
+        VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] = [];
+      }
+      if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].includes(canonicalMainGenre)) {
+          VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].push(canonicalMainGenre);
+      }
+    });
+    const normalizedMainKey = getNormalizedGenreKey(mainGenre);
+    if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedMainKey]) {
+        VARIANT_TO_MAIN_GENRE_MAP[normalizedMainKey] = [canonicalMainGenre];
+    }
+  });
+
+  if (typeof GENRE_ALIASES_RAW !== "undefined") {
+    for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+      const canonicalKey = getNormalizedGenreKey(canonical);
+      const targetMains = VARIANT_TO_MAIN_GENRE_MAP[canonicalKey] || (GENRE_MAPPINGS[canonical] ? [canonical] : null);
+      if (targetMains && targetMains.length > 0) {
+        aliases.forEach(alias => {
+          const aliasKey = getNormalizedGenreKey(alias);
+          if (!VARIANT_TO_MAIN_GENRE_MAP[aliasKey]) {
+            VARIANT_TO_MAIN_GENRE_MAP[aliasKey] = [];
+          }
+          targetMains.forEach(mainGenre => {
+            if (!VARIANT_TO_MAIN_GENRE_MAP[aliasKey].includes(mainGenre)) {
+              VARIANT_TO_MAIN_GENRE_MAP[aliasKey].push(mainGenre);
+            }
+          });
+        });
+      }
+    }
+  }
+  
+  Object.entries(COUNTRY_MAPPINGS).forEach(([mainCountry, variants]) => {
+    variants.forEach(variant => {
+      const normalizedKey = getNormalizedGenreKey(variant);
+      if (!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey]) {
+        VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey] = mainCountry;
+      }
+    });
+    const normalizedMainKey = getNormalizedGenreKey(mainCountry);
+    if (!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedMainKey]) {
+        VARIANT_TO_MAIN_COUNTRY_MAP[normalizedMainKey] = mainCountry;
+    }
+  });
+
+  const BLACKLIST_UMBRELLA_MAP = {
+    "afrobeats": ["afropop","amapiano","afro house","afro r&b","afro-funk","afrobeat","alte","bongo flava","gengetone","highlife","juju","fuji","coupe-decale","makossa","gqom","kwaito","singeli","kizomba","semba","soukous","ndombolo","asakaa","hiplife","zouglou"],
+    "alternative": ["alternative rock","indie rock","alternative pop","alternative r&b","alternative hip hop","alternative metal","alternative country","grunge","post-grunge","britpop","shoegaze","dream pop","emo","post-punk","new wave","indie pop"],
+    "alternative rock": ["indie rock","grunge","post-grunge","britpop","shoegaze","dream pop","math rock","post-rock","midwest emo","noise rock","jangle pop","chamber pop","lo-fi rock","college rock","slacker rock","madchester","baggy"],
+    "amapiano": ["private school amapiano","bacardi","barcadi","deep amapiano","underground amapiano","gospel amapiano","sgija"],
+    "ambient": ["dark ambient","space ambient","ambient techno","drone","chillout","lowercase","new age","illbient","warm drone","sleep","psybient"],
+    "black metal": ["atmospheric black metal","depressive suicidal black metal","symphonic black metal","blackgaze","pagan black metal","viking metal","war metal","melodic black metal","norwegian black metal","raw black metal","post-black metal","black 'n' roll","black thrash","nsbm","dungeon synth"],
+    "blues": ["delta blues","chicago blues","texas blues","electric blues","acoustic blues","country blues","blues rock","soul blues","jump blues","boogie-woogie","piedmont blues","swamp blues","hill country blues","harmonica blues","classic blues","memphis blues","new orleans blues","piano blues"],
+    "bossa nova": ["samba-jazz","mpb"],
+    "brazilian funk": ["funk carioca","baile funk","brazilian funk","funk brasileiro","brega funk","funk 150 bpm","funk mandelao","funk mtg","mtg funk","funk ostentacao","funk paulista","funk viral","mega funk","rave funk","funk rj","funk bh","funk consciente","funk das antigas","funk melody","funk evangelico","funk capixaba","trap funk","cumbia funk","chill baile","deep funk ostentacao","funk bruxaria","funk automotivo","eletrofunk","arrocha funk","deboxe"],
+    "c-pop": ["chinese pop","mandopop","cantopop","chinese indie","hokkien pop","taiwan pop","hk-pop","singaporean mandopop","chinese hip hop","chinese rock","zhongguo feng"],
+    "christian": ["christian pop","christian rock","christian metal","christian hip hop","worship","gospel","global christian"],
+    "classic rock": ["hard rock","album rock","blues rock","psychedelic rock","glam rock","southern rock","arena rock","yacht rock","soft rock","rock and roll","rockabilly","surf rock","prog rock","art rock","heartland rock","british invasion","merseybeat","jam band"],
+    "classical": ["orchestra","orchestral","early music","medieval","renaissance","baroque","classical period","romantic classical","modern classical","contemporary classical","neoclassical","minimalism","post-minimalism","avant-garde classical","opera","choral","symphony","chamber music","string quartet","piano"],
+    "cloud rap": ["plugg","pluggnb","rage rap","vapor rap","sad rap","emoplugg","dark plugg","dream plugg"],
+    "country": ["classic country","outlaw country","bakersfield sound","nashville sound","country rock","alt-country","americana","bluegrass","progressive bluegrass","traditional country","contemporary country","country pop","bro-country","red dirt","texas country","oklahoma country","western swing","honky-tonk","rockabilly","cowboy western","canadian country","australian country"],
+    "cumbia": ["cumbia sonidera","cumbia villera","cumbia pop","cumbia colombiana","chicha","cumbia santafesina","electro cumbia","cumbia 420","tecnocumbia","porro","champeta"],
+    "dance": ["dance pop","pop dance","edm","house","eurodance","disco","nu disco","italo dance","club","tech house","deep house","electro house","tropical house","slap house","uk garage","afro house","amapiano","bass house","progressive house"],
+    "dancehall": ["ragga","dancehall queen","soca","bouyon","shatta","trinibad","zimdancehall"],
+    "death metal": ["melodic death metal","technical death metal","brutal death metal","slam death metal","swedish death metal","florida death metal","deathcore","death-doom","blackened death metal","goregrind","progressive death metal","symphonic death metal","death 'n' roll","deathrash"],
+    "deathcore": ["blackened deathcore","slam deathcore","slamming deathcore","technical deathcore","beatdown","symphonic deathcore","progressive deathcore","melodic deathcore","brutal deathcore","downtempo deathcore"],
+    "deep house": ["lo-fi house","soulful house","deep groove house","deep tropical house","south african deep house","float house","deep soul house","outsider house","chill house","melodic house","organic house","jazz house"],
+    "disco": ["nu disco","italo disco","euro disco","post-disco","space disco","cosmic disco","hi-nrg","boogie","mutant disco","dark disco"],
+    "doom metal": ["stoner metal","sludge metal","funeral doom","drone metal","epic doom","death-doom","traditional doom metal","atmospheric doom","progressive doom","gothic doom"],
+    "drill": ["uk drill","chicago drill","brooklyn drill","bronx drill","sample drill","sexy drill","new york drill","drill francais","drill brasileiro","drill italiana","australian drill","canadian drill","irish drill","dutch drill","swedish drill","german drill","spanish drill","polish drill","russian drill","greek drill","turkce drill","ghanaian drill","afro drill"],
+    "drum and bass": ["jungle","liquid funk","neurofunk","jump up","ragga jungle","darkstep","sambass","breakcore","drumfunk","atmospheric dnb","halftime","halftime dnb","techstep","dancefloor dnb","minimal dnb","deep dnb"],
+    "dubstep": ["brostep","riddim","riddim dubstep","melodic dubstep","deathstep","tearout","chillstep","post-dubstep","color bass","briddim","deep dubstep","filthstep","drumstep"],
+    "edm": ["electro house","progressive house","future house","bass house","slap house","tropical house","tech house","deep house","house","trance","psytrance","dubstep","future bass","hardstyle","drum and bass","eurodance","big room","melbourne bounce","electronic"],
+    "electro house": ["progressive electro house","dutch house","fidget house","bouncy house","speed house","complextro","big room","melbourne bounce","future bounce","future house","slap house"],
+    "electronic": ["edm","house","techno","trance","psytrance","dubstep","drum and bass","jungle","uk garage","bass music","bass house","deep house","tech house","progressive house","electro house","tropical house","afro house","breakbeat","breakcore","hardstyle","happy hardcore","hardcore techno","gabber","ambient","dark ambient","idm","downtempo","trip hop","synthwave","vaporwave","chillwave","electro","electropop","synthpop","future bass","chiptune","glitch","eurodance","eurobeat","ebm","industrial","deconstructed club","club","hyperpop","disco","nu disco","krushclub","nightcore","moombahton","electro swing","french house"],
+    "emo": ["screamo","midwest emo","emo pop","emoviolence","post-hardcore","emo rap","5th wave emo","diy emo","orgcore"],
+    "eurodance": ["euro-techno","bubblegum dance","hands up","italo dance","vocal trance","jumpstyle","hi-nrg","eurobeat"],
+    "experimental": ["noise","harsh noise","drone","sound art","musique concrete","field recording","lowercase","dark ambient","glitch","deconstructed club","avant-garde","plunderphonics","free improvisation","microtonal","hauntology"],
+    "folk": ["contemporary folk","traditional folk","indie folk","folk rock","freak folk","anti-folk","neofolk","celtic","celtic folk","irish folk","scottish folk","american folk revival","singer-songwriter","appalachian folk","sea shanties","bluegrass","folk punk","americana","klezmer","fado","balkan","turkish folk","persian traditional","polka","flamenco","zydeco"],
+    "funk": ["p-funk","g-funk","funk rock","jazz funk","boogie","synth funk","deep funk","new orleans funk","brit funk","latin funk","afro-funk","afrobeat","modern funk","traditional funk","minneapolis sound","go-go","rare groove"],
+    "funk carioca": ["baile funk","brazilian funk","funk brasileiro","brega funk","funk 150 bpm","funk mandelao","funk mtg","mtg funk","funk ostentacao","funk paulista","funk viral","mega funk","rave funk","funk rj","funk bh","funk consciente","funk das antigas","funk melody","funk evangelico","funk capixaba","trap funk","cumbia funk","chill baile","deep funk ostentacao","funk bruxaria","funk automotivo","eletrofunk","arrocha funk","deboxe"],
+    "garage rock": ["garage punk","proto-punk","freakbeat","garage rock revival","pub rock","mod revival","rautalanka"],
+    "gospel": ["christian pop","worship","global christian","christian hip hop"],
+    "grindcore": ["goregrind","pornogrind","electrogrind","deathgrind","cybergrind","mathgrind","mincecore","noisecore","gorenoise","powerviolence"],
+    "hard rock": ["glam metal","arena rock","sleaze rock","pub rock","shock rock","nwocr","melodic hard rock"],
+    "hardcore punk": ["crust punk","d-beat","melodic hardcore","youth crew","beatdown hardcore","powerviolence","metallic hardcore","street punk","oi","skate punk","thrashcore","fastcore","chain punk","egg punk"],
+    "hardstyle": ["rawstyle","xtra raw","euphoric hardstyle","frenchcore","gabber","nu gabber","happy hardcore","hardcore techno","speedcore","extratone","terrorcore","makina","jumpstyle","uptempo hardcore","mainstream hardcore","industrial hardcore","hardtek","lento violento","hardbass"],
+    "heavy metal": ["nwobhm","nwothm","traditional metal","speed metal","us power metal","glam metal","power metal","doom metal","thrash metal"],
+    "hip hop": ["rap","trap","drill","uk drill","sexy drill","boom bap","gangster rap","conscious hip hop","cloud rap","phonk","drift phonk","crunk","grime","pop rap","hardcore hip hop","jazz rap","old school hip hop","alternative hip hop","east coast hip hop","west coast hip hop","southern hip hop","memphis rap","uk hip hop","canadian hip hop","australian hip hop","french hip hop","german hip hop","dutch hip hop","spanish hip hop","italian hip hop","polish hip hop","russian hip hop","scandinavian hip hop","turkish hip hop","arabic hip hop","persian hip hop","desi hip hop","punjabi hip hop","latin hip hop","latin trap","brazilian hip hop","moroccan rap","j-rap","k-rap","c-rap","pinoy hip hop","vietnamese hip hop","thai hip hop","indonesian hip hop","christian hip hop","horrorcore","chopped and screwed","turntablism","plugg","pluggnb","rage rap","jerk rap","new jazz","sigilkore","trap metal","rap rock","emo rap","lofi","lo-fi hip hop","nerdcore","miami bass","hyphy","g-funk"],
+    "house": ["deep house","tech house","electro house","progressive house","bass house","afro house","tropical house","future house","slap house","acid house","disco house","chicago house","microhouse","lo-fi house","hard house","witch house","g-house","tribal house","funky house","garage house","french house","italo house","soulful house","fidget house","speed house","jackin house","piano house","vocal house","organic house","chill house","melodic house","big room","melbourne bounce","amapiano","gqom","kwaito","stutter house","3-step","deep amapiano","hip house","diva house"],
+    "hyperpop": ["glitchcore","digicore","bubblegum bass","deconstructed club","pc music","dariacore","krushclub","scenecore","sigilkore","glitchbreak"],
+    "idm": ["glitch","breakcore","glitch hop","microhouse","electronica","deconstructed club","braindance","algorave","skweee","folktronica"],
+    "indie": ["indie rock","indie pop","indie folk","indie r&b","indietronica","bedroom pop","dream pop","shoegaze","lo-fi indie","jangle pop","twee pop","chamber pop","math rock","midwest emo","post-punk revival","slowcore","freak folk","slacker rock","j-indie","k-indie","australian indie","indonesian indie","thai indie","icelandic indie","canadian indie","uk alternative pop","itpop"],
+    "indie pop": ["dream pop","twee pop","chamber pop","bedroom pop","jangle pop","lo-fi pop","sophisti-pop","shimmer pop","indie surf","c86"],
+    "indie rock": ["indie pop","bedroom pop","jangle pop","lo-fi indie","post-punk revival","garage rock revival","slowcore","sadcore","slacker rock","math rock","noise pop","shoegaze","crank wave","windmill scene"],
+    "industrial": ["ebm","aggrotech","electro-industrial","dark electro","industrial metal","industrial rock","martial industrial","power noise","neue deutsche harte","industrial techno","industrial hardcore","industrial hip hop","ambient industrial"],
+    "j-pop": ["japanese pop","city pop","shibuya-kei","anime","anison","j-indie","enka","kayokyoku","vocaloid","utaite","vtuber","denpa-kei","idol kayo","j-r&b"],
+    "jazz": ["bebop","hard bop","cool jazz","modal jazz","free jazz","avant-garde jazz","jazz fusion","latin jazz","afro-cuban jazz","bossa nova","smooth jazz","vocal jazz","gypsy jazz","swing","big band","dixieland","new orleans jazz","nu jazz","acid jazz","contemporary jazz","jazz rap","jazz funk","ethio-jazz","trad jazz","spiritual jazz","ecm-style jazz","dark jazz","stride","ragtime","jazz pop","jazz piano","modern jazz piano","jazz trio","modern jazz trio","jazz quartet","jazz saxophone","jazz trumpet","jazz trombone","jazz clarinet","jazz flute","jazz violin","jazz guitar","jazz guitar trio","jazz double bass","jazz organ","hammond organ","jazz vibraphone","jazz harp","jazz accordion","jazz drums","jazz brass","modern big band","modern free jazz","deep free jazz","dinner jazz","jazz cover","indie jazz","experimental jazz","british jazz","uk contemporary jazz","scottish jazz","irish modern jazz","french jazz","german jazz","austrian jazz","swiss jazz","italian jazz","italian contemporary jazz","spanish jazz","portuguese jazz","dutch jazz","belgian jazz","belgian modern jazz","norwegian jazz","norwegian contemporary jazz","swedish jazz","danish jazz","danish modern jazz","finnish jazz","finnish modern jazz","icelandic jazz","polish jazz","polish modern jazz","polish free jazz","czech jazz","russian jazz","russian modern jazz","greek jazz","turkish jazz","turkish modern jazz","israeli jazz","indian jazz","japanese jazz","classic japanese jazz","korean jazz","chinese jazz","australian jazz","nz jazz","canadian modern jazz","south african jazz","south african modern jazz","brazilian jazz","brazilian modern jazz","argentine jazz","jazz mexicano","jazz chileno","jazz colombiano","jazzworship","jazz worship"],
+    "k-pop": ["korean pop","korean r&b","k-ballad","k-indie","trot","k-rap","k-rock","korean ost"],
+    "latin": ["urbano latino","reggaeton","latin trap","trap latino","bachata","salsa","cumbia","tango","merengue","bolero","vallenato","dembow","latin pop","rock en espanol","latin rock","latin hip hop","latin jazz","regional mexican","musica mexicana","corridos","corridos tumbados","corridos belicos","norteno","banda","ranchera","mariachi","sierreno","sierreno urbano","tejano","samba","pagode","bossa nova","forro","piseiro","sertanejo","mpb","axé","funk carioca","baile funk","latin alternative","trova","nueva trova","huayno","joropo","champeta"],
+    "latin pop": ["pop en espanol","tropipop","latin ballad","balada","latin arena pop","latin viral pop","cancion melodica","romantico"],
+    "lo-fi": ["lofi","lo-fi beats","lo-fi hip hop","chillhop","lo-fi house","lo-fi indie","lo-fi emo","ambient lo-fi","christian lo-fi","late night lo-fi","indonesian lo-fi pop","brazilian lo-fi rock","lo-fi dnb"],
+    "metal": ["heavy metal","death metal","black metal","thrash metal","power metal","doom metal","speed metal","groove metal","sludge metal","metalcore","deathcore","grindcore","mathcore","djent","nu metal","alternative metal","industrial metal","symphonic metal","gothic metal","folk metal","viking metal","post-metal","progressive metal","drone metal","stoner metal","glam metal","kawaii metal","neoclassical metal","pagan metal","blackgaze","slam death metal","melodic death metal","technical death metal","goregrind","pornogrind","thall","crust punk","trap metal","rap metal","j-metal","brazilian metal","christian metal","balkan folk metal"],
+    "metalcore": ["melodic metalcore","mathcore","deathcore","progressive metalcore","electronicore","post-metalcore","easycore","nu-metalcore","trancecore","metallic hardcore"],
+    "musica mexicana": ["regional mexican","corridos","corridos tumbados","corridos belicos","norteno","banda","sierreno","sierreno urbano","sad sierreno","ranchera","mariachi","tejano","tex-mex","grupera","duranguense","tierra caliente","huapango","son jarocho","son huasteco","bolero mexicano"],
+    "nu metal": ["rap metal","alternative metal","post-grunge","rap rock","nu-metalcore"],
+    "phonk": ["drift phonk","phonk brasileiro","wave phonk","raw phonk","montagem phonk","funk phonk","house phonk","gym phonk","memphis phonk","ukrainian phonk","russian phonk"],
+    "pop": ["dance pop","pop dance","electropop","synthpop","synth pop","teen pop","post-teen pop","bubblegum pop","adult contemporary","indie pop","art pop","dream pop","k-pop","j-pop","c-pop","mandopop","cantopop","opm","p-pop","v-pop","vietnamese pop","t-pop","thai pop","indonesian pop","bollywood pop","punjabi pop","latin pop","pop nacional","french pop","german pop","italian pop","itpop","dutch pop","scandinavian pop","swedish pop","russian pop","turkish pop","arabic pop","persian pop","city pop","bedroom pop","hyperpop","europop","eurodance","power pop","baroque pop","chamber pop","sunshine pop","sophisti-pop","schlager","disco polo","christian pop","pop rock","pop rap","pop punk","pop r&b"],
+    "pop punk": ["easycore","neon pop punk","skate punk","midwest emo","emo pop","power-pop punk","ramonescore"],
+    "post-hardcore": ["screamo","easycore","swancore","mathcore","melodic hardcore","emo","emoviolence","sasscore"],
+    "post-punk": ["gothic rock","dark wave","coldwave","deathrock","no wave","post-punk revival","sovietwave","minimal wave","grave wave","crank wave","dance-punk"],
+    "post-rock": ["math rock","instrumental rock","cinematic post-rock","ambient post-rock","post-metal","shoegaze"],
+    "power metal": ["symphonic power metal","neoclassical metal","euro-power metal","us power metal","progressive power metal","speed metal","heavy metal"],
+    "progressive house": ["classic progressive house","dark progressive house","deep progressive house","japanese progressive house","melodic house","melodic techno","minimal melodic techno"],
+    "progressive metal": ["djent","thall","progressive metalcore","math metal","technical metal","progressive death metal","progressive black metal","progressive power metal","progressive groove metal","progressive sludge","progressive doom"],
+    "progressive rock": ["prog rock","krautrock","canterbury scene","symphonic prog","symphonic rock","neo-prog","neo-progressive","space rock","art rock","avant-prog","zeuhl","rock progressivo italiano","math rock","post-rock"],
+    "psychedelic": ["psychedelic rock","psychedelic pop","psychedelic folk","psychedelic soul","psychedelic trance","psytrance","psych rock","neo-psychedelia","acid rock","space rock","desert rock","heavy psych","psybient","dream pop","shoegaze"],
+    "psychedelic rock": ["psych rock","acid rock","space rock","neo-psychedelia","krautrock","desert rock","stoner rock","psychedelic pop","psychedelic folk","heavy psych","palm desert scene","zamrock","freakbeat"],
+    "psytrance": ["goa trance","progressive psytrance","dark psytrance","full-on","forest psy","hi-tech","goa","twilight psy","zenonesque","suomisaundi","nitzhonot","psybient","psydub","psybass"],
+    "punk": ["hardcore punk","post-punk","pop punk","skate punk","crust punk","d-beat","street punk","oi","riot grrrl","anarcho-punk","melodic hardcore","emo","screamo","post-hardcore","gothic rock","deathrock","no wave","skacore","ska punk","queercore","garage punk","horror punk","folk punk","celtic punk","gypsy punk","cowpunk","surf punk","synth punk","art punk","noise punk","egg punk","chain punk","proto-punk","psychobilly"],
+    "r&b": ["contemporary r&b","quiet storm","new jack swing","neo soul","alternative r&b","indie r&b","bedroom r&b","chill r&b","dark r&b","pop r&b","urban contemporary","trap soul","afro r&b","korean r&b","j-r&b","uk r&b","french r&b","soul","funk","motown","doo-wop"],
+    "rap": ["hip hop","trap","drill","uk drill","sexy drill","boom bap","gangster rap","conscious hip hop","cloud rap","phonk","drift phonk","crunk","grime","pop rap","hardcore hip hop","jazz rap","old school hip hop","alternative hip hop","east coast hip hop","west coast hip hop","southern hip hop","memphis rap","uk hip hop","canadian hip hop","australian hip hop","french hip hop","german hip hop","dutch hip hop","spanish hip hop","italian hip hop","polish hip hop","russian hip hop","scandinavian hip hop","turkish hip hop","arabic hip hop","persian hip hop","desi hip hop","punjabi hip hop","latin hip hop","latin trap","brazilian hip hop","moroccan rap","j-rap","k-rap","pinoy hip hop","vietnamese hip hop","thai hip hop","indonesian hip hop","christian hip hop","plugg","pluggnb","rage rap","jerk rap","new jazz","sigilkore","trap metal","rap rock","emo rap","horrorcore","nerdcore","chopped and screwed","turntablism","miami bass","hyphy","g-funk"],
+    "reggae": ["roots reggae","dub","dancehall","lovers rock","ragga","rocksteady","ska","ska punk","reggae rock","reggae fusion","calypso","soca","mento","nyahbinghi","seggae","sega","maloya","kaneka","zimdancehall","dub poetry"],
+    "reggaeton": ["dembow","perreo","neoperreo","latin trap","urbano latino","cubaton","reparto","salsaton","cumbiaton","cumbia 420","rkt","turreo","malianteo","bellakeo","moombahton"],
+    "regional mexican": ["corridos","corridos tumbados","corridos belicos","norteno","banda","sierreno","sierreno urbano","sad sierreno","ranchera","mariachi","tejano","tex-mex","grupera","duranguense","tierra caliente","huapango","son jarocho","son huasteco"],
+    "rock": ["classic rock","hard rock","alternative rock","indie rock","punk","punk rock","pop punk","post-punk","post-hardcore","emo","screamo","psychedelic rock","progressive rock","garage rock","grunge","post-grunge","glam rock","southern rock","heartland rock","yacht rock","soft rock","aor","folk rock","country rock","americana","blues rock","pop rock","power pop","art rock","post-rock","math rock","noise rock","shoegaze","slowcore","space rock","stoner rock","desert rock","krautrock","rock and roll","rockabilly","psychobilly","surf rock","funk rock","rap rock","gothic rock","dark wave","industrial rock","christian rock","rock en espanol","argentine rock","chilean rock","mexican rock","brazilian rock","german rock","russian rock","turkish rock","anatolian rock","persian rock","pinoy rock","j-rock","visual kei","k-rock","australian rock"],
+    "salsa": ["salsa dura","salsa romantica","salsa brava","timba","boogaloo","mambo","son cubano","son montuno","guaguanco","cuban rumba","cha-cha-cha","danzon","charanga","descarga","latin jazz"],
+    "samba": ["pagode","samba de roda","samba-enredo","partido alto","bossa nova","pagodao","pagode baiano","samba-rock","samba-jazz","samba-cancao","choro","chorinho","marchinha","batucada"],
+    "shoegaze": ["dream pop","nu gaze","slowcore","ambient pop","space rock","blackgaze","doomgaze","grungegaze","dreamgaze","psych gaze"],
+    "ska": ["two-tone","third wave ska","3rd wave ska","ska punk","skacore","traditional ska","rocksteady","ska jazz","bluebeat","crack rock steady"],
+    "soul": ["motown","southern soul","northern soul","memphis soul","chicago soul","blue-eyed soul","psychedelic soul","deep soul","philly soul","new orleans soul","neo soul","retro soul","souldies","british soul","brazilian soul","soul jazz","soul blues","gospel","doo-wop","r&b"],
+    "soundtrack": ["score","film score","epic","epiccore","trailer music","vgm","video game music","anime score","anime ost","orchestral soundtrack","ambient score","chiptune","show tunes","library music","tv themes"],
+    "synthpop": ["electropop","futurepop","new wave","synthwave","electroclash","indie pop","minimal synth","minimal wave","dark wave","italo disco"],
+    "synthwave": ["retrowave","darksynth","outrun","vaporwave","future funk","chillwave","synthpop","cyberpunk","spacesynth","chillsynth","spacewave","dreamwave"],
+    "tech house": ["minimal tech house","uk tech house","french tech house","deep tech house","italian tech house","funky tech house","latin tech house","german tech house","brazilian tech house","mexican tech house","bass house","g-house","jackin house","tribal house"],
+    "techno": ["minimal techno","acid techno","hard techno","industrial techno","detroit techno","dub techno","dark techno","berlin minimal techno","schranz","peak time techno","deep techno","ambient techno","melodic techno","minimal melodic techno","rominimal","hardgroove","raw techno","hypnotic techno","modular techno","bleep techno","acidcore","hardtek"],
+    "thrash metal": ["crossover thrash","groove metal","bay area thrash","teutonic thrash","speed metal","black thrash","deathrash","technical thrash","progressive thrash"],
+    "trance": ["psytrance","goa trance","progressive trance","uplifting trance","vocal trance","hard trance","tech trance","euro trance","eurotrance","dream trance","melodic trance","acid trance","balearic trance","bubble trance","hypertrance"],
+    "trap": ["latin trap","trap latino","trap argentino","dark trap","trap brasileiro","trap soul","emo trap","emo rap","plugg","pluggnb","dark plugg","dream plugg","emoplugg","tread","phonk","drift phonk","drill","uk drill","sexy drill","jerk rap","new jazz","sigilkore","krushclub","rage rap","cloud rap","trap metal","detroit trap","atl trap","southern trap","hybrid trap","electronic trap","wave","hardwave","vaportrap"],
+    "uk garage": ["2-step","speed garage","bassline","future garage","grime","uk funky","sublow","breakstep","dubstep"],
+    "worship": ["christian pop","christian rock","gospel","global christian"]
+  };
+  
+  let isCountryOnly_Set = null;
+  function isCountryOnly(tag) {
+      if (!tag) return false;
+      const lowerTag = tag.toLowerCase().trim();
+
+      if (!isCountryOnly_Set) {
+          isCountryOnly_Set = new Set();
+          Object.keys(COUNTRY_MAPPINGS).forEach(c => isCountryOnly_Set.add(c.toLowerCase().trim()));
+          Object.values(COUNTRY_MAPPINGS).forEach(variants => {
+              variants.forEach(v => isCountryOnly_Set.add(v.toLowerCase().trim()));
+          });
+      }
+      
+      return isCountryOnly_Set.has(lowerTag);
+  }
+
+  let isWhitelistedGenre_MappedSet = null;
+  function isWhitelistedGenre(tag, genreMap) {
+      if (!tag) return false;
+      const normalizedTag = normalizeGenre(tag);
+      
+      if (!isWhitelistedGenre_MappedSet) {
+          isWhitelistedGenre_MappedSet = new Set();
+          Object.keys(GENRE_MAPPINGS).forEach(g => isWhitelistedGenre_MappedSet.add(normalizeGenre(g)));
+          Object.values(GENRE_MAPPINGS).forEach(variants => {
+              variants.forEach(v => isWhitelistedGenre_MappedSet.add(normalizeGenre(v)));
+          });
+          if (typeof GENRE_ALIASES_RAW !== "undefined") {
+              Object.keys(GENRE_ALIASES_RAW).forEach(g => isWhitelistedGenre_MappedSet.add(normalizeGenre(g)));
+              Object.values(GENRE_ALIASES_RAW).forEach(aliases => {
+                  aliases.forEach(a => isWhitelistedGenre_MappedSet.add(normalizeGenre(a)));
+              });
+          }
+          if (typeof BLACKLIST_UMBRELLA_MAP !== "undefined" && BLACKLIST_UMBRELLA_MAP) {
+              Object.keys(BLACKLIST_UMBRELLA_MAP).forEach(g => isWhitelistedGenre_MappedSet.add(normalizeGenre(g)));
+              Object.values(BLACKLIST_UMBRELLA_MAP).forEach(subgenres => {
+                  subgenres.forEach(s => isWhitelistedGenre_MappedSet.add(normalizeGenre(s)));
+              });
+          }
+      }
+      
+      const isMapped = isWhitelistedGenre_MappedSet.has(normalizedTag);
+      
+      let isInJson = false;
+      if (genreMap) {
+          if (!genreMap._normalizedSet) {
+              genreMap._normalizedSet = new Set(genreMap.map(p => normalizeGenre(p.genre)));
+          }
+          isInJson = genreMap._normalizedSet.has(normalizedTag);
+      }
+      
+      return isMapped || isInJson;
+  }
+
+  const lastfmArtistRawTagsCache = new Map();
+
+  const SPLIT_TAG_SYNTHESIS_RULES = [
+    {
+      synthesized: "funk carioca",
+      baseTags: ["funk"],
+      contextTags: [
+        "funk carioca", "baile funk", "brazilian funk", "funk brasileiro", "brazil funk", "favela funk",
+        "funk paulista", "funk rj", "funk bh", "funk mtg", "funk mandelao", "funk mandelão",
+        "funk ostentacao", "funk ostentação", "brega funk", "mega funk", "rave funk", "funk 150 bpm",
+        "funk consciente", "funk das antigas", "funk melody", "funk capixaba", "trap funk"
+      ],
+      excludeIfPresent: ["funk rock", "funk metal"],
+      replaceBase: true
+    },
+    {
+      synthesized: "funk carioca",
+      baseTags: ["funk"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira"],
+      excludeIfPresent: [
+        "funk rock", "funk metal", "jazz funk", "g funk", "g-funk", "p funk", "p-funk",
+        "synth funk", "future funk", "soul funk", "boogie", "motown", "afro-funk",
+        "soul", "disco", "bossa nova", "samba-rock", "jazz", "blues", "thrash metal", "heavy metal", "death metal"
+      ],
+      replaceBase: true
+    },
+    {
+      synthesized: "funk bruxaria",
+      baseTags: ["funk"],
+      contextTags: ["bruxaria", "beat bruxaria", "funk bruxaria", "dz7", "submundo"],
+      excludeIfPresent: ["funk rock", "funk metal"],
+      replaceBase: true
+    },
+    {
+      synthesized: "funk automotivo",
+      baseTags: ["funk"],
+      contextTags: ["automotivo", "som automotivo", "paredao", "paredão", "funk automotivo"],
+      excludeIfPresent: ["funk rock", "funk metal"],
+      replaceBase: true
+    },
+    {
+      synthesized: "eletrofunk",
+      baseTags: ["funk"],
+      contextTags: ["eletro", "eletronejo", "desande", "eletrofunk", "electro funk brasil"],
+      excludeIfPresent: ["funk rock", "funk metal", "jazz funk", "electro funk 80s", "freestyle"],
+      replaceBase: true
+    },
+    {
+      synthesized: "arrocha funk",
+      baseTags: ["funk"],
+      contextTags: ["arrocha", "arrochado", "arrochafunk"],
+      excludeIfPresent: ["funk rock", "funk metal"],
+      replaceBase: true
+    },
+    {
+      synthesized: "funk mtg",
+      baseTags: ["funk"],
+      contextTags: ["mtg", "montagem", "funk de bh", "funk bh", "funk mtg", "mtg funk"],
+      excludeIfPresent: ["funk rock", "magic the gathering"],
+      replaceBase: true
+    },
+    {
+      synthesized: "phonk brasileiro",
+      baseTags: ["phonk", "drift phonk", "aggressive phonk", "gym phonk"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "funk carioca", "baile funk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "trap brasileiro",
+      baseTags: ["trap"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "trap brasileiro", "trap carioca", "trap baiano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "drill brasileiro",
+      baseTags: ["drill"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "drill brasileiro"],
+      replaceBase: false
+    },
+    {
+      synthesized: "brazilian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "rap nacional", "brazilian hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "brazilian rock",
+      baseTags: ["rock"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "brazilian rock", "rock nacional brasileiro"],
+      replaceBase: false
+    },
+    {
+      synthesized: "pop nacional",
+      baseTags: ["pop"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "pop nacional", "brazilian pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "brazilian metal",
+      baseTags: ["metal", "heavy metal"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira"],
+      replaceBase: false
+    },
+    {
+      synthesized: "brazilian punk",
+      baseTags: ["punk", "punk rock", "hardcore punk"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira"],
+      replaceBase: false
+    },
+    {
+      synthesized: "brazilian gospel",
+      baseTags: ["gospel", "christian"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "gospel brasileiro", "musica crista"],
+      replaceBase: false
+    },
+    {
+      synthesized: "brazilian bass",
+      baseTags: ["bass house", "edm", "house"],
+      contextTags: ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "brazilian bass", "alok"],
+      replaceBase: false
+    },
+    {
+      synthesized: "k-pop",
+      baseTags: ["pop", "dance pop", "boy band", "girl group"],
+      contextTags: ["korea", "korean", "south korea", "k-pop", "kpop", "korean pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "k-rap",
+      baseTags: ["rap", "hip hop", "hip-hop", "hiphop"],
+      contextTags: ["korea", "korean", "south korea", "k-rap", "korean hip hop", "k-hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "k-rock",
+      baseTags: ["rock", "indie rock"],
+      contextTags: ["korea", "korean", "south korea", "k-rock", "k-indie", "korean indie rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "korean r&b",
+      baseTags: ["r&b", "rnb", "contemporary r&b"],
+      contextTags: ["korea", "korean", "south korea", "korean r&b", "krnb", "k-r&b"],
+      replaceBase: false
+    },
+    {
+      synthesized: "k-indie",
+      baseTags: ["indie", "indie rock", "indie pop"],
+      contextTags: ["korea", "korean", "south korea", "k-indie", "korean indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "k-ballad",
+      baseTags: ["ballad", "pop"],
+      contextTags: ["korea", "korean", "south korea", "k-ballad", "korean ballad"],
+      replaceBase: false
+    },
+    {
+      synthesized: "j-pop",
+      baseTags: ["pop"],
+      contextTags: ["japan", "japanese", "j-pop", "jpop", "japanese pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "j-rock",
+      baseTags: ["rock"],
+      contextTags: ["japan", "japanese", "j-rock", "jrock", "japanese rock", "visual kei"],
+      replaceBase: false
+    },
+    {
+      synthesized: "j-rap",
+      baseTags: ["rap", "hip hop", "hip-hop", "hiphop"],
+      contextTags: ["japan", "japanese", "j-rap", "japanese hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "j-metal",
+      baseTags: ["metal", "heavy metal"],
+      contextTags: ["japan", "japanese", "j-metal", "jmetal", "japanese metal"],
+      replaceBase: false
+    },
+    {
+      synthesized: "j-indie",
+      baseTags: ["indie", "indie rock", "indie pop"],
+      contextTags: ["japan", "japanese", "j-indie", "japanese indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "city pop",
+      baseTags: ["pop", "funk", "disco"],
+      contextTags: ["japan", "japanese", "tokyo", "city pop", "citypop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "c-pop",
+      baseTags: ["pop"],
+      contextTags: ["china", "chinese", "taiwan", "taiwanese", "mandarin", "cantonese", "c-pop", "mandopop", "cantopop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "uk drill",
+      baseTags: ["drill"],
+      contextTags: ["uk", "united kingdom", "british", "england", "english", "london", "uk drill", "uk hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "uk hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["uk", "united kingdom", "british", "england", "english", "london", "uk hip hop", "uk rap", "grime"],
+      replaceBase: false
+    },
+    {
+      synthesized: "uk garage",
+      baseTags: ["garage", "speed garage", "2-step"],
+      contextTags: ["uk", "united kingdom", "british", "england", "english", "london", "uk garage", "ukg"],
+      replaceBase: false
+    },
+    {
+      synthesized: "uk post-punk",
+      baseTags: ["post-punk", "post punk", "postpunk"],
+      contextTags: ["uk", "united kingdom", "british", "england", "english", "london", "uk post-punk", "windmill scene"],
+      replaceBase: false
+    },
+    {
+      synthesized: "uk funky",
+      baseTags: ["funky", "house", "funky house"],
+      contextTags: ["uk", "united kingdom", "british", "england", "english", "london", "uk funky"],
+      replaceBase: false
+    },
+    {
+      synthesized: "uk grime",
+      baseTags: ["grime"],
+      contextTags: ["uk", "united kingdom", "british", "england", "english", "london"],
+      replaceBase: false
+    },
+    {
+      synthesized: "irish folk",
+      baseTags: ["folk", "traditional folk"],
+      contextTags: ["ireland", "irish", "eire", "celtic", "dublin", "irish folk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "scottish folk",
+      baseTags: ["folk", "traditional folk"],
+      contextTags: ["scotland", "scottish", "gaelic", "highland", "scottish folk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "french hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["france", "french", "francais", "français", "french hip hop", "rap francais"],
+      replaceBase: false
+    },
+    {
+      synthesized: "french pop",
+      baseTags: ["pop"],
+      contextTags: ["france", "french", "francais", "français", "french pop", "chanson"],
+      replaceBase: false
+    },
+    {
+      synthesized: "french house",
+      baseTags: ["house", "disco house", "filter house"],
+      contextTags: ["france", "french", "francais", "français", "paris", "french touch", "french house"],
+      replaceBase: false
+    },
+    {
+      synthesized: "french indie pop",
+      baseTags: ["indie pop", "indie", "pop"],
+      contextTags: ["france", "french", "francais", "français", "french indie pop", "french indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "french rock",
+      baseTags: ["rock"],
+      contextTags: ["france", "french", "francais", "français", "french rock", "rock francais"],
+      replaceBase: false
+    },
+    {
+      synthesized: "drill francais",
+      baseTags: ["drill"],
+      contextTags: ["france", "french", "francais", "français", "drill fr", "rapfr", "french rap", "paris", "marseille"],
+      replaceBase: false
+    },
+    {
+      synthesized: "german hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["germany", "german", "deutsch", "deutschland", "german hip hop", "deutschrap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "german pop",
+      baseTags: ["pop"],
+      contextTags: ["germany", "german", "deutsch", "deutschland", "german pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "german metal",
+      baseTags: ["metal", "heavy metal"],
+      contextTags: ["germany", "german", "deutsch", "deutschland", "german metal", "neue deutsche harte", "ndh"],
+      replaceBase: false
+    },
+    {
+      synthesized: "german punk",
+      baseTags: ["punk", "punk rock"],
+      contextTags: ["germany", "german", "deutsch", "deutschland", "german punk", "deutschpunk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "german drill",
+      baseTags: ["drill"],
+      contextTags: ["germany", "german", "deutsch", "deutschland", "german drill", "deutschrap drill"],
+      replaceBase: false
+    },
+    {
+      synthesized: "italian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["italy", "italian", "italia", "italiano", "italiana", "italian hip hop", "trap italiana"],
+      replaceBase: false
+    },
+    {
+      synthesized: "italian pop",
+      baseTags: ["pop"],
+      contextTags: ["italy", "italian", "italia", "italiano", "italiana", "italian pop", "musica italiana"],
+      replaceBase: false
+    },
+    {
+      synthesized: "italo disco",
+      baseTags: ["disco", "synthpop"],
+      contextTags: ["italy", "italian", "italia", "italiano", "italiana", "italo disco", "italo-disco", "italodisco"],
+      replaceBase: false
+    },
+    {
+      synthesized: "italo dance",
+      baseTags: ["eurodance", "dance"],
+      contextTags: ["italy", "italian", "italia", "italiano", "italiana", "italo dance", "italodance"],
+      replaceBase: false
+    },
+    {
+      synthesized: "drill italiano",
+      baseTags: ["drill"],
+      contextTags: ["italy", "italian", "italia", "italiano", "italiana", "drill italiano", "trap italiana", "milan"],
+      replaceBase: false
+    },
+    {
+      synthesized: "spanish hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["spain", "spanish", "espana", "españa", "espanol", "español", "spanish hip hop", "rap espanol"],
+      replaceBase: false
+    },
+    {
+      synthesized: "spanish pop",
+      baseTags: ["pop"],
+      contextTags: ["spain", "spanish", "espana", "españa", "espanol", "español", "spanish pop", "pop espanol"],
+      replaceBase: false
+    },
+    {
+      synthesized: "spanish rock",
+      baseTags: ["rock"],
+      contextTags: ["spain", "spanish", "espana", "españa", "espanol", "español", "spanish rock", "rock espanol"],
+      replaceBase: false
+    },
+    {
+      synthesized: "drill espanol",
+      baseTags: ["drill"],
+      contextTags: ["spain", "spanish", "espana", "españa", "espanol", "español", "drill espanol", "drill español"],
+      replaceBase: false
+    },
+    {
+      synthesized: "dutch hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["netherlands", "dutch", "nederland", "holland", "nederhop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "latin pop",
+      baseTags: ["pop"],
+      contextTags: ["latin", "latino", "latina", "pop latino", "latin pop", "musica latina"],
+      replaceBase: false
+    },
+    {
+      synthesized: "latin rock",
+      baseTags: ["rock"],
+      contextTags: ["latin", "latino", "latina", "latin rock", "rock en espanol", "rock en español"],
+      replaceBase: false
+    },
+    {
+      synthesized: "latin hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["latin", "latino", "latina", "latin hip hop", "latin rap", "rap latino"],
+      replaceBase: false
+    },
+    {
+      synthesized: "latin jazz",
+      baseTags: ["jazz"],
+      contextTags: ["latin", "latino", "latina", "latin jazz", "afro-cuban", "afro-cuban jazz"],
+      replaceBase: false
+    },
+    {
+      synthesized: "trap latino",
+      baseTags: ["trap"],
+      contextTags: ["latin", "latino", "latina", "urbano latino", "reggaeton", "puerto rico", "puerto rican", "boricua", "colombia", "colombian", "argentina", "argentine", "trap latino"],
+      replaceBase: false
+    },
+    {
+      synthesized: "mexican rock",
+      baseTags: ["rock"],
+      contextTags: ["mexico", "mexican", "mexicano", "mexicana", "mexican rock", "rock mexicano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "mexican pop",
+      baseTags: ["pop"],
+      contextTags: ["mexico", "mexican", "mexicano", "mexicana", "mexican pop", "pop mexicano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "mexican hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["mexico", "mexican", "mexicano", "mexicana", "mexican hip hop", "rap mexicano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "trap mexicano",
+      baseTags: ["trap"],
+      contextTags: ["mexico", "mexican", "mexicano", "mexicana", "trap mexicano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "corridos belicos",
+      baseTags: ["corridos", "corrido"],
+      contextTags: ["belicos", "bélicos", "belico", "bélico", "guerra", "luis r conriquez"],
+      replaceBase: true
+    },
+    {
+      synthesized: "sierreño urbano",
+      baseTags: ["sierreño", "sierreno"],
+      contextTags: ["urbano", "urban", "corridos tumbados", "sad sierreno"],
+      replaceBase: true
+    },
+    {
+      synthesized: "argentine rock",
+      baseTags: ["rock"],
+      contextTags: ["argentina", "argentine", "argentino", "argentina", "argentine rock", "rock argentino", "rock nacional argentino"],
+      replaceBase: false
+    },
+    {
+      synthesized: "trap argentino",
+      baseTags: ["trap"],
+      contextTags: ["argentina", "argentine", "argentino", "trap argentino"],
+      replaceBase: false
+    },
+    {
+      synthesized: "chilean rock",
+      baseTags: ["rock"],
+      contextTags: ["chile", "chilean", "chileno", "chilean rock", "rock chileno"],
+      replaceBase: false
+    },
+    {
+      synthesized: "trap chileno",
+      baseTags: ["trap"],
+      contextTags: ["chile", "chilean", "chileno", "trap chileno"],
+      replaceBase: false
+    },
+    {
+      synthesized: "colombian pop",
+      baseTags: ["pop"],
+      contextTags: ["colombia", "colombian", "colombiano", "colombian pop", "tropipop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "trap boricua",
+      baseTags: ["trap"],
+      contextTags: ["puerto rico", "puerto rican", "boricua", "trap boricua", "trap latino"],
+      replaceBase: false
+    },
+    {
+      synthesized: "swedish pop",
+      baseTags: ["pop"],
+      contextTags: ["sweden", "swedish", "sverige", "stockholm", "swedish pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "swedish death metal",
+      baseTags: ["death metal"],
+      contextTags: ["sweden", "swedish", "sverige", "stockholm", "gothenburg", "swedish death metal"],
+      replaceBase: false
+    },
+    {
+      synthesized: "swedish metal",
+      baseTags: ["metal", "heavy metal"],
+      contextTags: ["sweden", "swedish", "sverige", "swedish metal"],
+      replaceBase: false
+    },
+    {
+      synthesized: "norwegian black metal",
+      baseTags: ["black metal"],
+      contextTags: ["norway", "norwegian", "norge", "oslo", "norwegian black metal", "true norwegian black metal"],
+      replaceBase: false
+    },
+    {
+      synthesized: "norwegian pop",
+      baseTags: ["pop"],
+      contextTags: ["norway", "norwegian", "norge", "norwegian pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "finnish metal",
+      baseTags: ["metal", "heavy metal"],
+      contextTags: ["finland", "finnish", "suomi", "helsinki", "finnish metal"],
+      replaceBase: false
+    },
+    {
+      synthesized: "finnish pop",
+      baseTags: ["pop"],
+      contextTags: ["finland", "finnish", "suomi", "finnish pop", "suomipop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "danish pop",
+      baseTags: ["pop"],
+      contextTags: ["denmark", "danish", "danmark", "copenhagen", "danish pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "icelandic indie",
+      baseTags: ["indie", "indie rock", "indie pop"],
+      contextTags: ["iceland", "icelandic", "reykjavik", "icelandic indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "icelandic pop",
+      baseTags: ["pop"],
+      contextTags: ["iceland", "icelandic", "reykjavik", "icelandic pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "russian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["russia", "russian", "russian hip hop", "russian trap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "russian pop",
+      baseTags: ["pop"],
+      contextTags: ["russia", "russian", "moscow", "russian pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "russian rock",
+      baseTags: ["rock"],
+      contextTags: ["russia", "russian", "russian rock", "russkiy rok"],
+      replaceBase: false
+    },
+    {
+      synthesized: "russian phonk",
+      baseTags: ["phonk", "drift phonk"],
+      contextTags: ["russia", "russian", "russian phonk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "russian post-punk",
+      baseTags: ["post-punk", "post punk", "postpunk"],
+      contextTags: ["russia", "russian", "soviet", "belarus", "belarusian", "russian post-punk", "sovietwave"],
+      replaceBase: false
+    },
+    {
+      synthesized: "ukrainian pop",
+      baseTags: ["pop"],
+      contextTags: ["ukraine", "ukrainian", "kyiv", "ukrainian pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "ukrainian phonk",
+      baseTags: ["phonk", "drift phonk"],
+      contextTags: ["ukraine", "ukrainian", "ukrainian phonk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "polish hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["poland", "polish", "polska", "polski", "polish hip hop", "polish trap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "polish pop",
+      baseTags: ["pop"],
+      contextTags: ["poland", "polish", "polska", "polski", "warsaw", "polish pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "polish rock",
+      baseTags: ["rock"],
+      contextTags: ["poland", "polish", "polska", "polski", "polish rock", "polski rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "romanian pop",
+      baseTags: ["pop"],
+      contextTags: ["romania", "romanian", "bucharest", "romanian pop", "popdance"],
+      replaceBase: false
+    },
+    {
+      synthesized: "turkish pop",
+      baseTags: ["pop"],
+      contextTags: ["turkey", "turkish", "turkce", "türkçe", "türkiye", "turkish pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "turkish hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["turkey", "turkish", "turkce", "türkçe", "türkiye", "turkish hip hop", "turkce rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "turkish rock",
+      baseTags: ["rock"],
+      contextTags: ["turkey", "turkish", "turkce", "türkçe", "türkiye", "anatolian", "anatolian rock", "turkish rock", "turkce rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "turkish folk",
+      baseTags: ["folk", "traditional folk"],
+      contextTags: ["turkey", "turkish", "turkce", "türkçe", "türkiye", "anatolian", "turkish folk", "türk halk müziği"],
+      replaceBase: false
+    },
+    {
+      synthesized: "turkish deep house",
+      baseTags: ["deep house", "house"],
+      contextTags: ["turkey", "turkish", "turkce", "türkçe", "türkiye", "istanbul", "turkish deep house"],
+      replaceBase: false
+    },
+    {
+      synthesized: "arabic pop",
+      baseTags: ["pop"],
+      contextTags: ["arabic", "arab", "middle east", "egypt", "lebanon", "cairo", "beirut", "arabic pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "arabic hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["arabic", "arab", "middle east", "egypt", "lebanon", "morocco", "arabic hip hop", "arabic rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "moroccan rap",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["morocco", "moroccan", "maroc", "marocain", "rap maroc", "darija"],
+      replaceBase: false
+    },
+    {
+      synthesized: "egyptian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["egypt", "egyptian", "cairo", "arabic", "wegz", "marwan pablo"],
+      replaceBase: false
+    },
+    {
+      synthesized: "persian pop",
+      baseTags: ["pop"],
+      contextTags: ["iran", "iranian", "persian", "farsi", "tehran", "persian pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "persian rock",
+      baseTags: ["rock"],
+      contextTags: ["iran", "iranian", "persian", "farsi", "tehran", "persian rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "persian traditional",
+      baseTags: ["traditional", "folk"],
+      contextTags: ["iran", "iranian", "persian", "farsi", "tehran", "persian traditional", "sonnati", "radif"],
+      replaceBase: false
+    },
+    {
+      synthesized: "opm",
+      baseTags: ["pop"],
+      contextTags: ["philippines", "filipino", "pinoy", "tagalog", "manila", "opm", "pinoy pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "pinoy rock",
+      baseTags: ["rock"],
+      contextTags: ["philippines", "filipino", "pinoy", "tagalog", "manila", "pinoy rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "indonesian pop",
+      baseTags: ["pop"],
+      contextTags: ["indonesia", "indonesian", "jakarta", "indonesian pop", "pop indonesia"],
+      replaceBase: false
+    },
+    {
+      synthesized: "indonesian indie",
+      baseTags: ["indie", "indie rock", "indie pop"],
+      contextTags: ["indonesia", "indonesian", "jakarta", "indonesian indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "thai pop",
+      baseTags: ["pop"],
+      contextTags: ["thailand", "thai", "bangkok", "thai pop", "t-pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "thai indie",
+      baseTags: ["indie", "indie rock", "indie pop"],
+      contextTags: ["thailand", "thai", "bangkok", "thai indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "v-pop",
+      baseTags: ["pop"],
+      contextTags: ["vietnam", "vietnamese", "hanoi", "saigon", "v-pop", "vpop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "vietnamese hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["vietnam", "vietnamese", "vietnamese hip hop", "rap viet"],
+      replaceBase: false
+    },
+    {
+      synthesized: "desi hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["india", "indian", "desi", "hindi", "punjabi", "pakistan", "pakistani", "urdu", "desi hip hop", "punjabi hip hop", "hindi hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "desi pop",
+      baseTags: ["pop"],
+      contextTags: ["india", "indian", "desi", "hindi", "pakistan", "pakistani", "desi pop", "indipop", "indi-pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "punjabi pop",
+      baseTags: ["pop"],
+      contextTags: ["punjab", "punjabi", "punjabi pop", "bhangra"],
+      replaceBase: false
+    },
+    {
+      synthesized: "aussie drill",
+      baseTags: ["drill"],
+      contextTags: ["australia", "australian", "aussie", "sydney", "melbourne", "aussie drill", "onefour"],
+      replaceBase: false
+    },
+    {
+      synthesized: "australian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["australia", "australian", "aussie", "australian hip hop", "aus rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "australian indie",
+      baseTags: ["indie", "indie rock", "indie pop"],
+      contextTags: ["australia", "australian", "aussie", "australian indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "nigerian pop",
+      baseTags: ["pop"],
+      contextTags: ["nigeria", "nigerian", "lagos", "nigerian pop", "afrobeats", "afropop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "nigerian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["nigeria", "nigerian", "afrobeats", "lagos"],
+      replaceBase: false
+    },
+    {
+      synthesized: "ghanaian pop",
+      baseTags: ["pop"],
+      contextTags: ["ghana", "ghanaian", "accra", "ghanaian pop", "highlife"],
+      replaceBase: false
+    },
+    {
+      synthesized: "south african house",
+      baseTags: ["house"],
+      contextTags: ["south africa", "south african", "johannesburg", "south african house", "kwaito", "gqom"],
+      replaceBase: false
+    },
+    {
+      synthesized: "south african deep house",
+      baseTags: ["deep house"],
+      contextTags: ["south africa", "south african", "south african deep house"],
+      replaceBase: false
+    },
+    {
+      synthesized: "3-step",
+      baseTags: ["house", "afro house"],
+      contextTags: ["3-step", "three step", "thakzin", "3-step house"],
+      replaceBase: false
+    },
+    {
+      synthesized: "krushclub",
+      baseTags: ["club", "jersey club"],
+      contextTags: ["krush", "krushclub", "krush club"],
+      replaceBase: false
+    },
+    {
+      synthesized: "jerk rap",
+      baseTags: ["jerk"],
+      contextTags: ["hoodtrap", "kashtrap", "plugg", "cloud rap", "rage", "underground rap", "trap", "vampjerk"],
+      excludeIfPresent: ["comedy", "humor"],
+      replaceBase: true
+    },
+    {
+      synthesized: "new jazz",
+      baseTags: ["jazz"],
+      contextTags: ["new jazz", "newjazz"],
+      excludeIfPresent: ["bebop", "hard bop", "modal jazz", "post-bop", "smooth jazz", "cool jazz", "free jazz", "vocal jazz", "big band", "swing", "dixieland"],
+      replaceBase: true
+    },
+    {
+      synthesized: "sexy drill",
+      baseTags: ["drill"],
+      contextTags: ["sexy", "slizzy", "sample drill", "sexy drill"],
+      excludeIfPresent: ["drill and bass"],
+      replaceBase: true
+    },
+    {
+      synthesized: "pluggnb",
+      baseTags: ["plugg"],
+      contextTags: ["rnb", "r&b", "pluggnb", "plugg n b", "plugg&b"],
+      replaceBase: true
+    },
+    {
+      synthesized: "sigilkore",
+      baseTags: ["hexd", "cloud rap"],
+      contextTags: ["sigil", "sigilkore", "jewelxxet", "vampjerk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "dariacore",
+      baseTags: ["hyperpop", "breakcore", "jersey club"],
+      contextTags: ["daria", "dariacore", "hyperflip", "leroy", "berdlycore"],
+      replaceBase: false
+    },
+    {
+      synthesized: "stutter house",
+      baseTags: ["house"],
+      contextTags: ["stutter", "flutter", "tremolo", "stutter house", "flutter house"],
+      excludeIfPresent: ["acid house", "deep house classic", "chicago house"],
+      replaceBase: true
+    },
+    {
+      synthesized: "color bass",
+      baseTags: ["dubstep", "riddim"],
+      contextTags: ["color", "colour", "melodic riddim", "future riddim", "rushdown", "color bass", "colour bass"],
+      replaceBase: true
+    },
+    {
+      synthesized: "briddim",
+      baseTags: ["dubstep", "riddim"],
+      contextTags: ["briddim", "brostep", "subtronics"],
+      replaceBase: true
+    },
+    {
+      synthesized: "canadian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["canada", "canadian", "toronto", "vancouver", "montreal", "ottawa", "canadian hip hop", "toronto rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "canadian pop",
+      baseTags: ["pop"],
+      contextTags: ["canada", "canadian", "toronto", "vancouver", "montreal", "canadian pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "canadian rock",
+      baseTags: ["rock", "alternative rock", "indie rock"],
+      contextTags: ["canada", "canadian", "toronto", "vancouver", "montreal", "canadian rock", "canadian indie"],
+      replaceBase: false
+    },
+    {
+      synthesized: "australian rock",
+      baseTags: ["rock", "alternative rock", "hard rock"],
+      contextTags: ["australia", "australian", "aussie", "sydney", "melbourne", "brisbane", "perth", "australian rock", "aussie rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "australian pop",
+      baseTags: ["pop", "dance pop"],
+      contextTags: ["australia", "australian", "aussie", "sydney", "melbourne", "brisbane", "australian pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "argentine hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["argentina", "argentine", "argentinian", "argentino", "buenos aires", "argentine hip hop", "rap argentino"],
+      replaceBase: false
+    },
+    {
+      synthesized: "chilean hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["chile", "chilean", "chileno", "santiago", "chilean hip hop", "rap chileno", "hip hop chileno"],
+      replaceBase: false
+    },
+    {
+      synthesized: "colombian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["colombia", "colombian", "colombiano", "medellin", "bogota", "cali", "colombian hip hop", "rap colombiano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "venezuelan hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["venezuela", "venezuelan", "venezolano", "caracas", "venezuelan hip hop", "rap venezolano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "peruvian rock",
+      baseTags: ["rock"],
+      contextTags: ["peru", "peruvian", "peruano", "lima", "peruvian rock", "rock peruano"],
+      replaceBase: false
+    },
+    {
+      synthesized: "colombian rock",
+      baseTags: ["rock"],
+      contextTags: ["colombia", "colombian", "colombiano", "bogota", "medellin", "colombian rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "venezuelan rock",
+      baseTags: ["rock"],
+      contextTags: ["venezuela", "venezuelan", "venezolano", "caracas", "venezuelan rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "uruguayan rock",
+      baseTags: ["rock"],
+      contextTags: ["uruguay", "uruguayan", "uruguayo", "montevideo", "rock uruguayo"],
+      replaceBase: false
+    },
+    {
+      synthesized: "swedish hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["sweden", "swedish", "sverige", "svenska", "stockholm", "swedish hip hop", "swedish rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "norwegian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["norway", "norwegian", "norge", "norsk", "oslo", "norwegian hip hop", "norsk rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "danish hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["denmark", "danish", "danmark", "dansk", "copenhagen", "danish hip hop", "dansk rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "finnish hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["finland", "finnish", "suomi", "helsinki", "finnish hip hop", "suomirap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "greek hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["greece", "greek", "athens", "thessaloniki", "greek hip hop", "greek trap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "greek pop",
+      baseTags: ["pop"],
+      contextTags: ["greece", "greek", "athens", "greek pop", "laiko"],
+      replaceBase: false
+    },
+    {
+      synthesized: "romanian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["romania", "romanian", "bucharest", "romanian hip hop", "romanian rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "hungarian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["hungary", "hungarian", "magyar", "budapest", "hungarian hip hop", "magyar trap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "czech hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["czech", "czech republic", "czechia", "prague", "czech hip hop", "czsk hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "slovak hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["slovakia", "slovak", "slovakian", "bratislava", "slovak hip hop", "czsk hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "serbian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["serbia", "serbian", "belgrade", "serbian hip hop", "balkan hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "croatian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["croatia", "croatian", "zagreb", "croatian hip hop", "balkan hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "bulgarian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["bulgaria", "bulgarian", "sofia", "bulgarian hip hop", "bulgarian trap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "albanian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["albania", "albanian", "kosovo", "kosovan", "kosovar", "albanian hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "albanian pop",
+      baseTags: ["pop", "dance pop"],
+      contextTags: ["albania", "albanian", "kosovo", "kosovan", "kosovar", "albanian pop", "kosovan pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "ukrainian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["ukraine", "ukrainian", "kyiv", "ukrainian hip hop", "ukrainian rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "ukrainian rock",
+      baseTags: ["rock", "alternative rock", "indie rock", "post-punk"],
+      contextTags: ["ukraine", "ukrainian", "kyiv", "ukrainian rock", "ukrainian post-punk"],
+      replaceBase: false
+    },
+    {
+      synthesized: "kazakh hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["kazakhstan", "kazakh", "qazaq", "kazakh hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "kazakh pop",
+      baseTags: ["pop"],
+      contextTags: ["kazakhstan", "kazakh", "qazaq", "kazakh pop", "q-pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "persian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["iran", "iranian", "persian", "farsi", "tehran", "persian hip hop", "persian rap", "rap farsi"],
+      replaceBase: false
+    },
+    {
+      synthesized: "israeli pop",
+      baseTags: ["pop"],
+      contextTags: ["israel", "israeli", "tel aviv", "hebrew", "israeli pop", "mizrahi"],
+      replaceBase: false
+    },
+    {
+      synthesized: "israeli hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["israel", "israeli", "tel aviv", "hebrew", "israeli hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "pakistani pop",
+      baseTags: ["pop", "indie pop"],
+      contextTags: ["pakistan", "pakistani", "urdu", "karachi", "lahore", "pakistani pop", "coke studio"],
+      replaceBase: false
+    },
+    {
+      synthesized: "pakistani hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["pakistan", "pakistani", "urdu", "karachi", "lahore", "pakistani hip hop", "urdu hip hop", "urdu rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "punjabi hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["punjab", "punjabi", "punjabi hip hop", "punjabi rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "tamil pop",
+      baseTags: ["pop"],
+      contextTags: ["tamil", "kollywood", "chennai", "tamil nadu", "tamil pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "tamil hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["tamil", "kollywood", "chennai", "tamil nadu", "tamil hip hop", "tamil rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "pinoy hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["philippines", "filipino", "pinoy", "tagalog", "manila", "pinoy hip hop", "pinoy rap", "tagalog rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "indonesian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["indonesia", "indonesian", "jakarta", "indonesian hip hop", "indonesian rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "indonesian rock",
+      baseTags: ["rock", "alternative rock"],
+      contextTags: ["indonesia", "indonesian", "jakarta", "bandung", "indonesian rock", "indonesian alternative rock"],
+      replaceBase: false
+    },
+    {
+      synthesized: "thai hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["thailand", "thai", "bangkok", "thai hip hop", "thai rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "malaysian pop",
+      baseTags: ["pop"],
+      contextTags: ["malaysia", "malaysian", "kuala lumpur", "malay", "malaysian pop", "lagu melayu"],
+      replaceBase: false
+    },
+    {
+      synthesized: "malaysian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["malaysia", "malaysian", "kuala lumpur", "malay", "malaysian hip hop", "malay rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "singaporean pop",
+      baseTags: ["pop"],
+      contextTags: ["singapore", "singaporean", "singaporean pop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "south african hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap"],
+      contextTags: ["south africa", "south african", "johannesburg", "cape town", "durban", "mzansi", "south african hip hop", "kasi rap"],
+      replaceBase: false
+    },
+    {
+      synthesized: "ghanaian hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap", "drill"],
+      contextTags: ["ghana", "ghanaian", "accra", "kumasi", "asakaa", "hiplife", "ghanaian hip hop"],
+      replaceBase: false
+    },
+    {
+      synthesized: "kenyan hip hop",
+      baseTags: ["hip hop", "hip-hop", "hiphop", "rap", "drill"],
+      contextTags: ["kenya", "kenyan", "nairobi", "gengetone", "kenyan hip hop", "kenyan drill"],
+      replaceBase: false
+    },
+    {
+      synthesized: "tanzanian pop",
+      baseTags: ["pop", "afrobeats", "r&b"],
+      contextTags: ["tanzania", "tanzanian", "bongo flava", "tanzanian pop"],
+      replaceBase: false
+    }
+  ];
+
+  function synthesizeLastfmSplitTags(rawTags, extraContextTags = null) {
+    if (!rawTags || !Array.isArray(rawTags) || rawTags.length === 0) return [];
+    const lowerTags = rawTags.map(t => {
+      const s = typeof t === 'string' ? t : (t?.name || '');
+      return String(s).toLowerCase().trim();
+    }).filter(Boolean);
+    const tagSet = new Set(lowerTags);
+    const fullContextSet = new Set(lowerTags);
+
+    if (extraContextTags && Array.isArray(extraContextTags)) {
+      for (let i = 0; i < extraContextTags.length; i++) {
+        const item = extraContextTags[i];
+        const s = typeof item === 'string' ? item : (item?.name || '');
+        if (s) fullContextSet.add(String(s).toLowerCase().trim());
+      }
+    }
+
+    const toAdd = new Set();
+    const toRemove = new Set();
+
+    for (let i = 0; i < SPLIT_TAG_SYNTHESIS_RULES.length; i++) {
+      const rule = SPLIT_TAG_SYNTHESIS_RULES[i];
+      const matchedBases = rule.baseTags.filter(b => tagSet.has(b));
+      if (matchedBases.length === 0) continue;
+
+      const hasContext = rule.contextTags.some(c => fullContextSet.has(c));
+      if (!hasContext) continue;
+
+      if (rule.excludeIfPresent && rule.excludeIfPresent.some(ex => fullContextSet.has(ex))) {
+        continue;
+      }
+
+      toAdd.add(rule.synthesized);
+      if (rule.replaceBase) {
+        for (let j = 0; j < matchedBases.length; j++) {
+          toRemove.add(matchedBases[j]);
+        }
+      }
+    }
+
+    if (toAdd.size === 0 && toRemove.size === 0) return lowerTags;
+
+    const result = [];
+    const seen = new Set();
+    for (let i = 0; i < lowerTags.length; i++) {
+      const t = lowerTags[i];
+      if (toRemove.has(t)) continue;
+      if (!seen.has(t)) {
+        seen.add(t);
+        result.push(t);
+      }
+    }
+    for (const synth of toAdd) {
+      if (!seen.has(synth)) {
+        seen.add(synth);
+        result.push(synth);
+      }
+    }
+    return result;
+  }
+
+  function hydrateCachedGenreRecord(record) {
+    if (!record || typeof record !== 'object') return record;
+
+    const hasTrackTags = Array.isArray(record.lastfm_track_genres) && record.lastfm_track_genres.length > 0;
+    const hasArtistTags = Array.isArray(record.lastfm_artist_genres) && record.lastfm_artist_genres.length > 0;
+    const hasSpTrack = Array.isArray(record.spotify_track_genres) && record.spotify_track_genres.length > 0;
+    const hasEveryNoise = Array.isArray(record.everynoise_artist_genres) && record.everynoise_artist_genres.length > 0;
+    const sig = `${hasTrackTags ? record.lastfm_track_genres.length : 0}:${hasArtistTags ? record.lastfm_artist_genres.length : 0}:${hasSpTrack ? 1 : 0}:${hasEveryNoise ? 1 : 0}`;
+
+    if (record._lfm_synthesized === sig) return record;
+
+    if (hasTrackTags || hasArtistTags) {
+      const trackTags = hasTrackTags ? record.lastfm_track_genres : [];
+      const artistTags = hasArtistTags ? record.lastfm_artist_genres : [];
+      const extraCtx = [];
+      if (hasSpTrack) extraCtx.push(...record.spotify_track_genres);
+      if (hasEveryNoise) extraCtx.push(...record.everynoise_artist_genres);
+
+      const synthTrack = synthesizeLastfmSplitTags(trackTags, [...artistTags, ...extraCtx]);
+      const synthArtist = synthesizeLastfmSplitTags(artistTags, [...(synthTrack.length > 0 ? synthTrack : trackTags), ...extraCtx]);
+
+      record.lastfm_track_genres = synthTrack;
+      record.lastfm_artist_genres = synthArtist;
+    }
+
+    record._lfm_synthesized = `${record.lastfm_track_genres?.length || 0}:${record.lastfm_artist_genres?.length || 0}:${hasSpTrack ? 1 : 0}:${hasEveryNoise ? 1 : 0}`;
+    return record;
+  }
+  const MUSIC_MODEL_MAP = {
+    "chill": { M: 1.0 }, "nostalgia": { M: 1.0 }, "easy listening": { M: 1.0 }, "relaxing": { M: 1.0 },
+    "slow": { M: 1.0 }, "mellow": { M: 1.0 }, "love": { M: 1.0 }, "soft": { M: 1.0 },
+    "melancholy": { M: 1.0 }, "moody": { M: 1.0 }, "calm": { M: 1.0 }, "sad": { M: 1.0 },
+    "romantic": { M: 1.0 }, "tranquil": { M: 1.0 }, "smooth": { M: 1.0 }, "quiet": { M: 1.0 },
+    "dark": { M: 1.0 }, "acoustic": { M: 0.8, U: 0.2 }, "lounge": { M: 1.0 }, "chill beats": { M: 0.8, C: 0.2 },
+    "emotional": { M: 1.0 }, "new age": { M: 0.8, S: 0.2 }, "downtempo": { M: 0.7, C: 0.3 }, "soothing": { M: 1.0 },
+    "peaceful": { M: 1.0 }, "gentle": { M: 1.0 }, "atmospheric": { M: 0.8, S: 0.2 }, "cozy": { M: 1.0 },
+    "sensual": { M: 1.0 }, "ambient": { M: 0.9, S: 0.1 }, "children's music": { M: 0.8, U: 0.2 }, "ethereal": { M: 0.8, S: 0.2 },
+    "nature": { M: 1.0 }, "rain": { M: 1.0 }, "lullaby": { M: 1.0 }, "chanson": { M: 0.7, S: 0.3 }, "spiritual": { M: 0.6, U: 0.4 }, "soulful": { M: 0.6, S: 0.4 },
+    "country": { U: 1.0 }, "singer-songwriter": { U: 0.7, M: 0.3 }, "folk": { U: 0.9, M: 0.1 }, "americana": { U: 1.0 },
+    "gospel": { U: 0.8, S: 0.2 }, "bluegrass": { S: 0.6, U: 0.4 }, "worship": { U: 0.8, M: 0.2 }, "devotional": { U: 0.8, M: 0.2 }, "ccm": { U: 0.6, C: 0.4 }, "sertanejo": { U: 1.0 },
+    "tejano": { U: 1.0 }, "norte": { U: 1.0 }, "sierre": { U: 1.0 }, "banda": { U: 1.0 }, "country blues": { U: 0.7, S: 0.3 },
+    "classical": { S: 1.0 }, "jazz": { S: 1.0 }, "blues": { S: 0.8, U: 0.2 }, "classy": { S: 1.0 },
+    "soundtrack": { S: 0.8, M: 0.2 }, "soul funk": { S: 0.6, C: 0.4 }, "latin": { S: 0.5, C: 0.5 },
+    "orchestral": { S: 1.0 }, "symphony": { S: 1.0 }, "acid jazz": { S: 0.7, C: 0.3 }, "epic": { S: 0.6, I: 0.4 },
+    "swing music": { S: 0.8, C: 0.2 }, "classical piano": { S: 0.9, M: 0.1 }, "gregorian chant": { S: 0.8, M: 0.2 },
+    "tango": { S: 0.9, I: 0.1 }, "bolero": { S: 0.8, M: 0.2 }, "cumbia": { S: 0.6, C: 0.4 }, "mariachi": { S: 0.8, U: 0.2 },
+    "bossa nova": { S: 0.7, M: 0.3 }, "flamenco": { S: 0.8, I: 0.2 }, "samba": { S: 0.7, C: 0.3 }, "salsa": { S: 0.6, C: 0.4 }, "pagode": { C: 0.6, S: 0.4 }, "big band": { S: 1.0 },
+    "cabaret": { S: 1.0 }, "minimalism": { S: 0.8, M: 0.2 }, "opera": { S: 1.0 }, "musicals": { S: 0.8, M: 0.2 }, "a cappella": { S: 0.7, M: 0.3 }, "progressive rock": { S: 0.7, I: 0.3 },
+    "rock": { I: 1.0 }, "rock and roll": { U: 0.6, I: 0.4 }, "metal": { I: 1.0 }, "hard rock": { I: 1.0 },
+    "aggressive": { I: 1.0 }, "punk": { I: 1.0 }, "angst": { I: 1.0 }, "emo": { I: 0.7, M: 0.3 },
+    "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "alternative metal": { I: 0.9, C: 0.1 }, "rock en espa": { I: 0.9, C: 0.1 },
+    "grunge": { I: 1.0 }, "death metal": { I: 1.0 }, "metalcore": { I: 1.0 }, "screamo": { I: 1.0 }, "post-hardcore": { I: 0.9, C: 0.1 },
+    "rockabilly": { I: 0.8, U: 0.2 }, "industrial": { I: 0.8, C: 0.2 }, "hardcore punk": { I: 1.0 },
+    "black metal": { I: 1.0 }, "doom metal": { I: 1.0 }, "southern rock": { I: 0.7, U: 0.3 },
+    "pop": { U: 0.4, C: 0.4, M: 0.2 }, "electronic": { M: 0.6, C: 0.4 }, "electronica": { M: 0.6, C: 0.4 }, "dance pop": { C: 0.6, U: 0.4 },
+    "dance": { C: 0.6, M: 0.4 }, "electropop": { C: 0.8, M: 0.2 }, "upbeat": { C: 1.0 }, "energetic": { C: 0.7, I: 0.3 }, "electro": { C: 0.8, M: 0.2 },
+    "edm": { C: 1.0 }, "fast": { C: 1.0 }, "happy": { C: 0.7, M: 0.3 }, "pump up": { C: 0.8, I: 0.2 }, "anime": { C: 0.7, I: 0.3 },
+    "beats": { C: 0.8, M: 0.2 }, "hip hop": { C: 1.0 }, "club": { C: 1.0 }, "rap": { C: 1.0 },
+    "disco": { C: 1.0 }, "house": { C: 1.0 }, "garage": { C: 1.0 }, "gaming": { C: 0.7, I: 0.3 },
+    "bubblegum pop": { C: 1.0 }, "ibiza": { C: 1.0 }, "funk": { C: 0.8, S: 0.2 }, "techno": { C: 1.0 }, "minimal techno": { C: 0.7, M: 0.3 },
+    "motivation": { C: 0.8, I: 0.2 }, "trap": { C: 1.0 }, "trance": { C: 1.0 }, "goa trance": { C: 0.8, I: 0.2 }, "funny": { C: 0.8, U: 0.2 },
+    "motown": { C: 0.6, S: 0.4 }, "reggaeton": { C: 1.0 }, "reggae": { S: 0.5, C: 0.5 }, "k-pop": { C: 1.0 },
+    "dub": { C: 0.8, M: 0.2 }, "ska": { C: 0.7, I: 0.3 }, "drum and bass": { C: 0.8, I: 0.2 }, "j-pop": { C: 1.0 },
+    "dubstep": { C: 0.8, I: 0.2 }, "trap latino": { C: 1.0 }, "gangster rap": { C: 1.0 }, "crunk": { C: 1.0 },
+    "hardstyle": { C: 0.8, I: 0.2 }, "hardcore techno": { C: 0.8, I: 0.2 }, "afrobeats": { C: 1.0 }, "dancehall": { C: 1.0 },
+    "funk carioca": { C: 1.0 }, "merengue": { C: 1.0 }, "bachata": { C: 1.0 }, "roots reggae": { S: 0.5, C: 0.3, U: 0.2 },
+    "grime": { C: 0.8, I: 0.2 }, "happy hardcore": { C: 0.8, I: 0.2 }, "chillwave": { M: 0.6, C: 0.4 },
+    "pop rock": { C: 0.6, I: 0.4 },
+    "alternative rock": { I: 0.7, C: 0.3 },
+    "modern rock": { I: 0.7, C: 0.3 },
+    "indie": { C: 0.5, M: 0.3, U: 0.2 },
+    "classic rock": { I: 0.8, S: 0.2 },
+    "soft rock": { M: 0.7, I: 0.3 },
+    "indie rock": { I: 0.6, C: 0.3, M: 0.1 },
+    "pop rap": { C: 1.0 },
+    "indie pop": { C: 0.6, M: 0.4 },
+    "synthpop": { C: 0.8, M: 0.2 },
+    "synth pop": { C: 0.8, M: 0.2 },
+    "alternative pop": { C: 0.7, M: 0.3 },
+    "garage rock": { I: 0.8, U: 0.2 },
+    "r&b": { M: 0.6, C: 0.4 },
+    "electro house": { C: 0.8, I: 0.2 },
+    "roots rock": { I: 0.6, U: 0.4 },
+    "folk rock": { U: 0.6, I: 0.4 },
+    "psychedelic rock": { I: 0.6, S: 0.4 },
+    "pop punk": { I: 0.6, C: 0.4 },
+    "new wave": { C: 0.6, I: 0.4 },
+    "jazz blues": { S: 0.8, U: 0.2 },
+    "britpop": { C: 0.6, I: 0.4 },
+    "folk pop": { U: 0.5, C: 0.3, M: 0.2 },
+    "soul": { M: 0.6, S: 0.4 },
+    "jazz funk": { S: 0.7, C: 0.3 },
+    "trip hop": { C: 0.5, M: 0.3, S: 0.2 },
+    "deep house": { C: 0.8, M: 0.2 },
+    "aor": { I: 0.5, M: 0.3, S: 0.2 },
+    "spooky": { M: 0.5, I: 0.5 },
+    "indie folk": { U: 0.6, M: 0.4 },
+    "chillstep": { C: 0.6, M: 0.4 },
+    "blues rock": { I: 0.7, S: 0.3 },
+    "dream pop": { M: 0.7, C: 0.3 },
+    "funk rock": { I: 0.6, C: 0.4 },
+    "synthwave": { C: 0.6, M: 0.4 },
+    "smooth jazz": { S: 0.7, M: 0.3 },
+    "alternative hip hop": { C: 0.7, S: 0.3 },
+    "country rock": { U: 0.6, I: 0.4 },
+    "post-punk": { I: 0.7, S: 0.3 },
+    "southern hip hop": { C: 1.0 },
+    "vaporwave": { M: 0.6, C: 0.4 },
+    "post-rock": { S: 0.5, I: 0.5 },
+    "shoegaze": { I: 0.6, M: 0.4 }
+  };
+
+  const NORMALIZED_MUSIC_MODEL_MAP = {};
+  for (const [k, v] of Object.entries(MUSIC_MODEL_MAP)) {
+      NORMALIZED_MUSIC_MODEL_MAP[k] = v;
+      NORMALIZED_MUSIC_MODEL_MAP[normalizeGenre(k)] = v;
+      NORMALIZED_MUSIC_MODEL_MAP[getNormalizedGenreKey(k)] = v;
+  }
+
   const shoutboxCache = new Map();
   const lfmDetailsCache = new Map();
   const spotifyImageCache = new Map();
@@ -2966,22 +5726,75 @@
     return Ge_mini_Key_Pool[randomIndex];
   }
   
+  let lfmDirectConsecutive403 = 0;
+  let lfmDirectFailureStrikes = 0;
+  let lfmDirectLastStrikeTs = 0;
+  let lfmDirectHasSucceeded = false;
+  let lfmGatewayHasWorkingKey = false;
+  const lfmSuspectKeyStrikes = new Map();
+  const inFlightLfmTrackInfo = new Map();
+  const pendingLfmArtistFetches = new Map();
+  const pendingLfmTrackGenresFetches = new Map();
+
   async function fetchLfmWithGateway(params) {
     if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
     let networkErrorRetries = 0;
 
-    const checkRevoked = async (response) => {
-        if (response.status === 403) {
+    const checkKeyStatus = async (response) => {
+        if (response.status !== 403 && response.status !== 401) return 'ok';
+        try {
+            const contentType = (response.headers.get('content-type') || '').toLowerCase();
+            const text = await response.clone().text();
+            if (!text) return 'suspect_403';
             try {
-                const cloned = response.clone();
-                const data = await cloned.json();
-                if (data && (data.error === 10 || data.message === "Invalid API key")) return true;
-                return false; 
-            } catch (e) {
-                return true; 
+                const data = JSON.parse(text);
+                if (data && (data.error === 10 || data.error === 26 || /invalid api key|suspended api key/i.test(data.message || ''))) {
+                    return 'revoked';
+                }
+                if (data && typeof data.error === 'number') return 'lfm_error';
+            } catch (_) {
+                if (/invalid api key|suspended api key|error code="(10|26)"/i.test(text)) {
+                    return 'revoked';
+                }
+                if (contentType.includes('text/html') || /<!doctype html|<html\b/i.test(text)) {
+                    return 'waf_blocked';
+                }
             }
+            return 'suspect_403';
+        } catch (_) {
+            return 'waf_blocked';
         }
-        return false;
+    };
+
+    const handleGatewayKeyCheck = async (response, apiKey) => {
+        const status = await checkKeyStatus(response);
+        if (status === 'revoked') {
+            console.warn(`Last.fm request failed with Invalid Key. Revoking key ...${apiKey.slice(-4)} and retrying.`);
+            revokedLfmKeys.add(apiKey);
+            lfmSuspectKeyStrikes.delete(apiKey);
+            return { shouldRetry: true, status };
+        }
+        if (status === 'suspect_403' || status === 'waf_blocked') {
+            const remainingValidKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
+            if (status === 'suspect_403' && lfmGatewayHasWorkingKey) {
+                const strikes = (lfmSuspectKeyStrikes.get(apiKey) || 0) + 1;
+                lfmSuspectKeyStrikes.set(apiKey, strikes);
+                if (strikes >= 2 && remainingValidKeys > 1) {
+                    console.warn(`Last.fm key ...${apiKey.slice(-4)} repeatedly returned 403 on gateway. Revoking and retrying.`);
+                    revokedLfmKeys.add(apiKey);
+                    lfmSuspectKeyStrikes.delete(apiKey);
+                    return { shouldRetry: true, status };
+                }
+            }
+            if (remainingValidKeys > 1 && networkErrorRetries < 2) {
+                networkErrorRetries++;
+                return { shouldRetry: true, status };
+            }
+        } else if (response.ok || status === 'lfm_error') {
+            lfmGatewayHasWorkingKey = true;
+            lfmSuspectKeyStrikes.delete(apiKey);
+        }
+        return { shouldRetry: false, status };
     };
 
     while (true) {
@@ -2997,11 +5810,8 @@
         if (useLfmGateway) {
             try {
                 const response = await fetch(gatewayUrl);
-                if (await checkRevoked(response)) {
-                    console.warn(`Last.fm gateway request failed with 403 (Invalid Key). Revoking key ...${apiKey.slice(-4)} and retrying.`);
-                    revokedLfmKeys.add(apiKey);
-                    continue;
-                }
+                const { shouldRetry } = await handleGatewayKeyCheck(response, apiKey);
+                if (shouldRetry) continue;
                 return response;
             } catch (gatewayError) {
                 if (networkErrorRetries < 2) {
@@ -3014,18 +5824,37 @@
         } else {
             let response;
             let needsGateway = false;
-            let isDirectKeyRevoked = false;
+            let isDirectBlocked403 = false;
             try {
-                response = await fetch(directUrl);
-                if (await checkRevoked(response)) {
-                    console.warn(`Last.fm direct request failed with 403 (Invalid Key). Trying gateway for key ...${apiKey.slice(-4)}.`);
+                const directFetchOpts = (!lfmDirectHasSucceeded && typeof AbortSignal?.timeout === 'function')
+                    ? { signal: AbortSignal.timeout(8000) }
+                    : undefined;
+                response = await fetch(directUrl, directFetchOpts);
+                const directKeyStatus = await checkKeyStatus(response);
+
+                if (directKeyStatus === 'revoked') {
+                    lfmDirectHasSucceeded = true;
+                    lfmDirectConsecutive403 = 0;
+                    lfmDirectFailureStrikes = 0;
+                    lfmDirectLastStrikeTs = 0;
+                    console.warn(`Last.fm direct request returned Invalid Key for ...${apiKey.slice(-4)}. Revoking and retrying.`);
+                    revokedLfmKeys.add(apiKey);
+                    continue;
+                } else if (directKeyStatus === 'waf_blocked' || directKeyStatus === 'suspect_403') {
+                    console.warn(`Last.fm direct request blocked with ${response.status}. Trying gateway.`);
                     needsGateway = true;
-                    isDirectKeyRevoked = true;
-                } else if (response.status === 403) {
+                    isDirectBlocked403 = true;
+                } else {
+                    if (response.status < 500) {
+                        lfmDirectHasSucceeded = true;
+                        lfmDirectConsecutive403 = 0;
+                        lfmDirectFailureStrikes = 0;
+                        lfmDirectLastStrikeTs = 0;
+                        lfmSuspectKeyStrikes.delete(apiKey);
+                    }
                     return response;
                 }
             } catch (error) {
-                console.warn(`Last.fm direct request failed with network error. Trying gateway for key ...${apiKey.slice(-4)}.`);
                 needsGateway = true;
             }
 
@@ -3035,15 +5864,26 @@
 
             try {
                 response = await fetch(gatewayUrl);
-                if (await checkRevoked(response)) {
-                    console.warn(`Last.fm gateway request also failed with 403 (Invalid Key). Revoking key ...${apiKey.slice(-4)} and retrying.`);
-                    revokedLfmKeys.add(apiKey);
-                    continue;
-                }
-                if (response.ok || response.status === 403) {
-                    if (!isDirectKeyRevoked) {
-                        console.log("Last.fm gateway successful. Using gateway for the rest of the session.");
-                        useLfmGateway = true;
+                const { shouldRetry, status: gwStatus } = await handleGatewayKeyCheck(response, apiKey);
+                if (shouldRetry) continue;
+
+                if (response.ok || gwStatus === 'lfm_error') {
+                    if (isDirectBlocked403) {
+                        lfmDirectConsecutive403++;
+                        if (lfmDirectConsecutive403 >= 3) {
+                            console.log("Last.fm direct 403 block confirmed. Using gateway for the rest of the session.");
+                            useLfmGateway = true;
+                        }
+                    } else {
+                        const now = Date.now();
+                        if (now - lfmDirectLastStrikeTs >= 2500) {
+                            lfmDirectFailureStrikes++;
+                            lfmDirectLastStrikeTs = now;
+                            if (lfmDirectFailureStrikes >= 5) {
+                                console.log("Last.fm direct connection persistently unreachable. Using gateway for the rest of the session.");
+                                useLfmGateway = true;
+                            }
+                        }
                     }
                 }
                 return response;
@@ -3283,6 +6123,8 @@
     selectedAiModel = localStorage.getItem(STORAGE_KEY_AI_MODEL) || DEFAULT_AI_MODEL;
     userSystemInstruction = localStorage.getItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2) || DEFAULT_USER_SYSTEM_INSTRUCTION_v2;
     matchAllGenres = localStorage.getItem(STORAGE_KEY_MATCH_ALL_GENRES) === "true";
+    groupSimilarGenres = localStorage.getItem(STORAGE_KEY_GROUP_SIMILAR_GENRES) !== "false";
+    filterNoiseGenres = localStorage.getItem(STORAGE_KEY_FILTER_NOISE_GENRES) !== "false";
     const addToQueueStored = localStorage.getItem(STORAGE_KEY_ADD_TO_QUEUE);
     addToQueueEnabled = addToQueueStored === null ? false : addToQueueStored === "true";
     createPlaylistAfterSort = localStorage.getItem(STORAGE_KEY_CREATE_PLAYLIST) !== "false";
@@ -3426,6 +6268,7 @@
         }
     }
     migrateLegacyNpSettings();
+    prefetchBlacklistMap.clear();
   }
   
   function saveSettings() {
@@ -3444,6 +6287,8 @@
     localStorage.setItem(STORAGE_KEY_AI_MODEL, selectedAiModel);
     localStorage.setItem(STORAGE_KEY_USER_SYSTEM_INSTRUCTION_v2, userSystemInstruction);
     localStorage.setItem(STORAGE_KEY_MATCH_ALL_GENRES, matchAllGenres);
+    localStorage.setItem(STORAGE_KEY_GROUP_SIMILAR_GENRES, groupSimilarGenres);
+    localStorage.setItem(STORAGE_KEY_FILTER_NOISE_GENRES, filterNoiseGenres);
     localStorage.setItem(STORAGE_KEY_ADD_TO_QUEUE, addToQueueEnabled);
     localStorage.setItem(STORAGE_KEY_CREATE_PLAYLIST, createPlaylistAfterSort);
     localStorage.setItem(STORAGE_KEY_SORT_CURRENT_PLAYLIST, sortCurrentPlaylistEnabled);
@@ -3633,6 +6478,8 @@
           [STORAGE_KEY_INCLUDE_LYRICS]: "false",
           [STORAGE_KEY_AI_MODEL]: DEFAULT_AI_MODEL,
           [STORAGE_KEY_MATCH_ALL_GENRES]: "false",
+          [STORAGE_KEY_GROUP_SIMILAR_GENRES]: "true",
+          [STORAGE_KEY_FILTER_NOISE_GENRES]: "true",
           [STORAGE_KEY_MY_SCROBBLES_DISPLAY_MODE]: "number",
           [STORAGE_KEY_KEY_DISPLAY_MODE]: "standard",
           [STORAGE_KEY_SHOW_LIKE_BUTTON]: "false",
@@ -4183,42 +7030,160 @@
     if (cachedAllGenresPool && (!genrePlaylistsCache || cachedAllGenresPool._hasEveryNoise)) {
       return cachedAllGenresPool;
     }
-    const set = new Set();
+    const rawSet = new Set();
     if (typeof MUSIC_MODEL_MAP !== "undefined") {
-      Object.keys(MUSIC_MODEL_MAP).forEach(g => set.add(g.toLowerCase().trim()));
+      Object.keys(MUSIC_MODEL_MAP).forEach(g => rawSet.add(g.toLowerCase().trim()));
     }
-    if (typeof GENRE_MAPPINGS !== "undefined") {
-      Object.keys(GENRE_MAPPINGS).forEach(g => set.add(g.toLowerCase().trim()));
-      Object.values(GENRE_MAPPINGS).forEach(arr => arr.forEach(g => set.add(g.toLowerCase().trim())));
+    if (typeof GENRE_MAPPINGS !== "undefined" && GENRE_MAPPINGS) {
+      Object.keys(GENRE_MAPPINGS).forEach(g => rawSet.add(g.toLowerCase().trim()));
+      Object.values(GENRE_MAPPINGS).forEach(arr => arr.forEach(g => rawSet.add(g.toLowerCase().trim())));
+    }
+    if (typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+      Object.keys(GENRE_ALIASES_RAW).forEach(g => rawSet.add(g.toLowerCase().trim()));
+    }
+    if (typeof BLACKLIST_UMBRELLA_MAP !== "undefined" && BLACKLIST_UMBRELLA_MAP) {
+      Object.keys(BLACKLIST_UMBRELLA_MAP).forEach(g => rawSet.add(g.toLowerCase().trim()));
+      Object.values(BLACKLIST_UMBRELLA_MAP).forEach(arr => arr.forEach(g => rawSet.add(g.toLowerCase().trim())));
     }
     let hasEveryNoise = false;
     if (genrePlaylistsCache && Array.isArray(genrePlaylistsCache) && genrePlaylistsCache.length > 0) {
-      genrePlaylistsCache.forEach(p => { if (p.genre) set.add(p.genre.toLowerCase().trim()); });
+      genrePlaylistsCache.forEach(p => { if (p.genre) rawSet.add(p.genre.toLowerCase().trim()); });
       hasEveryNoise = true;
     }
-    if (typeof MOOD_DESCRIPTORS_SET !== "undefined") {
-      MOOD_DESCRIPTORS_SET.forEach(m => set.delete(m.toLowerCase().trim()));
+    const canonicalSet = new Set();
+    for (const g of rawSet) {
+      if (!g) continue;
+      const norm = normalizeGenre(g);
+      if (typeof MOOD_DESCRIPTORS_SET !== "undefined" && (MOOD_DESCRIPTORS_SET.has(norm) || MOOD_DESCRIPTORS_SET.has(g))) {
+        continue;
+      }
+      canonicalSet.add(norm || g);
     }
-    cachedAllGenresPool = Array.from(set).filter(Boolean).sort();
+    cachedAllGenresPool = Array.from(canonicalSet).filter(Boolean).sort();
     cachedAllGenresPool._hasEveryNoise = hasEveryNoise;
     return cachedAllGenresPool;
   }
 
   function getRuleExpandedTargets(rule) {
     if (!rule?.name) return new Set();
-    const target = normalizeGenre(rule.name.toLowerCase().trim());
+    const rawTarget = rule.name.toLowerCase().trim();
+    const target = normalizeGenre(rawTarget);
     const mode = rule.mode || 'contains';
     const expand = !!rule.expandSubgenres;
-    const expanded = new Set([target]);
+    const expanded = new Set([target, rawTarget]);
 
-    if (expand && typeof GENRE_MAPPINGS !== "undefined") {
-      for (const [main, variants] of Object.entries(GENRE_MAPPINGS)) {
-        const normMain = normalizeGenre(main.toLowerCase().trim());
-        const isMainMatch = (mode === 'exact') ? (normMain === target) : (normMain === target || normMain.includes(target));
-        if (isMainMatch) {
-          expanded.add(normMain);
-          for (let i = 0; i < variants.length; i++) {
-            expanded.add(normalizeGenre(variants[i].toLowerCase().trim()));
+    if (mode === 'contains' && typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+      for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+        if (canonical.includes(rawTarget) || aliases.some(a => a.includes(rawTarget))) {
+          expanded.add(canonical.toLowerCase().trim());
+          expanded.add(normalizeGenre(canonical));
+        }
+      }
+    }
+
+    if (expand) {
+      const initialTargets = new Set(expanded);
+
+      if (typeof BLACKLIST_UMBRELLA_MAP !== "undefined" && BLACKLIST_UMBRELLA_MAP) {
+        const umbrellaEntries = Object.entries(BLACKLIST_UMBRELLA_MAP);
+        const normUmbrellaMap = new Map();
+        for (let i = 0; i < umbrellaEntries.length; i++) {
+          const [uRaw, subs] = umbrellaEntries[i];
+          const uClean = uRaw.toLowerCase().trim();
+          normUmbrellaMap.set(uClean, subs);
+        }
+        for (let i = 0; i < umbrellaEntries.length; i++) {
+          const [uRaw, subs] = umbrellaEntries[i];
+          const uNorm = normalizeGenre(uRaw.toLowerCase().trim());
+          if (!normUmbrellaMap.has(uNorm)) normUmbrellaMap.set(uNorm, subs);
+        }
+
+        const TOP_LEVEL_MACRO_UMBRELLAS = new Set([
+          "electronic", "edm", "dance", "indie", "alternative", "metal", "rock", "hip hop", "rap", "pop", "latin", "punk", "jazz",
+          "blues", "country", "folk", "classical", "reggae", "r&b", "soul", "afrobeats", "soundtrack", "experimental"
+        ]);
+
+        const queue = [];
+        const visitedUmbrellas = new Set();
+
+        for (let i = 0; i < umbrellaEntries.length; i++) {
+          const [umbrella] = umbrellaEntries[i];
+          const rawUmbrella = umbrella.toLowerCase().trim();
+          const normUmbrella = normalizeGenre(rawUmbrella);
+          const isUmbrellaMatch = (mode === 'exact')
+            ? (normUmbrella === target || rawUmbrella === rawTarget)
+            : (normUmbrella === target || normUmbrella.includes(target) || initialTargets.has(normUmbrella) || initialTargets.has(rawUmbrella));
+          if (isUmbrellaMatch) {
+            if (!visitedUmbrellas.has(rawUmbrella)) {
+              visitedUmbrellas.add(normUmbrella);
+              visitedUmbrellas.add(rawUmbrella);
+              const isMacro = TOP_LEVEL_MACRO_UMBRELLAS.has(rawUmbrella) || TOP_LEVEL_MACRO_UMBRELLAS.has(normUmbrella);
+              queue.push({ name: umbrella, depth: 0, canHop: isMacro });
+            }
+          }
+        }
+
+        while (queue.length > 0) {
+          const item = queue.shift();
+          const rawCurr = item.name.toLowerCase().trim();
+          const normCurr = normalizeGenre(rawCurr);
+          expanded.add(rawCurr);
+          expanded.add(normCurr);
+
+          const subgenres = normUmbrellaMap.get(normCurr) || normUmbrellaMap.get(rawCurr) || [];
+          for (let i = 0; i < subgenres.length; i++) {
+            const sRaw = subgenres[i].toLowerCase().trim();
+            const sNorm = normalizeGenre(sRaw);
+            expanded.add(sRaw);
+            expanded.add(sNorm);
+
+            if (item.canHop && item.depth === 0) {
+              if ((normUmbrellaMap.has(sNorm) || normUmbrellaMap.has(sRaw)) && !visitedUmbrellas.has(sRaw)) {
+                visitedUmbrellas.add(sNorm);
+                visitedUmbrellas.add(sRaw);
+                queue.push({ name: sRaw, depth: 1, canHop: false });
+              }
+            }
+          }
+        }
+      }
+
+      if (typeof GENRE_MAPPINGS !== "undefined" && GENRE_MAPPINGS) {
+        const NON_UPWARD_EXPANDING_CLUSTERS = new Set([
+          "afrobeats", "alternative", "alternative rock", "ambient", "arabic pop", "balkan", "blues",
+          "bollywood pop", "c-pop", "children's music", "choral", "classic rock", "classical",
+          "contemporary jazz", "country", "dance", "edm", "electronic", "experimental",
+          "folk", "global christian", "hard rock", "hardcore punk", "heavy metal", "hip hop",
+          "house", "indie", "indie pop", "indie rock", "indonesian pop", "instrumental",
+          "italian pop", "j-pop", "jazz", "k-pop", "karaoke", "latin", "latin hip hop", "latin pop",
+          "metal", "mpb", "opera", "piano", "pop", "pop nacional", "pop rap", "punk",
+          "r&b", "rap", "reggae", "regional mexican", "rock", "rock en espanol",
+          "russian pop", "scandinavian pop", "singer-songwriter", "soul", "soundtrack",
+          "spoken word", "thai pop", "turkish pop", "vietnamese pop"
+        ]);
+
+        const isDirectMainKey = Object.keys(GENRE_MAPPINGS).some(
+          main => normalizeGenre(main.toLowerCase().trim()) === target || main.toLowerCase().trim() === rawTarget
+        );
+
+        for (const [main, variants] of Object.entries(GENRE_MAPPINGS)) {
+          const rawMain = main.toLowerCase().trim();
+          const normMain = normalizeGenre(rawMain);
+          const normVariants = variants.map(v => normalizeGenre(v.toLowerCase().trim()));
+          const isMainMatch = (mode === 'exact')
+            ? (expanded.has(normMain) || expanded.has(rawMain))
+            : (normMain === target || normMain.includes(target) || expanded.has(normMain) || expanded.has(rawMain));
+          const isVariantExactMatch = !isDirectMainKey && !NON_UPWARD_EXPANDING_CLUSTERS.has(rawMain) && (normVariants.includes(target) || variants.some(v => v.toLowerCase().trim() === rawTarget));
+
+          if (isMainMatch || isVariantExactMatch) {
+            expanded.add(normMain);
+            expanded.add(rawMain);
+            for (let i = 0; i < variants.length; i++) {
+              const vRaw = variants[i].toLowerCase().trim();
+              const vNorm = normVariants[i];
+              expanded.add(vRaw);
+              expanded.add(vNorm);
+            }
           }
         }
       }
@@ -4226,21 +7191,63 @@
     return expanded;
   }
 
-  function getRuleMatchedGenresSet(rule) {
+  function getRuleExcludedSet(rule) {
+    const set = new Set();
+    if (!Array.isArray(rule?.excludedGenres) || rule.excludedGenres.length === 0) return set;
+    for (let i = 0; i < rule.excludedGenres.length; i++) {
+      const ex = (rule.excludedGenres[i] || "").toLowerCase().trim();
+      if (ex) {
+        set.add(ex);
+        set.add(normalizeGenre(ex));
+      }
+    }
+    return set;
+  }
+
+  function isGenreExcludedFromRule(genreName, rule, precomputedExSet = null) {
+    if (!genreName || !Array.isArray(rule?.excludedGenres) || rule.excludedGenres.length === 0) return false;
+    const exSet = precomputedExSet || getRuleExcludedSet(rule);
+    if (exSet.size === 0) return false;
+    const rawLower = genreName.toLowerCase().trim();
+    const normG = normalizeGenre(rawLower);
+    return exSet.has(rawLower) || exSet.has(normG);
+  }
+
+  function isTrackExemptFromRule(allTrackGenres, rule) {
+    if (!allTrackGenres || !Array.isArray(rule?.excludedGenres) || rule.excludedGenres.length === 0) return false;
+    const exSet = getRuleExcludedSet(rule);
+    if (exSet.size === 0) return false;
+    for (const g of allTrackGenres) {
+      const name = typeof g === 'string' ? g : (g?.name || '');
+      if (name && isGenreExcludedFromRule(name, rule, exSet)) return true;
+    }
+    return false;
+  }
+
+  function getRuleMatchedGenresSet(rule, includeExcluded = false) {
     if (!rule?.name) return new Set();
     const pool = getAllUniqueGenresPool();
     const mode = rule.mode || 'contains';
+    const rawTarget = rule.name.toLowerCase().trim();
     const targets = getRuleExpandedTargets(rule);
+    const exSet = includeExcluded ? null : getRuleExcludedSet(rule);
     const matched = new Set();
 
     for (let i = 0; i < pool.length; i++) {
       const genre = pool[i];
+      if (!includeExcluded && exSet && exSet.size > 0 && isGenreExcludedFromRule(genre, rule, exSet)) {
+        continue;
+      }
       const normG = normalizeGenre(genre);
       if (mode === 'exact') {
-        if (targets.has(normG)) matched.add(genre);
+        if (targets.has(normG) || targets.has(genre.toLowerCase().trim())) matched.add(genre);
       } else {
+        if (genre.includes(rawTarget)) {
+          matched.add(genre);
+          continue;
+        }
         for (const exp of targets) {
-          if (normG.includes(exp)) {
+          if (normG.includes(exp) || genre.includes(exp)) {
             matched.add(genre);
             break;
           }
@@ -4252,39 +7259,53 @@
 
   function isGenreMatchedByRule(genreName, rule) {
     if (!genreName || !rule?.name || rule.enabled === false) return false;
-    const normG = normalizeGenre(genreName.toLowerCase().trim());
-    if (typeof MOOD_DESCRIPTORS_SET !== "undefined" && MOOD_DESCRIPTORS_SET.has(normG)) return false;
+    const rawLower = genreName.toLowerCase().trim();
+    const normG = normalizeGenre(rawLower);
+    if (typeof MOOD_DESCRIPTORS_SET !== "undefined" && (MOOD_DESCRIPTORS_SET.has(normG) || MOOD_DESCRIPTORS_SET.has(rawLower))) return false;
+    if (isGenreExcludedFromRule(rawLower, rule)) return false;
     const mode = rule.mode || 'contains';
     const targets = getRuleExpandedTargets(rule);
 
     if (mode === 'exact') {
-      return targets.has(normG);
+      return targets.has(normG) || targets.has(rawLower);
     }
 
+    const rawTarget = rule.name.toLowerCase().trim();
+    if (rawLower.includes(rawTarget)) return true;
+
     for (const exp of targets) {
-      if (normG.includes(exp)) return true;
+      if (normG.includes(exp) || rawLower.includes(exp)) return true;
     }
     return false;
   }
 
   async function isTrackLikedForBlacklist(trackUri) {
     if (!trackUri || !genreBlacklistProtectLiked) return false;
-    if (cachedLikedSongs && cachedLikedSongs.some(s => s.uri === trackUri)) return true;
     try {
       if (Spicetify.Platform?.LibraryAPI?.contains) {
         const res = await Spicetify.Platform.LibraryAPI.contains(trackUri);
-        if (Array.isArray(res) ? res[0] : res) return true;
+        return Boolean(Array.isArray(res) ? res[0] : res);
       }
     } catch (e) {}
+    if (isTrackDirectlyLiked({ uri: trackUri })) return true;
+    if (cachedLikedSongs && cachedLikedSongs.some(s => s.uri === trackUri)) return true;
     return false;
   }
 
-  function findMatchingBlacklistRule(genresList, sourceName, minConfidence = 25) {
-    if (!genreBlacklistEnabled || !genreBlacklistRules || genreBlacklistRules.length === 0) return null;
+  function hasActiveBlacklistRules() {
+    if (!genreBlacklistEnabled || !Array.isArray(genreBlacklistRules) || genreBlacklistRules.length === 0) return false;
+    const src = genreBlacklistConfig?.sources;
+    if (src && !src.spotify_track && !src.everynoise_artist && !src.lastfm_track && !src.lastfm_artist && !src.deezer) return false;
+    return genreBlacklistRules.some(r => r && r.enabled !== false && r.name && r.name.trim().length > 0);
+  }
+
+  function findMatchingBlacklistRule(genresList, sourceName, minConfidence = 25, allTrackGenres = null) {
+    if (!hasActiveBlacklistRules()) return null;
     if (!genresList || !Array.isArray(genresList) || genresList.length === 0) return null;
     const confSources = genreBlacklistConfig?.sources || {};
     if (sourceName && confSources[sourceName] === false) return null;
 
+    const validNamesInSource = [];
     for (let i = 0; i < genresList.length; i++) {
       const item = genresList[i];
       let name = "";
@@ -4301,13 +7322,21 @@
 
       if (!name) continue;
       if (sourceName === 'spotify_track' && score < minConfidence) continue;
+      if (isCountryOnly(name)) continue;
 
       const norm = normalizeGenre(name);
       if (typeof MOOD_DESCRIPTORS_SET !== "undefined" && MOOD_DESCRIPTORS_SET.has(norm)) continue;
+      validNamesInSource.push(name);
+    }
 
+    if (validNamesInSource.length === 0) return null;
+    const contextGenres = allTrackGenres || validNamesInSource;
+
+    for (let i = 0; i < validNamesInSource.length; i++) {
+      const name = validNamesInSource[i];
       for (let r = 0; r < genreBlacklistRules.length; r++) {
         const rule = genreBlacklistRules[r];
-        if (isGenreMatchedByRule(name, rule)) {
+        if (isGenreMatchedByRule(name, rule) && !isTrackExemptFromRule(contextGenres, rule)) {
           return { matchedGenre: name, rule };
         }
       }
@@ -4316,7 +7345,7 @@
   }
 
   async function triggerBlacklistAutoSkip(track, matchedGenre) {
-    if (!genreBlacklistEnabled) return;
+    if (!hasActiveBlacklistRules()) return;
     const currentItem = Spicetify.Player.data?.item;
     if (!currentItem || currentItem.uri !== track.uri) return;
     if (Spicetify.Player.data?.is_paused === true) return;
@@ -4366,155 +7395,317 @@
     }
   }
 
+  const pendingBlacklistEvaluations = new Map();
+
   async function evaluateTrackAgainstBlacklist(track, isPrefetch = false) {
-    if (!genreBlacklistEnabled || !genreBlacklistRules || genreBlacklistRules.length === 0) return null;
+    if (!hasActiveBlacklistRules()) return null;
     if (!track || !track.uri || Spicetify.URI.isLocal(track.uri)) return null;
 
-    if (genreBlacklistProtectLiked) {
-      const isLiked = await isTrackLikedForBlacklist(track.uri);
-      if (isLiked) return null;
+    if (pendingBlacklistEvaluations.has(track.uri)) {
+      const match = await pendingBlacklistEvaluations.get(track.uri);
+      if (match && !isPrefetch) {
+        triggerBlacklistAutoSkip(track, match.matchedGenre);
+      }
+      return match;
     }
 
-    const confSources = genreBlacklistConfig?.sources || {};
-    const minConf = genreBlacklistConfig?.minSpotifyConfidence ?? 25;
+    let triggeredSkipDuringEval = false;
 
-    const cachedMap = nowPlayingGenreCache.get(track.uri);
-    if (cachedMap instanceof Map) {
-      for (const item of cachedMap.values()) {
-        let isSourceActive = false;
-        for (const s of item.sources) {
-          if (s.startsWith("Spotify Track")) {
-            if (confSources.spotify_track) {
-              const match = s.match(/\((\d+)%\)/);
-              const score = match ? parseInt(match[1], 10) : 100;
-              if (score >= minConf) isSourceActive = true;
-            }
-          } else if (s.startsWith("EveryNoise") && confSources.everynoise_artist) {
-            isSourceActive = true;
-          } else if (s.startsWith("Last.fm Track") && confSources.lastfm_track) {
-            isSourceActive = true;
-          } else if (s.startsWith("Last.fm Artist") && confSources.lastfm_artist) {
-            isSourceActive = true;
-          } else if (s.startsWith("Deezer") && confSources.deezer) {
-            isSourceActive = true;
-          }
-          if (isSourceActive) break;
+    const evalPromise = (async () => {
+      if (genreBlacklistProtectLiked) {
+        const isLiked = await isTrackLikedForBlacklist(track.uri);
+        if (isLiked) return null;
+      }
+
+      if (pendingGenreFetches.has(track.uri)) {
+        try { await pendingGenreFetches.get(track.uri); } catch (_) {}
+      }
+
+      const confSources = genreBlacklistConfig?.sources || {};
+      const minConf = genreBlacklistConfig?.minSpotifyConfidence ?? 25;
+      const allResolvedGenres = [];
+      const coveredSources = {
+        spotify_track: false,
+        everynoise_artist: false,
+        lastfm_track: false,
+        lastfm_artist: false,
+        deezer: false
+      };
+
+      const cachedMap = nowPlayingGenreCache.get(track.uri);
+      if (cachedMap instanceof Map) {
+        if (genreSourcesNpSpotifyTrack && minConf >= 5) coveredSources.spotify_track = true;
+        if (genreSourcesNpEveryNoise) coveredSources.everynoise_artist = true;
+        if (genreSourcesNpLastfm) {
+          coveredSources.lastfm_track = true;
+          coveredSources.lastfm_artist = true;
         }
+        if (genreSourcesNpDeezer) coveredSources.deezer = true;
 
-        if (isSourceActive) {
+        for (const item of cachedMap.values()) {
+          let isSourceActive = false;
+          for (const s of item.sources) {
+            if (s.startsWith("Spotify Track")) {
+              if (confSources.spotify_track) {
+                const match = s.match(/\((\d+)%\)/);
+                const score = match ? parseInt(match[1], 10) : 100;
+                if (score >= minConf) isSourceActive = true;
+              }
+            } else if (s.startsWith("EveryNoise") && confSources.everynoise_artist) {
+              isSourceActive = true;
+            } else if (s.startsWith("Last.fm Track") && confSources.lastfm_track) {
+              isSourceActive = true;
+            } else if (s.startsWith("Last.fm Artist") && confSources.lastfm_artist) {
+              isSourceActive = true;
+            } else if (s.startsWith("Deezer") && confSources.deezer) {
+              isSourceActive = true;
+            }
+            if (isSourceActive) break;
+          }
+          if (isSourceActive && item.name && !isCountryOnly(item.name)) {
+            allResolvedGenres.push(item.name);
+          }
+        }
+      }
+
+      const cachedRecord = sessionGenreCache.get(track.uri) || (track.isrc ? sessionGenreCache.get(track.isrc) : null);
+      if (cachedRecord && typeof cachedRecord === 'object' && !(cachedRecord instanceof Map)) {
+        hydrateCachedGenreRecord(cachedRecord);
+        const spTrackItems = Array.isArray(cachedRecord.spotify_track_genres)
+          ? cachedRecord.spotify_track_genres.map(g => (typeof g === 'string' && cachedRecord._spotify_track_genre_scores?.[g] !== undefined)
+              ? { name: g, score: cachedRecord._spotify_track_genre_scores[g] }
+              : g)
+          : null;
+
+        if (spTrackItems && minConf > 5) coveredSources.spotify_track = true;
+        if (cachedRecord._everynoise_checked) coveredSources.everynoise_artist = true;
+        if (cachedRecord._lfm_track_checked) coveredSources.lastfm_track = true;
+        if (cachedRecord._lfm_artist_checked) coveredSources.lastfm_artist = true;
+        if (cachedRecord._deezer_checked) coveredSources.deezer = true;
+
+        const addCachedList = (list, isSpTrack = false) => {
+          if (!Array.isArray(list)) return;
+          for (let i = 0; i < list.length; i++) {
+            const item = list[i];
+            const name = typeof item === 'string' ? item : item?.name;
+            const score = typeof item === 'object' && item?.score !== undefined ? Math.round(item.score <= 1 ? item.score * 100 : item.score) : 100;
+            if (name && (!isSpTrack || score >= minConf) && !isCountryOnly(name)) {
+              allResolvedGenres.push(name);
+            }
+          }
+        };
+
+        if (confSources.spotify_track && spTrackItems) addCachedList(spTrackItems, true);
+        if (confSources.everynoise_artist) addCachedList(cachedRecord.everynoise_artist_genres);
+        if (confSources.lastfm_track) addCachedList(cachedRecord.lastfm_track_genres);
+        if (confSources.lastfm_artist) addCachedList(cachedRecord.lastfm_artist_genres);
+        if (confSources.deezer) addCachedList(cachedRecord.deezer_genres);
+      }
+
+      const needSpotifyTrack = Boolean(confSources.spotify_track && !coveredSources.spotify_track);
+      const needEveryNoise = Boolean(confSources.everynoise_artist && !coveredSources.everynoise_artist);
+      const needLfmTrack = Boolean(confSources.lastfm_track && !coveredSources.lastfm_track);
+      const needLfmArtist = Boolean(confSources.lastfm_artist && !coveredSources.lastfm_artist);
+      const needDeezer = Boolean(confSources.deezer && !coveredSources.deezer);
+      const hasUncoveredSources = needSpotifyTrack || needEveryNoise || needLfmTrack || needLfmArtist || needDeezer;
+
+      const deferredMatches = [];
+
+      if (allResolvedGenres.length > 0) {
+        for (let i = 0; i < allResolvedGenres.length; i++) {
+          const gName = allResolvedGenres[i];
           for (let r = 0; r < genreBlacklistRules.length; r++) {
             const rule = genreBlacklistRules[r];
-            if (isGenreMatchedByRule(item.name, rule)) {
-              const directMatch = { matchedGenre: item.name, rule };
-              if (!isPrefetch) triggerBlacklistAutoSkip(track, directMatch.matchedGenre);
-              return directMatch;
+            if (isGenreMatchedByRule(gName, rule) && !isTrackExemptFromRule(allResolvedGenres, rule)) {
+              const directMatch = { matchedGenre: gName, rule };
+              if (hasUncoveredSources && Array.isArray(rule.excludedGenres) && rule.excludedGenres.length > 0) {
+                deferredMatches.push(directMatch);
+              } else {
+                if (!isPrefetch) {
+                  triggeredSkipDuringEval = true;
+                  triggerBlacklistAutoSkip(track, directMatch.matchedGenre);
+                }
+                return directMatch;
+              }
             }
           }
         }
       }
-    }
 
-    const cachedRecord = sessionGenreCache.get(track.uri);
-    if (cachedRecord && typeof cachedRecord === 'object' && !(cachedRecord instanceof Map)) {
-      const directMatch = (confSources.spotify_track && findMatchingBlacklistRule(cachedRecord.spotify_track_genres, 'spotify_track', minConf)) ||
-                          (confSources.everynoise_artist && findMatchingBlacklistRule(cachedRecord.everynoise_artist_genres, 'everynoise_artist', minConf)) ||
-                          (confSources.lastfm_track && findMatchingBlacklistRule(cachedRecord.lastfm_track_genres, 'lastfm_track', minConf)) ||
-                          (confSources.lastfm_artist && findMatchingBlacklistRule(cachedRecord.lastfm_artist_genres, 'lastfm_artist', minConf)) ||
-                          (confSources.deezer && findMatchingBlacklistRule(cachedRecord.deezer_genres, 'deezer', minConf));
-      if (directMatch) {
-        if (!isPrefetch) triggerBlacklistAutoSkip(track, directMatch.matchedGenre);
-        return directMatch;
+      if (!hasUncoveredSources) {
+        return null;
       }
-    }
 
-    let hasSkipped = false;
-    let matchResult = null;
+      let hasSkipped = false;
+      let matchResult = null;
 
-    const checkSourceResult = (genreList, sourceName) => {
-      if (hasSkipped) return;
-      const match = findMatchingBlacklistRule(genreList, sourceName, minConf);
-      if (match && !hasSkipped) {
-        hasSkipped = true;
-        matchResult = match;
-        if (!isPrefetch) {
-          triggerBlacklistAutoSkip(track, match.matchedGenre);
+      const checkSourceResult = (genreList, sourceName) => {
+        if (!genreList || !Array.isArray(genreList)) return;
+        for (let i = 0; i < genreList.length; i++) {
+          const item = genreList[i];
+          const name = typeof item === 'string' ? item : item?.name;
+          const score = typeof item === 'object' && item?.score !== undefined ? Math.round(item.score <= 1 ? item.score * 100 : item.score) : 100;
+          if (name && (sourceName !== 'spotify_track' || score >= minConf) && !isCountryOnly(name)) {
+            allResolvedGenres.push(name);
+          }
+        }
+        if (hasSkipped) return;
+        const match = findMatchingBlacklistRule(genreList, sourceName, minConf, allResolvedGenres);
+        if (match && !hasSkipped) {
+          if (Array.isArray(match.rule?.excludedGenres) && match.rule.excludedGenres.length > 0) {
+            deferredMatches.push(match);
+          } else {
+            hasSkipped = true;
+            matchResult = match;
+            if (!isPrefetch) {
+              triggeredSkipDuringEval = true;
+              triggerBlacklistAutoSkip(track, match.matchedGenre);
+            }
+          }
+        }
+      };
+
+      const promises = [];
+
+      if (needSpotifyTrack) {
+        promises.push((async () => {
+          try {
+            const concepts = await fetchNativeSpotifyTrackGenres(track.uri);
+            checkSourceResult(concepts, 'spotify_track');
+          } catch (e) {}
+        })());
+      }
+
+      const artistIds = [...new Set([
+        track.artistId,
+        ...(track.artists || []).map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)),
+        ...(track.artistUris || []).map(u => u ? u.split(':')[2] : null),
+        track.metadata?.artist_uri ? track.metadata.artist_uri.split(':')[2] : null
+      ].filter(Boolean))];
+
+      if (needEveryNoise && artistIds.length > 0) {
+        promises.push((async () => {
+          try {
+            const missingIds = [];
+            for (let i = 0; i < artistIds.length; i++) {
+              const aId = artistIds[i];
+              if (pendingEveryNoiseFetches.has(aId)) {
+                try { await pendingEveryNoiseFetches.get(aId); } catch (_) {}
+              }
+              let tags = everyNoiseCache.get(aId);
+              if (!tags) {
+                tags = await idb.get('everyNoiseArtistTags', aId, CACHE_EXPIRE_EVERYNOISE);
+                if (tags) everyNoiseCache.set(aId, tags);
+              }
+              if (tags && Array.isArray(tags)) {
+                checkSourceResult(tags, 'everynoise_artist');
+                if (hasSkipped) return;
+              } else {
+                missingIds.push(aId);
+              }
+            }
+
+            if (!hasSkipped && missingIds.length > 0) {
+              const genreMap = await getGenreMapping();
+              const sortedIds = [...new Set(missingIds)].sort();
+              const idsString = sortedIds.join(',');
+              const executionPromise = (async () => {
+                try {
+                  const res = await fetch(`${EVERYNOISE_GATEWAY_URL}${idsString}`, { signal: AbortSignal.timeout(11000) });
+                  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                  const data = await res.json();
+                  sortedIds.forEach(aId => {
+                    const rawGenres = (sortedIds.length === 1 && Array.isArray(data)) ? data : (data?.[aId] || []);
+                    const validGenres = rawGenres.filter(g => !isCountryOnly(g) && isWhitelistedGenre(g, genreMap));
+                    everyNoiseCache.set(aId, validGenres);
+                    idb.set('everyNoiseArtistTags', aId, validGenres);
+                    if (validGenres.length > 0 && !hasSkipped) {
+                      checkSourceResult(validGenres, 'everynoise_artist');
+                    }
+                  });
+                } catch (_) {
+                } finally {
+                  sortedIds.forEach(aId => pendingEveryNoiseFetches.delete(aId));
+                }
+              })();
+              sortedIds.forEach(aId => pendingEveryNoiseFetches.set(aId, executionPromise));
+              await executionPromise;
+            }
+          } catch (e) {}
+        })());
+      }
+
+      const artistName = track.artists?.[0]?.name || track.artistName || track.metadata?.artist_name || "";
+      const trackName = track.name || track.songTitle || track.metadata?.title || "";
+
+      if ((needLfmTrack || needLfmArtist) && artistName) {
+        promises.push((async () => {
+          try {
+            const lfmData = await getLastfmGenres(artistName, trackName, !needLfmArtist);
+            if (lfmData) {
+              if (needLfmTrack && lfmData.track_genres?.length) {
+                checkSourceResult(lfmData.track_genres, 'lastfm_track');
+              }
+              if (needLfmArtist && lfmData.artist_genres?.length) {
+                checkSourceResult(lfmData.artist_genres, 'lastfm_artist');
+              }
+            }
+          } catch (e) {}
+        })());
+      }
+
+      if (needDeezer && track.uri) {
+        promises.push((async () => {
+          try {
+            let isrc = track.isrc || track.external_ids?.isrc || track.metadata?.isrc || null;
+            if (!isrc) {
+              const metaMap = await fetchCoreMetadataBatch([track.uri]);
+              isrc = metaMap.get(track.uri)?.isrc;
+            }
+            if (isrc) {
+              let deezerGenres = await idb.get('deezerGenres', isrc);
+              if (!deezerGenres) {
+                deezerGenres = await getDeezerGenres(isrc);
+                idb.set('deezerGenres', isrc, deezerGenres || []);
+              }
+              if (deezerGenres && Array.isArray(deezerGenres)) {
+                checkSourceResult(deezerGenres, 'deezer');
+              }
+            }
+          } catch (e) {}
+        })());
+      }
+
+      await Promise.allSettled(promises);
+
+      if (!hasSkipped && deferredMatches.length > 0) {
+        for (let i = 0; i < deferredMatches.length; i++) {
+          const candidate = deferredMatches[i];
+          if (!isTrackExemptFromRule(allResolvedGenres, candidate.rule)) {
+            hasSkipped = true;
+            matchResult = candidate;
+            if (!isPrefetch) {
+              triggeredSkipDuringEval = true;
+              triggerBlacklistAutoSkip(track, candidate.matchedGenre);
+            }
+            break;
+          }
         }
       }
-    };
 
-    const promises = [];
+      return matchResult;
+    })();
 
-    if (confSources.spotify_track) {
-      promises.push((async () => {
-        try {
-          const concepts = await fetchNativeSpotifyTrackGenres(track.uri);
-          checkSourceResult(concepts, 'spotify_track');
-        } catch (e) {}
-      })());
+    pendingBlacklistEvaluations.set(track.uri, evalPromise);
+    try {
+      const res = await evalPromise;
+      if (res && !isPrefetch && !triggeredSkipDuringEval) {
+        triggerBlacklistAutoSkip(track, res.matchedGenre);
+      }
+      return res;
+    } finally {
+      pendingBlacklistEvaluations.delete(track.uri);
     }
-
-    const artistIds = [...new Set([
-      track.artistId,
-      ...(track.artists || []).map(a => a.id || (a.uri ? a.uri.split(':')[2] : null)),
-      ...(track.artistUris || []).map(u => u ? u.split(':')[2] : null),
-      track.metadata?.artist_uri ? track.metadata.artist_uri.split(':')[2] : null
-    ].filter(Boolean))];
-
-    if (confSources.everynoise_artist && artistIds.length > 0) {
-      promises.push((async () => {
-        try {
-          for (let i = 0; i < artistIds.length; i++) {
-            const aId = artistIds[i];
-            let tags = everyNoiseCache.get(aId);
-            if (!tags) tags = await idb.get('everyNoiseArtistTags', aId, CACHE_EXPIRE_EVERYNOISE);
-            if (tags && Array.isArray(tags)) {
-              checkSourceResult(tags, 'everynoise_artist');
-              if (hasSkipped) break;
-            }
-          }
-        } catch (e) {}
-      })());
-    }
-
-    const artistName = track.artists?.[0]?.name || track.artistName || track.metadata?.artist_name || "";
-    const trackName = track.name || track.songTitle || track.metadata?.title || "";
-
-    if ((confSources.lastfm_track || confSources.lastfm_artist) && artistName) {
-      promises.push((async () => {
-        try {
-          const lfmData = await getLastfmGenres(artistName, trackName, !confSources.lastfm_artist);
-          if (lfmData) {
-            if (confSources.lastfm_track && lfmData.track_genres?.length) {
-              checkSourceResult(lfmData.track_genres, 'lastfm_track');
-            }
-            if (confSources.lastfm_artist && lfmData.artist_genres?.length) {
-              checkSourceResult(lfmData.artist_genres, 'lastfm_artist');
-            }
-          }
-        } catch (e) {}
-      })());
-    }
-
-    if (confSources.deezer && track.uri) {
-      promises.push((async () => {
-        try {
-          let isrc = track.isrc || track.external_ids?.isrc || track.metadata?.isrc || null;
-          if (!isrc) {
-            const metaMap = await fetchCoreMetadataBatch([track.uri]);
-            isrc = metaMap.get(track.uri)?.isrc;
-          }
-          if (isrc) {
-            const deezerGenres = await idb.get('deezerGenres', isrc) || await getDeezerGenres(isrc);
-            if (deezerGenres && Array.isArray(deezerGenres)) {
-              checkSourceResult(deezerGenres, 'deezer');
-            }
-          }
-        } catch (e) {}
-      })());
-    }
-
-    await Promise.allSettled(promises);
-    return matchResult;
   }
 
   let cachedCuratedSet = null;
@@ -4531,21 +7722,47 @@
     return s;
   }
 
-  function showMatchedGenresModal(rule) {
+  function showMatchedGenresModal(rule, onRuleChange = null) {
     if (!rule?.name) return;
-    const rawMatches = Array.from(getRuleMatchedGenresSet(rule));
-    const normTarget = normalizeGenre(rule.name.toLowerCase().trim());
+    if (!Array.isArray(rule.excludedGenres)) rule.excludedGenres = [];
+    const rawMatchesSet = getRuleMatchedGenresSet(rule, true);
+    for (let i = 0; i < rule.excludedGenres.length; i++) {
+      const ex = (rule.excludedGenres[i] || "").toLowerCase().trim();
+      if (ex) rawMatchesSet.add(ex);
+    }
+    const rawMatches = Array.from(rawMatchesSet);
+    const rawTarget = rule.name.toLowerCase().trim();
+    const normTarget = normalizeGenre(rawTarget);
+    const ruleDisplayName = formatGenreTitle(rule.name);
     const isContainsMode = (rule.mode || 'contains') === 'contains';
 
     const getMatchDetails = (name) => {
-      const normG = normalizeGenre(name);
-      if (normG === normTarget) {
-        return { priority: 0, badgeClass: "mg-badge-exact", badgeLabel: "Exact Match" };
+      const rawLower = name.toLowerCase().trim();
+      const normG = normalizeGenre(rawLower);
+      if (normG === normTarget || rawLower === rawTarget) {
+        return {
+          priority: 0,
+          badgeClass: "mg-badge-exact",
+          badgeLabel: "Exact Match",
+          badgeTooltip: `Exact match for your target genre "${ruleDisplayName}"`
+        };
       }
-      if (isContainsMode && normG.includes(normTarget)) {
-        return { priority: 1, badgeClass: "mg-badge-contains", badgeLabel: "Contains" };
+      if (isContainsMode && (rawLower.includes(rawTarget) || normG.includes(normTarget) || !rule.expandSubgenres)) {
+        return {
+          priority: 1,
+          badgeClass: "mg-badge-contains",
+          badgeLabel: "Contains",
+          badgeTooltip: rawLower.includes(rawTarget)
+            ? `Included because Match Mode is set to "Contains" (tag contains "${ruleDisplayName}")`
+            : `Included because Match Mode is set to "Contains" (matches variant of "${ruleDisplayName}")`
+        };
       }
-      return { priority: 2, badgeClass: "mg-badge-related", badgeLabel: "Related Style" };
+      return {
+        priority: 2,
+        badgeClass: "mg-badge-related",
+        badgeLabel: "Related Style",
+        badgeTooltip: `Included because "Include Related Styles" is enabled (subgenre or related style of "${ruleDisplayName}")`
+      };
     };
 
     const sortedData = rawMatches.map(name => {
@@ -4566,7 +7783,7 @@
 
     const modal = document.createElement("div");
     modal.className = "sort-play-modal-container sort-play-font-scope";
-    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(540px, 94vw) !important; max-width: 540px !important; min-width: 320px !important; max-height: min(600px, 86vh) !important; border-radius: 24px; overflow: hidden; background-color: #181818 !important; color: #fff; border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.65);`;
+    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(560px, 94vw) !important; max-width: 560px !important; min-width: 320px !important; max-height: min(620px, 86vh) !important; border-radius: 24px; overflow: hidden; background-color: #181818 !important; color: #fff; border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.65);`;
 
     const shadowRoot = modal.attachShadow({ mode: "open" });
     const ITEM_HEIGHT = 38;
@@ -4582,7 +7799,7 @@
         .mg-header { padding: 22px 24px 12px; display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #282828; flex-shrink: 0; }
         .mg-title-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
         .mg-title { margin: 0; font-size: 20px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mg-subtitle { font-size: 12px; color: #888; display: flex; align-items: center; gap: 8px; }
+        .mg-subtitle { font-size: 12px; color: #888; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .mg-close-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.15s ease; flex-shrink: 0; }
         .mg-close-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
         .mg-toolbar { display: flex; align-items: center; gap: 8px; padding: 10px 24px; border-bottom: 1px solid #282828; background: rgba(0,0,0,0.15); flex-shrink: 0; }
@@ -4592,18 +7809,31 @@
         .mg-search-input:focus { border-color: #555; background: #262626; }
         .mg-search-clear { position: absolute; right: 8px; background: none; border: none; color: rgba(255,255,255,0.5); cursor: pointer; font-size: 18px; padding: 0; }
         .mg-search-clear:hover { color: #fff; }
-        .mg-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; position: relative; padding: 8px 16px; scrollbar-width: thin; scrollbar-color: #555 transparent; }
-        .mg-content::-webkit-scrollbar { width: 6px; }
-        .mg-content::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
-        .mg-list-wrap { position: relative; width: 100%; contain: layout; }
-        .mg-row { position: absolute; left: 0; width: 100%; height: 34px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 38px 0 8px; border-radius: 6px; background: transparent; border: 1px solid transparent; transition: background 0.15s ease, border-color 0.15s ease; user-select: none; }
+        .mg-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; position: relative; padding: 10px 16px 20px 16px; scrollbar-width: auto !important; scrollbar-color: auto !important; will-change: scroll-position; }
+        .mg-content::-webkit-scrollbar { width: 4px !important; }
+        .mg-content::-webkit-scrollbar-track { background: transparent !important; margin-bottom: 12px !important; }
+        .mg-content::-webkit-scrollbar-button:vertical:start:decrement { display: none !important; }
+        .mg-content::-webkit-scrollbar-button:vertical:end:increment { display: block !important; height: 12px !important; background: transparent !important; border: none !important; }
+        .mg-content::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.15) !important; border-radius: 4px !important; }
+        .mg-content::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.28) !important; }
+        .mg-list-wrap { position: relative; width: 100%; min-height: 100%; contain: layout; }
+        .is-scrolling .mg-row { pointer-events: none !important; }
+        .mg-row { position: absolute; left: 0; width: 100%; height: 34px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 74px 0 8px; border-radius: 6px; background: transparent; border: 1px solid transparent; transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease; user-select: none; }
         .mg-row:hover { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.12); }
+        .mg-row.is-excluded { opacity: 0.6; background: rgba(233, 20, 41, 0.05); }
+        .mg-row.is-excluded .mg-title-cell { text-decoration: line-through; color: #aaa; }
         .mg-rank { width: 32px; text-align: right; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.35); flex-shrink: 0; font-variant-numeric: tabular-nums; }
         .mg-title-cell { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
-        .mg-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.3px; }
+        .mg-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.3px; cursor: help; }
         .mg-badge-exact { background: rgba(30, 215, 96, 0.14); color: #1ed760; border: 1px solid rgba(30, 215, 96, 0.3); }
         .mg-badge-contains { background: rgba(50, 190, 240, 0.14); color: #45c8f5; border: 1px solid rgba(50, 190, 240, 0.3); }
         .mg-badge-related { background: rgba(180, 140, 255, 0.14); color: #c49bff; border: 1px solid rgba(180, 140, 255, 0.3); }
+        .mg-badge-excluded { background: rgba(233, 20, 41, 0.16); color: #ff6b6b; border: 1px solid rgba(233, 20, 41, 0.35); }
+        .mg-excl-btn { position: absolute; right: 36px; top: 0; bottom: 0; width: 34px; height: 100%; background: transparent; border: none; color: rgba(255,255,255,0.45); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; flex-shrink: 0; }
+        .mg-row:hover .mg-excl-btn { color: rgba(255,255,255,0.85); }
+        .mg-excl-btn:hover { background: rgba(233, 20, 41, 0.18) !important; color: #ff6b6b !important; }
+        .mg-row.is-excluded .mg-excl-btn { color: #1ed760; }
+        .mg-row.is-excluded .mg-excl-btn:hover { background: rgba(30, 215, 96, 0.18) !important; color: #3be377 !important; }
         .mg-copy-btn { position: absolute; right: 0; top: 0; bottom: 0; width: 36px; height: 100%; background: transparent; border: none; color: rgba(255,255,255,0.4); cursor: pointer; padding: 0; display: flex; align-items: center; justify-content: center; border-radius: 0 6px 6px 0; transition: all 0.15s ease; flex-shrink: 0; }
         .mg-row:hover .mg-copy-btn { color: rgba(255,255,255,0.8); }
         .mg-copy-btn:hover { background: rgba(255,255,255,0.15) !important; color: #fff !important; }
@@ -4611,13 +7841,13 @@
       </style>
       <div class="mg-header">
         <div class="mg-title-wrap">
-          <h2 class="mg-title">Matched Genres: "${escapeHtml(formatGenreTitle(rule.name))}"</h2>
+          <h2 class="mg-title">Matched Genres: ${escapeHtml(formatGenreTitle(rule.name))}</h2>
           <div class="mg-subtitle">
-            <span>${rule.mode === 'exact' ? 'Exact Tag' : 'Contains Word'}</span>
+            <span>${rule.mode === 'exact' ? 'Exact Tag' : 'Contains'}</span>
             <span>•</span>
             <span>${rule.expandSubgenres ? 'Related Styles Included' : 'No Related Styles'}</span>
             <span>•</span>
-            <span id="mgTotalCountBadge">${sortedData.length} matched</span>
+            <span id="mgTotalCountBadge"></span>
           </div>
         </div>
         <button id="mgCloseBtn" class="mg-close-btn" title="Close">${closeModalIcon20Svg}</button>
@@ -4629,8 +7859,8 @@
           <button id="mgSearchClear" class="mg-search-clear" style="display: none;">&times;</button>
         </div>
       </div>
-      <div style="padding: 6px 24px; font-size: 11px; color: #888; background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid #282828; flex-shrink: 0;">
-        * This list is based on known catalog samples. Dynamic sources (Last.fm, Deezer) may trigger skips on unlisted tags.
+      <div style="padding: 7px 24px; font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.45); text-align: center; background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid #282828; flex-shrink: 0; letter-spacing: 0.1px;">
+        Click the <span style="color: rgba(255, 255, 255, 0.85); font-weight: 700;">&minus;</span> / <span style="color: rgba(255, 255, 255, 0.85); font-weight: 700;">+</span> button on any genre row to exclude (whitelist) or re-include it for this rule.
       </div>
       <div class="mg-content" id="mgContent">
         <div class="mg-list-wrap" id="mgListWrap"></div>
@@ -4648,20 +7878,43 @@
     const closeBtn = shadowRoot.querySelector("#mgCloseBtn");
     const countBadge = shadowRoot.querySelector("#mgTotalCountBadge");
     const smallCopy = copyIconSVG.replace('width="16px"', 'width="12px"').replace('height="16px"', 'height="12px"');
+    const canToggleExclusion = sortedData.length > 1;
+
+    const updateHeaderCount = () => {
+      const exSet = getRuleExcludedSet(rule);
+      let activeCount = 0;
+      let exCount = 0;
+      for (let i = 0; i < currentVisible.length; i++) {
+        if (isGenreExcludedFromRule(currentVisible[i].name, rule, exSet)) exCount++;
+        else activeCount++;
+      }
+      countBadge.textContent = exCount > 0 ? `${activeCount} active (${exCount} excluded)` : `${activeCount} matched`;
+    };
 
     const getRowHtml = (item, idx) => {
       const topPx = idx * ITEM_HEIGHT;
+      const isExcluded = isGenreExcludedFromRule(item.name, rule);
+      const badgeClass = isExcluded ? "mg-badge-excluded" : item.badgeClass;
+      const badgeLabel = isExcluded ? "Excluded" : item.badgeLabel;
+      const badgeTooltip = isExcluded
+        ? "Excluded exception — tracks with this tag will never be skipped by this rule"
+        : item.badgeTooltip;
+      const isPrimaryTarget = item.priority === 0;
+      const exclBtnHtml = ((!isPrimaryTarget && canToggleExclusion) || isExcluded)
+        ? `<button class="mg-excl-btn" title="${isExcluded ? 'Re-include in rule' : 'Exclude from rule (allow this genre)'}">${isExcluded ? tagAddIconSvg : tagRemoveIconSvg}</button>`
+        : '';
       return `
-        <div class="mg-row" data-idx="${idx}" data-genre="${escapeHtml(item.title)}" style="top: ${topPx}px;">
+        <div class="mg-row ${isExcluded ? 'is-excluded' : ''}" data-idx="${idx}" data-genre="${escapeHtml(item.title)}" data-raw-genre="${escapeHtml(item.name)}" style="top: ${topPx}px;">
           <span class="mg-rank">${idx + 1}.</span>
           <span class="mg-title-cell" title="${escapeHtml(item.title)}">${escapeHtml(item.title)}</span>
-          <span class="mg-badge ${item.badgeClass}">${item.badgeLabel}</span>
+          <span class="mg-badge ${badgeClass}" title="${escapeHtml(badgeTooltip)}">${badgeLabel}</span>
+          ${exclBtnHtml}
           <button class="mg-copy-btn" title="Copy genre">${smallCopy}</button>
         </div>
       `;
     };
 
-    const renderVisibleGenres = () => {
+    const renderVisibleGenres = (forceRebind = false) => {
       if (!modal.isConnected || !currentVisible.length) return;
       const scrollTop = contentArea.scrollTop;
       const clientHeight = contentArea.clientHeight || 450;
@@ -4669,9 +7922,14 @@
       const startIndex = Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - buffer);
       const endIndex = Math.min(currentVisible.length - 1, Math.ceil((scrollTop + clientHeight) / ITEM_HEIGHT) + buffer);
 
-      if (startIndex === lastStartIndex && endIndex === lastEndIndex) return;
+      if (!forceRebind && startIndex === lastStartIndex && endIndex === lastEndIndex) return;
       lastStartIndex = startIndex;
       lastEndIndex = endIndex;
+
+      if (forceRebind) {
+        renderedElements.clear();
+        listWrap.innerHTML = "";
+      }
 
       const newIndices = new Set();
       for (let i = startIndex; i <= endIndex; i++) newIndices.add(i);
@@ -4714,8 +7972,16 @@
       listWrap.innerHTML = "";
       const q = searchInput.value.trim().toLowerCase();
       searchClear.style.display = q ? "block" : "none";
-      currentVisible = q ? sortedData.filter(g => g.name.includes(q) || g.title.toLowerCase().includes(q)) : sortedData;
-      countBadge.textContent = `${currentVisible.length} matched`;
+      const aliasMatchedCanonicals = new Set();
+      if (q && typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+        for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+          if (aliases.some(a => a.includes(q))) {
+            aliasMatchedCanonicals.add(normalizeGenre(canonical));
+          }
+        }
+      }
+      currentVisible = q ? sortedData.filter(g => g.name.includes(q) || g.title.toLowerCase().includes(q) || aliasMatchedCanonicals.has(normalizeGenre(g.name))) : sortedData;
+      updateHeaderCount();
 
       if (currentVisible.length === 0) {
         listWrap.innerHTML = `<div class="mg-empty">No matched genres found for "${escapeHtml(q)}"</div>`;
@@ -4729,34 +7995,96 @@
     };
 
     let scrollTicking = false;
+    let scrollEndTimer = null;
     contentArea.addEventListener("scroll", () => {
+      if (!contentArea.classList.contains("is-scrolling")) {
+        contentArea.classList.add("is-scrolling");
+      }
+      clearTimeout(scrollEndTimer);
+      scrollEndTimer = setTimeout(() => {
+        contentArea.classList.remove("is-scrolling");
+      }, 120);
+
       if (!scrollTicking) {
         window.requestAnimationFrame(() => {
-          renderVisibleGenres();
-          scrollTicking = false;
+          try {
+            renderVisibleGenres();
+          } finally {
+            scrollTicking = false;
+          }
         });
         scrollTicking = true;
       }
     }, { passive: true });
 
-    searchInput.addEventListener("input", updateFilter);
+    const onResize = () => {
+      if (!modal.isConnected) {
+        window.removeEventListener("resize", onResize);
+        return;
+      }
+      renderVisibleGenres();
+    };
+    window.addEventListener("resize", onResize, { passive: true });
+
+    let searchRaf = null;
+    searchInput.addEventListener("input", () => {
+      if (searchRaf) cancelAnimationFrame(searchRaf);
+      searchRaf = requestAnimationFrame(updateFilter);
+    });
     searchClear.addEventListener("click", () => {
+      if (searchRaf) cancelAnimationFrame(searchRaf);
       searchInput.value = "";
       updateFilter();
       searchInput.focus();
     });
 
     contentArea.addEventListener("click", (e) => {
+      const exclBtn = e.target.closest(".mg-excl-btn");
+      if (exclBtn) {
+        const row = exclBtn.closest(".mg-row");
+        const rawGenre = (row?.dataset?.rawGenre || "").toLowerCase().trim();
+        if (!rawGenre) return;
+        const normRaw = normalizeGenre(rawGenre);
+        if (!Array.isArray(rule.excludedGenres)) rule.excludedGenres = [];
+        const existingIdx = rule.excludedGenres.findIndex(ex => {
+          const cleanEx = (ex || "").toLowerCase().trim();
+          return cleanEx === rawGenre || normalizeGenre(cleanEx) === normRaw;
+        });
+        if (existingIdx !== -1) {
+          rule.excludedGenres.splice(existingIdx, 1);
+        } else if (normRaw !== normTarget) {
+          rule.excludedGenres.push(rawGenre);
+        }
+        updateHeaderCount();
+        renderVisibleGenres(true);
+        if (onRuleChange) onRuleChange(rule);
+        return;
+      }
+
       const copyBtn = e.target.closest(".mg-copy-btn");
       if (!copyBtn) return;
+      e.stopPropagation();
       const row = copyBtn.closest(".mg-row");
       const genre = row?.dataset?.genre;
       if (!genre) return;
-      navigator.clipboard.writeText(genre).then(() => {
+      const doCopy = () => {
         copyBtn.style.color = "#1ed760";
         copyBtn.innerHTML = checkSvgIcon;
         setTimeout(() => { copyBtn.style.color = ""; copyBtn.innerHTML = smallCopy; }, 1000);
-      }).catch(() => {});
+      };
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(genre).then(doCopy).catch(() => {
+          const ta = document.createElement("textarea");
+          ta.value = genre;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand("copy");
+          ta.remove();
+          doCopy();
+        });
+      } else {
+        doCopy();
+      }
     });
 
     const onKeyDown = (e) => {
@@ -4769,13 +8097,16 @@
 
     const closeModal = () => {
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onResize);
+      clearTimeout(scrollEndTimer);
+      if (searchRaf) cancelAnimationFrame(searchRaf);
       overlay.style.opacity = "0";
       setTimeout(() => overlay.remove(), 200);
     };
 
     closeBtn.addEventListener("click", closeModal);
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
 
+    updateHeaderCount();
     if (sortedData.length === 0) {
       listWrap.innerHTML = '<div class="mg-empty">No genres in the catalog matched this rule.</div>';
       listWrap.style.height = "auto";
@@ -4785,7 +8116,7 @@
     }
   }
   
-  function showGenreRuleConfigModal(existingRule, onSave, onDelete = null) {
+  function showGenreRuleConfigModal(existingRule, onSave, onDelete = null, clickedGenreContext = null) {
     const isEditing = Boolean(existingRule?.id);
     const overlay = document.createElement("div");
     overlay.className = "sort-play-font-scope";
@@ -4793,7 +8124,7 @@
 
     const modal = document.createElement("div");
     modal.className = "sort-play-modal-container sort-play-font-scope";
-    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(440px, 92vw) !important; max-width: 440px !important; min-width: 320px !important; border-radius: 24px; overflow: hidden; background-color: #181818 !important; color: #fff; border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.6);`;
+    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(460px, 92vw) !important; max-width: 460px !important; min-width: 320px !important; max-height: 90vh !important; border-radius: 24px; overflow: hidden; background-color: #181818 !important; color: #fff; border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.6);`;
 
     const shadowRoot = modal.attachShadow({ mode: 'open' });
     const currentRule = {
@@ -4801,34 +8132,84 @@
       name: existingRule?.name || '',
       mode: existingRule?.mode || 'exact',
       expandSubgenres: existingRule?.expandSubgenres !== undefined ? existingRule.expandSubgenres : false,
-      enabled: existingRule?.enabled !== undefined ? existingRule.enabled : true
+      enabled: existingRule?.enabled !== undefined ? existingRule.enabled : true,
+      excludedGenres: Array.isArray(existingRule?.excludedGenres) ? [...existingRule.excludedGenres] : []
     };
+
+    const cleanContext = (clickedGenreContext || "").toLowerCase().trim();
+    const showQuickExcludeBanner = Boolean(
+      isEditing &&
+      cleanContext &&
+      normalizeGenre(cleanContext) !== normalizeGenre(currentRule.name) &&
+      !isGenreExcludedFromRule(cleanContext, currentRule)
+    );
 
     const initialMatchedCount = currentRule.name ? getRuleMatchedGenresSet(currentRule).size : 0;
 
     shadowRoot.innerHTML = `
       <style>
-        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+        :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; max-height: 90vh; }
         *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
-        .cfg-header { padding: 24px 28px 12px; }
+        .cfg-header { padding: 22px 24px 14px 28px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #262626; flex-shrink: 0; }
         .cfg-title { margin: 0; font-size: 20px; font-weight: 700; color: #fff; }
-        .cfg-body { padding: 8px 28px 24px; display: flex; flex-direction: column; gap: 16px; }
-        .cfg-label { font-size: 13px; color: #b3b3b3; margin-bottom: 6px; font-weight: 500; }
-        .cfg-input { width: 100%; background: #242424; border: 1px solid #333; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; outline: none; }
-        .cfg-input:focus { border-color: #1ed760; }
-        .cfg-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
-        .cfg-select { background: #242424; border: 1px solid #333; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; outline: none; }
+        .cfg-close-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: all 0.15s ease; flex-shrink: 0; }
+        .cfg-close-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+        .cfg-body { padding: 16px 28px 20px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+        .cfg-target-group { display: flex; flex-direction: column; }
+        .cfg-label { font-size: 13px; color: #b3b3b3; margin-bottom: 6px; font-weight: 600; }
+        .cfg-input { width: 100%; background: #242424; border: 1px solid #333; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 14px; outline: none; transition: border-color 0.15s ease, background-color 0.15s ease; }
+        .cfg-input:focus { border-color: #1ed760; background: #282828; }
+        .cfg-alias-notice { margin-top: 8px; padding: 8px 12px; background: rgba(140, 180, 255, 0.07); border: 1px solid rgba(140, 180, 255, 0.22); border-radius: 8px; font-size: 12px; color: #9fc0ff; line-height: 1.45; }
+        .cfg-alias-prefix { font-weight: 600; color: #bad2ff; }
+        .cfg-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 2px 0; }
+        .cfg-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .cfg-row-title { font-size: 14px; color: #fff; font-weight: 500; }
+        .cfg-row-sub { font-size: 12px; color: #888; line-height: 1.3; }
+        .cfg-segmented { display: inline-flex; background: #222; border: 1px solid #333; border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0; }
+        .cfg-seg-btn { background: transparent; border: none; color: #999; padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; white-space: nowrap; }
+        .cfg-seg-btn:hover:not(.is-active) { color: #ddd; background: rgba(255, 255, 255, 0.04); }
+        .cfg-seg-btn.is-active { background: #333; color: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
         .cfg-switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
         .cfg-switch input { opacity: 0; width: 0; height: 0; }
         .cfg-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 22px; transition: .2s; }
         .cfg-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: .2s; }
         .cfg-switch input:checked + .cfg-slider { background-color: #1DB954; }
         .cfg-switch input:checked + .cfg-slider:before { transform: translateX(16px); }
-        .cfg-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(30, 215, 96, 0.12); color: #1ed760; border: 1px solid rgba(30, 215, 96, 0.3); border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; width: fit-content; }
-        .cfg-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 28px; border-top: 1px solid #282828; }
+        .cfg-excl-box { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; margin-top: 2px; border-top: 1px solid #282828; }
+        .cfg-excl-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .cfg-excl-meta { font-size: 11px; color: #777; }
+        .cfg-excl-input-row { position: relative; display: flex; }
+        .cfg-excl-input-wrap { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; }
+        .cfg-excl-input { width: 100%; height: 36px; background: #222; border: 1px solid #333; color: #fff; padding: 0 84px 0 12px; border-radius: 8px; font-size: 13px; outline: none; transition: border-color 0.15s ease, background-color 0.15s ease; }
+        .cfg-excl-input:focus { border-color: #555; background: #262626; }
+        .cfg-excl-add-btn { position: absolute; right: 4px; top: 4px; bottom: 4px; background: #2f2f2f; color: #e5e5e5; border: 1px solid #404040; padding: 0 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+        .cfg-excl-add-btn:hover { background: #3b3b3b; border-color: #5a5a5a; color: #fff; }
+        .cfg-excl-typeahead { position: absolute; bottom: calc(100% + 4px); left: 0; right: 0; background: #242424; border: 1px solid #383838; border-radius: 8px; max-height: 180px; overflow-y: auto; z-index: 120; box-shadow: 0 -6px 20px rgba(0,0,0,0.6); display: none; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+        .cfg-excl-typeahead-item { padding: 7px 12px; font-size: 12px; color: #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .cfg-excl-typeahead-item:hover { background: #333; color: #fff; }
+        .cfg-excl-item-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #ff9b9b; flex-shrink: 0; }
+        .cfg-excl-item-matched { background: rgba(30, 215, 96, 0.14); color: #1ed760; border: 1px solid rgba(30, 215, 96, 0.3); padding: 1px 6px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+        .cfg-excl-pills { display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto; scrollbar-width: thin; }
+        .cfg-excl-pill { display: inline-flex; align-items: center; gap: 5px; background: rgba(233, 20, 41, 0.14); border: 1px solid rgba(233, 20, 41, 0.35); color: #ff9b9b; border-radius: 12px; padding: 2px 8px 2px 10px; font-size: 12px; font-weight: 500; }
+        .cfg-excl-pill-rm { background: none; border: none; color: #ff9b9b; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; display: flex; align-items: center; opacity: 0.75; }
+        .cfg-excl-pill-rm:hover { opacity: 1; color: #fff; }
+        .cfg-quick-excl-banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.35); border-radius: 10px; font-size: 12px; color: #ffe082; }
+        .cfg-quick-excl-btn { background: #1ed760; color: #000; border: none; border-radius: 14px; padding: 5px 12px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: background 0.15s ease; }
+        .cfg-quick-excl-btn:hover { background: #3be377; }
+        .cfg-bottom-dock { background: #141414; display: flex; flex-direction: column; flex-shrink: 0; }
+        .cfg-summary-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 11px 28px; background: rgba(30, 215, 96, 0.06); border-top: 1px solid rgba(30, 215, 96, 0.25); border-bottom: 1px solid rgba(30, 215, 96, 0.25); cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; user-select: none; }
+        .cfg-summary-bar:hover:not(.is-empty) { background: rgba(30, 215, 96, 0.12); border-color: rgba(30, 215, 96, 0.4); }
+        .cfg-summary-bar.is-empty { background: transparent; border-top-color: #282828; border-bottom-color: #222; cursor: default; pointer-events: none; }
+        .cfg-summary-left { display: flex; align-items: center; min-width: 0; font-size: 12.5px; font-weight: 600; color: #1ed760; }
+        .cfg-summary-bar.is-empty .cfg-summary-left { color: #777; font-weight: 500; }
+        .cfg-summary-num { font-weight: 800; color: #3be377; }
+        .cfg-summary-excl { color: #ff9b9b; font-weight: 500; margin-left: 2px; }
+        .cfg-summary-action { font-size: 12px; font-weight: 700; color: #1ed760; white-space: nowrap; flex-shrink: 0; }
+        .cfg-summary-bar.is-empty .cfg-summary-action { display: none; }
+        .cfg-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 28px; flex-shrink: 0; }
         .cfg-btn { padding: 8px 18px; border-radius: 20px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; text-transform: uppercase; transition: all 0.15s ease; }
-        .cfg-btn-sec { background: #333; color: #fff; }
-        .cfg-btn-sec:hover { background: #444; }
+        .cfg-btn-sec { background: #2c2c2c; color: #fff; }
+        .cfg-btn-sec:hover { background: #3d3d3d; }
         .cfg-btn-pri { background: #1ed760; color: #000; }
         .cfg-btn-pri:hover { background: #3be377; }
         .cfg-btn-del { background: transparent; border: 1px solid #e91429; color: #ff6b6b; margin-right: auto; }
@@ -4836,41 +8217,67 @@
       </style>
       <div class="cfg-header">
         <h2 class="cfg-title">${isEditing ? 'Edit Blacklisted Genre' : 'Blacklist Genre'}</h2>
+        <button id="ruleCloseBtn" class="cfg-close-btn" type="button" title="Close">${closeModalIcon20Svg}</button>
       </div>
       <div class="cfg-body">
-        <div>
+        ${showQuickExcludeBanner ? `
+        <div class="cfg-quick-excl-banner">
+          <span><b>"${escapeHtml(formatGenreTitle(cleanContext))}"</b> is matched by this rule.</span>
+          <button id="quickExcludeContextBtn" class="cfg-quick-excl-btn" type="button">Allow "${escapeHtml(formatGenreTitle(cleanContext))}"</button>
+        </div>
+        ` : ''}
+        <div class="cfg-target-group">
           <div class="cfg-label">Genre Name / Pattern</div>
           <input type="text" id="ruleNameInput" class="cfg-input" value="${escapeHtml(currentRule.name)}" placeholder="e.g. k-pop, metal, nightcore">
+          <div id="ruleAliasNotice" class="cfg-alias-notice" style="display: none;"></div>
         </div>
         <div class="cfg-row">
-          <div>
-            <div style="font-size: 14px; color: #fff; font-weight: 500;">Match Mode</div>
-            <div style="font-size: 12px; color: #888;">Partial substring match or strict exact tag</div>
+          <div class="cfg-row-text">
+            <div class="cfg-row-title">Match Mode</div>
+            <div id="ruleModeSubtext" class="cfg-row-sub">${currentRule.mode === 'exact' ? 'Match the exact genre tag only' : 'Match any genre tag containing this text'}</div>
           </div>
-          <select id="ruleModeSelect" class="cfg-select">
-            <option value="exact" ${currentRule.mode === 'exact' ? 'selected' : ''}>Exact Tag</option>
-            <option value="contains" ${currentRule.mode === 'contains' ? 'selected' : ''}>Contains Word</option>
-          </select>
+          <div class="cfg-segmented" id="ruleModeSegmented" role="group" aria-label="Match Mode">
+            <button type="button" class="cfg-seg-btn ${currentRule.mode === 'exact' ? 'is-active' : ''}" data-mode="exact">Exact Tag</button>
+            <button type="button" class="cfg-seg-btn ${currentRule.mode === 'contains' ? 'is-active' : ''}" data-mode="contains">Contains</button>
+          </div>
         </div>
         <div class="cfg-row">
-          <div>
-            <div style="font-size: 14px; color: #fff; font-weight: 500;">Include Related Styles</div>
-            <div style="font-size: 12px; color: #888;">Expands to known taxonomy aliases, related styles, and regional variants</div>
+          <div class="cfg-row-text">
+            <div class="cfg-row-title">Include Related Styles</div>
+            <div class="cfg-row-sub">Also blocks subgenres and regional variations</div>
           </div>
           <label class="cfg-switch">
             <input type="checkbox" id="ruleExpandToggle" ${currentRule.expandSubgenres ? 'checked' : ''}>
             <span class="cfg-slider"></span>
           </label>
         </div>
-        <div id="ruleAliasNotice" style="display: none; font-size: 12px; color: #8cb4ff; line-height: 1.4; padding: 6px 10px; background: rgba(140, 180, 255, 0.08); border: 1px solid rgba(140, 180, 255, 0.2); border-radius: 6px;"></div>
-        <div id="ruleMatchBadge" class="cfg-badge" style="cursor: pointer;" title="Click to view all matched genres">
-          Matches ${initialMatchedCount} library genres ↗
+        <div class="cfg-excl-box">
+          <div class="cfg-excl-header">
+            <div class="cfg-label" style="margin-bottom: 0;">Excluded Genres (Exceptions)</div>
+            <span class="cfg-excl-meta">Tracks with these tags are never skipped</span>
+          </div>
+          <div class="cfg-excl-input-row">
+            <div class="cfg-excl-input-wrap">
+              <input type="text" id="ruleExclInput" class="cfg-excl-input" placeholder="e.g. funk rock, dream pop...">
+              <button id="ruleExclAddBtn" class="cfg-excl-add-btn" type="button">+ Exclude</button>
+              <div id="ruleExclTypeahead" class="cfg-excl-typeahead"></div>
+            </div>
+          </div>
+          <div id="ruleExclPills" class="cfg-excl-pills" style="display: none;"></div>
         </div>
       </div>
-      <div class="cfg-footer">
-        ${isEditing && onDelete ? `<button id="ruleDeleteBtn" class="cfg-btn cfg-btn-del">Delete</button>` : ''}
-        <button id="ruleCancelBtn" class="cfg-btn cfg-btn-sec">Cancel</button>
-        <button id="ruleSaveBtn" class="cfg-btn cfg-btn-pri">${isEditing ? 'Save' : 'Blacklist'}</button>
+      <div class="cfg-bottom-dock">
+        <div id="ruleMatchBadge" class="cfg-summary-bar ${currentRule.name ? '' : 'is-empty'}" title="Click to preview and toggle matched genres">
+          <div class="cfg-summary-left">
+            <span id="ruleMatchText"><span class="cfg-summary-num">${initialMatchedCount}</span> library ${initialMatchedCount === 1 ? 'genre' : 'genres'} matched</span>
+          </div>
+          <span id="ruleMatchAction" class="cfg-summary-action">Preview & Edit ↗</span>
+        </div>
+        <div class="cfg-footer">
+          ${isEditing && onDelete ? `<button id="ruleDeleteBtn" class="cfg-btn cfg-btn-del" type="button">Delete</button>` : ''}
+          <button id="ruleCancelBtn" class="cfg-btn cfg-btn-sec" type="button">Cancel</button>
+          <button id="ruleSaveBtn" class="cfg-btn cfg-btn-pri" type="button">${isEditing ? 'Save' : 'Blacklist'}</button>
+        </div>
       </div>
     `;
 
@@ -4878,55 +8285,249 @@
     overlay.appendChild(modal);
 
     const nameInput = shadowRoot.querySelector("#ruleNameInput");
-    const modeSelect = shadowRoot.querySelector("#ruleModeSelect");
+    const modeSegmented = shadowRoot.querySelector("#ruleModeSegmented");
+    const modeSubtext = shadowRoot.querySelector("#ruleModeSubtext");
     const expandToggle = shadowRoot.querySelector("#ruleExpandToggle");
     const matchBadge = shadowRoot.querySelector("#ruleMatchBadge");
+    const matchText = shadowRoot.querySelector("#ruleMatchText");
+    const matchAction = shadowRoot.querySelector("#ruleMatchAction");
+    const exclInput = shadowRoot.querySelector("#ruleExclInput");
+    const exclAddBtn = shadowRoot.querySelector("#ruleExclAddBtn");
+    const exclTypeahead = shadowRoot.querySelector("#ruleExclTypeahead");
+    const exclPills = shadowRoot.querySelector("#ruleExclPills");
+    const quickExcludeBtn = shadowRoot.querySelector("#quickExcludeContextBtn");
+    const closeBtn = shadowRoot.querySelector("#ruleCloseBtn");
     const saveBtn = shadowRoot.querySelector("#ruleSaveBtn");
     const cancelBtn = shadowRoot.querySelector("#ruleCancelBtn");
     const deleteBtn = shadowRoot.querySelector("#ruleDeleteBtn");
-
     const aliasNotice = shadowRoot.querySelector("#ruleAliasNotice");
+
     const getAliasesText = (rawName) => {
       const lower = (rawName || "").toLowerCase().trim();
       if (!lower) return null;
+      const norm = normalizeGenre(lower);
       for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
-        if (canonical === lower || aliases.includes(lower)) {
-          const variants = aliases.filter(a => a !== lower);
+        if (canonical === lower || canonical === norm || aliases.includes(lower)) {
+          const variants = [canonical, ...aliases].filter((a, i, arr) => a !== lower && arr.indexOf(a) === i);
           if (variants.length > 0) return variants.join(", ");
         }
       }
       return null;
     };
 
+    const renderExcludedPills = () => {
+      if (!Array.isArray(currentRule.excludedGenres) || currentRule.excludedGenres.length === 0) {
+        exclPills.style.display = "none";
+        exclPills.innerHTML = "";
+        return;
+      }
+      exclPills.style.display = "flex";
+      exclPills.innerHTML = currentRule.excludedGenres.map((g, idx) => `
+        <span class="cfg-excl-pill" data-idx="${idx}">
+          <span>${escapeHtml(formatGenreTitle(g))}</span>
+          <button type="button" class="cfg-excl-pill-rm" data-idx="${idx}" title="Remove exception">&times;</button>
+        </span>
+      `).join('');
+    };
+
     const updatePreview = () => {
       currentRule.name = nameInput.value.trim();
-      currentRule.mode = modeSelect.value;
       currentRule.expandSubgenres = expandToggle.checked;
-      const count = currentRule.name ? getRuleMatchedGenresSet(currentRule).size : 0;
-      matchBadge.textContent = `Matches ${count} library genres ↗`;
+      modeSubtext.textContent = currentRule.mode === 'exact'
+        ? 'Match the exact genre tag only'
+        : 'Match any genre tag containing this text';
+
+      if (!currentRule.name) {
+        matchBadge.classList.add("is-empty");
+        matchText.textContent = "Enter a genre name to preview matches";
+        aliasNotice.style.display = "none";
+        return;
+      }
+
+      matchBadge.classList.remove("is-empty");
+      const count = getRuleMatchedGenresSet(currentRule).size;
+      const exCount = currentRule.excludedGenres?.length || 0;
+      const genreWord = count === 1 ? 'genre' : 'genres';
+      matchText.innerHTML = exCount > 0
+        ? `<span class="cfg-summary-num">${count}</span> library ${genreWord} matched <span class="cfg-summary-excl">(${exCount} excluded)</span>`
+        : `<span class="cfg-summary-num">${count}</span> library ${genreWord} matched`;
+      matchAction.textContent = (count > 1 || exCount > 0) ? 'Preview & Edit ↗' : (count === 1 ? 'View Match ↗' : 'Preview ↗');
+
       const aliases = getAliasesText(currentRule.name);
       if (aliases) {
-        aliasNotice.textContent = `Spelling variants auto-matched: ${aliases}`;
+        aliasNotice.innerHTML = `<span class="cfg-alias-prefix">Spelling variants auto-matched:</span> ${escapeHtml(aliases)}`;
         aliasNotice.style.display = "block";
       } else {
         aliasNotice.style.display = "none";
       }
     };
 
+    modeSegmented.addEventListener("click", (e) => {
+      const btn = e.target.closest(".cfg-seg-btn");
+      if (!btn || btn.dataset.mode === currentRule.mode) return;
+      currentRule.mode = btn.dataset.mode;
+      modeSegmented.querySelectorAll(".cfg-seg-btn").forEach(b => b.classList.toggle("is-active", b === btn));
+      updatePreview();
+    });
+
+    const addExcludedGenre = (rawVal) => {
+      const parts = (rawVal || "").split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      if (parts.length === 0) return;
+      let changed = false;
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        if (!isGenreExcludedFromRule(p, currentRule)) {
+          currentRule.excludedGenres.push(p);
+          changed = true;
+        }
+      }
+      exclInput.value = "";
+      exclTypeahead.style.display = "none";
+      if (changed) {
+        renderExcludedPills();
+        updatePreview();
+      }
+    };
+
+    exclAddBtn.addEventListener("click", () => addExcludedGenre(exclInput.value));
+    exclInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addExcludedGenre(exclInput.value);
+      } else if (e.key === "Escape") {
+        e.stopPropagation();
+        exclTypeahead.style.display = "none";
+      }
+    });
+
+    exclInput.addEventListener("input", () => {
+      const q = exclInput.value.trim().toLowerCase();
+      if (!q || q.includes(',')) {
+        exclTypeahead.style.display = "none";
+        return;
+      }
+      const matchedSet = currentRule.name ? getRuleMatchedGenresSet(currentRule, false) : new Set();
+      const sourcePool = getAllUniqueGenresPool();
+      const normRuleName = normalizeGenre(currentRule.name);
+      const aliasMatchMap = new Map();
+      if (typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+        for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+          const matchingAliases = aliases.filter(a => a.includes(q));
+          if (matchingAliases.length > 0) {
+            matchingAliases.sort((a, b) => (a === q ? -1 : b === q ? 1 : a.startsWith(q) ? -1 : b.startsWith(q) ? 1 : a.length - b.length));
+            aliasMatchMap.set(normalizeGenre(canonical), matchingAliases[0]);
+          }
+        }
+      }
+
+      const candidates = sourcePool
+        .filter(g => (g.includes(q) || aliasMatchMap.has(g)) && !isGenreExcludedFromRule(g, currentRule) && normalizeGenre(g) !== normRuleName)
+        .sort((a, b) => {
+          const aInMatched = matchedSet.has(a) ? 0 : 1;
+          const bInMatched = matchedSet.has(b) ? 0 : 1;
+          if (aInMatched !== bInMatched) return aInMatched - bInMatched;
+          const aEff = a.includes(q) ? a : (aliasMatchMap.get(a) || a);
+          const bEff = b.includes(q) ? b : (aliasMatchMap.get(b) || b);
+          const aStarts = aEff.startsWith(q) ? 0 : 1;
+          const bStarts = bEff.startsWith(q) ? 0 : 1;
+          if (aStarts !== bStarts) return aStarts - bStarts;
+          return aEff.length - bEff.length || a.localeCompare(b);
+        })
+        .slice(0, 15);
+
+      if (candidates.length === 0) {
+        exclTypeahead.style.display = "none";
+        return;
+      }
+      exclTypeahead.innerHTML = candidates.map(c => {
+        const matchedAlias = !c.includes(q) ? aliasMatchMap.get(c) : null;
+        const isMatchedByRule = matchedSet.has(c);
+        const labelHtml = matchedAlias
+          ? `${escapeHtml(formatGenreTitle(c))} <span style="color: #888; font-weight: 400;">(${escapeHtml(formatGenreTitle(matchedAlias))})</span>`
+          : escapeHtml(formatGenreTitle(c));
+        return `
+        <div class="cfg-excl-typeahead-item" data-val="${escapeHtml(c)}">
+          <span>${labelHtml}</span>
+          <span class="cfg-excl-item-meta">${isMatchedByRule ? '<span class="cfg-excl-item-matched">Matched</span>' : ''}<span>+ Exclude</span></span>
+        </div>`;
+      }).join('');
+      exclTypeahead.style.display = "block";
+    });
+
+    exclTypeahead.addEventListener("click", (e) => {
+      const item = e.target.closest(".cfg-excl-typeahead-item");
+      if (!item) return;
+      addExcludedGenre(item.dataset.val);
+    });
+
+    shadowRoot.addEventListener("click", (e) => {
+      if (!e.target.closest(".cfg-excl-input-wrap")) {
+        exclTypeahead.style.display = "none";
+      }
+    });
+
+    exclPills.addEventListener("click", (e) => {
+      const rmBtn = e.target.closest(".cfg-excl-pill-rm");
+      if (!rmBtn) return;
+      const idx = parseInt(rmBtn.dataset.idx, 10);
+      if (!Number.isNaN(idx) && idx >= 0 && idx < currentRule.excludedGenres.length) {
+        currentRule.excludedGenres.splice(idx, 1);
+        renderExcludedPills();
+        updatePreview();
+      }
+    });
+
     matchBadge.addEventListener("click", () => {
       if (!currentRule.name) return;
-      showMatchedGenresModal(currentRule);
+      showMatchedGenresModal(currentRule, () => {
+        renderExcludedPills();
+        updatePreview();
+      });
     });
 
     nameInput.addEventListener("input", updatePreview);
-    modeSelect.addEventListener("change", updatePreview);
+    nameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        saveBtn.click();
+      }
+    });
     expandToggle.addEventListener("change", updatePreview);
+    renderExcludedPills();
     updatePreview();
 
-    const closeSelf = () => overlay.remove();
+    const onKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+      if (exclTypeahead.style.display === "block") {
+        e.stopPropagation();
+        exclTypeahead.style.display = "none";
+        return;
+      }
+      if (document.getElementById("sort-play-confirmation-overlay") || document.querySelector(".sort-play-font-scope[style*='1000005']")) {
+        return;
+      }
+      e.stopPropagation();
+      closeSelf();
+    };
+    document.addEventListener("keydown", onKeyDown);
 
+    const closeSelf = () => {
+      document.removeEventListener("keydown", onKeyDown);
+      overlay.remove();
+    };
+
+    if (quickExcludeBtn) {
+      quickExcludeBtn.addEventListener("click", () => {
+        if (!isGenreExcludedFromRule(cleanContext, currentRule)) {
+          currentRule.excludedGenres.push(cleanContext);
+        }
+        onSave(currentRule);
+        closeSelf();
+      });
+    }
+
+    closeBtn.addEventListener("click", closeSelf);
     cancelBtn.addEventListener("click", closeSelf);
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSelf(); });
 
     saveBtn.addEventListener("click", () => {
       const trimmed = nameInput.value.trim().toLowerCase();
@@ -4934,8 +8535,10 @@
         showNotification("Please enter a genre name.", true);
         return;
       }
+      if (exclInput.value.trim()) {
+        addExcludedGenre(exclInput.value);
+      }
       currentRule.name = trimmed;
-      currentRule.mode = modeSelect.value;
       currentRule.expandSubgenres = expandToggle.checked;
       if (currentRule.enabled === undefined) currentRule.enabled = true;
       onSave(currentRule);
@@ -4943,9 +8546,16 @@
     });
 
     if (deleteBtn) {
-      deleteBtn.addEventListener("click", () => {
-        if (onDelete) onDelete(currentRule);
+      deleteBtn.addEventListener("click", async () => {
+        const confirmed = await showConfirmationModal({
+          title: "Delete Blacklist Rule",
+          description: `Are you sure you want to remove "${formatGenreTitle(currentRule.name)}" from your genre blacklist?`,
+          confirmText: "Delete",
+          cancelText: "Cancel"
+        });
+        if (confirmed !== 'confirm') return;
         closeSelf();
+        if (onDelete) onDelete(currentRule);
       });
     }
 
@@ -4960,7 +8570,7 @@
 
     const modal = document.createElement("div");
     modal.className = "sort-play-modal-container sort-play-font-scope";
-    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(815px, 92vw) !important; max-width: 815px !important; min-width: 320px !important; min-height: 0 !important; max-height: 85vh !important; flex-shrink: 0 !important; border-radius: 30px; overflow: hidden; background-color: #181818 !important; color: var(--spice-text, #ffffff); border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.5);`;
+    modal.style.cssText = `box-sizing: border-box !important; position: relative !important; width: min(815px, 92vw) !important; max-width: 815px !important; min-width: 320px !important; min-height: min(520px, 85vh) !important; max-height: 85vh !important; flex-shrink: 0 !important; border-radius: 30px; overflow: hidden; background-color: #181818 !important; color: var(--spice-text, #ffffff); border: 2px solid #282828; display: flex; flex-direction: column; box-shadow: 0 16px 48px rgba(0,0,0,0.5);`;
 
     const shadowRoot = modal.attachShadow({ mode: 'open' });
 
@@ -4974,9 +8584,9 @@
         .mgr-badge { background: rgba(30, 215, 96, 0.12); border: 1px solid rgba(30, 215, 96, 0.3); color: #1ed760; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
         .mgr-close-btn { background: transparent; border: none; color: #888; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: color 0.15s ease, background-color 0.15s ease; }
         .mgr-close-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
-        .mgr-body { padding: 20px 32px 25px !important; display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
-        .mgr-layout { display: grid; grid-template-columns: 1.18fr 1fr; gap: 32px; min-height: 0; }
-        .mgr-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+        .mgr-body { padding: 20px 32px 20px !important; display: flex; flex-direction: column; overflow: hidden; flex: 1; min-height: 0; }
+        .mgr-layout { display: grid; grid-template-columns: 1.18fr 1fr; gap: 32px; min-height: 0; flex: 1; }
+        .mgr-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; flex: 1; }
         .section-header { font-weight: bold; font-size: 16px; color: white; border-bottom: 1px solid #333; padding-bottom: 8px; margin-bottom: 10px; flex-shrink: 0; }
         .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; gap: 12px; }
         .setting-label { color: #c1c1c1; font-size: 15px; font-weight: 500; user-select: none; }
@@ -4998,13 +8608,13 @@
         .mgr-add-btn { height: 36px; background: #282828; color: #e5e5e5; border: 1px solid #3a3a3a; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: all 0.15s ease; display: flex; align-items: center; gap: 4px; }
         .mgr-add-btn:hover { background: #333; border-color: #555; color: #fff; }
         .mgr-add-btn:active { transform: scale(0.97); }
-        .mgr-typeahead { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #242424; border: 1px solid #383838; border-radius: 8px; max-height: 320px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: none; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+        .mgr-typeahead { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #242424; border: 1px solid #383838; border-radius: 8px; max-height: 240px; overflow-y: auto; z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.6); display: none; scrollbar-width: thin; scrollbar-color: #555 transparent; }
         .mgr-typeahead::-webkit-scrollbar { width: 6px; }
         .mgr-typeahead::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
         .mgr-typeahead-item { padding: 8px 12px; font-size: 13px; color: #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .mgr-typeahead-item:hover { background: #333; color: #fff; }
         .mgr-typeahead-added { font-size: 11px; color: #1ed760; background: rgba(30, 215, 96, 0.12); padding: 1px 6px; border-radius: 4px; }
-        .mgr-rules-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overflow-x: hidden; max-height: min(385px, 48vh); margin-right: -10px; padding-right: 10px; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
+        .mgr-rules-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overflow-x: hidden; max-height: min(385px, 48vh); margin-right: -10px; padding-right: 10px; flex: 1; min-height: 0; scrollbar-width: thin; scrollbar-color: #535353 transparent; }
         .mgr-rules-list::-webkit-scrollbar { width: 4px; }
         .mgr-rules-list::-webkit-scrollbar-track { background: transparent; }
         .mgr-rules-list::-webkit-scrollbar-thumb { background-color: #535353; border-radius: 4px; }
@@ -5032,7 +8642,7 @@
         .mgr-icon-btn svg { width: 14px; height: 14px; fill: currentColor; pointer-events: none; }
         .mgr-icon-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
         .mgr-del-btn:hover { background: rgba(233, 20, 41, 0.15); color: #ff6b6b; }
-        .mgr-empty { text-align: center; color: #777; font-size: 13px; padding: 70px 16px; background: rgba(255,255,255,0.02); border: 1px dashed #2e2e2e; border-radius: 10px; margin-top: 4px; }
+        .mgr-empty { text-align: center; color: #777; font-size: 13px; background: rgba(255,255,255,0.02); border: 1px dashed #2e2e2e; border-radius: 10px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 16px; min-height: 140px; margin-top: 0; line-height: 1.5; }
         .mgr-sources-note { font-size: 12px; color: #888; line-height: 1.45; margin-bottom: 12px; }
         .custom-tooltip { visibility: hidden; position: absolute; z-index: 1000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; }
         .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
@@ -5040,7 +8650,7 @@
         .custom-tooltip.tooltip-bottom::after { top: auto; bottom: 100%; border-color: transparent transparent #373737 transparent; }
         .tooltip-container { position: relative; display: inline-block; vertical-align: middle; margin-left: 6px; }
         .tooltip-container:hover .custom-tooltip { visibility: visible; }
-        .mgr-footer { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 15px; border-top: 1px solid #282828; flex-shrink: 0; }
+        .mgr-footer { display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 14px; border-top: 1px solid #282828; flex-shrink: 0; }
         .mgr-done-btn { padding: 8px 24px; border-radius: 20px; border: none; cursor: pointer; background-color: #1ED760; color: black; font-weight: 550; font-size: 13px; text-transform: uppercase; transition: all 0.04s ease; }
       </style>
       <div class="mgr-header">
@@ -5122,6 +8732,36 @@
                 </label>
               </div>
             </div>
+
+            <div class="section-header" style="margin-top: 20px; margin-bottom: 6px;">Behavior</div>
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <div class="setting-row">
+                <div style="display: flex; align-items: center;">
+                  <label class="setting-label" for="mgrNotifyToggle">Show Skip Notifications</label>
+                  <span class="tooltip-container">
+                    ${infoIconSvg}
+                    <span class="custom-tooltip">Displays a toast notification whenever a track is automatically skipped by genre.</span>
+                  </span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="mgrNotifyToggle" ${genreBlacklistNotify ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+              <div class="setting-row">
+                <div style="display: flex; align-items: center;">
+                  <label class="setting-label" for="mgrProtectLikedToggle">Never Auto-Skip Liked Songs</label>
+                  <span class="tooltip-container">
+                    ${infoIconSvg}
+                    <span class="custom-tooltip">Prevents your Liked Songs from ever being auto-skipped, even if their genres match the blacklist.</span>
+                  </span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="mgrProtectLikedToggle" ${genreBlacklistProtectLiked ? 'checked' : ''}>
+                  <span class="sliderx"></span>
+                </label>
+              </div>
+            </div>
           </div>
         </div>
         <div class="mgr-footer">
@@ -5154,8 +8794,13 @@
 
     const recheckLiveTrack = () => {
       prefetchBlacklistMap.clear();
+      const openGenreWindow = document.getElementById("sort-play-genre-details-window");
+      if (openGenreWindow && typeof openGenreWindow._refreshWindowDisplay === 'function') {
+        openGenreWindow._refreshWindowDisplay();
+      }
+      if (openGenreWindow?.classList.contains("in-block-mode")) return;
       const liveTrack = Spicetify.Player.data?.item;
-      if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+      if (liveTrack && hasActiveBlacklistRules()) evaluateTrackAgainstBlacklist(liveTrack, false);
     };
 
     const saveSourcesConfig = () => {
@@ -5174,6 +8819,27 @@
     [srcSpotifyTrack, srcEverynoise, srcLastfmTrack, srcLastfmArtist, srcDeezer, confSelect].forEach(el => {
       el.addEventListener("change", saveSourcesConfig);
     });
+    const mgrNotifyToggle = shadowRoot.querySelector("#mgrNotifyToggle");
+    const mgrProtectLikedToggle = shadowRoot.querySelector("#mgrProtectLikedToggle");
+
+    mgrNotifyToggle.addEventListener("change", () => {
+      genreBlacklistNotify = mgrNotifyToggle.checked;
+      saveSettings();
+    });
+
+    mgrProtectLikedToggle.addEventListener("change", () => {
+      genreBlacklistProtectLiked = mgrProtectLikedToggle.checked;
+      saveSettings();
+      const openGenreWindow = document.getElementById("sort-play-genre-details-window");
+      if (openGenreWindow && typeof openGenreWindow._refreshWindowDisplay === 'function') {
+        openGenreWindow._refreshWindowDisplay();
+      }
+      if (!genreBlacklistProtectLiked) {
+        recheckLiveTrack();
+      } else {
+        prefetchBlacklistMap.clear();
+      }
+    });
 
     const renderRules = () => {
       rulesCount.textContent = `${genreBlacklistRules.length} ${genreBlacklistRules.length === 1 ? 'rule' : 'rules'}`;
@@ -5185,16 +8851,19 @@
       rulesList.innerHTML = genreBlacklistRules.map((rule, idx) => {
         const count = getRuleMatchedGenresSet(rule).size;
         const isEnabled = rule.enabled !== false;
+        const exCount = Array.isArray(rule.excludedGenres) ? rule.excludedGenres.length : 0;
+        const exTitle = exCount > 0 ? `Excluded: ${rule.excludedGenres.map(formatGenreTitle).join(', ')}` : '';
         return `
           <div class="mgr-rule-card ${isEnabled ? '' : 'is-disabled'}" data-idx="${idx}">
             <div class="mgr-rule-info">
               <div class="mgr-rule-top">
                 <span class="mgr-rule-name" title="${escapeHtml(rule.name)}">${escapeHtml(formatGenreTitle(rule.name))}</span>
-                <span class="mgr-rule-badge" data-action="inspect-matches" title="Click to view all matched genres">${count} ${count === 1 ? 'match' : 'matches'} ↗</span>
+                <span class="mgr-rule-badge" data-action="inspect-matches" title="Click to view and toggle matched genres">${count} ${count === 1 ? 'match' : 'matches'} ↗</span>
               </div>
               <div class="mgr-rule-meta">
                 <span class="mgr-rule-tag" data-action="toggle-mode" title="Click to toggle match mode">${rule.mode === 'exact' ? 'Exact' : 'Contains'}</span>
                 <span class="mgr-rule-tag" data-action="toggle-expand" title="Click to toggle subgenre expansion">${rule.expandSubgenres ? '+ Related Styles' : 'No Related'}</span>
+                ${exCount > 0 ? `<span class="mgr-rule-tag" data-action="inspect-matches" style="color: #ff9b9b; border-color: rgba(233, 20, 41, 0.3); background: rgba(233, 20, 41, 0.1);" title="${escapeHtml(exTitle)}">Except ${exCount}</span>` : ''}
               </div>
             </div>
             <div class="mgr-rule-actions">
@@ -5228,7 +8897,7 @@
       recheckLiveTrack();
     });
 
-    rulesList.addEventListener("click", (e) => {
+    rulesList.addEventListener("click", async (e) => {
       const actionEl = e.target.closest("[data-action]");
       if (!actionEl) return;
       const card = actionEl.closest(".mgr-rule-card");
@@ -5239,15 +8908,30 @@
 
       const action = actionEl.dataset.action;
       if (action === "inspect-matches") {
-        showMatchedGenresModal(rule);
+        showMatchedGenresModal(rule, () => {
+          prefetchBlacklistMap.clear();
+          saveSettings();
+          renderRules();
+          recheckLiveTrack();
+        });
         return;
       }
       if (action === "delete") {
-        genreBlacklistRules.splice(idx, 1);
-        prefetchBlacklistMap.clear();
-        saveSettings();
-        renderRules();
-        recheckLiveTrack();
+        const confirmed = await showConfirmationModal({
+          title: "Delete Blacklist Rule",
+          description: `Are you sure you want to remove "${formatGenreTitle(rule.name)}" from your genre blacklist?`,
+          confirmText: "Delete",
+          cancelText: "Cancel"
+        });
+        if (confirmed !== 'confirm') return;
+        const targetIdx = genreBlacklistRules.indexOf(rule);
+        if (targetIdx !== -1) {
+          genreBlacklistRules.splice(targetIdx, 1);
+          prefetchBlacklistMap.clear();
+          saveSettings();
+          renderRules();
+          recheckLiveTrack();
+        }
       } else if (action === "toggle-mode") {
         rule.mode = rule.mode === 'exact' ? 'contains' : 'exact';
         saveSettings();
@@ -5260,15 +8944,20 @@
         recheckLiveTrack();
       } else if (action === "edit") {
         showGenreRuleConfigModal(rule, (updated) => {
-          genreBlacklistRules[idx] = updated;
+          const targetIdx = genreBlacklistRules.indexOf(rule);
+          if (targetIdx !== -1) genreBlacklistRules[targetIdx] = updated;
           saveSettings();
           renderRules();
           recheckLiveTrack();
         }, () => {
-          genreBlacklistRules.splice(idx, 1);
-          prefetchBlacklistMap.clear();
-          saveSettings();
-          renderRules();
+          const targetIdx = genreBlacklistRules.indexOf(rule);
+          if (targetIdx !== -1) {
+            genreBlacklistRules.splice(targetIdx, 1);
+            prefetchBlacklistMap.clear();
+            saveSettings();
+            renderRules();
+            recheckLiveTrack();
+          }
         });
       }
     });
@@ -5285,7 +8974,8 @@
       if (!cleanName) return;
       typeahead.style.display = "none";
       searchInput.value = "";
-      const existingIdx = genreBlacklistRules.findIndex(r => r.name.toLowerCase() === cleanName);
+      const normClean = normalizeGenre(cleanName);
+      const existingIdx = genreBlacklistRules.findIndex(r => r.name.toLowerCase() === cleanName || normalizeGenre(r.name) === normClean);
       if (existingIdx !== -1) {
         showGenreRuleConfigModal(genreBlacklistRules[existingIdx], (updated) => {
           genreBlacklistRules[existingIdx] = updated;
@@ -5293,10 +8983,15 @@
           renderRules();
           recheckLiveTrack();
         }, () => {
-          genreBlacklistRules.splice(existingIdx, 1);
-          prefetchBlacklistMap.clear();
-          saveSettings();
-          renderRules();
+          const ruleToDelete = genreBlacklistRules[existingIdx];
+          const targetIdx = genreBlacklistRules.indexOf(ruleToDelete);
+          if (targetIdx !== -1) {
+            genreBlacklistRules.splice(targetIdx, 1);
+            prefetchBlacklistMap.clear();
+            saveSettings();
+            renderRules();
+            recheckLiveTrack();
+          }
         });
       } else {
         showGenreRuleConfigModal({ name: cleanName, mode: 'exact', expandSubgenres: false, enabled: true }, (newRule) => {
@@ -5315,46 +9010,72 @@
         return;
       }
       const pool = getAllUniqueGenresPool();
-      const existingSet = new Set(genreBlacklistRules.map(r => r.name.toLowerCase()));
+      const existingSet = new Set(genreBlacklistRules.map(r => normalizeGenre(r.name)));
       const wordBoundaryRegex = new RegExp(`(^|[\\s\\-_/])${escapeRegExp(q)}([\\s\\-_/]|$)`, 'i');
 
-      const getTier = (g) => {
-        if (g === q) return 0;
-        if (g.startsWith(q) || wordBoundaryRegex.test(g)) return 1;
+      const getStringTier = (str) => {
+        if (str === q) return 0;
+        if (str.startsWith(q) || wordBoundaryRegex.test(str)) return 1;
         return 2;
       };
 
-      const rawFiltered = pool.filter(g => g.includes(q));
+      const aliasMatchMap = new Map();
+      if (typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+        for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+          const matchingAliases = aliases.filter(a => a.includes(q));
+          if (matchingAliases.length > 0) {
+            matchingAliases.sort((a, b) => getStringTier(a) - getStringTier(b) || a.length - b.length);
+            aliasMatchMap.set(normalizeGenre(canonical), matchingAliases[0]);
+          }
+        }
+      }
+
+      const getEffectiveStr = (g) => {
+        const alias = aliasMatchMap.get(g);
+        if (!g.includes(q) && alias) return alias;
+        if (g.includes(q) && alias && getStringTier(alias) < getStringTier(g)) return alias;
+        return g;
+      };
+
+      const rawFiltered = pool.filter(g => g.includes(q) || aliasMatchMap.has(g)).sort((a, b) => {
+        const effA = getEffectiveStr(a);
+        const effB = getEffectiveStr(b);
+        const tierA = getStringTier(effA);
+        const tierB = getStringTier(effB);
+        if (tierA !== tierB) return tierA - tierB;
+        if (effA.length !== effB.length) return effA.length - effB.length;
+        return a.localeCompare(b);
+      });
+
       const seenNormalized = new Set();
-      const deduplicated = [];
+      const matches = [];
 
       for (let i = 0; i < rawFiltered.length; i++) {
         const item = rawFiltered[i];
         const norm = normalizeGenre(item);
         if (!seenNormalized.has(norm)) {
           seenNormalized.add(norm);
-          deduplicated.push(item);
+          matches.push(item);
+          if (matches.length >= 30) break;
         }
       }
-
-      const matches = deduplicated
-        .sort((a, b) => {
-          const tierA = getTier(a);
-          const tierB = getTier(b);
-          if (tierA !== tierB) return tierA - tierB;
-          if (a.length !== b.length) return a.length - b.length;
-          return a.localeCompare(b);
-        })
-        .slice(0, 30);
 
       if (matches.length === 0) {
         typeahead.style.display = "none";
         return;
       }
       typeahead.innerHTML = matches.map(m => {
-        const isAdded = existingSet.has(m);
-        return `<div class="mgr-typeahead-item" data-val="${escapeHtml(m)}"><span>${escapeHtml(formatGenreTitle(m))}</span>${isAdded ? '<span class="mgr-typeahead-added">Added</span>' : ''}</div>`;
+        const isAdded = existingSet.has(normalizeGenre(m));
+        const matchedAlias = !m.includes(q) ? aliasMatchMap.get(m) : null;
+        const labelHtml = matchedAlias
+          ? `${escapeHtml(formatGenreTitle(m))} <span style="color: #888; font-weight: 400; font-size: 12px;">(${escapeHtml(formatGenreTitle(matchedAlias))})</span>`
+          : escapeHtml(formatGenreTitle(m));
+        return `<div class="mgr-typeahead-item" data-val="${escapeHtml(m)}"><span>${labelHtml}</span>${isAdded ? '<span class="mgr-typeahead-added">Added</span>' : ''}</div>`;
       }).join('');
+      const footerEl = shadowRoot.querySelector(".mgr-footer");
+      const footerTop = footerEl ? footerEl.getBoundingClientRect().top : modal.getBoundingClientRect().bottom;
+      const spaceBelow = footerTop - searchInput.getBoundingClientRect().bottom - 10;
+      typeahead.style.maxHeight = `${Math.max(120, Math.min(320, Math.floor(spaceBelow)))}px`;
       typeahead.style.display = "block";
     });
 
@@ -5393,7 +9114,6 @@
 
     closeBtn.addEventListener("click", closeModal);
     doneBtn.addEventListener("click", closeModal);
-    overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
   }
   
   function showSettingsModal() {
@@ -6228,38 +9948,6 @@
         </div>
     </div>
 
-    <div class="setting-row" id="genreBlacklistNotifySetting">
-        <label class="col description">
-            Show Skip Notifications
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">Displays a toast notification whenever a track is automatically skipped by genre.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" id="genreBlacklistNotifyToggle" ${genreBlacklistNotify ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
-
-    <div class="setting-row" id="genreBlacklistProtectLikedSetting">
-        <label class="col description">
-            Never Auto-Skip Liked Songs
-            <span class="tooltip-container">
-                ${infoIconSvg}
-                <span class="custom-tooltip">Prevents your Liked Songs from ever being auto-skipped, even if their genres match the blacklist.</span>
-            </span>
-        </label>
-        <div class="col action">
-            <label class="switch">
-                <input type="checkbox" id="genreBlacklistProtectLikedToggle" ${genreBlacklistProtectLiked ? 'checked' : ''}>
-                <span class="sliderx"></span>
-            </label>
-        </div>
-    </div>
-    
     <div style="color: white; font-weight: bold; font-size: 18px; margin-top: 10px;">
         Notifications
     </div>
@@ -6417,23 +10105,18 @@
     const genreSourcesSettingsBtn = modalContainer.querySelector("#genreSourcesSettingsBtn");
     const autoHideDiscographyNotificationToggle = modalContainer.querySelector("#autoHideDiscographyNotificationToggle");
     const genreBlacklistEnabledToggle = modalContainer.querySelector("#genreBlacklistEnabledToggle");
-    const genreBlacklistNotifyToggle = modalContainer.querySelector("#genreBlacklistNotifyToggle");
-    const genreBlacklistProtectLikedToggle = modalContainer.querySelector("#genreBlacklistProtectLikedToggle");
     const manageGenreBlacklistBtn = modalContainer.querySelector("#manageGenreBlacklistBtn");
 
     genreBlacklistEnabledToggle.addEventListener("change", () => {
       genreBlacklistEnabled = genreBlacklistEnabledToggle.checked;
+      prefetchBlacklistMap.clear();
       saveSettings();
-    });
-
-    genreBlacklistNotifyToggle.addEventListener("change", () => {
-      genreBlacklistNotify = genreBlacklistNotifyToggle.checked;
-      saveSettings();
-    });
-
-    genreBlacklistProtectLikedToggle.addEventListener("change", () => {
-      genreBlacklistProtectLiked = genreBlacklistProtectLikedToggle.checked;
-      saveSettings();
+      const openGenreWindow = document.getElementById("sort-play-genre-details-window");
+      if (openGenreWindow && typeof openGenreWindow._refreshWindowDisplay === 'function') {
+        openGenreWindow._refreshWindowDisplay();
+      }
+      const liveTrack = Spicetify.Player.data?.item;
+      if (liveTrack && hasActiveBlacklistRules()) evaluateTrackAgainstBlacklist(liveTrack, false);
     });
 
     manageGenreBlacklistBtn.addEventListener("click", () => {
@@ -14269,7 +17952,7 @@
       overlay.style.cssText = `
           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
           background-color: rgba(0, 0, 0, 0.7);
-          z-index: 99999;
+          z-index: 10000010;
           display: flex; justify-content: center; align-items: center;
       `;
 
@@ -14612,22 +18295,6 @@
 
   let activePlaylistGenreRequestId = 0;
 
-  const UPPER_ACRONYMS = new Set(["idm", "edm", "ost", "r&b", "rnb", "uk", "us", "bpm", "hi-nrg", "dj", "ep", "lp"]);
-  const genreTitleCache = new Map();
-  const formatGenreTitle = (rawName) => {
-      if (!rawName) return "";
-      let cached = genreTitleCache.get(rawName);
-      if (cached) return cached;
-      cached = rawName.split(' ').map(word => {
-          return word.split('-').map(part => {
-              const lower = part.toLowerCase();
-              if (UPPER_ACRONYMS.has(lower)) return lower.toUpperCase();
-              return part.charAt(0).toUpperCase() + part.slice(1);
-          }).join('-');
-      }).join(' ');
-      genreTitleCache.set(rawName, cached);
-      return cached;
-  };
 
   async function handleOpenPlaylistGenres(uri) {
       const currentUri = uri || getCurrentUri();
@@ -15170,17 +18837,20 @@
                   return;
               }
 
-              const titleEl = target.closest('.sp-pg-genre-title, .sp-pg-genre-info');
-              if (titleEl) {
-                  const rowEl = titleEl.closest('.sp-pg-genre-row');
+              const rowEl = target.closest('.sp-pg-genre-row');
+              if (rowEl) {
                   const targetGenre = rowEl?.dataset?.rawGenre || rowEl?.dataset?.genre;
                   if (targetGenre) {
-                      removeFloatingTooltip();
                       if (modal.classList.contains('in-block-mode') && typeof modal._handleGenreClickForBlocking === 'function') {
+                          removeFloatingTooltip();
                           modal._handleGenreClickForBlocking(targetGenre);
                           return;
                       }
-                      navigateToGenre(targetGenre);
+                      const titleEl = target.closest('.sp-pg-genre-title, .sp-pg-genre-info');
+                      if (titleEl) {
+                          removeFloatingTooltip();
+                          navigateToGenre(targetGenre);
+                      }
                   }
               }
           });
@@ -15426,7 +19096,7 @@
               closeBtn.onclick = () => {
                   existing.remove();
                   const liveTrack = Spicetify.Player.data?.item;
-                  if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+                  if (liveTrack && hasActiveBlacklistRules()) evaluateTrackAgainstBlacklist(liveTrack, false);
               };
           }
 
@@ -15550,6 +19220,8 @@
           };
 
           const showLoaderKeepingHeight = () => {
+              const statusEl = existing.querySelector('#sp-genre-skip-status');
+              if (statusEl) statusEl.style.display = 'none';
               const currentHeight = existing.offsetHeight;
               existing.style.transition = 'none';
               existing.style.height = `${currentHeight}px`;
@@ -15569,7 +19241,10 @@
               genreMapOrPromise.then(genreMap => {
                   if (existing.dataset.trackId !== trackIdKey) return;
                   existing._genreMap = genreMap;
-                  transitionToContent(existing._renderContentHtml(genreMap, true), () => existing._bindEvents());
+                  transitionToContent(existing._renderContentHtml(genreMap, true), () => {
+                      existing._bindEvents();
+                      existing._updateSkipStatus?.(genreMap, trackUri, trackIdKey);
+                  });
               }).catch(err => {
                   if (existing.dataset.trackId !== trackIdKey) return;
                   console.error("[Sort-Play] Failed to fetch genres for modal", err);
@@ -15577,7 +19252,10 @@
               });
           } else {
               existing._genreMap = genreMapOrPromise;
-              transitionToContent(existing._renderContentHtml(genreMapOrPromise, true), () => existing._bindEvents());
+              transitionToContent(existing._renderContentHtml(genreMapOrPromise, true), () => {
+                  existing._bindEvents();
+                  existing._updateSkipStatus?.(genreMapOrPromise, trackUri, trackIdKey);
+              });
           }
           
           return;
@@ -15646,8 +19324,23 @@
 
           const allItems = Array.from(genreMap.values());
           const nonMoodItems = allItems.filter(item => !MOOD_DESCRIPTORS_SET.has(normalizeGenre(item.name)));
+          const displayItems = nonMoodItems.length > 0 ? nonMoodItems : allItems;
+          const confSources = genreBlacklistConfig?.sources || {};
+          const minConf = genreBlacklistConfig?.minSpotifyConfidence ?? 25;
+          const allTrackGenreNames = displayItems.filter(item => {
+              for (const s of item.sources) {
+                  if (s.startsWith("Spotify Track") && confSources.spotify_track) {
+                      const m = s.match(/\(([\d.]+)%\)/);
+                      if ((m ? parseFloat(m[1]) : 100) >= minConf) return true;
+                  } else if (s.startsWith("EveryNoise") && confSources.everynoise_artist) return true;
+                  else if (s.startsWith("Last.fm Track") && confSources.lastfm_track) return true;
+                  else if (s.startsWith("Last.fm Artist") && confSources.lastfm_artist) return true;
+                  else if (s.startsWith("Deezer") && confSources.deezer) return true;
+              }
+              return false;
+          }).map(item => item.name);
 
-          (nonMoodItems.length > 0 ? nonMoodItems : allItems).forEach(item => {
+          displayItems.forEach(item => {
               item.sources.forEach(source => {
                   let category = 'Other';
                   let score = '';
@@ -15679,6 +19372,13 @@
               });
           });
 
+          const categoryCountByGenre = new Map();
+          categoryMap.forEach((genres) => {
+              genres.forEach(g => {
+                  categoryCountByGenre.set(g.name, (categoryCountByGenre.get(g.name) || 0) + 1);
+              });
+          });
+
           let contentHtml = '';
           let globalTagIndex = 0;
 
@@ -15692,8 +19392,8 @@
                   });
 
                   contentHtml += `
-                        <div style="margin-bottom: 24px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
+                        <div style="margin-bottom: 18px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 6px;">
                                 <div style="color: rgba(255,255,255,0.6); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                                     ${category}
                                 </div>
@@ -15703,23 +19403,56 @@
                   contentHtml += genres.map(g => {
                       const titleCase = formatGenreTitle(g.name);
                       const uniqueSources = [...new Set(g.sources)];
-                      const tooltip = uniqueSources.join(' & ');
                       const scoreHtml = g.score ? `<span class="genre-detail-score">${g.score}</span>` : '';
                       
                       const delayStyle = animate ? `animation-delay: ${globalTagIndex * 30}ms;` : '';
                       const animClass = animate ? 'animated' : '';
                       globalTagIndex++;
 
-                      const matchedRule = genreBlacklistRules.find(r => isGenreMatchedByRule(g.name, r));
+                      const activeRule = genreBlacklistRules.find(r => isGenreMatchedByRule(g.name, r) && !isTrackExemptFromRule(allTrackGenreNames, r));
+                      const exemptRule = !activeRule ? genreBlacklistRules.find(r => isGenreMatchedByRule(g.name, r)) : null;
+                      const matchedRule = activeRule || exemptRule;
                       const isBanned = Boolean(matchedRule);
                       const bannedClass = isBanned ? 'is-blacklisted' : '';
-                      const bannedTitle = matchedRule ? ` • Blacklisted: "${matchedRule.name}"` : '';
+
+                      const tooltipParts = [];
+                      if (category === 'Every Noise (Artist)' || category === 'Spotify (Artist)') {
+                          const artists = uniqueSources.map(s => s.match(/\((.+)\)$/)?.[1]).filter(Boolean);
+                          if (artists.length > 0) {
+                              tooltipParts.push(`${artists.length > 1 ? 'Artists' : 'Artist'}: ${artists.join(', ')}`);
+                          }
+                      }
+                      const consensusCount = categoryCountByGenre.get(g.name) || 1;
+                      if (consensusCount > 1) {
+                          tooltipParts.push(`Matched in ${consensusCount} sources`);
+                      }
+                      const isCategorySourceEnabled =
+                          (category === 'Spotify (Track)' && confSources.spotify_track) ||
+                          (category === 'Every Noise (Artist)' && confSources.everynoise_artist) ||
+                          (category === 'Last.fm (Track)' && confSources.lastfm_track) ||
+                          (category === 'Last.fm (Artist)' && confSources.lastfm_artist) ||
+                          (category === 'Deezer (Album)' && confSources.deezer);
+                      const isBelowConf = category === 'Spotify (Track)' && g.score && parseFloat(g.score) < minConf;
+
+                      if (matchedRule) {
+                          if (!isCategorySourceEnabled) {
+                              tooltipParts.push(`Blacklisted by "${formatGenreTitle(matchedRule.name)}" • Source disabled in Blacklist Manager`);
+                          } else if (isBelowConf) {
+                              tooltipParts.push(`Blacklisted by "${formatGenreTitle(matchedRule.name)}" • Below ${minConf}% confidence threshold`);
+                          } else if (exemptRule) {
+                              const allowedMatch = allTrackGenreNames.find(n => isGenreExcludedFromRule(n, exemptRule));
+                              tooltipParts.push(`Blacklisted by "${formatGenreTitle(matchedRule.name)}" • Allowed by "${formatGenreTitle(allowedMatch || 'Exception')}"`);
+                          } else {
+                              tooltipParts.push(`Blacklisted by "${formatGenreTitle(matchedRule.name)}"`);
+                          }
+                      }
+                      const titleAttr = tooltipParts.length > 0 ? `title="${escapeHtml(tooltipParts.join(' • '), "")}"` : '';
 
                       const toggleIconSvg = isBanned ? tagRemoveIconSvg : tagAddIconSvg;
 
                       return `
-                        <div class="genre-detail-tag ${animClass} ${bannedClass}" data-genre="${escapeHtml(titleCase, "")}" data-raw-genre="${escapeHtml(g.name, "")}" data-blacklisted="${isBanned ? 'true' : 'false'}" title="Source: ${escapeHtml(tooltip, "")}${escapeHtml(bannedTitle, "")}" style="${delayStyle}">
-                            ${isBanned ? `<span class="genre-banned-badge" title="Blacklisted: ${escapeHtml(matchedRule.name)}">${banIconSvg}</span>` : ''}
+                        <div class="genre-detail-tag ${animClass} ${bannedClass}" data-genre="${escapeHtml(titleCase, "")}" data-raw-genre="${escapeHtml(g.name, "")}" data-blacklisted="${isBanned ? 'true' : 'false'}" ${titleAttr} style="${delayStyle}">
+                            ${isBanned ? `<span class="genre-banned-badge" title="Blacklisted by &quot;${escapeHtml(formatGenreTitle(matchedRule.name), "")}&quot;">${banIconSvg}</span>` : ''}
                             <span class="genre-text">${escapeHtml(titleCase, "")}</span>${scoreHtml}
                             <button class="genre-copy-btn" title="Copy">
                                 ${smallCopyIcon}
@@ -15751,8 +19484,9 @@
             @keyframes sp-tag-pop { 0% { opacity: 0; transform: scale(0.8) translateY(10px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
             .genre-detail-tag { height: 28px; box-sizing: border-box; padding: 0 0 0 12px; border-radius: 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.05); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease; user-select: none; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; position: relative; }
             .genre-detail-tag:hover { background-color: rgba(255,255,255,0.14) !important; border-color: rgba(255,255,255,0.18) !important; }
+            .genre-detail-tag.is-consensus-match { background-color: rgba(var(--sp-pg-accent, 255, 255, 255), 0.22) !important; border-color: rgba(var(--sp-pg-accent-light, 255, 255, 255), 0.5) !important; box-shadow: 0 0 10px rgba(var(--sp-pg-accent, 255, 255, 255), 0.2); }
             .genre-detail-tag.is-blacklisted { background: rgba(233, 20, 41, 0.14) !important; border-color: rgba(233, 20, 41, 0.45) !important; color: #ff9b9b !important; }
-            .genre-detail-tag.is-blacklisted:hover { background: rgba(233, 20, 41, 0.25) !important; border-color: rgba(233, 20, 41, 0.7) !important; color: #fff !important; }
+            .genre-detail-tag.is-blacklisted:hover, .genre-detail-tag.is-blacklisted.is-consensus-match { background: rgba(233, 20, 41, 0.25) !important; border-color: rgba(233, 20, 41, 0.7) !important; color: #fff !important; }
             .genre-banned-badge { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; color: #ff6b6b; margin-right: 2px; flex-shrink: 0; }
             .genre-banned-badge svg { width: 12px; height: 12px; }
             .sp-control-btn.block-mode-btn.is-active { color: #ff6b6b !important; background-color: rgba(233, 20, 41, 0.2) !important; }
@@ -15766,10 +19500,13 @@
             .in-block-mode .genre-toggle-icon { display: flex !important; }
             .sp-pg-genre-row.is-blacklisted { background: rgba(233, 20, 41, 0.1) !important; border-color: rgba(233, 20, 41, 0.35) !important; }
             .sp-pg-genre-row.is-blacklisted .sp-pg-genre-title { color: #ff9b9b !important; }
+            .in-block-mode .sp-pg-genre-row { cursor: pointer !important; }
+            .in-block-mode .sp-pg-genre-row:not(.is-blacklisted):hover { background: rgba(233, 20, 41, 0.16) !important; border-color: rgba(255, 107, 107, 0.5) !important; }
+            .in-block-mode .sp-pg-genre-row .genre-copy-btn { display: none !important; }
             .genre-detail-tag.animated { animation: sp-tag-pop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; opacity: 0; }
             .genre-detail-score { background: rgba(var(--sp-pg-accent, 255, 255, 255), 0.14); border: 1px solid rgba(255, 255, 255, 0.07); color: rgb(var(--sp-pg-accent-light, 255, 255, 255)); padding: 2px 6px; border-radius: 10px; font-size: 11px; font-weight: 500; line-height: 1; display: inline-flex; align-items: center; letter-spacing: 0.2px; font-family: var(--font-family, 'SpotifyMixUI', 'CircularSp', sans-serif); flex-shrink: 0; -webkit-font-smoothing: antialiased; transition: background 0.3s ease, color 0.3s ease; }
             .genre-detail-tag:hover .genre-detail-score { background: rgba(var(--sp-pg-accent, 255, 255, 255), 0.28); color: #fff; }
-            .genre-detail-tag .genre-copy-btn { position: relative !important; right: auto !important; top: auto !important; bottom: auto !important; height: 100% !important; width: 22px !important; background: transparent !important; border: none !important; color: rgba(255,255,255,0.5); cursor: pointer; padding: 0 5px 0 2px !important; display: flex; align-items: center; justify-content: center; border-radius: 0 13px 13px 0; transition: background-color 0.15s ease, color 0.15s ease; flex-shrink: 0; margin: 0; }
+            .genre-detail-tag .genre-copy-btn { position: relative !important; right: auto !important; top: auto !important; bottom: auto !important; height: 100% !important; width: 22px !important; background: transparent !important; border: none !important; color: rgba(255,255,255,0.22); cursor: pointer; padding: 0 5px 0 2px !important; display: flex; align-items: center; justify-content: center; border-radius: 0 13px 13px 0; transition: background-color 0.15s ease, color 0.15s ease; flex-shrink: 0; margin: 0; }
             .genre-detail-tag:hover .genre-copy-btn { color: rgba(255,255,255,0.85); }
             .genre-detail-tag .genre-copy-btn:hover { background-color: rgba(255,255,255,0.2) !important; color: #fff !important; }
             .sp-pg-consensus-card.animated { animation: sp-tag-pop 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; opacity: 0; }
@@ -15784,13 +19521,17 @@
             .sp-genre-cover-wrapper { position: relative; width: 56px; height: 56px; margin-right: 16px; flex-shrink: 0; z-index: 2; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
             .sp-genre-cover { width: 100%; height: 100%; border-radius: 4px; object-fit: cover; background-color: rgba(255,255,255,0.1); position: absolute; top: 0; left: 0; transition: opacity 0.2s ease; }
             .sp-genre-info { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: center; position: relative; z-index: 2; }
-            .sp-genre-all-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+            .sp-genre-title-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; min-width: 0; overflow: hidden; white-space: nowrap; }
+            .sp-genre-all-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 1px; margin-right: -1px; flex-shrink: 0; }
+            .sp-genre-skip-status { font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.42); display: none; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
+            .sp-genre-skip-status::before { content: "•"; color: rgba(255,255,255,0.38); flex-shrink: 0; }
+            #sort-play-genre-details-window[data-mode="playlist"] .sp-genre-skip-status { display: none !important; }
             .sp-genre-track { font-size: 18px; font-weight: 800; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; text-shadow: 0 2px 10px rgba(0,0,0,0.2); }
             .sp-genre-artist { font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,0.2); }
             .sp-window-controls { display: flex; gap: 8px; align-items: center; padding-left: 12px; position: relative; z-index: 2; }
             .sp-control-btn { background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer; width: 28px; height: 28px; padding: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: color 0.2s, background-color 0.2s; box-sizing: border-box; }
             .sp-control-btn:hover { color: white; background-color: rgba(255,255,255,0.1); }
-            .sp-window-content { padding: 24px 20px 24px 24px; overflow-y: auto; scrollbar-gutter: stable; background-color: transparent; flex-grow: 1; position: relative; z-index: 2; scrollbar-width: auto !important; scrollbar-color: auto !important; will-change: scroll-position; }
+            .sp-window-content { padding: 18px 20px 20px 24px; overflow-y: auto; scrollbar-gutter: stable; background-color: transparent; flex-grow: 1; position: relative; z-index: 2; scrollbar-width: auto !important; scrollbar-color: auto !important; will-change: scroll-position; }
             .sp-window-content > div:last-child { margin-bottom: 0 !important; }
             .sp-window-content::-webkit-scrollbar { width: 4px !important; }
             .sp-window-content::-webkit-scrollbar-track { background: transparent !important; margin-bottom: 12px !important; }
@@ -15836,7 +19577,10 @@
                   ${coverUrl ? `<img src="${coverUrl}" class="sp-genre-cover" />` : ''}
               </div>
               <div class="sp-genre-info">
-                  <div class="sp-genre-all-title">All Genres</div>
+                  <div class="sp-genre-title-row">
+                      <div class="sp-genre-all-title">All Genres</div>
+                      <span class="sp-genre-skip-status" id="sp-genre-skip-status"></span>
+                  </div>
                   <div class="sp-genre-track" title="${escapeHtml(trackName)}">${escapeHtml(trackName)}</div>
                   <div class="sp-genre-artist" title="${escapeHtml(artistName)}">${escapeHtml(artistName)}</div>
               </div>
@@ -15877,6 +19621,142 @@
 
       let isBlockModeActive = false;
 
+      const updateSkipStatus = async (genreMap, targetUri = modalContainer._trackUri, targetTrackId = modalContainer.dataset.trackId) => {
+          const statusEl = modalContainer.querySelector('#sp-genre-skip-status');
+          if (!statusEl) return;
+          if (modalContainer.dataset.mode === 'playlist' || !genreMap || typeof genreMap.forEach !== 'function') {
+              statusEl.style.display = 'none';
+              return;
+          }
+
+          const allItems = Array.from(genreMap.values());
+          const nonMoodItems = allItems.filter(item => !MOOD_DESCRIPTORS_SET.has(normalizeGenre(item.name)));
+          const displayItems = nonMoodItems.length > 0 ? nonMoodItems : allItems;
+          const confSources = genreBlacklistConfig?.sources || {};
+          const minConf = genreBlacklistConfig?.minSpotifyConfidence ?? 25;
+
+          const activeSourceGenreNames = [];
+          let hasDisplayedRuleMatch = false;
+          let hasBelowConfRuleMatch = false;
+          let hasDisabledSourceRuleMatch = false;
+
+          for (let i = 0; i < displayItems.length; i++) {
+              const item = displayItems[i];
+              let isFromActiveSource = false;
+              let hasEnabledSourceButBelowConf = false;
+              let hasDisabledSource = false;
+
+              for (const s of item.sources) {
+                  if (s.startsWith("Spotify Track")) {
+                      if (confSources.spotify_track) {
+                          const m = s.match(/\(([\d.]+)%\)/);
+                          const score = m ? parseFloat(m[1]) : 100;
+                          if (score >= minConf) isFromActiveSource = true;
+                          else hasEnabledSourceButBelowConf = true;
+                      } else {
+                          hasDisabledSource = true;
+                      }
+                  } else if (s.startsWith("EveryNoise")) {
+                      if (confSources.everynoise_artist) isFromActiveSource = true;
+                      else hasDisabledSource = true;
+                  } else if (s.startsWith("Last.fm Track")) {
+                      if (confSources.lastfm_track) isFromActiveSource = true;
+                      else hasDisabledSource = true;
+                  } else if (s.startsWith("Last.fm Artist")) {
+                      if (confSources.lastfm_artist) isFromActiveSource = true;
+                      else hasDisabledSource = true;
+                  } else if (s.startsWith("Deezer")) {
+                      if (confSources.deezer) isFromActiveSource = true;
+                      else hasDisabledSource = true;
+                  }
+              }
+
+              if (isFromActiveSource) {
+                  activeSourceGenreNames.push(item.name);
+              }
+
+              if (genreBlacklistRules.some(r => isGenreMatchedByRule(item.name, r))) {
+                  hasDisplayedRuleMatch = true;
+                  if (!isFromActiveSource) {
+                      if (hasEnabledSourceButBelowConf) hasBelowConfRuleMatch = true;
+                      if (hasDisabledSource) hasDisabledSourceRuleMatch = true;
+                  }
+              }
+          }
+
+          if (!hasDisplayedRuleMatch) {
+              statusEl.style.display = 'none';
+              return;
+          }
+
+          if (!genreBlacklistEnabled) {
+              statusEl.textContent = 'Auto-Skip Off';
+              statusEl.title = 'Genre Auto-Skip is currently turned off in settings.';
+              statusEl.style.display = 'inline-flex';
+              return;
+          }
+
+          let hasActiveSourceMatchedRule = false;
+          let hasActiveNonExemptRule = false;
+          const exemptAllowedGenres = new Set();
+
+          for (let i = 0; i < activeSourceGenreNames.length; i++) {
+              const gName = activeSourceGenreNames[i];
+              for (let r = 0; r < genreBlacklistRules.length; r++) {
+                  const rule = genreBlacklistRules[r];
+                  if (isGenreMatchedByRule(gName, rule)) {
+                      hasActiveSourceMatchedRule = true;
+                      if (!isTrackExemptFromRule(activeSourceGenreNames, rule)) {
+                          hasActiveNonExemptRule = true;
+                      } else {
+                          for (let k = 0; k < activeSourceGenreNames.length; k++) {
+                              if (isGenreExcludedFromRule(activeSourceGenreNames[k], rule)) {
+                                  exemptAllowedGenres.add(formatGenreTitle(activeSourceGenreNames[k]));
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+
+          if (!hasActiveSourceMatchedRule) {
+              if (hasBelowConfRuleMatch && !hasDisabledSourceRuleMatch) {
+                  statusEl.textContent = `Not Auto-Skipped (<${minConf}% Confidence)`;
+                  statusEl.title = `Matched genre is below your ${minConf}% Spotify Track confidence threshold.`;
+              } else {
+                  statusEl.textContent = 'Not Auto-Skipped (Source Disabled)';
+                  statusEl.title = 'Matched genre only appears in a source that is disabled in Genre Blacklist Manager.';
+              }
+              statusEl.style.display = 'inline-flex';
+              return;
+          }
+
+          if (!hasActiveNonExemptRule) {
+              const allowedList = Array.from(exemptAllowedGenres).join(', ');
+              statusEl.textContent = 'Not Auto-Skipped (Allowed Genre)';
+              statusEl.title = allowedList
+                  ? `Matches your blacklist, but allowed by rule exception: ${allowedList}`
+                  : 'Matches your blacklist, but allowed by a rule exception.';
+              statusEl.style.display = 'inline-flex';
+              return;
+          }
+
+          if (genreBlacklistProtectLiked && targetUri && !Spicetify.URI.isLocal(targetUri)) {
+              const isLiked = await isTrackLikedForBlacklist(targetUri);
+              if (modalContainer.dataset.trackId !== targetTrackId) return;
+              if (isLiked) {
+                  statusEl.textContent = 'Not Auto-Skipped (Liked Song)';
+                  statusEl.title = 'Matches your blacklist, but "Never Auto-Skip Liked Songs" is enabled.';
+                  statusEl.style.display = 'inline-flex';
+                  return;
+              }
+          }
+
+          statusEl.style.display = 'none';
+      };
+
+      modalContainer._updateSkipStatus = updateSkipStatus;
+
       const refreshWindowDisplay = () => {
           if (modalContainer.dataset.mode === 'playlist') {
               if (typeof modalContainer._refreshPlaylistGenres === 'function') {
@@ -15887,6 +19767,7 @@
           if (modalContainer._genreMap) {
               contentArea.innerHTML = renderContentHtml(modalContainer._genreMap, false);
               bindEvents();
+              updateSkipStatus(modalContainer._genreMap);
           }
       };
 
@@ -15909,12 +19790,13 @@
                   showNotification(`Updated blacklist: ${formatGenreTitle(updated.name)}`);
                   prefetchBlacklistMap.clear();
               }, () => {
-                  if (ruleIndex !== -1) genreBlacklistRules.splice(ruleIndex, 1);
+                  const targetIdx = genreBlacklistRules.indexOf(matchedRule);
+                  if (targetIdx !== -1) genreBlacklistRules.splice(targetIdx, 1);
                   prefetchBlacklistMap.clear();
                   saveSettings();
                   refreshWindowDisplay();
                   showNotification(`Removed from blacklist: ${formatGenreTitle(matchedRule.name)}`);
-              });
+              }, cleanName);
           } else {
               showGenreRuleConfigModal({ name: cleanName, mode: 'exact', expandSubgenres: false }, (newRule) => {
                   genreBlacklistRules.push(newRule);
@@ -15930,7 +19812,20 @@
       modalContainer._handleGenreClickForBlocking = handleGenreClickForBlocking;
 
       const bindEvents = () => {
-          modalContainer.querySelectorAll('.genre-detail-tag').forEach(tag => {
+          const allTags = modalContainer.querySelectorAll('.genre-detail-tag');
+          allTags.forEach(tag => {
+              tag.addEventListener('mouseenter', () => {
+                  const raw = tag.dataset.rawGenre;
+                  if (!raw) return;
+                  allTags.forEach(other => {
+                      if (other !== tag && other.dataset.rawGenre === raw) {
+                          other.classList.add('is-consensus-match');
+                      }
+                  });
+              });
+              tag.addEventListener('mouseleave', () => {
+                  allTags.forEach(other => other.classList.remove('is-consensus-match'));
+              });
               tag.addEventListener('click', (e) => {
                   if (e.target.closest('.genre-copy-btn')) return;
 
@@ -16012,6 +19907,7 @@
               modalContainer._genreMap = genreMap;
               contentArea.innerHTML = renderContentHtml(genreMap, true);
               bindEvents();
+              updateSkipStatus(genreMap, trackUri, trackIdKey);
               requestAnimationFrame(() => {
                   const delta = contentArea.scrollHeight - contentArea.clientHeight;
                   contentArea.style.overflowY = delta > 14 ? 'auto' : 'hidden';
@@ -16027,6 +19923,7 @@
           modalContainer._genreMap = genreMapOrPromise;
           contentArea.innerHTML = renderContentHtml(genreMapOrPromise, false);
           bindEvents();
+          updateSkipStatus(genreMapOrPromise, trackUri, trackIdKey);
           requestAnimationFrame(() => {
               const delta = contentArea.scrollHeight - contentArea.clientHeight;
               contentArea.style.overflowY = delta > 14 ? 'auto' : 'hidden';
@@ -16058,7 +19955,7 @@
       const closeModal = () => {
           modalContainer.remove();
           const liveTrack = Spicetify.Player.data?.item;
-          if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+          if (liveTrack && hasActiveBlacklistRules()) evaluateTrackAgainstBlacklist(liveTrack, false);
       };
       
       const closeBtn = modalContainer.querySelector('.close-btn');
@@ -16082,7 +19979,7 @@
               enforceBoundaries(modalContainer);
               if (!isBlockModeActive) {
                   const liveTrack = Spicetify.Player.data?.item;
-                  if (liveTrack && genreBlacklistEnabled) evaluateTrackAgainstBlacklist(liveTrack, false);
+                  if (liveTrack && hasActiveBlacklistRules()) evaluateTrackAgainstBlacklist(liveTrack, false);
               }
           });
       }
@@ -16320,171 +20217,6 @@
       }
   }
 
-  const GENRE_ALIASES_RAW = {
-    "r&b": ["r&b","rnb","r and b","r n b","rhythm and blues","rhythm & blues","r&b's","rnb's","r & b"],
-    "neo soul": ["neo soul","neosoul","neo-soul"],
-    "hip hop": ["hip hop","hip-hop","hiphop","hip-hop music","hip hop's","hip-hops"],
-    "lo-fi": ["lo-fi","lofi","lo fi"],
-    "trap": ["trap","trap music"],
-    "pop": ["pop","pop music","pop's","popmusic","pops"],
-    "indie pop": ["indie pop","indiepop","indie-pop"],
-    "synth pop": ["synth pop","synthpop","synth-pop"],
-    "electropop": ["electropop","electro-pop","electro pop"],
-    "dream pop": ["dream pop","dreampop"],
-    "art pop": ["art pop","art-pop"],
-    "k-pop": ["k-pop","kpop","k pop"],
-    "j-pop": ["j-pop","jpop","j pop"],
-    "c-pop": ["c-pop","cpop","c pop"],
-    "rock and roll": ["rock & roll","rock n roll","rock and roll","rock'n'roll"],
-    "alternative rock": ["alternative rock","alt rock","alt-rock"],
-    "indie rock": ["indie rock","indierock","indie-rock"],
-    "hard rock": ["hard rock","hardrock","hard rock music","hard rock's","hard-rock","hardrockmusic"],
-    "soft rock": ["soft rock","softrock"],
-    "psychedelic rock": ["psychedelic rock","psych rock"],
-    "pop punk": ["pop punk","poppunk","pop-punk"],
-    "post-punk": ["post-punk","postpunk","post punk"],
-    "new wave": ["new wave","newwave"],
-    "post-rock": ["post-rock","postrock","post rock"],
-    "shoegaze": ["shoegaze","shoe gaze","nu gaze","nu-gaze","nugaze"],
-    "idm": ["idm","intelligent dance music"],
-    "metal": ["metal","heavy metal","heavymetal","metal rock","metal's","metalhead","metallic","metalmusic","metals"],
-    "death metal": ["death metal","deathmetal"],
-    "black metal": ["black metal","blackmetal"],
-    "metalcore": ["metalcore","metal core"],
-    "nu metal": ["nu metal","numetal","nu-metal"],
-    "power metal": ["power metal","powermetal"],
-    "thrash metal": ["thrash metal","thrashmetal"],
-    "doom metal": ["doom metal","doommetal"],
-    "electronic": ["electro","electro's","electronic","electronic music","electronic's","electronica","electronicas","electronico","electronics","electronik","eletronic"],
-    "edm": ["edm","electronic dance","electronic dance music","edm music","edm's","edmmusic"],
-    "house": ["house","house music","house's","housemusic"],
-    "deep house": ["deep house","deephouse"],
-    "tech house": ["tech house","techhouse"],
-    "drum and bass": ["drum and bass","dnb","d&b","drum n bass","drum & bass","drumandbass","drum'n'bass"],
-    "psytrance": ["psytrance","psy trance","psy-trance"],
-    "synthwave": ["synthwave","synth wave","synth-wave","synthwave's"],
-    "vaporwave": ["vaporwave","vapor wave"],
-    "chillwave": ["chillwave","chill wave"],
-    "latin": ["latin","latin music","latin's","latina","latinas","latinmusic","latino","latinos"],
-    "reggaeton": ["reggaeton","reggaetón","regueton"],
-    "bossa nova": ["bossa nova","bossanova"],
-    "salsa": ["salsa","salsa music"],
-    "singer-songwriter": ["singer-songwriter","singer songwriter","singer/songwriter"],
-    "nu disco": ["nu disco","nu-disco","nudisco"],
-    "soundtrack": ["soundtrack","ost","original soundtrack"],
-    "country": ["country","country music","country's","countrymusic"],
-    "classical": ["classic","classical","classical music","classical's","classics","orchestra","orchestral","orchestral music","orchestras"],
-    "world": ["world","world music"],
-    "christian": ["christian","christian music"],
-    "christian pop": ["christian pop","ccm","deep ccm"],
-    "rock": ["rock","rock music","rock's","rockmusic","rocks","rockin","rockin'"],
-    "indie": ["indie","indie's","indiemusic","indies"],
-    "dance": ["dance","dance music","dance's","dances","dancey"],
-    "jazz": ["jazz","jazz's","jazzier","jazziest","jazzmusic","jazzy"],
-    "folk": ["folk","folk music","folk's","folkie","folkier","folklore","folkmusic","folksy"],
-    "rap": ["rap","rap music","raps","rapper","rappers"],
-    "punk": ["punk","punk music","punk's","punkmusic","punks","punky"],
-    "soul": ["soul","soul music","soul's","soulful","soulmusic","souly"],
-    "blues": ["blues","blues music","blues'","bluesier","bluesiest","bluesmusic","bluesy"],
-    "alternative": ["alt","alternative","alternative music","alternative's","alternativemusic","alternatives"],
-    "instrumental": ["instrumental","instrumental's","instrumentalmusic","instrumentals","no vocals"],
-    "experimental": ["experiment","experimental","experimental's","experimentalmusic","experiments"],
-    "ambient": ["ambient","ambient's","ambients","atmospheric"],
-    "acoustic": ["acoustic","acoustic's","acousticmusic","acoustics"],
-    "reggae": ["reggae","reggae music","reggae's","reggaemusic"],
-    "techno": ["tech","techno","techno music","techno's","technomusic"],
-    "trance": ["trance","trance music","trance's","trancemusic","trancing"],
-    "funk": ["funk","funk's","funkier","funkiest","funkmusic","funky"],
-    "disco": ["disco","disco music","disco's","discomusic","discos"],
-    "afrobeats": ["afrobeats","afro beats"],
-    "baroque": ["baroque","baroque's"],
-    "drone": ["drone","drone's","dronemusic","drones"],
-    "dubstep": ["dubstep","dub step","dub-step","dubstep's","dubstepmusic"],
-    "epic": ["epic","epic music","epic's","epicmusic"],
-    "epiccore": ["epiccore","epic core","epic-core"],
-    "future bass": ["future bass","future bass's","futurebass","futurebassmusic"],
-    "jungle": ["jungle","jungle's","junglemusic","jungles"],
-    "new age": ["new age","new age music","new-age","new-age music","newage","newagemusic"],
-    "piano": ["piano","piano music"],
-    "pop rock": ["pop rock","pop rock music","pop rock's","pop-rock","poprock","poprockmusic"],
-    "swing": ["swing","swing music"],
-    "trip hop": ["trip hop","trip hop's","trip hops","triphop","triphopmusic"],
-    "a cappella": ["a cappella","acappella"],
-    "folk rock": ["folk rock","folk-rock"]
-  };
-
-  const GENRE_ALIAS_MAP = new Map();
-  for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
-      GENRE_ALIAS_MAP.set(canonical, canonical);
-      aliases.forEach(alias => GENRE_ALIAS_MAP.set(alias, canonical));
-  }
-
-  function normalizeGenre(genre) {
-      if (!genre) return "";
-      let lower = genre.toLowerCase().trim();
-      
-      if (GENRE_ALIAS_MAP.has(lower)) {
-          return GENRE_ALIAS_MAP.get(lower);
-      }
-
-      return lower
-          .replace(/-/g, ' ')
-          .replace(/&/g, 'and')
-          .replace(/\s+/g, ' ');
-  }
-
-  const MOOD_DESCRIPTORS_SET = new Set([
-      "chill", "relaxing", "calm", "love", "fast", "slow", "soothing", "peaceful", "tranquil",
-      "mellow", "soft", "smooth", "quiet", "energetic", "sad", "upbeat", "pump up", "romantic",
-      "moody", "melancholy", "nostalgia", "emotional", "cozy", "gentle", "happy", "rain", "children's music",
-      "motivation", "angst", "aggressive", "atmospheric", "nature", "angry", "dark", "classy",
-      "funny", "spooky", "epic", "sensual", "ethereal", "beats", "ibiza", "club", "gaming", "spiritual", "soulful"
-  ]);
-
-  let isCountryOnly_Set = null;
-  function isCountryOnly(tag) {
-      if (!tag) return false;
-      const lowerTag = tag.toLowerCase().trim();
-
-      if (!isCountryOnly_Set) {
-          isCountryOnly_Set = new Set();
-          Object.keys(COUNTRY_MAPPINGS).forEach(c => isCountryOnly_Set.add(c.toLowerCase().trim()));
-          Object.values(COUNTRY_MAPPINGS).forEach(variants => {
-              variants.forEach(v => isCountryOnly_Set.add(v.toLowerCase().trim()));
-          });
-      }
-      
-      return isCountryOnly_Set.has(lowerTag);
-  }
-
-  let isWhitelistedGenre_MappedSet = null;
-  function isWhitelistedGenre(tag, genreMap) {
-      if (!tag) return false;
-      const normalizedTag = normalizeGenre(tag);
-      
-      if (!isWhitelistedGenre_MappedSet) {
-          isWhitelistedGenre_MappedSet = new Set();
-          Object.keys(GENRE_MAPPINGS).forEach(g => isWhitelistedGenre_MappedSet.add(normalizeGenre(g)));
-          Object.values(GENRE_MAPPINGS).forEach(variants => {
-              variants.forEach(v => isWhitelistedGenre_MappedSet.add(normalizeGenre(v)));
-          });
-          if (typeof GENRE_ALIASES_RAW !== "undefined") {
-              Object.keys(GENRE_ALIASES_RAW).forEach(g => isWhitelistedGenre_MappedSet.add(normalizeGenre(g)));
-          }
-      }
-      
-      const isMapped = isWhitelistedGenre_MappedSet.has(normalizedTag);
-      
-      let isInJson = false;
-      if (genreMap) {
-          if (!genreMap._normalizedSet) {
-              genreMap._normalizedSet = new Set(genreMap.map(p => normalizeGenre(p.genre)));
-          }
-          isInJson = genreMap._normalizedSet.has(normalizedTag);
-      }
-      
-      return isMapped || isInJson;
-  }
 
   const nativeConceptTextDecoder = new TextDecoder();
 
@@ -16615,23 +20347,45 @@
           .sort((a, b) => b.score - a.score);
   }
 
+  const nativeSpotifyTrackGenreCache = new Map();
+  const pendingNativeTrackGenreFetches = new Map();
+
   async function fetchNativeSpotifyTrackGenres(trackUri) {
       if (!trackUri || !trackUri.startsWith("spotify:track:")) return [];
-      try {
-          const client = getMetadataClient();
-          if (!client) return [];
-
-          const response = await client.fetch({ extensionQuery: [
-              { extensionKind: 6, entityUri: [trackUri] }
-          ]});
-
-          const ext = response?.extension?.find(e => e.extensionKind === 6) || response?.extension?.[0];
-          const item = ext?.entityExtension?.find(e => e.entityUri === trackUri) || ext?.entityExtension?.[0];
-          return parseNativeTrackConceptsBuffer(item?.extensionData?.value);
-      } catch (e) {
-          console.warn("[Sort-Play] Failed to fetch Native Spotify Track Genres:", e);
-          return [];
+      if (nativeSpotifyTrackGenreCache.has(trackUri)) {
+          return nativeSpotifyTrackGenreCache.get(trackUri);
       }
+      if (pendingNativeTrackGenreFetches.has(trackUri)) {
+          return await pendingNativeTrackGenreFetches.get(trackUri);
+      }
+
+      const promise = (async () => {
+          try {
+              const client = getMetadataClient();
+              if (!client) return [];
+
+              const response = await client.fetch({ extensionQuery: [
+                  { extensionKind: 6, entityUri: [trackUri] }
+              ]});
+
+              const ext = response?.extension?.find(e => e.extensionKind === 6) || response?.extension?.[0];
+              const item = ext?.entityExtension?.find(e => e.entityUri === trackUri) || ext?.entityExtension?.[0];
+              const parsed = parseNativeTrackConceptsBuffer(item?.extensionData?.value);
+              nativeSpotifyTrackGenreCache.set(trackUri, parsed);
+              if (nativeSpotifyTrackGenreCache.size > 500) {
+                  nativeSpotifyTrackGenreCache.delete(nativeSpotifyTrackGenreCache.keys().next().value);
+              }
+              return parsed;
+          } catch (e) {
+              console.warn("[Sort-Play] Failed to fetch Native Spotify Track Genres:", e);
+              return [];
+          } finally {
+              pendingNativeTrackGenreFetches.delete(trackUri);
+          }
+      })();
+
+      pendingNativeTrackGenreFetches.set(trackUri, promise);
+      return await promise;
   }
 
   async function fetchNativeSpotifyTrackGenresBatch(trackUris) {
@@ -16731,7 +20485,12 @@
                   })());
               }
 
-              const artistsToFetch = track.artists ? track.artists.filter(a => a.id || (a.uri && a.uri.split(':')[2])) : [];
+              const rawArtists = track.artists?.length
+                  ? track.artists
+                  : (track.metadata?.artist_uri
+                      ? [{ id: track.metadata.artist_uri.split(':')[2], uri: track.metadata.artist_uri, name: track.metadata.artist_name || "Artist" }]
+                      : []);
+              const artistsToFetch = rawArtists.filter(a => a.id || (a.uri && a.uri.split(':')[2]));
 
               if (genreSourcesNpEveryNoise && artistsToFetch.length > 0) {
                   const idsToFetch = [];
@@ -16838,98 +20597,76 @@
                   }
               }
 
-              const artistName = track.artists?.[0]?.name || "";
-              const trackName = track.name || "";
+              const artistName = track.artists?.[0]?.name || track.artistName || track.metadata?.artist_name || "";
+              const trackName = track.name || track.songTitle || track.metadata?.title || "";
 
               if (genreSourcesNpLastfm && artistName && trackName) {
-                  let cachedLastfmArtist = null;
-                  if (lastfmArtistTagsCache.has(artistName)) {
-                      cachedLastfmArtist = lastfmArtistTagsCache.get(artistName);
-                  } else {
-                      const cached = await idb.get('lastfmArtistTags', artistName, CACHE_EXPIRE_GENRES);
-                      if (cached) {
-                          cachedLastfmArtist = cached;
-                          lastfmArtistTagsCache.set(artistName, cached);
-                      }
-                  }
+                  promises.push((async () => {
+                      const trackCacheKey = `${artistName}|${trackName}`;
+                      let cachedLastfmArtist = lastfmArtistTagsCache.get(artistName) ?? await idb.get('lastfmArtistTags', artistName, CACHE_EXPIRE_GENRES);
+                      let cachedLastfmTrack = lastfmTrackTagsCache.get(trackCacheKey) ?? await idb.get('lastfmTrackTags', trackCacheKey, CACHE_EXPIRE_GENRES);
 
-                  if (cachedLastfmArtist) {
-                      if (cachedLastfmArtist.length > 0) addGenres(cachedLastfmArtist, 'Last.fm Artist');
-                  } else {
-                      promises.push((async () => {
+                      const fetchArtistTask = cachedLastfmArtist ? Promise.resolve(cachedLastfmArtist) : (async () => {
                           try {
                               const params = new URLSearchParams({ method: 'artist.getInfo', artist: artistName, format: 'json' });
                               const res = await fetchLfmWithGateway(params);
                               if (res.ok) {
                                   const data = await res.json();
                                   if (data?.artist?.tags?.tag) {
-                                      const tags = data.artist.tags.tag
+                                      const rawTags = data.artist.tags.tag
                                           .map(t => t.name.toLowerCase())
                                           .filter(g => !/^\d+$/.test(g));
-                                      
-                                      const validTags = tags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
-                                      lastfmArtistTagsCache.set(artistName, validTags);
-                                      idb.set('lastfmArtistTags', artistName, validTags);
-                                      
-                                      if (validTags.length > 0) {
-                                          addGenres(validTags, 'Last.fm Artist');
-                                      }
-                                  } else {
-                                      lastfmArtistTagsCache.set(artistName, []);
-                                      idb.set('lastfmArtistTags', artistName, []);
+                                      lastfmArtistRawTagsCache.set(artistName, rawTags);
+                                      const synthTags = synthesizeLastfmSplitTags(rawTags);
+                                      lastfmArtistTagsCache.set(artistName, synthTags);
+                                      idb.set('lastfmArtistTags', artistName, synthTags);
+                                      return synthTags;
                                   }
                               }
                           } catch (e) { console.warn("LFM Artist fetch failed", e); }
-                      })());
-                  }
+                          lastfmArtistTagsCache.set(artistName, []);
+                          idb.set('lastfmArtistTags', artistName, []);
+                          return [];
+                      })();
 
-                  const trackCacheKey = `${artistName}|${trackName}`;
-                  let cachedLastfmTrack = null;
-                  if (lastfmTrackTagsCache.has(trackCacheKey)) {
-                      cachedLastfmTrack = lastfmTrackTagsCache.get(trackCacheKey);
-                  } else {
-                      const cached = await idb.get('lastfmTrackTags', trackCacheKey, CACHE_EXPIRE_GENRES);
-                      if (cached) {
-                          cachedLastfmTrack = cached;
-                          lastfmTrackTagsCache.set(trackCacheKey, cached);
-                      }
-                  }
-
-                  if (cachedLastfmTrack) {
-                      if (cachedLastfmTrack.length > 0) addGenres(cachedLastfmTrack, 'Last.fm Track');
-                  } else {
-                      promises.push((async () => {
+                      const fetchTrackTask = cachedLastfmTrack ? Promise.resolve({ fromCache: true, tags: cachedLastfmTrack }) : (async () => {
                           try {
                               const params = new URLSearchParams({ method: 'track.getInfo', artist: artistName, track: trackName, format: 'json' });
                               const res = await fetchLfmWithGateway(params);
                               if (res.ok) {
                                   const data = await res.json();
                                   if (data?.track?.toptags?.tag) {
-                                      const tags = data.track.toptags.tag
+                                      const rawTags = data.track.toptags.tag
                                           .map(t => t.name.toLowerCase())
                                           .filter(g => !/^\d+$/.test(g));
-                                      
-                                      const validTags = tags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
-                                      lastfmTrackTagsCache.set(trackCacheKey, validTags);
-                                      idb.set('lastfmTrackTags', trackCacheKey, validTags);
-                                      
-                                      if (validTags.length > 0) {
-                                          addGenres(validTags, 'Last.fm Track');
-                                      }
-                                  } else {
-                                      lastfmTrackTagsCache.set(trackCacheKey, []);
-                                      idb.set('lastfmTrackTags', trackCacheKey, []);
+                                      return { fromCache: false, tags: rawTags };
                                   }
-                              } else {
-                                  lastfmTrackTagsCache.set(trackCacheKey, []);
-                                  idb.set('lastfmTrackTags', trackCacheKey, []);
                               }
-                          } catch (e) {
-                              lastfmTrackTagsCache.set(trackCacheKey, []);
-                              idb.set('lastfmTrackTags', trackCacheKey, []);
-                          }
-                      })());
-                  }
+                          } catch (e) {}
+                          return { fromCache: false, tags: [] };
+                      })();
+
+                      const [artistTagsResult, trackTagsObj] = await Promise.all([fetchArtistTask, fetchTrackTask]);
+                      const rawArtistCtx = lastfmArtistRawTagsCache.get(artistName) || artistTagsResult || [];
+                      const synthArtistTags = synthesizeLastfmSplitTags(artistTagsResult || [], trackTagsObj?.tags || []);
+                      if (cachedLastfmArtist) {
+                          lastfmArtistTagsCache.set(artistName, synthArtistTags);
+                      }
+                      const finalArtistTags = synthArtistTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
+                      if (finalArtistTags.length > 0) {
+                          addGenres(finalArtistTags, 'Last.fm Artist');
+                      }
+
+                      const synthTrackTags = synthesizeLastfmSplitTags(trackTagsObj?.tags || [], [...rawArtistCtx, ...finalArtistTags]);
+                      const finalTrackTags = synthTrackTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap));
+                      lastfmTrackTagsCache.set(trackCacheKey, finalTrackTags);
+                      if (!trackTagsObj?.fromCache) {
+                          idb.set('lastfmTrackTags', trackCacheKey, finalTrackTags);
+                      }
+                      if (finalTrackTags.length > 0) {
+                          addGenres(finalTrackTags, 'Last.fm Track');
+                      }
+                  })());
               }
 
               if (genreSourcesNpDeezer) {
@@ -16992,6 +20729,13 @@
   async function prefetchNextTrackData() {
       if (!Spicetify.Platform?.PlayerAPI?.getQueue) return;
 
+      const shouldPrefetchDisplayGenres = Boolean(showGenreTags && showGenreTagsNowPlaying);
+      const shouldPrefetchBlacklist = hasActiveBlacklistRules();
+      const titleNeeded = Boolean(showNowPlayingData && nowPlayingConfig.title?.enabled && nowPlayingConfig.title.items?.length > 0);
+      const artistNeeded = Boolean(showNowPlayingData && nowPlayingConfig.artist?.enabled && nowPlayingConfig.artist.items?.length > 0);
+
+      if (!shouldPrefetchDisplayGenres && !shouldPrefetchBlacklist && !titleNeeded && !artistNeeded) return;
+
       try {
           await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -17010,37 +20754,46 @@
               albumId = nextTrack.metadata.album_uri.split(":")[2];
           }
 
+          const extractedArtists = Array.isArray(nextTrack.artists) && nextTrack.artists.length > 0
+              ? nextTrack.artists
+              : (nextTrack.metadata?.artist_name || nextTrack.metadata?.artist_uri
+                  ? [{
+                      name: nextTrack.metadata.artist_name || "",
+                      uri: nextTrack.metadata.artist_uri || null,
+                      id: nextTrack.metadata.artist_uri ? nextTrack.metadata.artist_uri.split(":")[2] : null
+                  }]
+                  : []);
+
           const mockTrackObj = {
               uri: nextTrack.uri,
-              name: nextTrack.name,
-              artists: nextTrack.artists || [],
+              name: nextTrack.name || nextTrack.metadata?.title || "",
+              artists: extractedArtists,
+              metadata: nextTrack.metadata || {},
               albumUri: albumId ? `spotify:album:${albumId}` : null,
               albumId: albumId,
-              artistName: nextTrack.artists[0]?.name,
+              artistName: extractedArtists[0]?.name || nextTrack.metadata?.artist_name || "",
               track: {
                   id: trackId,
                   album: { id: albumId }
               }
           };
 
-          if (showGenreTags && showGenreTagsNowPlaying) {
-              fetchDisplayGenres(mockTrackObj).catch(() => {});
-          }
+          const displayGenresPromise = shouldPrefetchDisplayGenres
+              ? fetchDisplayGenres(mockTrackObj).catch(() => {})
+              : Promise.resolve();
 
-          if (genreBlacklistEnabled && genreBlacklistRules.length > 0) {
-              evaluateTrackAgainstBlacklist(mockTrackObj, true).then(match => {
-                  if (match) {
-                      prefetchBlacklistMap.set(nextTrack.uri, match);
+          if (shouldPrefetchBlacklist && !prefetchBlacklistMap.has(nextTrack.uri)) {
+              displayGenresPromise.then(() => {
+                  if (!hasActiveBlacklistRules() || prefetchBlacklistMap.has(nextTrack.uri)) return;
+                  return evaluateTrackAgainstBlacklist(mockTrackObj, true).then(match => {
+                      prefetchBlacklistMap.set(nextTrack.uri, match || null);
                       if (prefetchBlacklistMap.size > 50) {
                           const firstKey = prefetchBlacklistMap.keys().next().value;
                           prefetchBlacklistMap.delete(firstKey);
                       }
-                  }
+                  });
               }).catch(() => {});
           }
-
-          const titleNeeded = nowPlayingConfig.title?.enabled;
-          const artistNeeded = nowPlayingConfig.artist?.enabled;
 
           if (titleNeeded || artistNeeded) {
               const allItems = [
@@ -17665,14 +21418,17 @@
 
                           if (nameToUse) {
                               if (lastfmArtistTagsCache.has(nameToUse)) {
-                                  const cached = lastfmArtistTagsCache.get(nameToUse);
+                                  const cached = synthesizeLastfmSplitTags(lastfmArtistTagsCache.get(nameToUse), lastfmArtistRawTagsCache.get(nameToUse))
+                                      .filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
                                   if (cached.length > 0) addGenres(cached, 'Last.fm Artist');
                                   return;
                               }
                               const dbCachedLfm = await idb.get('lastfmArtistTags', nameToUse, CACHE_EXPIRE_GENRES);
                               if (dbCachedLfm) {
-                                  lastfmArtistTagsCache.set(nameToUse, dbCachedLfm);
-                                  if (dbCachedLfm.length > 0) addGenres(dbCachedLfm, 'Last.fm Artist');
+                                  const synthCached = synthesizeLastfmSplitTags(dbCachedLfm, lastfmArtistRawTagsCache.get(nameToUse));
+                                  lastfmArtistTagsCache.set(nameToUse, synthCached);
+                                  const validCached = synthCached.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
+                                  if (validCached.length > 0) addGenres(validCached, 'Last.fm Artist');
                                   return;
                               }
 
@@ -17699,18 +21455,21 @@
                                   }
                               }
 
+                              let synthTags = [];
                               const artistParams = new URLSearchParams({ method: 'artist.getInfo', artist: canonicalArtistName, format: 'json' });
                               const artistRes = await fetchLfmWithGateway(artistParams);
                               if (artistRes.ok) {
                                   const data = await artistRes.json();
                                   if (data?.artist?.tags?.tag) {
-                                      const rawTags = data.artist.tags.tag.map(t => t.name.toLowerCase());
-                                      validTags = rawTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
+                                      const rawTags = data.artist.tags.tag.map(t => t.name.toLowerCase()).filter(g => !/^\d+$/.test(g));
+                                      lastfmArtistRawTagsCache.set(nameToUse, rawTags);
+                                      synthTags = synthesizeLastfmSplitTags(rawTags);
+                                      validTags = synthTags.filter(tag => !isCountryOnly(tag) && isWhitelistedGenre(tag, genreMap) && !MOOD_DESCRIPTORS_SET.has(normalizeGenre(tag)));
                                   }
                               }
 
-                              lastfmArtistTagsCache.set(nameToUse, validTags);
-                              idb.set('lastfmArtistTags', nameToUse, validTags);
+                              lastfmArtistTagsCache.set(nameToUse, synthTags);
+                              idb.set('lastfmArtistTags', nameToUse, synthTags);
                               if (validTags.length > 0) addGenres(validTags, 'Last.fm Artist');
                           }
                       } catch (e) {}
@@ -28820,8 +32579,8 @@ shadowRoot.innerHTML = `
         if (!isHeadless) mainButton.innerText = "Filtering History...";
         const lastFmUsername = loadLastFmUsername();
         if (lastFmUsername) {
-            const tracksWithScrobbles = await processBatchesWithDelay(
-                filteredTracks, 250, 1000, () => {}, getTrackDetailsWithPersonalScrobbles
+            const tracksWithScrobbles = await handleScrobblesSorting(
+                filteredTracks, 'personalScrobbles', (p) => { if (!isHeadless) mainButton.innerText = `History ${p}%`; }
             );
             
             filteredTracks = tracksWithScrobbles.filter(t => {
@@ -29084,18 +32843,36 @@ shadowRoot.innerHTML = `
 
     if (filters.genreFilterSettings && (filters.genreFilterSettings.selectedGenres?.length > 0 || filters.genreFilterSettings.excludedGenres?.length > 0)) {
         if (!isHeadless) mainButton.innerText = "Filtering Genres...";
-        const { selectedGenres, excludedGenres, matchAllGenres: jobMatchAll } = filters.genreFilterSettings;
-        
-        const { trackGenreMap } = await fetchAllTrackGenres(
-            filteredTracks, 
-            isHeadless ? () => {} : null
+        const {
+            selectedGenres,
+            excludedGenres,
+            matchAllGenres: jobMatchAll,
+            groupGenres: jobGroupGenres = true,
+            filterNoise: jobFilterNoise = true
+        } = filters.genreFilterSettings;
+        const gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
+
+        const { rawTrackGenres } = await fetchAllTrackGenres(
+            filteredTracks,
+            isHeadless ? () => {} : null,
+            null,
+            gfSources
+        );
+
+        const jobTrackGenreMap = buildGenreFilterTrackMap(
+            filteredTracks,
+            rawTrackGenres,
+            gfSources,
+            jobGroupGenres,
+            jobFilterNoise,
+            genrePlaylistsCache
         );
 
         filteredTracks = filterTracksByGenres(
-            filteredTracks, 
-            selectedGenres || [], 
-            excludedGenres || [], 
-            trackGenreMap, 
+            filteredTracks,
+            selectedGenres || [],
+            excludedGenres || [],
+            jobTrackGenreMap,
             jobMatchAll
         );
     }
@@ -29210,11 +32987,22 @@ shadowRoot.innerHTML = `
         case "personalScrobbles": {
             const tracksWithScrobbles = await handleScrobblesSorting(uniqueTracks, sortType, () => {});
             if (sortType === 'personalScrobbles') {
-                sortedTracks = tracksWithScrobbles
-                    .sort((a, b) => isAscending ? (a.personalScrobbles ?? 0) - (b.personalScrobbles ?? 0) : (b.personalScrobbles ?? 0) - (a.personalScrobbles ?? 0));
+                sortedTracks = tracksWithScrobbles.sort((a, b) => {
+                    const valA = typeof a.personalScrobbles === 'number' ? a.personalScrobbles : -1;
+                    const valB = typeof b.personalScrobbles === 'number' ? b.personalScrobbles : -1;
+                    if (valA !== valB) return isAscending ? valA - valB : valB - valA;
+                    const globA = typeof a.scrobbles === 'number' ? a.scrobbles : -1;
+                    const globB = typeof b.scrobbles === 'number' ? b.scrobbles : -1;
+                    if (globA !== globB) return isAscending ? globA - globB : globB - globA;
+                    return (a._origIndex ?? 0) - (b._origIndex ?? 0);
+                });
             } else {
-                sortedTracks = tracksWithScrobbles
-                    .sort((a, b) => isAscending ? (a.scrobbles ?? 0) - (b.scrobbles ?? 0) : (b.scrobbles ?? 0) - (a.scrobbles ?? 0));
+                sortedTracks = tracksWithScrobbles.sort((a, b) => {
+                    const valA = typeof a.scrobbles === 'number' ? a.scrobbles : -1;
+                    const valB = typeof b.scrobbles === 'number' ? b.scrobbles : -1;
+                    if (valA !== valB) return isAscending ? valA - valB : valB - valA;
+                    return (a._origIndex ?? 0) - (b._origIndex ?? 0);
+                });
             }
             break;
         }
@@ -30855,6 +34643,10 @@ shadowRoot.innerHTML = `
     if (!genrePlaylistsCache) {
         genrePlaylistsCache = await getGenreMapping();
     }
+    if (genrePlaylistsCache && !genrePlaylistsCache._normalizedSet) {
+        genrePlaylistsCache._normalizedSet = new Set(genrePlaylistsCache.map(p => normalizeGenre(p.genre)));
+    }
+
     return new Promise((resolve) => {
         const overlay = document.createElement("div");
         overlay.id = "dynamic-genre-filter-overlay";
@@ -30878,7 +34670,7 @@ shadowRoot.innerHTML = `
             width: min(750px, 92vw) !important;
             max-width: 750px !important;
             min-width: 340px !important;
-            min-height: 0 !important;
+            height: min(780px, 88vh) !important;
             max-height: 90vh !important;
             flex-shrink: 0 !important;
             background-color: #181818 !important;
@@ -30900,34 +34692,53 @@ shadowRoot.innerHTML = `
 
         let selectedGenres = safeFilters.selectedGenres ? [...safeFilters.selectedGenres] : [];
         let excludedGenres = safeFilters.excludedGenres ? [...safeFilters.excludedGenres] : [];
+        const selectedSet = new Set(selectedGenres);
+        const excludedSet = new Set(excludedGenres);
+
         let matchAllGenres = safeFilters.matchAllGenres || false;
         let groupGenres = safeFilters.groupGenres !== undefined ? safeFilters.groupGenres : true;
-        
+        let filterNoise = safeFilters.filterNoise !== undefined ? safeFilters.filterNoise : true;
         let rawDetectedGenres = safeFilters.detectedGenres ? [...safeFilters.detectedGenres] : [];
-        let detectedGenres = [...rawDetectedGenres];
+        let detectedGenres = [];
+        let detectedSet = new Set();
 
         let gfSources = JSON.parse(localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SOURCES) || '{"spotify_track":true,"lastfm_track":false,"lastfm_artist":false,"deezer":false,"everynoise_artist":false}');
 
-        const normalizeList = (list) => {
-            if (!list || list.length === 0) return [];
-            const rawObjs = list.map(g => ({ name: g, source: 'spotify' }));
-            const normalizedObjs = mapAndNormalizeGenres(rawObjs);
-            return [...new Set(normalizedObjs.map(o => o.name))];
+        const syncSets = () => {
+            selectedSet.clear();
+            excludedSet.clear();
+            for (let i = 0; i < selectedGenres.length; i++) selectedSet.add(selectedGenres[i]);
+            for (let i = 0; i < excludedGenres.length; i++) excludedSet.add(excludedGenres[i]);
         };
 
-        if (groupGenres && rawDetectedGenres.length > 0) {
-            detectedGenres = normalizeList(rawDetectedGenres);
+        const resolveSavedList = (list) => {
+            if (!list || list.length === 0) return [];
+            const onlySpTrack = gfSources.spotify_track && !gfSources.lastfm_track && !gfSources.lastfm_artist && !gfSources.everynoise_artist && !gfSources.deezer;
+            const defaultSrc = onlySpTrack ? 'spotify_track' : 'lastfm_artist';
+            const out = new Set();
+            for (let i = 0; i < list.length; i++) {
+                const item = list[i];
+                if (onlySpTrack && isSpotifyTrackExcludedConcept(item)) continue;
+                const resolved = resolveGenreForFilter(item, defaultSrc, groupGenres, filterNoise, genrePlaylistsCache);
+                resolved.forEach(r => out.add(r));
+            }
+            return Array.from(out);
+        };
+
+        if (rawDetectedGenres.length > 0) {
+            detectedGenres = resolveSavedList(rawDetectedGenres);
+            detectedSet = new Set(detectedGenres);
         }
 
         let isScanned = false;
         let isScanning = false;
-        let allAvailableGenres = Object.keys(GENRE_MAPPINGS).sort();
-        
-        let lastScanResult = null; 
-        let scannedTracks = []; 
+        const groupedCatalogGenres = Object.keys(GENRE_MAPPINGS).sort();
+        const getCatalogGenresList = () => groupGenres ? groupedCatalogGenres : getFilterCatalogSubgenresPool(genrePlaylistsCache);
+        let lastScanResult = null;
+        let scannedTracks = [];
         let cachedFetchedTracks = null;
-        let genreCounts = new Map();
-        let currentTrackGenreMap = new Map();
+        const genreCounts = new Map();
+        const currentTrackGenreMap = new Map();
 
         const updateStats = () => {
             const statsContainer = modalContainer.querySelector('.genre-stats-footer');
@@ -30957,239 +34768,408 @@ shadowRoot.innerHTML = `
             `;
         };
 
-        const renderGenres = () => {
+        const measureCanvas = document.createElement("canvas");
+        const measureCtx = measureCanvas.getContext("2d");
+        const pillWidthCache = new Map();
+
+        const getDynamicPillWidth = (genreName, isDetected) => {
+            const countVal = isDetected ? (genreCounts.has(genreName) ? genreCounts.get(genreName) : '-') : null;
+            const cacheKey = `${genreName}\0${isDetected ? countVal : ''}`;
+            let cached = pillWidthCache.get(cacheKey);
+            if (cached !== undefined) return cached;
+
+            measureCtx.font = "500 13px 'SpotifyMixUI', sans-serif";
+            const textWidth = Math.ceil(measureCtx.measureText(genreName).width);
+
+            if (isDetected) {
+                measureCtx.font = "400 12px 'SpotifyMixUI', sans-serif";
+                const badgeTextW = Math.ceil(measureCtx.measureText(String(countVal)).width);
+                const badgeW = Math.max(24, badgeTextW + 18);
+                cached = 10 + textWidth + 6 + badgeW + 6 + 4;
+            } else {
+                cached = 12 + textWidth + 12 + 4;
+            }
+
+            pillWidthCache.set(cacheKey, cached);
+            return cached;
+        };
+
+        let virtualItems = [];
+        let totalVirtualHeight = 0;
+        const renderedItems = new Map();
+        let lastStartIdx = -1;
+        let lastEndIdx = -1;
+        let lastContainerW = 0;
+
+        const buildVirtualItems = () => {
             const container = modalContainer.querySelector('.genre-list-container');
             if (!container) return;
-            const prevScrollTop = container.scrollTop;
-            const searchInput = modalContainer.querySelector('.search-bar');
-            const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
-            
-            let html = '';
+            const rawW = container.clientWidth || 660;
+            lastContainerW = rawW;
+            const availWidth = Math.max(200, rawW - 16);
+            const GAP = 8;
 
-            const renderGenreButton = (genre, isDetected = false) => {
-                let statusClass = '';
-                if (selectedGenres.includes(genre)) statusClass = 'selected';
-                else if (excludedGenres.includes(genre)) statusClass = 'excluded';
-                
-                const countDisplay = isDetected ? (genreCounts.has(genre) ? genreCounts.get(genre) : '-') : 0;
-                const hasCountClass = isDetected ? 'has-count' : '';
-                
-                return `
-                    <button class="genre-button ${statusClass} ${isDetected ? 'detected' : ''} ${hasCountClass}" data-genre="${escapeHtml(genre, "")}">
-                        <span>${escapeHtml(genre, "")}</span>
-                        ${isDetected ? `<span class="genre-count-badge">${countDisplay}</span>` : ''}
-                    </button>
-                `;
+            const searchInput = modalContainer.querySelector('.search-bar');
+            const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+            const aliasMatchedSet = searchTerm ? buildGenreSearchMatchSet(searchTerm, groupGenres) : null;
+
+            const matchesSearch = (g) => {
+                if (!searchTerm) return true;
+                const lower = g.toLowerCase();
+                return lower.includes(searchTerm) || aliasMatchedSet.has(lower) || aliasMatchedSet.has(normalizeGenre(lower));
             };
 
-            const filteredDetected = detectedGenres.filter(g => g.toLowerCase().includes(searchTerm));
-            const filteredCommon = allAvailableGenres.filter(g => g.toLowerCase().includes(searchTerm) && !detectedGenres.includes(g));
+            const filteredDetected = detectedGenres.filter(matchesSearch);
+            const filteredCommon = getCatalogGenresList().filter(g => !detectedSet.has(g) && matchesSearch(g));
+
+            const items = [];
+            let currentY = 0;
+
+            const packSectionRows = (list, isDetected) => {
+                let row = [];
+                let rowW = 0;
+                for (let i = 0; i < list.length; i++) {
+                    const g = list[i];
+                    const w = getDynamicPillWidth(g, isDetected);
+                    if (row.length > 0 && rowW + GAP + w > availWidth) {
+                        items.push({ type: 'row', top: currentY, height: 38, genres: row, isDetected });
+                        currentY += 38;
+                        row = [g];
+                        rowW = w;
+                    } else {
+                        rowW = row.length > 0 ? rowW + GAP + w : w;
+                        row.push(g);
+                    }
+                }
+                if (row.length > 0) {
+                    items.push({ type: 'row', top: currentY, height: 38, genres: row, isDetected });
+                    currentY += 38;
+                }
+            };
 
             if (detectedGenres.length > 0) {
-                html += `<div class="genre-section-title">Detected Genres</div><div class="genre-group">`;
+                items.push({ type: 'header', top: currentY, height: 32, text: 'Detected Genres' });
+                currentY += 32;
                 if (filteredDetected.length > 0) {
-                    html += filteredDetected.map(g => renderGenreButton(g, true)).join('');
+                    packSectionRows(filteredDetected, true);
                 } else {
-                    html += `<div class="no-results">No matching detected genres</div>`;
+                    items.push({ type: 'empty', top: currentY, height: 38, text: 'No matching detected genres' });
+                    currentY += 38;
                 }
-                html += `</div>`;
             }
 
-            html += `<div class="genre-section-title">Common Genres</div><div class="genre-group">`;
+            items.push({ type: 'header', top: currentY, height: 36, text: 'Common Genres' });
+            currentY += 36;
             if (filteredCommon.length > 0) {
-                html += filteredCommon.map(g => renderGenreButton(g)).join('');
+                packSectionRows(filteredCommon, false);
             } else {
-                html += `<div class="no-results">No matching common genres</div>`;
+                items.push({ type: 'empty', top: currentY, height: 38, text: 'No matching common genres' });
+                currentY += 38;
             }
-            html += `</div>`;
 
-            container.innerHTML = html;
-            container.scrollTop = prevScrollTop;
+            virtualItems = items;
+            totalVirtualHeight = currentY + 8;
+        };
 
-            container.querySelectorAll('.genre-button').forEach(btn => {
-                const genre = btn.dataset.genre;
-                btn.addEventListener('click', () => {
-                    if (excludedGenres.includes(genre)) {
-                        excludedGenres = excludedGenres.filter(g => g !== genre);
+        let dgfAutoscrollEl = null;
+
+        const getVirtualItemHtml = (item, idx) => {
+            if (item.type === 'header') {
+                return `<div class="dgf-virtual-item genre-section-title" data-vidx="${idx}" style="top: ${item.top}px; height: ${item.height}px;">${item.text}</div>`;
+            }
+            if (item.type === 'empty') {
+                return `<div class="dgf-virtual-item no-results" data-vidx="${idx}" style="top: ${item.top}px; height: ${item.height}px;">${item.text}</div>`;
+            }
+            let buttonsHtml = "";
+            const isDetected = item.isDetected;
+            for (let i = 0; i < item.genres.length; i++) {
+                const genre = item.genres[i];
+                const esc = escapeHtml(genre, "");
+                let statusClass = '';
+                if (selectedSet.has(genre)) statusClass = 'selected';
+                else if (excludedSet.has(genre)) statusClass = 'excluded';
+
+                const countDisplay = isDetected ? (genreCounts.has(genre) ? genreCounts.get(genre) : '-') : 0;
+                const hasCountClass = isDetected ? 'detected has-count' : '';
+
+                buttonsHtml += `<button class="genre-button ${statusClass} ${hasCountClass}" data-genre="${esc}"><span>${esc}</span>${isDetected ? `<span class="genre-count-badge">${countDisplay}</span>` : ''}</button>`;
+            }
+            return `<div class="dgf-virtual-item dgf-virtual-row" data-vidx="${idx}" style="top: ${item.top}px; height: ${item.height}px;">${buttonsHtml}</div>`;
+        };
+
+        const renderVisibleItems = (force = false) => {
+            const container = modalContainer.querySelector('.genre-list-container');
+            const spacer = modalContainer.querySelector('#dgf-virtual-spacer');
+            if (!container || !spacer || !modalContainer.isConnected) return;
+
+            spacer.style.height = `${totalVirtualHeight}px`;
+
+            if (virtualItems.length === 0) {
+                renderedItems.clear();
+                dgfAutoscrollEl = null;
+                lastStartIdx = -1;
+                lastEndIdx = -1;
+                spacer.innerHTML = '';
+                return;
+            }
+
+            const scrollTop = container.scrollTop;
+            const clientH = container.clientHeight || 360;
+
+            if (!force && lastStartIdx !== -1 && lastEndIdx !== -1) {
+                const topSafeY = virtualItems[lastStartIdx]?.top ?? 0;
+                const bottomItem = virtualItems[lastEndIdx];
+                const bottomSafeY = bottomItem ? (bottomItem.top + bottomItem.height) : totalVirtualHeight;
+                const canStayTop = lastStartIdx === 0 || scrollTop >= topSafeY + 120;
+                const canStayBottom = lastEndIdx === virtualItems.length - 1 || (scrollTop + clientH) <= bottomSafeY - 120;
+                if (canStayTop && canStayBottom) return;
+            }
+
+            const minY = scrollTop - 600;
+            const maxY = scrollTop + clientH + 600;
+
+            let startIdx = 0;
+            let endIdx = virtualItems.length - 1;
+
+            for (let i = 0; i < virtualItems.length; i++) {
+                if (virtualItems[i].top + virtualItems[i].height >= minY) {
+                    startIdx = i;
+                    break;
+                }
+            }
+            for (let i = startIdx; i < virtualItems.length; i++) {
+                if (virtualItems[i].top > maxY) {
+                    endIdx = Math.max(startIdx, i - 1);
+                    break;
+                }
+            }
+
+            if (!force && startIdx === lastStartIdx && endIdx === lastEndIdx) return;
+            lastStartIdx = startIdx;
+            lastEndIdx = endIdx;
+
+            if (force) {
+                renderedItems.clear();
+                dgfAutoscrollEl = null;
+                spacer.innerHTML = "";
+            } else {
+                for (const [idx, el] of renderedItems.entries()) {
+                    if (idx < startIdx || idx > endIdx) {
+                        if (el === dgfAutoscrollEl) continue;
+                        el.remove();
+                        renderedItems.delete(idx);
                     }
-                    if (selectedGenres.includes(genre)) {
-                        selectedGenres = selectedGenres.filter(g => g !== genre);
-                    } else {
-                        selectedGenres.push(genre);
+                }
+            }
+
+            let htmlToAppend = "";
+            const addedIndices = [];
+            for (let i = startIdx; i <= endIdx; i++) {
+                if (!renderedItems.has(i)) {
+                    htmlToAppend += getVirtualItemHtml(virtualItems[i], i);
+                    addedIndices.push(i);
+                }
+            }
+
+            if (htmlToAppend) {
+                spacer.insertAdjacentHTML("beforeend", htmlToAppend);
+                const children = spacer.children;
+                for (let i = children.length - addedIndices.length; i < children.length; i++) {
+                    const child = children[i];
+                    if (child && child.dataset.vidx !== undefined) {
+                        renderedItems.set(Number(child.dataset.vidx), child);
                     }
-                    renderGenres();
-                    updateStats();
+                }
+            }
+        };
+
+        const updateMountedStates = () => {
+            syncSets();
+            for (const el of renderedItems.values()) {
+                if (!el.classList.contains('dgf-virtual-row')) continue;
+                const btns = el.children;
+                for (let i = 0; i < btns.length; i++) {
+                    const btn = btns[i];
+                    const g = btn.dataset.genre;
+                    btn.classList.remove('selected', 'excluded');
+                    if (selectedSet.has(g)) btn.classList.add('selected');
+                    else if (excludedSet.has(g)) btn.classList.add('excluded');
+                }
+            }
+        };
+
+        const renderGenres = () => {
+            syncSets();
+            detectedSet = new Set(detectedGenres);
+            buildVirtualItems();
+            renderVisibleItems(true);
+        };
+
+        const isMappedCache = new Map();
+
+        const checkMapped = (genreName) => {
+            if (isMappedCache.has(genreName)) return isMappedCache.get(genreName);
+            const normalizedKey = getNormalizedGenreKey(genreName);
+            const isMapped = !!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] ||
+                             !!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey] ||
+                             isWhitelistedGenre(genreName, genrePlaylistsCache) ||
+                             salvageAndValidateLastfmTag(genreName, genrePlaylistsCache).length > 0;
+            isMappedCache.set(genreName, isMapped);
+            return isMapped;
+        };
+
+        const collectRawItemsWithSources = (rawGenresMap) => {
+            const seen = new Set();
+            const out = [];
+            const add = (name, source) => {
+                if (!name) return;
+                const key = `${name}\0${source}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    out.push({ name, source });
+                }
+            };
+            if (rawGenresMap) {
+                rawGenresMap.forEach(data => {
+                    if (!data) return;
+                    hydrateCachedGenreRecord(data);
+                    if (gfSources.spotify_track && data.spotify_track_genres) data.spotify_track_genres.forEach(g => add(g, 'spotify_track'));
+                    if (gfSources.everynoise_artist && data.everynoise_artist_genres) data.everynoise_artist_genres.forEach(g => add(g, 'everynoise'));
+                    if (gfSources.deezer) {
+                        if (data.deezer_genres) data.deezer_genres.forEach(g => add(g, 'deezer'));
+                        if (data.apple_music_genres) data.apple_music_genres.forEach(g => add(g, 'apple_music'));
+                    }
+                    if (gfSources.lastfm_track && data.lastfm_track_genres) data.lastfm_track_genres.forEach(g => add(g, 'lastfm_track'));
+                    if (gfSources.lastfm_artist && data.lastfm_artist_genres) data.lastfm_artist_genres.forEach(g => add(g, 'lastfm_artist'));
                 });
-                btn.addEventListener('contextmenu', (e) => {
-                    e.preventDefault();
-                    if (selectedGenres.includes(genre)) {
-                        selectedGenres = selectedGenres.filter(g => g !== genre);
-                    }
-                    if (excludedGenres.includes(genre)) {
-                        excludedGenres = excludedGenres.filter(g => g !== genre);
-                    } else {
-                        excludedGenres.push(genre);
-                    }
-                    renderGenres();
-                    updateStats();
-                });
-            });
+            } else {
+                rawDetectedGenres.forEach(g => add(g, 'lastfm_artist'));
+            }
+            return out;
         };
 
         const processRawGenres = (rawGenresMap) => {
             genreCounts.clear();
             currentTrackGenreMap.clear();
-            
-            const capturedRawSet = new Set();
+            pillWidthCache.clear();
+
+            const capturedRawCounts = new Map();
+            const countRaw = (g) => {
+                if (!g) return;
+                capturedRawCounts.set(g, (capturedRawCounts.get(g) || 0) + 1);
+            };
             rawGenresMap.forEach(data => {
                 if (!data) return;
-                const genres = [];
-                if (gfSources.spotify_track) genres.push(...(data.spotify_track_genres || []));
-                if (gfSources.lastfm_track) genres.push(...(data.lastfm_track_genres || []));
-                if (gfSources.lastfm_artist) genres.push(...(data.lastfm_artist_genres || []));
-                if (gfSources.everynoise_artist) genres.push(...(data.everynoise_artist_genres || []));
+                hydrateCachedGenreRecord(data);
+                if (gfSources.spotify_track && data.spotify_track_genres) data.spotify_track_genres.forEach(countRaw);
+                if (gfSources.lastfm_track && data.lastfm_track_genres) data.lastfm_track_genres.forEach(countRaw);
+                if (gfSources.lastfm_artist && data.lastfm_artist_genres) data.lastfm_artist_genres.forEach(countRaw);
+                if (gfSources.everynoise_artist && data.everynoise_artist_genres) data.everynoise_artist_genres.forEach(countRaw);
                 if (gfSources.deezer) {
-                    genres.push(...(data.deezer_genres || []));
-                    genres.push(...(data.apple_music_genres || []));
+                    if (data.deezer_genres) data.deezer_genres.forEach(countRaw);
+                    if (data.apple_music_genres) data.apple_music_genres.forEach(countRaw);
                 }
-                genres.forEach(g => capturedRawSet.add(g));
             });
-            rawDetectedGenres = Array.from(capturedRawSet).sort();
-            
+            rawDetectedGenres = Array.from(capturedRawCounts.keys()).sort((a, b) => (capturedRawCounts.get(b) - capturedRawCounts.get(a)) || a.localeCompare(b));
+
             const genreDetails = new Map();
-            const mainGenres = Object.keys(GENRE_MAPPINGS);
-            const countryKeys = Object.keys(COUNTRY_MAPPINGS);
-            
             const playlistArtistNames = new Set();
             const uriToArtistMap = new Map();
-            
-            if (scannedTracks.length > 0) {
-                scannedTracks.forEach(t => {
-                    const name = t.artistName || (t.artists && t.artists[0]?.name) || "";
-                    if (name) {
-                        const lowerName = name.toLowerCase();
-                        playlistArtistNames.add(lowerName);
-                        uriToArtistMap.set(t.uri, lowerName);
-                    }
-                });
+
+            for (let i = 0; i < scannedTracks.length; i++) {
+                const t = scannedTracks[i];
+                const name = (t.artistName || t.artists?.[0]?.name || "").toLowerCase();
+                if (name) {
+                    playlistArtistNames.add(name);
+                    uriToArtistMap.set(t.uri, name);
+                }
             }
             const totalUniqueArtistsInPlaylist = playlistArtistNames.size;
+            const nameSetsMap = new Map();
 
             scannedTracks.forEach(track => {
                 const rawData = rawGenresMap.get(track.uri);
-                let finalGenresForTrack = [];
+                const finalGenresForTrack = rawData
+                    ? buildTrackGenresForFilter(rawData, gfSources, groupGenres, filterNoise, genrePlaylistsCache)
+                    : [];
 
-                if (rawData) {
-                    let combined = [];
-                    if (gfSources.spotify_track) combined.push(...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
-                    if (gfSources.lastfm_track) combined.push(...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
-                    if (gfSources.lastfm_artist) combined.push(...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
-                    if (gfSources.everynoise_artist) combined.push(...(rawData.everynoise_artist_genres || []).map(g => ({ name: g, source: 'everynoise' })));
-                    if (gfSources.deezer) {
-                        combined.push(...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
-                        combined.push(...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
-                    }
-
-                    let uniqueSet = new Set();
-                    if (groupGenres) {
-                        const mapped = mapAndNormalizeGenres(combined);
-                        mapped.forEach(g => uniqueSet.add(JSON.stringify(g))); 
-                    } else {
-                        combined.forEach(g => uniqueSet.add(JSON.stringify({ name: g.name.toLowerCase().trim(), source: g.source })));
-                    }
-                    
-                    finalGenresForTrack = Array.from(uniqueSet).map(s => JSON.parse(s));
-                }
-                
                 currentTrackGenreMap.set(track.uri, finalGenresForTrack);
 
                 const trackArtist = uriToArtistMap.get(track.uri) || "";
-                
                 const genresCountedForTrack = new Set();
 
-                finalGenresForTrack.forEach(gObj => {
+                for (let i = 0; i < finalGenresForTrack.length; i++) {
+                    const gObj = finalGenresForTrack[i];
                     const genreName = gObj.name;
                     const source = gObj.source;
 
-                    if (!genreDetails.has(genreName)) {
-                        const normalizedKey = getNormalizedGenreKey(genreName);
-                        let isMapped = !!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] || !!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey];
-                        
-                        if (!isMapped) {
-                            isMapped = mainGenres.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
-                            if (!isMapped) {
-                                isMapped = countryKeys.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
-                            }
-                            if (!isMapped && genrePlaylistsCache) {
-                                const normalizedTag = normalizeGenre(genreName);
-                                isMapped = genrePlaylistsCache.some(p => normalizeGenre(p.genre) === normalizedTag);
-                            }
-                        }
-
-                        genreDetails.set(genreName, {
+                    let details = genreDetails.get(genreName);
+                    if (!details) {
+                        details = {
                             name: genreName,
                             isTrusted: false,
                             count: 0,
                             artists: new Set(),
-                            isMapped: isMapped,
+                            isMapped: checkMapped(genreName),
                             isSelfTitle: false
-                        });
+                        };
+                        genreDetails.set(genreName, details);
                     }
 
-                    const details = genreDetails.get(genreName);
-                    
                     if (trackArtist) details.artists.add(trackArtist);
-                    if (source === 'spotify' || source === 'spotify_track' || source === 'deezer' || source === 'apple_music') details.isTrusted = true;
+                    if (source === 'spotify' || source === 'spotify_track' || source === 'everynoise' || source === 'deezer' || source === 'apple_music') details.isTrusted = true;
                     if (trackArtist && genreName.toLowerCase() === trackArtist) details.isSelfTitle = true;
 
                     if (!genresCountedForTrack.has(genreName)) {
-                        genreCounts.set(genreName, (genreCounts.get(genreName) || 0) + 1);
-                        details.count++;
                         genresCountedForTrack.add(genreName);
+                        details.count++;
+                        genreCounts.set(genreName, details.count);
                     }
-                });
+                }
+
+                nameSetsMap.set(track.uri, genresCountedForTrack);
             });
 
+            currentTrackGenreMap._nameSetsMap = nameSetsMap;
+
+            const getTier = (details) => {
+                if (filterNoise) return 1;
+                if (details.isTrusted || details.isMapped) return 1;
+                if (details.isSelfTitle || details?.name?.length < 2) return 2;
+                if (details.artists.size >= 3) return 1;
+                if (details.count >= 15 && details.artists.size >= 2) return 1;
+                if (totalUniqueArtistsInPlaylist < 3) {
+                    const threshold = Math.min(4, Math.max(2, Math.ceil(scannedTracks.length * 0.05)));
+                    if (details.count >= threshold) return 1;
+                }
+                return 2;
+            };
+
             detectedGenres = Array.from(genreCounts.keys()).sort((a, b) => {
-                const detailsA = genreDetails.get(a) || { name: a, count: 0, isTrusted: false, artists: new Set(), isMapped: false };
-                const detailsB = genreDetails.get(b) || { name: b, count: 0, isTrusted: false, artists: new Set(), isMapped: false };
-
-                const getTier = (details) => {
-                    if (details.isTrusted) return 1;
-                    if (details.isMapped) return 1;
-                    if (details.isSelfTitle) return 2;
-                    if (details?.name?.length < 2) return 2;
-                    if (details.artists.size >= 3) return 1;
-                    if (details.count >= 15 && details.artists.size >= 2) return 1;
-                    if (totalUniqueArtistsInPlaylist < 3) {
-                        const threshold = Math.min(4, Math.max(2, Math.ceil(scannedTracks.length * 0.05)));
-                        if (details.count >= threshold) return 1;
-                    }
-                    return 2;
-                };
-
+                const detailsA = genreDetails.get(a);
+                const detailsB = genreDetails.get(b);
                 const tierA = getTier(detailsA);
                 const tierB = getTier(detailsB);
 
                 if (tierA !== tierB) return tierA - tierB;
                 if (detailsB.count !== detailsA.count) return detailsB.count - detailsA.count;
-                if (detailsA.isTrusted && !detailsB.isTrusted) return -1;
-                if (!detailsA.isTrusted && detailsB.isTrusted) return 1;
-
+                if (detailsA.isTrusted !== detailsB.isTrusted) return detailsA.isTrusted ? -1 : 1;
                 return a.localeCompare(b);
             });
-            
+            detectedSet = new Set(detectedGenres);
+
             if (onScanComplete) {
                 onScanComplete(detectedGenres);
             }
-            
+
             renderGenres();
             updateStats();
         };
 
         shadowRoot.innerHTML = `
             <style>
-              :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+              :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; height: 100%; }
               *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
               .modal-header { padding: 24px 32px 16px; border-bottom: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
               .modal-title { font-size: 24px; font-weight: 700; color: white; }
@@ -31210,19 +35190,21 @@ shadowRoot.innerHTML = `
               .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: white; transition: .2s; border-radius: 50%; }
               input:checked + .slider { background-color: #1ED760; }
               input:checked + .slider:before { transform: translateX(16px); }
-              .genre-list-container { flex-grow: 1; overflow-y: auto; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #555 transparent; }
+              .genre-list-container { position: relative; flex-grow: 1; overflow-y: auto; overflow-x: hidden; overflow-anchor: none; padding-right: 8px; scrollbar-width: thin; scrollbar-color: #555 transparent; transform: translateZ(0); backface-visibility: hidden; }
               .genre-list-container::-webkit-scrollbar { width: 8px; }
               .genre-list-container::-webkit-scrollbar-thumb { background-color: #555; border-radius: 4px; }
-              .genre-section-title { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; margin: 16px 0 8px; letter-spacing: 0.5px; }
-              .genre-group { display: flex; flex-wrap: wrap; gap: 8px; }
-              .genre-button { background-color: #333; color: #ddd; padding: 6px 12px; border-radius: 16px; border: none; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.1s; }
+              .dgf-virtual-spacer { position: relative; width: 100%; }
+              .dgf-virtual-item { position: absolute; left: 0; width: 100%; box-sizing: border-box; }
+              .dgf-virtual-row { display: flex; align-items: center; gap: 8px; }
+              .genre-section-title { color: #888; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; height: 26px; margin: 0; }
+              .genre-button { background-color: #333; color: #ddd; padding: 6px 12px; border-radius: 16px; border: none; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; flex-shrink: 0; white-space: nowrap; transition: all 0.1s; }
+              .genre-button > * { pointer-events: none; }
               .genre-button.selected { background-color: #1ED760; color: black; }
               .genre-button.excluded { background-color: #a92121; color: white; }
               .genre-button.has-count { padding: 4px 6px 4px 10px; }
               .genre-count-badge { background-color: rgba(255, 255, 255, 0.1); color: #e0e0e0; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 400; min-width: 16px; text-align: center; }
               .genre-button.selected .genre-count-badge { background-color: rgba(0, 0, 0, 0.2); color: #000; }
               .genre-button.excluded .genre-count-badge { background-color: rgba(255, 255, 255, 0.2); color: #fff; }
-              .detected-badge { font-size: 8px; color: #1ED760; }
               .modal-footer { padding: 16px 32px; border-top: 1px solid #282828; display: flex; justify-content: space-between; align-items: center; }
               .genre-stats-footer { display: flex; gap: 20px; }
               .footer-buttons { display: flex; gap: 12px; }
@@ -31231,7 +35213,7 @@ shadowRoot.innerHTML = `
               .btn-secondary:hover { border-color: white; }
               .btn-primary { background-color: #1ED760; border: none; color: black; padding: 8px 24px; border-radius: 20px; font-weight: 600; cursor: pointer; }
               .btn-primary:hover { background-color: #3BE377; }
-              .no-results { color: #666; font-style: italic; font-size: 13px; width: 100%; text-align: center; padding: 10px; }
+              .no-results { color: #666; font-style: italic; font-size: 13px; width: 100%; text-align: center; padding: 8px; }
               .tooltip-container { position: relative; display: inline-block; vertical-align: middle; }
               .custom-tooltip { visibility: hidden; position: absolute; z-index: 10000; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; text-align: left; pointer-events: none; }
               .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
@@ -31252,7 +35234,7 @@ shadowRoot.innerHTML = `
                 <span class="modal-title">Genre Filter</span>
             </div>
             <div class="scan-banner" style="${isScanned ? 'display: none;' : ''}">
-            <span class="scan-text" id="scan-status-text">${detectedGenres.length > 0 ? "Showing saved genres. Scan sources to update counts." : "Showing common genres. Click 'Scan Sources' to see actual genres from your sources."}</span>
+                <span class="scan-text" id="scan-status-text">${detectedGenres.length > 0 ? "Showing saved genres. Scan sources to update counts." : "Showing common genres. Click 'Scan Sources' to see actual genres from your sources."}</span>
                 <button class="scan-btn" id="scan-sources-btn">Scan Sources</button>
             </div>
             <div class="modal-content">
@@ -31260,13 +35242,13 @@ shadowRoot.innerHTML = `
                 <div class="search-container">
                     <input type="text" class="search-bar" placeholder="Search genres...">
                 </div>
-                <div class="settings-row">
+                <div class="settings-row" style="flex-wrap: wrap;">
                     <label class="switch-label">
                         <div class="switch"><input type="checkbox" id="match-all-toggle" ${matchAllGenres ? 'checked' : ''}><span class="slider"></span></div>
                         Match All Selected
                         <span class="tooltip-container">
                             ${infoIconSvg}
-                            <span class="custom-tooltip">Only include tracks matching all selected genres.</span>
+                            <span class="custom-tooltip">Only includes tracks that match every selected genre.</span>
                         </span>
                     </label>
                     <label class="switch-label">
@@ -31274,11 +35256,21 @@ shadowRoot.innerHTML = `
                         Group Similar Genres
                         <span class="tooltip-container">
                             ${infoIconSvg}
-                            <span class="custom-tooltip">Enable to group similar genres (e.g. 'electro' -> 'electronic'). Disable to see raw tags.</span>
+                            <span class="custom-tooltip">Groups micro-genres and regional variations into main genres (e.g. 'bedroom pop' → 'indie pop').</span>
+                        </span>
+                    </label>
+                    <label class="switch-label">
+                        <div class="switch"><input type="checkbox" id="filter-noise-toggle" ${filterNoise ? 'checked' : ''}><span class="slider"></span></div>
+                        Filter Noise Tags
+                        <span class="tooltip-container">
+                            ${infoIconSvg}
+                            <span class="custom-tooltip">Filters out random Last.fm user tags and mood descriptors, keeping only valid genres.</span>
                         </span>
                     </label>
                 </div>
-                <div class="genre-list-container"></div>
+                <div class="genre-list-container">
+                    <div class="dgf-virtual-spacer" id="dgf-virtual-spacer"></div>
+                </div>
             </div>
             <div class="modal-footer">
                 <div class="genre-stats-footer"></div>
@@ -31293,16 +35285,79 @@ shadowRoot.innerHTML = `
         document.body.appendChild(overlay);
         overlay.appendChild(modalContainer);
 
-        requestAnimationFrame(() => {
-            overlay.style.opacity = "1";
+        const listContainer = modalContainer.querySelector('.genre-list-container');
+        listContainer.addEventListener('mousedown', (e) => {
+            dgfAutoscrollEl = e.button === 1 ? e.target.closest('.dgf-virtual-item') : null;
+        }, { passive: true });
+        let scrollTicking = false;
+
+        listContainer.addEventListener('scroll', () => {
+            if (!scrollTicking) {
+                window.requestAnimationFrame(() => {
+                    try {
+                        renderVisibleItems(false);
+                    } finally {
+                        scrollTicking = false;
+                    }
+                });
+                scrollTicking = true;
+            }
+        }, { passive: true });
+
+        new ResizeObserver(() => {
+            const w = listContainer.clientWidth;
+            if (w > 0 && Math.abs(w - lastContainerW) > 2) {
+                buildVirtualItems();
+                renderVisibleItems(true);
+            }
+        }).observe(listContainer);
+
+        listContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.genre-button');
+            if (!btn) return;
+            const genre = btn.dataset.genre;
+            if (!genre) return;
+
+            if (excludedSet.has(genre)) {
+                excludedGenres = excludedGenres.filter(g => g !== genre);
+            }
+            if (selectedSet.has(genre)) {
+                selectedGenres = selectedGenres.filter(g => g !== genre);
+            } else {
+                selectedGenres.push(genre);
+            }
+            updateMountedStates();
+            updateStats();
         });
 
-        renderGenres();
+        listContainer.addEventListener('contextmenu', (e) => {
+            const btn = e.target.closest('.genre-button');
+            if (!btn) return;
+            e.preventDefault();
+            const genre = btn.dataset.genre;
+            if (!genre) return;
+
+            if (selectedSet.has(genre)) {
+                selectedGenres = selectedGenres.filter(g => g !== genre);
+            }
+            if (excludedSet.has(genre)) {
+                excludedGenres = excludedGenres.filter(g => g !== genre);
+            } else {
+                excludedGenres.push(genre);
+            }
+            updateMountedStates();
+            updateStats();
+        });
+
+        requestAnimationFrame(() => {
+            renderGenres();
+            overlay.style.opacity = "1";
+        });
 
         const scanBtn = modalContainer.querySelector('#scan-sources-btn');
         const statusText = modalContainer.querySelector('#scan-status-text');
         const scanBanner = modalContainer.querySelector('.scan-banner');
-        
+
         const runScan = async (preFetchedTracks = null, forceRescan = false) => {
             if (isScanning) return;
             if (isScanned && !preFetchedTracks && !forceRescan) return;
@@ -31310,7 +35365,7 @@ shadowRoot.innerHTML = `
             isScanned = false;
             scanBtn.disabled = true;
             statusText.textContent = "Fetching tracks from sources...";
-            
+
             try {
                 let allTracks = preFetchedTracks || (forceRescan ? null : cachedFetchedTracks);
                 if (!allTracks) {
@@ -31332,7 +35387,7 @@ shadowRoot.innerHTML = `
                             } else if (source.type === 'folder' || sourceUri.includes('start-group') || sourceUri.includes(':folder:')) {
                                 sourceTracks = await getTracksFromFolder(sourceUri);
                             }
-                            
+
                             if (sourceTracks?.length > 0) {
                                 const hasLocal = sourceTracks.some(t => Spicetify.URI.isLocal(t.uri));
                                 if (hasLocal) {
@@ -31351,7 +35406,7 @@ shadowRoot.innerHTML = `
                     allTracks = trackArrays.flat();
                     cachedFetchedTracks = allTracks;
                 }
-                
+
                 if (!allTracks?.length) {
                     if (modalContainer.isConnected) {
                         statusText.textContent = "No tracks found in sources.";
@@ -31425,7 +35480,7 @@ shadowRoot.innerHTML = `
                             } else if (source.type === 'folder' || sourceUri.includes('start-group') || sourceUri.includes(':folder:')) {
                                 sourceTracks = await getTracksFromFolder(sourceUri);
                             }
-                            
+
                             if (sourceTracks?.length > 0) {
                                 const hasLocal = sourceTracks.some(t => Spicetify.URI.isLocal(t.uri));
                                 if (hasLocal) {
@@ -31456,14 +35511,21 @@ shadowRoot.innerHTML = `
                             runScan(allTracks);
                         }
                     }
-                } catch(e) {
+                } catch (e) {
                     console.warn("Auto-scan check failed", e);
                 }
             })();
         }
 
-        modalContainer.querySelector('.search-bar').addEventListener('input', renderGenres);
-        
+        let searchRaf = null;
+        modalContainer.querySelector('.search-bar').addEventListener('input', () => {
+            if (searchRaf) cancelAnimationFrame(searchRaf);
+            searchRaf = requestAnimationFrame(() => {
+                listContainer.scrollTop = 0;
+                renderGenres();
+            });
+        });
+
         modalContainer.querySelector('#match-all-toggle').addEventListener('change', (e) => {
             matchAllGenres = e.target.checked;
             updateStats();
@@ -31471,19 +35533,33 @@ shadowRoot.innerHTML = `
 
         modalContainer.querySelector('#group-genres-toggle').addEventListener('change', (e) => {
             groupGenres = e.target.checked;
-            if (groupGenres) {
-                selectedGenres = normalizeList(selectedGenres);
-                excludedGenres = normalizeList(excludedGenres);
-            }
+            const rawItems = collectRawItemsWithSources(lastScanResult);
+            selectedGenres = translateGenreSelectionForGrouping(selectedGenres, rawItems, groupGenres, filterNoise, genrePlaylistsCache);
+            excludedGenres = translateGenreSelectionForGrouping(excludedGenres, rawItems, groupGenres, filterNoise, genrePlaylistsCache);
+
             if (lastScanResult) {
                 processRawGenres(lastScanResult);
             } else {
-                if (groupGenres) {
-                    detectedGenres = normalizeList(rawDetectedGenres);
-                } else {
-                    detectedGenres = [...rawDetectedGenres];
-                }
+                detectedGenres = resolveSavedList(rawDetectedGenres);
                 renderGenres();
+                updateStats();
+            }
+        });
+
+        modalContainer.querySelector('#filter-noise-toggle').addEventListener('change', (e) => {
+            filterNoise = e.target.checked;
+            if (lastScanResult) {
+                processRawGenres(lastScanResult);
+            } else {
+                detectedGenres = resolveSavedList(rawDetectedGenres);
+                renderGenres();
+                updateStats();
+            }
+            if (filterNoise) {
+                const validPool = new Set([...detectedGenres, ...getCatalogGenresList()]);
+                selectedGenres = selectedGenres.filter(g => validPool.has(g) || resolveGenreForFilter(g, 'lastfm_artist', groupGenres, true, genrePlaylistsCache).length > 0);
+                excludedGenres = excludedGenres.filter(g => validPool.has(g) || resolveGenreForFilter(g, 'lastfm_artist', groupGenres, true, genrePlaylistsCache).length > 0);
+                updateMountedStates();
                 updateStats();
             }
         });
@@ -31502,6 +35578,7 @@ shadowRoot.innerHTML = `
                 excludedGenres,
                 matchAllGenres,
                 groupGenres,
+                filterNoise,
                 detectedGenres: rawDetectedGenres
             });
         });
@@ -31522,7 +35599,7 @@ shadowRoot.innerHTML = `
                 isScanned = false;
             });
         });
-        overlay.addEventListener('click', (e) => { if(e.target === overlay) closeModal(null); });
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(null); });
     });
   }
   
@@ -33129,12 +37206,14 @@ shadowRoot.innerHTML = `
                     return;
                 }
                 
-                const currentGenreSettings = jobFilters.genreFilterSettings || {
+                const currentGenreSettings = {
                     selectedGenres: [],
                     excludedGenres: [],
                     matchAllGenres: false,
                     groupGenres: true,
-                    detectedGenres: []
+                    filterNoise: true,
+                    detectedGenres: [],
+                    ...(jobFilters.genreFilterSettings || {})
                 };
 
                 const newGenreSettings = await showDynamicGenreFilterModal(
@@ -33146,8 +37225,12 @@ shadowRoot.innerHTML = `
                                 selectedGenres: [],
                                 excludedGenres: [],
                                 matchAllGenres: false,
-                                groupGenres: true
+                                groupGenres: true,
+                                filterNoise: true
                             };
+                        } else {
+                            if (jobFilters.genreFilterSettings.groupGenres === undefined) jobFilters.genreFilterSettings.groupGenres = true;
+                            if (jobFilters.genreFilterSettings.filterNoise === undefined) jobFilters.genreFilterSettings.filterNoise = true;
                         }
                         jobFilters.genreFilterSettings.detectedGenres = detectedGenres;
                     }
@@ -33684,330 +37767,6 @@ shadowRoot.innerHTML = `
     });
   }
 
-  const GENRE_MAPPINGS = {
-    "acoustic": ["acoustic"],
-    "adult standards": ["adult standards","crooner","easy listening","lounge","standards","traditional pop"],
-    "afro r&b": ["afro r&b","afro soul","afrofuturism","bongo flava"],
-    "afro-funk": ["afro-funk","highlife","nigerian hip hop"],
-    "afrobeats": ["afrobeats","afropop","afroswing","azonto","azontobeats","coupé-décalé","ghanaian pop","makossa","nigerian pop"],
-    "alternative": ["alternative"],
-    "alternative metal": ["alternative metal","funk metal","industrial metal","nu metal","rap metal"],
-    "alternative rock": ["alternative rock","britpop","modern alternative rock","modern rock","permanent wave"],
-    "amapiano": ["amapiano","afro piano","sgija"],
-    "ambient": ["ambient"],
-    "art pop": ["art pop","baroque pop","chamber pop","experimental pop"],
-    "art rock": ["art rock","experimental rock","rock in opposition","zeuhl"],
-    "bachata": ["bachata","bachata dominicana"],
-    "bebop": ["bebop","bop","post-bop"],
-    "black metal": ["black metal","atmospheric black metal","blackgaze","cascadian black metal","melodic black metal","metal noir quebecois","pagan black metal","raw black metal","symphonic black metal","viking metal"],
-    "blues": ["blues","jazz blues","punk blues"],
-    "blues rock": ["blues rock","british blues","electric blues"],
-    "bollywood pop": ["bollywood pop","classic bollywood","desi pop","filmi","kollywood","modern bollywood","mollywood","sandalwood","tollywood","bollywood"],
-    "bossa nova": ["bossa nova","bossa nova cover","bossa nova jazz","samba-jazz"],
-    "breakbeat": ["breakbeat","big beat","breaks","funky breaks","nu skool breaks"],
-    "c-pop": ["c-pop","cantopop","chinese pop","mandopop"],
-    "chillwave": ["chillwave","hypnagogic pop"],
-    "christian hip hop": ["christian hip hop","christian trap","gospel rap"],
-    "christian metal": ["christian metal","christian death metal","christian metalcore","unblack metal"],
-    "christian rock": ["christian rock","christian alternative rock","christian indie"],
-    "city pop": ["city pop","japanese funk","japanese soul","shibuya-kei"],
-    "classic rock": ["classic rock","album rock","aor","soft rock","southern rock"],
-    "classical": ["classical","baroque","minimalism","symphonic","symphonies","symphony"],
-    "conscious hip hop": ["conscious hip hop","political hip hop","rap conscient","underground hip hop"],
-    "contemporary r&b": ["contemporary r&b","contemporary r and b","contemporary rhythm and blues","contemporary rnb","modern r&b","modern rnb"],
-    "corridos tumbados": ["corridos tumbados","corridos alternativos","corridos belicos","sad sierreno","sierre","sierreno"],
-    "country": ["country","country & western music","country blues","country-pop"],
-    "cumbia": ["cumbia","cumbia 420","cumbia andina mexicana","cumbia boliviana","cumbia chilena","cumbia del sureste","cumbia lagunera","cumbia peruana","cumbia pop","cumbia ranchera","cumbia salvadorena","cumbia santafesina","cumbia sonidera","cumbia uruguaya","cumbia villera","nu-cumbia","tecnocumbia"],
-    "dance": ["dance"],
-    "dark wave": ["dark wave","coldwave","gothic","gothic americana","neoclassical darkwave"],
-    "death metal": ["death metal","brutal death metal","cavernous death metal","death 'n' roll","deathgrind","florida death metal","gothenburg metal","melodic death metal","swedish melodeath","technical death metal"],
-    "dembow": ["dembow","dembow dominicano"],
-    "disco": ["disco","future funk"],
-    "doom metal": ["doom metal","drone metal","epic doom","funeral doom","psychedelic doom","sludge metal"],
-    "dream pop": ["dream pop","ethereal","ethereal wave"],
-    "drill": ["drill","aussie drill","bronx drill","brooklyn drill","chicago drill","classical drill","drill chileno","drill espanol","drill francais","drill tuga","florida drill","german drill","melodic drill","ny drill","uk drill"],
-    "drone": ["drone"],
-    "drum and bass": ["drum and bass"],
-    "dubstep": ["dubstep","brostep","chillstep","drumstep"],
-    "east coast hip hop": ["east coast hip hop","boom bap","hardcore hip hop"],
-    "edm": ["edm"],
-    "electro swing": ["electro swing","swing house"],
-    "electronic": ["electronic"],
-    "electropop": ["electropop","electronic pop"],
-    "emo": ["emo","emo rap","emo trap","emocore","midwest emo","pop emo"],
-    "epic": ["epic"],
-    "epiccore": ["epiccore"],
-    "eurodance": ["eurodance","bubblegum dance","hands up","hi-nrg","italo dance"],
-    "experimental": ["experimental","experimental electronic"],
-    "folk": ["folk","folk-pop","contemporary folk"],
-    "forro": ["forro","baiao","forro de favela","forro tradicional","piseiro","xote"],
-    "french hip hop": ["french hip hop","pop urbaine","r&b francais","rap francais","rap marseille"],
-    "french pop": ["french pop","chanson","french indie pop","french synthpop","nouvelle chanson francaise","variete francaise","yeye"],
-    "funk": ["funk"],
-    "funk carioca": ["funk carioca","brega funk","funk 150 bpm","funk mandelao","funk mtg","funk ostentacao","funk paulista","funk viral","mega funk","rave funk"],
-    "future bass": ["future bass"],
-    "gangster rap": ["gangster rap","chicano rap","crunk","dirty south rap","g funk","hardcore hip hop","houston rap","memphis hip hop","southern hip hop","west coast rap"],
-    "garage rock": ["garage rock","freakbeat","garage psych","garage rock revival","protopunk","punk blues"],
-    "german hip hop": ["german hip hop","frauenrap","german alternative rap","german cloud rap","german underground rap","oldschool deutschrap"],
-    "german pop": ["german pop","deutschrock","neue deutsche welle","ostrock"],
-    "glam rock": ["glam rock","glam metal","glam punk","hard glam","sleaze rock"],
-    "global christian": ["global christian","african gospel","celtic worship","latin christian","reggae cristao","tagalog worship","world worship"],
-    "gospel": ["gospel","black gospel","brazilian gospel","choir","gospel r&b","gospel soul","naija worship","southern gospel","spiritual","spirituals"],
-    "gothic metal": ["gothic metal","gothic","gothic symphonic metal","metal gotico"],
-    "gothic rock": ["gothic rock","dark post-punk","deathrock","gothabilly","gothic"],
-    "grime": ["grime","eskibeat","sublow","uk grime"],
-    "grunge": ["grunge","grungegaze","post-grunge","seattle sound"],
-    "hard bop": ["hard bop","bebop","bop","post-bop","soul jazz"],
-    "hard rock": ["hard rock","glam metal"],
-    "hardcore punk": ["hardcore punk","crust punk","d-beat","melodic hardcore","nyhc","powerviolence","skate punk","straight edge","youth crew"],
-    "hardstyle": ["hardstyle","euphoric hardstyle","gabber","hard dance","hardcore","hardcore techno","jumpstyle","rawstyle","uptempo hardcore"],
-    "heavy metal": ["heavy metal","hard rock","nwobhm","traditional heavy metal"],
-    "hip hop": ["hip hop"],
-    "house": ["house","deep house","electro house"],
-    "idm": ["idm","ambient idm","braindance","drill and bass","fluxwork","glitch","glitch hop","wonky"],
-    "indie": ["indie"],
-    "indie folk": ["indie folk","chamber folk","folk-pop","freak folk","indie anthem-folk","new americana","stomp and holler"],
-    "indie pop": ["indie pop","alt pop","alternative pop","bedroom pop","indie poptimism","shimmer pop","twee pop"],
-    "indietronica": ["indietronica","indie psych-pop","metropopolis"],
-    "industrial": ["industrial","aggrotech","ebm","electro-industrial","industrial rock","martial industrial","power noise","industrial metal"],
-    "instrumental": ["instrumental"],
-    "italian pop": ["italian pop","classic italian pop","italian adult pop","italian indie pop","italian pop rock","pop virale italiano"],
-    "j-pop": ["j-pop","anime","j-division","j-idol","j-pop boy group","j-pop girl group","j-rap","japanese teen pop","kayokyoku","vocaloid","japanese electropop"],
-    "j-rock": ["j-rock","j-metal","j-poprock"],
-    "jazz": ["jazz"],
-    "jazz rap": ["jazz rap","abstract hip hop","jazz hop"],
-    "jungle": ["jungle"],
-    "k-ballad": ["k-ballad","k-pop ballad"],
-    "k-pop": ["k-pop","korean pop"],
-    "k-rock": ["k-rock","k-indie","korean indie rock"],
-    "latin": ["latin"],
-    "latin trap": ["latin trap","trap argentino","trap boricua","trap chileno","trap colombiano","trap latino","trap mexicano","trap venezolano"],
-    "lofi": ["lofi","chill beats","chillhop","lo-fi beats","lo-fi chill","lo-fi cover","lo-fi jazzhop","lo-fi sleep","lo-fi study","sad lo-fi"],
-    "medieval": ["medieval","early music","gregorian chant","renaissance"],
-    "metal": ["metal"],
-    "metalcore": ["metalcore","chaotic hardcore","deathcore","electronicore","mathcore","melodic metalcore","nintendocore","progressive metalcore"],
-    "mpb": ["mpb","jovem guarda","nova mpb","pop folk","tropicalia","velha guarda","violao"],
-    "new age": ["new age"],
-    "new wave": ["new wave","new romantic","new wave pop","sophisti-pop"],
-    "nu jazz": ["nu jazz","broken beat","future jazz","jazztronica"],
-    "old school hip hop": ["old school hip hop","golden age hip hop"],
-    "opera": ["opera","arias","libretto","operatic"],
-    "pagode": ["pagode","pagode baiano","pagode novo","partido alto","samba de roda"],
-    "persian pop": ["persian pop","farsi pop","iranian pop"],
-    "persian rock": ["persian rock","iranian metal","iranian rock","persian metal"],
-    "persian traditional": ["persian traditional","classical persian","iranian traditional","sonati"],
-    "phonk": ["phonk","aggressive phonk","cowbell","drift phonk","gym phonk","memphis phonk"],
-    "piano": ["piano","classical piano","piano cover","solo piano"],
-    "pop": ["pop","alt pop","bubblegum pop","dance pop"],
-    "pop punk": ["pop punk","anthem emo","easycore","neon pop punk","socal pop punk"],
-    "pop rap": ["pop rap","commercial rap","mainstream rap","melodic rap","radio rap","rap pop"],
-    "pop rock": ["pop rock","britpop","power pop"],
-    "post-hardcore": ["post-hardcore","swancore"],
-    "post-punk": ["post-punk","dance-punk","minimal synth","new rave","no wave","uk post-punk"],
-    "power metal": ["power metal","epic metal","fantasy metal","melodic power metal"],
-    "progressive rock": ["progressive rock","canterbury scene","crossover prog","krautrock","neo-prog","symphonic rock"],
-    "psychedelic rock": ["psychedelic rock","acid rock","neo-psychedelic","psychedelic pop","raga rock","space rock"],
-    "punjabi pop": ["punjabi pop","bhangra","desi hip hop"],
-    "punk": ["punk"],
-    "r&b": ["r&b","neo soul","trap soul"],
-    "rap": ["rap"],
-    "reggae": ["reggae","roots reggae"],
-    "reggaeton": ["reggaeton","dembow","neoperreo","perreo","pop reggaeton","reggaeton chileno","reggaeton colombiano","reggaeton flow","reggaeton mexicano"],
-    "regional mexican": ["regional mexican","banda","banda sinaloense","corrido","grupera","mariachi","musica mexicana","norte","norteno","norteno-sax","ranchera","tejano"],
-    "rock": ["rock","power pop"],
-    "salsa": ["salsa","boogaloo","modern salsa","salsa choke","salsa colombiana","salsa cubana","salsa puertorriquena","salsa urbana","salsa venezolana","timba"],
-    "samba": ["samba","samba paulista","samba-enredo","samba-rock"],
-    "scandinavian pop": ["scandinavian pop","classic swedish pop","danish pop","dansband","finnish pop","iskelma","norwegian pop","scandipop","swedish pop"],
-    "sertanejo": ["sertanejo","agronejo","sertanejo pop","sertanejo tradicional","sertanejo universitario"],
-    "singer-songwriter": ["singer-songwriter","acoustic pop","cantautor","canzone d'autore","gen z singer-songwriter","liedermacher","lilith","neo mellow"],
-    "soul": ["soul","motown","neo soul","soul funk"],
-    "soundtrack": ["soundtrack","film music","film score","game music","game score","movie music","original motion picture soundtrack","original score","score","theme music","tv music"],
-    "sufi music": ["sufi music","ghazal","indian instrumental","qawwali"],
-    "swing": ["swing","big band"],
-    "symphonic metal": ["symphonic metal","gothic symphonic metal","symphonic power metal"],
-    "synthpop": ["synthpop","electropop","neo-synthpop"],
-    "synthwave": ["synthwave","futuresynth","outrun","retrowave"],
-    "techno": ["techno","minimal techno"],
-    "trance": ["trance","psytrance"],
-    "trap": ["trap","atl trap","cloud rap","dark trap","desi trap","emo trap","melodic rap","plugg","pluggnb","rage rap","sad rap","trap brasileiro","trap carioca","trap queen","trap soul","viral rap"],
-    "trip hop": ["trip hop"],
-    "turkish folk": ["turkish folk"],
-    "turkish pop": ["turkish pop","arabesk"],
-    "turkish rock": ["turkish rock","anadolu rock","turkish alternative","turkish psych"],
-    "uk garage": ["uk garage","2-step","bassline","future garage","garage","speed garage"],
-    "vaporwave": ["vaporwave","broken transmission","future funk","mallsoft","slushwave","utopian virtual","vapor trap"],
-    "vgm": ["vgm","anime game","anime score","gamecore","indie game soundtrack","japanese vgm","nintendocore","otacore","rhythm game","scorecore","vgm remix","video game music"],
-    "vocal jazz": ["vocal jazz","crooner","jazz singing","lounge music"],
-    "west coast hip hop": ["west coast hip hop","g funk","g-funk","west coast rap"],
-    "christian pop": ["christian pop","christian music"],
-    "worship": ["worship","worship pop","pop worship","anthem worship","praise","adoracao","louvor","devotional"],
-    "arabic pop": ["arabic pop","dabke","egyptian pop","iraqi pop","khaliji","lebanese pop","maghreb pop","raï","shaabi","arabic hip hop"],
-    "balkan": ["balkan","balkan brass","chalga","manele","tallava","turbo-folk","yugoslav rock"],
-    "bluegrass": ["bluegrass","jamgrass","old-time","progressive bluegrass"],
-    "bolero": ["bolero","bolero cubano","bolero mexicano"],
-    "celtic": ["celtic","celtic punk","celtic rock","irish folk","scottish folk","traditional irish"],
-    "dangdut": ["dangdut","campursari","dangdut koplo"],
-    "flamenco": ["flamenco","flamenco pop","nuevo flamenco","rumba","rumba catalana"],
-    "indonesian pop": ["indonesian pop","indo pop","indonesian indie","pop minang"],
-    "kizomba": ["kizomba","ghetto zouk","semba","tarraxinha","zouk"],
-    "merengue": ["merengue","mambo","merengue tipico","tecno-merengue"],
-    "rockabilly": ["rockabilly","neo-rockabilly","psychobilly"],
-    "schlager": ["schlager","discofox","german schlager","partyschlager","volksmusik"],
-    "ska": ["ska","rocksteady","ska punk","traditional ska","two-tone"],
-    "soukous": ["soukous","congolese rumba","ndombolo"],
-    "tango": ["tango","neotango","tango cancion"],
-    "thai pop": ["thai pop","luk thung","mor lam","t-pop","thai indie","thai rock"],
-    "vietnamese pop": ["vietnamese pop","v-pop","vietnamese hip hop","vinahouse"],
-    "dancehall": ["dancehall","dancehall queen","ragga"],
-    "dub": ["dub","dub poetry","reggae dub"],
-    "folk metal": ["folk metal","celtic metal","medieval metal","pagan metal"],
-    "highlife": ["highlife","burger highlife","igbo highlife"],
-    "math rock": ["math rock","math pop","midwest math rock"],
-    "opm": ["opm","pinoy indie","pinoy pop","pinoy rock","vispop"],
-    "post-rock": ["post-rock","instrumental post-rock","post-metal"],
-    "russian pop": ["russian pop","russian dance","russian hip hop","russian rock"],
-    "soca": ["soca","calypso","chutney"],
-    "vallenato": ["vallenato","vallenato moderno"],
-    "americana": ["americana","alternative country","country rock","roots rock","southern gothic","stomp and holler"],
-    "chiptune": ["chiptune","8-bit","bitpop"],
-    "enka": ["enka","japanese traditional"],
-    "fado": ["fado","fado de coimbra","fado de lisboa","portuguese folk"],
-    "grindcore": ["grindcore","cybergrind","goregrind","pornogrind"],
-    "klezmer": ["klezmer","yiddish folk"],
-    "latin jazz": ["latin jazz","afro-cuban jazz"],
-    "polka": ["polka","slovenian folk"],
-    "trot": ["trot","korean traditional"],
-    "zydeco": ["zydeco","cajun","louisiana blues","swamp pop"],
-    "afro house": ["afro house","gqom","kuduro","south african house","3-step","afro house angolano"],
-    "doo-wop": ["doo-wop","rhythm and blues","street corner harmony"],
-    "french house": ["french house","filter house","french touch"],
-    "noise": ["noise","harsh noise","japanoise","noise rock","power electronics"],
-    "progressive metal": ["progressive metal","djent","math metal","progressive metalcore"],
-    "show tunes": ["show tunes","broadway","hollywood","musical","musicals","theatre","west end"],
-    "thrash metal": ["thrash metal","crossover thrash","speed metal","teutonic thrash metal","trash metal"],
-    "tropical house": ["tropical house","sax house","deep tropical house"],
-    "children's music": ["children's music","disney","kids","kindermusik","nursery rhymes"],
-    "lullaby": ["lullaby","baby sleep","music box"],
-    "club": ["club","baltimore club","jersey club","philly club"],
-    "comedy": ["comedy","comedy rock","parody","stand-up","stand-up comedy"],
-    "dungeon synth": ["dungeon synth","fantasy synth"],
-    "eurovision": ["eurovision"],
-    "kawaii metal": ["kawaii metal","idol metal","cute metal"],
-    "moombahton": ["moombahton","moombahcore"],
-    "nightcore": ["nightcore","sped up"],
-    "christmas": ["christmas","christmas pop","holiday","carols"],
-    "jazz fusion": ["jazz fusion","fusion","jazz funk","jazz rock","electric jazz"],
-    "psytrance": ["psytrance","psychedelic trance","goa trance","dark psytrance","forest psy"],
-    "sea shanties": ["sea shanties","sea shanty","shanty","maritime"],
-    "surf rock": ["surf rock","surf music","instrumental surf"],
-    "a cappella": ["a cappella","barbershop","vocal group"],
-    "bass house": ["bass house","g-house","wobble house"],
-    "boogie": ["boogie","post-disco"],
-    "choral": ["choral","choir","chamber choir","gregorian chant"],
-    "dark ambient": ["dark ambient","ritual ambient","isolationism"],
-    "neofolk": ["neofolk","dark folk","apocalyptic folk"],
-    "new jack swing": ["new jack swing","90s r&b"],
-    "smooth jazz": ["smooth jazz","contemporary jazz"],
-    "breakcore": ["breakcore","lolicore","mashcore"],
-    "dark cabaret": ["dark cabaret","cabaret","circus rock"],
-    "eurobeat": ["eurobeat","para para"],
-    "shoegaze": ["shoegaze","chillgaze","blackgaze"],
-    "stoner rock": ["stoner rock","stoner metal","desert rock","heavy psych"],
-    "visual kei": ["visual kei","angura kei","eroguro"],
-    "yacht rock": ["yacht rock"],
-    "acid jazz": ["acid jazz"],
-    "downtempo": ["downtempo","chillout"],
-    "happy hardcore": ["happy hardcore","uk hardcore","makina"],
-    "riot grrrl": ["riot grrrl"],
-    "rock and roll": ["rock and roll","rock n' roll"],
-    "oldies": ["oldies","golden oldies","classic oldies"],
-    "screamo": ["screamo","skramz","emoviolence"],
-    "slowcore": ["slowcore","sadcore"],
-    "axé": ["axé","samba-reggae"],
-    "hyperpop": ["hyperpop","digicore","glitchcore","dariacore"],
-    "ballad": ["ballad","power ballad","piano ballad","pop ballad","sentimental"],
-    "alternative hip hop": ["alternative hip hop","alt hip hop"],
-    "folk rock": ["folk rock"],
-    "funk rock": ["funk rock"],
-    "indie rock": ["indie rock"],
-    "rock en espanol": ["rock en espanol","rock en espa","latin rock","rock latino"]
-  };
-
-  const COUNTRY_MAPPINGS = {
-    "united states": ["usa", "us", "united states", "united states of america", "america", "american", "u.s.a.", "murica"],
-    "canada": ["canada", "canadian", "canadien", "ca", "canuck", "great white north"],
-    "mexico": ["mexico", "mexican", "mexicano", "mx", "mex", "aztec"],
-    "united kingdom": ["uk", "united kingdom", "britain", "british", "great britain", "england", "english", "scotland", "scottish", "wales", "welsh", "northern ireland", "northern irish", "gb", "gbr", "brit", "albion", "blighty"],
-    "ireland": ["ireland", "irish", "eire", "ie", "hibernia", "emerald isle"],
-    "france": ["france", "french", "français", "francaise", "francophone", "fr", "hexagon", "gallia"],
-    "germany": ["germany", "german", "deutschland", "deutsch", "de", "brd", "allemagne", "aleman"],
-    "netherlands": ["netherlands", "dutch", "holland", "flemish", "nl", "nld", "low countries", "nederland"],
-    "belgium": ["belgium", "belgian", "be", "belgique", "belgie"],
-    "switzerland": ["switzerland", "swiss", "ch", "suisse", "schweiz", "svizzera", "helvetia"],
-    "austria": ["austria", "austrian", "at", "osterreich"],
-    "sweden": ["sweden", "swedish", "sverige", "svensk", "se", "swe"],
-    "norway": ["norway", "norwegian", "norge", "norsk", "no", "nor"],
-    "denmark": ["denmark", "danish", "danmark", "dansk", "dk", "dnk"],
-    "finland": ["finland", "finnish", "suomi", "fi", "fin"],
-    "iceland": ["iceland", "icelandic", "island", "is", "ice"],
-    "spain": ["spain", "spanish", "españa", "espanol", "castellano", "es", "iberia"],
-    "portugal": ["portugal", "portuguese", "portugues", "luso", "pt", "lusitania"],
-    "italy": ["italy", "italian", "italia", "italiano", "it", "azzurri"],
-    "greece": ["greece", "greek", "ellada", "hellenic", "gr", "hellas"],
-    "russia": ["russia", "russian", "rossiya", "russkij", "rus", "ru", "soviet"],
-    "ukraine": ["ukraine", "ukrainian", "ua", "ukr", "ukrayina"],
-    "poland": ["poland", "polish", "polska", "polski", "pl", "pol"],
-    "czech republic": ["czech republic", "czech", "czechia", "cz", "bohemia"],
-    "hungary": ["hungary", "hungarian", "magyar", "hu", "hun"],
-    "romania": ["romania", "romanian", "ro", "rom"],
-    "bulgaria": ["bulgaria", "bulgarian", "bg"],
-    "serbia": ["serbia", "serbian", "rs", "srbija"],
-    "croatia": ["croatia", "croatian", "hr", "hrvatska"],
-    "bosnia": ["bosnia", "herzegovina", "bosnian", "ba", "bih"],
-    "albania": ["albania", "albanian", "al", "shqiperia", "shqip"],
-    "estonia": ["estonia", "estonian", "eesti", "ee"],
-    "latvia": ["latvia", "latvian", "lv", "latvija"],
-    "lithuania": ["lithuania", "lithuanian", "lt", "lietuva"],
-    "turkey": ["turkey", "turkish", "türkiye", "turkce", "tr", "anatolian", "ottoman"],
-    "japan": ["japan", "japanese", "nihon", "nippon", "jp", "jpn", "yamato"],
-    "south korea": ["south korea", "korea", "korean", "hanguk", "kr", "kor", "rok", "joseon"],
-    "china": ["china", "chinese", "mandarin", "cantonese", "cn", "chn", "prc", "zhongguo", "mainland china", "hk", "hong kong", "taiwan", "taiwanese", "roc"],
-    "india": ["india", "indian", "in", "ind", "hindi", "bharat", "desi", "tamil", "telugu", "bhojpuri", "bengali", "malayalam"],
-    "pakistan": ["pakistan", "pakistani", "pk", "pak", "urdu"],
-    "bangladesh": ["bangladesh", "bengali", "bd", "bangla"],
-    "philippines": ["philippines", "filipino", "pinoy", "tagalog", "ph", "phi", "pinas"],
-    "indonesia": ["indonesia", "indonesian", "indo", "id", "idn", "nusantara"],
-    "vietnam": ["vietnam", "vietnamese", "vn", "vnm", "kinh"],
-    "thailand": ["thailand", "thai", "th", "tha", "siam"],
-    "malaysia": ["malaysia", "malaysian", "my", "mas", "malay"],
-    "singapore": ["singapore", "singaporean", "sg", "sgp", "lion city"],
-    "brazil": ["brazil", "brazilian", "brasil", "brasileiro", "brasileira", "br", "bra"],
-    "argentina": ["argentina", "argentinian", "argentine", "ar", "arg", "gaucho"],
-    "colombia": ["colombia", "colombian", "co", "col", "cafetero"],
-    "chile": ["chile", "chilean", "chileno", "cl", "chl"],
-    "peru": ["peru", "peruvian", "pe", "per", "inca"],
-    "venezuela": ["venezuela", "venezuelan", "ve", "ven"],
-    "uruguay": ["uruguay", "uruguayan", "uy", "ury", "charrúa"],
-    "puerto rico": ["puerto rico", "puerto rican", "boricua", "pr", "pri", "borinquen"],
-    "cuba": ["cuba", "cuban", "cu", "cub"],
-    "dominican republic": ["dominican republic", "dominican", "dr", "do", "dom", "quisqueya", "quisqueyano"],
-    "jamaica": ["jamaica", "jamaican", "jm", "jam", "yardie", "yard"],
-    "australia": ["australia", "australian", "aussie", "au", "aus", "oz", "straya", "down under"],
-    "new zealand": ["new zealand", "nz", "kiwi", "aotearoa", "zealand"],
-    "israel": ["israel", "israeli", "hebrew", "il", "isr", "zion"],
-    "egypt": ["egypt", "egyptian", "eg", "egy", "misr"],
-    "iran": ["iran", "iranian", "persian", "farsi", "ir", "irn", "Iranis", "irani"],
-    "morocco": ["morocco", "moroccan", "ma", "mar", "maroc", "maghreb"],
-    "algeria": ["algeria", "algerian", "dz", "dza", "algerie"],
-    "nigeria": ["nigeria", "nigerian", "ng", "nga", "naija", "9ja"],
-    "south africa": ["south africa", "south african", "za", "zaf", "rsa", "mzansi"],
-    "ghana": ["ghana", "ghanaian", "gh", "gha", "gold coast"],
-    "kenya": ["kenya", "kenyan", "ke", "ken", "254", "swahili"],
-    "senegal": ["senegal", "senegalese", "sn", "sen", "wolof"]
-  };
-
-  const mainGenres = Object.keys(GENRE_MAPPINGS);
-
   function showCustomFilterSettingsModal(onSave) {
       const descriptionHtml = `
           <div style="background-color: rgba(241, 94, 108, 0.1); border: 1px solid rgba(241, 94, 108, 0.3); border-radius: 8px; padding: 12px; margin-bottom: 5px;">
@@ -34087,7 +37846,6 @@ shadowRoot.innerHTML = `
             const activeKeys = group.keys.filter(k => activeSources[k]);
             if (activeKeys.length > 0) {
                 const hasPending = activeKeys.some(k => !fetchedSources[k]);
-                
                 if (hasPending) {
                     activePills.push(`<span title="Source enabled but not fetched. Re-run filter to apply." style="background: rgba(233, 20, 41, 0.15); border: 1px solid rgba(233, 20, 41, 0.4); color: #ffbaba; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; cursor: help;">${group.label}</span>`);
                 } else {
@@ -34097,81 +37855,139 @@ shadowRoot.innerHTML = `
         });
 
         if (activePills.length === 0) return `<span style="color: #b3b3b3; font-size: 11px;">None</span>`;
-
         return activePills.join('');
     };
 
     if (!genrePlaylistsCache) {
         genrePlaylistsCache = await getGenreMapping();
     }
-    let trackGenreMap = initialTrackGenreMap;
+    if (genrePlaylistsCache && !genrePlaylistsCache._normalizedSet) {
+        genrePlaylistsCache._normalizedSet = new Set(genrePlaylistsCache.map(p => normalizeGenre(p.genre)));
+    }
+
+    let trackGenreMap = new Map();
     let allGenres = new Set();
     let genreCounts = new Map();
-    let groupGenres = true;
+    let masterSortedGenres = [];
+    let groupGenres = groupSimilarGenres;
+    let filterNoise = filterNoiseGenres;
 
-    const refreshGenreStats = () => {
+    const uriToArtistMap = new Map();
+    const playlistArtistNames = new Set();
+    tracks.forEach(t => {
+        const name = (t.artistName || t.artists?.[0]?.name || "").toLowerCase();
+        if (name) {
+            playlistArtistNames.add(name);
+            uriToArtistMap.set(t.uri, name);
+        }
+    });
+    const totalUniqueArtistsInPlaylist = playlistArtistNames.size;
+    const isMappedGenreCache = new Map();
+
+    const checkIsGenreMapped = (genreName) => {
+        if (isMappedGenreCache.has(genreName)) return isMappedGenreCache.get(genreName);
+        const normalizedKey = getNormalizedGenreKey(genreName);
+        const isMapped = !!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] ||
+                         !!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey] ||
+                         isWhitelistedGenre(genreName, genrePlaylistsCache) ||
+                         salvageAndValidateLastfmTag(genreName, genrePlaylistsCache).length > 0;
+        isMappedGenreCache.set(genreName, isMapped);
+        return isMapped;
+    };
+
+    const refreshGenreStatsAndOrder = () => {
         allGenres.clear();
         genreCounts.clear();
-        trackGenreMap.forEach(genres => {
-            const uniqueNames = new Set(genres.map(g => g.name));
-            uniqueNames.forEach(name => {
-                allGenres.add(name);
-                genreCounts.set(name, (genreCounts.get(name) || 0) + 1);
-            });
-        });
-    };
-    refreshGenreStats();
+        const nameSetsMap = new Map();
+        const genreDetails = new Map();
 
-    const rebuildGenreMap = () => {
-        trackGenreMap = new Map();
-        tracks.forEach(track => {
-            const rawData = rawGenreData.get(track.uri);
-            if (rawData) {
-                let combined = [];
-                if (gfSources.spotify_track) combined.push(...(rawData.spotify_track_genres || []).map(g => ({ name: g, source: 'spotify_track' })));
-                if (gfSources.lastfm_track) combined.push(...(rawData.lastfm_track_genres || []).map(g => ({ name: g, source: 'lastfm_track' })));
-                if (gfSources.lastfm_artist) combined.push(...(rawData.lastfm_artist_genres || []).map(g => ({ name: g, source: 'lastfm_artist' })));
-                if (gfSources.everynoise_artist) combined.push(...(rawData.everynoise_artist_genres || []).map(g => ({ name: g, source: 'everynoise' })));
-                if (gfSources.deezer) {
-                    combined.push(...(rawData.deezer_genres || []).map(g => ({ name: g, source: 'deezer' })));
-                    combined.push(...(rawData.apple_music_genres || []).map(g => ({ name: g, source: 'apple_music' })));
+        trackGenreMap.forEach((genres, trackUri) => {
+            const trackArtist = uriToArtistMap.get(trackUri) || "";
+            const nameSet = new Set();
+
+            for (let i = 0; i < genres.length; i++) {
+                const g = genres[i];
+                const genreName = g.name;
+                let details = genreDetails.get(genreName);
+                if (!details) {
+                    details = {
+                        name: genreName,
+                        isTrusted: false,
+                        count: 0,
+                        artists: new Set(),
+                        isMapped: checkIsGenreMapped(genreName),
+                        isSelfTitle: false
+                    };
+                    genreDetails.set(genreName, details);
                 }
 
-                let finalUniqueGenres;
-                if (groupGenres) {
-                    const mapped = mapAndNormalizeGenres(combined);
-                    finalUniqueGenres = Array.from(new Set(mapped.map(g => JSON.stringify(g)))).map(s => JSON.parse(s));
-                } else {
-                    const uniqueRaw = new Map();
-                    combined.forEach(g => {
-                        const name = g.name.toLowerCase().trim();
-                        if (!uniqueRaw.has(name) || (g.source !== 'lastfm_track' && g.source !== 'lastfm_artist')) {
-                            uniqueRaw.set(name, { name: name, source: g.source });
-                        }
-                    });
-                    finalUniqueGenres = Array.from(uniqueRaw.values());
+                if (g.source === 'spotify' || g.source === 'spotify_track' || g.source === 'everynoise' || g.source === 'deezer' || g.source === 'apple_music') {
+                    details.isTrusted = true;
                 }
-                trackGenreMap.set(track.uri, finalUniqueGenres);
-            } else {
-                trackGenreMap.set(track.uri, []);
+                if (trackArtist) {
+                    details.artists.add(trackArtist);
+                    if (genreName.toLowerCase() === trackArtist) details.isSelfTitle = true;
+                }
+
+                if (!nameSet.has(genreName)) {
+                    nameSet.add(genreName);
+                    allGenres.add(genreName);
+                    details.count++;
+                    genreCounts.set(genreName, details.count);
+                }
             }
+
+            nameSetsMap.set(trackUri, nameSet);
         });
-        
-        refreshGenreStats();
-        
-        let tracksWithGenresCount = 0;
-        trackGenreMap.forEach(genres => {
-            if (genres.length > 0) tracksWithGenresCount++;
+
+        trackGenreMap._nameSetsMap = nameSetsMap;
+
+        const getTier = (details) => {
+            if (filterNoise) return 1;
+            if (details.isTrusted || details.isMapped) return 1;
+            if (details.isSelfTitle || details.name.length < 2) return 2;
+            if (details.artists.size >= 3) return 1;
+            if (details.count >= 15 && details.artists.size >= 2) return 1;
+            if (totalUniqueArtistsInPlaylist < 3) {
+                const threshold = Math.min(4, Math.max(2, Math.ceil(tracks.length * 0.05)));
+                if (details.count >= threshold) return 1;
+            }
+            return 2;
+        };
+
+        masterSortedGenres = Array.from(allGenres).sort((a, b) => {
+            const detailsA = genreDetails.get(a);
+            const detailsB = genreDetails.get(b);
+            const tierA = getTier(detailsA);
+            const tierB = getTier(detailsB);
+            if (tierA !== tierB) return tierA - tierB;
+            if (detailsB.count !== detailsA.count) return detailsB.count - detailsA.count;
+            if (detailsA.isTrusted !== detailsB.isTrusted) return detailsA.isTrusted ? -1 : 1;
+            return a.localeCompare(b);
         });
-        totalTracksStat.innerHTML = `
-            <span class="tooltip-container" style="cursor: help;">
-                Total tracks: ${tracksWithGenresCount} (${tracks.length})
-                <span class="custom-tooltip" style="text-align: center; white-space: nowrap; font-weight: normal; z-index: 10000;">
-                    Tracks with genres: ${tracksWithGenresCount}<br>Total tracks: ${tracks.length}
-                </span>
-            </span>
-        `;
     };
+
+    const rebuildGenreMap = (updateDomStat = true) => {
+        trackGenreMap = buildGenreFilterTrackMap(tracks, rawGenreData, gfSources, groupGenres, filterNoise, genrePlaylistsCache);
+        refreshGenreStatsAndOrder();
+
+        if (updateDomStat && typeof totalTracksStat !== "undefined" && totalTracksStat) {
+            let tracksWithGenresCount = 0;
+            trackGenreMap.forEach(genres => {
+                if (genres.length > 0) tracksWithGenresCount++;
+            });
+            totalTracksStat.innerHTML = `
+                <span class="tooltip-container" style="cursor: help;">
+                    Total tracks: ${tracksWithGenresCount} (${tracks.length})
+                    <span class="custom-tooltip" style="text-align: center; white-space: nowrap; font-weight: normal; z-index: 10000;">
+                        Tracks with genres: ${tracksWithGenresCount}<br>Total tracks: ${tracks.length}
+                    </span>
+                </span>
+            `;
+        }
+    };
+
+    rebuildGenreMap(false);
 
     let canModifyCurrentPlaylist = false;
     if (URI.isPlaylistV1OrV2(sourceUri)) {
@@ -34181,7 +37997,7 @@ shadowRoot.innerHTML = `
             if (meta.owner && (meta.owner.username === user.username || meta.owner.uri.includes(user.username))) {
                 canModifyCurrentPlaylist = true;
             }
-        } catch(e) {}
+        } catch (e) {}
     }
 
     const existingModal = document.getElementById('genre-filter-modal-overlay');
@@ -34215,17 +38031,17 @@ shadowRoot.innerHTML = `
     modalContainer.style.cssText = `
         box-sizing: border-box !important;
         position: relative !important;
-        width: min(620px, 92vw) !important; 
+        width: min(620px, 92vw) !important;
         max-width: 620px !important;
         min-width: 320px !important;
-        min-height: 0 !important;
+        height: min(780px, 85vh) !important;
         max-height: 85vh !important;
         flex-shrink: 0 !important;
-        display: flex; 
+        display: flex;
         flex-direction: column;
-        border-radius: 30px; 
+        border-radius: 30px;
         overflow: hidden;
-        background-color: #181818 !important; 
+        background-color: #181818 !important;
         color: var(--spice-text, #ffffff);
         border: 2px solid #282828;
         box-shadow: 0 16px 48px rgba(0,0,0,0.5);
@@ -34236,30 +38052,60 @@ shadowRoot.innerHTML = `
 
     shadowRoot.innerHTML = `
     <style>
-      :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; }
+      :host { font-family: 'SpotifyMixUI', sans-serif !important; color: #fff; display: flex; flex-direction: column; width: 100%; height: 100%; }
       *, *::before, *::after { box-sizing: border-box; font-family: 'SpotifyMixUI', sans-serif !important; }
       h1 { margin: 0; line-height: normal; }
       .sp-gf-header { padding: 32px 32px 19px 32px !important; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
       .sp-gf-body { overflow-y: hidden !important; padding: 0 32px 32px 32px; display: flex; flex-direction: column; flex: 1; min-height: 0; }
-      .genre-button { padding: 6px 7px 6px 16px; margin: 4px; border-radius: 20px; border: none; cursor: pointer; background-color: #303030; color: white; font-weight: 500; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; position: relative; overflow: hidden; z-index: 0; transition: background-color 0.2s ease, color 0.2s ease; }
-      .genre-button > * { position: relative; z-index: 2; }
-      .genre-button::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0; transition: opacity 0.2s ease; }
+      .genre-button { padding: 6px 7px 6px 16px; margin: 0; border-radius: 20px; border: none; cursor: pointer; background-color: #303030; color: white; font-weight: 500; font-size: 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px; position: relative; overflow: hidden; z-index: 0; flex-shrink: 0; max-width: 100%; transition: background-color 0.2s ease, color 0.2s ease; }
+      .genre-button > * { position: relative; z-index: 2; pointer-events: none; }
+      .genre-button-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .genre-button::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; opacity: 0; transition: opacity 0.2s ease; pointer-events: none; }
       .genre-button.related { background-color: rgb(52 123 77 / 30%); border: none; color: white; }
       .genre-button.selected { border: none; color: #ffffff; }
       .genre-button.selected::before { background: linear-gradient(to right, rgb(30 215 96 / 35%), rgb(30 215 96 / 80%)); opacity: 1; }
       .genre-button.excluded { color: #ffffff; border: none; }
       .genre-button.excluded::before { background: linear-gradient(to right, rgb(169 33 33 / 45%), rgb(169 33 33 / 85%)); opacity: 1; }
-      .genre-count-badge { background-color: #454545; color: #e0e0e0; padding: 1px 8px; border-radius: 12px; font-size: 13px; font-weight: 400; min-width: 22px; text-align: center; line-height: 1.5; transition: background-color 0.1s ease, color 0.1s ease; }
+      .genre-count-badge { background-color: #454545; color: #e0e0e0; padding: 1px 8px; border-radius: 12px; font-size: 13px; font-weight: 400; min-width: 22px; text-align: center; line-height: 1.5; flex-shrink: 0; transition: background-color 0.1s ease, color 0.1s ease; }
       .genre-button.selected .genre-count-badge { background-color: rgb(20, 109, 52); color: #ffffff; }
       .genre-button.excluded .genre-count-badge { background-color: rgb(91, 21, 21); color: #ffffff; }
       .genre-button.related .genre-count-badge { background-color: rgb(59, 78, 66); color: #ffffff; }
-      .search-bar { width: 100%; padding-top: 10px; padding-right: 35px; padding-bottom: 10px; padding-left: 40px; border-radius: 12px; border: 1px solid #343434; background: #1e1e1e; color: white; }
+      .search-bar { width: 100%; padding-top: 10px; padding-right: 35px; padding-bottom: 10px; padding-left: 40px; border-radius: 12px; border: 1px solid #343434; background: #1e1e1e; color: white; outline: none !important; box-shadow: none !important; transition: border-color 0.15s ease; }
+      .search-bar:focus, .search-bar:focus-visible { border-color: #555 !important; outline: none !important; box-shadow: none !important; }
       .search-bar-container { position: relative; flex: 1; display: flex; align-items: center; }
       .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #b3b3b3; }
       .clear-search-button { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #b3b3b3; cursor: pointer; font-size: 24px; padding: 0 5px; line-height: 1; display: none; }
       .clear-search-button:hover { color: white; }
-      .sort-type-select { padding: 8px; border-radius: 10px; border: 1px solid #434343; background: #313131; color: white; width: 217px; cursor: pointer; transition: border-color 0.05s ease; }
-      .sort-type-select:hover { border: 1px solid #5b5b5b; }
+      .gf-active-pills-bar { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 100%; min-width: 0; height: 38px; overflow: hidden; background: #1e1e1e; border: 1px solid #343434; border-radius: 10px; padding: 0 10px 0 0; flex-shrink: 0; margin-top: -4px; margin-bottom: -4px; box-sizing: border-box; }
+      .gf-active-pills-scroll-wrap { position: relative; flex: 1 1 0%; min-width: 0; max-width: 100%; height: 100%; display: flex; align-items: center; overflow: hidden; }
+      .gf-active-pills-scroll-wrap::before, .gf-active-pills-scroll-wrap::after { content: ""; position: absolute; top: 0; bottom: 5px; width: 28px; z-index: 5; pointer-events: none; opacity: 0; transition: opacity 0.2s ease; }
+      .gf-active-pills-scroll-wrap::before { left: 0; background: linear-gradient(to right, #1e1e1e 0%, rgba(30, 30, 30, 0.85) 35%, rgba(30, 30, 30, 0) 100%); }
+      .gf-active-pills-scroll-wrap::after { right: 0; background: linear-gradient(to left, #1e1e1e 0%, rgba(30, 30, 30, 0.85) 35%, rgba(30, 30, 30, 0) 100%); }
+      .gf-active-pills-scroll-wrap.can-scroll-left::before { opacity: 1; }
+      .gf-active-pills-scroll-wrap.can-scroll-right::after { opacity: 1; }
+      .gf-active-pills-scroll { display: flex; align-items: center; gap: 6px; overflow-x: scroll; overflow-y: hidden; width: 100%; min-width: 0; max-width: 100%; height: 100%; padding: 5px 2px 0 12px; transition: padding-top 0.15s ease; scrollbar-width: auto !important; scrollbar-color: auto !important; }
+      .gf-active-pills-scroll.has-overflow { padding: 2px 2px 0 12px; }
+      .gf-active-pills-scroll::-webkit-scrollbar { width: 5px !important; height: 5px !important; background-color: transparent !important; display: block !important; }
+      .gf-active-pills-scroll::-webkit-scrollbar-button { display: none !important; height: 0 !important; width: 0 !important; background-color: transparent !important; }
+      .gf-active-pills-scroll::-webkit-scrollbar-thumb { background-color: #535353 !important; border-radius: 20px !important; border-top: 1px solid transparent !important; border-bottom: 1px solid transparent !important; border-left: none !important; border-right: none !important; background-clip: padding-box !important; }
+      .gf-active-pills-scroll::-webkit-scrollbar-thumb:hover { background-color: #777 !important; }
+      .gf-active-pills-scroll::-webkit-scrollbar-track { background: transparent !important; border: none !important; box-shadow: none !important; margin: 0 4px !important; }
+      .gf-active-pills-scroll::-webkit-scrollbar-corner { background: transparent !important; }
+      .gf-active-empty-state { display: flex; align-items: center; justify-content: space-between; width: 100%; min-width: 0; user-select: none; white-space: nowrap; }
+      .gf-empty-label { color: #777; font-size: 13px; font-weight: 400; }
+      .gf-empty-hints { display: flex; align-items: center; gap: 10px; color: #888; font-size: 12px; font-weight: 400; }
+      .gf-hint-item { display: inline-flex; align-items: center; gap: 6px; }
+      .gf-hint-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+      .gf-hint-dot.inc { background-color: rgba(30, 215, 96, 0.75); box-shadow: 0 0 6px rgba(30, 215, 96, 0.35); }
+      .gf-hint-dot.exc { background-color: rgba(229, 115, 115, 0.8); box-shadow: 0 0 6px rgba(229, 115, 115, 0.3); }
+      .gf-hint-sep { color: #484848; font-size: 11px; }
+      .gf-active-pill { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px 0 10px; border-radius: 12px; font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; flex-shrink: 0; border: 1px solid transparent; user-select: none; transition: filter 0.15s ease; }
+      .gf-active-pill:hover { filter: brightness(1.15); }
+      .gf-active-pill.is-inc { background: rgba(30, 215, 96, 0.18); border-color: rgba(30, 215, 96, 0.45); color: #7ef0a6; }
+      .gf-active-pill.is-exc { background: rgba(233, 20, 41, 0.2); border-color: rgba(233, 20, 41, 0.45); color: #ff9b9b; }
+      .gf-active-pill-x { font-size: 14px; line-height: 1; opacity: 0.8; }
+      .gf-clear-all-btn { display: none; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #ccc; border-radius: 8px; height: 24px; padding: 0 8px; font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: all 0.15s ease; }
+      .gf-clear-all-btn:hover { background: rgba(255,255,255,0.16); color: #fff; }
       .genre-filter-footer-actions { display: flex; gap: 12px; width: 100%; margin-top: 8px; flex-shrink: 0; }
       .action-btn { flex: 1; padding: 7px 0; border-radius: 12px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: background-color 0.2s ease, filter 0.2s ease; }
       .action-btn:hover { filter: brightness(1.1); }
@@ -34267,7 +38113,9 @@ shadowRoot.innerHTML = `
       .action-btn-primary:hover { background: #1ed760; filter: brightness(1.1); }
       .action-btn-secondary { background: #333; color: white; }
       .action-btn-secondary:hover { background: #444; filter: brightness(1.1); }
-      .genre-container { display: flex; flex-wrap: wrap; height: 100%; width: 100%; overflow-y: auto; background-color: #1e1e1e; border: 1px solid #343434; padding: 10px 10px; box-sizing: border-box; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-top-left-radius: 12px; border-top-right-radius: 12px; scrollbar-width: auto; scrollbar-color: auto; }
+      .genre-container { position: relative; height: 100%; width: 100%; overflow-y: auto; overflow-x: hidden; overflow-anchor: none; background-color: #1e1e1e; border: 1px solid #343434; padding: 0; box-sizing: border-box; border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-top-left-radius: 12px; border-top-right-radius: 12px; scrollbar-width: auto; scrollbar-color: auto; transform: translateZ(0); backface-visibility: hidden; }
+      .genre-virtual-spacer { position: relative; width: 100%; }
+      .genre-virtual-row { position: absolute; left: 0; width: 100%; height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 14px; box-sizing: border-box; }
       .genre-scroll-wrapper { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-bottom: -15px; margin-top: 2px; z-index: 0; }
       .genre-scroll-wrapper::before, .genre-scroll-wrapper::after { content: ""; position: absolute; left: 1px; right: 8px; height: 26px; z-index: 10; pointer-events: none; transition: opacity 0.2s ease; opacity: 0; }
       .genre-scroll-wrapper::before { top: 1px; border-top-left-radius: 12px; border-top-right-radius: 12px; background: linear-gradient(to bottom, #1e1e1e 0%, rgba(30, 30, 30, 0) 100%); }
@@ -34286,7 +38134,7 @@ shadowRoot.innerHTML = `
       .select-all-button:active { background-color: #B3B3B3; color: black; transition: none; }
       .select-all-button svg { fill: #b3b3b3; }
       .genre-header { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
-      .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; width: auto; }
+      .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 1px 0; width: auto; }
       .switch { position: relative; display: inline-block; width: 40px; height: 24px; }
       .switch input { opacity: 0; width: 0; height: 0; }
       .sliderx { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #484848; border-radius: 24px; transition: .2s; }
@@ -34294,28 +38142,23 @@ shadowRoot.innerHTML = `
       input:checked + .sliderx { background-color: #1DB954; }
       input:checked + .sliderx:before { transform: translateX(16px); }
       .settings-container { display: flex; gap: 12px; flex-shrink: 0; }
-      .settings-box { flex: 1; background-color: #252525; border-radius: 12px; border: 1px solid #343434; padding: 12px 16px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+      .settings-box { flex: 1; background-color: #252525; border-radius: 12px; border: 1px solid #343434; padding: 10px 16px; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
       .setting-label { color: #ccc; font-size: 14px; display: flex; align-items: center; gap: 4px; }
       .setting-label svg { margin-left: 0 !important; margin-bottom: 1px !important; }
       .sort-type-select { padding: 6px 10px !important; border-radius: 6px !important; border: 1px solid #444 !important; background: #333 !important; color: white !important; width: 100% !important; cursor: pointer !important; font-size: 14px !important; }
+      .sort-type-select:hover { border: 1px solid #5b5b5b !important; }
       .tooltip-container { position: relative; display: inline-block; }
       .custom-tooltip { visibility: hidden; opacity: 0; transition: opacity 0.1s ease, visibility 0s linear 0.1s; position: absolute; z-index: 1; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; max-width: 240px; width: max-content; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; word-wrap: break-word; }
       .custom-tooltip::after { content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
       .tooltip-container:hover .custom-tooltip { visibility: visible; opacity: 1; transition: opacity 0.1s ease 0.1s, visibility 0s linear 0.1s; }
       .genre-stats { display: flex; justify-content: center; align-items: center; color: #c1c1c1; font-size: 14px; background-color: #252525; padding: 10px 0; border: 1px solid #343434; border-top: none; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; margin-bottom: 5px; position: relative; z-index: 1; flex-shrink: 0; }
       .genre-stats span { margin: 0 25px; }
-      .genre-modal-title { font-size: 15px; font-weight: 400; color: white; flex-shrink: 0; }
       .top-right-controls { position: absolute; top: 20px; right: 20px; display: flex; gap: 8px; z-index: 10; }
       .top-icon-btn { background: rgba(0,0,0,0.3) !important; border: 1px solid rgba(255,255,255,0.1) !important; border-radius: 50% !important; width: 32px !important; height: 32px !important; color: white !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: background 0.2s, border-color 0.2s; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); padding: 0 !important; margin: 0 !important; line-height: 0 !important; font-size: 0 !important; box-sizing: border-box !important; }
       .top-icon-btn:hover { background: rgba(255,255,255,0.15) !important; border-color: rgba(255,255,255,0.3) !important; }
       .top-icon-btn svg { display: block !important; margin: 0 !important; padding: 0 !important; transform: none !important; }
       #closeGenreModalBtn svg { width: 17px !important; height: 17px !important; }
       #gfSettingsBtn svg { width: 19px !important; height: 19px !important; }
-      .gf-help-icon-wrapper { position: absolute; right: 16px; display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #777; color: #777; cursor: help; font-size: 10px; font-weight: bold; transition: all 0.2s; }
-      .gf-help-icon-wrapper:hover { color: #fff; border-color: #fff; }
-      .gf-help-icon-tooltip { visibility: hidden; opacity: 0; transition: opacity 0.1s ease, visibility 0s linear 0.1s; position: absolute; z-index: 100; background-color: #373737; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; width: max-content; bottom: 100%; right: -6px; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); line-height: 1.4; text-align: left; font-weight: normal; }
-      .gf-help-icon-tooltip::after { content: ""; position: absolute; top: 100%; right: 9px; border-width: 5px; border-style: solid; border-color: #373737 transparent transparent transparent; }
-      .gf-help-icon-wrapper:hover .gf-help-icon-tooltip { visibility: visible; opacity: 1; transition: opacity 0.1s ease 0.1s, visibility 0s linear 0.1s; }
     </style>
     <div class="genre-filter-modal" style="position: relative; display: flex; flex-direction: column; height: 100%; overflow: hidden;">
     <div class="top-right-controls">
@@ -34327,11 +38170,11 @@ shadowRoot.innerHTML = `
     </div>
 
     <div class="sp-gf-body">
-        <div style="display: flex; flex-direction: column; gap: 15px; flex: 1; min-height: 0;">
+        <div style="display: flex; flex-direction: column; gap: 15px; flex: 1; min-height: 0; min-width: 0; width: 100%;">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: -5px;">
                 <span style="color: #b3b3b3; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">Sources:</span>
                 <div id="gf-dynamic-sources-container" style="display: flex; gap: 6px; flex-wrap: wrap;">
-                        ${getDynamicGenreSourcesHtml(activeTitleSources, originallyFetchedSources)}
+                    ${getDynamicGenreSourcesHtml(activeTitleSources, originallyFetchedSources)}
                 </div>
             </div>
             <div class="genre-header">
@@ -34344,19 +38187,20 @@ shadowRoot.innerHTML = `
                     ${selectAllIconSvg}
                 </button>
             </div>
+            <div class="gf-active-pills-bar" id="gf-active-pills-bar">
+                <div class="gf-active-pills-scroll-wrap" id="gf-active-pills-scroll-wrap">
+                    <div class="gf-active-pills-scroll" id="gf-active-pills-scroll"></div>
+                </div>
+                <button class="gf-clear-all-btn" id="gf-clear-all-btn" title="Clear all selected and excluded genres">Clear</button>
+            </div>
             <div class="genre-scroll-wrapper">
-                <div class="genre-container"></div>
+                <div class="genre-container">
+                    <div class="genre-virtual-spacer" id="gf-virtual-spacer"></div>
+                </div>
             </div>
             <div class="genre-stats">
                 <span id="total-tracks-stat">Total tracks: 0</span>
                 <span id="filtered-tracks-stat">Filtered tracks: 0</span>
-                <div class="gf-help-icon-wrapper">
-                    ?
-                    <div class="gf-help-icon-tooltip">
-                        Include: <b style="color: #7ad891;">Left-click</b><br>
-                        Exclude: <b style="color: #e57373;">Right-click</b>
-                    </div>
-                </div>
             </div>
             <div class="settings-container">
                 <div class="settings-box">
@@ -34379,23 +38223,36 @@ shadowRoot.innerHTML = `
                 <div class="settings-box">
                     <div class="setting-row">
                         <label class="setting-label" for="groupGenresToggle">
-                            Group Similar
+                            Group Similar Genres
                             <span class="tooltip-container">
                                 ${infoIconSvg}
-                                <span class="custom-tooltip">Merges variations (e.g. 'electro' -> 'electronic').</span>
+                                <span class="custom-tooltip">Groups micro-genres and regional variations into main genres (e.g. 'bedroom pop' → 'indie pop').</span>
                             </span>
                         </label>
                         <label class="switch">
-                            <input type="checkbox" id="groupGenresToggle" checked>
+                            <input type="checkbox" id="groupGenresToggle" ${groupGenres ? 'checked' : ''}>
+                            <span class="sliderx"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <label class="setting-label" for="filterNoiseToggle">
+                            Filter Noise Tags
+                            <span class="tooltip-container">
+                                ${infoIconSvg}
+                                <span class="custom-tooltip">Filters out random Last.fm user tags and mood descriptors, keeping only valid genres.</span>
+                            </span>
+                        </label>
+                        <label class="switch">
+                            <input type="checkbox" id="filterNoiseToggle" ${filterNoise ? 'checked' : ''}>
                             <span class="sliderx"></span>
                         </label>
                     </div>
                     <div class="setting-row">
                         <label class="setting-label" for="matchAllGenresToggle">
-                            Match All
+                            Match All Selected
                             <span class="tooltip-container">
                                 ${infoIconSvg}
-                                <span class="custom-tooltip">Tracks must match ALL selected genres.</span>
+                                <span class="custom-tooltip">Only includes tracks that match every selected genre.</span>
                             </span>
                         </label>
                         <label class="switch">
@@ -34419,182 +38276,509 @@ shadowRoot.innerHTML = `
     document.body.appendChild(overlay);
     overlay.appendChild(modalContainer);
 
-    modalContainer.querySelector('#closeGenreModalBtn').addEventListener('click', closeModal);
-    modalContainer.querySelector('#gfSettingsBtn').addEventListener('click', () => {
-        showGenreFilterSettingsModal(gfSources, (newSources) => {
-            gfSources = newSources;
-            localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(gfSources));
-
-            activeTitleSources = { ...newSources };
-            
-            const sourcesContainer = modalContainer.querySelector('#gf-dynamic-sources-container');
-            if (sourcesContainer) sourcesContainer.innerHTML = getDynamicGenreSourcesHtml(activeTitleSources, originallyFetchedSources);
-
-            rebuildGenreMap();
-            updateGenreButtons();
-            updateFilteredTracksCount();
-            showNotification("Settings saved. Close and reopen the Genre Filter to apply changes.", "warning");
-        });
-    });
-    preventDragCloseModal(abortController.signal);
-
     const matchAllGenresToggle = modalContainer.querySelector("#matchAllGenresToggle");
     const groupGenresToggle = modalContainer.querySelector("#groupGenresToggle");
+    const filterNoiseToggle = modalContainer.querySelector("#filterNoiseToggle");
     const genreContainer = modalContainer.querySelector(".genre-container");
+    const virtualSpacer = modalContainer.querySelector("#gf-virtual-spacer");
     const genreScrollWrapper = modalContainer.querySelector(".genre-scroll-wrapper");
     const searchBar = modalContainer.querySelector(".search-bar");
     const clearSearchButton = modalContainer.querySelector(".clear-search-button");
+    const activePillsScrollWrap = modalContainer.querySelector("#gf-active-pills-scroll-wrap");
+    const activePillsScroll = modalContainer.querySelector("#gf-active-pills-scroll");
+    const clearAllBtn = modalContainer.querySelector("#gf-clear-all-btn");
+
+    const updateActivePillsFades = () => {
+        const sl = activePillsScroll.scrollLeft;
+        const sw = activePillsScroll.scrollWidth;
+        const cw = activePillsScroll.clientWidth;
+        const hasOverflow = sw - cw > 4;
+        activePillsScroll.classList.toggle('has-overflow', hasOverflow);
+        activePillsScrollWrap.classList.toggle('can-scroll-left', hasOverflow && sl > 4);
+        activePillsScrollWrap.classList.toggle('can-scroll-right', hasOverflow && (sw - cw - sl) > 4);
+    };
     const sortTypeSelect = modalContainer.querySelector(".sort-type-select");
     const btnQueue = modalContainer.querySelector("#gfBtnQueue");
     const btnModify = modalContainer.querySelector("#gfBtnModify");
     const btnCreate = modalContainer.querySelector("#gfBtnCreate");
     const selectAllButton = modalContainer.querySelector(".select-all-button");
     const selectionErrorDiv = modalContainer.querySelector("#genre-selection-error");
-
     const totalTracksStat = modalContainer.querySelector("#total-tracks-stat");
     const filteredTracksStat = modalContainer.querySelector("#filtered-tracks-stat");
+
+    let selectedGenres = [];
+    let excludedGenres = [];
+    const selectedSet = new Set();
+    const excludedSet = new Set();
+    const relatedGenres = new Set();
+
+    const syncSelectionSets = () => {
+        selectedSet.clear();
+        excludedSet.clear();
+        for (let i = 0; i < selectedGenres.length; i++) selectedSet.add(selectedGenres[i]);
+        for (let i = 0; i < excludedGenres.length; i++) excludedSet.add(excludedGenres[i]);
+    };
+
+    const ROW_HEIGHT = 42;
+    const TOP_PAD = 14;
+    const BOTTOM_PAD = 14;
+    let currentFilteredGenres = [];
+    let virtualRows = [];
+    const renderedRows = new Map();
+    let lastStartRow = -1;
+    let lastEndRow = -1;
+    let lastPackedWidth = 0;
+
+    const measureCanvas = document.createElement("canvas");
+    const measureCtx = measureCanvas.getContext("2d");
+    const pillWidthCache = new Map();
+
+    const getPillWidth = (genreName, count) => {
+        const cacheKey = `${genreName}\0${count}`;
+        let cached = pillWidthCache.get(cacheKey);
+        if (cached !== undefined) return cached;
+
+        measureCtx.font = "500 14px 'SpotifyMixUI', sans-serif";
+        const textWidth = Math.ceil(measureCtx.measureText(genreName).width);
+
+        const countStr = String(count);
+        measureCtx.font = "400 13px 'SpotifyMixUI', sans-serif";
+        const badgeTextWidth = Math.ceil(measureCtx.measureText(countStr).width);
+        const badgeWidth = Math.max(22, badgeTextWidth + 16);
+
+        cached = 16 + textWidth + 8 + badgeWidth + 7 + 4;
+        pillWidthCache.set(cacheKey, cached);
+        return cached;
+    };
+
+    const buildVirtualRows = () => {
+        const rawWidth = genreContainer.clientWidth || 548;
+        lastPackedWidth = rawWidth;
+        const availWidth = Math.max(200, rawWidth - 28);
+        const GAP = 8;
+        const rows = [];
+        let currentRow = [];
+        let currentWidth = 0;
+
+        for (let i = 0; i < currentFilteredGenres.length; i++) {
+            const g = currentFilteredGenres[i];
+            const count = genreCounts.get(g) || 0;
+            const w = getPillWidth(g, count);
+
+            if (currentRow.length > 0 && currentWidth + GAP + w > availWidth) {
+                rows.push(currentRow);
+                currentRow = [g];
+                currentWidth = w;
+            } else {
+                currentWidth = currentRow.length > 0 ? currentWidth + GAP + w : w;
+                currentRow.push(g);
+            }
+        }
+        if (currentRow.length > 0) rows.push(currentRow);
+        virtualRows = rows;
+    };
+
+    let gfAutoscrollEl = null;
+
+    const getRowHtml = (rowGenres, rowIdx) => {
+        const topPx = TOP_PAD + rowIdx * ROW_HEIGHT;
+        let inner = "";
+        for (let i = 0; i < rowGenres.length; i++) {
+            const genre = rowGenres[i];
+            const count = genreCounts.get(genre) || 0;
+            const escaped = escapeHtml(genre, "");
+            let stateClass = "";
+            if (selectedSet.has(genre)) stateClass = "selected";
+            else if (excludedSet.has(genre)) stateClass = "excluded";
+            else if (relatedGenres.has(genre)) stateClass = "related";
+
+            inner += `<button class="genre-button ${stateClass}" data-genre="${escaped}"><span class="genre-button-label">${escaped}</span><span class="genre-count-badge">${count}</span></button>`;
+        }
+        return `<div class="genre-virtual-row" data-row="${rowIdx}" style="top: ${topPx}px;">${inner}</div>`;
+    };
+
+    const renderVisibleRows = (force = false) => {
+        if (!modalContainer.isConnected) return;
+        if (virtualRows.length === 0) {
+            renderedRows.clear();
+            gfAutoscrollEl = null;
+            lastStartRow = -1;
+            lastEndRow = -1;
+            virtualSpacer.style.height = "100%";
+            virtualSpacer.innerHTML = `<div style="color: #666; text-align: center; padding: 28px 10px; font-size: 14px;">No genre found</div>`;
+            return;
+        }
+
+        const clientHeight = genreContainer.clientHeight || 300;
+        const rawTotalHeight = TOP_PAD + virtualRows.length * ROW_HEIGHT - 8 + BOTTOM_PAD;
+        const totalHeight = (rawTotalHeight > clientHeight && rawTotalHeight - clientHeight <= 10) ? clientHeight : rawTotalHeight;
+        virtualSpacer.style.height = `${totalHeight}px`;
+
+        const scrollTop = genreContainer.scrollTop;
+        const firstVis = Math.max(0, Math.floor((scrollTop - TOP_PAD) / ROW_HEIGHT));
+        const lastVis = Math.min(virtualRows.length - 1, Math.ceil((scrollTop + clientHeight - TOP_PAD) / ROW_HEIGHT));
+
+        if (!force && lastStartRow !== -1 && lastEndRow !== -1) {
+            const topOk = lastStartRow === 0 || firstVis >= lastStartRow + 4;
+            const bottomOk = lastEndRow === virtualRows.length - 1 || lastVis <= lastEndRow - 4;
+            if (topOk && bottomOk) return;
+        }
+
+        const buffer = 16;
+        const startRow = Math.max(0, firstVis - buffer);
+        const endRow = Math.min(virtualRows.length - 1, lastVis + buffer);
+
+        if (!force && startRow === lastStartRow && endRow === lastEndRow) return;
+        lastStartRow = startRow;
+        lastEndRow = endRow;
+
+        if (force) {
+            renderedRows.clear();
+            gfAutoscrollEl = null;
+            virtualSpacer.innerHTML = "";
+        } else {
+            for (const [rIdx, el] of renderedRows.entries()) {
+                if (rIdx < startRow || rIdx > endRow) {
+                    if (el === gfAutoscrollEl) continue;
+                    el.remove();
+                    renderedRows.delete(rIdx);
+                }
+            }
+        }
+
+        let htmlToAppend = "";
+        const addedIndices = [];
+        for (let r = startRow; r <= endRow; r++) {
+            if (!renderedRows.has(r)) {
+                htmlToAppend += getRowHtml(virtualRows[r], r);
+                addedIndices.push(r);
+            }
+        }
+
+        if (htmlToAppend) {
+            virtualSpacer.insertAdjacentHTML("beforeend", htmlToAppend);
+            const children = virtualSpacer.children;
+            for (let i = children.length - addedIndices.length; i < children.length; i++) {
+                const child = children[i];
+                if (child && child.dataset.row !== undefined) {
+                    renderedRows.set(Number(child.dataset.row), child);
+                }
+            }
+        }
+    };
+
+    const renderActivePillsBar = () => {
+        if (selectedGenres.length === 0 && excludedGenres.length === 0) {
+            clearAllBtn.style.display = "none";
+            activePillsScroll.scrollLeft = 0;
+            activePillsScroll.innerHTML = `<div class="gf-active-empty-state"><span class="gf-empty-label">No genres selected</span><div class="gf-empty-hints"><span class="gf-hint-item"><span class="gf-hint-dot inc"></span>Left-click to include</span><span class="gf-hint-sep">&bull;</span><span class="gf-hint-item"><span class="gf-hint-dot exc"></span>Right-click to exclude</span></div></div>`;
+            updateActivePillsFades();
+            return;
+        }
+        clearAllBtn.style.display = "inline-block";
+        let html = "";
+        for (let i = 0; i < selectedGenres.length; i++) {
+            const g = selectedGenres[i];
+            const esc = escapeHtml(g, "");
+            html += `<span class="gf-active-pill is-inc" data-genre="${esc}" title="Click to remove">${esc}<span class="gf-active-pill-x">&times;</span></span>`;
+        }
+        for (let i = 0; i < excludedGenres.length; i++) {
+            const g = excludedGenres[i];
+            const esc = escapeHtml(g, "");
+            html += `<span class="gf-active-pill is-exc" data-genre="${esc}" title="Click to remove">${esc}<span class="gf-active-pill-x">&times;</span></span>`;
+        }
+        activePillsScroll.innerHTML = html;
+        requestAnimationFrame(updateActivePillsFades);
+    };
+
+    const updateMountedButtonClasses = () => {
+        for (const rowEl of renderedRows.values()) {
+            const buttons = rowEl.children;
+            for (let i = 0; i < buttons.length; i++) {
+                const button = buttons[i];
+                const genreName = button.dataset.genre;
+                button.classList.remove('selected', 'excluded', 'related');
+                if (selectedSet.has(genreName)) button.classList.add('selected');
+                else if (excludedSet.has(genreName)) button.classList.add('excluded');
+                else if (relatedGenres.has(genreName)) button.classList.add('related');
+            }
+        }
+    };
+
+    function updateFilteredTracksCount() {
+        syncSelectionSets();
+        relatedGenres.clear();
+        let filteredCount = 0;
+
+        if (selectedSet.size > 0 || excludedSet.size > 0) {
+            const nameSetsMap = trackGenreMap._nameSetsMap;
+            const hasSelected = selectedSet.size > 0;
+            const hasExcluded = excludedSet.size > 0;
+
+            for (let t = 0; t < tracks.length; t++) {
+                const trackUri = tracks[t].uri;
+                const trackGenreNames = nameSetsMap ? nameSetsMap.get(trackUri) : null;
+                if (!trackGenreNames || trackGenreNames.size === 0) {
+                    if (!hasSelected) filteredCount++;
+                    continue;
+                }
+
+                if (hasExcluded) {
+                    let isExcluded = false;
+                    for (const g of trackGenreNames) {
+                        if (excludedSet.has(g)) {
+                            isExcluded = true;
+                            break;
+                        }
+                    }
+                    if (isExcluded) continue;
+                }
+
+                let isMatched = true;
+                if (hasSelected) {
+                    if (matchAllGenres) {
+                        for (const s of selectedSet) {
+                            if (!trackGenreNames.has(s)) {
+                                isMatched = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        isMatched = false;
+                        for (const s of selectedSet) {
+                            if (trackGenreNames.has(s)) {
+                                isMatched = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (isMatched) {
+                    filteredCount++;
+                    if (hasSelected) {
+                        for (const g of trackGenreNames) {
+                            if (!selectedSet.has(g)) relatedGenres.add(g);
+                        }
+                    }
+                }
+            }
+        }
+
+        filteredTracksStat.textContent = `Filtered tracks: ${filteredCount}`;
+        updateMountedButtonClasses();
+        renderActivePillsBar();
+    }
+
+    function updateGenreButtons() {
+        const searchTerm = searchBar.value.trim().toLowerCase();
+        if (!searchTerm) {
+            currentFilteredGenres = masterSortedGenres;
+        } else {
+            const aliasMatchedSet = buildGenreSearchMatchSet(searchTerm, groupGenres);
+            currentFilteredGenres = masterSortedGenres.filter(genre => {
+                const lower = genre.toLowerCase();
+                return lower.includes(searchTerm) || aliasMatchedSet.has(lower) || aliasMatchedSet.has(normalizeGenre(lower));
+            });
+        }
+
+        genreContainer.scrollTop = 0;
+        buildVirtualRows();
+        renderVisibleRows(true);
+        updateFilteredTracksCount();
+        updateScrollFades();
+    }
+
+    modalContainer.querySelector('#closeGenreModalBtn').addEventListener('click', closeModal);
+    modalContainer.querySelector('#gfSettingsBtn').addEventListener('click', () => {
+        showGenreFilterSettingsModal(gfSources, (newSources) => {
+            const needsRefetch = Object.keys(newSources).some(k => newSources[k] && !originallyFetchedSources[k]);
+            gfSources = newSources;
+            localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SOURCES, JSON.stringify(gfSources));
+            activeTitleSources = { ...newSources };
+
+            const sourcesContainer = modalContainer.querySelector('#gf-dynamic-sources-container');
+            if (sourcesContainer) sourcesContainer.innerHTML = getDynamicGenreSourcesHtml(activeTitleSources, originallyFetchedSources);
+
+            rebuildGenreMap();
+            selectedGenres = selectedGenres.filter(g => allGenres.has(g));
+            excludedGenres = excludedGenres.filter(g => allGenres.has(g));
+            updateGenreButtons();
+            if (needsRefetch) {
+                showNotification("Settings saved. Close and reopen the Genre Filter to fetch newly enabled sources.", "warning");
+            }
+        });
+    });
+    preventDragCloseModal(abortController.signal);
 
     const lastSelectedSort = localStorage.getItem(STORAGE_KEY_GENRE_FILTER_SORT) || "default";
     sortTypeSelect.value = lastSelectedSort;
 
     sortTypeSelect.addEventListener("change", () => {
-      localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SORT, sortTypeSelect.value);
+        localStorage.setItem(STORAGE_KEY_GENRE_FILTER_SORT, sortTypeSelect.value);
     });
 
     const updateScrollFades = () => {
         const scrollTop = genreContainer.scrollTop;
         const scrollHeight = genreContainer.scrollHeight;
         const clientHeight = genreContainer.clientHeight;
-        
-        if (scrollTop > 0) {
-            genreScrollWrapper.classList.add('can-scroll-top');
-        } else {
-            genreScrollWrapper.classList.remove('can-scroll-top');
-        }
+        const scrollableDist = scrollHeight - clientHeight;
 
-        if (scrollHeight > clientHeight && scrollTop + clientHeight < scrollHeight - 1) {
-            genreScrollWrapper.classList.add('can-scroll-bottom');
-        } else {
-            genreScrollWrapper.classList.remove('can-scroll-bottom');
-        }
+        genreScrollWrapper.classList.toggle('can-scroll-top', scrollableDist > 10 && scrollTop > 8);
+        genreScrollWrapper.classList.toggle('can-scroll-bottom', scrollableDist > 10 && (scrollHeight - (scrollTop + clientHeight)) > 8);
     };
 
-    genreContainer.addEventListener('scroll', updateScrollFades);
-    
-    new ResizeObserver(() => updateScrollFades()).observe(genreContainer);
+    genreContainer.addEventListener('mousedown', (e) => {
+        gfAutoscrollEl = e.button === 1 ? e.target.closest('.genre-virtual-row') : null;
+    }, { passive: true });
+    let scrollTicking = false;
 
-    genreContainer.addEventListener('scroll', updateScrollFades);
-    matchAllGenresToggle.addEventListener("change", () => {
-      matchAllGenres = matchAllGenresToggle.checked;
-      saveSettings();
-      updateFilteredTracksCount();
-    setTimeout(updateScrollFades, 50);
-    });
-    
-    groupGenresToggle.addEventListener("change", () => {
-        const oldSelectedSet = new Set(selectedGenres);
-        const oldExcludedSet = new Set(excludedGenres);
-        
-        groupGenres = groupGenresToggle.checked;
-        
-        const newSelectedSet = new Set();
-        const newExcludedSet = new Set();
-
-        if (groupGenres) {
-            
-            const uniqueSelectedRawGenres = new Set();
-            const uniqueExcludedRawGenres = new Set();
-
-            tracks.forEach(track => {
-                const rawData = rawGenreData.get(track.uri);
-                if (!rawData) return;
-                const rawGenres = [];
-                if (gfSources.spotify_track) rawGenres.push(...(rawData.spotify_track_genres || []));
-                if (gfSources.lastfm_track) rawGenres.push(...(rawData.lastfm_track_genres || []));
-                if (gfSources.lastfm_artist) rawGenres.push(...(rawData.lastfm_artist_genres || []));
-                if (gfSources.everynoise_artist) rawGenres.push(...(rawData.everynoise_artist_genres || []));
-                if (gfSources.deezer) {
-                    rawGenres.push(...(rawData.deezer_genres || []));
-                    rawGenres.push(...(rawData.apple_music_genres || []));
+    genreContainer.addEventListener('scroll', () => {
+        if (!scrollTicking) {
+            window.requestAnimationFrame(() => {
+                try {
+                    renderVisibleRows(false);
+                    updateScrollFades();
+                } finally {
+                    scrollTicking = false;
                 }
-                
-                rawGenres.forEach(r => {
-                    if (oldSelectedSet.has(r)) uniqueSelectedRawGenres.add(r);
-                    if (oldExcludedSet.has(r)) uniqueExcludedRawGenres.add(r);
-                });
             });
-
-            const processVotes = (rawGenreSet) => {
-                const sVotes = new Set();
-                const wVotes = new Set();
-                
-                rawGenreSet.forEach(rawGenre => {
-                    const mappedGroupObjects = mapAndNormalizeGenres([{ name: rawGenre, source: 'spotify' }]);
-                    const groupNames = [...new Set(mappedGroupObjects.map(o => o.name))];
-                    
-                    if (groupNames.length === 1) {
-                        sVotes.add(groupNames[0]);
-                    } else {
-                        groupNames.forEach(g => wVotes.add(g));
-                    }
-                });
-                
-                const finalSet = new Set();
-                if (sVotes.size > 0) {
-                    sVotes.forEach(g => finalSet.add(g));
-                } else {
-                    wVotes.forEach(g => finalSet.add(g));
-                }
-                return finalSet;
-            };
-
-            const selectedGroups = processVotes(uniqueSelectedRawGenres);
-            const excludedGroups = processVotes(uniqueExcludedRawGenres);
-            
-            selectedGroups.forEach(g => newSelectedSet.add(g));
-            excludedGroups.forEach(g => newExcludedSet.add(g));
-
-        } else {
-            tracks.forEach(track => {
-                const rawData = rawGenreData.get(track.uri);
-                if (!rawData) return;
-
-                const rawGenres = [];
-                if (gfSources.spotify_track) rawGenres.push(...(rawData.spotify_track_genres || []));
-                if (gfSources.lastfm_track) rawGenres.push(...(rawData.lastfm_track_genres || []));
-                if (gfSources.lastfm_artist) rawGenres.push(...(rawData.lastfm_artist_genres || []));
-                if (gfSources.everynoise_artist) rawGenres.push(...(rawData.everynoise_artist_genres || []));
-                if (gfSources.deezer) {
-                    rawGenres.push(...(rawData.deezer_genres || []));
-                    rawGenres.push(...(rawData.apple_music_genres || []));
-                }
-
-                rawGenres.forEach(rawGenre => {
-                    const mappedGroupObjects = mapAndNormalizeGenres([{ name: rawGenre, source: 'spotify' }]);
-                    const groupNames = mappedGroupObjects.map(o => o.name);
-
-                    const isGroupSelected = groupNames.some(g => oldSelectedSet.has(g));
-                    const isGroupExcluded = groupNames.some(g => oldExcludedSet.has(g));
-                    
-                    if (isGroupSelected) newSelectedSet.add(rawGenre);
-                    if (isGroupExcluded) newExcludedSet.add(rawGenre);
-                });
-            });
+            scrollTicking = true;
         }
+    }, { passive: true });
 
-        selectedGenres = Array.from(newSelectedSet);
-        excludedGenres = Array.from(newExcludedSet);
+    new ResizeObserver(() => {
+        const w = genreContainer.clientWidth;
+        if (w > 0 && Math.abs(w - lastPackedWidth) > 2) {
+            buildVirtualRows();
+            renderVisibleRows(true);
+        }
+        updateScrollFades();
+        updateActivePillsFades();
+    }).observe(genreContainer);
 
-        rebuildGenreMap();
-        updateGenreButtons();
+    genreContainer.addEventListener("click", (e) => {
+        const btn = e.target.closest(".genre-button");
+        if (!btn) return;
+        const genre = btn.dataset.genre;
+        if (!genre) return;
+
+        if (excludedSet.has(genre)) {
+            excludedGenres = excludedGenres.filter(g => g !== genre);
+        }
+        if (selectedSet.has(genre)) {
+            selectedGenres = selectedGenres.filter(g => g !== genre);
+        } else {
+            selectedGenres.push(genre);
+        }
         updateFilteredTracksCount();
     });
-    
-    let selectedGenres = [];
-    let excludedGenres = [];
+
+    genreContainer.addEventListener("contextmenu", (e) => {
+        const btn = e.target.closest(".genre-button");
+        if (!btn) return;
+        e.preventDefault();
+        const genre = btn.dataset.genre;
+        if (!genre) return;
+
+        if (selectedSet.has(genre)) {
+            selectedGenres = selectedGenres.filter(g => g !== genre);
+        }
+        if (excludedSet.has(genre)) {
+            excludedGenres = excludedGenres.filter(g => g !== genre);
+        } else {
+            excludedGenres.push(genre);
+        }
+        updateFilteredTracksCount();
+    });
+
+    activePillsScroll.addEventListener("scroll", updateActivePillsFades, { passive: true });
+    activePillsScroll.addEventListener("wheel", (e) => {
+        if (e.deltaY !== 0 && e.deltaX === 0) {
+            e.preventDefault();
+            activePillsScroll.scrollLeft += e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+        }
+    }, { passive: false });
+
+    activePillsScroll.addEventListener("click", (e) => {
+        const pill = e.target.closest(".gf-active-pill");
+        if (!pill) return;
+        const genre = pill.dataset.genre;
+        if (!genre) return;
+        selectedGenres = selectedGenres.filter(g => g !== genre);
+        excludedGenres = excludedGenres.filter(g => g !== genre);
+        updateFilteredTracksCount();
+    });
+
+    clearAllBtn.addEventListener("click", () => {
+        selectedGenres = [];
+        excludedGenres = [];
+        updateFilteredTracksCount();
+    });
+
+    matchAllGenresToggle.addEventListener("change", () => {
+        matchAllGenres = matchAllGenresToggle.checked;
+        saveSettings();
+        updateFilteredTracksCount();
+        setTimeout(updateScrollFades, 50);
+    });
+
+    const collectActiveRawItemsWithSources = () => {
+        const seen = new Set();
+        const out = [];
+        const add = (name, source) => {
+            if (!name) return;
+            const key = `${name}\0${source}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                out.push({ name, source });
+            }
+        };
+        tracks.forEach(track => {
+            const rawData = rawGenreData.get(track.uri);
+            if (!rawData) return;
+            hydrateCachedGenreRecord(rawData);
+            if (gfSources.spotify_track && rawData.spotify_track_genres) rawData.spotify_track_genres.forEach(r => add(r, 'spotify_track'));
+            if (gfSources.everynoise_artist && rawData.everynoise_artist_genres) rawData.everynoise_artist_genres.forEach(r => add(r, 'everynoise'));
+            if (gfSources.deezer) {
+                if (rawData.deezer_genres) rawData.deezer_genres.forEach(r => add(r, 'deezer'));
+                if (rawData.apple_music_genres) rawData.apple_music_genres.forEach(r => add(r, 'apple_music'));
+            }
+            if (gfSources.lastfm_track && rawData.lastfm_track_genres) rawData.lastfm_track_genres.forEach(r => add(r, 'lastfm_track'));
+            if (gfSources.lastfm_artist && rawData.lastfm_artist_genres) rawData.lastfm_artist_genres.forEach(r => add(r, 'lastfm_artist'));
+        });
+        return out;
+    };
+
+    groupGenresToggle.addEventListener("change", () => {
+        groupGenres = groupGenresToggle.checked;
+        groupSimilarGenres = groupGenres;
+        saveSettings();
+
+        const rawItems = collectActiveRawItemsWithSources();
+        selectedGenres = translateGenreSelectionForGrouping(selectedGenres, rawItems, groupGenres, filterNoise, genrePlaylistsCache);
+        excludedGenres = translateGenreSelectionForGrouping(excludedGenres, rawItems, groupGenres, filterNoise, genrePlaylistsCache);
+
+        rebuildGenreMap();
+        selectedGenres = selectedGenres.filter(g => allGenres.has(g));
+        excludedGenres = excludedGenres.filter(g => allGenres.has(g));
+        updateGenreButtons();
+    });
+
+    filterNoiseToggle.addEventListener("change", () => {
+        filterNoise = filterNoiseToggle.checked;
+        filterNoiseGenres = filterNoise;
+        saveSettings();
+
+        rebuildGenreMap();
+        selectedGenres = selectedGenres.filter(g => allGenres.has(g));
+        excludedGenres = excludedGenres.filter(g => allGenres.has(g));
+        updateGenreButtons();
+    });
+
     let tracksWithGenresCount = 0;
     trackGenreMap.forEach(genres => {
-      if (genres.length > 0) tracksWithGenresCount++;
+        if (genres.length > 0) tracksWithGenresCount++;
     });
     totalTracksStat.innerHTML = `
         <span class="tooltip-container" style="cursor: help;">
@@ -34606,258 +38790,44 @@ shadowRoot.innerHTML = `
     `;
     filteredTracksStat.textContent = `Filtered tracks: 0`;
 
-    function updateFilteredTracksCount() {
-      let filteredTracks = [];
-      if (selectedGenres.length > 0 || excludedGenres.length > 0) {
-          filteredTracks = filterTracksByGenres(
-            tracks,
-            selectedGenres,
-            excludedGenres,
-            trackGenreMap  
-          );
-      }
-      filteredTracksStat.textContent = `Filtered tracks: ${filteredTracks.length}`;
-
-      const relatedGenres = new Set();
-      if (selectedGenres.length > 0) {
-          filteredTracks.forEach(track => {
-              const genresOnTrack = trackGenreMap.get(track.uri);
-              if (genresOnTrack) {
-                  genresOnTrack.forEach(genre => {
-                      relatedGenres.add(genre.name);
-                  });
-              }
-          });
-
-          selectedGenres.forEach(genre => {
-              relatedGenres.delete(genre);
-          });
-      }
-
-      const genreButtons = genreContainer.querySelectorAll('.genre-button');
-      genreButtons.forEach(button => {
-          const genreName = button.querySelector('span:first-child').textContent;
-
-          button.classList.remove('selected', 'excluded', 'related');
-
-          if (selectedGenres.includes(genreName)) {
-              button.classList.add('selected');
-          } else if (excludedGenres.includes(genreName)) {
-              button.classList.add('excluded');
-          } else if (relatedGenres.has(genreName)) {
-              button.classList.add('related');
-          }
-      });
-    }
-
-    function updateGenreButtons() {
-      genreContainer.innerHTML = "";
-      const searchTerm = searchBar.value.toLowerCase();
-      const filteredGenres = Array.from(allGenres).filter((genre) =>
-        genre.toLowerCase().includes(searchTerm)
-      );
-    
-      const uriToArtistMap = new Map();
-      const playlistArtistNames = new Set();
-      tracks.forEach(t => {
-          const name = t.artistName || (t.artists && t.artists[0]?.name) || "";
-          if (name) {
-              playlistArtistNames.add(name.toLowerCase());
-              uriToArtistMap.set(t.uri, name.toLowerCase());
-          }
-      });
-      const totalUniqueArtistsInPlaylist = playlistArtistNames.size;
-    
-      const genreDetails = new Map();
-      trackGenreMap.forEach((genresOnTrack, trackUri) => {
-        const trackArtist = uriToArtistMap.get(trackUri) || "";
-        const uniqueGenreNamesOnTrack = new Set(genresOnTrack.map(g => g.name));
-        
-        uniqueGenreNamesOnTrack.forEach(genreName => {
-            if (filteredGenres.includes(genreName)) {
-                const genreData = genresOnTrack.find(g => g.name === genreName);
-                if (!genreDetails.has(genreName)) {
-                    const normalizedKey = getNormalizedGenreKey(genreName);
-                    let isMapped = !!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] || !!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey];
-                    
-                    if (!isMapped) {
-                        isMapped = mainGenres.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
-                        
-                        if (!isMapped) {
-                             const countryKeys = Object.keys(COUNTRY_MAPPINGS);
-                             isMapped = countryKeys.some(key => genreName.toLowerCase().includes(key.toLowerCase()));
-                        }
-                        if (!isMapped && genrePlaylistsCache) {
-                            const normalizedTag = normalizeGenre(genreName);
-                            isMapped = genrePlaylistsCache.some(p => normalizeGenre(p.genre) === normalizedTag);
-                        }
-                    }
-
-                    genreDetails.set(genreName, {
-                        name: genreName,
-                        isTrusted: false,
-                        count: 0,
-                        artists: new Set(),
-                        isMapped: isMapped,
-                        isSelfTitle: false
-                    });
-                }
-                const details = genreDetails.get(genreName);
-                details.count++;
-                if (trackArtist) details.artists.add(trackArtist);
-
-                if (genreData?.source === 'spotify' || genreData?.source === 'spotify_track' || genreData?.source === 'deezer' || genreData?.source === 'apple_music') {
-                    details.isTrusted = true;
-                }
-                
-                if (trackArtist && genreName.toLowerCase() === trackArtist) {
-                    details.isSelfTitle = true;
-                }
-            }
-        });
-      });
-    
-      const sortedGenres = filteredGenres.sort((a, b) => {
-        const detailsA = genreDetails.get(a) || { count: 0, isTrusted: false, artists: new Set(), isMapped: false };
-        const detailsB = genreDetails.get(b) || { count: 0, isTrusted: false, artists: new Set(), isMapped: false };
-
-        const getTier = (details) => {
-            if (details.isTrusted) return 1;
-            if (details.isMapped) return 1;
-            if (details.isSelfTitle) return 2;
-            if (details.name.length < 2) return 2;
-            if (details.artists.size >= 3) return 1;
-            if (details.count >= 15 && details.artists.size >= 2) return 1;
-            if (totalUniqueArtistsInPlaylist < 3) {
-                const threshold = Math.min(4, Math.max(2, Math.ceil(tracks.length * 0.05)));
-                if (details.count >= threshold) return 1;
-            }
-            return 2;
-        };
-
-        const tierA = getTier(detailsA);
-        const tierB = getTier(detailsB);
-
-        if (tierA !== tierB) {
-            return tierA - tierB;
-        }
-
-        if (detailsB.count !== detailsA.count) {
-            return detailsB.count - detailsA.count;
-        }
-
-        if (detailsA.isTrusted && !detailsB.isTrusted) return -1;
-        if (!detailsA.isTrusted && detailsB.isTrusted) return 1;
-
-        return a.localeCompare(b);
-      });
-    
-      if (sortedGenres.length === 0) {
-        const noGenreMessage = document.createElement("div");
-        noGenreMessage.textContent = "No genre found";
-        noGenreMessage.style.color = "#666";
-        noGenreMessage.style.textAlign = "center";
-        noGenreMessage.style.padding = "10px";
-        genreContainer.appendChild(noGenreMessage);
-      } else {
-        sortedGenres.forEach((genre) => {
-          const genreButton = document.createElement("button");
-          genreButton.classList.add("genre-button");
-          
-          const genreNameSpan = document.createElement("span");
-          genreNameSpan.textContent = genre;
-
-          const countBadge = document.createElement("span");
-          countBadge.classList.add("genre-count-badge");
-          const count = genreCounts.get(genre) || 0;
-          countBadge.textContent = count;
-
-          genreButton.appendChild(genreNameSpan);
-          genreButton.appendChild(countBadge);
-
-          if (selectedGenres.includes(genre)) {
-            genreButton.classList.add("selected");
-          } else if (excludedGenres.includes(genre)) {
-            genreButton.classList.add("excluded");
-          }
-    
-          genreButton.addEventListener("click", () => {
-            if (excludedGenres.includes(genre)) {
-              excludedGenres = excludedGenres.filter((g) => g !== genre);
-            }
-            if (selectedGenres.includes(genre)) {
-              selectedGenres = selectedGenres.filter((g) => g !== genre);
-            } else {
-              selectedGenres.push(genre);
-            }
-            updateFilteredTracksCount();
-          });
-
-          genreButton.addEventListener("contextmenu", (event) => {
-            event.preventDefault();
-            if (selectedGenres.includes(genre)) {
-              selectedGenres = selectedGenres.filter((g) => g !== genre);
-            }
-            if (excludedGenres.includes(genre)) {
-              excludedGenres = excludedGenres.filter((g) => g !== genre);
-            } else {
-              excludedGenres.push(genre);
-            }
-            updateFilteredTracksCount();
-          });
-    
-          genreContainer.appendChild(genreButton);
-        });
-      }
-    updateFilteredTracksCount();
-    }
-
+    let searchRaf = null;
     searchBar.addEventListener("input", () => {
-      updateGenreButtons();
-      clearSearchButton.style.display = searchBar.value.length > 0 ? 'block' : 'none';
+        clearSearchButton.style.display = searchBar.value.length > 0 ? 'block' : 'none';
+        if (searchRaf) cancelAnimationFrame(searchRaf);
+        searchRaf = requestAnimationFrame(() => {
+            updateGenreButtons();
+        });
     });
 
     clearSearchButton.addEventListener("click", () => {
         searchBar.value = "";
-        const event = new Event('input', { bubbles: true });
-        searchBar.dispatchEvent(event);
+        clearSearchButton.style.display = 'none';
+        updateGenreButtons();
         searchBar.focus();
     });
-    
+
     selectAllButton.addEventListener("click", () => {
-      const searchTerm = searchBar.value.toLowerCase();
-      const filteredGenres = Array.from(allGenres).filter((genre) => 
-        genre.toLowerCase().includes(searchTerm)
-      );
-      
-      const allSelected = filteredGenres.every((genre) => selectedGenres.includes(genre));
+        const filteredSet = new Set(currentFilteredGenres);
+        const allSelected = currentFilteredGenres.length > 0 && currentFilteredGenres.every(genre => selectedSet.has(genre));
 
-      selectedGenres = selectedGenres.filter((genre) => !filteredGenres.includes(genre));
-      excludedGenres = excludedGenres.filter((genre) => !filteredGenres.includes(genre));
+        selectedGenres = selectedGenres.filter(genre => !filteredSet.has(genre));
+        excludedGenres = excludedGenres.filter(genre => !filteredSet.has(genre));
 
-      if (!allSelected) {
-        filteredGenres.forEach((genre) => {
-          if (!selectedGenres.includes(genre)) {
-            selectedGenres.push(genre);
-          }
-        });
-      }
-      
-      updateGenreButtons();
-      updateFilteredTracksCount();
+        if (!allSelected) {
+            for (let i = 0; i < currentFilteredGenres.length; i++) {
+                selectedGenres.push(currentFilteredGenres[i]);
+            }
+        }
+
+        updateFilteredTracksCount();
     });
 
-    searchBar.addEventListener("input", updateGenreButtons);
-    updateGenreButtons();
-
     genreScrollWrapper.classList.add('no-transition');
-    
-    updateScrollFades();
 
     requestAnimationFrame(() => {
+        updateGenreButtons();
         requestAnimationFrame(() => {
             overlay.style.opacity = "1";
-            
             setTimeout(() => {
                 genreScrollWrapper.classList.remove('no-transition');
             }, 200);
@@ -35171,99 +39141,157 @@ shadowRoot.innerHTML = `
     if (cached && (skipArtist || cached._artist_fetched)) {
         return cached;
     }
-  
-    const result = cached || { track_genres: [], artist_genres: [], _artist_fetched: false, _track_fetched: false };
-  
-    try {
-        const safeJson = async (response) => {
-            try {
-                const text = await response.text();
-                return text ? JSON.parse(text) : null;
-            } catch (e) {
-                return null;
-            }
-        };
 
-        const promises = [];
+    const baseTrackKey = `${(artist || '').toLowerCase().trim()}|${(track || '').toLowerCase().trim()}`;
+    const fullInFlightKey = `${baseTrackKey}|0`;
+    const inFlightTrackKey = `${baseTrackKey}|${skipArtist ? 1 : 0}`;
 
-        if (!result._track_fetched) {
-            promises.push((async () => {
-                const params = new URLSearchParams({ method: 'track.getInfo', artist, track, format: 'json' });
-                return fetchLfmWithGateway(params).then(async r => ({ type: 'track', res: r }));
-            })());
+    if (pendingLfmTrackGenresFetches.has(fullInFlightKey)) {
+        return await pendingLfmTrackGenresFetches.get(fullInFlightKey);
+    }
+    if (skipArtist && pendingLfmTrackGenresFetches.has(inFlightTrackKey)) {
+        return await pendingLfmTrackGenresFetches.get(inFlightTrackKey);
+    }
+
+    const fetchPromise = (async () => {
+        const currentCached = lastfmCache.get(cacheKey);
+        if (currentCached && (skipArtist || currentCached._artist_fetched)) {
+            return currentCached;
         }
 
-        let cachedArtistTags = null;
-        if (!skipArtist && !result._artist_fetched) {
-            if (lastfmArtistTagsCache.has(artist)) {
-                cachedArtistTags = lastfmArtistTagsCache.get(artist);
-            } else {
-                const dbCached = await idb.get('lastfmArtistTags', artist, CACHE_EXPIRE_GENRES);
-                if (dbCached) {
-                    cachedArtistTags = dbCached;
-                    lastfmArtistTagsCache.set(artist, dbCached);
+        const result = currentCached
+            ? { ...currentCached, track_genres: [...(currentCached.track_genres || [])], artist_genres: [...(currentCached.artist_genres || [])] }
+            : { track_genres: [], artist_genres: [], _artist_fetched: false, _track_fetched: false };
+
+        try {
+            const safeJson = async (response) => {
+                try {
+                    const text = await response.text();
+                    return text ? JSON.parse(text) : null;
+                } catch (e) {
+                    return null;
+                }
+            };
+
+            const promises = [];
+
+            if (!result._track_fetched) {
+                promises.push((async () => {
+                    const params = new URLSearchParams({ method: 'track.getInfo', artist, track, format: 'json' });
+                    return fetchLfmWithGateway(params).then(async r => ({ type: 'track', res: r }));
+                })());
+            }
+
+            let cachedArtistTags = null;
+            if (!skipArtist && !result._artist_fetched) {
+                if (lastfmArtistTagsCache.has(artist)) {
+                    cachedArtistTags = lastfmArtistTagsCache.get(artist);
                 } else {
-                    promises.push((async () => {
-                        const params = new URLSearchParams({ method: 'artist.getInfo', artist, format: 'json' });
-                        return fetchLfmWithGateway(params).then(async r => ({ type: 'artist', res: r }));
-                    })());
+                    const dbCached = await idb.get('lastfmArtistTags', artist, CACHE_EXPIRE_GENRES);
+                    if (dbCached) {
+                        cachedArtistTags = dbCached;
+                        lastfmArtistTagsCache.set(artist, dbCached);
+                    } else {
+                        const artistNormKey = (artist || '').toLowerCase().trim();
+                        let sharedArtistPromise = pendingLfmArtistFetches.get(artistNormKey);
+                        if (!sharedArtistPromise) {
+                            sharedArtistPromise = (async () => {
+                                const params = new URLSearchParams({ method: 'artist.getInfo', artist, format: 'json' });
+                                const artistResponse = await fetchLfmWithGateway(params);
+                                if (!artistResponse.ok && artistResponse.status !== 404) {
+                                    throw new Error(`Last.fm artist network error: ${artistResponse.status}`);
+                                }
+                                let tags = [];
+                                if (artistResponse.ok) {
+                                    const artistData = await safeJson(artistResponse);
+                                    if (artistData && artistData.error && artistData.error !== 6) {
+                                        throw new Error(`Last.fm API error: ${artistData.message}`);
+                                    } else if (artistData?.artist?.tags?.tag) {
+                                        const rawTags = artistData.artist.tags.tag
+                                            .map(tag => tag.name.toLowerCase())
+                                            .filter(g => !/^\d+$/.test(g));
+                                        lastfmArtistRawTagsCache.set(artist, rawTags);
+                                        tags = synthesizeLastfmSplitTags(rawTags);
+                                        lastfmArtistTagsCache.set(artist, tags);
+                                        idb.set('lastfmArtistTags', artist, tags);
+                                    }
+                                }
+                                return tags;
+                            })();
+                            pendingLfmArtistFetches.set(artistNormKey, sharedArtistPromise);
+                            sharedArtistPromise.finally(() => {
+                                pendingLfmArtistFetches.delete(artistNormKey);
+                            }).catch(() => {});
+                        }
+                        promises.push(sharedArtistPromise.then(tags => ({ type: 'artist_resolved', tags })));
+                    }
                 }
             }
-        }
 
-        const responses = await Promise.all(promises);
-        
-        for (const item of responses) {
-            if (item.type === 'track') {
-                const trackResponse = item.res;
-                if (!trackResponse.ok && trackResponse.status !== 404) {
-                     throw new Error(`Last.fm track network error: ${trackResponse.status}`);
-                }
-                if (trackResponse.ok) {
-                    const trackData = await safeJson(trackResponse);
-                    if (trackData && trackData.error && trackData.error !== 6) {
-                        throw new Error(`Last.fm API error: ${trackData.message}`);
-                    } else if (trackData?.track?.toptags?.tag) {
-                        result.track_genres = trackData.track.toptags.tag
-                            .map(tag => tag.name.toLowerCase())
-                            .filter(g => !/^\d+$/.test(g));
+            const responses = await Promise.all(promises);
+            
+            for (const item of responses) {
+                if (item.type === 'track') {
+                    const trackResponse = item.res;
+                    if (!trackResponse.ok && trackResponse.status !== 404) {
+                         throw new Error(`Last.fm track network error: ${trackResponse.status}`);
                     }
-                    result._track_fetched = true;
-                }
-            } else if (item.type === 'artist') {
-                const artistResponse = item.res;
-                if (!artistResponse.ok && artistResponse.status !== 404) {
-                     throw new Error(`Last.fm artist network error: ${artistResponse.status}`);
-                }
-                if (artistResponse.ok) {
-                    const artistData = await safeJson(artistResponse);
-                    if (artistData && artistData.error && artistData.error !== 6) {
-                        throw new Error(`Last.fm API error: ${artistData.message}`);
-                    } else if (artistData?.artist?.tags?.tag) {
-                        const tags = artistData.artist.tags.tag
-                            .map(tag => tag.name.toLowerCase())
-                            .filter(g => !/^\d+$/.test(g));
-                        
-                        lastfmArtistTagsCache.set(artist, tags);
-                        idb.set('lastfmArtistTags', artist, tags);
-                        result.artist_genres = tags;
+                    if (trackResponse.ok) {
+                        const trackData = await safeJson(trackResponse);
+                        if (trackData && trackData.error && trackData.error !== 6) {
+                            throw new Error(`Last.fm API error: ${trackData.message}`);
+                        } else if (trackData?.track?.toptags?.tag) {
+                            result.track_genres = trackData.track.toptags.tag
+                                .map(tag => tag.name.toLowerCase())
+                                .filter(g => !/^\d+$/.test(g));
+                        }
+                        result._track_fetched = true;
                     }
+                } else if (item.type === 'artist_resolved') {
+                    result.artist_genres = synthesizeLastfmSplitTags(item.tags || [], lastfmArtistRawTagsCache.get(artist));
                     result._artist_fetched = true;
                 }
             }
+
+            if (cachedArtistTags) {
+                result.artist_genres = synthesizeLastfmSplitTags(cachedArtistTags, lastfmArtistRawTagsCache.get(artist));
+                result._artist_fetched = true;
+            }
+
+            const latestCached = lastfmCache.get(cacheKey);
+            if (latestCached) {
+                if (!result._artist_fetched && latestCached._artist_fetched) {
+                    result.artist_genres = latestCached.artist_genres;
+                    result._artist_fetched = true;
+                }
+                if (!result._track_fetched && latestCached._track_fetched) {
+                    result.track_genres = latestCached.track_genres;
+                    result._track_fetched = true;
+                }
+            }
+
+            if (result.track_genres?.length > 0) {
+                const artistCtx = [...(lastfmArtistRawTagsCache.get(artist) || []), ...(result.artist_genres || [])];
+                result.track_genres = synthesizeLastfmSplitTags(result.track_genres, artistCtx);
+            }
+            if (result.artist_genres?.length > 0 && result.track_genres?.length > 0) {
+                result.artist_genres = synthesizeLastfmSplitTags(result.artist_genres, result.track_genres);
+            }
+
+            lastfmCache.set(cacheKey, result);
+            return result; 
+
+        } catch (error) {
+            console.warn(`Last.fm fetch failed for ${artist} - ${track}:`, error.message);
+            return null;
         }
-  
-        if (cachedArtistTags) {
-            result.artist_genres = cachedArtistTags;
-            result._artist_fetched = true;
-        }
-  
-        lastfmCache.set(cacheKey, result);
-        return result; 
-  
-    } catch (error) {
-        console.warn(`Last.fm fetch failed for ${artist} - ${track}:`, error.message);
-        return null;
+    })();
+
+    pendingLfmTrackGenresFetches.set(inFlightTrackKey, fetchPromise);
+    try {
+        return await fetchPromise;
+    } finally {
+        pendingLfmTrackGenresFetches.delete(inFlightTrackKey);
     }
   }
 
@@ -35860,6 +39888,7 @@ shadowRoot.innerHTML = `
           if (urisNotInSession.length > 0 && needsTurso) {
             cachedGenresByUri = await getGenresFromTurso(urisNotInSession, 'ids');
             cachedGenresByUri.forEach(val => {
+              hydrateCachedGenreRecord(val);
               val._lfm_track_checked = true;
               val._lfm_artist_checked = true;
               val._deezer_checked = true;
@@ -35930,6 +39959,7 @@ shadowRoot.innerHTML = `
           const tursoResults = await getGenresFromTurso(isrcsNotInSession, 'isrcs');
           tursoResults.forEach((val, key) => {
             const flattenedVal = flattenAudioFeatures(val);
+            hydrateCachedGenreRecord(flattenedVal);
             flattenedVal._lfm_track_checked = true;
             flattenedVal._lfm_artist_checked = true;
             flattenedVal._deezer_checked = true;
@@ -36248,7 +40278,7 @@ shadowRoot.innerHTML = `
           } else {
             if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
             const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
-            const totalConcurrency = Math.min(250, Math.max(5, validKeys * 5));
+            const totalConcurrency = Math.min(100, Math.max(5, validKeys * 3));
             let currentIndex = 0;
 
             const worker = async () => {
@@ -36321,6 +40351,7 @@ shadowRoot.innerHTML = `
       const isLocal = Spicetify.URI.isLocal(uri);
 
       const extData = externalResult.externalMap.get(uri) || sessionGenreCache.get(uri) || {};
+      hydrateCachedGenreRecord(extData);
 
       let nativeGenres = isLocal ? [] : extData.spotify_track_genres;
       let nativeScores = isLocal ? null : (extData._spotify_track_genre_scores || null);
@@ -36405,143 +40436,677 @@ shadowRoot.innerHTML = `
     return { trackGenreMap, rawTrackGenres: finalGenresMap };
   }
   
-  function getNormalizedGenreKey(genre) {
-    return genre
-      .toLowerCase()
-      .replace(/&/g, 'and')
-      .replace(/[\s-]+/g, '');
+  const GENRE_FILTER_CLEANUP_KEYWORDS = [
+    "spotify", "deezer", "last.fm", "lastfm",
+    "my top", "favorite", "fave", "playlist",
+    "library", "seen live", "radio", "stream"
+  ];
+
+  const GENRE_FILTER_ALLOWED_MOOD_GENRES = new Set(["club", "epic"]);
+
+  const CURATED_LFM_MULTIWORD_MODIFIERS = [
+    "female fronted", "male fronted", "old school", "old skool", "new school",
+    "new wave of", "lo fi", "hi fi", "avant garde",
+    "early 50s", "early 60s", "early 70s", "early 80s", "early 90s", "early 00s",
+    "late 50s", "late 60s", "late 70s", "late 80s", "late 90s", "late 00s",
+    "mid 60s", "mid 70s", "mid 80s", "mid 90s", "mid 00s"
+  ];
+
+  const CURATED_LFM_MODIFIER_WORDS = new Set([
+    "50s", "60s", "70s", "80s", "90s", "00s", "10s", "20s",
+    "1950s", "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s",
+    "early", "late", "mid", "vintage", "retro", "classic", "modern", "contemporary",
+    "traditional", "trad", "oldschool", "oldskool", "newschool", "underground", "mainstream",
+    "experimental", "avant", "avantgarde", "progressive", "prog", "psychedelic", "psych",
+    "melodic", "atmospheric", "symphonic", "orchestral", "cinematic", "acoustic", "instrumental",
+    "vocal", "electric", "electronic", "electro", "synth", "cyber", "digital", "analog",
+    "dark", "heavy", "soft", "light", "deep", "raw", "pure", "true", "brutal", "technical",
+    "tech", "blackened", "cosmic", "ethereal", "dreamy", "ambient", "chill", "sad", "happy",
+    "emotional", "aggressive", "fast", "slow", "uplifting", "euphoric", "hypnotic", "minimal",
+    "minimalist", "industrial", "gothic", "goth", "pagan", "celtic", "medieval", "folk",
+    "jazzy", "funky", "soulful", "bluesy", "groovy", "lofi", "indie", "alternative", "alt",
+    "post", "neo", "nu", "proto", "hyper", "micro", "diy", "queer", "christian", "gospel",
+    "islamic", "jewish", "sacred", "spiritual", "political", "conscious", "anarcho", "chaotic",
+    "dissonant", "sludge", "stoner", "doom", "fuzz", "noise", "acid", "dub", "liquid", "neuro",
+    "hard", "hardcore", "extreme", "crossover", "fusion", "revival"
+  ]);
+
+  let canonicalSubgenreMap = null;
+  let cachedFilterCatalogSubgenres = null;
+
+  function ensureCanonicalSubgenreMap(genreMap = genrePlaylistsCache) {
+    const hasEveryNoise = Boolean(genreMap && Array.isArray(genreMap) && genreMap.length > 0);
+    if (canonicalSubgenreMap && (!hasEveryNoise || canonicalSubgenreMap._hasEveryNoise)) {
+      return canonicalSubgenreMap;
+    }
+
+    const wasUpgraded = Boolean(canonicalSubgenreMap && !canonicalSubgenreMap._hasEveryNoise && hasEveryNoise);
+    const map = new Map();
+    const register = (rawStr) => {
+      if (!rawStr) return;
+      const clean = rawStr.toLowerCase().trim();
+      if (!clean) return;
+      const norm = normalizeGenre(clean);
+      const key = getNormalizedGenreKey(clean);
+      const canonical = GENRE_ALIAS_MAP.get(clean) || GENRE_ALIAS_MAP.get(norm) || map.get(norm) || map.get(key) || clean;
+      if (!map.has(clean)) map.set(clean, canonical);
+      if (norm && !map.has(norm)) map.set(norm, canonical);
+      if (key && !map.has(key)) map.set(key, canonical);
+    };
+
+    if (typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+      Object.keys(GENRE_ALIASES_RAW).forEach(register);
+    }
+    if (typeof GENRE_MAPPINGS !== "undefined" && GENRE_MAPPINGS) {
+      Object.keys(GENRE_MAPPINGS).forEach(register);
+    }
+    if (hasEveryNoise) {
+      genreMap.forEach(p => { if (p?.genre) register(p.genre); });
+    }
+    if (typeof GENRE_MAPPINGS !== "undefined" && GENRE_MAPPINGS) {
+      Object.values(GENRE_MAPPINGS).forEach(arr => arr.forEach(register));
+    }
+    if (typeof BLACKLIST_UMBRELLA_MAP !== "undefined" && BLACKLIST_UMBRELLA_MAP) {
+      Object.keys(BLACKLIST_UMBRELLA_MAP).forEach(register);
+      Object.values(BLACKLIST_UMBRELLA_MAP).forEach(arr => arr.forEach(register));
+    }
+
+    map._hasEveryNoise = hasEveryNoise;
+    canonicalSubgenreMap = map;
+    if (wasUpgraded) {
+      salvagedLastfmTagCache.clear();
+      resolvedFilterGenreCache.clear();
+    }
+    return map;
   }
 
-  Object.entries(GENRE_MAPPINGS).forEach(([mainGenre, variants]) => {
-    const canonicalMainGenre = mainGenre;
-    variants.forEach(variant => {
-      const normalizedKey = getNormalizedGenreKey(variant);
-      if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey]) {
-        VARIANT_TO_MAIN_GENRE_MAP[normalizedKey] = [];
-      }
-      if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].includes(canonicalMainGenre)) {
-          VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].push(canonicalMainGenre);
-      }
-    });
-    const normalizedMainKey = getNormalizedGenreKey(mainGenre);
-    if (!VARIANT_TO_MAIN_GENRE_MAP[normalizedMainKey]) {
-        VARIANT_TO_MAIN_GENRE_MAP[normalizedMainKey] = [canonicalMainGenre];
-    }
-  });
+  function buildGenreSearchMatchSet(searchTerm, groupGenres = true) {
+    const matched = new Set();
+    if (!searchTerm) return matched;
 
-  if (typeof GENRE_ALIASES_RAW !== "undefined") {
-    for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
-      const canonicalKey = getNormalizedGenreKey(canonical);
-      const targetMains = VARIANT_TO_MAIN_GENRE_MAP[canonicalKey] || (GENRE_MAPPINGS[canonical] ? [canonical] : null);
-      if (targetMains && targetMains.length > 0) {
-        aliases.forEach(alias => {
-          const aliasKey = getNormalizedGenreKey(alias);
-          if (!VARIANT_TO_MAIN_GENRE_MAP[aliasKey]) {
-            VARIANT_TO_MAIN_GENRE_MAP[aliasKey] = [];
+    if (typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+      for (const [canonical, aliases] of Object.entries(GENRE_ALIASES_RAW)) {
+        if (aliases.some(a => a.includes(searchTerm))) {
+          const norm = normalizeGenre(canonical);
+          const canonSub = toCanonicalSubgenreName(canonical, genrePlaylistsCache);
+          matched.add(canonical.toLowerCase());
+          if (norm) matched.add(norm);
+          if (canonSub) matched.add(canonSub);
+          if (groupGenres) {
+            const mains = VARIANT_TO_MAIN_GENRE_MAP[getNormalizedGenreKey(canonical)];
+            if (mains) mains.forEach(m => matched.add(m.toLowerCase()));
           }
-          targetMains.forEach(mainGenre => {
-            if (!VARIANT_TO_MAIN_GENRE_MAP[aliasKey].includes(mainGenre)) {
-              VARIANT_TO_MAIN_GENRE_MAP[aliasKey].push(mainGenre);
-            }
-          });
-        });
+        }
       }
     }
+
+    if (groupGenres && typeof GENRE_MAPPINGS !== "undefined" && GENRE_MAPPINGS) {
+      for (const [mainGenre, variants] of Object.entries(GENRE_MAPPINGS)) {
+        if (variants.some(v => v.includes(searchTerm))) {
+          matched.add(mainGenre.toLowerCase());
+        }
+      }
+    }
+
+    if (typeof COUNTRY_MAPPINGS !== "undefined" && COUNTRY_MAPPINGS) {
+      for (const [mainCountry, variants] of Object.entries(COUNTRY_MAPPINGS)) {
+        if (mainCountry.includes(searchTerm) || variants.some(v => v.includes(searchTerm))) {
+          matched.add(mainCountry.toLowerCase());
+        }
+      }
+    }
+
+    return matched;
   }
-  
-  Object.entries(COUNTRY_MAPPINGS).forEach(([mainCountry, variants]) => {
-    variants.forEach(variant => {
-      const normalizedKey = getNormalizedGenreKey(variant);
-      if (!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey]) {
-        VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey] = mainCountry;
-      }
-    });
-    const normalizedMainKey = getNormalizedGenreKey(mainCountry);
-    if (!VARIANT_TO_MAIN_COUNTRY_MAP[normalizedMainKey]) {
-        VARIANT_TO_MAIN_COUNTRY_MAP[normalizedMainKey] = mainCountry;
+
+  function toCanonicalSubgenreName(tag, genreMap = genrePlaylistsCache) {
+    if (!tag) return "";
+    const lower = (typeof tag === 'string' ? tag : (tag?.name || '')).toLowerCase().trim();
+    if (!lower) return "";
+    if (GENRE_ALIAS_MAP.has(lower)) return GENRE_ALIAS_MAP.get(lower);
+    const map = ensureCanonicalSubgenreMap(genreMap);
+    const norm = normalizeGenre(lower);
+    return map.get(lower) || map.get(norm) || map.get(getNormalizedGenreKey(norm)) || norm || lower;
+  }
+
+  function getFilterCatalogSubgenresPool(genreMap = genrePlaylistsCache) {
+    const hasEveryNoise = Boolean(genreMap && Array.isArray(genreMap) && genreMap.length > 0);
+    if (cachedFilterCatalogSubgenres && (!hasEveryNoise || cachedFilterCatalogSubgenres._hasEveryNoise)) {
+      return cachedFilterCatalogSubgenres;
     }
-  });
-  
-  function mapAndNormalizeGenres(rawGenres) {
-    const mappedGenres = new Set();
-    if (!rawGenres) return [];
+
+    const rawSet = new Set();
+    if (typeof GENRE_MAPPINGS !== "undefined" && GENRE_MAPPINGS) {
+      Object.keys(GENRE_MAPPINGS).forEach(g => rawSet.add(g));
+      Object.values(GENRE_MAPPINGS).forEach(arr => arr.forEach(g => rawSet.add(g)));
+    }
+    if (typeof GENRE_ALIASES_RAW !== "undefined" && GENRE_ALIASES_RAW) {
+      Object.keys(GENRE_ALIASES_RAW).forEach(g => rawSet.add(g));
+    }
+    if (hasEveryNoise) {
+      genreMap.forEach(p => { if (p?.genre) rawSet.add(p.genre); });
+    }
+
+    const canonicalSet = new Set();
+    for (const g of rawSet) {
+      const canon = toCanonicalSubgenreName(g, genreMap);
+      if (!canon || isPureMoodDescriptorForFilter(canon) || isCountryOnly(canon)) continue;
+      canonicalSet.add(canon);
+    }
+
+    cachedFilterCatalogSubgenres = Array.from(canonicalSet).sort();
+    cachedFilterCatalogSubgenres._hasEveryNoise = hasEveryNoise;
+    return cachedFilterCatalogSubgenres;
+  }
+
+  function isPureMoodDescriptorForFilter(tag) {
+    if (!tag) return false;
+    const lower = (typeof tag === 'string' ? tag : (tag?.name || '')).toLowerCase().trim();
+    if (lower === "children's music" || GENRE_FILTER_ALLOWED_MOOD_GENRES.has(lower)) return false;
+    return MOOD_DESCRIPTORS_SET.has(lower);
+  }
+
+  function isSpotifyTrackExcludedConcept(tag) {
+    if (!tag) return false;
+    const lower = (typeof tag === 'string' ? tag : (tag?.name || '')).toLowerCase().trim();
+    if (GENRE_FILTER_ALLOWED_MOOD_GENRES.has(lower)) return false;
+    if (lower === "children's music" || MOOD_DESCRIPTORS_SET.has(lower)) return true;
+    const norm = normalizeGenre(lower);
+    if (GENRE_FILTER_ALLOWED_MOOD_GENRES.has(norm)) return false;
+    return norm === "children's music" || MOOD_DESCRIPTORS_SET.has(norm);
+  }
+
+  function isCuratedModifierOrCountryWord(word) {
+    if (!word) return false;
+    return CURATED_LFM_MODIFIER_WORDS.has(word) || isCountryOnly(word);
+  }
+
+  const CURATED_LFM_MULTIWORD_MODIFIER_SET = new Set(CURATED_LFM_MULTIWORD_MODIFIERS);
+
+  function getLfmModifierStepAt(words, idx, limitIdx) {
+    if (idx + 2 <= limitIdx) {
+      const tri = `${words[idx]} ${words[idx + 1]} ${words[idx + 2]}`;
+      if (CURATED_LFM_MULTIWORD_MODIFIER_SET.has(tri)) return 3;
+    }
+    if (idx + 1 <= limitIdx) {
+      const bi = `${words[idx]} ${words[idx + 1]}`;
+      if (CURATED_LFM_MULTIWORD_MODIFIER_SET.has(bi)) return 2;
+    }
+    if (isCuratedModifierOrCountryWord(words[idx])) return 1;
+    return 0;
+  }
+
+  function areAllWordsLfmModifiers(words, fromIdx, toIdx) {
+    let k = fromIdx;
+    while (k <= toIdx) {
+      const step = getLfmModifierStepAt(words, k, toIdx);
+      if (step === 0) return false;
+      k += step;
+    }
+    return true;
+  }
+
+  const salvagedLastfmTagCache = new Map();
+
+  function salvageAndValidateLastfmTag(rawTag, genreMap = genrePlaylistsCache) {
+    const tagStr = typeof rawTag === 'string' ? rawTag : (rawTag?.name || '');
+    const lower = tagStr.toLowerCase().trim();
+    if (!lower || lower.length < 2 || /^\d+$/.test(lower)) return [];
+    if (GENRE_FILTER_CLEANUP_KEYWORDS.some(kw => lower.includes(kw))) return [];
+
+    const hasEveryNoise = Boolean(genreMap && genreMap.length > 0);
+    const cacheKey = `${lower}\0${hasEveryNoise ? 1 : 0}`;
+    if (salvagedLastfmTagCache.has(cacheKey)) {
+      return salvagedLastfmTagCache.get(cacheKey);
+    }
+
+    const norm = normalizeGenre(lower);
+    if (isPureMoodDescriptorForFilter(lower) || isPureMoodDescriptorForFilter(norm)) {
+      salvagedLastfmTagCache.set(cacheKey, []);
+      return [];
+    }
+
+    const normKey = getNormalizedGenreKey(norm);
+    if (VARIANT_TO_MAIN_COUNTRY_MAP[normKey]) {
+      const res = [lower];
+      salvagedLastfmTagCache.set(cacheKey, res);
+      return res;
+    }
+
+    if (VARIANT_TO_MAIN_GENRE_MAP[normKey] || isWhitelistedGenre(lower, genreMap) || isWhitelistedGenre(norm, genreMap)) {
+      const res = [toCanonicalSubgenreName(lower, genreMap)];
+      salvagedLastfmTagCache.set(cacheKey, res);
+      return res;
+    }
+
+    if (/[\/,;]/.test(lower)) {
+      const parts = lower.split(/[\/,;]+/).map(p => p.trim()).filter(Boolean);
+      if (parts.length > 1 && parts.length <= 4) {
+        const collected = [];
+        let allPartsValid = true;
+        for (let i = 0; i < parts.length; i++) {
+          const partRes = salvageAndValidateLastfmTag(parts[i], genreMap);
+          if (partRes.length === 0) {
+            allPartsValid = false;
+            break;
+          }
+          collected.push(...partRes);
+        }
+        if (allPartsValid && collected.length > 0) {
+          const uniqueRes = [...new Set(collected)];
+          salvagedLastfmTagCache.set(cacheKey, uniqueRes);
+          return uniqueRes;
+        }
+      }
+    }
+
+    const words = norm.split(/\s+/).filter(Boolean);
+    if (words.length >= 2 && words.length <= 7) {
+      for (let span = words.length - 1; span >= 1; span--) {
+        for (let start = 0; start <= words.length - span; start++) {
+          const end = start + span - 1;
+          if (start > 0 && !areAllWordsLfmModifiers(words, 0, start - 1)) continue;
+          if (end < words.length - 1 && !areAllWordsLfmModifiers(words, end + 1, words.length - 1)) continue;
+
+          const rawSlice = words.slice(start, end + 1).join(" ");
+          const candidate = normalizeGenre(rawSlice);
+          const candidateKey = getNormalizedGenreKey(candidate);
+          if (candidate && !isPureMoodDescriptorForFilter(candidate) && (VARIANT_TO_MAIN_GENRE_MAP[candidateKey] || isWhitelistedGenre(candidate, genreMap))) {
+            const res = [toCanonicalSubgenreName(rawSlice, genreMap)];
+            salvagedLastfmTagCache.set(cacheKey, res);
+            return res;
+          }
+        }
+      }
+
+      const matchedGenres = [];
+      let idx = 0;
+      let allTokensAccounted = true;
+
+      while (idx < words.length) {
+        let matchedSpan = 0;
+        const maxSpan = Math.min(4, words.length - idx);
+        for (let span = maxSpan; span >= 1; span--) {
+          if (span === words.length) continue;
+          const rawPhrase = words.slice(idx, idx + span).join(" ");
+          const phrase = normalizeGenre(rawPhrase);
+          const phraseKey = getNormalizedGenreKey(phrase);
+          if (!isPureMoodDescriptorForFilter(phrase) && (VARIANT_TO_MAIN_GENRE_MAP[phraseKey] || isWhitelistedGenre(phrase, genreMap))) {
+            matchedGenres.push(toCanonicalSubgenreName(rawPhrase, genreMap));
+            matchedSpan = span;
+            break;
+          }
+        }
+        if (matchedSpan > 0) {
+          idx += matchedSpan;
+        } else {
+          const modStep = getLfmModifierStepAt(words, idx, words.length - 1);
+          if (modStep > 0) {
+            idx += modStep;
+          } else {
+            allTokensAccounted = false;
+            break;
+          }
+        }
+      }
+
+      if (allTokensAccounted && matchedGenres.length > 0) {
+        const uniqueRes = [...new Set(matchedGenres)];
+        salvagedLastfmTagCache.set(cacheKey, uniqueRes);
+        return uniqueRes;
+      }
+    }
+
+    salvagedLastfmTagCache.set(cacheKey, []);
+    return [];
+  }
+
+  const resolvedFilterGenreCache = new Map();
+
+  function resolveGenreForFilter(rawGenreName, source, groupGenres = true, filterNoise = true, genreMap = genrePlaylistsCache) {
+    const rawStr = typeof rawGenreName === 'string' ? rawGenreName : (rawGenreName?.name || '');
+    if (!rawStr) return [];
+    const lowerName = rawStr.toLowerCase().trim();
+    if (!lowerName || /^\d+$/.test(lowerName)) return [];
+
+    const isSpotifyTrack = source === 'spotify_track';
+    const isLastfm = source === 'lastfm_track' || source === 'lastfm_artist';
+    const hasEveryNoise = Boolean(genreMap && genreMap.length > 0);
+    const cacheKey = `${lowerName}\0${isSpotifyTrack ? 'sp' : (isLastfm ? 'lfm' : 'o')}\0${groupGenres ? 1 : 0}\0${filterNoise ? 1 : 0}\0${hasEveryNoise ? 1 : 0}`;
+
+    if (resolvedFilterGenreCache.has(cacheKey)) {
+      return resolvedFilterGenreCache.get(cacheKey);
+    }
+
+    if (GENRE_FILTER_CLEANUP_KEYWORDS.some(kw => lowerName.includes(kw))) {
+      resolvedFilterGenreCache.set(cacheKey, []);
+      return [];
+    }
+
+    if (isSpotifyTrack && isSpotifyTrackExcludedConcept(lowerName)) {
+      resolvedFilterGenreCache.set(cacheKey, []);
+      return [];
+    }
+
+    let candidateTags;
+    if (isLastfm) {
+      const salvaged = (filterNoise || groupGenres) ? salvageAndValidateLastfmTag(lowerName, genreMap) : [];
+      if (salvaged.length > 0) {
+        candidateTags = salvaged;
+      } else if (filterNoise) {
+        resolvedFilterGenreCache.set(cacheKey, []);
+        return [];
+      } else {
+        candidateTags = [lowerName];
+      }
+    } else {
+      const norm = normalizeGenre(lowerName);
+      if (filterNoise && (isPureMoodDescriptorForFilter(lowerName) || isPureMoodDescriptorForFilter(norm))) {
+        resolvedFilterGenreCache.set(cacheKey, []);
+        return [];
+      }
+      candidateTags = [lowerName];
+    }
+
+    const out = [];
+    const seen = new Set();
+
+    for (let i = 0; i < candidateTags.length; i++) {
+      const tag = candidateTags[i];
+      const normGenre = normalizeGenre(tag);
+      const normKey = getNormalizedGenreKey(normGenre);
+
+      let mappedList;
+      if (VARIANT_TO_MAIN_COUNTRY_MAP[normKey]) {
+        const mainCountry = VARIANT_TO_MAIN_COUNTRY_MAP[normKey];
+        mappedList = [mainCountry.charAt(0).toUpperCase() + mainCountry.slice(1)];
+      } else if (groupGenres && VARIANT_TO_MAIN_GENRE_MAP[normKey]) {
+        mappedList = VARIANT_TO_MAIN_GENRE_MAP[normKey];
+      } else {
+        mappedList = [toCanonicalSubgenreName(tag, genreMap)];
+      }
+
+      for (let j = 0; j < mappedList.length; j++) {
+        const item = mappedList[j];
+        if (!item) continue;
+        if (isSpotifyTrack && isSpotifyTrackExcludedConcept(item)) continue;
+        if (filterNoise && isPureMoodDescriptorForFilter(item)) continue;
+        if (!seen.has(item)) {
+          seen.add(item);
+          out.push(item);
+        }
+      }
+    }
+
+    resolvedFilterGenreCache.set(cacheKey, out);
+    return out;
+  }
+
+  function buildTrackGenresForFilter(rawData, gfSources, groupGenres = true, filterNoise = true, genreMap = genrePlaylistsCache) {
+    if (!rawData) return [];
+    hydrateCachedGenreRecord(rawData);
+
+    const combined = [];
+    if (gfSources.spotify_track && rawData.spotify_track_genres) {
+      for (let i = 0; i < rawData.spotify_track_genres.length; i++) {
+        combined.push({ name: rawData.spotify_track_genres[i], source: 'spotify_track' });
+      }
+    }
+    if (gfSources.everynoise_artist && rawData.everynoise_artist_genres) {
+      for (let i = 0; i < rawData.everynoise_artist_genres.length; i++) {
+        combined.push({ name: rawData.everynoise_artist_genres[i], source: 'everynoise' });
+      }
+    }
+    if (gfSources.deezer) {
+      if (rawData.deezer_genres) {
+        for (let i = 0; i < rawData.deezer_genres.length; i++) {
+          combined.push({ name: rawData.deezer_genres[i], source: 'deezer' });
+        }
+      }
+      if (rawData.apple_music_genres) {
+        for (let i = 0; i < rawData.apple_music_genres.length; i++) {
+          combined.push({ name: rawData.apple_music_genres[i], source: 'apple_music' });
+        }
+      }
+    }
+    if (gfSources.spotify_artist && rawData.spotify_artist_genres) {
+      for (let i = 0; i < rawData.spotify_artist_genres.length; i++) {
+        combined.push({ name: rawData.spotify_artist_genres[i], source: 'spotify' });
+      }
+    }
+    if (gfSources.lastfm_track && rawData.lastfm_track_genres) {
+      for (let i = 0; i < rawData.lastfm_track_genres.length; i++) {
+        combined.push({ name: rawData.lastfm_track_genres[i], source: 'lastfm_track' });
+      }
+    }
+    if (gfSources.lastfm_artist && rawData.lastfm_artist_genres) {
+      for (let i = 0; i < rawData.lastfm_artist_genres.length; i++) {
+        combined.push({ name: rawData.lastfm_artist_genres[i], source: 'lastfm_artist' });
+      }
+    }
+
+    if (combined.length === 0) return [];
+
+    const byName = new Map();
+    for (let i = 0; i < combined.length; i++) {
+      const { name: rawName, source } = combined[i];
+      const resolvedNames = resolveGenreForFilter(rawName, source, groupGenres, filterNoise, genreMap);
+      for (let j = 0; j < resolvedNames.length; j++) {
+        const finalName = resolvedNames[j];
+        const existing = byName.get(finalName);
+        if (!existing || ((existing.source === 'lastfm_track' || existing.source === 'lastfm_artist') && source !== 'lastfm_track' && source !== 'lastfm_artist')) {
+          byName.set(finalName, { name: finalName, source });
+        }
+      }
+    }
+
+    return Array.from(byName.values());
+  }
+
+  function buildGenreFilterTrackMap(tracks, rawGenresMap, gfSources, groupGenres = true, filterNoise = true, genreMap = genrePlaylistsCache) {
+    const map = new Map();
+    const nameSetsMap = new Map();
+    if (!tracks || !rawGenresMap) {
+      map._nameSetsMap = nameSetsMap;
+      return map;
+    }
+
+    for (let i = 0; i < tracks.length; i++) {
+      const uri = tracks[i].uri;
+      const rawData = rawGenresMap.get(uri);
+      const genres = rawData ? buildTrackGenresForFilter(rawData, gfSources, groupGenres, filterNoise, genreMap) : [];
+      map.set(uri, genres);
+      const nameSet = new Set();
+      for (let j = 0; j < genres.length; j++) {
+        nameSet.add(genres[j].name);
+      }
+      nameSetsMap.set(uri, nameSet);
+    }
+
+    map._nameSetsMap = nameSetsMap;
+    return map;
+  }
+
+  function translateGenreSelectionForGrouping(selectedList, rawItemsWithSources, targetGroupGenres, filterNoise = true, genreMap = genrePlaylistsCache) {
+    if (!selectedList || selectedList.length === 0) return [];
+    const targetSet = new Set(selectedList);
+    const newSet = new Set();
+
+    if (targetGroupGenres) {
+      const sVotes = new Set();
+      const wVotes = new Set();
+
+      for (let i = 0; i < selectedList.length; i++) {
+        const sel = selectedList[i];
+        const grouped = resolveGenreForFilter(sel, 'everynoise', true, filterNoise, genreMap);
+        if (grouped.length === 1) sVotes.add(grouped[0]);
+        else grouped.forEach(g => wVotes.add(g));
+      }
+
+      if (rawItemsWithSources && rawItemsWithSources.length > 0) {
+        for (let i = 0; i < rawItemsWithSources.length; i++) {
+          const { name, source } = rawItemsWithSources[i];
+          const ungrouped = resolveGenreForFilter(name, source, false, filterNoise, genreMap);
+          if (!ungrouped.some(u => targetSet.has(u))) continue;
+          const grouped = resolveGenreForFilter(name, source, true, filterNoise, genreMap);
+          if (grouped.length === 1) sVotes.add(grouped[0]);
+          else grouped.forEach(g => wVotes.add(g));
+        }
+      }
+
+      const finalVotes = sVotes.size > 0 ? sVotes : wVotes;
+      finalVotes.forEach(g => newSet.add(g));
+    } else if (rawItemsWithSources && rawItemsWithSources.length > 0) {
+      const matchedParents = new Set();
+      for (let i = 0; i < rawItemsWithSources.length; i++) {
+        const { name, source } = rawItemsWithSources[i];
+        const grouped = resolveGenreForFilter(name, source, true, filterNoise, genreMap);
+        let hit = false;
+        for (let j = 0; j < grouped.length; j++) {
+          if (targetSet.has(grouped[j])) {
+            matchedParents.add(grouped[j]);
+            hit = true;
+          }
+        }
+        if (hit) {
+          const ungrouped = resolveGenreForFilter(name, source, false, filterNoise, genreMap);
+          ungrouped.forEach(u => newSet.add(u));
+        }
+      }
+      for (let i = 0; i < selectedList.length; i++) {
+        const sel = selectedList[i];
+        if (!matchedParents.has(sel)) {
+          const ungrouped = resolveGenreForFilter(sel, 'everynoise', false, filterNoise, genreMap);
+          ungrouped.forEach(u => newSet.add(u));
+        }
+      }
+    } else {
+      for (let i = 0; i < selectedList.length; i++) {
+        const ungrouped = resolveGenreForFilter(selectedList[i], 'everynoise', false, filterNoise, genreMap);
+        ungrouped.forEach(u => newSet.add(u));
+      }
+    }
+
+    return Array.from(newSet);
+  }
+
+  const mappedSingleGenreCache = new Map();
+
+  function mapSingleRawGenre(rawGenreName) {
+    const lowerName = rawGenreName.toLowerCase().trim();
+    if (mappedSingleGenreCache.has(lowerName)) {
+      return mappedSingleGenreCache.get(lowerName);
+    }
 
     const GENRE_CLEANUP_KEYWORDS = [
-        "spotify", "deezer", "last.fm", "lastfm", 
-        "my top", "favorite", "fave", "playlist", 
-        "library", "seen live", "radio", "stream"
+      "spotify", "deezer", "last.fm", "lastfm",
+      "my top", "favorite", "fave", "playlist",
+      "library", "seen live", "radio", "stream"
     ];
 
-    rawGenres.forEach(genreObj => {
-        const rawGenreName = typeof genreObj === 'string' ? genreObj : genreObj.name;
-        const source = typeof genreObj === 'string' ? 'unknown' : genreObj.source;
-        const lowerName = rawGenreName.toLowerCase().trim();
+    if (GENRE_CLEANUP_KEYWORDS.some(keyword => lowerName.includes(keyword))) {
+      mappedSingleGenreCache.set(lowerName, []);
+      return [];
+    }
 
-        if (GENRE_CLEANUP_KEYWORDS.some(keyword => lowerName.includes(keyword))) {
-            return;
-        }
+    const normalizedGenre = normalizeGenre(lowerName);
+    const normalizedKey = getNormalizedGenreKey(normalizedGenre);
+    let result;
 
-        if (source === 'spotify_track') {
-            mappedGenres.add(JSON.stringify({ name: normalizeGenre(rawGenreName), source: source }));
-            return;
-        }
+    if (VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey]) {
+      const mainCountry = VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey];
+      result = [mainCountry.charAt(0).toUpperCase() + mainCountry.slice(1)];
+    } else if (VARIANT_TO_MAIN_GENRE_MAP[normalizedKey]) {
+      result = VARIANT_TO_MAIN_GENRE_MAP[normalizedKey];
+    } else {
+      result = [normalizedGenre || lowerName];
+    }
 
-        const normalizedGenre = normalizeGenre(rawGenreName);
-        const normalizedKey = getNormalizedGenreKey(normalizedGenre);
-        
-        if (VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey]) {
-            const mainCountry = VARIANT_TO_MAIN_COUNTRY_MAP[normalizedKey];
-            const formattedCountry = mainCountry.charAt(0).toUpperCase() + mainCountry.slice(1);
-            mappedGenres.add(JSON.stringify({ name: formattedCountry, source: source }));
-        }
-        else if (VARIANT_TO_MAIN_GENRE_MAP[normalizedKey]) {
-            VARIANT_TO_MAIN_GENRE_MAP[normalizedKey].forEach(mainGenre => {
-                mappedGenres.add(JSON.stringify({ name: mainGenre, source: source }));
-            });
-        } 
-        else {
-            mappedGenres.add(JSON.stringify({ name: normalizedGenre || lowerName, source: source }));
-        }
-    });
+    mappedSingleGenreCache.set(lowerName, result);
+    return result;
+  }
 
-    return Array.from(mappedGenres).map(item => JSON.parse(item));
+  function mapAndNormalizeGenres(rawGenres) {
+    if (!rawGenres || rawGenres.length === 0) return [];
+    const seen = new Set();
+    const result = [];
+
+    for (let i = 0; i < rawGenres.length; i++) {
+      const genreObj = rawGenres[i];
+      const rawGenreName = typeof genreObj === 'string' ? genreObj : genreObj.name;
+      if (!rawGenreName) continue;
+      const source = typeof genreObj === 'string' ? 'unknown' : genreObj.source;
+
+      if (source === 'spotify_track') {
+        const mappedList = mapSingleRawGenre(rawGenreName);
+        if (mappedList.length === 0) continue;
+        const normName = normalizeGenre(rawGenreName);
+        const key = `${normName}\0${source}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push({ name: normName, source });
+        }
+        continue;
+      }
+
+      const mappedNames = mapSingleRawGenre(rawGenreName);
+      for (let j = 0; j < mappedNames.length; j++) {
+        const name = mappedNames[j];
+        const key = `${name}\0${source}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push({ name, source });
+        }
+      }
+    }
+
+    return result;
   }
 
   function filterTracksByGenres(tracks, selectedGenres, excludedGenres, trackGenreMap, matchAll = null) {
     const effectiveMatchAll = matchAll !== null ? matchAll : matchAllGenres;
+    const hasSelected = selectedGenres.length > 0;
+    const hasExcluded = excludedGenres.length > 0;
 
-    if (selectedGenres.length === 0 && excludedGenres.length === 0) {
-        return tracks;
-    }
-    let includedTracks;
-
-    if (selectedGenres.length === 0) {
-        includedTracks = tracks;
-    } else if (effectiveMatchAll) {
-        includedTracks = tracks.filter((track) => {
-            const trackGenres = trackGenreMap.get(track.uri);
-            if (!trackGenres) return false;
-            const trackGenreNames = new Set(trackGenres.map(g => g.name));
-            return selectedGenres.every((selectedGenre) => trackGenreNames.has(selectedGenre));
-        });
-    } else {
-        includedTracks = tracks.filter((track) => {
-            const trackGenres = trackGenreMap.get(track.uri);
-            if (!trackGenres) return false;
-            const trackGenreNames = new Set(trackGenres.map(g => g.name));
-            return selectedGenres.some((selectedGenre) => trackGenreNames.has(selectedGenre));
-        });
+    if (!hasSelected && !hasExcluded) {
+      return tracks;
     }
 
-    if (excludedGenres.length === 0) {
-        return includedTracks;
-    }
+    const excludedSet = hasExcluded ? new Set(excludedGenres) : null;
+    const nameSetsMap = trackGenreMap._nameSetsMap;
 
-    return includedTracks.filter(track => {
+    return tracks.filter(track => {
+      let trackGenreNames = nameSetsMap ? nameSetsMap.get(track.uri) : null;
+      if (!trackGenreNames) {
         const trackGenres = trackGenreMap.get(track.uri);
-        if (!trackGenres) return true;
-        const trackGenreNames = new Set(trackGenres.map(g => g.name));
-        return !excludedGenres.some(excludedGenre => trackGenreNames.has(excludedGenre));
+        if (!trackGenres || trackGenres.length === 0) return !hasSelected;
+        trackGenreNames = new Set();
+        for (let i = 0; i < trackGenres.length; i++) {
+          trackGenreNames.add(trackGenres[i].name);
+        }
+      } else if (trackGenreNames.size === 0) {
+        return !hasSelected;
+      }
+
+      if (hasExcluded) {
+        for (const g of trackGenreNames) {
+          if (excludedSet.has(g)) return false;
+        }
+      }
+
+      if (!hasSelected) return true;
+
+      if (effectiveMatchAll) {
+        for (let i = 0; i < selectedGenres.length; i++) {
+          if (!trackGenreNames.has(selectedGenres[i])) return false;
+        }
+        return true;
+      } else {
+        for (let i = 0; i < selectedGenres.length; i++) {
+          if (trackGenreNames.has(selectedGenres[i])) return true;
+        }
+        return false;
+      }
     });
   }
 
@@ -36858,6 +41423,7 @@ shadowRoot.innerHTML = `
     cachedLikedSongs = null;
     cachedLikedSongsTimestamp = 0;
     activeLikedSongsPromise = null;
+    prefetchBlacklistMap.clear();
   }
 
   async function ensureLikedSongsIndex() {
@@ -39016,50 +43582,64 @@ shadowRoot.innerHTML = `
   }
   
   async function _fetchLastFmTrackInfoCore(artistName, trackName, username = null, useFallback = false, noRedirect = false) {
-    const maxRetries = 5;
-    let delay = 1000;
+    const inFlightKey = `${(artistName || '').toLowerCase().trim()}|${(trackName || '').toLowerCase().trim()}|${(username || '').toLowerCase().trim()}|${useFallback ? 1 : 0}|${noRedirect ? 1 : 0}`;
+    if (inFlightLfmTrackInfo.has(inFlightKey)) {
+      return await inFlightLfmTrackInfo.get(inFlightKey);
+    }
 
-    for (let retries = 0; retries < maxRetries; retries++) {
-      try {
-        const params = new URLSearchParams({
-          method: 'track.getInfo',
-          artist: artistName,
-          track: trackName,
-          format: 'json'
-        });
-        if (username) params.set('username', username);
-        if (lastFmAutocorrect && !noRedirect) params.set('autocorrect', '1');
-        else if (noRedirect) params.set('autocorrect', '0');
+    const requestPromise = (async () => {
+      const maxRetries = 5;
+      let delay = 1000;
 
-        let response = await fetchLfmWithGateway(params);
-        let text = await response.text();
-        if (!text || text.trim() === '') throw new Error("Received empty response from Last.fm");
-        
-        let data = JSON.parse(text);
+      for (let retries = 0; retries < maxRetries; retries++) {
+        try {
+          const params = new URLSearchParams({
+            method: 'track.getInfo',
+            artist: artistName,
+            track: trackName,
+            format: 'json'
+          });
+          if (username) params.set('username', username);
+          if (lastFmAutocorrect && !noRedirect) params.set('autocorrect', '1');
+          else if (noRedirect) params.set('autocorrect', '0');
 
-        if (data && data.error === 17) {
-            return data;
-        }
+          let response = await fetchLfmWithGateway(params);
+          let text = await response.text();
+          if (!text || text.trim() === '') throw new Error("Received empty response from Last.fm");
+          
+          let data = JSON.parse(text);
 
-        if (!response.ok && (!data || data.error !== 6)) {
-            throw new Error(`Last.fm API request failed with status ${response.status}`);
-        }
-
-        if (data.error === 6 && useFallback && !noRedirect) {
-          params.set('autocorrect', lastFmAutocorrect ? '0' : '1');
-          const responseRetry = await fetchLfmWithGateway(params);
-          const textRetry = await responseRetry.text();
-          if (textRetry && textRetry.trim() !== '') {
-            const dataRetry = JSON.parse(textRetry);
-            if (!dataRetry.error) data = dataRetry;
+          if (data && data.error === 17) {
+              return data;
           }
+
+          if (!response.ok && (!data || data.error !== 6)) {
+              throw new Error(`Last.fm API request failed with status ${response.status}`);
+          }
+
+          if (data.error === 6 && useFallback && !noRedirect) {
+            params.set('autocorrect', lastFmAutocorrect ? '0' : '1');
+            const responseRetry = await fetchLfmWithGateway(params);
+            const textRetry = await responseRetry.text();
+            if (textRetry && textRetry.trim() !== '') {
+              const dataRetry = JSON.parse(textRetry);
+              if (!dataRetry.error) data = dataRetry;
+            }
+          }
+          return data;
+        } catch (error) {
+          if (retries === maxRetries - 1) throw error;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2;
         }
-        return data;
-      } catch (error) {
-        if (retries === maxRetries - 1) throw error;
-        await new Promise(resolve => setTimeout(resolve, delay));
-        delay *= 2;
       }
+    })();
+
+    inFlightLfmTrackInfo.set(inFlightKey, requestPromise);
+    try {
+      return await requestPromise;
+    } finally {
+      inFlightLfmTrackInfo.delete(inFlightKey);
     }
   }
 
@@ -39123,7 +43703,9 @@ shadowRoot.innerHTML = `
           }
           if (!isLocal && !skipCacheWrite) {
               await setCachedScrobbles(lfmInfo.key, -1);
-              if (username) await setCachedPersonalScrobbles(lfmInfo.key, -1, false);
+              if (username && track.uri !== currentTrackUriForScrobbleCache) {
+                  await setCachedPersonalScrobbles(lfmInfo.key, -1, false);
+              }
           }
           return { ...track, scrobbles: -1, personalScrobbles: -1, error: "Track not found on Last.fm", errorLabel: "N/A" };
         }
@@ -39148,7 +43730,7 @@ shadowRoot.innerHTML = `
 
       if (!isLocal && !skipCacheWrite) {
           resTrack.scrobbles = await setCachedScrobbles(lfmInfo.key, scrobbles);
-          if (resTrack.personalScrobbles !== undefined) {
+          if (resTrack.personalScrobbles !== undefined && track.uri !== currentTrackUriForScrobbleCache) {
               await setCachedPersonalScrobbles(lfmInfo.key, resTrack.personalScrobbles, false);
           }
       }
@@ -45245,97 +49827,6 @@ shadowRoot.innerHTML = `
 
   const softGte = (val, t, m = 0.15) => spMath.clamp((val - (t - m)) / (2 * m), 0, 1);
   const softLte = (val, t, m = 0.15) => spMath.clamp(((t + m) - val) / (2 * m), 0, 1);
-
-  const MUSIC_MODEL_MAP = {
-    "chill": { M: 1.0 }, "nostalgia": { M: 1.0 }, "easy listening": { M: 1.0 }, "relaxing": { M: 1.0 },
-    "slow": { M: 1.0 }, "mellow": { M: 1.0 }, "love": { M: 1.0 }, "soft": { M: 1.0 },
-    "melancholy": { M: 1.0 }, "moody": { M: 1.0 }, "calm": { M: 1.0 }, "sad": { M: 1.0 },
-    "romantic": { M: 1.0 }, "tranquil": { M: 1.0 }, "smooth": { M: 1.0 }, "quiet": { M: 1.0 },
-    "dark": { M: 1.0 }, "acoustic": { M: 0.8, U: 0.2 }, "lounge": { M: 1.0 }, "chill beats": { M: 0.8, C: 0.2 },
-    "emotional": { M: 1.0 }, "new age": { M: 0.8, S: 0.2 }, "downtempo": { M: 0.7, C: 0.3 }, "soothing": { M: 1.0 },
-    "peaceful": { M: 1.0 }, "gentle": { M: 1.0 }, "atmospheric": { M: 0.8, S: 0.2 }, "cozy": { M: 1.0 },
-    "sensual": { M: 1.0 }, "ambient": { M: 0.9, S: 0.1 }, "children's music": { M: 0.8, U: 0.2 }, "ethereal": { M: 0.8, S: 0.2 },
-    "nature": { M: 1.0 }, "rain": { M: 1.0 }, "lullaby": { M: 1.0 }, "chanson": { M: 0.7, S: 0.3 }, "spiritual": { M: 0.6, U: 0.4 }, "soulful": { M: 0.6, S: 0.4 },
-    "country": { U: 1.0 }, "singer-songwriter": { U: 0.7, M: 0.3 }, "folk": { U: 0.9, M: 0.1 }, "americana": { U: 1.0 },
-    "gospel": { U: 0.8, S: 0.2 }, "bluegrass": { S: 0.6, U: 0.4 }, "worship": { U: 0.8, M: 0.2 }, "devotional": { U: 0.8, M: 0.2 }, "ccm": { U: 0.6, C: 0.4 }, "sertanejo": { U: 1.0 },
-    "tejano": { U: 1.0 }, "norte": { U: 1.0 }, "sierre": { U: 1.0 }, "banda": { U: 1.0 }, "country blues": { U: 0.7, S: 0.3 },
-    "classical": { S: 1.0 }, "jazz": { S: 1.0 }, "blues": { S: 0.8, U: 0.2 }, "classy": { S: 1.0 },
-    "soundtrack": { S: 0.8, M: 0.2 }, "soul funk": { S: 0.6, C: 0.4 }, "latin": { S: 0.5, C: 0.5 },
-    "orchestral": { S: 1.0 }, "symphony": { S: 1.0 }, "acid jazz": { S: 0.7, C: 0.3 }, "epic": { S: 0.6, I: 0.4 },
-    "swing music": { S: 0.8, C: 0.2 }, "classical piano": { S: 0.9, M: 0.1 }, "gregorian chant": { S: 0.8, M: 0.2 },
-    "tango": { S: 0.9, I: 0.1 }, "bolero": { S: 0.8, M: 0.2 }, "cumbia": { S: 0.6, C: 0.4 }, "mariachi": { S: 0.8, U: 0.2 },
-    "bossa nova": { S: 0.7, M: 0.3 }, "flamenco": { S: 0.8, I: 0.2 }, "samba": { S: 0.7, C: 0.3 }, "salsa": { S: 0.6, C: 0.4 }, "pagode": { C: 0.6, S: 0.4 }, "big band": { S: 1.0 },
-    "cabaret": { S: 1.0 }, "minimalism": { S: 0.8, M: 0.2 }, "opera": { S: 1.0 }, "musicals": { S: 0.8, M: 0.2 }, "a cappella": { S: 0.7, M: 0.3 }, "progressive rock": { S: 0.7, I: 0.3 },
-    "rock": { I: 1.0 }, "rock and roll": { U: 0.6, I: 0.4 }, "metal": { I: 1.0 }, "hard rock": { I: 1.0 },
-    "aggressive": { I: 1.0 }, "punk": { I: 1.0 }, "angst": { I: 1.0 }, "emo": { I: 0.7, M: 0.3 },
-    "heavy metal": { I: 1.0 }, "angry": { I: 1.0 }, "nu metal": { I: 0.9, C: 0.1 }, "alternative metal": { I: 0.9, C: 0.1 }, "rock en espa": { I: 0.9, C: 0.1 },
-    "grunge": { I: 1.0 }, "death metal": { I: 1.0 }, "metalcore": { I: 1.0 }, "screamo": { I: 1.0 }, "post-hardcore": { I: 0.9, C: 0.1 },
-    "rockabilly": { I: 0.8, U: 0.2 }, "industrial": { I: 0.8, C: 0.2 }, "hardcore punk": { I: 1.0 },
-    "black metal": { I: 1.0 }, "doom metal": { I: 1.0 }, "southern rock": { I: 0.7, U: 0.3 },
-    "pop": { U: 0.4, C: 0.4, M: 0.2 }, "electronic": { M: 0.6, C: 0.4 }, "electronica": { M: 0.6, C: 0.4 }, "dance pop": { C: 0.6, U: 0.4 },
-    "dance": { C: 0.6, M: 0.4 }, "electropop": { C: 0.8, M: 0.2 }, "upbeat": { C: 1.0 }, "energetic": { C: 0.7, I: 0.3 }, "electro": { C: 0.8, M: 0.2 },
-    "edm": { C: 1.0 }, "fast": { C: 1.0 }, "happy": { C: 0.7, M: 0.3 }, "pump up": { C: 0.8, I: 0.2 }, "anime": { C: 0.7, I: 0.3 },
-    "beats": { C: 0.8, M: 0.2 }, "hip hop": { C: 1.0 }, "club": { C: 1.0 }, "rap": { C: 1.0 },
-    "disco": { C: 1.0 }, "house": { C: 1.0 }, "garage": { C: 1.0 }, "gaming": { C: 0.7, I: 0.3 },
-    "bubblegum pop": { C: 1.0 }, "ibiza": { C: 1.0 }, "funk": { C: 0.8, S: 0.2 }, "techno": { C: 1.0 }, "minimal techno": { C: 0.7, M: 0.3 },
-    "motivation": { C: 0.8, I: 0.2 }, "trap": { C: 1.0 }, "trance": { C: 1.0 }, "goa trance": { C: 0.8, I: 0.2 }, "funny": { C: 0.8, U: 0.2 },
-    "motown": { C: 0.6, S: 0.4 }, "reggaeton": { C: 1.0 }, "reggae": { S: 0.5, C: 0.5 }, "k-pop": { C: 1.0 },
-    "dub": { C: 0.8, M: 0.2 }, "ska": { C: 0.7, I: 0.3 }, "drum and bass": { C: 0.8, I: 0.2 }, "j-pop": { C: 1.0 },
-    "dubstep": { C: 0.8, I: 0.2 }, "trap latino": { C: 1.0 }, "gangster rap": { C: 1.0 }, "crunk": { C: 1.0 },
-    "hardstyle": { C: 0.8, I: 0.2 }, "hardcore techno": { C: 0.8, I: 0.2 }, "afrobeats": { C: 1.0 }, "dancehall": { C: 1.0 },
-    "funk carioca": { C: 1.0 }, "merengue": { C: 1.0 }, "bachata": { C: 1.0 }, "roots reggae": { S: 0.5, C: 0.3, U: 0.2 },
-    "grime": { C: 0.8, I: 0.2 }, "happy hardcore": { C: 0.8, I: 0.2 }, "chillwave": { M: 0.6, C: 0.4 },
-    "pop rock": { C: 0.6, I: 0.4 },
-    "alternative rock": { I: 0.7, C: 0.3 },
-    "modern rock": { I: 0.7, C: 0.3 },
-    "indie": { C: 0.5, M: 0.3, U: 0.2 },
-    "classic rock": { I: 0.8, S: 0.2 },
-    "soft rock": { M: 0.7, I: 0.3 },
-    "indie rock": { I: 0.6, C: 0.3, M: 0.1 },
-    "pop rap": { C: 1.0 },
-    "indie pop": { C: 0.6, M: 0.4 },
-    "synthpop": { C: 0.8, M: 0.2 },
-    "synth pop": { C: 0.8, M: 0.2 },
-    "alternative pop": { C: 0.7, M: 0.3 },
-    "garage rock": { I: 0.8, U: 0.2 },
-    "r&b": { M: 0.6, C: 0.4 },
-    "electro house": { C: 0.8, I: 0.2 },
-    "roots rock": { I: 0.6, U: 0.4 },
-    "folk rock": { U: 0.6, I: 0.4 },
-    "psychedelic rock": { I: 0.6, S: 0.4 },
-    "pop punk": { I: 0.6, C: 0.4 },
-    "new wave": { C: 0.6, I: 0.4 },
-    "jazz blues": { S: 0.8, U: 0.2 },
-    "britpop": { C: 0.6, I: 0.4 },
-    "folk pop": { U: 0.5, C: 0.3, M: 0.2 },
-    "soul": { M: 0.6, S: 0.4 },
-    "jazz funk": { S: 0.7, C: 0.3 },
-    "trip hop": { C: 0.5, M: 0.3, S: 0.2 },
-    "deep house": { C: 0.8, M: 0.2 },
-    "aor": { I: 0.5, M: 0.3, S: 0.2 },
-    "spooky": { M: 0.5, I: 0.5 },
-    "indie folk": { U: 0.6, M: 0.4 },
-    "chillstep": { C: 0.6, M: 0.4 },
-    "blues rock": { I: 0.7, S: 0.3 },
-    "dream pop": { M: 0.7, C: 0.3 },
-    "funk rock": { I: 0.6, C: 0.4 },
-    "synthwave": { C: 0.6, M: 0.4 },
-    "smooth jazz": { S: 0.7, M: 0.3 },
-    "alternative hip hop": { C: 0.7, S: 0.3 },
-    "country rock": { U: 0.6, I: 0.4 },
-    "post-punk": { I: 0.7, S: 0.3 },
-    "southern hip hop": { C: 1.0 },
-    "vaporwave": { M: 0.6, C: 0.4 },
-    "post-rock": { S: 0.5, I: 0.5 },
-    "shoegaze": { I: 0.6, M: 0.4 }
-  };
-
-  const NORMALIZED_MUSIC_MODEL_MAP = {};
-  for (const [k, v] of Object.entries(MUSIC_MODEL_MAP)) {
-      NORMALIZED_MUSIC_MODEL_MAP[k] = v;
-      NORMALIZED_MUSIC_MODEL_MAP[normalizeGenre(k)] = v;
-      NORMALIZED_MUSIC_MODEL_MAP[getNormalizedGenreKey(k)] = v;
-  }
 
   function getTrackMusicProfile(genres, features) {
       let m = 0, u = 0, s = 0, i = 0, c = 0;
@@ -52308,21 +56799,27 @@ shadowRoot.innerHTML = `
                         throw new Error("No personal scrobbles found for any tracks in this list.");
                     }
 
-                    let tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
+                    let tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: track._origIndex ?? index }));
 
                     sortedTracks = tracksToSort.sort((a, b) => {
                         const getVal = (t) => (typeof t.personalScrobbles === 'number') ? t.personalScrobbles : -1;
                         const valA = getVal(a);
                         const valB = getVal(b);
 
-                        if (valA === valB) {
-                             return a.originalIndex - b.originalIndex;
+                        if (valA !== valB) {
+                            return isAscending ? valA - valB : valB - valA;
                         }
-                        
-                        return isAscending ? valA - valB : valB - valA;
+
+                        const globA = (typeof a.scrobbles === 'number') ? a.scrobbles : -1;
+                        const globB = (typeof b.scrobbles === 'number') ? b.scrobbles : -1;
+                        if (globA !== globB) {
+                            return isAscending ? globA - globB : globB - globA;
+                        }
+
+                        return a.originalIndex - b.originalIndex;
                     });
                 } else { 
-                    const tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: index }));
+                    const tracksToSort = uniqueTracks.map((track, index) => ({ ...track, originalIndex: track._origIndex ?? index }));
 
                     sortedTracks = tracksToSort.sort((a, b) => {
                         const getVal = (t) => (typeof t.scrobbles === 'number') ? t.scrobbles : -1;
@@ -55262,10 +59759,11 @@ shadowRoot.innerHTML = `
       if (!lastFmUsername) throw new Error('Last.fm username required for personal scrobbles sorting');
     }
 
-    const tracksWithLfmKeys = tracks.map(track => {
+    const tracksWithLfmKeys = tracks.map((track, idx) => {
         const lfmInfo = getLfmInfo(track);
         return {
             ...track,
+            _origIndex: track._origIndex ?? idx,
             _lfmKey: lfmInfo ? lfmInfo.key : null,
             id: Spicetify.URI.isLocal(track.uri) ? track.uri : track.uri.split(":")[2]
         };
@@ -55275,13 +59773,17 @@ shadowRoot.innerHTML = `
     const storeName = isPersonal ? 'personalScrobbles' : 'scrobbles';
     const expiryTime = isPersonal ? CACHE_EXPIRE_PERSONAL_SCROBBLES : CACHE_EXPIRE_GLOBAL_SCROBBLES;
     
-    const cachedMap = await idb.getMany(storeName, allLfmKeys, expiryTime);
+    const [cachedMap, highWaterGlobalMap] = await Promise.all([
+        idb.getMany(storeName, allLfmKeys, expiryTime),
+        idb.getMany('scrobbles', allLfmKeys)
+    ]);
 
     const results = [];
     const missingTracks = [];
 
     tracksWithLfmKeys.forEach(track => {
         const cached = track._lfmKey ? cachedMap.get(track._lfmKey) : null;
+        const cachedGlobal = track._lfmKey ? highWaterGlobalMap.get(track._lfmKey) : undefined;
         
         let hasValidCache = false;
         let val = null;
@@ -55299,7 +59801,11 @@ shadowRoot.innerHTML = `
         }
 
         if (hasValidCache) {
-            results.push({ ...track, [sortType]: val });
+            const entry = { ...track, [sortType]: val };
+            if (isPersonal && typeof cachedGlobal === 'number') {
+                entry.scrobbles = cachedGlobal;
+            }
+            results.push(entry);
         } else {
             missingTracks.push({
                 ...track,
@@ -55311,17 +59817,17 @@ shadowRoot.innerHTML = `
     });
 
     if (missingTracks.length > 0) {
-        const highWaterGlobalMap = await idb.getMany('scrobbles', allLfmKeys);
         const fetchFunction = isPersonal ? getTrackDetailsWithPersonalScrobbles : getTrackDetailsWithScrobbles;
         
         if (L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
-        const safeConcurrencyPerKey = 5;
-        const validKeys = L_F_M_Key_Pool.length - revokedLfmKeys.size;
-        const totalConcurrency = Math.min(250, Math.max(5, validKeys * safeConcurrencyPerKey));
+        const safeConcurrencyPerKey = 3;
+        const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+        const totalConcurrency = Math.min(100, Math.max(5, validKeys * safeConcurrencyPerKey));
 
         let currentIndex = 0;
         let processedCount = 0;
         let lastReported = -1;
+        const batchKeyPromises = new Map();
 
         const worker = async () => {
             while (currentIndex < missingTracks.length) {
@@ -55329,7 +59835,18 @@ shadowRoot.innerHTML = `
                 if (!track) continue;
 
                 try {
-                    const result = await fetchFunction(track, false, true, true);
+                    let result;
+                    if (track._lfmKey) {
+                        let keyPromise = batchKeyPromises.get(track._lfmKey);
+                        if (!keyPromise) {
+                            keyPromise = fetchFunction(track, false, true, true);
+                            batchKeyPromises.set(track._lfmKey, keyPromise);
+                        }
+                        const baseResult = await keyPromise;
+                        result = baseResult ? { ...baseResult, ...track, scrobbles: baseResult.scrobbles, personalScrobbles: baseResult.personalScrobbles, error: baseResult.error, errorLabel: baseResult.errorLabel } : null;
+                    } else {
+                        result = await fetchFunction(track, false, true, true);
+                    }
                     if (result) {
                         const prevHigh = track._lfmKey ? highWaterGlobalMap.get(track._lfmKey) : null;
                         if (typeof prevHigh === 'number' && prevHigh >= 0 && (result.scrobbles === undefined || result.scrobbles === null || prevHigh > result.scrobbles)) {
@@ -55397,6 +59914,7 @@ shadowRoot.innerHTML = `
         updateProgress(100);
     }
 
+    results.sort((a, b) => (a._origIndex ?? 0) - (b._origIndex ?? 0));
     return results;
   }
 
@@ -55472,71 +59990,94 @@ shadowRoot.innerHTML = `
     const scrobblesMap = new Map();
     const limit = 200;
     const maxPages = 25;
-    let currentPage = 1;
 
     updateProgress(0);
 
-    while (currentPage <= maxPages) {
+    const fetchPage = async (pageNum) => {
       const params = new URLSearchParams({
         method: 'user.getrecenttracks',
         user: username,
         limit: limit.toString(),
-        page: currentPage.toString(),
+        page: pageNum.toString(),
         format: 'json'
       });
-      
-      try {
-        const response = await fetchLfmWithGateway(params);
-        const text = await response.text();
-        const data = text ? JSON.parse(text) : null;
+      const response = await fetchLfmWithGateway(params);
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
 
-        if (data && data.error) {
-            if (data.error === 17) {
-                throw new Error("Last.fm profile is private. Please make your listening history public.");
-            }
-            throw new Error(data.message || "Last.fm API Error");
+      if (data && data.error) {
+        if (data.error === 17) {
+          throw new Error("Last.fm profile is private. Please make your listening history public.");
         }
-
-        if (!response.ok) {
-            console.warn(`Last.fm API request for recent tracks failed on page ${currentPage}`);
-            if (currentPage === 1) throw new Error("Failed to fetch recent scrobbles from Last.fm");
-            break; 
-        }
-
-        const tracks = data?.recenttracks?.track;
-
-        if (!tracks || tracks.length === 0) {
-          break;
-        }
-        
-        const processableTracks = tracks.filter(t => t.date && t.date.uts);
-
-        for (const track of processableTracks) {
-          const artist = track.artist['#text'].toLowerCase();
-          const name = track.name.toLowerCase();
-          const key = `${artist}|-|${name}`;
-          
-          if (!scrobblesMap.has(key)) {
-            scrobblesMap.set(key, parseInt(track.date.uts, 10) * 1000);
-          }
-        }
-
-        updateProgress(Math.floor((currentPage / maxPages) * 100));
-
-        if (currentPage >= data.recenttracks['@attr'].totalPages) {
-            break;
-        }
-
-        currentPage++;
-      } catch (error) {
-        console.error(`Error fetching page ${currentPage} of recent scrobbles:`, error);
-        if (currentPage === 1 || error.message.includes("private") || error.message.includes("public")) {
-            throw error;
-        }
-        break; 
+        throw new Error(data.message || "Last.fm API Error");
       }
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch recent scrobbles from Last.fm (page ${pageNum})`);
+      }
+
+      return data;
+    };
+
+    const extractPageTracks = (data) => {
+      const rawTracks = data?.recenttracks?.track;
+      const tracks = Array.isArray(rawTracks) ? rawTracks : (rawTracks ? [rawTracks] : []);
+      for (const track of tracks) {
+        if (!track?.date?.uts) continue;
+        const artist = (track.artist?.['#text'] || track.artist?.name || '').toLowerCase();
+        const name = (track.name || '').toLowerCase();
+        if (!artist || !name) continue;
+        const key = `${artist}|-|${name}`;
+        if (!scrobblesMap.has(key)) {
+          scrobblesMap.set(key, parseInt(track.date.uts, 10) * 1000);
+        }
+      }
+    };
+
+    const firstPageData = await fetchPage(1);
+    extractPageTracks(firstPageData);
+
+    const rawTotalPages = parseInt(firstPageData?.recenttracks?.['@attr']?.totalPages, 10) || 1;
+    const totalPages = Math.min(maxPages, rawTotalPages);
+
+    if (totalPages <= 1) {
+      updateProgress(100);
+      return scrobblesMap;
     }
-    
+
+    let completedPages = 1;
+    updateProgress(Math.floor((completedPages / totalPages) * 100));
+
+    const remainingPageNumbers = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+    const validKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+    const concurrency = Math.min(remainingPageNumbers.length, Math.max(4, validKeys * 3));
+    const pageResults = [];
+    let pageIdx = 0;
+
+    const workers = Array.from({ length: concurrency }, async () => {
+      while (pageIdx < remainingPageNumbers.length) {
+        const pageNum = remainingPageNumbers[pageIdx++];
+        try {
+          const data = await fetchPage(pageNum);
+          pageResults.push({ pageNum, data });
+        } catch (error) {
+          console.error(`Error fetching page ${pageNum} of recent scrobbles:`, error);
+          pageResults.push({ pageNum, data: null });
+        } finally {
+          completedPages++;
+          updateProgress(Math.floor((completedPages / totalPages) * 100));
+        }
+      }
+    });
+
+    await Promise.all(workers);
+
+    pageResults
+      .sort((a, b) => a.pageNum - b.pageNum)
+      .forEach(({ data }) => {
+        if (data) extractPageTracks(data);
+      });
+
     updateProgress(100);
     return scrobblesMap;
   }
@@ -55613,16 +60154,24 @@ shadowRoot.innerHTML = `
       
       updateProgress("Matching...");
 
-      const results = tracks.map(track => {
+      const lfmInfos = tracks.map(t => getLfmInfo(t));
+      const allLfmKeys = [...new Set(lfmInfos.map(info => info?.key).filter(Boolean))];
+      const cachedGlobalMap = allLfmKeys.length > 0 ? await idb.getMany('scrobbles', allLfmKeys) : new Map();
+
+      const results = tracks.map((track, idx) => {
           const trackId = Spicetify.URI.isLocal(track.uri) ? track.uri : (track.uri ? track.uri.split(":")[2] : (track.track ? track.track.id : null));
           let playCount = 0;
-          const lfmInfo = getLfmInfo(track);
+          const lfmInfo = lfmInfos[idx];
+          let globalScrobbles = track.scrobbles;
           
           if (lfmInfo) {
               playCount = lfmMap.get(lfmInfo.key) || 0;
+              if (globalScrobbles === undefined && cachedGlobalMap.has(lfmInfo.key)) {
+                  globalScrobbles = cachedGlobalMap.get(lfmInfo.key);
+              }
           }
 
-          return { ...track, personalScrobbles: playCount, id: trackId };
+          return { ...track, _origIndex: track._origIndex ?? idx, personalScrobbles: playCount, scrobbles: globalScrobbles, id: trackId };
       });
 
       updateProgress("100%");
@@ -58624,6 +63173,12 @@ shadowRoot.innerHTML = `
                     const resolvedVals = {};
 
                     for (const c of nonAudioConfigs) {
+                        const needsCol = activeEls.some(el => {
+                            const dEl = el.querySelector(c.dataSelector);
+                            return dEl && !dEl.dataset.spProcessed;
+                        });
+                        if (!needsCol) continue;
+
                         if (c.type === 'playCount') {
                             let pc = dataMap.playCounts?.get(t.id);
                             if (pc !== undefined && pc !== null) {
@@ -58653,14 +63208,22 @@ shadowRoot.innerHTML = `
                             resolvedVals.info = info;
 
                             if (c.type === 'scrobbles') {
-                                const r = await getTrackDetailsWithScrobbles(info, true);
-                                resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.scrobbles;
+                                if (resolvedVals.scrobbles === undefined) {
+                                    const r = await getTrackDetailsWithScrobbles(info, true);
+                                    resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
+                                    if (r.personalScrobbles !== undefined && resolvedVals.personalScrobbles === undefined) {
+                                        resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
+                                    }
+                                }
                             } else if (c.type === 'personalScrobbles') {
-                                if (loadLastFmUsername()) {
-                                    const r = await getTrackDetailsWithPersonalScrobbles(info, true);
-                                    resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: "N/A" } : r.personalScrobbles;
-                                } else {
+                                if (!loadLastFmUsername()) {
                                     resolvedVals.personalScrobbles = { error: "Set last.fm username", errorLabel: "No User" };
+                                } else if (resolvedVals.personalScrobbles === undefined) {
+                                    const r = await getTrackDetailsWithPersonalScrobbles(info, true);
+                                    resolvedVals.personalScrobbles = (r.personalScrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.personalScrobbles;
+                                    if (r.scrobbles !== undefined && resolvedVals.scrobbles === undefined) {
+                                        resolvedVals.scrobbles = (r.scrobbles === -1 || r.error) ? { error: r.error || "Not found", errorLabel: r.errorLabel || "N/A" } : r.scrobbles;
+                                    }
                                 }
                             } else if (c.type === 'lastScrobbled') {
                                 if (loadLastFmUsername()) {
@@ -58804,7 +63367,10 @@ shadowRoot.innerHTML = `
                         await processTrackData(t);
                     };
 
-                    const CONCURRENCY_LIMIT = 5;
+                    const hasLfmCol = nonAudioConfigs.some(c => c.type === 'scrobbles' || c.type === 'personalScrobbles' || c.type === 'lastScrobbled');
+                    if (hasLfmCol && L_F_M_Key_Pool.length === 0) await fetchLastFmKeys();
+                    const validLfmKeys = Math.max(1, L_F_M_Key_Pool.length - revokedLfmKeys.size);
+                    const CONCURRENCY_LIMIT = hasLfmCol ? Math.min(25, Math.max(5, validLfmKeys * 2)) : 5;
                     const queue = [...idsToFetchFromApi];
                     const workers = Array(Math.min(CONCURRENCY_LIMIT, queue.length)).fill(null).map(async () => {
                         while (queue.length > 0) {
@@ -62440,23 +67006,23 @@ shadowRoot.innerHTML = `
   
   Spicetify.Player.addEventListener("songchange", async () => {
       const currentTrack = Spicetify.Player.data?.item;
-      if (currentTrack && currentTrack.uri && !Spicetify.URI.isLocal(currentTrack.uri)) {
+      if (currentTrack && currentTrack.uri && !Spicetify.URI.isLocal(currentTrack.uri) && hasActiveBlacklistRules()) {
           if (blacklistPlayTimer) clearTimeout(blacklistPlayTimer);
           blacklistPlayTimer = setTimeout(() => {
               consecutiveBlacklistSkips = 0;
           }, 4000);
 
-          if (genreBlacklistEnabled && genreBlacklistRules.length > 0) {
+          if (prefetchBlacklistMap.has(currentTrack.uri)) {
               const prefetched = prefetchBlacklistMap.get(currentTrack.uri);
+              prefetchBlacklistMap.delete(currentTrack.uri);
               if (prefetched) {
-                  prefetchBlacklistMap.delete(currentTrack.uri);
                   const isLiked = await isTrackLikedForBlacklist(currentTrack.uri);
                   if (!isLiked) {
                       triggerBlacklistAutoSkip(currentTrack, prefetched.matchedGenre);
                       return;
                   }
               }
-
+          } else {
               if (blacklistDebounceTimer) clearTimeout(blacklistDebounceTimer);
               blacklistDebounceTimer = setTimeout(() => {
                   evaluateTrackAgainstBlacklist(currentTrack, false);
