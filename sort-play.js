@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.10.1";
+  const SORT_PLAY_VERSION = "6.10.2";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -60677,23 +60677,22 @@ shadowRoot.innerHTML = `
     }
 
     const titleCell = trackElement.querySelector('[role="gridcell"][aria-colindex="2"], .main-trackList-rowSectionStart');
-    if (titleCell) {
-        if (!name) {
-            const titleEl = titleCell.querySelector('a[href*="/track/"], .main-trackList-rowTitle, div[data-encore-id="text"], .standalone-ellipsis-one-line');
-            if (titleEl) name = titleEl.textContent.trim();
-        }
-        const artistLinks = Array.from(titleCell.querySelectorAll('a[href*="/artist/"]'));
-        if (artistLinks.length > 0) {
-            artists = artistLinks.map(a => {
-                const aId = a.getAttribute('href')?.split('/artist/')[1]?.split('?')[0];
-                return { name: a.textContent.trim(), id: aId || null, uri: aId ? `spotify:artist:${aId}` : null };
-            }).filter(a => a.name);
-        } else if (!artistName) {
-            const leafTexts = Array.from(titleCell.querySelectorAll('[data-encore-id="text"]'))
-                .filter(el => !el.querySelector('[data-encore-id="text"]') && el.textContent.trim());
-            if (leafTexts.length > 1) {
-                artistName = leafTexts[leafTexts.length - 1].textContent.trim();
-            }
+    if (titleCell && !name) {
+        const titleEl = titleCell.querySelector('a[href*="/track/"], .main-trackList-rowTitle, div[data-encore-id="text"], .standalone-ellipsis-one-line');
+        if (titleEl) name = titleEl.textContent.trim();
+    }
+
+    const artistLinks = Array.from(trackElement.querySelectorAll('a[href*="/artist/"]'));
+    if (artistLinks.length > 0) {
+        artists = artistLinks.map(a => {
+            const aId = a.getAttribute('href')?.split('/artist/')[1]?.split('?')[0];
+            return { name: a.textContent.trim(), id: aId || null, uri: aId ? `spotify:artist:${aId}` : null };
+        }).filter(a => a.name);
+    } else if (!artistName && titleCell) {
+        const leafTexts = Array.from(titleCell.querySelectorAll('[data-encore-id="text"]'))
+            .filter(el => !el.querySelector('[data-encore-id="text"], [data-encore-id="tagIcon"], [aria-label="Explicit"]') && !el.closest('[data-encore-id="tagIcon"], [aria-label="Explicit"]') && el.textContent.trim());
+        if (leafTexts.length > 1) {
+            artistName = leafTexts[leafTexts.length - 1].textContent.trim();
         }
     }
 
@@ -60701,19 +60700,17 @@ shadowRoot.innerHTML = `
         artists = [{ name: artistName }];
     }
 
-    const albumCell = trackElement.querySelector('[role="gridcell"][aria-colindex="3"]');
-    if (albumCell) {
-        const albumLink = albumCell.querySelector('a[href*="/album/"]');
-        if (albumLink) {
-            albumName = albumLink.textContent.trim();
-            const albId = albumLink.getAttribute('href')?.split('/album/')[1]?.split('?')[0];
-            if (albId) albumUri = `spotify:album:${albId}`;
-        } else if (!albumName && Spicetify.URI.isLocal(uri)) {
-            albumName = albumCell.textContent.trim();
-        }
+    const albumLink = trackElement.querySelector('a[href*="/album/"]');
+    if (albumLink) {
+        albumName = albumLink.textContent.trim();
+        const albId = albumLink.getAttribute('href')?.split('/album/')[1]?.split('?')[0];
+        if (albId) albumUri = `spotify:album:${albId}`;
+    } else if (!albumName && Spicetify.URI.isLocal(uri)) {
+        const albumCell = trackElement.querySelector('[role="gridcell"][aria-colindex="3"]');
+        if (albumCell) albumName = albumCell.textContent.trim();
     }
 
-    if (!name) return null;
+    if (!name || (!Spicetify.URI.isLocal(uri) && artists.length === 0)) return null;
 
     return {
         uri,
@@ -62930,6 +62927,12 @@ shadowRoot.innerHTML = `
                     }
                 });
             } else {
+                columnConfigs.forEach(config => {
+                    const dataElement = trackElement.querySelector(config.dataSelector);
+                    if (dataElement && !dataElement.dataset.spProcessed) {
+                        updateDisplay(dataElement, "―", config.type);
+                    }
+                });
                 trackElement.classList.remove('sort-play-processing');
             }
         } else if (trackUri.includes("track")) {
@@ -63735,7 +63738,7 @@ shadowRoot.innerHTML = `
     
     if (nativeHeaders.length === 0) return;
     
-    const endHeaderCell = tracklistHeader.querySelector(".main-trackList-rowSectionEnd") || tracklistHeader.lastElementChild;
+    const endHeaderCell = tracklistHeader.querySelector(".main-trackList-rowSectionEnd") || nativeHeaders[nativeHeaders.length - 1];
     let dateAddedHeaderCell = nativeHeaders.find(el => {
         const txt = el.textContent || '';
         return txt.includes('Date added') || txt.includes('Date Added') || txt.includes('Added');
@@ -63745,8 +63748,8 @@ shadowRoot.innerHTML = `
         if (variableHeaders.length > 0) dateAddedHeaderCell = variableHeaders[variableHeaders.length - 1];
     }
 
-    const dateAddedIndexAttr = dateAddedHeaderCell ? dateAddedHeaderCell.getAttribute("aria-colindex") : null;
     const skeletonDateAddedIndex = nativeHeaders.indexOf(dateAddedHeaderCell);
+    const dateAddedIndexAttr = skeletonDateAddedIndex !== -1 ? (skeletonDateAddedIndex + 1).toString() : null;
 
     let existingHeaderColumn = tracklistHeader.querySelector(".sort-play-column");
     const headerTextSpan = existingHeaderColumn?.querySelector("span");
@@ -63810,18 +63813,23 @@ shadowRoot.innerHTML = `
             if (endHeaderCell) tracklistHeader.insertBefore(headerColumn, endHeaderCell);
             else tracklistHeader.appendChild(headerColumn);
             existingHeaderColumn = headerColumn;
-        } else if (columnTypeChanged) {
-            if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
-            tracklist_.querySelectorAll('.sort-play-data').forEach(cell => { 
-                cell.textContent = ""; 
-                delete cell.dataset.spProcessed; 
-                cell.onclick = null;
-                cell.onmouseover = null;
-                cell.onmouseout = null;
-                cell.style.cursor = "default";
-                cell.style.textDecoration = "none";
-                cell.removeAttribute('title');
-            });
+        } else {
+            if (endHeaderCell && existingHeaderColumn.nextElementSibling !== endHeaderCell) {
+                tracklistHeader.insertBefore(existingHeaderColumn, endHeaderCell);
+            }
+            if (columnTypeChanged) {
+                if (headerTextSpan) headerTextSpan.innerText = expectedHeaderText;
+                tracklist_.querySelectorAll('.sort-play-data').forEach(cell => { 
+                    cell.textContent = ""; 
+                    delete cell.dataset.spProcessed; 
+                    cell.onclick = null;
+                    cell.onmouseover = null;
+                    cell.onmouseout = null;
+                    cell.style.cursor = "default";
+                    cell.style.textDecoration = "none";
+                    cell.removeAttribute('title');
+                });
+            }
         }
     } else if (existingHeaderColumn) {
         existingHeaderColumn.remove();
@@ -63829,34 +63837,34 @@ shadowRoot.innerHTML = `
     }
 
     if (showSecondAdditionalColumn) {
+        const insertBeforeNode = existingHeaderColumn || endHeaderCell;
         if (!existingSecondHeaderColumn) {
             const headerColumn = createHeaderColumn('sort-play-second-column', expectedSecondHeaderText, 'playlist2');
-            const firstExtra = tracklistHeader.querySelector(".sort-play-column");
-            const insertBeforeNode = firstExtra || endHeaderCell;
             if (insertBeforeNode) tracklistHeader.insertBefore(headerColumn, insertBeforeNode);
             else tracklistHeader.appendChild(headerColumn);
             existingSecondHeaderColumn = headerColumn;
-        } else if (secondColumnTypeChanged) {
-            if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
-            tracklist_.querySelectorAll('.sort-play-second-data').forEach(cell => { 
-                cell.textContent = ""; 
-                delete cell.dataset.spProcessed; 
-                cell.onclick = null;
-                cell.onmouseover = null;
-                cell.onmouseout = null;
-                cell.style.cursor = "default";
-                cell.style.textDecoration = "none";
-                cell.removeAttribute('title');
-            });
+        } else {
+            if (insertBeforeNode && existingSecondHeaderColumn.nextElementSibling !== insertBeforeNode) {
+                tracklistHeader.insertBefore(existingSecondHeaderColumn, insertBeforeNode);
+            }
+            if (secondColumnTypeChanged) {
+                if (secondHeaderTextSpan) secondHeaderTextSpan.innerText = expectedSecondHeaderText;
+                tracklist_.querySelectorAll('.sort-play-second-data').forEach(cell => { 
+                    cell.textContent = ""; 
+                    delete cell.dataset.spProcessed; 
+                    cell.onclick = null;
+                    cell.onmouseover = null;
+                    cell.onmouseout = null;
+                    cell.style.cursor = "default";
+                    cell.style.textDecoration = "none";
+                    cell.removeAttribute('title');
+                });
+            }
         }
     } else if (existingSecondHeaderColumn) {
         existingSecondHeaderColumn.remove();
         existingSecondHeaderColumn = null;
     }
-
-    const headerChildren = Array.from(tracklistHeader.children);
-    const sp1HeaderIndex = existingHeaderColumn ? headerChildren.indexOf(existingHeaderColumn) : -1;
-    const sp2HeaderIndex = existingSecondHeaderColumn ? headerChildren.indexOf(existingSecondHeaderColumn) : -1;
 
     let currentHeaderCols = Array.from(tracklistHeader.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
     currentHeaderCols.forEach((el, index) => {
@@ -63866,21 +63874,8 @@ shadowRoot.innerHTML = `
         }
     });
     
-    let maxCols = currentHeaderCols.length;
-    const allRenderedRows = tracklist_.querySelectorAll('.main-trackList-trackListRow, [role="row"]:not([aria-rowindex="1"])');
-    for (const row of allRenderedRows) {
-        const rowCols = Array.from(row.querySelectorAll('[role="gridcell"]')).filter(el => el.style.display !== 'none').length;
-        if (rowCols > maxCols) {
-            maxCols = rowCols;
-        }
-    }
-    
-    let storedMax = parseInt(tracklist_.getAttribute('data-sp-max-cols') || "0");
-    if (maxCols > storedMax) {
-        storedMax = maxCols;
-        tracklist_.setAttribute('data-sp-max-cols', storedMax.toString());
-    }
-    maxCols = Math.max(maxCols, storedMax);
+    const maxCols = currentHeaderCols.length;
+    tracklist_.setAttribute('data-sp-max-cols', maxCols.toString());
 
     const expectedColCount = maxCols.toString();
     if (tracklist_.getAttribute('aria-colcount') !== expectedColCount) {
@@ -63969,31 +63964,7 @@ shadowRoot.innerHTML = `
             dateAddedCell.style.display = shouldRemoveDateAdded ? 'none' : '';
         }
 
-        if (showSecondAdditionalColumn) {
-            if (!existingSecondDataColumn) {
-                existingSecondDataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
-            } else if (secondColumnTypeChanged) {
-                const dataSpan = existingSecondDataColumn.querySelector('.sort-play-second-data');
-                if (dataSpan) {
-                    dataSpan.textContent = "";
-                    delete dataSpan.dataset.spProcessed;
-                    dataSpan.onclick = null;
-                    dataSpan.onmouseover = null;
-                    dataSpan.onmouseout = null;
-                    dataSpan.style.cursor = "default";
-                    dataSpan.style.textDecoration = "none";
-                    dataSpan.removeAttribute('title');
-                }
-            }
-            const targetNode = cellContainer.children[sp2HeaderIndex];
-            if (targetNode && existingSecondDataColumn !== targetNode) {
-                cellContainer.insertBefore(existingSecondDataColumn, targetNode);
-            } else if (!targetNode && existingSecondDataColumn.parentElement !== cellContainer) {
-                cellContainer.appendChild(existingSecondDataColumn);
-            }
-        } else if (existingSecondDataColumn) {
-            existingSecondDataColumn.remove();
-        }
+        const endCell = cellContainer.querySelector(".main-trackList-rowSectionEnd") || Array.from(cellContainer.children).filter(el => !el.classList.contains('sort-play-data-column') && !el.classList.contains('sort-play-second-data-column')).pop();
 
         if (showAdditionalColumn) {
             if (!existingDataColumn) {
@@ -64011,14 +63982,41 @@ shadowRoot.innerHTML = `
                     dataSpan.removeAttribute('title');
                 }
             }
-            const targetNode = cellContainer.children[sp1HeaderIndex];
-            if (targetNode && existingDataColumn !== targetNode) {
-                cellContainer.insertBefore(existingDataColumn, targetNode);
-            } else if (!targetNode && existingDataColumn.parentElement !== cellContainer) {
+            if (endCell && existingDataColumn.nextElementSibling !== endCell) {
+                cellContainer.insertBefore(existingDataColumn, endCell);
+            } else if (!endCell && existingDataColumn.parentElement !== cellContainer) {
                 cellContainer.appendChild(existingDataColumn);
             }
         } else if (existingDataColumn) {
             existingDataColumn.remove();
+            existingDataColumn = null;
+        }
+
+        if (showSecondAdditionalColumn) {
+            if (!existingSecondDataColumn) {
+                existingSecondDataColumn = createDataColumn('sort-play-second-data-column sort-play-second-column', 'sort-play-second-data');
+            } else if (secondColumnTypeChanged) {
+                const dataSpan = existingSecondDataColumn.querySelector('.sort-play-second-data');
+                if (dataSpan) {
+                    dataSpan.textContent = "";
+                    delete dataSpan.dataset.spProcessed;
+                    dataSpan.onclick = null;
+                    dataSpan.onmouseover = null;
+                    dataSpan.onmouseout = null;
+                    dataSpan.style.cursor = "default";
+                    dataSpan.style.textDecoration = "none";
+                    dataSpan.removeAttribute('title');
+                }
+            }
+            const targetNode = existingDataColumn || endCell;
+            if (targetNode && existingSecondDataColumn.nextElementSibling !== targetNode) {
+                cellContainer.insertBefore(existingSecondDataColumn, targetNode);
+            } else if (!targetNode && existingSecondDataColumn.parentElement !== cellContainer) {
+                cellContainer.appendChild(existingSecondDataColumn);
+            }
+        } else if (existingSecondDataColumn) {
+            existingSecondDataColumn.remove();
+            existingSecondDataColumn = null;
         }
     }
   }
@@ -64188,16 +64186,19 @@ shadowRoot.innerHTML = `
             if (existingHeader) {
                 const headerRow = existingHeader.parentElement;
                 existingHeader.remove();
-                if(headerRow) headerRow.style.gridTemplateColumns = "";
-                tracklistContainer.setAttribute('aria-colcount', '4');
-                const allRows = tracklistContainer.querySelectorAll('.main-trackList-trackList .main-trackList-trackListRow');
-                allRows.forEach(row => {
-                    const cell = row.querySelector('.sort-play-album-col');
-                    if (cell) cell.remove();
+                if (headerRow) {
+                    headerRow.style.gridTemplateColumns = "";
+                    const remainingHeaders = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
+                    remainingHeaders.forEach((el, idx) => el.setAttribute('aria-colindex', (idx + 1).toString()));
+                    tracklistContainer.setAttribute('aria-colcount', remainingHeaders.length.toString());
+                }
+                tracklistContainer.querySelectorAll('.sort-play-album-col, .sort-play-album-skeleton-col').forEach(el => el.remove());
+                tracklistContainer.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
                     row.style.gridTemplateColumns = "";
                 });
             }
             tracklistContainer.removeAttribute('data-sp-grid');
+            tracklistContainer.removeAttribute('data-sp-max-cols');
             let gridStyleEl = document.getElementById("sort-play-album-grid-style");
             if (gridStyleEl) gridStyleEl.innerHTML = "";
             return;
@@ -64224,23 +64225,53 @@ shadowRoot.innerHTML = `
             default: expectedHeaderText = "Plays";
         }
 
-        let currentHeaderCols = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
-        let maxCols = currentHeaderCols.length;
-        if (!headerRow.querySelector('.sort-play-album-col-header')) maxCols += 1;
-        
-        const sampleRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow');
-        for (let i = 0; i < sampleRows.length; i++) {
-            let rowCols = Array.from(sampleRows[i].querySelectorAll(':scope > [role="gridcell"]')).filter(el => el.style.display !== 'none').length;
-            if (!sampleRows[i].querySelector('.sort-play-album-col')) rowCols += 1;
-            if (rowCols > maxCols) maxCols = rowCols;
+        let existingHeader = headerRow.querySelector('.sort-play-album-col-header');
+        const nativeHeaders = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => !el.classList.contains('sort-play-album-col-header'));
+        const endHeaderCell = headerRow.querySelector('.main-trackList-rowSectionEnd') || nativeHeaders[nativeHeaders.length - 1];
+
+        if (!existingHeader) {
+            existingHeader = document.createElement('div');
+            existingHeader.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
+            existingHeader.innerHTML = `<button class="sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
+            existingHeader.setAttribute('role', 'columnheader');
+            existingHeader.firstChild.onclick = (e) => showColumnSelector(e, 'album');
+            existingHeader.style.cssText = 'display: flex; justify-content: center; align-items: center;';
+
+            if (endHeaderCell) {
+                headerRow.insertBefore(existingHeader, endHeaderCell);
+            } else {
+                headerRow.appendChild(existingHeader);
+            }
+        } else {
+            if (endHeaderCell && existingHeader.nextElementSibling !== endHeaderCell) {
+                headerRow.insertBefore(existingHeader, endHeaderCell);
+            }
+            const headerTextSpan = existingHeader.querySelector('span');
+            if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
+                headerTextSpan.innerText = expectedHeaderText;
+                const allCells = tracklistContainer.querySelectorAll('.sort-play-album-col .sort-play-data');
+                allCells.forEach(cell => {
+                    cell.textContent = "";
+                    delete cell.dataset.spProcessed;
+                    cell.onclick = null;
+                    cell.onmouseover = null;
+                    cell.onmouseout = null;
+                    cell.style.cursor = "default";
+                    cell.style.textDecoration = "none";
+                    cell.removeAttribute('title');
+                });
+            }
         }
-        
-        let storedMax = parseInt(tracklistContainer.getAttribute('data-sp-max-cols') || "0");
-        if (maxCols > storedMax) {
-            storedMax = maxCols;
-            tracklistContainer.setAttribute('data-sp-max-cols', storedMax.toString());
-        }
-        maxCols = Math.max(maxCols, storedMax);
+
+        const currentHeaderCols = Array.from(headerRow.querySelectorAll('[role="columnheader"]')).filter(el => el.style.display !== 'none');
+        currentHeaderCols.forEach((el, idx) => {
+            const colIdx = (idx + 1).toString();
+            if (el.getAttribute('aria-colindex') !== colIdx) el.setAttribute('aria-colindex', colIdx);
+        });
+
+        const maxCols = currentHeaderCols.length;
+        tracklistContainer.setAttribute('data-sp-max-cols', maxCols.toString());
+        tracklistContainer.setAttribute('aria-colcount', maxCols.toString());
 
         let newGridTemplate = "[index] 16px [first] 6fr ";
         for (let i = 1; i < maxCols - 2; i++) {
@@ -64258,42 +64289,6 @@ shadowRoot.innerHTML = `
         const cssString = `html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListHeaderRow, html body div[role="grid"][data-sp-grid="album"] [role="row"]:has([role="columnheader"]), html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRow, html body div.main-trackList-trackList[data-sp-grid="album"] .main-trackList-trackListRowGrid, html body div[role="grid"][data-sp-grid="album"] [role="row"] > div:has([role="gridcell"]) { grid-template-columns: ${newGridTemplate} !important; }`;
         if (gridStyleEl.innerHTML !== cssString) {
             gridStyleEl.innerHTML = cssString;
-        }
-
-        let existingHeader = headerRow.querySelector('.sort-play-album-col-header');
-
-        if (!existingHeader) {
-            tracklistContainer.setAttribute('aria-colcount', '5');
-            existingHeader = document.createElement('div');
-            existingHeader.className = 'main-trackList-rowSectionVariable sort-play-album-col-header';
-            existingHeader.innerHTML = `<button class="sort-play-column-header"><span class="encore-text-body-small">${expectedHeaderText}</span></button>`;
-            existingHeader.setAttribute('role', 'columnheader');
-            existingHeader.firstChild.onclick = (e) => showColumnSelector(e, 'album');
-            existingHeader.setAttribute('aria-colindex', '4');
-            existingHeader.style.cssText = 'display: flex; justify-content: center; align-items: center;';
-
-            const playsHeaderCell = headerRow.querySelector('[role="columnheader"][aria-colindex="3"]');
-            if (playsHeaderCell) {
-                playsHeaderCell.after(existingHeader);
-                const lastHeaderCell = headerRow.querySelector('.main-trackList-rowSectionEnd');
-                if (lastHeaderCell) lastHeaderCell.setAttribute('aria-colindex', '5');
-            }
-        } else {
-            const headerTextSpan = existingHeader.querySelector('span');
-            if (headerTextSpan && headerTextSpan.innerText !== expectedHeaderText) {
-                headerTextSpan.innerText = expectedHeaderText;
-                const allCells = tracklistContainer.querySelectorAll('.sort-play-album-col .sort-play-data');
-                allCells.forEach(cell => {
-                    cell.textContent = "";
-                    delete cell.dataset.spProcessed;
-                    cell.onclick = null;
-                    cell.onmouseover = null;
-                    cell.onmouseout = null;
-                    cell.style.cursor = "default";
-                    cell.style.textDecoration = "none";
-                    cell.removeAttribute('title');
-                });
-            }
         }
         
         const headerIndex = Array.from(headerRow.children).indexOf(existingHeader);
@@ -64328,15 +64323,15 @@ shadowRoot.innerHTML = `
                 newCell.style.justifyContent = 'center';
             }
             
-            const targetNode = cellContainer.children[headerIndex];
-            if (targetNode && newCell !== targetNode) {
-                cellContainer.insertBefore(newCell, targetNode);
-            } else if (!targetNode && newCell.parentElement !== cellContainer) {
+            const endCell = cellContainer.querySelector('.main-trackList-rowSectionEnd') || Array.from(cellContainer.children).filter(el => !el.classList.contains('sort-play-album-col')).pop();
+            if (endCell && newCell.nextElementSibling !== endCell) {
+                cellContainer.insertBefore(newCell, endCell);
+            } else if (!endCell && newCell.parentElement !== cellContainer) {
                 cellContainer.appendChild(newCell);
             }
             
-            const lastCell = cellContainer.querySelector('.main-trackList-rowSectionEnd');
-            if (lastCell) lastCell.setAttribute('aria-colindex', '5');
+            newCell.setAttribute('aria-colindex', (headerIndex + 1).toString());
+            if (endCell) endCell.setAttribute('aria-colindex', maxCols.toString());
         });
 
         loadAdditionalColumnData(tracklistContainer);
@@ -64369,16 +64364,15 @@ shadowRoot.innerHTML = `
         if (!showArtistColumn || !currentUri || !URI.isArtist(currentUri)) {
             const existingHeaderWrapper = tracklistContainer.querySelector('.sort-play-artist-header-wrapper');
             if (existingHeaderWrapper) {
-                const trackRows = tracklistContainer.querySelectorAll('.main-trackList-trackListRow.main-trackList-trackListRowGrid');
                 existingHeaderWrapper.remove();
                 tracklistContainer.setAttribute('aria-colcount', '4');
-                trackRows.forEach(row => {
-                    const cell = row.querySelector('.sort-play-artist-col');
-                    if (cell) cell.remove();
+                tracklistContainer.querySelectorAll('.sort-play-artist-col, .sort-play-artist-skeleton-col').forEach(el => el.remove());
+                tracklistContainer.querySelectorAll('.main-trackList-trackListRow, [role="row"]').forEach(row => {
                     row.style.gridTemplateColumns = "";
                 });
             }
             tracklistContainer.removeAttribute('data-sp-grid');
+            tracklistContainer.removeAttribute('data-sp-max-cols');
             let gridStyleEl = document.getElementById("sort-play-artist-grid-style");
             if (gridStyleEl) gridStyleEl.innerHTML = "";
             return;
@@ -64514,14 +64508,13 @@ shadowRoot.innerHTML = `
                 newCell.style.justifyContent = 'center';
             }
 
-            const targetNode = headerIndex !== -1 ? cellContainer.children[headerIndex] : null;
-            if (targetNode && newCell !== targetNode) {
-                cellContainer.insertBefore(newCell, targetNode);
-            } else if (!targetNode && newCell.parentElement !== cellContainer) {
+            const endSection = cellContainer.querySelector('.main-trackList-rowSectionEnd') || Array.from(cellContainer.children).filter(el => !el.classList.contains('sort-play-artist-col')).pop();
+            if (endSection && newCell.nextElementSibling !== endSection) {
+                cellContainer.insertBefore(newCell, endSection);
+            } else if (!endSection && newCell.parentElement !== cellContainer) {
                 cellContainer.appendChild(newCell);
             }
             
-            const endSection = cellContainer.querySelector('.main-trackList-rowSectionEnd');
             if (endSection) endSection.setAttribute('aria-colindex', '5');
         });
 
