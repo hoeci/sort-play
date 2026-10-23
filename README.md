@@ -58,7 +58,7 @@ Clean, filter, and audit your playlists with quick actions and interactive revie
 *   **Remove Duplicates:** Opens an interactive Duplicate Tracks Manager to audit, preview, and resolve duplicates before modifying your library:
     *   **Exact Duplicates:** Verified duplicates pre-selected for removal, sorted from highest review priority down to 100% identical recordings.
     *   **Possible Duplicates:** Detects potential duplicate candidates, ranked from most likely duplicate to least with similarity explanation badges.
-    *   **Interactive Review Tools:** Side-by-side play count, ISRC, and duration comparisons, built-in audio previewing, a "Keep ⇄" swap button to choose which version stays, and flexible actions to remove duplicates from playlists, unlike them from Liked Songs, create a clean deduplicated copy, archive duplicates into a backup playlist, or export metadata as Text/JSON.
+    *   **Interactive Review Tools:** Side-by-side play count, ISRC, and duration comparisons, in-row like buttons, built-in audio previewing, a "Keep ⇄" swap button to choose which version stays, and flexible actions to remove duplicates from playlists, unlike them from Liked Songs, create a clean deduplicated copy, archive duplicates into a backup playlist, or export metadata as Text/JSON.
 *   **Remove Unavailable:** Find and manage regionally unplayable (greyed-out) songs through a dedicated audit modal. Selectively remove them from your playlist, unlike them from Liked Songs, create a clean copy, export as Text/JSON, or archive them into a backup playlist.
 *   **One Track per Artist:** Keep only a single track for each unique artist, automatically prioritizing the most played or most popular track.
 *   **Liked Status:**
@@ -86,11 +86,12 @@ Enhance your music views with more information.
 </details>
 
 <details>
-<summary><b>➕ UI & Enhancements</b> - Genre tags, now playing data, old like button, and other tweaks.</summary>
+<summary><b>➕ Player & Utilities</b> - Genre tags & blacklist, now playing data, old like button, and more.</summary>
 <br>
 
 *   **Old Like Button:** Brings back the heart (♥) icon for liking songs in track lists, the player bar, Now Playing sidebar, and track previews feed, with intelligent ISRC matching. Right-clicking the like button opens a menu to view alternate versions, jump to albums, and copy ISRCs.
 *   **Interactive Genre Tags:** Displays clickable tags on the Now Playing bar and Artist pages linking to EveryNoise playlists or Spotify search.
+*   **Genre Blacklist:** Automatically skips tracks during playback based on customizable blacklisted genres. Configure rules with exact or partial matching, related subgenre expansion, per-rule genre exceptions, interactive match previews, multi-source detection (Spotify, Last.fm, EveryNoise, Deezer), and Liked Songs protection.
 *   **Now Playing Data:** Display extra track info (Release Date, Play Count, BPM, Key, Energy, Scrobbles, etc.) directly in the player bar next to the title or artist, with customizable formatting and separators.
 *   **Configurable Sorting:** Easily toggle ascending/descending order for all applicable sort types.
 *   **Last.fm Overrides Manager:** Manually fix mismatched Last.fm track links, edit overrides, and import/export override backups as JSON.
