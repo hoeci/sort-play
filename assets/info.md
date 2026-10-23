@@ -25,8 +25,8 @@ Clean, filter, and audit your playlists with one-click actions and interactive r
 ### ➕ Extra Data Columns
 Add up to two extra data columns to playlists or search views, and one to albums/artists. Display Play Count, Release Date, True Release Date, Scrobbles, My Scrobbles, Last Scrobbled, Key, BPM, Popularity, Energy, Danceability, Valence, and DJ Info with custom formatting.
 
-### ➕ UI & Enhancements
-Old Like Button returns the heart icon in track lists, player bar, and Now Playing views. Display Now Playing Data and Interactive Genre Tags in the player bar.
+### ➕ Player & Utilities
+Old Like Button returns the heart icon in track lists, player bar, and Now Playing views. Display Now Playing Data and Interactive Genre Tags in the player bar. Genre Blacklist automatically skips tracks during playback based on customizable genre rules.
 
 ### ➕ Context Menus
 Access powerful tools directly from Spotify's right-click menus. View detailed multi-source genres for tracks, playlists, and albums, explore Last.fm stats, generate a full artist discography, or instantly shuffle and play any playlist or album.
