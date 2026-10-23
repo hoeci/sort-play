@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.10.0";
+  const SORT_PLAY_VERSION = "6.10.1";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -20858,18 +20858,36 @@
 
         const currentUriAtStart = track.uri;
 
-        const npWidget = document.querySelector('.main-nowPlayingWidget-nowPlaying, [data-testid="now-playing-widget"]');
+        const npWidget = document.querySelector(
+            '.main-nowPlayingWidget-nowPlaying, [data-testid="now-playing-widget"], [data-testid="now-playing-widget-v2"], .main-nowPlayingBar-left [data-testid^="now-playing-widget"]:not([data-testid*="byline"]), [data-testid="now-playing-bar"] [data-testid^="now-playing-widget"]:not([data-testid*="byline"]), .main-nowPlayingBar-left [role="region"][aria-label]'
+        );
         let targetContainer = document.querySelector(".main-nowPlayingWidget-trackInfo, .main-trackInfo-container");
         if (!targetContainer && npWidget) {
-            const titleLink = Array.from(npWidget.querySelectorAll('a')).find(a => {
+            const links = Array.from(npWidget.querySelectorAll('a'));
+            const titleLink = links.find(a => {
                 const h = a.getAttribute('href') || '';
                 return h.startsWith('/album/') || h.startsWith('/track/');
             });
-            let p = titleLink?.parentElement;
-            while (p && p.parentElement && p.parentElement !== npWidget) {
-                p = p.parentElement;
+            const artistNode = links.find(a => (a.getAttribute('href') || '').startsWith('/artist/')) || npWidget.querySelector('[data-testid$="-byline"]');
+
+            if (titleLink && artistNode) {
+                let curr = titleLink.parentElement;
+                while (curr && curr !== npWidget) {
+                    if (curr.contains(artistNode)) {
+                        targetContainer = curr;
+                        break;
+                    }
+                    curr = curr.parentElement;
+                }
             }
-            targetContainer = p || null;
+
+            if (!targetContainer && titleLink) {
+                let p = titleLink.parentElement;
+                while (p && p.parentElement && p.parentElement !== npWidget) {
+                    p = p.parentElement;
+                }
+                targetContainer = p || null;
+            }
         }
 
         if (!targetContainer) {
@@ -21572,27 +21590,42 @@
 
         if (Spicetify.URI.isLocalTrack(track.uri)) return;
 
-        const npWidget = document.querySelector('.main-nowPlayingWidget-nowPlaying, [data-testid="now-playing-widget"]');
+        const npWidget = document.querySelector(
+            '.main-nowPlayingWidget-nowPlaying, [data-testid="now-playing-widget"], [data-testid="now-playing-widget-v2"], .main-nowPlayingBar-left [data-testid^="now-playing-widget"]:not([data-testid*="byline"]), [data-testid="now-playing-bar"] [data-testid^="now-playing-widget"]:not([data-testid*="byline"]), .main-nowPlayingBar-left [role="region"][aria-label]'
+        );
         let currentTitleParent = document.querySelector('.main-trackInfo-name');
         let currentArtistParent = document.querySelector('.main-trackInfo-artists');
 
-        if (!currentTitleParent && npWidget) {
-            const titleLink = Array.from(npWidget.querySelectorAll('a')).find(a => {
+        if ((!currentTitleParent || !currentArtistParent) && npWidget) {
+            const links = Array.from(npWidget.querySelectorAll('a'));
+            const titleLink = links.find(a => {
                 const h = a.getAttribute('href') || '';
                 return h.startsWith('/album/') || h.startsWith('/track/');
             });
-            if (titleLink) {
-                const trackInfoContainer = Array.from(npWidget.children).find(c => c.contains(titleLink));
-                const titleRow = trackInfoContainer ? Array.from(trackInfoContainer.children).find(c => c.contains(titleLink)) : null;
+            const artistLink = links.find(a => (a.getAttribute('href') || '').startsWith('/artist/'));
+            const artistNode = artistLink || npWidget.querySelector('[data-testid$="-byline"]');
+
+            let trackInfoContainer = null;
+            if (titleLink && artistNode) {
+                let curr = titleLink.parentElement;
+                while (curr && curr !== npWidget) {
+                    if (curr.contains(artistNode)) {
+                        trackInfoContainer = curr;
+                        break;
+                    }
+                    curr = curr.parentElement;
+                }
+            }
+
+            if (!currentTitleParent && titleLink) {
+                const infoRoot = trackInfoContainer || Array.from(npWidget.children).find(c => c.contains(titleLink));
+                const titleRow = infoRoot ? Array.from(infoRoot.children).find(c => c.contains(titleLink)) : null;
                 currentTitleParent = titleRow || titleLink.closest('[data-encore-id="text"]') || titleLink.parentElement;
             }
-        }
-        if (!currentArtistParent && npWidget) {
-            const artistLink = Array.from(npWidget.querySelectorAll('a')).find(a => (a.getAttribute('href') || '').startsWith('/artist/'));
-            if (artistLink) {
-                const trackInfoContainer = Array.from(npWidget.children).find(c => c.contains(artistLink));
-                const artistRow = trackInfoContainer ? Array.from(trackInfoContainer.children).find(c => c.contains(artistLink)) : null;
-                currentArtistParent = artistRow || artistLink.closest('[data-encore-id="text"]') || artistLink.parentElement;
+            if (!currentArtistParent && artistNode) {
+                const infoRoot = trackInfoContainer || Array.from(npWidget.children).find(c => c.contains(artistNode));
+                const artistRow = infoRoot ? Array.from(infoRoot.children).find(c => c.contains(artistNode)) : null;
+                currentArtistParent = artistRow || artistNode.closest('[data-encore-id="text"]') || artistNode.parentElement;
             }
         }
 
@@ -21756,7 +21789,7 @@
                 if (track.uri !== Spicetify.Player.data?.item?.uri) return;
             
                 if (!isTitleSection && !nowPlayingConfig.title.enabled) {
-                    const titleContainer = document.querySelector('.main-trackInfo-name') || (npWidget ? Array.from(npWidget.querySelectorAll('a')).find(a => {
+                    const titleContainer = currentTitleParent || document.querySelector('.main-trackInfo-name') || (npWidget ? Array.from(npWidget.querySelectorAll('a')).find(a => {
                         const h = a.getAttribute('href') || '';
                         return h.startsWith('/album/') || h.startsWith('/track/');
                     })?.closest('[data-encore-id="text"]') : null);
@@ -21792,9 +21825,11 @@
                             break;
                         }
                     }
-                    if (container.closest('[data-testid="now-playing-widget"]')) {
-                        contentReady = true;
-                        break;
+                    if ((npWidget && npWidget.contains(container)) || container.closest('[data-testid^="now-playing-widget"]')) {
+                        if (!targetText || checkAttempts >= 6) {
+                            contentReady = true;
+                            break;
+                        }
                     }
                     if (!overlayElement) {
                         await new Promise(r => setTimeout(r, 50));
@@ -21810,7 +21845,7 @@
                 const textWrapper = container.querySelector('.main-trackInfo-overlay') || 
                     (isTitleSection 
                         ? Array.from(container.children).find(c => c.querySelector && c.querySelector('a[href^="/album/"], a[href^="/track/"]'))
-                        : Array.from(container.children).find(c => c.querySelector && c.querySelector('a[href^="/artist/"]'))) || 
+                        : Array.from(container.children).find(c => c.querySelector && c.querySelector('a[href^="/artist/"], [data-testid$="-byline"]'))) || 
                     container.firstElementChild;
 
                 if (textWrapper && textWrapper !== container) {
@@ -49833,7 +49868,7 @@ shadowRoot.innerHTML = `
       let weightSum = 0;
 
       const resolveModel = (name, allowMoodFallback = false) => {
-          if (!name) return null;
+          if (!name || (!Spicetify.URI.isLocal(uri) && artists.length === 0)) return null;
           const lower = name.toLowerCase().trim();
           const norm = normalizeGenre(lower);
           const compactKey = getNormalizedGenreKey(lower);
@@ -60567,12 +60602,6 @@ shadowRoot.innerHTML = `
   }
 
   function getTrackDataObject(trackElement) {
-    const reactPropsKey = Object.keys(trackElement).find(key => key.startsWith("__reactProps$"));
-    if (!reactPropsKey) return null;
-
-    const props = trackElement[reactPropsKey];
-    if (!props) return null;
-
     const findItem = (obj, maxDepth = 10, visited = new Set()) => {
         if (!obj || typeof obj !== 'object' || maxDepth <= 0 || visited.has(obj)) return null;
         visited.add(obj);
@@ -60591,25 +60620,111 @@ shadowRoot.innerHTML = `
         return null;
     };
 
-    const trackData = findItem(props);
-    if (trackData) return trackData;
+    const reactPropsKey = Object.keys(trackElement).find(key => key.startsWith("__reactProps$"));
+    if (reactPropsKey && trackElement[reactPropsKey]) {
+        const props = trackElement[reactPropsKey];
+        const trackData = findItem(props);
+        if (trackData) return trackData;
 
-    const potentialPaths = [
-        () => props.children?.props?.item,
-        () => props.children?.[0]?.props?.item,
-        () => props.children?.props?.value?.item,
-        () => props.children?.[0]?.props?.children?.props?.item,
-        () => props.children?.[0]?.props?.children?.[0]?.props?.item,
-    ];
+        const potentialPaths = [
+            () => props.children?.props?.item,
+            () => props.children?.[0]?.props?.item,
+            () => props.children?.props?.value?.item,
+            () => props.children?.[0]?.props?.children?.props?.item,
+            () => props.children?.[0]?.props?.children?.[0]?.props?.item,
+        ];
 
-    for (const getPath of potentialPaths) {
-        const trackData = getPath();
-        if (trackData && trackData.uri && trackData.name && trackData.artists) {
-            return trackData;
+        for (const getPath of potentialPaths) {
+            const data = getPath();
+            if (data && data.uri && data.name && data.artists) {
+                return data;
+            }
         }
     }
-    
-    return null;
+
+    const fiberKey = Object.keys(trackElement).find(k => k.startsWith("__reactFiber$"));
+    if (fiberKey) {
+        let curr = trackElement[fiberKey];
+        let depth = 0;
+        while (curr && depth < 10) {
+            const found = findItem(curr.memoizedProps, 6) || findItem(curr.pendingProps, 6);
+            if (found) return found;
+            curr = curr.return;
+            depth++;
+        }
+    }
+
+    const uri = trackElement.dataset?.spTrackUri || getTracklistTrackUri(trackElement);
+    if (!uri) return null;
+
+    let name = "";
+    let artistName = "";
+    let albumName = "";
+    let albumUri = null;
+    let artists = [];
+
+    if (Spicetify.URI.isLocal(uri)) {
+        const parts = uri.split(':');
+        const decodePart = (str) => {
+            if (!str) return "";
+            try { return decodeURIComponent(str.replace(/\+/g, ' ')).trim(); } catch (_) { return str.replace(/\+/g, ' ').trim(); }
+        };
+        if (parts.length >= 6) {
+            artistName = decodePart(parts[2]);
+            albumName = decodePart(parts[3]);
+            name = decodePart(parts[4]);
+        }
+    }
+
+    const titleCell = trackElement.querySelector('[role="gridcell"][aria-colindex="2"], .main-trackList-rowSectionStart');
+    if (titleCell) {
+        if (!name) {
+            const titleEl = titleCell.querySelector('a[href*="/track/"], .main-trackList-rowTitle, div[data-encore-id="text"], .standalone-ellipsis-one-line');
+            if (titleEl) name = titleEl.textContent.trim();
+        }
+        const artistLinks = Array.from(titleCell.querySelectorAll('a[href*="/artist/"]'));
+        if (artistLinks.length > 0) {
+            artists = artistLinks.map(a => {
+                const aId = a.getAttribute('href')?.split('/artist/')[1]?.split('?')[0];
+                return { name: a.textContent.trim(), id: aId || null, uri: aId ? `spotify:artist:${aId}` : null };
+            }).filter(a => a.name);
+        } else if (!artistName) {
+            const leafTexts = Array.from(titleCell.querySelectorAll('[data-encore-id="text"]'))
+                .filter(el => !el.querySelector('[data-encore-id="text"]') && el.textContent.trim());
+            if (leafTexts.length > 1) {
+                artistName = leafTexts[leafTexts.length - 1].textContent.trim();
+            }
+        }
+    }
+
+    if (artists.length === 0 && artistName) {
+        artists = [{ name: artistName }];
+    }
+
+    const albumCell = trackElement.querySelector('[role="gridcell"][aria-colindex="3"]');
+    if (albumCell) {
+        const albumLink = albumCell.querySelector('a[href*="/album/"]');
+        if (albumLink) {
+            albumName = albumLink.textContent.trim();
+            const albId = albumLink.getAttribute('href')?.split('/album/')[1]?.split('?')[0];
+            if (albId) albumUri = `spotify:album:${albId}`;
+        } else if (!albumName && Spicetify.URI.isLocal(uri)) {
+            albumName = albumCell.textContent.trim();
+        }
+    }
+
+    if (!name) return null;
+
+    return {
+        uri,
+        name,
+        artists,
+        album: {
+            name: albumName || "Unknown Album",
+            uri: albumUri,
+            id: albumUri ? albumUri.split(':')[2] : null
+        }
+    };
   }
 
   let lfmOverridesCache = null;
@@ -62739,7 +62854,7 @@ shadowRoot.innerHTML = `
             if (trackData) {
                 const rawArtistName = trackData.artists[0]?.name || "";
                 const cleanedArtistName = rawArtistName.includes(';') ? rawArtistName.split(';')[0].trim() : rawArtistName;
-                const localTrackInfo = { name: trackData.name, artistName: cleanedArtistName, artists: [{ name: cleanedArtistName }], uri: trackData.uri };
+                const localTrackInfo = { name: trackData.name, artistName: cleanedArtistName, artists: [{ name: cleanedArtistName }], albumName: trackData.album?.name, uri: trackData.uri };
 
                 const localPromises = columnConfigs.map(async (config) => {
                     const dataElement = trackElement.querySelector(config.dataSelector);
@@ -62755,7 +62870,9 @@ shadowRoot.innerHTML = `
                                 showLastFmDetailsModal({
                                     name: localTrackInfo.name,
                                     artistName: localTrackInfo.artistName,
-                                    artists: localTrackInfo.artists
+                                    artists: localTrackInfo.artists,
+                                    albumName: localTrackInfo.albumName,
+                                    uri: localTrackInfo.uri
                                 });
                             };
                             dataElement.onmouseover = () => { dataElement.style.textDecoration = "underline"; dataElement.style.color = "var(--spice-text)"; };
@@ -64528,23 +64645,11 @@ shadowRoot.innerHTML = `
         return;
       }
 
-      if (isLocalFilesPage(currentUri)) {
-        const legacyBar = mainView.querySelector(".main-actionBar-ActionBarRow");
-        if (legacyBar) {
-          const controlsContainer = legacyBar.querySelector("div:last-child");
-          if (controlsContainer && !controlsContainer.contains(mainButton)) {
-            mainButton.style.marginLeft = ""; 
-            mainButton.style.marginRight = "8px";
-            controlsContainer.firstChild ? controlsContainer.insertBefore(mainButton, controlsContainer.firstChild) : controlsContainer.appendChild(mainButton);
-            return;
-          }
-        }
-      }
-
       const actionBar = mainView.querySelector('[data-testid="action-bar-row"]') || mainView.querySelector('[data-testid="action-bar"]');
       if (actionBar) {
         const searchBox = actionBar.querySelector('[role="search"], button[aria-label*="Search in playlist" i], [data-testid="search-input"], .x-filterBox-expandButton');
-        const sortBtn = actionBar.querySelector('[role="combobox"], .x-sortBox-sortDropdown, [data-sortbox-label="true"]');
+        const rawSortBtn = actionBar.querySelector('[role="combobox"], .x-sortBox-sortDropdown, [data-sortbox-label="true"]');
+        const sortBtn = rawSortBtn ? (rawSortBtn.closest('button, [role="combobox"]') || rawSortBtn) : null;
 
         const searchTarget = searchBox ? (searchBox.closest('[role="search"]') || searchBox) : null;
         const target = searchTarget || sortBtn;
@@ -64559,7 +64664,22 @@ shadowRoot.innerHTML = `
           inserted = true;
           return;
         }
+      }
 
+      if (isLocalFilesPage(currentUri)) {
+        const legacyBar = mainView.querySelector(".main-actionBar-ActionBarRow");
+        if (legacyBar) {
+          const controlsContainer = legacyBar.querySelector("div:last-child");
+          if (controlsContainer && !controlsContainer.contains(mainButton)) {
+            mainButton.style.marginLeft = ""; 
+            mainButton.style.marginRight = "8px";
+            controlsContainer.firstChild ? controlsContainer.insertBefore(mainButton, controlsContainer.firstChild) : controlsContainer.appendChild(mainButton);
+            return;
+          }
+        }
+      }
+
+      if (actionBar) {
         if (!actionBar.contains(mainButton)) {
           mainButton.style.marginLeft = "auto";
           mainButton.style.marginRight = "16px";
@@ -64602,6 +64722,29 @@ shadowRoot.innerHTML = `
         return;
       }
 
+      const actionBar = mainView.querySelector('[data-testid="action-bar-row"]') || mainView.querySelector('[data-testid="action-bar"]');
+      if (actionBar) {
+        const rawSortCombobox = actionBar.querySelector('[role="combobox"], .x-sortBox-sortDropdown, [data-sortbox-label="true"]');
+        const sortCombobox = rawSortCombobox ? (rawSortCombobox.closest('button, [role="combobox"]') || rawSortCombobox) : null;
+        if (sortCombobox && sortCombobox.parentElement) {
+          const parentContainer = sortCombobox.parentElement;
+          const parentDisplay = window.getComputedStyle(parentContainer).display;
+          if (parentDisplay !== 'flex' && parentDisplay !== 'inline-flex') {
+            parentContainer.style.display = 'flex';
+            parentContainer.style.alignItems = 'center';
+            parentContainer.style.gap = '8px';
+          }
+          if (!parentContainer.contains(mainButton) || mainButton.nextElementSibling !== sortCombobox) {
+            mainButton.style.marginLeft = "";
+            mainButton.style.marginRight = "";
+            mainButton.style.alignSelf = "center";
+            parentContainer.insertBefore(mainButton, sortCombobox);
+          }
+          inserted = true;
+          return;
+        }
+      }
+
       const legacyBar = mainView.querySelector(".main-actionBar-ActionBarRow");
       if (legacyBar) {
         if (!legacyBar.contains(mainButton)) {
@@ -64612,20 +64755,7 @@ shadowRoot.innerHTML = `
         return;
       }
 
-      const actionBar = mainView.querySelector('[data-testid="action-bar-row"]') || mainView.querySelector('[data-testid="action-bar"]');
       if (actionBar) {
-        const sortCombobox = actionBar.querySelector('[role="combobox"], .x-sortBox-sortDropdown, [data-sortbox-label="true"]');
-        if (sortCombobox && sortCombobox.parentElement) {
-          if (!sortCombobox.parentElement.contains(mainButton) || mainButton.nextElementSibling !== sortCombobox) {
-            mainButton.style.marginLeft = "";
-            mainButton.style.marginRight = "";
-            mainButton.style.alignSelf = "center";
-            sortCombobox.parentElement.insertBefore(mainButton, sortCombobox);
-          }
-          inserted = true;
-          return;
-        }
-
         if (!actionBar.contains(mainButton)) {
           mainButton.style.marginLeft = "auto";
           mainButton.style.marginRight = "16px";
@@ -66082,7 +66212,14 @@ shadowRoot.innerHTML = `
 
         try {
             const uri = uriParam || Spicetify.Player.data?.item?.uri || "";
-            const getNowPlayingWidget = () => document.querySelector(".main-nowPlayingWidget-nowPlaying, [data-testid=\"now-playing-widget\"]");
+            const getNowPlayingWidget = () => document.querySelector(
+                '.main-nowPlayingWidget-nowPlaying, [data-testid="now-playing-widget"], [data-testid="now-playing-widget-v2"], .main-nowPlayingBar-left [data-testid^="now-playing-widget"]:not([data-testid*="byline"]), [data-testid="now-playing-bar"] [data-testid^="now-playing-widget"]:not([data-testid*="byline"]), .main-nowPlayingBar-left [role="region"][aria-label]'
+            );
+            const getNativeActionButton = (widget) =>
+                widget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button:not(.sort-play-like-button)') ||
+                widget.querySelector('button[aria-label*="Liked Songs"]:not(.sort-play-like-button), button[aria-label*="Add to playlist"]:not(.sort-play-like-button)') ||
+                widget.querySelector('button[aria-checked="false"]:not(.sort-play-like-button), button[aria-checked="true"]:not(.sort-play-like-button)');
+
             let nowPlayingWidget = getNowPlayingWidget();
             let container = nowPlayingWidget ? nowPlayingWidget.querySelector(".likeControl-wrapper") : null;
 
@@ -66104,9 +66241,7 @@ shadowRoot.innerHTML = `
                     continue;
                 }
 
-                const nativeLikeButton = nowPlayingWidget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button') || 
-                                         nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
-                                         nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
+                const nativeLikeButton = getNativeActionButton(nowPlayingWidget);
                 if (!nativeLikeButton || !nativeLikeButton.parentNode) {
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                     retryDelay = Math.min(retryDelay * 2, 3000);
@@ -66125,9 +66260,7 @@ shadowRoot.innerHTML = `
                     container = document.createElement("div");
                     container.className = "likeControl-wrapper";
                     
-                    const currentNativeLikeButton = nowPlayingWidget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button') || 
-                                                    nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
-                                                    nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
+                    const currentNativeLikeButton = getNativeActionButton(nowPlayingWidget);
                     if (!currentNativeLikeButton || !currentNativeLikeButton.parentNode) {
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
                         retryDelay = Math.min(retryDelay * 2, 3000);
@@ -66144,9 +66277,7 @@ shadowRoot.innerHTML = `
                 }
                 
                 try {
-                    const currentNativeLikeButton = nowPlayingWidget.querySelector('.main-nowPlayingWidget-actionButtonWrapper button') || 
-                                                    nowPlayingWidget.querySelector('button[aria-label*="Liked Songs"], button[aria-label*="Add to playlist"]') || 
-                                                    nowPlayingWidget.querySelector('button[aria-checked="false"], button[aria-checked="true"]');
+                    const currentNativeLikeButton = getNativeActionButton(nowPlayingWidget);
                     if (!currentNativeLikeButton) {
                         await new Promise(resolve => setTimeout(resolve, retryDelay));
                         retryDelay = Math.min(retryDelay * 2, 3000);
@@ -66320,6 +66451,11 @@ shadowRoot.innerHTML = `
                 .replace(/\bencore-internal-color-text-subdued\b/g, '')
                 .trim();
 
+            const parentStyle = window.getComputedStyle(btnWrapper.parentElement);
+            const hasNativeSpacing = (parseFloat(parentStyle.columnGap) || parseFloat(parentStyle.gap) || 0) > 0 ||
+                (shareBtn && (parseFloat(window.getComputedStyle(shareBtn).marginRight) || 0) > 0) ||
+                cleanClassList.includes('condensed-all');
+
             Spicetify.ReactDOM.render(
                 Spicetify.React.createElement(LikeButton, {
                     uri: uri,
@@ -66327,7 +66463,7 @@ shadowRoot.innerHTML = `
                     classList: cleanClassList,
                     size: measuredSize,
                     dynamicSizeSelector: null,
-                    buttonStyle: { marginRight: "0px", marginLeft: "10px" },
+                    buttonStyle: { marginRight: "0px", marginLeft: hasNativeSpacing ? "-2px" : "10px" },
                     currentAlbum: { id: curAlbumId, name: curAlbumName },
                     artistIds: curArtistIds
                 }),
@@ -66541,7 +66677,7 @@ shadowRoot.innerHTML = `
             }
         } catch (e) {}
     
-        while (!Spicetify?.Player?.data?.item || !document.querySelector(".main-nowPlayingWidget-nowPlaying, [data-testid=\"now-playing-widget\"]")) {
+        while (!Spicetify?.Player?.data?.item || !document.querySelector('.main-nowPlayingWidget-nowPlaying, [data-testid="now-playing-widget"], [data-testid="now-playing-widget-v2"], .main-nowPlayingBar-left [data-testid^="now-playing-widget"]:not([data-testid*="byline"]), .main-nowPlayingBar-left [role="region"][aria-label]')) {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
@@ -66771,7 +66907,7 @@ shadowRoot.innerHTML = `
         likeButton_tracklistObserver = new MutationObserver((mutations) => {
             const currentUri = Spicetify.Player.data?.item?.uri;
             if (currentUri && (currentUri.startsWith("spotify:track:") || currentUri.startsWith("spotify:local:"))) {
-                const npBar = document.querySelector(".main-nowPlayingWidget-nowPlaying .likeControl-wrapper, [data-testid=\"now-playing-widget\"] .likeControl-wrapper");
+                const npBar = document.querySelector('.main-nowPlayingWidget-nowPlaying .likeControl-wrapper, [data-testid^="now-playing-widget"] .likeControl-wrapper, .main-nowPlayingBar-left .likeControl-wrapper');
                 if (likeButtonConfig.nowPlayingBar && (!npBar || npBar.dataset.renderedUri !== currentUri)) {
                     mountLikeButton(currentUri);
                 }
@@ -66921,12 +67057,13 @@ shadowRoot.innerHTML = `
                       }
                   }
                   
+                  const testId = node.getAttribute?.('data-testid');
                   if (
-                      node.getAttribute?.('data-testid') === 'action-bar-row' || 
-                      node.getAttribute?.('data-testid') === 'entity-header' ||
-                      node.getAttribute?.('data-testid') === 'adaptiveEntityTitle' ||
+                      testId === 'action-bar-row' || 
+                      testId === 'entity-header' ||
+                      testId === 'adaptiveEntityTitle' ||
                       node.getAttribute?.('role') === 'grid' || 
-                      node.getAttribute?.('data-testid') === 'now-playing-widget' ||
+                      (testId && testId.startsWith('now-playing-widget')) ||
                       node.getAttribute?.('role') === 'combobox' ||
                       node.getAttribute?.('role') === 'search'
                   ) {
@@ -66935,7 +67072,7 @@ shadowRoot.innerHTML = `
                   }
 
                   if (node.querySelector) {
-                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter, .x-sortBox-sortDropdown, [data-testid="action-bar-row"], [data-testid="entity-header"], [data-testid="adaptiveEntityTitle"], .main-entityHeader-container, .main-entityHeader-headerText, [role="grid"], [data-testid="now-playing-widget"], [role="combobox"], [role="search"]')) {
+                      if (node.querySelector('.main-trackList-indexable, .main-actionBar-ActionBarRow, .playlist-playlist-searchBoxContainer, .playlist-playlist-searchBoxContainerFlexCenter, .x-sortBox-sortDropdown, [data-testid="action-bar-row"], [data-testid="entity-header"], [data-testid="adaptiveEntityTitle"], .main-entityHeader-container, .main-entityHeader-headerText, [role="grid"], [data-testid^="now-playing-widget"], [role="combobox"], [role="search"]')) {
                           shouldTrigger = true;
                           break;
                       }
