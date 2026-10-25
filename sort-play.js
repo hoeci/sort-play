@@ -12,7 +12,7 @@
     return;
   }
 
-  const SORT_PLAY_VERSION = "6.10.2";
+  const SORT_PLAY_VERSION = "6.10.3";
 
   const SCHEDULER_INTERVAL_MINUTES = 10;
   const RANDOM_GENRE_HISTORY_SIZE = 200;
@@ -20836,6 +20836,7 @@
   async function displayGenreTags() {
     if (!showGenreTags || !showGenreTagsNowPlaying) {
         document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
+        document.querySelectorAll('.sort-play-track-info').forEach(el => el.classList.remove('sort-play-track-info'));
         return;
     }
 
@@ -20853,6 +20854,7 @@
 
         if (Spicetify.URI.isLocalTrack(track.uri)) {
             document.querySelectorAll('.sort-play-genre-container').forEach(el => el.remove());
+            document.querySelectorAll('.sort-play-track-info').forEach(el => el.classList.remove('sort-play-track-info'));
             return;
         }
 
@@ -20913,6 +20915,7 @@
             }
         }
 
+        targetContainer.classList.add('sort-play-track-info');
         let genreContainer = targetContainer.querySelector('.sort-play-genre-container');
         if (!genreContainer) {
             genreContainer = document.createElement("div");
@@ -41287,6 +41290,14 @@ shadowRoot.innerHTML = `
     #sort-play-now-playing-data:hover .sort-play-np-value {
         text-decoration: underline;
     }
+    button:where(.likeControl-wrapper-npv > .sort-play-like-button) { margin-inline-start: var(--sp-npv-like-ml, 10px); }
+    .sort-play-genre-container:empty { display: none !important; }
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)) { line-height: 15px; }
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) { gap: 0px !important; row-gap: 0px !important; line-height: 13px !important; }
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-encore-id="text"] { line-height: 14px !important; }
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-testid="context-item-info-quality"], .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) [data-testid="context-item-info-quality"] button { line-height: 13px !important; padding-top: 0px !important; padding-bottom: 0px !important; min-height: 0px !important; height: auto !important; }
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) .sort-play-np-container > span { line-height: 14px !important; }
+    .sort-play-track-info:has(> .sort-play-genre-container:not(:empty)):has([data-testid="context-item-info-quality"]) > .sort-play-genre-container { line-height: 14px !important; margin-top: 0px !important; }
     .sort-play-column-header {
         cursor: pointer !important;
         background: transparent !important;
@@ -66357,7 +66368,8 @@ shadowRoot.innerHTML = `
             if (!btn) return true;
             if (btn.classList.contains('sort-play-like-button') || btn.closest('.likeControl-wrapper-npv')) return true;
             const label = (btn.getAttribute('aria-label') || '').toLowerCase();
-            if (label.includes('hide') || label.includes('close') || label.includes('expand') || label.includes('collapse') || label.includes('more options') || label.includes('queue') || label.includes('show all')) return true;
+            const isHeaderHide = label.includes('hide') && !label.includes('playlist') && !label.includes('song') && !label.includes('track');
+            if (isHeaderHide || label.includes('close') || label.includes('expand') || label.includes('collapse') || label.includes('more options') || label.includes('queue') || label.includes('show all')) return true;
             if (btn.closest('.main-nowPlayingView-headerWrapper, .WU7dTdoNA51czqGivj8T, .cciGXIL4H2kwy1SlhFHO, header, [data-testid="now-playing-view-header"]')) return true;
             return false;
         };
@@ -66445,9 +66457,13 @@ shadowRoot.innerHTML = `
                 .trim();
 
             const parentStyle = window.getComputedStyle(btnWrapper.parentElement);
+            const templateStyle = window.getComputedStyle(templateBtn);
+            const wrapperMarginLeft = parseFloat(window.getComputedStyle(btnWrapper).marginLeft) || 0;
             const hasNativeSpacing = (parseFloat(parentStyle.columnGap) || parseFloat(parentStyle.gap) || 0) > 0 ||
                 (shareBtn && (parseFloat(window.getComputedStyle(shareBtn).marginRight) || 0) > 0) ||
-                cleanClassList.includes('condensed-all');
+                ((parseFloat(templateStyle.paddingLeft) || 0) + (parseFloat(templateStyle.paddingRight) || 0)) >= 8;
+            const fallbackMarginLeft = wrapperMarginLeft > 0 ? `${wrapperMarginLeft}px` : "10px";
+            container.style.setProperty("--sp-npv-like-ml", hasNativeSpacing ? "-2px" : fallbackMarginLeft);
 
             Spicetify.ReactDOM.render(
                 Spicetify.React.createElement(LikeButton, {
@@ -66456,7 +66472,7 @@ shadowRoot.innerHTML = `
                     classList: cleanClassList,
                     size: measuredSize,
                     dynamicSizeSelector: null,
-                    buttonStyle: { marginRight: "0px", marginLeft: hasNativeSpacing ? "-2px" : "10px" },
+                    buttonStyle: { marginRight: "0px" },
                     currentAlbum: { id: curAlbumId, name: curAlbumName },
                     artistIds: curArtistIds
                 }),
